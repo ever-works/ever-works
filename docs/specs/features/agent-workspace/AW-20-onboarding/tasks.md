@@ -559,7 +559,7 @@ pre-existing onboarding specs.
 ## Phase 2 — The checklist
 
 Ships: the five milestones evaluated server-side, the **Get set up** card on Home,
-the `/get-started` page, and the guided first mission, first decision and first
+the `/get-started` page, and the guided first task, first decision and first
 schedule.
 
 ---
@@ -643,15 +643,18 @@ run, and `down()` leaves no orphan index.
 **Phase:** P2
 **Create:**
 - `apps/api/src/onboarding/dto/onboarding-checklist.dto.ts` —
-  `SkipMilestoneDto` (`@IsIn(ONBOARDING_MILESTONES)`), `StarterMissionDto`
+  `SkipMilestoneDto` (`@IsIn(ONBOARDING_MILESTONES)`), `StarterTaskDto`
   (`briefId?`, `customBrief?` with `@MaxLength(10_000)`, `laneKey`),
-  `StarterScheduleDto` (`@IsIn(['dailyDigest','weeklyMissionReview','coordinatorCadence'])`),
+  `StarterScheduleDto` (`@IsIn(['dailyDigest','weeklyReview','coordinatorCadence'])`),
   and the response DTOs from
   [plan.md §4.2](./plan.md#42-checklist--appsapisrconboardingonboarding-checklistcontrollerts).
 - `apps/api/src/onboarding/starter-briefs.catalog.ts` — a frozen array of exactly
-  **3** entries, each `{ id, laneKey, titleKey, bodyKey, acceptanceChecks }`,
+  **3** entries, each `{ id, laneKey, titleKey, bodyKey, doneWhenKey }`,
   each body under **280** characters. The catalogue holds i18n **keys**, not
-  English text: the rendered copy lives in `en.json`.
+  English text: the rendered copy lives in `en.json`. `doneWhenKey` resolves to
+  the brief's "finished =" sentence and is appended to the Task's `description`;
+  it is **not** written to `Task.acceptanceChecks`, which is a runnable command
+  gate rather than prose.
 
 **Done when:** a spec asserts the catalogue has exactly 3 entries, each under 280
 characters when resolved against `en.json`, and each `laneKey` in
@@ -671,12 +674,14 @@ characters when resolved against `en.json`, and each `laneKey` in
   (FR-59); results cached for **60 s** on `evaluatedAt` and bypassed after any
   mutation (FR-38).
 - `skip` / `unskip` / `hide` / `show` / `dismiss` — all idempotent.
-- `startStarterMission(...)` — the six ordered steps in
-  [plan.md §4.3](./plan.md#43-the-starter-mission), **keeping** the Mission and
-  Task when assignment fails and reporting `dispatched: false`.
+- `startStarterTask(...)` — the five ordered steps in
+  [plan.md §4.3](./plan.md#43-the-starter-task), creating exactly **one Task**
+  and no Mission, **keeping** the Task when assignment fails and reporting
+  `dispatched: false`.
 - `armStarterSchedule(...)` — the three options in
   [plan.md §4.4](./plan.md#44-the-starter-schedule), each through the platform's
-  existing mechanism for that kind of work. No new scheduling mechanism.
+  existing mechanism for that kind of work — two recurring Tasks and one Agent
+  heartbeat cadence. No new scheduling mechanism, and no Mission.
 
 Never write a milestone to `done` from a client-supplied value (FR-36).
 
@@ -705,9 +710,9 @@ controller and the service.
 **Create:**
 - `apps/api/src/onboarding/onboarding-checklist.controller.spec.ts` — lazy row
   creation on first read; skip/unskip changing the denominator; hide/show/dismiss
-  transitions; `private, no-store`; the starter-mission handler creating Mission +
-  Task + assignment and keeping both when assignment fails; the 10 000-character
-  rejection; each of the three schedule options arming.
+  transitions; `private, no-store`; the starter-task handler creating exactly one
+  Task and no Mission, assigning it, and keeping the Task when assignment fails;
+  the 10 000-character rejection; each of the three schedule options arming.
 - `apps/api/src/onboarding/onboarding-checklist.service.spec.ts` — each milestone
   flipping only on its documented fact; a rejected read yielding `unknown` and
   never `done`; the 60 s cache honoured and bypassed after a mutation; an
@@ -853,8 +858,8 @@ under 280 characters in English.
 - `apps/web/e2e/onboarding-first-hour-checklist.spec.ts` — the card renders on
   Home with the right count; skip and undo; hide and reopen from Help; the
   `/get-started` page renders every section.
-- `apps/web/e2e/onboarding-first-mission.spec.ts` — picking a brief creates a
-  Mission and a Task, assigns it, and links to the Mission.
+- `apps/web/e2e/onboarding-first-task.spec.ts` — picking a brief creates exactly
+  one Task, assigns it to the lane agent, and links to it.
 
 **Done when:** `cd apps/web && pnpm test:e2e` is green.
 

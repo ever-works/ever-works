@@ -62,7 +62,9 @@ the truth about money without stopping anything new.*
   (`idx_plugin_usage_meter_user_occurred`, `idx_plugin_usage_pricekey_user_occurred`,
   `idx_plugin_usage_mission_occurred`).
   **Done when**: the entity compiles, `missionId` carries **no** `@ManyToOne` (audit rows must
-  outlive a deleted Mission, matching the existing `agentId` / `taskId` / `runId` comments).
+  outlive a deleted Mission, matching the existing `agentId` / `taskId` / `runId` comments), and
+  its doc comment states that the value is `tasks.missionId` for the row's Task — never
+  `agents.missionId`.
 
 - [ ] **T4. Migration `AddUsageMeterClassification` + the Mission backfill.**
   **Create** `apps/api/src/migrations/1789700000000-AddUsageMeterClassification.ts`.
@@ -122,16 +124,27 @@ the truth about money without stopping anything new.*
   asserts a meter for each.
 
 - [ ] **T8. Stamp it on the single write path.**
+  **Modify** `packages/plugin/src/facades/facade-options.interface.ts` to add one optional
+  `missionId` beside the existing `agentId` / `taskId` / `runId`, documented as "the Mission of
+  the run's Task (`tasks.missionId`), resolved once at dispatch — never `agents.missionId`".
   **Modify** `packages/agent/src/usage/plugin-usage.service.ts` — `record()` calls the classifier,
-  writes the seven new fields, and increments the two counters (`usage.payer.unconfirmed_ratio`,
+  writes the seven new fields (five from the classifier, `outcome` from the caller, and
+  `missionId` passed straight through — `record()` never reads the `tasks` table itself), and
+  increments the two counters (`usage.payer.unconfirmed_ratio`,
   `usage.pricebook.miss`). A classifier throw is caught: the row is still written with
   `payer = 'unconfirmed'`, `meter = 'credits'`, and the counter incremented. A repository throw
   still returns `null` exactly as today.
   **Modify** `packages/agent/src/usage/usage.module.ts` to provide the classifier.
   **Test**: extend `packages/agent/src/usage/plugin-usage.service.spec.ts`.
-  **Done when**: no facade change is required for a row to carry a meter.
+  **Done when**: no facade change is required for a row to carry a meter, and a seeded run whose
+  Task belongs to a Mission produces rows carrying that Mission while a heartbeat run with no Task
+  produces rows with `missionId = null`.
 
-- [ ] **T9. Facades pass outcome and payer.**
+- [ ] **T9. Facades pass outcome and payer; the run adapters pass the Task's Mission.**
+  **Modify** `packages/agent/src/agents/agent-ai-dispatch-facade.ts` and
+  `packages/agent/src/agents/agent-plugin-tools-facade.ts` — the two adapters that already
+  thread `taskId` / `runId` into `FacadeOptions` — to resolve the run's Task once and thread
+  its `missionId` alongside them. Heartbeat and chat runs with no Task leave it undefined.
   **Modify** `packages/agent/src/facades/search.facade.ts`,
   `packages/agent/src/facades/screenshot.facade.ts`,
   `packages/agent/src/facades/content-extractor.facade.ts` and
@@ -215,7 +228,9 @@ the truth about money without stopping anything new.*
   closed `[section]` allowlist — nothing else about that route changes.
   **Test**: extend `apps/api/src/subscriptions/costs.controller.spec.ts`; add a case to the web
   route's own unit spec asserting an unknown section still 404s before reaching the API.
-  **Done when**: `GET /api/usage/costs/by-mission?window=30d` returns ranked Mission rows.
+  **Done when**: `GET /api/usage/costs/by-mission?window=30d` returns ranked Mission rows, each
+  totalling the spend of the Tasks that Mission raised, plus a `Not in a Mission` row for spend
+  whose Run had no Task or whose Task names no Mission.
 
 - [ ] **T16. The Home line endpoint.**
   **Modify** `apps/api/src/budgets/account-usage.controller.ts` to add

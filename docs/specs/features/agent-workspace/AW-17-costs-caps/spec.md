@@ -12,7 +12,7 @@
 **Last updated:** 2026-09-06
 **Size:** L · **Blocking dependency:** AW-09 (Runs and receipts) · **Related:** AW-16 (Model
 accounts), AW-05 (Agent email), AW-19 (Home), AW-24 (Safety rails)
-**Extends (existing Ever Works nouns):** Run · Agent · Mission · Task · Work · Organization ·
+**Extends (existing Ever Works nouns):** Run · Agent · Task · Mission · Work · Organization ·
 Plugin / Connection · Node / Fleet · Schedule
 
 ---
@@ -121,7 +121,7 @@ question the owner did not ask — *"what is your total?"* — and leaves the re
 | "How much of this was thinking, and how much was searching?" | Open **Usage → Costs**, read the per-model panel, and mentally subtract it from the total. | Everything platform-metered — model calls, searches, screenshots, extraction, email — converts into **one** credits debit at settlement. There is no stored fact saying which kind of spend a credit paid for, so the subtraction is not available even in principle. |
 | "What does a web search cost?" | Nothing. | Credits are derived after the fact from a provider's own cost multiplied by a service margin. There is no price a user can read before spending. The Usage page tells them a margin percentage exists; it cannot tell them what any single call costs. |
 | "Was that call served from cache? Did I pay for the one that failed?" | Nothing. | The Costs page carries a standing note that cached reads are not recorded at all. Failed provider calls that still returned pricing are metered like successful ones. |
-| "Which Mission ate the budget?" | Nothing. | Usage groups by day, model, Agent and Work. There is no Mission axis, because a usage row is not attributed to a Mission. |
+| "Which Mission ate the budget?" | Nothing. | Usage groups by day, model, Agent and Work. A usage row records the Run and the Task the call was made for, but nothing carries the Mission that Task belongs to, so spend never reaches the standing initiative that caused it. |
 | "I brought my own key — am I being charged twice?" | Trust the label. | Own-key spend is exempted from the debit, but the exemption is worked out **at settlement time** by re-resolving where each plugin's key came from. When that resolution is unavailable the platform bills the full platform rate, and the code says so in a standing TODO. The owner has no way to see which of the two happened. |
 | "Cap my Agent at $20 a month." | They cannot. | The per-Agent budget exists as a data shape with no way to set it, and the one place that reads it computes current spend as a hard-coded zero. The Agent's Budgets tab therefore always says "no cap configured", and always will. |
 | "Cap my Workspace." | Set an unrelated cap on the autonomous Work Agent's own preferences page, which governs a different engine. | There is no Workspace-wide ceiling on agent spend anywhere in Billing or Usage. |
@@ -141,7 +141,7 @@ question the owner did not ask — *"what is your total?"* — and leaves the re
    Workspace-wide ceiling. Auto-recharge has no monthly maximum. Every one of these is a
    promise the product makes in its own vocabulary and does not keep.
 4. **Money is not where the work is.** Spend lives three clicks deep in Settings while the work
-   lives on Home, on the Mission board and in Runs. An owner should meet the number where they
+   lives on Home, on the Task board and in Runs. An owner should meet the number where they
    already are.
 
 ### 2.4 Why this epic is additive only
@@ -168,7 +168,7 @@ $30.00 in add-ons"*, with the credit figure showing a proportion bar against the
 allowance, and choosing any of the three numbers opens Billing scrolled to that meter.
 
 **S2 — Finding out what a tool costs before using it.**
-**Given** an owner about to give an Agent a research Mission,
+**Given** an owner about to hand an Agent a research Task,
 **when** they open **Billing → Credit price list**,
 **then** they see every priced kind of call with its credit cost, the current price-list version,
 and the date it took effect — for example *"Web search — 2 credits per query"*, *"Page fetch —
@@ -180,10 +180,10 @@ results and failed calls cost nothing.
 **when** the owner opens **Billing** and looks at *Where the credits went*,
 **then** they see three ranked breakdowns — by tool, by Agent, by Mission — each showing credits,
 share of the period, and a jump into the filtered Run list, and the by-Mission list names the one
-Mission that consumed 61% of the month.
+Mission whose Tasks consumed 61% of the month.
 
 **S4 — Itemised on the Run.**
-**Given** one Run inside that Mission,
+**Given** one Run from a Task that Mission raised,
 **when** the owner opens its receipt,
 **then** the cost block lists, per meter: model usage as tokens and the provider account that
 paid for it, credits as one line per priced call kind with counts and credits, and add-ons as
@@ -390,8 +390,19 @@ Every requirement below is testable. Every default, limit, threshold and cadence
   it MUST NOT be billed at a guessed rate.
 - **FR-5** Every stored unit of spend MUST record: its meter, the kind of call, the count of
   units, the outcome (`ok`, `cached`, `failed`), the credits charged, the price-list version used,
-  the paying account class (`workspace-owned` or `platform`), and its attribution to a Run, an
-  Agent, a Task, a Mission and a Work where each exists.
+  the paying account class (`workspace-owned` or `platform`), and its attribution to the Run that
+  made the call, the Agent that made it, and the Task that Run was dispatched for, where each
+  exists.
+- **FR-5a** Spend MUST roll up along exactly one path. A metered call attributes to its **Run**;
+  a Run's spend rolls up to the **Task** it was dispatched for; and a Task's spend rolls up to the
+  **Work**, **Mission**, **Idea**, **Team** and **Goal** its own owner fields name — any
+  combination of which may be set, and each of which is independently filterable. The Mission a
+  unit of spend belongs to MUST therefore be the Mission of its Task, MUST be captured when the
+  usage record is written, and MUST NOT be derived any other way — in particular not from the
+  Agent that happened to run it, which may be scoped to a different Mission.
+- **FR-5b** Spend from a Run with no Task — a heartbeat, a chat, or a call made outside the
+  Task path — has no Mission. It MUST be reported under an explicit *"Not in a Mission"* row
+  and MUST NOT be attributed to a Mission by inference.
 - **FR-6** Where the paying account class cannot be determined, the record MUST be classified to
   **credits**, MUST be marked as unconfirmed, and MUST be surfaced as unconfirmed on the receipt.
 - **FR-7** Unconfirmed classification MUST be counted; when it exceeds **0.1%** of metered calls
@@ -490,7 +501,9 @@ Every requirement below is testable. Every default, limit, threshold and cadence
 - **FR-42** A cap MUST be a **refusal**. When a cap is reached, the next unit of spend that would
   cross it MUST NOT happen. A cap MUST NOT be satisfiable by a notification alone.
 - **FR-43** Caps MUST be settable at four scopes: **Workspace**, **Agent**, **Mission**, and
-  **Work**. Each cap MUST name the meter it governs, or **all meters**.
+  **Work**. Each cap MUST name the meter it governs, or **all meters**. A **Mission** cap MUST be
+  measured over the spend that reaches that Mission through its Tasks (FR-5a). A Mission is a cap
+  target because it is a standing source of Tasks, never because it is itself a unit of work.
 - **FR-44** A cap MUST have a period of **one calendar month** in the Workspace's timezone, with
   per-Agent caps additionally supporting **hour**, **day** and **week** rolling periods anchored
   at creation.
@@ -581,7 +594,8 @@ Every requirement below is testable. Every default, limit, threshold and cadence
   permission as making the change directly.
 - **FR-79** Usage MUST be exportable as CSV for the selected period, streamed rather than
   buffered, one row per usage record, including meter, kind of call, outcome, units, credits,
-  money, price-list version, and the Run, Agent, Task, Mission and Work it is attributed to.
+  money, price-list version, the Run, Agent and Task it is attributed to, and the Mission and
+  Work that Task rolls up to.
 - **FR-80** Export MUST be refused, before any work starts, when the resolved set exceeds
   **50,000** rows or the period exceeds **92** days.
 - **FR-81** Itemised usage MUST be retained for **12 months**; settled totals on Runs, the credit
@@ -613,14 +627,14 @@ Every requirement below is testable. Every default, limit, threshold and cadence
 | Concept | New or existing | What it is here |
 | --- | --- | --- |
 | **Meter** | **New — a classification, not a table** | Which of the three ways a unit of spend is paid for. Stored on every usage record. It is a property of spend, not an object anyone creates, so it gets no surface of its own beyond the three cards. |
-| **Usage record** | **Existing** (extended) | One metered call, already attributed to user, Work, Agent, Task and Run and already carrying capability, Plugin, model, units and cost. This epic adds the meter, the kind of call, the outcome, the credits charged, the price-list version, the paying account class, and Mission attribution. |
+| **Usage record** | **Existing** (extended) | One metered call, already attributed to user, Work, Agent, Task and Run and already carrying capability, Plugin, model, units and cost. This epic adds the meter, the kind of call, the outcome, the credits charged, the price-list version, the paying account class, and the Mission of the row's Task — captured when the row is written, not joined at read time. |
 | **Credit price list** | **New — a published, versioned price table, not a stored record** | What each kind of call costs in credits. Server-authored and versioned; a price change is a shipped change, never a setting an operator can drift. Read by the pricing path and by the product surface that displays it. |
 | **Credit ledger entry** | **Existing** | The append-only record of every credit movement, with allowance buckets that expire and purchased buckets that never do. Unchanged in shape; this epic only narrows what produces a consumption entry. |
 | **Spend cap** | **Existing concept, new Workspace scope** | The user-facing name for the whole family of ceilings. Ever Works already has per-Work and per-Agent budgets; this epic adds the missing Workspace scope, adds a meter to all of them, and makes all of them refuse. "Budget" remains the name in the data model — this introduces no second word for an existing thing. |
 | **Add-on** | **New** | A flat recurring charge for a provisioned unit — an agent inbox, a dedicated Node, an extra seat — with a code, a quantity, a unit price, a reference to the unit, and a state. |
 | **Billing profile** | **Existing** (extended) | The bridge between the Workspace and the payment provider, already holding the payment-method summary and auto-recharge state. Gains the auto-recharge monthly maximum and the amount used against it this month. |
 | **Model account** | **Existing (AW-16)** | A Workspace-owned provider credential. Read here to determine the paying account class and to label the receipt. This epic never creates or edits one. |
-| **Run / Agent / Mission / Task / Work / Node** | **Existing** | Attribution targets, cap targets and link targets. Read unchanged. |
+| **Run / Agent / Task / Mission / Work / Node** | **Existing** | Attribution and cap targets. A Run and its Task are attributed directly; the Mission, Work and Goal are reached through that Task's own owner fields (FR-5a). All read unchanged. |
 | **Approval / Escalation ("My Decisions")** | **Existing (AW-03)** | The queue a cap stop and an auto-recharge ceiling stop raise a decision into. This epic writes items; it does not change the queue. |
 
 > **New nouns introduced by this epic:** **Meter**, **Credit price list**, **Add-on**. Each is a
@@ -772,6 +786,9 @@ Empty: `No model usage yet. Connect a model account to keep this at zero on our 
 Copy: `Where the credits went` · `By tool` · `By Agent` · `By Mission` ·
 `Everything else` · `Not in a Mission` · `See all {dimension}` ·
 `{credits} credits are from records made before meters were separated (before {date}).`
+
+A Mission row totals the spend of the Tasks that Mission raised. `Not in a Mission` totals the
+rest — Tasks filed against no Mission, and Runs that had no Task at all (heartbeats and chats).
 
 Each row is a link into the Run list filtered to that dimension and period.
 Loading: three skeleton lists. One panel failing shows
@@ -943,15 +960,15 @@ Reconciliation mismatch: `These lines do not add up to the settled total. We are
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │  ⛔ Nova reached its $20.00 monthly cap                            2 minutes ago      │
 │                                                                                      │
-│  Nova stopped mid-run on "Weekly market scan". Its credits cap for September is       │
-│  fully used. The cap resets on 1 October.                                             │
+│  Nova stopped mid-run on "Pull this week's listing data". Its credits cap            │
+│  for September is fully used. The cap resets on 1 October.                           │
 │                                                                                      │
 │  [ Raise to $30.00 ]   [ Raise to a different amount ]   [ Leave it stopped ]        │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Copy: `{target} reached its {amount} {period} cap` ·
-`{target} stopped mid-run on "{mission}". Its {meter} cap for {month} is fully used. The cap resets on {date}.` ·
+`{target} stopped mid-run on "{task}". Its {meter} cap for {month} is fully used. The cap resets on {date}.` ·
 `Raise to {amount}` · `Raise to a different amount` · `Leave it stopped`
 
 The auto-recharge variant:
@@ -1005,8 +1022,9 @@ without relying on colour.
   Untouched.
 - **Retiring pay-as-you-go.** The existing overflow-metering path and its monthly cap keep
   working exactly as they do. This epic does not migrate anyone onto or off it.
-- **Cost forecasting, anomaly detection, and pre-Mission estimates.** Worth doing; not here.
-  See §9.
+- **Cost forecasting, anomaly detection, and pre-flight cost estimates.** Estimating what a Task
+  will cost before it is dispatched, or what a Mission will cost across the Tasks it raises, is
+  worth doing; not here. See §9.
 - **Per-Agent or per-Mission invoicing, chargeback or cost centres.** Breakdown is reporting,
   not billing.
 - **Changing the credit conversion rate or the pack prices.** They are what they are.
@@ -1022,6 +1040,8 @@ A reviewer can run this list against the merged change.
 **The three meters**
 - [ ] Every usage record written after the cut-over carries a meter, an outcome, a credits
       charged figure, a price-list version and a paying account class.
+- [ ] A usage record's Mission is the Mission of the Task its Run served, captured when the row is
+      written and never taken from the Agent; a record whose Run had no Task carries no Mission.
 - [ ] A call paid with a Workspace-owned credential produces `0` credits and no ledger movement.
 - [ ] A call paid with a platform credential produces credits exactly equal to the price list.
 - [ ] No usage record can be produced that belongs to two meters, and none with no meter.
@@ -1076,6 +1096,8 @@ A reviewer can run this list against the merged change.
 - [ ] Billing shows three meter cards, and each states what it pays for.
 - [ ] By-tool, by-Agent and by-Mission breakdowns each render, rank, cap at 10 rows plus
       "Everything else", and link into the filtered Run list.
+- [ ] Spend on a Task raised by a Mission appears in that Mission's row; spend from a Run with no
+      Task appears under "Not in a Mission" and in no Mission's row.
 - [ ] A Run receipt itemises credits per kind of call with charged, cached and failed counts.
 - [ ] The itemisation reconciles to the settled total, or says it does not.
 - [ ] A non-terminal Run's figures are labelled "so far".
@@ -1112,10 +1134,10 @@ A reviewer can run this list against the merged change.
 - **[NEEDS CLARIFICATION: the legacy usage ledger]** A second, schedule-run-centric usage ledger
   exists alongside the credit ledger. Is it still written to? If it is, it needs a meter too; if it
   is not, it should be documented as historical before this epic's reporting is trusted.
-- **[NEEDS CLARIFICATION: pre-Mission estimates]** Should a Mission show an estimated credit cost
-  before it is started, based on its Tasks and the price list? It is the natural next step from a
-  published price list, it is the thing most likely to prevent a surprise, and it is deliberately
-  not in this epic.
+- **[NEEDS CLARIFICATION: pre-flight estimates]** Should a Task show an estimated credit cost
+  before it is dispatched, and should a Mission show the same estimate rolled up over the Tasks it
+  has raised? It is the natural next step from a published price list, it is the thing most likely
+  to prevent a surprise, and it is deliberately not in this epic.
 - **[NEEDS CLARIFICATION: cache ownership]** The 24-hour freshness window is stated per kind of
   call. Is the cache scoped per Workspace, per Organization, or global? A global cache is cheaper
   and faster; a Workspace-scoped one avoids one Workspace's query telling another Workspace's

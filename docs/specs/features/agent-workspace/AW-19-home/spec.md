@@ -10,7 +10,7 @@
 **Status**: `Draft`
 **Created**: 2026-09-06
 **Last updated**: 2026-09-06
-**Size**: M · **Blocking dependencies**: [AW-02](../AW-02-mission-board/), [AW-03](../AW-03-decision-queue/), [AW-04](../AW-04-live-feed/)
+**Size**: M · **Blocking dependencies**: [AW-02](../AW-02-task-board/), [AW-03](../AW-03-decision-queue/), [AW-04](../AW-04-live-feed/)
 **Extends**: the dashboard home route (existing) · **Adjacent epics**: [AW-01 Command palette](../AW-01-command-palette/), [AW-09 Runs & receipts](../AW-09-runs-receipts/), [AW-10 Schedules & calendar](../AW-10-schedules-calendar/), [AW-17 Costs & caps](../AW-17-costs-caps/), [AW-20 Onboarding](../AW-20-onboarding/)
 
 > **Additive by default (program rule #1).** Nothing here deletes a block, a
@@ -83,7 +83,7 @@ that is on Home today survives, collapsed under one heading below the fold.
 Three phases, each independently shippable:
 
 - **P1 — The morning read.** One composed summary behind the whole stack; the six
-  read blocks; the composer creating a Mission from one sentence; the existing
+  read blocks; the composer creating a Task from one sentence; the existing
   blocks relocated below.
 - **P2 — Answer without leaving.** Inline answering in the decision block, the
   Home preference row (hide / reorder blocks), the composer's expand-to-full-form.
@@ -98,8 +98,8 @@ A user signs in and lands on **Home**. A greeting names them and the date; one
 line under it scores the night — how many things need them, how many agents are
 working, how much finished, how much failed. A single text field invites one
 sentence, and one sentence is enough: typing *"summarise every item added this
-week and flag the duplicates"* and pressing Enter creates a Mission, which appears
-on the Mission board and starts being picked up.
+week and flag the duplicates"* and pressing Enter creates a Task, which lands in
+the Task board's Backlog lane and starts being picked up.
 
 Below the composer, a **Needs you** block lists everything blocked on a human
 decision — an approval an agent is waiting on, a question it asked, an escalation
@@ -141,7 +141,7 @@ run. It is asked once at 07:00 and three or four more times before lunch.
 | Who is working right now | Open the runs list and filter it to `running`; Home shows a *total* Agents count and an *active* Agents count, neither of which is "executing right now" |
 | What is scheduled today | Read the coming-up block, which knows only two of the seven kinds of schedule the platform actually runs and shows the next three regardless of whether they are today or next month |
 | What I have spent this week | Open settings, then Usage & Credits, then the Costs tab, then change the window to 7 days — four navigations from Home |
-| Hand out a new piece of work | Click "+ New", choose between Mission / Idea / Work, fill a form, submit |
+| Hand out a new piece of work | Open the "+ New" page, pick the right one out of eleven chips (Task, Mission, Idea, Agent and the Work kinds), fill a form, submit |
 
 ### 2.3 The five concrete gaps
 
@@ -195,14 +195,14 @@ Working-now panel names both running agents with the line each last reported —
 all of it rendered from a single server read that completes in under 800 ms at
 the 95th percentile.
 
-**S2 — One sentence becomes a Mission.**
+**S2 — One sentence becomes a Task.**
 **Given** a user on Home,
 **when** they type `summarise every item added this week and flag the duplicates`
 into the composer and press `Enter`,
 **then** the field clears, a chip appears immediately under the composer reading
-`Mission created — summarise every item added this week…` with a link, a Mission is
+`Task created — summarise every item added this week…` with a link, a Task is
 created with that sentence as its description and a title derived from it, the
-Mission appears on the Mission board's Backlog lane, and the chip stays visible
+Task lands in the Task board's Backlog lane, and the chip stays visible
 for 60 seconds so the user can click through without hunting for it.
 
 **S3 — Answering a decision without leaving Home.**
@@ -298,11 +298,11 @@ elsewhere.`, and the block's count is recomputed from a fresh read rather than
 decremented locally.
 
 **S13 — The composer submission fails.**
-**Given** the create call fails (offline, 500, or the create throttle of 30 per
+**Given** the create call fails (offline, 500, or the create throttle of 60 per
 minute is exceeded),
 **when** the user pressed Enter,
 **then** the typed sentence is **not** lost — it stays in the field, the field
-regains focus, an inline message under it reads `Couldn't create that Mission.`
+regains focus, an inline message under it reads `Couldn't create that Task.`
 with a `Try again` button, and on a throttle response specifically the message
 reads `You're creating these faster than we can file them. Try again in a
 minute.`
@@ -353,8 +353,8 @@ hidden) is per-user and therefore unchanged by the switch.
 **S20 — Background job runtime is not configured.**
 **Given** an installation with no configured job runtime, so nothing will ever be
 dispatched,
-**when** the user creates a Mission from the composer,
-**then** the Mission is still created (creation does not need the runtime), the
+**when** the user creates a Task from the composer,
+**then** the Task is still created (creation does not need the runtime), the
 existing degraded-runtime banner is already on screen above the content, and the
 composer's success chip carries the suffix `— nothing will run until a job
 runtime is configured` linking to that setting.
@@ -400,16 +400,19 @@ that backs the morning stack.
   also submits. `Escape` blurs the field without clearing it.
 - **FR-8.** Submission requires a trimmed length of at least **3** characters.
   The hard maximum is **2000** characters; a live counter appears at **1800**.
-- **FR-9.** A successful submission creates one **Mission** with:
-  `type = one-shot`, `description` = the submitted text verbatim,
-  `title` = the first sentence of the text truncated at the last word boundary
-  at or before **80** characters, with a single trailing `…` when truncated.
-  When the first sentence is shorter than 3 characters the whole text is used.
+- **FR-9.** A successful submission creates one **Task** with:
+  `status = backlog` (the create default, so it lands in the board's first lane),
+  the platform's default priority, and no owner scope — it is filed against no
+  Work, Mission, Idea, Team, Agent or Goal. `description` = the submitted text
+  verbatim; `title` = the first sentence of the text truncated at the last word
+  boundary at or before **80** characters, with a single trailing `…` when
+  truncated. When the first sentence is shorter than 3 characters the whole text
+  is used.
 - **FR-10.** The field is cleared and disabled while the create is in flight, and
   re-enabled on either outcome. A submission may not be issued while another is
   in flight.
 - **FR-11.** Up to **3** success chips are kept under the composer, newest first,
-  each for **60** seconds, each linking to the created Mission.
+  each for **60** seconds, each linking to the created Task.
 - **FR-12.** On failure the typed text is preserved, focus returns to the field,
   and an inline error with a `Try again` action is shown. A throttle response
   produces a distinct message (§6.9).
@@ -418,8 +421,8 @@ that backs the morning stack.
   never sent anywhere until the user submits.
 - **FR-14.** The composer functions when the summary read failed (§S11) — it has
   no dependency on it.
-- **FR-15.** An `Expand` affordance opens the full Mission creation form with the
-  typed text pre-filled into the description (P2).
+- **FR-15.** An `Expand` affordance opens the full Task creation form with the
+  typed text carried into it (P2).
 
 ### 4.3 Needs you
 
@@ -576,8 +579,8 @@ that backs the morning stack.
   ships it opens **My Decisions**. The block itself does not change shape.
 - **FR-66.** Before AW-04 ships, `Open the feed →` opens the activity page. After
   AW-04 ships it opens the Live Feed.
-- **FR-67.** Before AW-02 ships, the composer's success chip links to the Mission
-  detail page. After AW-02 ships it links to the Mission board with that Mission
+- **FR-67.** Before AW-02 ships, the composer's success chip links to the Task
+  detail page. After AW-02 ships it links to the Task board with that Task
   focused.
 - **FR-68.** Home never becomes the only surface for any signal it shows. Every
   block links to the surface that owns its data.
@@ -593,7 +596,7 @@ that backs the morning stack.
 - **FR-71.** Answering a decision from Home is subject to exactly the same rules,
   throttles and audit as answering it from its own surface. Home adds no new
   authority.
-- **FR-72.** The composer creates work under the same throttle the Mission create
+- **FR-72.** The composer creates work under the same throttle the Task create
   path already enforces; Home does not raise it.
 - **FR-73.** Nothing in the summary contains a secret, a credential, or a raw
   error body from an external service. Failure messages are message keys, not
@@ -625,8 +628,8 @@ that backs the morning stack.
 
 | Concept | What Home reads from it | Changed by this epic? |
 | --- | --- | --- |
-| **Mission** | Created by the composer; nothing else | No — creation uses the existing path |
-| **Task** | Blocked Tasks feed the "Also broken" list | No |
+| **Task** | Created by the composer; blocked Tasks feed the "Also broken" list | No — creation uses the existing path |
+| **Mission** | A standing initiative, never a unit of work here: a scheduled Mission's tick is one of the seven kinds in the Today panel, and the existing Missions preview keeps its own read below the fold | No |
 | **Agent** | Names in the decision rows and the working-now rows; errored Agents feed "Also broken" | No |
 | **Run** | Working-now rows; the `done today` / `failed today` / `working now` counters | No — one additive index only (see plan) |
 | **Approval / Escalation / Question** | The decision set behind "Needs you" | No |
@@ -735,7 +738,7 @@ sidebar entry and no modal.
 │  │ Hand something to your agents…                               │  │  Send  │  │
 │  └──────────────────────────────────────────────────────────────┘  └────────┘  │
 │   Describe a job in a sentence. An agent will pick it up.            Expand ↗  │
-│   ✓ Mission created — "summarise every item added this week…"  Open →          │
+│   ✓ Task created — "summarise every item added this week…"  Open →             │
 │                                                                                │
 │ ┌────────────────────────────────────────────────────────────────────────────┐ │
 │ │ NEEDS YOU  · 1 waiting over 3 days                          Open all (3) → │ │
@@ -922,19 +925,19 @@ Sent
 ┌──────────────────────────────────────────────┐  ┌────────┐
 │ Hand something to your agents…               │  │  Send  │
 └──────────────────────────────────────────────┘  └────────┘
- ✓ Mission created — "summarise every item added this week…"   Open →
+ ✓ Task created — "summarise every item added this week…"   Open →
 
 Failed
 ┌──────────────────────────────────────────────┐  ┌────────┐
 │ summarise every item added this week…        │  │  Send  │
 └──────────────────────────────────────────────┘  └────────┘
- ⚠ Couldn't create that Mission.   [ Try again ]
+ ⚠ Couldn't create that Task.   [ Try again ]
 
 Throttled
  ⚠ You're creating these faster than we can file them. Try again in a minute.
 
 No job runtime configured
- ✓ Mission created — "summarise every item added this week…"   Open →
+ ✓ Task created — "summarise every item added this week…"   Open →
    Nothing will run until a job runtime is configured.  Configure →
 ```
 
@@ -1037,8 +1040,8 @@ are registered through the same mechanism so the help panel lists them.
 | Composer send | `Send` |
 | Composer expand | `Expand` |
 | Composer counter | `{used} / 2000` |
-| Composer success | `Mission created — "{title}"` · link `Open` |
-| Composer failure | `Couldn't create that Mission.` · action `Try again` |
+| Composer success | `Task created — "{title}"` · link `Open` |
+| Composer failure | `Couldn't create that Task.` · action `Try again` |
 | Composer throttled | `You're creating these faster than we can file them. Try again in a minute.` |
 | Composer runtime note | `Nothing will run until a job runtime is configured.` · link `Configure` |
 | Needs-you heading | `Needs you` |
@@ -1098,15 +1101,15 @@ are registered through the same mechanism so the help panel lists them.
    shape, filters, bulk actions and the dedicated surface.
 2. **Owning the feed.** Home shows an 8-row tail; AW-04 owns the feed, its
    grouping and the "while you were away" summary.
-3. **Owning the Mission board.** The composer files a Mission; AW-02 owns lanes,
+3. **Owning the Task board.** The composer files a Task; AW-02 owns lanes,
    cards, staleness and steering.
 4. **Owning cost analysis.** Home shows one 7-day number and one cap bar; AW-17
    owns caps, credits, per-agent and per-model breakdowns.
 5. **Owning the calendar.** Home shows today; AW-10 owns the calendar, heartbeats
    and never-runs.
 6. **Routing the composer's sentence to a specific Agent.** The composer creates a
-   Mission; which Agent picks it up is the Mission board's and the agent
-   assignment's concern, not Home's.
+   Task with no assignee; which Agent picks it up is the Task board's and the
+   assignment path's concern, not Home's.
 7. **Rich composition.** No attachments, no `@` mentions, no `#` references and no
    markdown in the composer in this epic.
 8. **A push transport.** Freshness is polling on a 60-second cadence. Replacing
@@ -1142,9 +1145,11 @@ A reviewer can run this list against a build.
 
 - [ ] Typing 2 characters leaves `Send` disabled; 3 enables it.
 - [ ] `Enter` submits; `Shift+Enter` inserts a newline; `Ctrl/Cmd+Enter` submits.
-- [ ] A 250-character sentence produces a Mission whose title is at most 80
+- [ ] A 250-character sentence produces a Task whose title is at most 80
       characters, ends at a word boundary, and carries a single trailing `…`.
-- [ ] The full typed text is the Mission's description, byte for byte.
+- [ ] The full typed text is the Task's description, byte for byte.
+- [ ] The created Task lands in the board's Backlog lane and carries no Work,
+      Mission, Idea, Team, Agent or Goal owner.
 - [ ] A success chip appears within 100 ms of the response and disappears after
       60 seconds; at most 3 are ever visible.
 - [ ] Forcing the create to fail leaves the text in the field, restores focus and
@@ -1152,7 +1157,7 @@ A reviewer can run this list against a build.
 - [ ] Exceeding the create throttle shows the throttle-specific message.
 - [ ] Typing, navigating away and returning restores the unsent text; submitting
       clears it.
-- [ ] With the summary read forced to fail, the composer still creates a Mission.
+- [ ] With the summary read forced to fail, the composer still creates a Task.
 - [ ] At 1800 characters a counter appears; at 2000 further input is refused.
 
 ### Needs you
@@ -1274,9 +1279,9 @@ A reviewer can run this list against a build.
   to the account's notification timezone and then to UTC. A first-class account
   timezone would be better for every time-bounded surface (this one, the digest,
   quiet hours) and is worth its own small epic.
-- **[NEEDS CLARIFICATION: should "done today" count Runs or Missions?]**
+- **[NEEDS CLARIFICATION: should "done today" count Runs or Tasks?]**
   This spec counts Runs, because a Run is the unit that finishes. An owner may
-  read "done" as "Missions completed". If so, the counter should show both, which
+  read "done" as "Tasks moved to Done". If so, the counter should show both, which
   costs a column of width the glance row does not have.
 - **[NEEDS CLARIFICATION: should the composer be able to address an Agent?]**
   Out of scope here. If a later epic adds `@name` addressing, Home should adopt
@@ -1326,7 +1331,7 @@ A reviewer can run this list against a build.
 | I — Plugin-first | ✅ | No external integration. Home reads platform data only. |
 | II — Capability-driven | ✅ | No plugin id appears anywhere in this epic. |
 | III — Source-of-truth repos | ✅ | No content is read from or written to a repository. |
-| IV — Job runtime | ✅ | Home dispatches no background work. The composer creates a Mission through the existing path; whatever that path dispatches is unchanged. |
+| IV — Job runtime | ✅ | Home dispatches no background work. The composer creates a Task through the existing path; whatever that path dispatches is unchanged. |
 | V — Forward-only migrations | ✅ | One additive preference table and one additive index, both forward-only, both shipping with the change that needs them. |
 | VI — Tests first-class | ✅ | Unit tests for every threshold in §4, controller tests for the new read, an end-to-end test per user scenario in §3.1 and for §3.2's failure paths. |
 | VII — Secrets | ✅ | Nothing Home reads is a secret; failure copy is keyed, never provider text (FR-73). |
@@ -1339,7 +1344,7 @@ A reviewer can run this list against a build.
 ## 12. Cross-references
 
 - Program overview and rules — [`../README.md`](../README.md)
-- Mission board (lanes the composer's Mission lands in) — [`../AW-02-mission-board/spec.md`](../AW-02-mission-board/spec.md)
+- Task board (the lane the composer's Task lands in) — [`../AW-02-task-board/spec.md`](../AW-02-task-board/spec.md)
 - My Decisions (owns the decision queue Home previews) — [`../AW-03-decision-queue/`](../AW-03-decision-queue/)
 - Live Feed (owns the feed Home tails) — [`../AW-04-live-feed/`](../AW-04-live-feed/)
 - Runs & receipts (owns the Runs Home counts) — [`../AW-09-runs-receipts/`](../AW-09-runs-receipts/)

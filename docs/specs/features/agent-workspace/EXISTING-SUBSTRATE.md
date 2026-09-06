@@ -1,74 +1,120 @@
 # Existing substrate — what is already built, and where it is unreachable
 
-**Status:** `Reference` · **Created:** 2026-09-06
+**Status:** `Reference` · **Created:** 2026-09-06 · **Re-verified:** 2026-09-06 against `develop` @ `a2edec3d4`
 **Audience:** anyone sizing or implementing an [Agent Workspace](./README.md) epic
 
-A full read of the platform (17 subsystem inventories → 219 catalogued capabilities across
-736 API routes, 55 API modules, 84 BFF handlers, 135 entities and 102 plugin packages) turned up
-a pattern worth stating before any epic is estimated:
+> **Read this warning first.** An earlier revision of this document was compiled against a stale
+> checkout and asserted that several capabilities had "no UI". Four of those claims were wrong —
+> the UI had shipped. Every row below has since been re-verified against current `develop` with
+> file-level evidence, and the falsified rows are kept, struck through, so nobody re-discovers
+> them the hard way.
+>
+> **The standing rule this produced:** before you build a screen this document says is missing,
+> `rg` for it first. A "we don't have this" claim decays; a "we already have this" claim does not.
 
-> **Most of this program is not "build the feature". It is "bind a finished backend to a screen."**
+A full pass over the platform found a pattern worth stating before any epic is estimated:
 
-Repeatedly, a capability shipped complete — entity, endpoints, service logic, guards, tests — and
-the UI increment never followed. The code is live, exercised by tests, and reachable only by
-`curl`. Every row below is therefore a **UI-only or wiring-only** unit of work.
-
-Read this before writing an estimate. Several epics that look XL are M once you know the routing
-semantics, the confidence scoring, or the stream relay is already done and tested.
+> **A large part of this program is not "build the feature". It is "bind a finished backend to a
+> screen" — or "consume a hook that already exists".**
 
 ---
 
-## 1. Finished backends with no UI at all
+## 0. Claims that were WRONG — do not scope these as new work
+
+| Ref | The claim that was made | The truth on `develop` |
+| --- | --- | --- |
+| ~~S3~~ | ~~"Agent↔node affinity has no UI and no i18n key"~~ | **It shipped.** `AgentFleetSection.tsx` (284 lines) renders a *Preferred node* picker — "Any node", each enrolled node as name·platform·status, plus a synthetic option for a dangling binding — with warning hints for offline/drained/removed nodes and a personal-scope refusal branch. Policy in `agent-fleet.shared.ts`; mounted from `AgentCapabilitiesClient.tsx`; data via `agents/[id]/capabilities/agent-fleet-data.ts`; server actions in `app/actions/settings/fleet.ts`; **21 i18n keys** at `dashboard.agentsPage.capabilities.fleet`, present in **all 20 locales**. |
+| ~~S5~~ | ~~"The email SSE stream's client hook was never built"~~ | **Both hooks exist.** `lib/hooks/use-inbox-stream.ts` opens the `EventSource` and degrades to a 30 s poll; `lib/hooks/use-agent-inbox.ts` holds the store via `useSyncExternalStore`. The BFF proxies exist too. The real gap is narrower: **no component imports them yet.** |
+| ~~S14~~ | ~~"The schedule aggregator has no page"~~ | **It has one, deliberately.** `SchedulesList.tsx` + `TriggersManager.tsx` are mounted in `activity-client.tsx` behind a `Log \| Schedules` toggle, localStorage-persisted, deep-linkable via `?view=schedules`, with a full `dashboard.schedules` i18n block and **five e2e specs**. A merged spec (`docs/specs/features/schedules/`) chose the in-Activity toggle over a standalone route. Do not build a parallel view. |
+| ~~AW-01~~ | ~~(implicit) "we have no palette primitive to build on"~~ | **`cmdk@^1.1.1` is already a direct dependency** and a working palette ships today: `components/kb/workbench/KbSearchPalette.tsx` — `Cmd/Ctrl+K` toggle, debounced server search, filter chips, locale-aware routing, unit spec. AW-01 is the **promotion of an existing palette to global scope**, not a greenfield build. |
+| ~~AW-02~~ | ~~"build a board"~~ | **A working Task Kanban already ships.** `components/tasks/TasksKanbanView.tsx` (712 lines) — one column per `TaskStatus`, native drag-to-transition against a client mirror of the real transition lattice, optimistic move with rollback, per-card Run plus an `r` shortcut, per-column *Run all* capped at 20, branch/PR/CI/run/gate chips, a diff sheet, and run-state polling that merges only run fields. Reachable from `/tasks`, `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks`. |
+
+**Net effect:** AW-01, AW-02 and AW-11 are all materially smaller than first scoped, and AW-05's
+live-inbox work is a tick rather than a slice. AW-02 dropped **L → M** and now ships **zero schema
+change**.
+
+### What AW-02 actually turned out to be
+
+Once the board was found, the epic stopped being "build a board" and became "fix the four things
+that stop the shipped board answering the question" — each verified in code:
+
+1. **Every column count is a lie.** `tasks/page.tsx` fetches one 50-row page with no status filter,
+   and the board renders `{tasks.length}` per column. Nothing on screen says so.
+2. **Priority sorts nothing.** `task.repository.ts` `list()` ends `orderBy('task.updatedAt','DESC')`
+   and `ListTasksFilter` has no ordering field — priority is stored, filterable and chipped, but
+   never orders the board.
+3. **A filtered board cannot be shared.** View mode is `useState('cards')` — not in the URL, not
+   persisted, and the board is not the default.
+4. **It is not translated.** Every board string is hardcoded English while
+   `dashboard.tasksPage.status.*` (all 7) and `.priority.*` (all 5) already exist and are already
+   translated into 20 locales.
+
+### A live defect found during re-verification
+
+`Ctrl+K` currently has **two competing handlers**. The global one (`use-keyboard-shortcuts.ts`)
+listens on `document`; the KB palette listens on `window`. Both are bubble-phase and `document`
+bubbles to `window`, so on the three `/works/[id]/kb/*` routes the global handler wins and
+`router.push('/works?focus=search')` navigates the operator **out of the KB workbench** while the
+palette also toggles open on a component being unmounted. Neither calls `stopPropagation()`, so
+`preventDefault()` on either does not help.
+
+**AW-01 must own the fix** — a single shortcut registry with scope and priority — otherwise the new
+global palette becomes a third colliding listener.
+
+---
+
+## 1. Finished backends with no UI — verified still true
 
 | Ref | What exists | What is missing | Epic |
 | --- | --- | --- | --- |
-| **S1** | **Workflows** — a visual-agent-orchestration graph backend: create/update/run a saved graph, list runs, read a run trace, output truncation, failure node id, step count. 8 tested routes, 2 entities. | Any UI whatsoever. Even a plain list + Run button would surface it. | [AW-21](./AW-21-capability-catalog/) |
-| **S2** | **Escalation queue** — "what is waiting on me across every Work", confidence-ranked by an AI judge with a deterministic heuristic fallback, deduplicated, resolvable under a compare-and-set guard, already feeding the digest. | No page reads it. One list + a resolve button against three existing endpoints. | [AW-03](./AW-03-decision-queue/) |
-| **S3** | **Agent↔node affinity** — "this agent runs on that machine" is fully implemented: entity, 3 endpoints, an enqueue-time snapshot into `fleet_jobs.targetNodeId`, a lease-time filter, and tests. | A node picker on the agent settings page. No `affinity` i18n key exists yet. | [AW-11](./AW-11-agent-computers/) |
-| **S4** | **Per-agent Inbox** — list, detail and compose pages built with RFC-5321 recipient validation, a hardened server action and error scrubbing. | A tab entry in `AgentDetailTabs`, a `ROUTES` constant, and an i18n pass. The pages exist and nothing links to them. | [AW-05](./AW-05-agent-email/) |
-| **S5** | **Email live stream** — a working server-sent-events endpoint with a 5 s poll, 15 s heartbeat, 10-minute lifetime cap and per-connection diffing. | The client hook it was written for was never built. | [AW-05](./AW-05-agent-email/), [AW-04](./AW-04-live-feed/) |
-| **S11** | **Local model execution on a fleet node** — a complete CLI runner with process containment, Windows Job Objects, effort/permission/sandbox modes, timeouts and output limits. Built and tested. | No job kind dispatches to it. Add one kind + an executor registration. | [AW-11](./AW-11-agent-computers/) |
-| **S14** | **Schedule aggregation** — one endpoint normalises **seven** heterogeneous cadence sources (recurring tasks, agent heartbeats, work schedules, mission ticks, source validation, data sync, inbound triggers) into a single row shape, with per-source fault isolation. | No first-class page. The home "Soon" block deliberately drops 5 of the 7 kinds. | [AW-10](./AW-10-schedules-calendar/) |
-| **S19** | **Platform-admin cross-user × cross-Work usage view** — exists, guarded, throttled for PII. | No nav entry, no index page, and no way to discover a tenant id from the product at all. Three finished admin tools are undiscoverable. | [AW-01](./AW-01-command-palette/) |
+| **S1** | **Workflows** — a graph-orchestration backend: create/update/run a saved graph, list runs, read a run trace, output truncation, failure node id, step count. 8 routes, 2 entities. | No web route, no component. Confirmed by a full enumeration of the route tree. | [AW-21](./AW-21-capability-catalog/) |
+| **S2** | **Escalation queue** — `GET /api/escalations`, `GET /:id`, `POST /:id/resolve`, confidence ranking with a deterministic fallback, dedup, CAS-guarded resolve. | **No web surface calls it.** A search of `apps/web/src` finds only two comments. (Note: the backend is *not* unreachable — the agent runtime uses it; it is the operator who has no view.) | [AW-03](./AW-03-decision-queue/) |
+| **S4** | **Per-agent Inbox** — list, detail and compose pages, with real recipient validation and a hardened server action. | The pages exist; the **tab entry is still absent** from `AgentDetailTabs.tsx` (which lists ten other tabs), and there is **no `DASHBOARD_AGENT_INBOX` route constant** where every sibling tab has one. | [AW-05](./AW-05-agent-email/) |
+| **S19** | **Three platform-admin tools** — cross-user × cross-Work usage, the plugin allow-list, the per-tenant runtime allow-list. | No nav entry, no index page, and no way to discover a tenant id from the product. | [AW-01](./AW-01-command-palette/) |
+| **G19** | **Agent↔email assignment** — entity and repository, read by two internal factories. | No controller route and no UI. Writable only by direct SQL. | [AW-05](./AW-05-agent-email/) |
+| **G50** | Email send path | No **per-agent daily cap**, per-inbox burst ceiling or address-count cap. The route is auth-gated and covered by the global per-user throttler, but nothing bounds how much one agent may send. | [AW-05](./AW-05-agent-email/) · [AW-24](./AW-24-safety-rails/) |
+| **S18** | **Digest, personal and organization** — deterministic counts across runs, tasks, PRs, ingested events, goals and open escalations; a narrative that degrades with a visible reason; a quiet window that deliberately does not suppress open escalations. | The dispatch summary is computed, logged, and surfaced nowhere. | [AW-13](./AW-13-attention-controls/) |
+| **S8** | **Tool grants across four scopes** — tenant, organization, work, agent, with narrow-only merge over a permissive default. | UI only at agent scope. | [AW-15](./AW-15-connections-scopes/) · [AW-24](./AW-24-safety-rails/) |
 
-## 2. Built at one scope, needed at another
+## 2. Partly true — the claim moved
 
-| Ref | What exists | What is missing | Epic |
-| --- | --- | --- | --- |
-| **S8** | **Tool grants across four scopes** — resolve / check / upsert / delete for tenant, organization, work and agent, with narrow-only merge semantics over a permissive default. | UI exists only at agent scope. The org-scope card pattern already exists elsewhere and can be copied. | [AW-15](./AW-15-connections-scopes/), [AW-24](./AW-24-safety-rails/) |
-| **S12** | **Task workflow templates** — instantiate a parent Task plus one sub-task per step with `dependsOn` blocker edges, agent assignees and approvers, in one transaction, with acyclic validation at write time. | It is buried under a page that also renders an older, unrelated catalog. Promote it. | [AW-21](./AW-21-capability-catalog/) |
-| **S13** | **Inbound triggers** — HMAC-SHA256 signed public delivery, a 5-minute replay window, 24-hour rotation grace, a `(triggerId, dedupeKey)` idempotency ledger, event-matcher mode, template and single-task modes, test-fire, fire-now, and a fire log. | Nothing to build. It is under-surfaced and has a competing reduced UI. | [AW-10](./AW-10-schedules-calendar/) |
-| **S15** | **Knowledge retrieval trail** — every retrieval logged, every consumption attributed by consumer type and id, with an existing panel component. This answers "why did the model see this document", which very few products can. | Surfacing beyond the workbench. | [AW-06](./AW-06-knowledge-library/), [AW-09](./AW-09-runs-receipts/) |
-| **S18** | **Digest, personal and organization** — deterministic counts across runs, tasks, PRs, ingested events, goals and open escalations; an optional narrative that degrades with a visible reason; org-additive semantics; a quiet window that deliberately does *not* suppress open escalations. | Its dispatch summary is computed, logged, and surfaced nowhere. | [AW-13](./AW-13-attention-controls/) |
+| Ref | Corrected position | Epic |
+| --- | --- | --- |
+| **S11** | Local model execution on a node is a **live shipped path**, not a dormant one: `model-cli.ts` runs a local CLI in the task worktree, called by `agent-task.ts`, registered for the real `agent-task` job kind. What is *not* dispatched is the hardened, Windows-Job-Object-contained executor under `model-execution/`, which waits on a signed helper. The remaining gap is **containment for untrusted nodes**, not execution. | [AW-11](./AW-11-agent-computers/) |
+| **G25** | **The live-view half is still entirely true.** A repo-wide search for `vnc\|rdp\|screen.share\|desktopCapturer\|getDisplayMedia` finds only an unrelated e2e permissions spec. No node-scoped terminal, no screen capture, no node log upload. | [AW-11](./AW-11-agent-computers/) |
+| **G26** | Bulk cancel exists (`POST /api/fleet/cancel-…`); per-job cancel, retry and payload/result/error inspection do not. | [AW-11](./AW-11-agent-computers/) |
+| **G27** | Node pause exists as a first-class sticky status and the settings table exposes only disable/enable — confirmed, with the correction that the pause route has different exposure than first recorded. | [AW-11](./AW-11-agent-computers/) |
+| **S12** | The dual-catalog stacking on the templates page is exactly as described; the task-workflow-template instantiation (parent Task + one sub-task per step with `dependsOn` edges, in one transaction, acyclic-validated) is real. | [AW-21](./AW-21-capability-catalog/) |
+| **S15** | The KB **retrieval trail is workbench-only** as stated; the citations half differs — check the re-verification note before scoping. | [AW-06](./AW-06-knowledge-library/) · [AW-09](./AW-09-runs-receipts/) |
 
 ## 3. Stronger than expected — protect these, do not flatten them
 
-| Ref | Strength | Why it matters to this program |
+| Ref | Strength | Why it matters here |
 | --- | --- | --- |
-| **S17** | **The streaming terminal stack** — attach-token minting, a WS gateway that refuses tokens in the query string, an in-memory relay with byte-bounded scrollback replay, retained pre-attach error banners, a pinned non-evictable exit frame, sequence dedup, driver/viewer/worker roles, persisted transcripts with GC, and xterm.js with a dependency-free DOM fallback. | [AW-11](./AW-11-agent-computers/) does not need a new streaming architecture. It needs this pointed at a node instead of a run, plus cross-replica fan-out (already a declared seam). |
-| **S7** | **The job-runtime provider layer is finished** — 6 provider plugins, a binding factory routing all 11 dispatcher symbols, a per-tenant bring-your-own/override overlay with credential rotation, versioning and an append-only audit trail, and an operator per-tenant allow-list *with* a UI. | Two docs still claim this is unbuilt. The win here is deleting the stale docs. Every epic's background work rides this. |
-| **S16** | **Two production vector stores behind a real port** — pgvector (bundled, row-filtered) and Qdrant (registry-installed, collection-per-Work), plus a coordinates table that drives re-embedding when the model or its dimensions change. | [AW-07](./AW-07-memory-context/) inherits multi-tenant RAG infrastructure rather than designing it. |
-| **S9** | **Billing is fully implemented** — plan / pack / licence checkout, setup-intent payment methods, subscription mutation, seat quantity, pay-as-you-go meter events, invoice sync and webhook signature verification, behind a vendor-neutral provider abstraction. | The "coming soon" cards are a deployment flag, not missing code. [AW-17](./AW-17-costs-caps/) is mostly surfacing. |
-| **S6** | **An OpenAI-compatible completions endpoint** that resolves providers, injects knowledge, redacts secrets and returns clean 422s on a bad model or key. It already serves two clients. | A shippable third-party API surface today; only docs and key scoping are outstanding. |
-| **S10** | **Whole-account export / import / GitHub sync** — export as JSON with per-section toggles, preview an import with conflict resolution, apply it, and push/pull the account as a GitHub-backed config repo. | [AW-22](./AW-22-backup-export/) is largely *marketing an existing feature*, not building one. |
-| **S20** | **Account-level repository registry** — repos independent of Works, one-click import, a `credentialMode` that is always a pointer and never a token, and encrypted per-path seed env files behind an owner-gated endpoint. | "Give this agent this repo with these env files" is already solved. |
-| **S21** | **Machine-readable platform self-description** — an agent card advertising `register_work` over both REST and MCP, plus a works schema generated from the same schema the server validates with, so the two cannot drift. | Agent-to-agent onboarding is one unblocked pipeline away. |
-| **S22** | **21 locales with a real translation pipeline** — cookie-based locale with no URL prefix, English deep-merge fallback, RTL support, a parity-sync script that seeds full paths, and an automated translation pass. | Every epic's i18n cost is lower than it looks. Note the parity script exists *because* a missing **parent** key collapses a whole subtree. |
+| **S17** | **The streaming terminal stack** — attach-token minting, a WS gateway that refuses tokens in the query string, an in-memory relay with byte-bounded scrollback replay, retained pre-attach error banners, a pinned non-evictable exit frame, sequence dedup, driver/viewer/worker roles, persisted transcripts with GC, xterm.js with a dependency-free DOM fallback. **Confirmed** keyed by `AgentRun`, not `nodeId`. | AW-11 needs no new streaming architecture — it needs this repointed at a node, plus cross-replica fan-out (already a declared seam). |
+| **S9** | **Billing is fully implemented** behind a vendor-neutral provider abstraction — checkout, payment methods, subscription mutation, seat quantity, metered events, invoice sync, webhook signature verification. **Confirmed.** | The "coming soon" cards are a deployment flag, not missing code. AW-17 is mostly surfacing. |
+| **S22** | **21 locales with a real pipeline** — cookie-based locale, English deep-merge fallback, RTL, and a parity-sync script that seeds full paths **because a missing parent key collapses a whole subtree in next-intl**. **Confirmed.** | Every epic's i18n cost is lower than it looks — but respect the parent-key rule. |
+| **S16** | Two production vector stores behind a real port, with a coordinates table driving re-embedding when the model or its dimensions change. | AW-07 inherits multi-tenant RAG infrastructure rather than designing it. |
+| **S10** | Whole-account export / import / GitHub sync, already shipped and reachable. | AW-22 is largely *surfacing an existing feature*. |
+| **S6** | An OpenAI-compatible completions endpoint that resolves providers, injects knowledge and redacts secrets, already serving two clients. | A shippable third-party API surface today. |
+| **S20** | Account-level repository registry with a `credentialMode` that is always a pointer, never a token, and encrypted per-path seed env files behind an owner-gated endpoint. | "Give this agent this repo with these env files" is solved. |
+| **S21** | Machine-readable platform self-description, with the works schema generated from the same schema the server validates with, so the two cannot drift. | Agent-to-agent onboarding is one unblocked pipeline away. |
+| **S7** | The job-runtime provider layer — 6 provider plugins, a binding factory routing all 11 dispatcher symbols, a per-tenant overlay with credential rotation, versioning and an append-only audit trail. | Two docs still claim this is unbuilt. The win is deleting the stale docs. |
 
 ---
 
 ## 4. How to use this document
 
-1. **Before estimating an epic**, check whether its backend is in §1 or §2. If it is, the epic is a
-   binding exercise and should be re-sized down.
-2. **Before designing a mechanism**, check §3. We have production-grade streaming, RAG, billing,
-   job-runtime and i18n substrate. Reusing it is faster *and* keeps behaviour consistent.
-3. **Do not remove any of it** (NN #20). Several of these are invisible today; the fix is a route,
+1. **`rg` before you build.** Section 0 exists because four "missing" claims were wrong. Search the
+   current tree for the concept — several spellings — before scoping any screen as new.
+2. **Before estimating**, check §1 and §2. If the backend is there, the epic is a binding exercise.
+3. **Before designing a mechanism**, check §3. We have production-grade streaming, RAG, billing,
+   job-runtime and i18n substrate. Reusing it is faster and keeps behaviour consistent.
+4. **Do not remove any of it** (NN #20). Where something is invisible, the fix is a route constant,
    a tab entry, a nav link or an i18n key — never a rewrite.
-4. **Anything you surface must earn its keep**: if you bind a backend to a screen, it also needs
-   its i18n keys, an empty state, and a test — the reason these never shipped was almost certainly
-   that last mile.
+5. **Anything you surface must earn its keep**: i18n keys, an empty state, and a test. That last
+   mile is precisely why these never shipped.
 
-> A recurring hazard worth naming: several of these features are invisible **because a route
-> constant, a tab entry, or an i18n key is missing** — not because anything is broken. When an
-> epic says "add the page", check first whether the page already exists and is simply unlinked.
+> Two recurring hazards, both observed in this codebase: a feature can be invisible because a
+> route constant or tab entry is missing rather than because anything is broken; and a second
+> surface over the same row will silently drift from the first unless both revalidate each other.

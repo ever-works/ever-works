@@ -24,10 +24,10 @@
 A single overlay — opened from anywhere in the dashboard with `Ctrl+K` / `Cmd+K` — where the
 user types a few characters and gets, in one ranked and grouped list: every screen in the
 product, every Agent, Mission, Task, Work, Idea, Skill, Team and Knowledge-Base document they
-can open, and every **action** they can take without leaving the keyboard ("New Mission",
-"Open Help", "Switch workspace to …", later "Pause Ivy"). Arrow keys move, `Enter` opens,
-`Esc` closes, `Tab` narrows to one group. It remembers what the user opened recently, so the
-overlay is useful the instant it opens, before a single character is typed.
+can open, and every **action** they can take without leaving the keyboard ("New Task",
+"New Mission", "Open Help", "Switch workspace to …", later "Pause Ivy"). Arrow keys move,
+`Enter` opens, `Esc` closes, `Tab` narrows to one group. It remembers what the user opened
+recently, so the overlay is useful the instant it opens, before a single character is typed.
 
 The capability behind it is a **workspace-wide search read model**: one request answers
 "where is anything called *X* in my workspace", scoped to exactly what the caller is allowed
@@ -134,7 +134,7 @@ substring matches.
 **Given** the user types `zzzqqq`,
 **When** the search returns zero rows across every group,
 **Then** the palette shows "No matches for “zzzqqq”" plus exactly three fallback rows —
-"Ask the AI chat panel about “zzzqqq”", "Create a Mission from “zzzqqq”", "Open Help" — and
+"Ask the AI chat panel about “zzzqqq”", "Create a Task from “zzzqqq”", "Open Help" — and
 `Enter` activates the first.
 
 **S-11 — One source is broken, the rest are not.**
@@ -266,7 +266,10 @@ screen (the palette never paginates past 25 in one group).
   (Commands, Screens, Missions, Tasks, Agents, Works, Ideas, Skills, Teams, Knowledge, then
   the P2 kinds in the order listed in FR-18) → display name ascending, case-insensitive.
 - **FR-16** Results are grouped by kind. Group order follows the kind priority in FR-15, except
-  that any group containing a score-100 result is promoted to the top.
+  that any group containing a score-100 result is promoted to the top. **Missions and Tasks are
+  two distinct kinds and always render as two separate groups**; no record is ever counted in
+  both. A Task that a Mission raised is still a **Task** row — the Mission is provenance on that
+  row (FR-19), never the row itself and never the heading the row sits under.
 - **FR-17** A group renders at most **5** rows, followed by a "Show all {n}" row when more
   matched. Applying a group filter shows at most **25** rows for that group. The palette never
   shows more than **25** rows for one group and never more than **60** rows in total.
@@ -281,7 +284,7 @@ screen (the palette never paginates past 25 in one group).
   | P1 | **Commands** | command label + its alias list |
   | P1 | **Screens** | screen title + its breadcrumb path |
   | P1 | **Missions** | title, description |
-  | P1 | **Tasks** | reference, title, description, labels |
+  | P1 | **Tasks** | slug (e.g. `T-418`), title, description, labels |
   | P1 | **Agents** | name, slug, title |
   | P1 | **Works** | name, slug, description |
   | P1 | **Ideas** | title, description |
@@ -297,7 +300,11 @@ screen (the palette never paginates past 25 in one group).
   | P2 | **Connections** | installed plugin name + connected account label |
 
 - **FR-19** Every result row carries: kind, display name, an optional secondary line
-  (breadcrumb, status, owner or timestamp), an optional status badge, and a destination.
+  (breadcrumb, status, owner or timestamp), an optional status badge, and a destination. A Task
+  row's secondary line may name what the Task is filed against — its Mission, Work, Team or
+  Agent — as provenance, and its badge is a Task status (backlog, todo, in progress, in review,
+  blocked, done, cancelled). A Mission row's badge is a Mission status (active, paused,
+  completed, failed). The two vocabularies are never mixed on one row.
 - **FR-20** The **Screens** registry contains one entry per navigable screen in the dashboard,
   including every Settings sub-page and every Work sub-page, each with its full breadcrumb.
   A screen the user cannot reach in the current scope is not listed.
@@ -493,10 +500,10 @@ Nothing is moved or removed. Below 768 px it collapses to the `⌕` icon alone.
         ╟──────────────────────────────────────────────────────────────────╢
         ║  RECENT                                                          ║
         ║  ▸ ◈  Q3 partner outreach            Mission · active    2m ago  ║ ← selected
-        ║    ▤  TASK-418 Draft the follow-up   Task · in review    18m ago ║
+        ║    ▤  T-418 Draft the follow-up      Task · in review    18m ago ║
         ║    ⬢  acme-directory                 Work · ready        1h ago  ║
         ║    ✦  Ivy                            Agent · active      3h ago  ║
-        ║    ▤  TASK-402 Reconcile invoices    Task · done         y'day   ║
+        ║    ▤  T-402 Reconcile invoices       Task · done         y'day   ║
         ╟──────────────────────────────────────────────────────────────────╢
         ║  SUGGESTED                                                       ║
         ║    ＋ New Mission                                                ║
@@ -525,11 +532,11 @@ Nothing is moved or removed. Below 768 px it collapses to the `⌕` icon alone.
         ║    ◈  Supplier invoice intake          active     · updated 2w   ║
         ╟──────────────────────────────────────────────────────────────────╢
         ║  TASKS                                                     137   ║
-        ║    ▤  TASK-418 Invoice follow-up       in review  · Ivy          ║
-        ║    ▤  TASK-402 Reconcile invoices      done       · Ivy          ║
-        ║    ▤  TASK-377 Invoice template        blocked    · unassigned   ║
-        ║    ▤  TASK-311 Late invoice sweep      todo       · Ivy          ║
-        ║    ▤  TASK-289 Invoice import errors   backlog    · unassigned   ║
+        ║    ▤  T-418 Invoice follow-up          in review  · Ivy          ║
+        ║    ▤  T-402 Reconcile invoices         done       · Ivy          ║
+        ║    ▤  T-377 Invoice template           blocked    · unassigned   ║
+        ║    ▤  T-311 Late invoice sweep         todo       · Ivy          ║
+        ║    ▤  T-289 Invoice import errors      backlog    · unassigned   ║
         ║    ⋯  Show all 137                                               ║
         ╟──────────────────────────────────────────────────────────────────╢
         ║  SKILLS                                                      1   ║
@@ -551,7 +558,7 @@ Nothing is moved or removed. Below 768 px it collapses to the `⌕` icon alone.
         ║  ⌕  [ Tasks ✕ ] invoice                                          ║
         ╟──────────────────────────────────────────────────────────────────╢
         ║  TASKS · showing 25 of 137                                       ║
-        ║  ▸ ▤  TASK-418 Invoice follow-up       in review  · Ivy          ║
+        ║  ▸ ▤  T-418 Invoice follow-up          in review  · Ivy          ║
         ║    …  (24 more rows)                                             ║
         ║    →  Open the Tasks screen for the full list                    ║
         ╟──────────────────────────────────────────────────────────────────╢
@@ -594,7 +601,7 @@ Nothing is moved or removed. Below 768 px it collapses to the `⌕` icon alone.
         ║        Try a shorter word, or one of these:                      ║
         ║                                                                  ║
         ║  ▸ ✧  Ask the AI chat panel about “zzzqqq”                       ║
-        ║    ＋ Create a Mission from “zzzqqq”                             ║
+        ║    ＋ Create a Task from “zzzqqq”                                ║
         ║    ?  Open Help                                                  ║
         ╚══════════════════════════════════════════════════════════════════╝
 ```
@@ -655,7 +662,7 @@ Nothing is moved or removed. Below 768 px it collapses to the `⌕` icon alone.
         │    paused · 4d             │
         ├────────────────────────────┤
         │ TASKS                  137 │
-        │  ▤ TASK-418 Invoice foll…  │
+        │  ▤ T-418 Invoice follow…   │
         │    in review · Ivy         │
         │  ⋯ Show all 137            │
         └────────────────────────────┘
@@ -677,7 +684,7 @@ Nothing is moved or removed. Below 768 px it collapses to the `⌕` icon alone.
 | Too short | `Keep typing — 2 characters minimum.` |
 | No results title | `No matches for “{query}”` |
 | No results hint | `Try a shorter word, or one of these:` |
-| No results fallbacks | `Ask the AI chat panel about “{query}”` · `Create a Mission from “{query}”` · `Open Help` |
+| No results fallbacks | `Ask the AI chat panel about “{query}”` · `Create a Task from “{query}”` · `Open Help` |
 | Partial failure | `Some results couldn't be loaded. Showing what we have.` |
 | Timeout | `Search took too long. Press Enter to try again.` |
 | Offline | `You're offline. Showing recent items only.` |
@@ -741,6 +748,8 @@ and `Keyboard shortcuts` become palette commands so the drawer is reachable by t
 - [ ] An exact-name match ranks above a prefix match, which ranks above a substring match,
       which ranks above a fuzzy match, for a fixture set covering all four.
 - [ ] Every P1 kind in FR-18 returns at least one row for a seeded fixture.
+- [ ] A query matching both a Mission and a Task returns two separate groups — `Missions` and
+      `Tasks` — with the Mission named as provenance on the Task row, never as its group.
 - [ ] No group renders more than 5 rows without a "Show all {n}" row; no group exceeds 25 rows
       under a filter; no response exceeds 60 rows.
 

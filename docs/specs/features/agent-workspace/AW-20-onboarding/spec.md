@@ -12,7 +12,7 @@
 **Last updated**: 2026-09-06
 **Size**: M · **Blocking dependencies**: none
 **Extends**: the existing onboarding wizard and its role-driven starter seeding
-**Adjacent epics**: [AW-19 Home](../AW-19-home/), [AW-02 Mission board](../AW-02-mission-board/), [AW-03 My Decisions](../AW-03-decision-queue/), [AW-10 Schedules](../AW-10-schedules-calendar/), [AW-21 Capability catalogue](../AW-21-capability-catalog/), [AW-25 Help centre](../AW-25-help-center/)
+**Adjacent epics**: [AW-19 Home](../AW-19-home/), [AW-02 Task board](../AW-02-task-board/), [AW-03 My Decisions](../AW-03-decision-queue/), [AW-10 Schedules](../AW-10-schedules-calendar/), [AW-21 Capability catalogue](../AW-21-capability-catalog/), [AW-25 Help centre](../AW-25-help-center/)
 
 > **Additive by default (program rule #1).** The existing onboarding wizard keeps
 > every step it has today, in the same order, with the same server-persisted
@@ -27,7 +27,7 @@
 > not a new entity: it is the set of Agents the platform provisions for a
 > workspace, each carrying a lane.
 
-> **Dependency posture.** This epic is a *router*: it sends people into Missions,
+> **Dependency posture.** This epic is a *router*: it sends people into Tasks,
 > Approvals, Escalations and Schedules, all of which exist today. It therefore
 > reads those surfaces directly and must keep working before AW-02, AW-03, AW-10
 > and AW-19 land. §4.9 pins exactly what each milestone reads today and what it
@@ -44,7 +44,7 @@
    │  ─────────────────────────────────────────────────────────────────────    │
    │  ●  Connect your AI provider                              Done · 2 min ago│
    │  ●  Meet your agents                                      Done · just now │
-   │  ○  Ship your first mission                            [ Pick a brief ]   │
+   │  ○  Ship your first task                               [ Pick a brief ]   │
    │     Hand your agents one real piece of work.                              │
    │  ○  Answer your first decision                                  Waiting   │
    │     Your agents ask before anything leaves the workspace.                 │
@@ -66,7 +66,7 @@ Tasks, Approvals, Escalations, Skills, Schedules and a run history. What it does
 not have is a **first hour**: the current wizard asks which AI provider, which
 git storage, which database and which deployment target — four infrastructure
 questions — and then closes, leaving the user on a dashboard with **zero agents,
-zero missions and no next action**. The one step that does create agents (the
+no work assigned and no next action**. The one step that does create agents (the
 "what do you do" role step) is optional, is buried between two provider steps,
 creates a flat list of unrelated agents with no coordinator and no first job, and
 never tells the user afterwards that it worked.
@@ -78,8 +78,8 @@ closes the setup checklist they have:
    moment they entered it, instead of failing on the first agent run;
 2. **met their agents** — a provisioned roster with a coordinator and named
    lanes, introduced by name, with a reporting line and delegation already wired;
-3. **shipped one real mission** — from a starter brief that carries acceptance
-   checks, dispatched to the lane agent that owns it;
+3. **shipped one real task** — from a starter brief that says what "finished"
+   means, dispatched to the lane agent that owns it;
 4. **answered one decision** — which the platform reliably produces, because
    every provisioned agent ships with review-before-act guardrails;
 5. **put one job on a schedule** — so something runs tomorrow without them.
@@ -91,7 +91,7 @@ Three phases, each independently shippable:
   introduction, and the `lane` attribute on Agents.
 - **P2 — The checklist.** The five milestones evaluated server-side, the
   **Get set up** card on Home, the full `/get-started` page, and the guided
-  paths into the first mission, the first decision and the first schedule.
+  paths into the first task, the first decision and the first schedule.
 - **P3 — Repair and reach.** Re-run a failed lane, switch blueprint, replay the
   checklist from Help, hand a second person on the workspace their own checklist,
   and the completion funnel.
@@ -123,9 +123,9 @@ platform does not claim the user met agents it merely created.
 From that point the user sees a **Get set up** card at the top of Home and a full
 page at `/get-started`. It shows five milestones, how many are done, and the one
 action that advances each. Two are already done. The third offers three starter
-briefs — real, short pieces of work with acceptance checks written into them —
-and creates a Mission plus a Task assigned to the lane agent that owns it. The
-work starts immediately and is visible on the mission surfaces.
+briefs — real, short pieces of work that state what "finished" means — and
+creates one Task, assigned to the lane agent that owns it. The work starts
+immediately and is visible wherever Tasks are listed.
 
 Because every provisioned agent is created in review-before-act mode, that first
 run reaches a point where it needs permission — to send something, to spend
@@ -135,8 +135,11 @@ saying *"1 waiting"* and links straight to it. Answering it lets the work
 continue.
 
 Milestone five offers three recurring jobs the platform already knows how to run
-— a daily workspace digest, a weekly mission review, or a cadence on the
-coordinator — and arms exactly one.
+— a daily workspace digest, a weekly review of open work, or a cadence on the
+coordinator — and arms exactly one. Each of the three is a **Schedule** over work
+that already exists. None of them is a Mission: a Mission is a standing
+initiative that keeps generating *new* work until its owner ends it, and that is
+a bigger commitment than a first hour should make on someone's behalf.
 
 The checklist is a permanent, resumable object. It survives sign-out, a device
 switch, a browser wipe and a failed provisioning run. A milestone can be marked
@@ -164,7 +167,7 @@ to use it.
 | A working AI provider | Pick a card in the wizard, then discover on the first agent run — minutes or hours later, in a failed run's error message — whether the credential was any good |
 | Any agent at all | Find the optional "what do you do" step, pick roles, notice the suggestion block below the role grid, and press "create the whole kit" — or, after the wizard, go to Agents and create one by hand from a template |
 | A roster that works together | Create each agent by hand, then open each one's settings and set "reports to", then open the collaborators tab on the one that should delegate and enable each of the others — five screens per agent, and nothing in the product tells them this wiring exists |
-| A first mission | Guess. There is no starter brief anywhere, and a brief without acceptance checks is exactly the brief that ends in an escalation |
+| A first task | Guess. There is no starter brief anywhere, and a brief that never says what "finished" means is exactly the brief that ends in an escalation |
 | A first decision | Wait for one to happen, and hope they are looking at the right surface when it does — approvals render in a block on Home, escalations do not render anywhere |
 | A first schedule | Know that recurring tasks, agent heartbeats and work schedules exist, and find the one that fits |
 | To resume setup tomorrow | Nothing resumes. The wizard's saved state is a step index and four provider choices; it cannot express "you have not shipped anything yet" |
@@ -218,9 +221,8 @@ Most of this epic is wiring that already exists:
 - role → starter-kit resolution is written, exhaustive and type-enforced;
 - creating an Agent from a template is an endpoint;
 - reporting lines, delegation allow-lists and skill bindings are all endpoints;
-- creating a Mission, creating a Task and assigning it to an agent are endpoints,
-  and assignment already pre-creates a run and pushes it through the admission
-  gate;
+- creating a Task and assigning it to an agent are endpoints, and assignment
+  already pre-creates a run and pushes it through the admission gate;
 - approvals and escalations both have list-and-decide endpoints;
 - a single read aggregates every kind of schedule the platform runs.
 
@@ -248,18 +250,18 @@ What is missing is a **spine** that walks a person through them in order, and a
 > **And when** the wizard closes
 > **Then** Home shows a **Get set up** card reading *2 of 5*.
 
-### 3.2 Happy path — the first mission produces the first decision
+### 3.2 Happy path — the first task produces the first decision
 
 > **Given** a user with a provisioned roster and the checklist at *2 of 5*
-> **When** they press **Pick a brief** on *Ship your first mission*
+> **When** they press **Pick a brief** on *Ship your first task*
 > **Then** they see three starter briefs, each under 280 characters, each naming
 > what "finished" means, and each showing which lane will pick it up
 > **And when** they choose one and press **Send it**
-> **Then** a Mission is created with that brief, one Task is created under it
-> carrying the acceptance checks, the Task is assigned to the lane's agent, and
-> the user is shown the Mission with a link back to the checklist
-> **And** the milestone flips to done as soon as that Mission has one completed
-> run, or when the user marks the Mission complete
+> **Then** one Task is created carrying that brief and its definition of done,
+> the Task is assigned to the lane's agent, and the user is shown the Task with a
+> link back to the checklist
+> **And** the milestone flips to done as soon as that Task has one completed run,
+> or when the Task reaches `done`
 > **And when** the run reaches an action its guardrails will not take unattended
 > **Then** an approval or escalation is raised, the checklist card starts reading
 > *1 waiting* on *Answer your first decision*, and answering it marks milestone 4
@@ -284,7 +286,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 > **And** milestone 1 stays *not done*
 > **And if** they continue anyway and provision a roster, provisioning still
 > succeeds — agents are configuration, not inference — but the **Ship your first
-> mission** milestone shows an inline warning saying work will not run until a
+> task** milestone shows an inline warning saying work will not run until a
 > provider is connected, with a link back to the provider step.
 
 ### 3.5 Unhappy path — provisioning half-fails on a plan limit
@@ -349,14 +351,14 @@ What is missing is a **spine** that walks a person through them in order, and a
 
 ### 3.11 Unhappy path — the checklist is opened by someone who is already set up
 
-> **Given** an existing user who has had agents, missions, decisions and
+> **Given** an existing user who has had agents, tasks, decisions and
 > schedules for months, and who has never seen this feature
 > **When** they first load Home after this epic ships
 > **Then** the checklist is evaluated against what they already have, all
 > applicable milestones read **Done**, the card renders once in a completed state
 > with a **Nice — you're set up** line and a **Dismiss** button, and it never
 > renders again after dismissal
-> **And** no agent, mission, schedule or decision is created on their behalf.
+> **And** no agent, task, schedule or decision is created on their behalf.
 
 ### 3.12 Unhappy path — a permission denial
 
@@ -372,7 +374,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 
 ### 3.13 Unhappy path — the decision milestone with nothing to decide
 
-> **Given** a user whose first mission finished cleanly without raising anything
+> **Given** a user whose first task finished cleanly without raising anything
 > **When** they look at **Answer your first decision**
 > **Then** it reads **Nothing needs you yet** with a one-line explanation of when
 > a decision appears and a **Show me an example** link into the capability
@@ -526,7 +528,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 - **FR-34** The checklist holds exactly **five** milestones, in this order:
   1. Connect your AI provider
   2. Meet your agents
-  3. Ship your first mission
+  3. Ship your first task
   4. Answer your first decision
   5. Put something on a schedule
 - **FR-35** Each milestone is **pending**, **done**, or **skipped**. A done
@@ -539,7 +541,7 @@ What is missing is a **spine** that walks a person through them in order, and a
   | --- | --- | --- |
   | 1 | Connect your AI provider | A provider with AI capability reports a successful live check no older than **24 hours** |
   | 2 | Meet your agents | A provisioning run reached **ready** or **partial** *and* the introduction was acknowledged |
-  | 3 | Ship your first mission | A Mission owned by this person has at least one **completed** run, or has been marked complete |
+  | 3 | Ship your first task | A Task owned by this person has at least one **completed** run, or has reached `done` |
   | 4 | Answer your first decision | An approval owned by this person has been approved or rejected, or an escalation has been resolved |
   | 5 | Put something on a schedule | At least one **enabled** entry exists in the person's schedule read-model |
 - **FR-38** The checklist is evaluated on read and cached for **60 seconds** per
@@ -559,21 +561,27 @@ What is missing is a **spine** that walks a person through them in order, and a
   checklist, the first evaluation marks them done from existing facts. The
   checklist never creates anything to make itself true.
 
-### 4.6 The first mission
+### 4.6 The first task
 
-- **FR-45** *Ship your first mission* offers exactly **3** starter briefs. Each
+The unit of delegated work here is a **Task** — the thing an Agent can be handed
+and the thing that reaches `done`. A Mission is a standing initiative that keeps
+producing work; this milestone hands out one piece of work, so it creates one
+Task and no Mission.
+
+- **FR-45** *Ship your first task* offers exactly **3** starter briefs. Each
   brief is at most **280** characters, states what finished looks like, and names
   the lane that will pick it up.
 - **FR-46** A starter brief is offered only when a roster agent exists for its
   lane. When no roster exists, the milestone's action is **Set up my agents** and
   points at milestone 2.
-- **FR-47** Choosing a brief creates one Mission and one Task under it, records
-  the brief's acceptance checks on the Task, and assigns the Task to the lane's
-  agent — the same assignment path any hand-created task uses, including the
-  admission gate.
+- **FR-47** Choosing a brief creates exactly **one Task** — never a Mission —
+  carrying the brief and its definition of done, and assigns that Task to the
+  lane's agent using the same assignment path any hand-created Task uses,
+  including the admission gate. The Task is filed against nothing else: no Work,
+  Mission, Idea, Team or Goal.
 - **FR-48** The brief is editable before sending and may be replaced entirely
-  with the user's own text, up to the Mission description limit of **10 000**
-  characters.
+  with the user's own text, up to **10 000** characters — a ceiling this epic
+  puts on a starter brief, not a platform limit.
 - **FR-49** If no AI provider is connected, sending is still allowed but the
   confirmation states plainly that the work will not run until one is connected,
   and links to milestone 1.
@@ -592,7 +600,9 @@ What is missing is a **spine** that walks a person through them in order, and a
 ### 4.8 The first schedule
 
 - **FR-54** *Put something on a schedule* offers exactly **3** options: a daily
-  workspace digest, a weekly mission review, and a cadence on the coordinator.
+  workspace digest, a weekly review of open work, and a cadence on the
+  coordinator. All three are **Schedules** over work that already exists — two
+  recurring jobs and one agent cadence. None of them creates a Mission.
 - **FR-55** Each option states its cadence in the person's own timezone before it
   is armed. The default for the daily option is **08:00 local**.
 - **FR-56** Arming an option uses the platform's existing scheduling mechanism
@@ -603,7 +613,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 ### 4.9 Degradation and dependencies
 
 - **FR-58** Every milestone action must resolve to a surface that exists today:
-  Missions, the approvals block, escalations, Agents, and Schedules. Where a
+  Tasks, the approvals block, escalations, Agents, and Schedules. Where a
   program epic later owns a richer surface, the action's destination changes and
   nothing else does.
 - **FR-59** A failure reading any single milestone's completion fact degrades
@@ -625,10 +635,10 @@ What is missing is a **spine** that walks a person through them in order, and a
   else*.
 - **FR-64** Provisioning spends nothing. Creating agents, attaching skills and
   wiring reporting lines are configuration writes. The first thing in this epic
-  that can spend is the starter mission, and its confirmation says so.
+  that can spend is the starter task, and its confirmation says so.
 - **FR-65** Telemetry records milestone keys, blueprint slugs, lane keys,
-  outcomes and durations. It never records brief text, agent names, mission
-  titles or any provider reason string.
+  outcomes and durations. It never records brief text, agent names, Task titles
+  or any provider reason string.
 
 ---
 
@@ -639,9 +649,9 @@ What is missing is a **spine** that walks a person through them in order, and a
 | Entity | Role here | States it moves through |
 | --- | --- | --- |
 | **Agent** | The roster is Agents. Provisioning creates them from prebuilt templates and leaves them active. | `draft → active`, then the normal lifecycle |
-| **Agent run** | What "shipped a mission" is measured by. | `queued → running → completed \| failed \| cancelled` |
-| **Mission** | Created by the starter brief. | unchanged |
-| **Task** | Created under the starter Mission, carries the acceptance checks, is assigned to the lane agent. | unchanged |
+| **Agent run** | What "shipped a task" is measured by. | `queued → running → completed \| failed \| cancelled` |
+| **Task** | The unit of delegated work. Created by the starter brief, carries its definition of done, and is assigned to the lane agent. | `backlog → todo → in_progress → in_review → done`, unchanged |
+| **Mission** | **Nothing here creates one.** A Mission is a standing initiative that keeps producing work; the first hour hands out one piece of work, which is a Task. The existing Missions surface is untouched and a starter Task is filed against no Mission. | unchanged |
 | **Approval** | Raised by a roster agent's review-before-act guardrails; one of the two things milestone 4 counts. | `pending → approved \| rejected` |
 | **Escalation** | Raised when an agent gives up or refuses; the other thing milestone 4 counts. | `open → resolved` |
 | **Skill** | Attached to roster agents during the binding stage. | unchanged |
@@ -673,7 +683,7 @@ have no source anywhere else: *skipped*, *hidden*, and *the introduction was
 acknowledged*. All three are decisions the person made and must survive a device
 switch. Everything else on the row is a cache with a 60-second life.
 
-**States.** Per milestone: `pending → done` (irreversible — a shipped mission
+**States.** Per milestone: `pending → done` (irreversible — a shipped task
 stays shipped) and `pending ⇄ skipped`. Per row: `active → hidden`, reversible;
 `active → completed → dismissed`.
 
@@ -908,7 +918,7 @@ agent row is a link to that agent, reachable by `Tab`.
 │  ──────────────────────────────────────────────────────────────────────────  │
 │   ●  Connect your AI provider                                    Done         │
 │   ●  Meet your agents                                            Done         │
-│   ○  Ship your first mission                              [ Pick a brief ]    │
+│   ○  Ship your first task                                 [ Pick a brief ]    │
 │      Hand your agents one real piece of work.                                 │
 │   ○  Answer your first decision                                   Waiting     │
 │      Your agents ask before anything leaves the workspace.                    │
@@ -962,7 +972,7 @@ Milestone rows, exact:
 | --- | --- | --- | --- |
 | 1 | `Connect your AI provider` | `Your agents run on your own provider account.` | `Connect a provider` |
 | 2 | `Meet your agents` | `A small team, each with one area to own.` | `Set up my agents` |
-| 3 | `Ship your first mission` | `Hand your agents one real piece of work.` | `Pick a brief` |
+| 3 | `Ship your first task` | `Hand your agents one real piece of work.` | `Pick a brief` |
 | 4 | `Answer your first decision` | `Your agents ask before anything leaves the workspace.` | `Open decisions` / `Waiting` |
 | 5 | `Put something on a schedule` | `Something that runs tomorrow without you.` | `Choose a job` |
 
@@ -985,7 +995,7 @@ and is the last stop in the card.
 │        4 agents · Ada, Research, Content, Market watch                        │
 │                                    [ See the introduction ]  [ Open Agents ] │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│  ○  3 · Ship your first mission                                              │
+│  ○  3 · Ship your first task                                                 │
 │        Pick something real. A brief that says what "finished" means is the    │
 │        difference between work that lands and work that comes back to ask.    │
 │                                                                              │
@@ -1011,7 +1021,7 @@ and is the last stop in the card.
 ├──────────────────────────────────────────────────────────────────────────────┤
 │  ○  5 · Put something on a schedule                                          │
 │        ( ) A daily summary of the workspace          every day at 08:00 CET   │
-│        ( ) A weekly look at your missions            Mondays at 09:00 CET     │
+│        ( ) A weekly look at your open work           Mondays at 09:00 CET     │
 │        ( ) Give Ada a cadence                        every hour               │
 │                                                          [ Turn it on ]      │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -1022,14 +1032,13 @@ and is the last stop in the card.
 ```
 │        Your own brief                                          10 000 max    │
 │        [ …3 of 10 000 characters ]                                           │
-│        ⚠ That's longer than a mission brief can be. Trim it by 214           │
-│          characters.                                                         │
+│        ⚠ That's longer than a brief can be. Trim it by 214 characters.       │
 ```
 
 **No roster yet.**
 
 ```
-│  ○  3 · Ship your first mission                                              │
+│  ○  3 · Ship your first task                                                 │
 │        You need an agent before you can hand out work.                        │
 │                                                    [ Set up my agents ]      │
 ```
@@ -1052,7 +1061,7 @@ and is the last stop in the card.
 · `Show me an example` · `Turn it on` ·
 `You need an agent before you can hand out work.` ·
 `Nothing will run until you connect a provider. You can send this now and it'll start as soon as one is connected.`
-· `That's longer than a mission brief can be. Trim it by {n} characters.`
+· `That's longer than a brief can be. Trim it by {n} characters.`
 
 **Keyboard.** Each milestone is a section with a heading. Radio groups are single
 tab stops with arrow-key selection. `Ctrl/Cmd+Enter` inside a section triggers
@@ -1095,8 +1104,8 @@ This epic deliberately does **not**:
    epic ships a form because a form can be resumed, tested and translated.
 3. **Build a decision surface.** Milestone 4 links to what exists and to whatever
    AW-03 ships. It renders no decision of its own.
-4. **Build a mission board.** Milestone 3 creates a Mission and links to it.
-   Columns, cards and steering are AW-02.
+4. **Build a task board.** Milestone 3 creates a Task and links to it. Columns,
+   cards and steering are AW-02.
 5. **Build a schedules page.** Milestone 5 arms one of three known jobs. The
    calendar, heartbeats and never-runs detection are AW-10.
 6. **Add or change any AI provider.** Milestone 1 checks the connections the
@@ -1115,6 +1124,10 @@ This epic deliberately does **not**:
 11. **Backfill existing accounts.** Nothing is created for anyone. Existing
     accounts get an evaluated checklist and, in almost every case, a completed
     card they dismiss once.
+12. **Create a Mission.** A Mission is a standing initiative that keeps
+    generating work; the first hour delegates one piece of work, which is a
+    Task. Setting up a standing initiative stays exactly where it already lives,
+    on the existing Missions surface, and nothing in this epic writes to it.
 
 ---
 
@@ -1184,12 +1197,12 @@ A reviewer can run this list top to bottom against a build.
 - [ ] With the page open, completing a milestone elsewhere updates the count
       within 60 seconds without clobbering unsaved input.
 
-### First mission, decision and schedule
+### First task, decision and schedule
 
 - [ ] Three starter briefs are offered, each under 280 characters, each naming
       its lane.
-- [ ] Sending one creates a Mission and a Task, assigns the Task to the lane's
-      agent, and links to the Mission.
+- [ ] Sending one creates exactly one Task and no Mission, assigns it to the
+      lane's agent, and links to it.
 - [ ] With no roster, milestone 3 offers **Set up my agents** instead.
 - [ ] With no provider connected, sending is allowed and warns explicitly.
 - [ ] A brief over 10 000 characters is blocked with the trim message.
@@ -1206,10 +1219,10 @@ A reviewer can run this list top to bottom against a build.
       through message keys.
 - [ ] The whole feature is reachable, operable and understandable with a keyboard
       and with a screen reader.
-- [ ] No credential value, brief text, agent name or mission title appears in any
+- [ ] No credential value, brief text, agent name or Task title appears in any
       telemetry event.
 - [ ] Provisioning spends nothing; the only spend warning in the epic is on the
-      starter mission.
+      starter task.
 - [ ] Removing the checklist entirely would change no behaviour on any other
       surface.
 
@@ -1234,9 +1247,9 @@ A reviewer can run this list top to bottom against a build.
   re-check silently (costs a provider call per open) or only show the age and
   offer **Recheck**? The wireframes assume the latter.
 - **[NEEDS CLARIFICATION: what "shipped" means]** Milestone 3 completes on the
-  first completed run under the mission, which can be true while the mission is
-  still open. The stricter reading is "the mission reached a completed state",
-  which is more honest but can take days. Is the looser reading acceptable for a
+  first completed run against the Task, which can be true while the Task is
+  still `in_progress`. The stricter reading is "the Task reached `done`", which
+  is more honest but can take days. Is the looser reading acceptable for a
   first-hour signal?
 - **[NEEDS CLARIFICATION: starter brief content ownership]** The three briefs are
   written into the build. Should they instead be derived from the user's answered

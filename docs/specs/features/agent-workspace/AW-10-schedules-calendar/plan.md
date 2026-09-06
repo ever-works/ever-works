@@ -33,7 +33,7 @@
 | `recurring_task` | `tasks` ([`task.entity.ts`](../../../../../packages/agent/src/entities/task.entity.ts)) `isRecurring`, `recurrenceRule` xor `recurrenceCron`, `recurrenceTimezone`, `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`, `recurrenceOccurredCount`, `parentRecurringTaskId`, index `idx_tasks_recurrence_due (isRecurring, nextOccurrenceAt)` | `isRecurring = true AND parentRecurringTaskId IS NULL` | **No.** `DELETE /api/tasks/:id/recurring` clears the cadence — destructive. |
 | `agent_heartbeat` | `agents` ([`agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts)) `heartbeatCadence` (cron or `'manual'`), `nextHeartbeatAt`, `lastRunAt`, `lastRunStatus`, `errorCount`, `pauseAfterFailures` (default 3), index `idx_agents_next_heartbeat (status, nextHeartbeatAt)` | `heartbeatCadence IS NOT NULL` | **No.** Only by pausing the whole Agent, which also stops assigned Task work. |
 | `work_schedule` | `work_schedules` ([`work-schedule.entity.ts`](../../../../../packages/agent/src/entities/work-schedule.entity.ts)) `cadence`, `status`, `nextRunAt`, `lastRunAt`, `lastRunStatus`, `failureCount`, `maxFailureBeforePause` (default 3) | `status = active` | **Yes** — `WorkScheduleStatus.PAUSED`. |
-| `mission_tick` | `missions` ([`mission.entity.ts`](../../../../../packages/agent/src/entities/mission.entity.ts)) `type = scheduled`, `schedule` (cron), `status` | `status = active` | **Yes, but coarse** — pausing the Mission pauses everything about it (spec FR-19). |
+| `mission_tick` | `missions` ([`mission.entity.ts`](../../../../../packages/agent/src/entities/mission.entity.ts)) `type = scheduled`, `schedule` (cron), `status` (`MissionStatus`: `active` \| `paused` \| `completed` \| `failed`) | `status = active` | **Yes, but coarse** — pause writes `status = paused`, which stops the tick raising new Ideas; Ideas and Works already raised are untouched, and `runNow` still works on a paused Mission (spec FR-19). |
 | `source_validation` | `works` `sourceValidationEnabled`, `sourceValidationCadence`, `sourceValidationNextRunAt` | flag on | **Yes** — flip the flag; the cadence column survives. |
 | `data_sync` | `works` `syncIntervalMinutes`, `lastPolledAt` | interval > 0 | Partially — clearing the interval loses it. |
 | `inbound_trigger` | `inbound_triggers` ([`inbound-trigger.entity.ts`](../../../../../packages/agent/src/entities/inbound-trigger.entity.ts)) `status: active\|paused` | `status = active` | **Yes.** |
@@ -44,18 +44,25 @@
 | --- | --- | --- | --- |
 | [`packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts) | `* * * * *` | [`task-recurrence-dispatcher.service.ts`](../../../../../packages/agent/src/tasks-domain/task-recurrence-dispatcher.service.ts) `dispatchDue` / `dispatchDueScheduled` | `TaskRepository.findDueRecurringTemplates(limit, now)` and `findDueScheduledTasks` in [`task.repository.ts`](../../../../../packages/agent/src/database/repositories/task.repository.ts). CAS-claims by advancing `nextOccurrenceAt`; agent resolution is assignees → `task.agentId`, and on failure it raises a `task_run_no_agent` notification ([`task-notification.service.ts`](../../../../../packages/agent/src/tasks-domain/task-notification.service.ts)) rather than skipping silently. |
 | [`agent-heartbeat-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat-dispatcher.task.ts) | `*/N * * * *` | [`agent-schedule-dispatcher.service.ts`](../../../../../packages/agent/src/agents/agent-schedule-dispatcher.service.ts) `dispatchDue`, exporting `AGENT_HEARTBEAT_TRIGGER` | Scans `agents` for `nextHeartbeatAt <= now`, CAS-claims `active → running`. |
-| [`mission-tick.task.ts`](../../../../../packages/tasks/src/tasks/trigger/mission-tick.task.ts) | `* * * * *` | [`mission-tick.service.ts`](../../../../../packages/agent/src/missions/mission-tick.service.ts) | Cron-matches each active scheduled Mission. Untouched by this epic. |
+| [`mission-tick.task.ts`](../../../../../packages/tasks/src/tasks/trigger/mission-tick.task.ts) | `* * * * *` | [`mission-tick.service.ts`](../../../../../packages/agent/src/missions/mission-tick.service.ts) | `tickDue` cron-matches every `status = ACTIVE`, `type = SCHEDULED` Mission and asks the generator for Ideas (`WorkProposal` rows, capped at `MAX_IDEAS_PER_TICK = 5`), queueing them for build when `autoBuildWorks` is on. **It creates no Task and dispatches no `AgentRun`** — its only record of a fire is an `ActivityActionType.MISSION_TICK` row, and cron-no-match minutes are deliberately not logged. Dispatcher untouched by this epic; §3.5 reads that activity row for the calendar. |
 | [`work-schedule-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts) | config-driven | `WorkScheduleDispatcherService` | Untouched. |
 
 Dispatch indirection to respect (Constitution IV): [`packages/agent/src/tasks-domain/task-dispatcher.ts`](../../../../../packages/agent/src/tasks-domain/task-dispatcher.ts) declares `AGENT_TASK_EXECUTE_DISPATCHER`, `AGENT_CHAT_REPLY_DISPATCHER`, `TERMINAL_SESSION_STARTER` and `JOB_RUNTIME_NOT_CONFIGURED_REASON`. Nothing in `packages/agent` imports a third-party SDK; the adapters live in `packages/tasks` / `apps/api`.
 
-### 1.4 Where a fire becomes a Run
+### 1.4 Where a fire becomes a Run — and where it does not
 
-- Recurring Task fires clone an instance via `cloneRecurringTaskAsInstance` and dispatch through
-  the same gated path a manual run uses, producing an `AgentRun`
+- Recurring Task fires clone a **Task instance** via `cloneRecurringTaskAsInstance` (the clone
+  points back at its template through `parentRecurringTaskId`) and dispatch through the same gated
+  path a manual run uses, producing an `AgentRun`
   ([`agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts)) with
   `triggerKind = 'task'`.
 - Heartbeat fires produce an `AgentRun` with `triggerKind = 'heartbeat'`.
+- **A Mission tick becomes neither.** `MissionTickService.tickDue` raises `WorkProposal` rows
+  (Ideas) and may queue them for build through `IDEA_BUILD_EXECUTE_DISPATCHER`; the only trace that
+  the cadence fired is an `ActivityActionType.MISSION_TICK` activity row. That row — not a missing
+  `AgentRun` — is the evidence the calendar must read for `mission_tick` occurrences (spec FR-62).
+  The same holds for the other sources that keep their own outcome columns instead of dispatching a
+  Run (`work_schedules.lastRunStatus`, `works.sourceValidationLastRunAt`, `works.lastPolledAt`).
 - Terminal transitions run through
   [`agent-run-post-processor.ts`](../../../../../packages/agent/src/agents/agent-run-post-processor.ts)
   — the seam where announcements and the failure streak are updated.
@@ -66,10 +73,12 @@ Dispatch indirection to respect (Constitution IV): [`packages/agent/src/tasks-do
 
 ### 1.5 Migrations
 
-Migrations live in **`apps/api/src/migrations/`** (175 files today; newest
-`1789100000000-AddTaskGraphFanout.ts`). Note the drift: the constitution text says
+Migrations live in **`apps/api/src/migrations/`** (175 files today; the highest timestamp is
+`1789200000000-AddRepoConnectionEnvGrants.ts`, so each migration this epic adds must sort after
+it). Note the drift: the constitution text says
 `apps/api/src/database/migrations/`, and the repo `CLAUDE.md` says `apps/api/src/migrations/` —
-the second is correct on disk and is what this plan uses. Style to copy from the newest file:
+the second is correct on disk and is what this plan uses. Style to copy from
+`1789100000000-AddTaskGraphFanout.ts`:
 forward-only, existence-guarded, portable `TableColumn` DDL because the e2e stack runs
 better-sqlite3 while production runs Postgres. Adding an entity also requires registering it in
 [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts)
@@ -255,9 +264,13 @@ export interface ScheduleOccurrence {
     scheduleId: string;
     expectedAt: string;              // ISO, UTC
     outcome: 'ran' | 'failed' | 'did-not-run' | 'unknown' | 'upcoming' | 'paused';
-    runId: string | null;            // set for ran / failed
-    durationMs: number | null;
-    costCents: number | null;
+    /** How a past outcome was established. 'none' ⇒ outcome is 'unknown' or 'upcoming'. */
+    evidence: 'run' | 'sourceRecord' | 'none';
+    runId: string | null;            // set for ran / failed only when evidence === 'run'
+    /** Where to send the user when there is no receipt: the owning entity's link. */
+    ownerLink: string | null;
+    durationMs: number | null;       // null for sourceRecord evidence
+    costCents: number | null;        // null for sourceRecord evidence
     notRunReasonKey: string | null;  // 'pausedAtTheTime' | 'noAgent' | null
 }
 
@@ -286,6 +299,15 @@ export interface SchedulePage {
     healthCheckedAt: string | null;
 }
 ```
+
+`evidence` is what keeps spec FR-62 honest. `recurring_task` and `agent_heartbeat` fires produce an
+`AgentRun`, so their occurrences resolve with `evidence: 'run'` and a receipt link. A `mission_tick`
+fire produces Ideas rather than a Run, so its occurrences resolve with `evidence: 'sourceRecord'`
+from the `MISSION_TICK` activity row inside the same ±10 minute window, carry no `runId`, `durationMs`
+or `costCents`, and link to the Mission; with no such row the outcome is `unknown` — never
+`did-not-run`, which would be inferred from the absence of something that was never created. The
+same rule covers `work_schedule`, `source_validation` and `data_sync`, which keep their own outcome
+columns (§1.4).
 
 The web mirror in [`apps/web/src/lib/api/schedules.ts`](../../../../../apps/web/src/lib/api/schedules.ts)
 is updated in lockstep, following the local-interface convention that file already documents.
@@ -503,7 +525,12 @@ Run-now dispatch:
   success.
 - `agent_heartbeat` → the existing `AGENT_HEARTBEAT_TRIGGER` binding, the same one
   `POST /api/agents/:id/run-now` uses.
-- The other five sources delegate to their existing run-now endpoints; where none exists the row's
+- `mission_tick` → the existing `POST /api/me/missions/:id/run-now`
+  ([`apps/api/src/missions/missions.controller.ts`](../../../../../apps/api/src/missions/missions.controller.ts)),
+  which runs one tick through `MissionsService.runNow` (gated to `ACTIVE | PAUSED`). It returns a
+  `MissionTickOutcome`, not a `runId`, so the response carries no Run link and the toast points at
+  the Mission and the Ideas the tick raised (spec FR-14).
+- The other four sources delegate to their existing run-now endpoints; where none exists the row's
   `controls.runNow` is `false` with a reason.
 
 ---
@@ -541,7 +568,9 @@ dashboard.schedules
   columns (extend):  health · lastOutcome
   filters (extend):  agent · status · health · search · clear · unfilteredTotal
   actions:          runNow · pause · resume · edit · duplicate · reassign
-                    openTask · seePastRuns · fix · fixAll · disableAll · undo · apply · cancel
+                    openTask · openAgent · openMission · openWork   (owner entry, per source)
+                    seePastRuns · seeIdeasRaised
+                    fix · fixAll · disableAll · undo · apply · cancel
   health:
     ok · neverRuns · overlap · bannerCount · reviewAndFix · dismiss · staleNotice
     reasons:        impossibleDate · ended · exhausted · pastOneShot
@@ -574,16 +603,16 @@ dashboard.schedules
     outcomes:       ran · failed · paused · didNotRun · unknown · upcoming
     notRunReasons:  pausedAtTheTime · noAgent
     legend · rangeTooWide · tooManyOccurrences · emptyWeek · jumpToNext
-    openSchedule · openReceipt
+    openSchedule · openReceipt · openOwner · ranRaisedIdeas
   runNow:
-    queuedToast · doesNotShiftNote
+    queuedToast · doesNotShiftNote · missionTickToast   (no run link — links to the Mission)
     refused:        alreadyRunning · noAgent · ownerArchived · credits · rateLimited
   duplicate:        doneToast · startsPausedNote · openTheCopy
   reassign:         dialogTitle · currentlyRunsAs · moveItTo · movesWithIt
                     noModelWarning · archivedError · doneToast
   autoPause:        bannerTitle · bannerBody · openLastReceipt · raiseTimeLimit · resumeCta
   announce:         completed · failed · rolledUp
-  missionPause:     confirmTitle · confirmBody · openMissionInstead
+  missionPause:     confirmTitle · confirmBody · alreadyRaisedNote · openMissionInstead
   degraded:         sourceFailed · totalsExclude
   errors:           listFailed · calendarFailed · healthFailed · nothingWasChanged
   keyboard:         sheetTitle · move · open · runNow · pauseResume · edit · duplicate
@@ -639,6 +668,7 @@ row per Schedule — a 500-row batch must not flood the feed.
 | Repeated fire failures | `recurrenceFailureStreak` in the post-processor | Auto-pause at 5, notify regardless of the announce setting (FR-71). |
 | Occurrence expansion explodes | Caps at 500/Schedule and 2 000/request | Truncation is reported per Schedule, never silently (FR-65 / U9). |
 | A Schedule's Runs have aged out of retention | Run lookup returns nothing and the occurrence predates the retention floor | Rendered `unknown`, never `did not run` (FR-63). |
+| A source produces no Run at all (`mission_tick` raising Ideas; the three Work-owned sources) | `evidence` resolution finds no `AgentRun` because none is ever created | Resolved from that source's own record — the `MISSION_TICK` activity row, or the source's `lastRun*` columns — and rendered `unknown` when no record is held. Never `did not run` (FR-62 / §3.5). |
 
 ---
 
@@ -650,7 +680,7 @@ row per Schedule — a 500-row batch must not flood the feed.
 | --- | --- |
 | `packages/agent/src/schedules/__tests__/schedule-health.spec.ts` | All seven reasons produced by a matching fixture and by nothing else; a yearly cron, a 29-Feb cron and a paused row are **not** flagged; repair class per reason. |
 | `packages/agent/src/schedules/__tests__/schedule-repair.spec.ts` | `impossible-date` clamps to the last day existing in every named month (Feb → 28); end-date clear; occurrence-cap clear; past one-shot moves ≥5 min into the future; before-hash mismatch is refused. |
-| `packages/agent/src/schedules/__tests__/schedule-occurrence.spec.ts` | Expansion for cron and RRULE across a 92-day window; per-Schedule 500 and per-request 2 000 caps; ±10 min Run matching; `unknown` past the retention floor; paused occurrences marked, not dropped. |
+| `packages/agent/src/schedules/__tests__/schedule-occurrence.spec.ts` | Expansion for cron and RRULE across a 92-day window; per-Schedule 500 and per-request 2 000 caps; ±10 min Run matching; `unknown` past the retention floor; paused occurrences marked, not dropped; a `mission_tick` occurrence resolving from its `MISSION_TICK` activity row with `evidence: 'sourceRecord'`, and reading `unknown` — never `did-not-run` — when no such row exists. |
 | `packages/agent/src/schedules/__tests__/schedule-controls.spec.ts` | The control descriptor per source type, and each disabled reason. |
 | `packages/agent/src/schedules/__tests__/schedule-bulk-action.service.spec.ts` | Record contents, 15-minute window, single-undo enforcement, per-entry skip on changed state, 30-day pruning. |
 | `packages/agent/src/schedules/__tests__/heartbeat-overlap.spec.ts` | Coincidence at exactly 1 vs 2 fires in 7 days; duty score at 0.34 vs 0.35; the tight-heartbeat rule at 15 min with 0 and 1 Schedules. |

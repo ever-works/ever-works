@@ -8,8 +8,8 @@
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
 **Status**: `Draft`
 **Last updated**: 2026-09-06
-**Blocking dependency**: [AW-02 Mission board](../AW-02-mission-board/spec.md) must have
-landed its lane projection before **T9**.
+**Blocking dependency**: [AW-02 Task board](../AW-02-task-board/spec.md) must have
+landed its Focus-layout column projection before **T9**.
 
 ---
 
@@ -68,8 +68,8 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
       `published-board.dto.ts`, `published-document.dto.ts`, `publishable-activity.ts`
       and `index.ts`.
     - Declare `SharedViewSettingsDto`, `SharedViewSectionsDto`,
-      `SharedViewIndexingMode`, `PublishedBoardDto`, `PublishedLaneDto`,
-      `PublishedMissionCardDto`, `PublishedAgentDto`, `PublishedActivityLineDto`,
+      `SharedViewIndexingMode`, `PublishedBoardDto`, `PublishedColumnDto`,
+      `PublishedTaskCardDto`, `PublishedAgentDto`, `PublishedActivityLineDto`,
       `PublishedDocumentSummaryDto`, `PublishedDocumentDto`, and the frozen
       `PUBLISHABLE_ACTIVITY_ACTIONS` constant.
     - Every published DTO is **closed**: no index signature, no `Record<string, unknown>`.
@@ -90,13 +90,15 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
 
 - [ ] **T5**. Add the publish filters (the security boundary).
     - Create `packages/agent/src/shared-views/publish-filter.ts` exporting pure functions
-      `publishMissionCard`, `publishAgent`, `publishActivityLine`,
+      `publishTaskCard`, `publishAgent`, `publishActivityLine`,
       `publishDocumentSummary`, `publishDocument`.
     - **Test**: `packages/agent/src/shared-views/__tests__/publish-filter.spec.ts` —
       asserts the **exact key set** of each output object, and feeds each filter an input
       carrying `costUsd`, `budget`, `tokenCount`, `model`, `instructions`, `comments`,
-      `repoUrl`, `email` and asserts none survives.
-    - **Done when**: adding a field to `Mission` and re-running the spec fails until the
+      `repoUrl`, `email` and the Task's owner columns (`missionId`, `workId`, `ideaId`,
+      `teamId`, `agentId`, `goalId`) and asserts none survives — the shared view
+      publishes no provenance chip (FR-21).
+    - **Done when**: adding a field to `Task` and re-running the spec fails until the
       field is deliberately classified.
 
 - [ ] **T6**. Classify every activity action for publication.
@@ -132,14 +134,18 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
       enable is idempotent, pause keeps the token, regenerate replaces it, a stale
       `rotationCount` raises the conflict.
 
-- [ ] **T9**. Add the board projection service. **Requires AW-02's lane projection.**
+- [ ] **T9**. Add the board projection service. **Requires AW-02's Focus-layout column
+      projection.**
     - Create `packages/agent/src/shared-views/shared-view-projection.service.ts`:
-      `projectBoard(organizationId)` reads the **same** lane query the private board uses,
-      caps each lane at 50 rows, projects Agents and the last 20 publishable activity
-      rows, and passes everything through T5's filters.
+      `projectBoard(organizationId)` reads the **same** column query the private Task
+      board uses for its Focus layout (`Backlog`, `In flight`, `Needs you`, `Done`
+      grouping the seven `TaskStatus` values), caps each column at 50 rows, projects
+      Agents and the last 20 publishable activity rows, and passes everything through
+      T5's filters.
     - **Test**: `packages/agent/src/shared-views/__tests__/shared-view-projection.service.spec.ts`
-      — lane order and membership match the private board fixture; archived and trashed
-      Missions are absent and are not counted; the `+N more` overflow number is correct.
+      — column order and membership match the private Focus-layout fixture; cancelled
+      Tasks, recurring templates and board-hidden Tasks are absent and are not counted;
+      the `+N more` overflow number is correct.
 
 ### API — owner side
 
@@ -251,7 +257,7 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
       `apps/web/src/components/share/PublishedBoard.tsx`.
     - Implement all states from `spec.md` §6.7: loading skeleton, empty board, not
       active, throttled, poll-paused, preview banner, and the ≥360 px single-column
-      layout with sticky lane headers.
+      layout with sticky column headers.
     - Poll every 20 s; pause on `document.hidden`; stop after 30 min idle with a
       **Resume** control; back off to 60 s on `429`; keep the last good render on a
       network error.
@@ -330,12 +336,15 @@ Ships FR-50…FR-79.
 - [ ] **T25**. Write the attribution-columns migration.
     - Create `apps/api/src/migrations/1789220000000-AddRequesterAttribution.ts` adding
       `requestedByGuestId` (FK → `channel_guests`, `ON DELETE SET NULL`) and
-      `requestedByLabel varchar(160)` to `missions`, `tasks`,
+      `requestedByLabel varchar(160)` to `tasks`, `missions`,
       `agent_action_proposals`, `agent_escalations`, plus `originConversationRef
       varchar(256)` to `agent_action_proposals` and `agent_escalations`.
+    - `tasks` is the primary case (a guest's request produces Tasks); `missions` carries
+      the same pair only for the case where the Run sets up a standing initiative at the
+      guest's request (FR-68).
     - Add the matching nullable columns to
-      `packages/agent/src/entities/mission.entity.ts`,
       `packages/agent/src/entities/task.entity.ts`,
+      `packages/agent/src/entities/mission.entity.ts`,
       `packages/agent/src/entities/agent-action-proposal.entity.ts`,
       `packages/agent/src/entities/agent-escalation.entity.ts` **in the same PR**.
     - **Done when**: every column is nullable, no existing column is touched, and the
@@ -393,8 +402,9 @@ Ships FR-50…FR-79.
 - [ ] **T30**. Add the requester-attribution service.
     - Create `packages/agent/src/channel-guests/requester-attribution.service.ts`:
       builds `"{displayName} · {channelName}"`, stamps `requestedByGuestId` +
-      `requestedByLabel` on Missions, Tasks, Approvals and Escalations created by a
-      guest-originated Run, and appends `(revoked)` when rendering a revoked guest's
+      `requestedByLabel` on the Tasks, Approvals and Escalations a guest-originated Run
+      creates — and on a Mission only when that Run sets up a standing initiative at the
+      guest's request — and appends `(revoked)` when rendering a revoked guest's
       historical label.
     - **Test**: `packages/agent/src/channel-guests/__tests__/requester-attribution.service.spec.ts`
       — label format; stamping on all four record kinds; owner-originated work carries
@@ -454,8 +464,9 @@ Ships FR-50…FR-79.
     - **Test**: `apps/web/src/components/settings/ChannelGuestsPanel.unit.spec.tsx`.
 
 - [ ] **T35**. Surface the requester label.
-    - Add the optional label line to the Mission card and Mission detail header (AW-02
-      components) and to the My Decisions row (AW-03 component).
+    - Add the optional label line to the Task card and Task detail header (AW-02
+      components), to the Mission detail header, and to the My Decisions row (AW-03
+      component).
     - Render nothing when the label is absent — the absence of a label means "the owner
       asked", and the UI must not invent one.
     - Confirm the label is **not** present in any `Published*` DTO (T5's key-set spec

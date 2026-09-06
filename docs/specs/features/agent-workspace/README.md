@@ -63,8 +63,8 @@ here and every epic must honour it. The entity lifecycles decide it:
 | | `Task` | `Mission` |
 | --- | --- | --- |
 | What it is | "a trackable work item assigned to people or Agents" | a long-running initiative that continuously drives Idea generation, and via Ideas, Works |
-| Statuses | `backlog · todo · in_progress · in_review · blocked · done · cancelled` | `active · paused · completed · failed` |
-| Priority | `p0 · p1 · p2 · p3` | none |
+| Statuses | `backlog · todo · in_progress · in_review · blocked · done · cancelled` (a Kanban over these already ships — see EXISTING-SUBSTRATE.md) | `active · paused · completed · failed` |
+| Priority | `p0 Urgent · p1 High · p2 Medium · p3 Normal · p4 Low` (five steps, all translated) | none |
 | Cardinality | may be a sub-task of another Task; may be scoped to a Work, Mission, Idea, Team, Agent or Goal, in any combination | 1 Mission → many Ideas → many Works |
 | Lifetime | finishes | ongoing until the owner ends it; ticks on a cron when `type = scheduled` |
 | Recurrence | `isRecurring` makes the row a template that clones instances | `one-shot` or `scheduled` |

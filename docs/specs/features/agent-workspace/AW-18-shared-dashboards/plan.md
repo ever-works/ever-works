@@ -8,8 +8,8 @@
 **Spec**: [`./spec.md`](./spec.md) · **Tasks**: [`./tasks.md`](./tasks.md)
 **Status**: `Draft`
 **Last updated**: 2026-09-06
-**Blocking dependency**: [AW-02 Mission board](../AW-02-mission-board/spec.md) — the
-lane projection this epic publishes.
+**Blocking dependency**: [AW-02 Task board](../AW-02-task-board/spec.md) — the Focus
+column projection this epic publishes.
 
 ---
 
@@ -158,7 +158,7 @@ Slack delivery ─► apps/api/src/ingest/slack/slack-events.controller.ts     (
 
 ### 1.11 Migrations
 
-175 timestamp-prefixed files live in
+174 timestamp-prefixed files live in
 [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/); the newest is
 `1789100000000-AddTaskGraphFanout.ts`. New entities must also be registered in
 [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts)
@@ -205,23 +205,27 @@ flowchart TB
 ### 2.2 The seam for slice A — a projection service, not a second read model
 
 The published board must never disagree with the private board (FR-15). It therefore
-reads the **same** repository query the private board uses (delivered by AW-02) and
+reads the **same** repository query the private Task board uses for its **Focus**
+layout (delivered by AW-02 — four columns grouping the seven `TaskStatus` values) and
 passes the rows through a **publish filter** that is a pure function:
 
 ```
-MissionRow[]  ──►  publishMissionCard(row)  ──►  PublishedMissionCard
-                       ▲
-                       └── drops every field not on the FR-14 allowlist
+TaskRow[]  ──►  publishTaskCard(row)  ──►  PublishedTaskCard
+                    ▲
+                    └── drops every field not on the FR-14 allowlist
 ```
 
 Two rules keep this honest and testable:
 
-1. `PublishedMissionCard`, `PublishedAgent`, `PublishedActivityLine` and
+1. `PublishedTaskCard`, `PublishedAgent`, `PublishedActivityLine` and
    `PublishedDocument` are **closed DTO types in `packages/contracts`** with no index
    signature and no passthrough. A field that is not declared cannot be serialised.
 2. The publish filters are **pure functions with their own unit specs** that assert the
-   exact key set of the output object. Adding a field to a Mission cannot leak it,
-   because the key-set assertion fails first.
+   exact key set of the output object. Adding a field to `Task` cannot leak it,
+   because the key-set assertion fails first. In particular the Task's owner columns
+   (`missionId`, `workId`, `ideaId`, `teamId`, `agentId`, `goalId`) and the Mission
+   provenance chip the private card renders from them are **not** on the allowlist
+   (FR-21).
 
 The same rule governs the activity strip: `PUBLISHABLE_ACTIVITY_ACTIONS` is a frozen
 allowlist constant, and a spec asserts that every member of `ActivityActionType` is
@@ -318,10 +322,10 @@ All nullable, all safe on rollback (Constitution X).
 
 | Table | Column | Type | Why |
 | --- | --- | --- | --- |
-| `missions` | `requestedByGuestId` | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 |
-| `missions` | `requestedByLabel` | varchar(160), nullable | FR-67, FR-73 — retained verbatim after revoke |
-| `tasks` | `requestedByGuestId` | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 |
-| `tasks` | `requestedByLabel` | varchar(160), nullable | FR-67 |
+| `tasks` | `requestedByGuestId` | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 — the primary case: a guest's request produces Tasks |
+| `tasks` | `requestedByLabel` | varchar(160), nullable | FR-67, FR-73 — retained verbatim after revoke |
+| `missions` | `requestedByGuestId` | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 — only for the case where the Run sets up a standing initiative at the guest's request |
+| `missions` | `requestedByLabel` | varchar(160), nullable | FR-68, FR-73 |
 | `agent_action_proposals` | `requestedByGuestId` | uuid, nullable, FK `SET NULL` | FR-69 |
 | `agent_action_proposals` | `requestedByLabel` | varchar(160), nullable | FR-69 |
 | `agent_escalations` | `requestedByGuestId` | uuid, nullable, FK `SET NULL` | FR-69 |
@@ -365,7 +369,7 @@ Timestamps continue the existing sequence (newest on disk is `1789100000000`).
 | --- | --- | --- |
 | `1789200000000-CreateSharedViews.ts` | `CREATE TABLE shared_views` + 3 indexes | P1 |
 | `1789210000000-CreateChannelGuests.ts` | `CREATE TABLE channel_guests` + 3 indexes | P2 |
-| `1789220000000-AddRequesterAttribution.ts` | 9 nullable columns across `missions`, `tasks`, `agent_action_proposals`, `agent_escalations` + FKs `ON DELETE SET NULL` | P2 |
+| `1789220000000-AddRequesterAttribution.ts` | 10 nullable columns across `tasks`, `missions`, `agent_action_proposals`, `agent_escalations` + FKs `ON DELETE SET NULL` | P2 |
 | `1789230000000-AddKbSharedViewExcluded.ts` | `work_knowledge_documents.shared_view_excluded boolean NOT NULL DEFAULT false` | P3 |
 
 Every `down()` is a plain `DROP`/`DROP COLUMN` of only what its `up()` added. No
@@ -380,9 +384,9 @@ New DTOs under `packages/contracts/src/api/shared-view/`, exported from that fol
 - `SharedViewSettingsDto` (owner read/write — carries the decrypted token **only** on the
   owner read)
 - `SharedViewSectionsDto`, `SharedViewIndexingMode`
-- `PublishedBoardDto` — `{ workspaceName, lanes: PublishedLaneDto[], agents:
+- `PublishedBoardDto` — `{ workspaceName, columns: PublishedColumnDto[], agents:
   PublishedAgentDto[], recent: PublishedActivityLineDto[], generatedAt }`
-- `PublishedMissionCardDto`, `PublishedAgentDto`, `PublishedActivityLineDto`
+- `PublishedTaskCardDto`, `PublishedAgentDto`, `PublishedActivityLineDto`
 - `PublishedDocumentSummaryDto`, `PublishedDocumentDto`
 - `ChannelGuestDto`, `CreateChannelGuestDto`, `UpdateChannelGuestDto`
 - `PUBLISHABLE_ACTIVITY_ACTIONS` frozen constant
@@ -464,7 +468,7 @@ that could accidentally read the session cookie.
 | --- | --- | --- |
 | `apps/web/src/app/[locale]/share/[token]/page.tsx` | Server component | The published page. Sibling of `org-invite/`, so the static `share` segment wins over `[slug]`. Renders board + knowledge tabs; **no** client JS required for first paint (FR-85). |
 | `apps/web/src/app/[locale]/share/[token]/not-active.tsx` | Server component | The identical "no longer active" body used by every failure (FR-11). |
-| `apps/web/src/components/share/PublishedBoard.tsx` | Client | Lanes, cards, roster, strip; 20 s poll with visibility + idle handling (FR-43). |
+| `apps/web/src/components/share/PublishedBoard.tsx` | Client | Columns, cards, roster, strip; 20 s poll with visibility + idle handling (FR-43). |
 | `apps/web/src/components/share/PublishedKnowledge.tsx` | Client | Two-pane list/reader with debounced search. |
 | `apps/web/src/components/share/PublishedShell.tsx` | Client | Tabs, footer, live region, keyboard map (§6.12 of the spec). |
 | `apps/web/src/app/robots.ts` | Metadata route | New. `Disallow: /share/` unless the request resolves an indexable Shared view (FR-35). |
@@ -490,9 +494,9 @@ that could accidentally read the session cookie.
 - Mount `<ChannelGuestsPanel />` inside
   [`apps/web/src/components/settings/NotificationChannelsSettings.tsx`](../../../../../apps/web/src/components/settings/NotificationChannelsSettings.tsx)
   for each channel row.
-- Extend the Mission card and Mission detail header (AW-02 components) and the My
-  Decisions row (AW-03) with the optional requester label. Both render nothing when the
-  label is absent (FR-72).
+- Extend the Task card and Task detail header (AW-02 components), the Mission detail
+  header, and the My Decisions row (AW-03) with the optional requester label. All of
+  them render nothing when the label is absent (FR-72).
 
 ### 5.3 State and data fetching
 
@@ -608,7 +612,7 @@ throttledTitle, throttledBody,
 documentUnpublished, backToDocuments,
 searchPlaceholder, searchResults, searchTooShort,
 previewBannerOn, previewBannerOff, previewClose,
-laneBacklog, laneInFlight, laneNeedsYou, laneDone,
+columnBacklog, columnInFlight, columnNeedsYou, columnDone,
 needsDecision, staleFlag, moreCount,
 agentsHeading, agentWorking, agentIdle, agentPaused, agentInFlight,
 recentlyHeading, poweredBy
@@ -680,13 +684,13 @@ the emit site, not filtered downstream.
 | `packages/agent/src/entities/__tests__/shared-view.entity.spec.ts` | Column defaults; `sections` default shape; `knowledgeClasses` defaults to `[]` |
 | `packages/agent/src/entities/__tests__/channel-guest.entity.spec.ts` | Defaults, status enum |
 | `packages/agent/src/shared-views/__tests__/shared-view-token.spec.ts` | 256-bit generation, hash stability, encrypt/decrypt round trip, token never in `toJSON()` |
-| `packages/agent/src/shared-views/__tests__/publish-filter.spec.ts` | **Exact key-set assertions** on every published DTO; a Mission with cost/budget/comments fields yields a card without them |
+| `packages/agent/src/shared-views/__tests__/publish-filter.spec.ts` | **Exact key-set assertions** on every published DTO; a Task carrying cost/budget/comment fields and a `missionId` yields a card without any of them |
 | `packages/agent/src/shared-views/__tests__/publishable-activity.spec.ts` | Every `ActivityActionType` member is on the publish allowlist **or** the never-publish list — fails CI on an unclassified addition |
-| `packages/agent/src/shared-views/__tests__/shared-view-projection.service.spec.ts` | Lane order and membership match the private board fixture; archived and trashed Missions absent and uncounted; `+N more` overflow arithmetic |
+| `packages/agent/src/shared-views/__tests__/shared-view-projection.service.spec.ts` | Column order and membership match the private Focus-layout fixture; cancelled Tasks, recurring templates and board-hidden Tasks absent and uncounted; `+N more` overflow arithmetic |
 | `packages/agent/src/shared-views/__tests__/knowledge-publish-predicate.spec.ts` | Draft / archived / proposed / deselected-class / excluded → not published; empty class list → zero documents |
 | `packages/agent/src/shared-views/__tests__/shared-view.service.spec.ts` | Create idempotency; regenerate resets `firstViewNotifiedAt`; pause keeps the token; optimistic-concurrency `409` |
 | `packages/agent/src/channel-guests/__tests__/channel-guest-admission.service.spec.ts` | Gate order; owner always admitted; revoked denied; caps; the 24 h single-refusal ceiling; zero facade calls on deny |
-| `packages/agent/src/channel-guests/__tests__/requester-attribution.service.spec.ts` | Label format; label stamped on mission/task/approval/escalation; owner work has no label; revoked suffix |
+| `packages/agent/src/channel-guests/__tests__/requester-attribution.service.spec.ts` | Label format; label stamped on task/approval/escalation, and on a mission only when the Run sets one up; owner work has no label; revoked suffix |
 | `packages/agent/src/channel-guests/__tests__/guest-text-fence.spec.ts` | Forged boundary markers neutralised; control markers stripped; truncation at 4,000 chars |
 
 ### 10.2 Controller specs — `apps/api` (Jest)
@@ -742,8 +746,8 @@ soon" behind the existing `soon` copy pattern), guests, attribution.
 3. `ChannelGuestAdmissionService` (the gate) + insertion into the Slack bridge.
 4. `RequesterAttributionService` + the fence helper + label stamping.
 5. Owner-only decision routing + the post-back task.
-6. Guests panel inside the channels settings page + requester label on the Mission card,
-   Mission detail and My Decisions row.
+6. Guests panel inside the channels settings page + requester label on the Task card,
+   Task detail, Mission detail and My Decisions row.
 7. i18n (`dashboard.channelGuests`, `api.channelGuest`) + the tests in §10.
 
 **Ships**: FR-50…FR-79.

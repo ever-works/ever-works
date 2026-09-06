@@ -52,7 +52,7 @@ The five known weaknesses this epic fixes, all verified in source:
 | Today | `SchedulesService` → `ScheduleView[]` with all seven `sourceType`s, sorted by `nextRunAt` ascending, per-source `try/catch`, `MAX_PER_SOURCE = 500` | [`packages/agent/src/schedules/schedules.service.ts`](../../../../../packages/agent/src/schedules/schedules.service.ts), [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts), cadence text in [`packages/agent/src/schedules/cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts) |
 | This week | `CostsSummaryService.getSummary(userId, windowDays)` with `COSTS_WINDOW_DAYS = [7, 30, 90]`, plus `BudgetService`'s account-wide cap read behind `GET /me/usage/account-wide` | [`packages/agent/src/subscriptions/credits/costs-summary.service.ts`](../../../../../packages/agent/src/subscriptions/credits/costs-summary.service.ts), [`apps/api/src/subscriptions/costs.controller.ts`](../../../../../apps/api/src/subscriptions/costs.controller.ts), [`packages/agent/src/budgets/budget.service.ts`](../../../../../packages/agent/src/budgets/budget.service.ts), [`apps/api/src/budgets/account-usage.controller.ts`](../../../../../apps/api/src/budgets/account-usage.controller.ts), [`apps/web/src/lib/api/usage.ts`](../../../../../apps/web/src/lib/api/usage.ts) |
 | Recent activity | `ActivityLogRepository` / `ActivityLogService` (`activity_log`, indexed on `(userId, createdAt)`) | [`packages/agent/src/database/repositories/activity-log.repository.ts`](../../../../../packages/agent/src/database/repositories/activity-log.repository.ts), [`apps/api/src/activity-log/activity-log.controller.ts`](../../../../../apps/api/src/activity-log/activity-log.controller.ts) |
-| Composer | `POST /api/me/missions` (30/min throttle) via `createMissionAction` | [`apps/api/src/missions/missions.controller.ts`](../../../../../apps/api/src/missions/missions.controller.ts), [`apps/web/src/app/actions/dashboard/missions.ts`](../../../../../apps/web/src/app/actions/dashboard/missions.ts), client in [`apps/web/src/lib/api/missions.ts`](../../../../../apps/web/src/lib/api/missions.ts) |
+| Composer | `POST /api/tasks` (60/min throttle) via `createTaskAction`; a body with no `status` gets the entity default `backlog`, so the Task lands in the board's first lane | [`apps/api/src/tasks/tasks.controller.ts`](../../../../../apps/api/src/tasks/tasks.controller.ts), [`apps/web/src/app/actions/tasks.ts`](../../../../../apps/web/src/app/actions/tasks.ts), client in [`apps/web/src/lib/api/tasks.ts`](../../../../../apps/web/src/lib/api/tasks.ts) |
 | Scope | `ScopeContextService` (request-scoped `AsyncLocalStorage`, `getOrganizationId()`) | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts) |
 
 ### 1.3 Conventions this plan must match
@@ -95,12 +95,12 @@ flowchart TD
     subgraph web["apps/web"]
         P["(home)/page.tsx (RSC)"] --> A["getHomeSummaryAction()"]
         C["HomeSummaryProvider (client, 60s tick)"] --> A
-        K["HomeComposer"] --> M["createMissionAction()"]
+        K["HomeComposer"] --> M["createTaskAction()"]
         N["NeedsYouBlock"] --> R["replyToInboxItemAction()"]
         A --> HC["lib/api/home.ts · serverFetch"]
     end
     HC -->|"GET /api/home/summary?tz="| HCTL["apps/api/src/home/home.controller.ts"]
-    M -->|"POST /api/me/missions"| MCTL["missions.controller.ts (existing)"]
+    M -->|"POST /api/tasks"| MCTL["tasks.controller.ts (existing)"]
     R -->|"POST /api/inbox/:id/reply"| ICTL["inbox.controller.ts (existing)"]
     HCTL --> HS["HomeSummaryService (packages/agent/src/home)"]
     HS --> D1["InboxService + InboxItemRepository"]
@@ -124,7 +124,7 @@ Three rules hold the design together:
    This is the same per-source fault isolation `SchedulesService` already applies
    across its seven sources, lifted one level.
 3. **Home writes only through paths that already exist.** The composer calls the
-   Mission create endpoint; the decision block calls the Inbox reply endpoint.
+   Task create endpoint; the decision block calls the Inbox reply endpoint.
    No new write path is introduced for either, so throttles, audit and the
    steer/resume routing are inherited unchanged.
 
@@ -438,7 +438,9 @@ first change. Duplicate ids inside an array are de-duplicated server-side;
 
 ### 4.3 Endpoints reused unchanged
 
-- `POST /api/me/missions` — the composer. Already throttled 30/min.
+- `POST /api/tasks` — the composer. Already throttled 60/min. A Task created
+  without an explicit `status` takes the entity default `backlog`, so no extra
+  field is sent.
 - `POST /api/inbox/:id/reply` — inline answering. Already throttled 30/min and
   already returns `InboxReplyOutcome.routed` (`steered` / `resumed` / `approved` /
   `rejected` / `escalation-resolved` / `already-decided` / `none`), which is
@@ -452,10 +454,10 @@ first change. Duplicate ids inside an array are de-duplicated server-side;
 
 | File | Kind | Responsibility |
 | --- | --- | --- |
-| `home.shared.ts` | types-only, no directive | `HOME_BLOCK_IDS` re-export, `formatWaiting()`, `formatElapsed()`, `formatCount()` (`999+`), `greetingKeyForHour()`, `deriveMissionTitle()`. Imported by both server and client, so no `server-only` guard. |
+| `home.shared.ts` | types-only, no directive | `HOME_BLOCK_IDS` re-export, `formatWaiting()`, `formatElapsed()`, `formatCount()` (`999+`), `greetingKeyForHour()`, `deriveTaskTitle()`. Imported by both server and client, so no `server-only` guard. |
 | `HomeSummaryProvider.tsx` | client | Holds the summary in state, owns the 60 s `setInterval` gated on `document.visibilityState`, exposes `refresh()` and `refreshBlock(id)`, computes the "new since you opened this" delta against the count at mount. |
 | `HomeGreeting.tsx` | client | Greeting + date + score line (`aria-live="polite"`) + `updated {n}s ago` + manual refresh. |
-| `HomeComposer.tsx` | client | The text field, counter, chips, inline errors, draft persistence, `Expand`. Calls `createMissionAction`. |
+| `HomeComposer.tsx` | client | The text field, counter, chips, inline errors, draft persistence, `Expand`. Calls `createTaskAction`. |
 | `NeedsYouBlock.tsx` | client | Decision rows, waiting chips, inline option buttons, overflow footer, the `Also broken` sub-list (renders the existing `AttentionSection`). Calls `replyToInboxItemAction`. |
 | `GlanceCounters.tsx` | client | The four linked counters. |
 | `ThisWeekPanel.tsx` | client | Spend headline, run line, cap bar, blocked/overage line, `Manage spend`. |
@@ -534,8 +536,8 @@ first change. Duplicate ids inside an array are de-duplicated server-side;
 **None.** Home dispatches no jobs, registers no cron, and enqueues nothing.
 
 Constitution IV compliance is therefore vacuous on the read path and inherited on
-the write path: the composer's `POST /api/me/missions` reaches whatever the
-Mission create path already dispatches, which goes through the agent-package
+the write path: the composer's `POST /api/tasks` reaches whatever the
+Task create path already dispatches, which goes through the agent-package
 `*_DISPATCHER` DI symbols in
 [`packages/agent/src/tasks-domain/task-dispatcher.ts`](../../../../../packages/agent/src/tasks-domain/task-dispatcher.ts).
 No file added by this epic imports `@trigger.dev/sdk` or any other runtime SDK.
@@ -593,9 +595,9 @@ dashboard.home.composer.send               "Send"
 dashboard.home.composer.sending            "Sending"
 dashboard.home.composer.expand             "Expand"
 dashboard.home.composer.counter            "{used} / {max}"
-dashboard.home.composer.created            "Mission created — \"{title}\""
+dashboard.home.composer.created            "Task created — \"{title}\""
 dashboard.home.composer.open               "Open"
-dashboard.home.composer.failed             "Couldn't create that Mission."
+dashboard.home.composer.failed             "Couldn't create that Task."
 dashboard.home.composer.retry              "Try again"
 dashboard.home.composer.throttled          "You're creating these faster than we can file them. Try again in a minute."
 dashboard.home.composer.noRuntime          "Nothing will run until a job runtime is configured."
@@ -711,8 +713,8 @@ values ship in `en.json`; the other 20 receive translated values in the same PR
 ### 9.1 What is recorded
 
 No new `ActivityActionType` member is added — Home records nothing to the activity
-log, because it performs no user-visible domain action of its own. The Mission the
-composer creates is logged by the existing Mission create path.
+log, because it performs no user-visible domain action of its own. The Task the
+composer creates is logged by the existing Task create path.
 
 Through [`packages/monitoring`](../../../../../packages/monitoring):
 
@@ -776,7 +778,7 @@ an assertion.
 
 | File | Covers |
 | --- | --- |
-| `apps/web/src/components/home/home.shared.unit.spec.ts` | `formatWaiting` at 59 m / 60 m / 23 h 59 m / 24 h / 72 h; `formatElapsed`; `formatCount` at 999 / 1000; `greetingKeyForHour` at 04:59 / 05:00 / 11:59 / 12:00 / 17:59 / 18:00; `deriveMissionTitle` word-boundary truncation at 80, a 2-character first sentence, and a sentence with no terminator |
+| `apps/web/src/components/home/home.shared.unit.spec.ts` | `formatWaiting` at 59 m / 60 m / 23 h 59 m / 24 h / 72 h; `formatElapsed`; `formatCount` at 999 / 1000; `greetingKeyForHour` at 04:59 / 05:00 / 11:59 / 12:00 / 17:59 / 18:00; `deriveTaskTitle` word-boundary truncation at 80, a 2-character first sentence, and a sentence with no terminator |
 | `apps/web/src/components/home/HomeComposer.unit.spec.tsx` | 2 vs 3 characters and the disabled `Send`; `Enter` vs `Shift+Enter` vs `Ctrl+Enter`; counter appears at 1800 and input refused past 2000; text preserved on failure and focus restored; the throttle message; chips capped at 3; draft restore and clear-on-success |
 | `apps/web/src/components/home/NeedsYouBlock.unit.spec.tsx` | Waiting-chip tones; the overdue header suffix; 1–3 options inline vs `Open` only; optimistic removal then reconcile; the already-decided informational path; `Also broken` capped at 6 and excluded from the count; titles rendered as plain text |
 | `apps/web/src/components/home/HomeBlockShell.unit.spec.tsx` | Skeleton / empty / error are three distinct renders; `Retry` calls back with the block id |
@@ -788,7 +790,7 @@ an assertion.
 | File | Covers |
 | --- | --- |
 | `apps/web/e2e/home-morning.spec.ts` | Spec S1, S4, S5, S6, S7 — block order, the score line, the day-scoped Today panel, the spend headline, the working-now rows, the activity tail |
-| `apps/web/e2e/home-composer.spec.ts` | Spec S2, S13, S14, S20 — one sentence creates a Mission, the chip and its link, failure preserves the text, the throttle message, the length bounds, the no-runtime suffix |
+| `apps/web/e2e/home-composer.spec.ts` | Spec S2, S13, S14, S20 — one sentence creates a Task in the Backlog lane, the chip and its link, failure preserves the text, the throttle message, the length bounds, the no-runtime suffix |
 | `apps/web/e2e/home-decisions.spec.ts` | Spec S3, S12, S15, S16, S17 — inline answer with the routed toast, the already-decided path, waiting-on-input placement, the overdue float, the preview cap with the exact total |
 | `apps/web/e2e/home-degradation.spec.ts` | Spec S9, S10, S11, S18, S19, S21 — first-run empty, one block failed, whole summary failed, the UTC footnote, an Organization switch, refresh suspended on a hidden tab |
 | `apps/web/e2e/home-a11y.spec.ts` | Landmarks and accessible names, keyboard-only decision answering, focus rings, contrast in both themes, a locale switch leaving no English behind |
@@ -832,7 +834,7 @@ fold, nothing is configurable, refresh is on navigation only.
   migration `1789400000000-AddUserHomePreferences.ts`;
   `GET`/`PUT /api/home/preferences`; `HomeBlockMenu`; `WorkspaceSection`
   expansion persistence.
-- Composer `Expand` handing the typed text to the full Mission form.
+- Composer `Expand` handing the typed text to the full Task form.
 - Tests: the preferences halves of §10.1/§10.2, `NeedsYouBlock.unit.spec.tsx`,
   `home-decisions.spec.ts`.
 
@@ -871,10 +873,10 @@ fold, nothing is configurable, refresh is on navigation only.
       read through the existing costs aggregation, which groups by agent and
       capability, never by provider id.
 - [x] **III — Source-of-truth repositories.** Home reads no repository content and
-      writes none. The composer creates a Mission row; Mission content that lives
-      in a user repo is untouched.
+      writes none. The composer creates a Task row; nothing that lives in a user
+      repository is read or written.
 - [x] **IV — Job runtime.** Home dispatches nothing. The one write path
-      (Mission create) reaches the existing dispatcher DI symbols; no new file
+      (Task create) reaches the existing dispatcher DI symbols; no new file
       imports a runtime SDK.
 - [x] **V — Forward-only migrations.** Two additive migrations in
       `apps/api/src/migrations/`, each in the PR that needs it: indexes in P1,

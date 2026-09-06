@@ -12,7 +12,7 @@
 **Last updated**: 2026-09-06
 **Size**: L · **Blocking dependencies**: none
 **Extends**: Approvals + Escalations (both already exist in Ever Works)
-**Adjacent epics**: [AW-02 Mission board](../AW-02-mission-board/) · [AW-04 Live Feed](../AW-04-live-feed/) · [AW-09 Runs & receipts](../AW-09-runs-receipts/) · [AW-13 Attention controls](../AW-13-attention-controls/) · [AW-15 Connections & scopes](../AW-15-connections-scopes/) · [AW-19 Home](../AW-19-home/) · [AW-24 Safety rails](../AW-24-safety-rails/)
+**Adjacent epics**: [AW-02 Task board](../AW-02-task-board/) · [AW-04 Live Feed](../AW-04-live-feed/) · [AW-09 Runs & receipts](../AW-09-runs-receipts/) · [AW-13 Attention controls](../AW-13-attention-controls/) · [AW-15 Connections & scopes](../AW-15-connections-scopes/) · [AW-19 Home](../AW-19-home/) · [AW-24 Safety rails](../AW-24-safety-rails/)
 
 > **Additive by default (program rule #1).** Nothing here is removed, renamed or
 > consolidated away. The Approval block on Home keeps working. The Inbox keeps
@@ -33,7 +33,7 @@
    │  Everything waiting on you, and nothing else.                             │
    │                                                                           │
    │  ┌───────┬──────────┬──────────┐        ┌───────────────────────────────┐ │
-   │  │ Open  │ Answered │ Archived │        │ Agent ▾  Mission ▾  Kind ▾    │ │
+   │  │ Open  │ Answered │ Archived │        │Agent ▾ Task ▾ Mission ▾ Kind ▾ │ │
    │  └═══════┴──────────┴──────────┘        └───────────────────────────────┘ │
    ├─────────────────────────────────┬────────────────────────────────────────┤
    │ QUEUE                     1 / 3 │ DECISION                               │
@@ -50,8 +50,8 @@
    │                                 │   ○ 2. Which feed tier?                │
    │                                 │   ○ 3. Grant read access to Analytics  │
    │                                 │                                        │
-   │                                 │  Answer all three and this Mission     │
-   │                                 │  restarts itself where it stopped.     │
+   │                                 │  Answer all three and Researcher       │
+   │                                 │  picks this up where it stopped.       │
    └─────────────────────────────────┴────────────────────────────────────────┘
 ```
 
@@ -208,8 +208,8 @@ its first message.
 and an access ask for a read-only analytics connection,
 **when** the user answers the approval and the choice,
 **then** the checklist shows `2 of 3`, the decision stays open, the blocked Task
-stays blocked, and the detail pane says *"One more and this Mission restarts
-itself."*
+stays blocked, and the detail pane says *"One more and Researcher picks this up
+where it stopped."*
 **And when** they complete the access grant and mark it granted,
 **then** the decision closes and the agent restarts with all three answers folded
 into one message.
@@ -259,10 +259,10 @@ the last fourteen days,
 *"Write this into Editor's instructions"* that opens the Agent's instruction file
 with the answer pre-filled as a draft rule.
 
-**S10 — Answering from the Mission board.**
-**Given** a Mission sitting in the `Needs you` lane,
-**when** the user clicks the lane's decision indicator,
-**then** they land in My Decisions with that Mission's decisions filtered and the
+**S10 — Answering from the Task board.**
+**Given** a Task sitting in the `Needs you` column carrying a **Decision** chip,
+**when** the user clicks that card's **Open decision** action,
+**then** they land in My Decisions with that Task's decisions filtered and the
 first one selected — the same screen, not a second implementation.
 
 ### 3.2 Edge cases, failures and races
@@ -410,9 +410,10 @@ testable.
   non-blocking; (b) descending confidence, where an unscored decision ranks as if
   its confidence were **0.5** and is labelled *not scored* rather than shown a
   percentage; (c) ascending age — oldest first among equals.
-- **FR-5** The queue MUST support filtering by Agent, by Mission, and by ask kind,
-  and a free-text search over the decision summary. Filters MUST be reflected in
-  the URL so a filtered queue is linkable.
+- **FR-5** The queue MUST support filtering by Agent, by Task, by Mission — the
+  standing initiative the Task was raised under, carried as provenance — and by
+  ask kind, plus a free-text search over the decision summary. Filters MUST be
+  reflected in the URL so a filtered queue is linkable.
 - **FR-6** The queue MUST paginate at **25** decisions per page, with a maximum
   requestable page size of **100**.
 - **FR-7** While the queue tab is focused, the open count MUST refresh at most
@@ -424,12 +425,15 @@ testable.
 
 ### 4.2 The decision
 
-- **FR-10** A decision MUST display: the Agent that raised it, the Mission and Task
-  it belongs to when it has them, its age, its confidence (or *not scored*), a
-  one-line summary of what happened, and — when the source record carries one — the
-  trail of what the agent already tried.
+- **FR-10** A decision MUST display: the Agent that raised it, the Task it belongs
+  to and — as provenance — the Mission that Task was raised under, where it has
+  them; its age; its confidence (or *not scored*); a one-line summary of what
+  happened; and, when the source record carries one, the trail of what the agent
+  already tried.
 - **FR-11** A decision MUST display whether it is blocking, and what it is blocking
-  (a named Mission, Task or Run), with a link to each.
+  — a named Task (`blocked`) or a named parked Run — with a link to each. A
+  Mission is never itself blocked; it appears only as the provenance chip on the
+  decision.
 - **FR-12** A decision MUST NOT ask the user a bare question: it MUST carry at
   least one ask, and every ask MUST carry a prompt of at most **1000** characters
   and optional context of at most **4000** characters.
@@ -633,11 +637,11 @@ testable.
 
 | Concept | What it is today | What this epic adds |
 | --- | --- | --- |
-| **Approval** (an agent's proposed side-effectful action: spawn an agent, schedule a task, send a message, override a budget; with risk flags and a pending/approved/rejected state) | A durable queue and decision record. Deciding it flips a status and, by its own documentation, restarts nothing | An `archived` state · a link to the Mission it belongs to · a first-viewed timestamp · one or more **Asks** · restart-on-resolution |
-| **Escalation** (the record written when an agent gives up: ten reason codes, an attempt trail, a confidence score, a dedupe key, open/resolved) | Fully built server-side, with chat tools and an Inbox mirror, and **no screen at all** | An `archived` state · a link to the Mission it belongs to · a first-viewed timestamp · one or more **Asks** · restart-on-resolution · a queue that reads it |
+| **Approval** (an agent's proposed side-effectful action: spawn an agent, schedule a task, send a message, override a budget; with risk flags and a pending/approved/rejected state) | A durable queue and decision record. Deciding it flips a status and, by its own documentation, restarts nothing | An `archived` state · a Task link and, through it, the Mission that raised the Task, both stored for filtering · a first-viewed timestamp · one or more **Asks** · restart-on-resolution |
+| **Escalation** (the record written when an agent gives up: ten reason codes, an attempt trail, a confidence score, a dedupe key, open/resolved) | Fully built server-side, with chat tools and an Inbox mirror, and **no screen at all** | An `archived` state · the Mission that raised its Task, stored for filtering · a first-viewed timestamp · one or more **Asks** · restart-on-resolution · a queue that reads it |
 | **Run** | One agent execution; already knows how to park on a question, and already knows how to be restarted as a new Run carrying the same conversation | Nothing. This epic *uses* the park/restart behaviour that exists; it does not re-implement it |
 | **Task** | Already has a `blocked` status that remembers the status it came from | Nothing. Unblocking uses the existing restore-to-previous behaviour |
-| **Mission** | The unit of delegated work | Nothing stored. A decision points at the Mission through its Task |
+| **Mission** | A standing initiative that keeps producing Ideas and, through them, Works and Tasks. Statuses `active` / `paused` / `completed` / `failed`; no priority; it is a *source* of work, never a unit of it | Nothing new. A decision reaches its Mission through its Task, and shows it as a provenance chip and offers it as a filter. Answering a decision never resolves, pauses or unblocks a Mission |
 | **Inbox** | The operator message center, which already mirrors escalations and approvals as messages and already routes a reply back to the record | Nothing removed. Inbox rows for a decision gain a link into My Decisions, and the two surfaces share one resolution path so their behaviour cannot drift |
 | **Agent instructions** | The Agent's own instruction files | Nothing stored. The recurring-decision action opens them with a draft rule |
 | **Activity history** | The audit trail | New entry kinds for opened / answered / resolved / withdrawn / archived / restarted |
@@ -697,7 +701,7 @@ considered and all three are the wrong shape:
   fallback prompt for the derived Ask, so nothing breaks.
 - *A second escalation per question* would multiply notifications, multiply
   dedupe keys, and split one interruption into three, which is the opposite of the
-  goal. It would also make "is this Mission unblocked yet?" a query over an
+  goal. It would also make "is this Task unblocked yet?" a query over an
   unbounded set instead of a count.
 - *The Task approver record* gates a Task's review-to-done transition. It is a
   different gate at a different point in a different lifecycle, and it is not
@@ -742,9 +746,10 @@ valid answer, and whether a reason is required.
 - **No decision table.** The queue is a projection over two existing records. A
   third record would be a third place to write, a third dedupe key, and a third
   thing to keep in sync.
-- **No decision thread.** A decision links to the Task's existing thread and to
-  the Mission's thread (AW-02). Withdrawals and reasons are posted there, not into
-  a fourth conversation surface.
+- **No decision thread.** A decision links to the Task's existing comment thread,
+  the one the board surfaces (AW-02). Withdrawals and reasons are posted there, not
+  into a second conversation surface. There is no Mission-scoped thread and this
+  epic does not invent one.
 - **No decision assignee.** Every decision belongs to the workspace, and any
   member who can see the work can answer it. Routing a decision to a named person
   needs a per-organisation role model that does not exist yet (§9).
@@ -771,8 +776,8 @@ Four other surfaces link *in* and none of them re-implements it:
 
 - **Home** — the existing approval block gains a footer link *"See all decisions
   (3)"*; the block itself is unchanged.
-- **Mission board** (AW-02) — the `Needs you` lane's indicator opens the queue
-  filtered to that Mission.
+- **Task board** (AW-02) — a card's **Decision** chip opens the queue filtered to
+  that Task.
 - **Inbox** — an escalation or approval message gains **Open in My Decisions**.
 - **Task detail** — the escalation feed gains the same link per row.
 
@@ -786,7 +791,7 @@ Four other surfaces link *in* and none of them re-implements it:
 │  ● 3 open  ·  ⏸ 1 blocking                             [ Archive all ]  [ ? ]    │
 │                                                                                  │
 │  ┌───────┬──────────┬──────────┐   ┌──────────────────────────────────────────┐  │
-│  │ Open 3│ Answered │ Archived │   │ 🔍 Search   Agent ▾   Mission ▾   Kind ▾ │  │
+│  │ Open 3│ Answered │ Archived │   │🔍 Search  Agent ▾ Task ▾ Mission ▾ Kind ▾│  │
 │  └═══════┴──────────┴──────────┘   └──────────────────────────────────────────┘  │
 │                                                                                  │
 │  ✓ Healthy — about 3 decisions a day.                                            │
@@ -797,7 +802,7 @@ Four other surfaces link *in* and none of them re-implements it:
 │ │▌Spend $240 on the data feed      │ │  │ Spend $240 on the data feed          │  │
 │ │ Researcher · Refresh the pricing │ │  │ Researcher · 2h ago · 82% sure        │  │
 │ │ page · 2h · ⏸ BLOCKING           │ │  │ ⏸ Blocking: Run paused · Task blocked │  │
-│ │ 1 of 3 answered      ●●●○○○      │ │  │ Mission: Refresh the pricing page  →  │  │
+│ │ 1 of 3 answered      ●●●○○○      │ │  │ Task: Refresh the pricing page  →     │  │
 │ └──────────────────────────────────┘ │  ├──────────────────────────────────────┤  │
 │ ┌──────────────────────────────────┐ │  │ WHAT HAPPENED                         │  │
 │ │ Which supplier list is right?    │ │  │ The paid feed returned 402 and the    │  │
@@ -1159,7 +1164,7 @@ an answer so the queue can be walked one-handed.
 ### 6.16 Entry points
 
 ```
- Sidebar                Home                        Mission board (AW-02)
+ Sidebar                Home                        Task board (AW-02)
  ┌──────────────┐       ┌──────────────────────┐    ┌──────────────────────┐
  │ Dashboard    │       │ Action approvals   2 │    │ ● Needs you        3 │
  │ My Decisions 3│  ◄── │ …                    │    │ [card] ⏸ 1 decision  │──►
@@ -1198,7 +1203,7 @@ Every binding is inert while focus is inside a text field except `Esc` and
 | Page subtitle | `Everything waiting on you, and nothing else.` |
 | Header counts | `{count} open` · `{count} blocking` |
 | Tabs | `Open` · `Answered` · `Archived` |
-| Filters | `Agent` · `Mission` · `Kind` · `Search decisions` |
+| Filters | `Agent` · `Task` · `Mission` · `Kind` · `Search decisions` |
 | Ask section heading | `What this needs from you` |
 | Ask progress | `{answered} of {required}` |
 | Context heading | `What happened` |
@@ -1272,8 +1277,9 @@ Every binding is inert while focus is inside a text field except `Esc` and
   a platform-side executor for spawn / schedule / send / budget-override is a
   separate piece of work with its own safety surface.
 - **A discussion thread on a decision.** Reasons and withdrawals are posted to the
-  Task's existing thread and to the Mission thread (AW-02). A fourth conversation
-  surface is not warranted.
+  Task's existing comment thread, the one the board surfaces (AW-02). A third
+  conversation surface is not warranted, and no Mission-scoped thread exists to
+  post into.
 - **Assigning or routing a decision to a named person.** Requires a
   per-organisation role model that does not exist (§9).
 - **Changing any notification default.** Escalations and approvals already notify
@@ -1288,9 +1294,10 @@ Every binding is inert while focus is inside a text field except `Esc` and
   "handle it". AW-24 owns it, and nothing in this epic graduates itself.
 - **Mobile applications.** The surface is responsive down to 320 px; a native
   application is not in this epic.
-- **Archiving the blocked Mission alongside its decisions.** Archiving a decision
-  sets the decision aside; the Mission's own archive is AW-02's, and the two are
-  deliberately not chained in this epic.
+- **Cancelling or hiding the blocked Task alongside its decisions.** Archiving a
+  decision sets the decision aside; the Task's own lifecycle — its status and its
+  hidden-from-board marker — belongs to AW-02, and the two are deliberately not
+  chained in this epic.
 - **Bulk-answering.** The queue's bulk action is archive, not approve. A bulk
   approve defeats the reason the decision exists. The existing approve-all control
   on Home is unchanged and is not extended to escalations.
@@ -1307,7 +1314,8 @@ Every binding is inert while focus is inside a text field except `Esc` and
       while the read is in flight.
 - [ ] Tabs `Open` / `Answered` / `Archived` are present, deep-linkable, and each
       has its own empty state.
-- [ ] Filters by Agent, Mission and ask kind, plus search, are reflected in the URL.
+- [ ] Filters by Agent, Task, Mission and ask kind, plus search, are reflected in
+      the URL.
 - [ ] The list pages at 25 with a `Load 25 more` control; a requested page size
       above 100 is clamped.
 - [ ] A failed read renders the error state, never an empty queue.
@@ -1473,8 +1481,8 @@ Every binding is inert while focus is inside a text field except `Esc` and
 - Program overview and vocabulary: [`../README.md`](../README.md)
 - What already exists server-side, and where it is unreachable:
   [`../EXISTING-SUBSTRATE.md`](../EXISTING-SUBSTRATE.md) (row **S2**)
-- Mission board, which derives its `Needs you` lane from this queue:
-  [`../AW-02-mission-board/`](../AW-02-mission-board/)
+- Task board, which counts this queue's decisions per Task and links into it:
+  [`../AW-02-task-board/`](../AW-02-task-board/)
 - Live Feed, which links its decision entries here:
   [`../AW-04-live-feed/`](../AW-04-live-feed/)
 - Runs and receipts, which owns the Run detail this surface links out to:

@@ -28,9 +28,10 @@ Every path below was opened before it was written down.
 | Plugin-declared prices | `getPricing?(): PluginPricing` on every capability interface in `packages/plugin/src/contracts/capabilities/` (search, screenshot, content-extractor, email-provider, notification-channel, metrics-provider, connector). |
 | Model cost metadata | `packages/agent/src/facades/model-catalog.ts` — `ModelCatalogEntry` with `inputCostPer1k` / `outputCostPer1k`. |
 
-**The gap.** `PluginUsageEvent` has no meter, no outcome, no credits figure, no price-list
-version and no Mission attribution. `record()` stores what a call *cost the platform*, never what
-it *costs the owner* or *who paid the provider*.
+**The gap.** `PluginUsageEvent` has no meter, no outcome, no credits figure and no price-list
+version, and nothing on it reaches the Mission behind the work: it carries `taskId`, but no read
+path joins from there to `tasks.missionId`. `record()` stores what a call *cost the platform*,
+never what it *costs the owner* or *who paid the provider*.
 
 ### 1.2 Credits — one blended balance, priced after the fact
 
@@ -93,7 +94,7 @@ zero spend. Auto-recharge has no ceiling. The Fleet ceiling is invisible from Bi
 | 2 | Price derived from provider cost × margin | Published, versioned price list keyed on capability + operation |
 | 3 | Own-key exemption guessed at settlement | Paying account class stamped at the call |
 | 4 | Cached and failed calls priced like successes | Outcome on the row; both zero-rated |
-| 5 | No Mission axis | `missionId` on the usage row; a third breakdown |
+| 5 | No Mission axis | `missionId` on the usage row, copied from `tasks.missionId`; a third breakdown |
 | 6 | Per-Agent cap unsettable, spend hard-coded `0` | Full CRUD, real aggregation, real refusal |
 | 7 | No Workspace ceiling | `workspace_spend_caps`, per meter, no overage switch |
 | 8 | Auto-recharge unbounded per month | Monthly maximum, hard refusal, one decision per month |
@@ -117,14 +118,14 @@ flowchart TB
         F4[ai.facade]
     end
 
-    F1 & F2 & F3 & F4 -->|"1 - before the call"| GUARD["BudgetGuardService.checkBudget()<br/>+ meter + agentId + missionId"]
+    F1 & F2 & F3 & F4 -->|"1 - before the call"| GUARD["BudgetGuardService.checkBudget()<br/>+ meter + agentId + taskId + the Task's missionId"]
     GUARD -->|"cap reached"| REFUSE["BudgetExceededException<br/>-> run stops, escalation, decision"]
     GUARD -->|"ok"| CALL[provider call]
     CALL -->|"2 - after the call"| REC["PluginUsageService.record()<br/>(the single write path)"]
 
     REC --> CLASS["UsageMeterClassifier<br/>meter + payer + outcome"]
     CLASS --> PRICE["CreditPricebook.priceFor(capability, operation, units, outcome)"]
-    PRICE --> ROW[("plugin_usage_events<br/>+ meter, outcome, creditsCharged,<br/>pricebookVersion, payer, missionId")]
+    PRICE --> ROW[("plugin_usage_events<br/>+ meter, outcome, creditsCharged,<br/>pricebookVersion, payer,<br/>missionId (from the Task)")]
 
     ROW --> SETTLE["RunCostSettlementService<br/>(credits meter rows only)"]
     SETTLE --> LEDGER[("credit_ledger_entries")]
@@ -139,7 +140,7 @@ flowchart TB
     ADDONS[("account_addons")] --> BILL
 ```
 
-Three deliberate choices:
+Four deliberate choices:
 
 1. **Classification at capture, never at read.** `UsageMeterClassifier` runs inside
    `record()`, where the caller's `FacadeOptions` still carry the resolved settings source. This
@@ -152,6 +153,18 @@ Three deliberate choices:
 3. **One guard, four scopes.** `BudgetGuardService` already resolves Work / Idea / Mission /
    Agent budgets through one polymorphic SQL path. Adding `workspace` as a fifth owner type and a
    `meter` filter keeps a single enforcement point rather than a second, parallel one.
+4. **One roll-up path, captured once.** A metered call belongs to a **Run**; a Run belongs to a
+   **Task** (`agent_runs.taskId`); and a Task names its Work, Mission, Idea, Team, Agent and Goal
+   in its own nullable owner columns (`tasks.workId` / `missionId` / `ideaId` / `teamId` /
+   `agentId` / `goalId`), any combination of which may be set and each independently filterable.
+   Mission attribution is therefore `tasks.missionId` and nothing else. It is resolved **once per
+   run** — threaded through `FacadeOptions` beside the `taskId` / `runId` / `agentId` that
+   already travel there (`packages/plugin/src/facades/facade-options.interface.ts`) — and
+   denormalised onto the usage row, so a breakdown is one indexed `GROUP BY` instead of a two-hop
+   join on a hot read path. It is **never** taken from `agents.missionId`: an Agent scoped to one
+   Mission can work a Task filed against another, and inferring would mis-attribute. A run with no
+   `taskId` (heartbeat or chat — the case `FacadeOptions.taskId` already documents) has no
+   Mission and lands in `Not in a Mission`.
 
 ---
 
@@ -185,7 +198,8 @@ priceKey?: string | null;               // e.g. 'search.query', 'ai.managed.fron
 @Column({ type: 'int', nullable: true })
 priceVersion?: number | null;
 
-/** Mission attribution, denormalised from the Task at record time. No FK — audit outlives. */
+/** The Mission of this row's Task (`tasks.missionId`), captured at record time — never
+ *  `agents.missionId`. NULL when the run had no Task. No FK — audit outlives the Mission. */
 @Column({ type: 'uuid', nullable: true })
 missionId?: string | null;
 ```
@@ -584,6 +598,12 @@ owning row and takes the distributed lock instead.
 - **Payer resolution** reads the same `ResolvedSetting.source` that
   `RunCostSettlementService` reads today, but at call time, inside `BaseFacadeService`'s
   `getResolvedSettings` result which the facade already has in hand. No new plugin API.
+- **Mission attribution rides the options object that already exists.** `FacadeOptions`
+  (`packages/plugin/src/facades/facade-options.interface.ts`) already carries `userId`, `workId`,
+  `agentId`, `taskId` and `runId`; this epic adds one optional `missionId` beside them, resolved
+  from the run's Task at dispatch. That is an additive optional field on an interface every facade
+  already receives — no facade signature changes, and nothing reads the `tasks` table on the
+  metered path.
 
 ---
 
@@ -702,7 +722,7 @@ dashboard.runs.receipt.cost.mismatch          "These lines do not add up to the 
 dashboard.runs.receipt.cost.agedOut           "Itemised usage for this Run is older than 12 months and is no longer retained. The total is unchanged."
 
 dashboard.approvals.spend.capTitle        "{target} reached its {amount} {period} cap"
-dashboard.approvals.spend.capBody         "{target} stopped mid-run on \"{mission}\". Its {meter} cap for {month} is fully used. The cap resets on {date}."
+dashboard.approvals.spend.capBody         "{target} stopped mid-run on \"{task}\". Its {meter} cap for {month} is fully used. The cap resets on {date}."
 dashboard.approvals.spend.raiseTo         "Raise to {amount}"
 dashboard.approvals.spend.raiseOther      "Raise to a different amount"
 dashboard.approvals.spend.leaveStopped    "Leave it stopped"
@@ -781,7 +801,7 @@ and new values: `spend_cap_created`, `spend_cap_updated`, `spend_cap_deleted`,
 | --- | --- |
 | `packages/agent/src/subscriptions/billing/credit-pricebook.spec.ts` | Every entry has a positive credit price and a unit; **no price key equals any registered plugin id** (Constitution II); the historical map is frozen and contains every version ever shipped; `priceFor` returns 0 for `cached` and `failed`. |
 | `packages/agent/src/usage/usage-meter-classifier.spec.ts` | The classification function is total: every (capability, payer, kind) triple maps to exactly one meter; workspace-owned → `model`; platform → `credits`; unresolvable → `credits` + `unconfirmed`; a provisioned unit never reaches the classifier. |
-| `packages/agent/src/usage/plugin-usage.service.spec.ts` | `record()` stamps meter, payer, outcome, credits, price key, version and `missionId`; a classifier throw still writes a row; a repository throw returns `null` and does not rethrow. |
+| `packages/agent/src/usage/plugin-usage.service.spec.ts` | `record()` stamps meter, payer, outcome, credits, price key, version and `missionId`; `missionId` is the one the caller passed from the run's Task, is `null` when the run had no Task, and is never read from the Agent; a classifier throw still writes a row; a repository throw returns `null` and does not rethrow. |
 | `packages/agent/src/subscriptions/credits/run-cost-settlement.service.spec.ts` | Settlement sums **only** `meter = 'credits'` rows; a Run made entirely on workspace-owned credentials produces no ledger row; the `run:{runId}` idempotency key still holds; the old provenance re-resolution path is gone. |
 | `packages/agent/src/budgets/budget-guard.service.spec.ts` | Workspace owner type resolves; the meter filter narrows correctly; the strictest of several caps wins and is named; a 100% cap refuses; `allowOverage` still permits on the legacy budgets and is absent on Workspace caps. |
 | `packages/agent/src/budgets/spend-cap.service.spec.ts` | Period arithmetic for `month` and the Agent rolling units; state transitions `ok → warning → stopped`; lowering below spend goes straight to `exceeded`; version conflict throws. |

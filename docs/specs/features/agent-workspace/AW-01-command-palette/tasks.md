@@ -85,8 +85,9 @@ Wire repositories in `workspace-search.module.ts` via `TypeOrmModule.forFeature`
 
 **T-8 — Backend specs.**
 Create `packages/agent/src/workspace-search/__tests__/workspace-search.service.spec.ts`
-(fan-out, per-source cap, group ordering, total cap, one throwing source → `degradedKinds` and
-still 200), `__tests__/workspace-search.scope.spec.ts` (`userId` always; Organization filter;
+(fan-out, per-source cap, group ordering, total cap, Missions and Tasks returned as two distinct
+groups for a query matching both, one throwing source → `degradedKinds` and still 200),
+`__tests__/workspace-search.scope.spec.ts` (`userId` always; Organization filter;
 `organizationId IS NULL` in personal scope; Knowledge restricted to member Works), and
 `__tests__/no-hardcoded-plugin-ids.spec.ts` (reads this epic's own source tree and fails if any
 known plugin identifier appears — Constitution II).
@@ -246,8 +247,10 @@ row and no existing key.
 
 **T-26 — Golden-path e2e.**
 Create `apps/web/e2e/command-palette.spec.ts`: `Ctrl+K` from Home, a Mission detail and Settings;
-type a seeded name; assert grouped results; `Enter` navigates; the top-bar trigger opens the same
-overlay; `Esc` closes and restores focus. Use the fixtures in `apps/web/e2e/helpers/api.ts`.
+type a seeded name; assert grouped results — a term seeded on both a Mission and a Task renders a
+`Missions` group and a `Tasks` group, never one merged group; `Enter` navigates; the top-bar
+trigger opens the same overlay; `Esc` closes and restores focus. Use the fixtures in
+`apps/web/e2e/helpers/api.ts`.
 **Done:** green locally and in CI.
 
 **T-27 — Keyboard e2e.**
@@ -257,9 +260,10 @@ Create `apps/web/e2e/command-palette-keyboard.spec.ts`: arrows, `Home`/`End`, `T
 **Done:** green.
 
 **T-28 — Commands e2e.**
-Create `apps/web/e2e/command-palette-commands.spec.ts`: `new mission` navigates to Mission
-creation; `help` opens the drawer without navigating; `Search Works` lands on the Works list with
-its filter focused (the preserved legacy destination).
+Create `apps/web/e2e/command-palette-commands.spec.ts`: `new task` navigates to Task creation and
+`new mission` navigates to Mission creation (two commands, two destinations); `help` opens the
+drawer without navigating; `Search Works` lands on the Works list with its filter focused (the
+preserved legacy destination).
 **Done:** green.
 
 **T-29 — Recent e2e.**

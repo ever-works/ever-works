@@ -101,7 +101,11 @@
       `firstViewedAt`; add `@Index('idx_agent_escalation_mission_status',
       ['missionId', 'status'])`.
     - Modify `packages/agent/src/entities/agent-action-proposal.entity.ts`: the same
-      five columns; add `@Index('idx_agent_action_proposals_mission_status',
+      five columns **plus `taskId`** — this table has none today, and both the Task
+      filter (spec FR-5) and the "what is this blocking" line (FR-11) need it, while
+      `agent_escalations` already carries one. Add
+      `@Index('idx_agent_action_proposals_task_status', ['taskId', 'status'])` and
+      `@Index('idx_agent_action_proposals_mission_status',
       ['missionId', 'status'])`; append `'archived'` to
       `AgentActionProposalStatus` and to `AGENT_ACTION_PROPOSAL_STATUSES`.
     - Modify `packages/contracts/src/agents/escalation.types.ts`: append
@@ -130,13 +134,15 @@
     - Land it at `apps/api/src/migrations/<timestamp>-CreateDecisionAsks.ts` and
       hand-edit it to add, after the generated DDL:
         1. `UPDATE agent_escalations SET "missionId" = t."missionId" FROM tasks t WHERE t.id = agent_escalations."taskId" AND agent_escalations."taskId" IS NOT NULL`
-        2. the equivalent two-hop backfill for `agent_action_proposals` via
-           `agent_runs.taskId`
+        2. `UPDATE agent_action_proposals SET "taskId" = r."taskId" FROM agent_runs r WHERE r.id = agent_action_proposals."runId" AND agent_action_proposals."runId" IS NOT NULL`,
+           then the same `FROM tasks` update as (1) to fill that table's `missionId`
+           from its freshly-filled `taskId`
         3. a **chunked** (500 rows) insert of one derived `decision_asks` row per
            currently-open escalation and pending proposal, using the same derivation
            rules T8 implements.
-    - Hand-check: 1 `CREATE TABLE`, 3 `CREATE INDEX` on it, 5 `ADD COLUMN` × 2
-      tables, 2 `CREATE INDEX`. **No** `DROP`, no `ALTER … TYPE`, no `NOT NULL`
+    - Hand-check: 1 `CREATE TABLE`, 3 `CREATE INDEX` on it, 5 `ADD COLUMN` on
+      `agent_escalations` and 6 on `agent_action_proposals`, 3 `CREATE INDEX` on
+      those two tables. **No** `DROP`, no `ALTER … TYPE`, no `NOT NULL`
       without a default. `down` drops only what `up` added, in reverse.
     - **Done when**: `pnpm typeorm migration:run -d typeorm.config.ts` applies on a
       fresh database *and* on a seeded one, a re-generate produces an empty diff,
@@ -185,8 +191,10 @@
       from the Task when `taskId` is set. Best-effort like the existing Inbox
       mirror — a failure warns and never fails the escalation.
     - Modify `packages/agent/src/agent-approvals/agent-approvals.service.ts`:
-      the same, after `createProposal`, resolving `missionId` through
-      `runId → agent_runs.taskId → tasks.missionId`.
+      the same, after `createProposal`, stamping `taskId` from
+      `runId → agent_runs.taskId` and `missionId` one hop further through
+      `tasks.missionId`. The Task is the thing the decision blocks; the Mission is
+      only provenance for the filter and the chip.
     - **Test**: extend `packages/agent/src/agents/__tests__/agent-escalation.service.spec.ts`
       and `packages/agent/src/agent-approvals/__tests__/` — a recorded escalation
       and a created proposal each produce exactly one ask; a duplicate `dedupKey`
@@ -277,8 +285,8 @@
 
 - [ ] **T14. Add the decisions controller and DTOs.**
     - Create `apps/api/src/decisions/dto/decisions.dto.ts` with
-      `ListDecisionsQueryDto` (`status`, `agentId`, `missionId`, `kind`, `q`,
-      `limit` `@Min(1) @Max(100)`, `offset` `@Min(0)`) and
+      `ListDecisionsQueryDto` (`status`, `agentId`, `taskId`, `missionId`, `kind`,
+      `q`, `limit` `@Min(1) @Max(100)`, `offset` `@Min(0)`) and
       `AnswerAskBodyDto` (`answer` validated as an object,
       `rationale?` `@MaxLength(1000)`), all `class-validator`-decorated.
     - Create `apps/api/src/decisions/decision-id.pipe.ts` — a `PipeTransform`
@@ -685,8 +693,8 @@
       every leaf key is camelCase, and no leaf key contains a literal `.`.
 - [ ] `grep -r "tryResumeLinkedRun"` returns nothing: there is exactly one
       implementation of close-deliver-unblock in the repository.
-- [ ] No file under `packages/agent/src/decisions/` imports a job-runtime vendor
-      SDK; every dispatch goes through the existing DI symbols.
+- [ ] No file under `packages/agent/src/decisions/` imports a job-runtime SDK
+      directly; every dispatch goes through the existing DI symbols.
 - [ ] No hardcoded plugin id appears anywhere in the new code.
 - [ ] No answer text, rationale or ask prompt appears in an activity-log entry, a
       product-analytics event or an error report.

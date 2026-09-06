@@ -507,7 +507,7 @@ dashboard.commandPalette
     title                 "No matches for “{query}”"
     hint                  "Try a shorter word, or one of these:"
     askChat               "Ask the AI chat panel about “{query}”"
-    createMission         "Create a Mission from “{query}”"
+    createTask            "Create a Task from “{query}”"
     openHelp              "Open Help"
   banner
     partial               "Some results couldn't be loaded. Showing what we have."
@@ -601,7 +601,7 @@ page someone, not one occurrence.
 | --- | --- |
 | `packages/agent/src/workspace-search/__tests__/ranking.spec.ts` | Every FR-14 score band; both boosts and the 100 cap; every FR-15 tie-break, including the promote-a-100-group rule |
 | `packages/agent/src/workspace-search/__tests__/fold.spec.ts` | Case folding, diacritic folding, non-Latin pass-through, empty/whitespace input |
-| `packages/agent/src/workspace-search/__tests__/workspace-search.service.spec.ts` | Fan-out over all P1 sources; per-source cap; a throwing source lands in `degradedKinds` and does not fail the call; group ordering; total cap |
+| `packages/agent/src/workspace-search/__tests__/workspace-search.service.spec.ts` | Fan-out over all P1 sources; per-source cap; a throwing source lands in `degradedKinds` and does not fail the call; group ordering; total cap; a query matching a Mission and a Task yields two distinct groups, never one merged group |
 | `packages/agent/src/workspace-search/__tests__/workspace-search.scope.spec.ts` | `userId` always filtered; Organization filter when active; `organizationId IS NULL` in personal scope; Knowledge restricted to member Works |
 | `packages/agent/src/workspace-search/__tests__/workspace-search.sqlite-portability.integration.spec.ts` | The whole fan-out runs on an in-memory `better-sqlite3` DataSource with `PRAGMA case_sensitive_like = ON` — the harness from the Ideas portability spec. Asserts no emitted SQL contains a Postgres-only operator |
 | `packages/agent/src/workspace-search/__tests__/no-hardcoded-plugin-ids.spec.ts` | Constitution II: the epic's source tree contains no known plugin identifier |
@@ -633,9 +633,9 @@ page someone, not one occurrence.
 
 | File | Covers |
 | --- | --- |
-| `apps/web/e2e/command-palette.spec.ts` | Golden path: `Ctrl+K` from three different screens → type → grouped results → `Enter` navigates; the top-bar trigger opens the same overlay; `Esc` restores focus |
+| `apps/web/e2e/command-palette.spec.ts` | Golden path: `Ctrl+K` from three different screens → type → grouped results (a term seeded on both a Mission and a Task shows a `Missions` group and a `Tasks` group) → `Enter` navigates; the top-bar trigger opens the same overlay; `Esc` restores focus |
 | `apps/web/e2e/command-palette-keyboard.spec.ts` | Arrow/Home/End/Tab/Shift+Tab/`Ctrl+Enter`/`Ctrl+1..9`; `/` inside vs outside a text field; `Ctrl+K` inside the chat composer inserts nothing |
-| `apps/web/e2e/command-palette-commands.spec.ts` | `new mission` navigates; `help` opens the drawer without navigating; `Search Works` reaches the Works list with its filter focused (the preserved legacy path, FR-4) |
+| `apps/web/e2e/command-palette-commands.spec.ts` | `new task` and `new mission` reach their own creation screens; `help` opens the drawer without navigating; `Search Works` reaches the Works list with its filter focused (the preserved legacy path, FR-4) |
 | `apps/web/e2e/command-palette-recents.spec.ts` | Open two records → reopen the palette → both in Recent, newest first, no duplicate on re-open |
 | `apps/web/e2e/command-palette-scope-isolation.spec.ts` | Seed a Mission in Organization B; search in Organization A → absent; switch scope → present (S-16) |
 | `apps/web/e2e/command-palette-degraded.spec.ts` | Route-level fault injection: one kind fails → other groups render + banner; endpoint held past 3.5 s → prior results dimmed + timeout banner; offline → local-only |

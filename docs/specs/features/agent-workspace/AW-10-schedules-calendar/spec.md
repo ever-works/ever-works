@@ -86,8 +86,15 @@ ticks, source-validation checks, data-sync polls and inbound Triggers — as one
 the owning Agent, the cadence in plain English, the next fire as a live countdown, the last
 outcome, a health badge, and a row menu that can run it now, pause it, resume it, edit it,
 duplicate it or hand it to a different Agent. The **Calendar** view lays the same Schedules onto
-a week or a month and marks every past occurrence with whether a Run actually happened, so
+a week or a month and marks every past occurrence with what actually happened, so
 "did Friday's scan run?" is a glance rather than an investigation.
+
+The seven sources do not all produce the same thing, and the surface never pretends otherwise. A
+recurring Task fire spawns a **Task** that an Agent picks up and executes as a **Run**; a heartbeat
+wakes an Agent and produces a Run; a **Mission** tick raises **Ideas**, and through them Works — the
+tick itself spawns no Task and dispatches no Run. A Mission is therefore a *source* of work here —
+a Task filed against it carries its id, but the cadence does not create one — and it appears as an
+owner, a provenance chip and a filter, never as a unit of work itself.
 
 Authoring a Schedule means writing a **standing definition**: instructions that will be executed
 with nobody watching, a cadence, and options — the model to run it with, a time limit, whether
@@ -376,9 +383,10 @@ so an edited Schedule is always accurate.
 **U20 — Pausing a Mission's cadence.**
 **Given** a `Mission tick` row,
 **when** the owner presses **Pause** on it,
-**then** a confirmation states plainly that pausing this cadence pauses the whole Mission,
-including its other activity, and offers to open the Mission instead. Nothing is paused until
-that is acknowledged.
+**then** a confirmation states plainly that pausing this cadence pauses the whole Mission — it
+stops raising new Ideas, and so stops producing new work — that the Ideas and Works it has already
+raised are left alone, and offers to open the Mission instead. Nothing is paused until that is
+acknowledged.
 
 ---
 
@@ -425,7 +433,10 @@ Numbers here are normative. Every default, limit and threshold is a number.
   **resume**, **edit**, **duplicate**, **reassign**. Controls that do not apply MUST be shown
   disabled with a one-line reason, not hidden.
 - **FR-14** **Run now** MUST dispatch an out-of-band execution immediately and MUST NOT change
-  the next scheduled fire. The interface MUST state this.
+  the next scheduled fire. The interface MUST state this, and MUST link to what that fire actually
+  produced — the Run for a source that produces one, and the owning entity for a source that does
+  not. A Mission tick produces Ideas, and through them Works; it produces no Run, and the interface
+  MUST NOT offer a Run link it cannot make.
 - **FR-15** **Run now** MUST be limited to **10 invocations per minute per user** and MUST be
   refused with a stated reason when: an execution for the same Schedule is already in flight; no
   Agent can be resolved; the owning entity is archived; or the workspace's credit balance cannot
@@ -436,7 +447,10 @@ Numbers here are normative. Every default, limit and threshold is a number.
 - **FR-18** Pausing an Agent heartbeat MUST NOT pause the Agent and MUST NOT stop that Agent's
   assigned Task work.
 - **FR-19** Pausing a Mission tick MUST require an explicit acknowledgement that this pauses the
-  whole Mission, because that cadence is not separable from its Mission.
+  whole Mission, because that cadence is not separable from its Mission. The acknowledgement MUST
+  state what pausing actually stops — the Mission stops raising new Ideas, and so stops producing
+  new work — and MUST state that the Ideas and Works it has already raised are left exactly as
+  they are.
 - **FR-20** **Duplicate** MUST copy instructions, cadence and options; MUST NOT copy run history;
   MUST name the copy `<name> (copy)`; and MUST create it **paused**, so an accidental duplicate
   never doubles the work.
@@ -507,13 +521,15 @@ Numbers here are normative. Every default, limit and threshold is a number.
   | `past-one-shot` | A one-time instant is in the past and was never claimed. |
   | `unparseable` | The cadence cannot be parsed. |
   | `no-agent` | No Agent can be resolved to execute it. |
-  | `owner-archived` | The owning Agent, Mission or Work is archived or deleted. |
+  | `owner-archived` | The owning Agent or Work is archived, or the owning Agent, Mission or Work no longer exists. A Mission the owner *completed* is **Ended**, not this. |
 
 - **FR-40** NEVER RUNS MUST mean **unsatisfiable**, not **infrequent**. A cadence that fires once
   a year, or on 29 February, MUST NOT be flagged. Absence of a fire inside any look-ahead window
   is never, on its own, evidence of unsatisfiability.
 - **FR-41** A **paused** Schedule MUST NOT be flagged NEVER RUNS. Paused is a state the user
-  chose; NEVER RUNS is a defect.
+  chose; NEVER RUNS is a defect. For the same reason, a Mission tick whose Mission the owner has
+  marked **completed** MUST render **Ended**, not NEVER RUNS — finishing an initiative is a choice,
+  not a fault in its cadence.
 - **FR-42** A Schedule that exists, is valid and has simply never fired yet MUST render as OK
   with a "never run yet" note. It MUST remain visible in both views.
 - **FR-43** Health MUST be recomputed on every write to a Schedule and by a background sweep at
@@ -577,11 +593,18 @@ Numbers here are normative. Every default, limit and threshold is a number.
   fired still appears; a Schedule flagged NEVER RUNS appears in the banner above the grid, since
   it has no occurrences to draw.
 - **FR-61** Every **past** occurrence MUST be marked with one of: **ran**, **failed**, **did not
-  run**, or **unknown**. "Ran" and "failed" MUST link to the Run receipt. "Did not run" MUST
-  state the reason where the platform knows it.
+  run**, or **unknown**. "Ran" and "failed" MUST link to the Run receipt where the source produces
+  a Run, and to the owning entity where it does not. "Did not run" MUST state the reason where the
+  platform knows it.
 - **FR-62** An occurrence is matched to a Run when a Run for that Schedule started within
   **±10 minutes** of the expected fire time. Outside that window it is reported as "did not run",
   and the interface MUST NOT claim a match it cannot make.
+  **Not every source produces a Run.** A Mission tick raises Ideas, and through them Works; it
+  spawns no Task and dispatches no Run. For a source whose fire produces no Run, the occurrence
+  MUST be resolved from that source's own record that the fire happened, within the same ±10 minute
+  window, and MUST read **unknown** where the platform holds no such record. Marking such an
+  occurrence "did not run" because no Run exists is forbidden: the absence of a Run is not evidence
+  about a source that never creates one.
 - **FR-63** "Unknown" MUST be used for occurrences older than the workspace's Run retention,
   rather than asserting the occurrence did not run.
 - **FR-64** The requested range MUST be at most **92** days; a wider request MUST be refused and
@@ -590,14 +613,17 @@ Numbers here are normative. Every default, limit and threshold is a number.
   a capped Schedule MUST say so on its row.
 - **FR-66** The Calendar MUST share the List's filter state, so switching views never loses the
   user's narrowing.
-- **FR-67** Choosing an occurrence MUST open the Schedule; choosing the Run marker on a past
-  occurrence MUST open that Run's receipt.
+- **FR-67** Choosing an occurrence MUST open the Schedule; choosing the outcome marker on a past
+  occurrence MUST open that Run's receipt, or, for a source that produces no Run, the owning entity
+  the fire acted on.
 
 ### 4.9 Announcements and failure handling
 
-- **FR-68** When **announce on completion** is on, a completed fire MUST produce one workspace
-  activity entry and one in-app notification naming the Schedule, the Agent, the outcome, the
-  duration, the cost, and linking to the Run receipt.
+- **FR-68** When **announce on completion** is on, a completed fire of that Schedule MUST produce
+  one workspace activity entry and one in-app notification naming the Schedule, the Agent, the
+  outcome, the duration, the cost, and linking to the Run receipt. Announce is an option of the
+  standing definition, so §4.9 applies to the sources that carry one; it introduces no announcement
+  on a source that has no authored options.
 - **FR-69** A **failed** fire MUST announce regardless of the announce setting once **2
   consecutive fires** have failed. A Schedule that fails silently forever is not an acceptable
   outcome of turning announcements off.
@@ -643,11 +669,13 @@ Numbers here are normative. Every default, limit and threshold is a number.
 | **Standing definition** | **Existing form, extended** | The authored kind of Schedule: instructions + cadence + options, owned by an Agent. In Ever Works this is a recurring Task bound to an Agent — the same object the Tasks surface already shows — extended with a pause that preserves the cadence, a model, a time limit, an announce flag, and a board-visibility flag. **No new noun is introduced**: it is a Schedule, and its Task remains a Task. |
 | **Heartbeat** | **Existing** (extended) | A per-Agent, instruction-free periodic wake. Gains an independent pause that preserves the cadence, and overlap detection against that Agent's Schedules. |
 | **Schedule health** | **New — projection only, no new table** | The verdict OK / NEVER RUNS plus one reason and one repair class, computed from the cadence, the bounds, and the owner's reachability. Declared new because "a schedule that cannot fire" has no representation today. |
-| **Occurrence** | **New — projection only, no new table** | One expansion of a Schedule's cadence onto a calendar instant, past or future, together with whether a Run matched it. It has no id, cannot be opened on its own, and is never a Run. Presenting projections and records as the same object would make every id on this surface unreliable. |
+| **Occurrence** | **New — projection only, no new table** | One expansion of a Schedule's cadence onto a calendar instant, past or future, together with what the platform knows actually happened at it: a matched Run for the sources that produce one, and the source's own record of the fire for those that do not. It has no id, cannot be opened on its own, and is never a Run. Presenting projections and records as the same object would make every id on this surface unreliable. |
 | **Schedule bulk action** | **New — a small record** | The durable receipt of one bulk operation: a disable-all batch or a fix batch. It stores exactly which Schedules were transitioned and their previous values, so undo restores precisely that set and touches nothing a teammate changed afterwards. Justified as new because an exact undo cannot be reconstructed from the current state, and reusing the activity log for functional state would make an audit record load-bearing. |
-| **Run** | **Existing** | One execution. Every fire produces one. This epic creates no run history of its own and links to AW-09's receipt. |
+| **Run** | **Existing** | One execution. A recurring Task fire and a heartbeat fire each produce one; a Mission tick does not (§5.2). This epic creates no run history of its own and links to AW-09's receipt. |
 | **Trigger** | **Existing** | The event-driven sibling. Appears in both views with a fixed "on event" cadence and no next fire, and is included in the workspace breaker because it also starts unattended work. |
-| **Agent / Task / Mission / Work** | **Existing** | Owners, link targets and filter dimensions. Read and written through their existing paths only. |
+| **Task** | **Existing** | The unit of delegated work. A recurring Task template *is* the standing definition; each fire spawns a Task instance that an Agent picks up. Read and written through the Tasks paths only. |
+| **Mission** | **Existing** | A standing initiative that keeps raising **Ideas**, and through them Works. It owns **one** of the seven cadences here: that cadence is the Schedule row, and the Mission is the row's source, owner, provenance and filter — never itself a unit of work. Its statuses are its own (`active` · `paused` · `completed` · `failed`) and this surface neither renames nor extends them; the lifecycle in §5.1 belongs to the Schedule. Read and written through the Missions paths only. |
+| **Agent / Work** | **Existing** | Owners, link targets and filter dimensions. Read and written through their existing paths only. |
 
 ### 5.1 Schedule lifecycle
 
@@ -685,20 +713,44 @@ Numbers here are normative. Every default, limit and threshold is a number.
 ```
 
 **Paused is not a defect and NEVER RUNS is not a state the user chose.** The two are drawn
-differently, counted separately, and never collapsed into one "inactive" bucket.
+differently, counted separately, and never collapsed into one "inactive" bucket. **ENDED** also
+covers a Mission tick whose Mission the owner has marked completed — an initiative that has
+finished is ended, not broken (FR-41).
+
+This lifecycle belongs to the **Schedule**, not to the entity that owns it. Pausing a Mission tick
+moves the Mission itself to paused, which is why FR-19 asks for it out loud; nothing here gives a
+Mission a status of its own on this surface.
 
 ### 5.2 What a fire produces
 
+A standing definition and a heartbeat both end in a Run. This is the path the whole surface is
+shaped around:
+
 ```
-  cadence matches ──▶ claim (exactly once) ──▶ Run dispatched ──▶ Run receipt (AW-09)
-                                │                     │
-                                │                     ├─ completed ──▶ announce (if on)
-                                │                     ├─ failed ─────▶ announce (2nd in a row)
-                                │                     └─ failed x5 ──▶ auto-pause + notify
+  cadence matches ──▶ claim (exactly once) ──▶ Task instance ──▶ Run ──▶ Run receipt (AW-09)
+   (recurring Task)             │           (a heartbeat wakes   │
+   (agent heartbeat)            │            the Agent instead)  │
+                                │                                ├─ completed ─▶ announce (if on)
+                                │                                ├─ failed ────▶ announce (2nd in
+                                │                                │                a row)
+                                │                                └─ failed x5 ─▶ auto-pause+notify
                                 │
                                 └─ no agent resolvable ──▶ health becomes NEVER RUNS
                                                             (today: one notification, then silence)
 ```
+
+**A Mission tick does not follow that path**, and the surface must not pretend it does:
+
+```
+  cadence matches ──▶ Mission tick ──▶ Ideas raised ──▶ (Ideas build) ──▶ Works
+                           │
+                           └─ recorded as a Mission tick entry, not as a Run
+```
+
+A Mission is a **source** of work, not a unit of it. Its tick spawns no Task and dispatches no Run —
+a Task that carries this Mission's id was filed against it, not created by the cadence — so a
+Mission-tick occurrence is resolved from that tick record (FR-62), its row offers no Run receipt,
+and pausing it is a decision about the whole initiative (FR-19) rather than about one job.
 
 ---
 
@@ -731,6 +783,8 @@ All copy below is the exact user-visible English string. Every one is an i18n ke
 │ │  ↳ recurring task              February never has a 30th day        RUNS         │ │
 │ │ Docs data sync       —         Every 30 minutes     in 21m     ✓ 08:39  OK    ⋯  │ │
 │ │  ↳ data sync                                                                     │ │
+│ │ Weekly idea scan     —         Every Wed at 06:00   in 3d      ✓ Wed    OK    ⋯  │ │
+│ │  ↳ mission tick                raises ideas, not runs                            │ │
 │ │ Support intake       Inbox     On event             —          ✓ 08:12  OK    ⋯  │ │
 │ │  ↳ inbound trigger                                                               │ │
 │ │ Nightly regeneration  —        Every day at 02:00   PAUSED     ✓ Tue     OK   ⋯  │ │
@@ -756,6 +810,11 @@ Row menu (`⋯`), in order, with disabled entries kept in place:
 
   disabled example (a data-sync row):
         │  Duplicate        Data sync is configured on the work   │
+
+  the same menu on a mission-tick row — the owner entry names what it opens,
+  and there are no runs to see because a tick produces ideas, not runs:
+        │  Open the mission                             │
+        │  See the ideas it raised                      │
 ```
 
 Copy:
@@ -767,7 +826,11 @@ Copy:
 - Status chips: **"Active"**, **"Paused"**, **"Paused after 5 failures"**, **"Ended"**
 - Summary line: **"{total} schedules · {active} active · {paused} paused"**
 - Run-now toast: **"Running now. This does not change the next scheduled fire."**
+- Run-now toast on a mission tick: **"Running one tick now. A tick raises ideas rather than a run —
+  open the mission to see what it raised."**
 - Pause toast: **"Paused. The cadence and instructions are kept."**
+- Row-menu owner entry, per source: **"Open the task"**, **"Open the agent"**, **"Open the
+  mission"**, **"Open the work"** · **"See past runs"** / **"See the ideas it raised"**
 - Timezone note under a cadence: **"UTC ({local} local)"**
 
 Keyboard: `↑`/`↓` move the focused row · `Enter` opens the Schedule · `R` run now · `P` pause or
@@ -892,6 +955,20 @@ Chip, did not run:
      │ Nightly regeneration                         │
      │ Expected Wed 10 Sep 02:00 UTC                │
      │ Did not run — paused at the time             │
+     └──────────────────────────────────────────────┘
+```
+
+Chip, a source that produces no Run. A Mission tick raises Ideas rather than dispatching a Run, so
+its chips are read from the tick's own record: they show **ran** or **unknown** and open the
+Mission, never a receipt, and never **did not run** inferred from a Run that was never going to
+exist (FR-62):
+
+```
+     ┌──────────────────────────────────────────────┐
+     │ Weekly idea scan · mission tick              │
+     │ Expected Wed 10 Sep 06:00 UTC                │
+     │ Ran — raised 3 ideas                         │
+     │ [ Open the mission ]                         │
      └──────────────────────────────────────────────┘
 ```
 
@@ -1094,6 +1171,22 @@ Copy: banner **"{n} schedules will never run."** · **"Review and fix"** · dial
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+**The one row-level pause that also asks first** is a mission tick, because its cadence is not
+separable from its Mission (FR-19):
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│ Pause the whole "Weekly idea scan" mission?                                      [✕] │
+│                                                                                      │
+│   This cadence belongs to the mission, so pausing it pauses the mission itself.      │
+│   The mission stops raising new ideas, and so stops producing new work.              │
+│                                                                                      │
+│   The ideas and works it has already raised are left exactly as they are.            │
+│                                                                                      │
+│                   [ Cancel ]   [ Open the mission ]   [ Pause the mission ]          │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
 ### 6.14 The circuit breaker — the whole workspace
 
 ```
@@ -1283,7 +1376,10 @@ A reviewer can run this list end to end.
 - [ ] Pausing a Schedule preserves its cadence, instructions and options; resuming needs no
       re-entry.
 - [ ] Pausing a heartbeat leaves the Agent active and its assigned Task work unaffected.
-- [ ] Pausing a Mission tick requires an explicit acknowledgement that the Mission is paused.
+- [ ] Pausing a Mission tick requires an explicit acknowledgement that the whole Mission is paused,
+      stating that it stops raising new Ideas and that Ideas and Works already raised are left alone.
+- [ ] Run now links to the Run where the source produces one, and to the owning entity where it
+      does not — a Mission tick offers no Run link.
 - [ ] Duplicate creates a paused copy named "… (copy)" with no run history.
 - [ ] Reassign moves instructions, cadence, options and next fire; archived Agents are not
       offered; reassigning to one archived mid-flow fails cleanly.
@@ -1315,6 +1411,7 @@ A reviewer can run this list end to end.
 - [ ] Each of the seven reasons is produced by a matching fixture and by nothing else.
 - [ ] A yearly cadence and a 29-February cadence are **not** flagged.
 - [ ] A paused Schedule is not flagged.
+- [ ] A Mission tick whose Mission the owner completed renders **Ended**, not NEVER RUNS.
 - [ ] A valid Schedule that has never fired shows OK with a "never run yet" note and stays visible.
 - [ ] Health recomputes on write and by a daily sweep; staleness beyond 48 hours is stated.
 - [ ] The banner counts flagged Schedules, dismisses for the session, and returns next visit.
@@ -1345,6 +1442,8 @@ A reviewer can run this list end to end.
 - [ ] Every past occurrence is marked ran / failed / did not run / unknown; ran and failed link to
       the receipt.
 - [ ] A Run within ±10 minutes matches; outside it, "did not run" is shown, never a guessed match.
+- [ ] A Mission-tick occurrence is resolved from its own tick record and reads "unknown" when none
+      is held; it is never marked "did not run" because no Run exists.
 - [ ] Occurrences older than Run retention read "unknown", not "did not run".
 - [ ] A range over 92 days is refused and snapped back with filters intact.
 - [ ] Expansion caps at 500 per Schedule and 2,000 per request, with an explanation on the row.

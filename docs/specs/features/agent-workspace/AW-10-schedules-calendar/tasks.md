@@ -73,7 +73,9 @@ due-scan, and no other selection criterion changes.
   (e.g. day 30 in a cadence restricted to February), a past end date, an exhausted occurrence cap,
   a past unclaimed one-shot, an unresolvable Agent, an archived owner. **A cadence that simply does
   not fire inside `computeNextCronFire`'s 31-day horizon is OK, never flagged** (FR-40).
-- A paused row is never flagged (FR-41).
+- A paused row is never flagged (FR-41). Nor is a `mission_tick` whose Mission is
+  `MissionStatus.COMPLETED` — that row is **Ended**, because finishing an initiative is a choice,
+  not a defect in its cadence.
 - `proposeRepair(row, health)` returns `{ class, before, after, beforeHash }` for the automatic
   repairs of FR-45; `choice` and `none` return no `after`.
 - Reuse `parseCron` from `packages/agent/src/missions/cron-matcher.ts` and the RRULE helpers in
@@ -149,7 +151,13 @@ unknown source type, a non-UUID owner, a missing colon, and an id with two colon
   every existing ownership check, throttle and activity emission is inherited. It must not write an
   owning table directly.
 - `pause` on `mission_tick` throws `MISSION_PAUSE_NOT_ACKNOWLEDGED` unless
-  `acknowledgeMissionPause` is set.
+  `acknowledgeMissionPause` is set; with it, it calls `MissionsService.pause`, which writes
+  `MissionStatus.PAUSED` and stops the tick raising new Ideas. Ideas and Works already raised are
+  left alone — do not cancel or withdraw anything.
+- `runNow` on `mission_tick` delegates to `MissionsService.runNow` (behind
+  `POST /api/me/missions/:id/run-now`), which runs one tick and raises Ideas. It produces no
+  `AgentRun`, so the result carries a Mission link and the tick outcome instead of a `runId`
+  (spec FR-14) — do not fabricate a Run id for it.
 - `runNow` never mutates `nextOccurrenceAt` or `nextHeartbeatAt`.
 - Refusal codes: `SCHEDULE_ALREADY_RUNNING`, `SCHEDULE_NO_AGENT`, `SCHEDULE_OWNER_ARCHIVED`,
   `SCHEDULE_CREDITS_EXHAUSTED`.
@@ -229,7 +237,10 @@ unchanged apart from the new link.
 
 Requirements: the wireframes and copy of spec §6.1–§6.5; countdown ticks each second but announces
 politely at most once a minute; disabled row-menu entries keep their position and carry their
-reason; filters are URL-synced; the banner dismisses for the session via `sessionStorage`.
+reason; filters are URL-synced; the banner dismisses for the session via `sessionStorage`. The row
+menu's owner entry names what it opens per source (`openTask` / `openAgent` / `openMission` /
+`openWork`); a `mission_tick` row offers the Ideas it raised rather than past runs, because a tick
+produces no Run.
 
 **Done when** every state in spec §6.1–§6.5 is reachable and no literal English string remains in
 the components.
@@ -252,7 +263,9 @@ the components.
 **Modify** `apps/web/messages/en.json` — extend the existing `dashboard.schedules` block (begins
 ~line 2632) with the P1 subset of plan §8: `pageSubtitle`, `views`, `summaryLine`, `timezoneNote`,
 `neverRunYet`, `loadMore`, `showingRange`, the extended `columns` and `filters`, `actions`,
-`health.*`, `runNow.*`, `missionPause.*`, `degraded.*`, `errors.*`, `keyboard.*`. Also add
+`health.*`, `runNow.*`, `missionPause.*` (including `alreadyRaisedNote`), `degraded.*`, `errors.*`,
+`keyboard.*`. `actions` carries all four owner-entry labels — `openTask`, `openAgent`,
+`openMission`, `openWork` — plus `seePastRuns` and `seeIdeasRaised`. Also add
 `dashboard.sidebar.navigation.schedules` and `metadata.pages.schedules`.
 
 **Modify** the 20 sibling locale files in `apps/web/messages/` with the same key tree.
@@ -278,7 +291,8 @@ breaks next-intl at runtime and reds the hydration e2e shards. Nothing existing 
   array with its original keys.
 
 **Must cover:** all seven health reasons; a yearly cron and a 29-February cron are **not** flagged;
-a paused row is not flagged; paused templates and paused heartbeats are excluded from their
+a paused row is not flagged; a `mission_tick` whose Mission is `COMPLETED` renders **Ended** rather
+than NEVER RUNS; paused templates and paused heartbeats are excluded from their
 due-scans while every other selection criterion is unchanged.
 
 **Done when** `cd packages/agent && pnpm test` is green.
@@ -300,7 +314,8 @@ due-scans while every other selection criterion is unchanged.
 - `apps/api/src/schedules/dto/schedules-query.dto.spec.ts` — cover the new page DTO.
 
 **Must cover:** scope isolation, 404-never-403, unknown-param rejection, every `409` code, run-now
-throttling, and the Mission-pause acknowledgement gate.
+throttling, the Mission-pause acknowledgement gate, and that run-now on a `mission_tick` returns the
+Mission link and tick outcome with **no** `runId`.
 
 **Done when** `cd apps/api && pnpm test` is green.
 
@@ -431,10 +446,18 @@ plan §3.4. Append only; reorder nothing. No migration is required (`actionType`
 - `expand(rows, from, to)` — cron via `parseCron`, RRULE via the `rrule` helpers, interval sources
   arithmetically. Caps: **500** occurrences per Schedule, **2 000** per request, reporting
   truncation per Schedule.
-- `matchRuns(occurrences, runs)` — a Run matches when it started within **±10 minutes** of the
-  expected instant. Unmatched past occurrences are `did-not-run` with a reason where known
-  (`pausedAtTheTime`, `noAgent`); occurrences older than the Run retention floor are `unknown`,
-  never `did-not-run` (spec FR-63).
+- `matchRuns(occurrences, runs, sourceRecords)` — for a source that dispatches a Run
+  (`recurring_task`, `agent_heartbeat`), a Run matches when it started within **±10 minutes** of the
+  expected instant, and the occurrence resolves with `evidence: 'run'`. Unmatched past occurrences
+  are `did-not-run` with a reason where known (`pausedAtTheTime`, `noAgent`); occurrences older than
+  the Run retention floor are `unknown`, never `did-not-run` (spec FR-63).
+- **A source that produces no Run is resolved from its own record, not from a missing Run.** A
+  `mission_tick` raises Ideas and writes an `ActivityActionType.MISSION_TICK` row; match that row in
+  the same ±10 minute window and emit `evidence: 'sourceRecord'` with the Mission's `ownerLink` and
+  no `runId` / `durationMs` / `costCents`. With no such row the outcome is `unknown`. Emitting
+  `did-not-run` for a Mission tick because no `AgentRun` exists is a bug, not a default (spec
+  FR-62). The same applies to `work_schedule`, `source_validation` and `data_sync`, which carry
+  their own `lastRun*` columns.
 - Occurrences of a paused Schedule are emitted with outcome `paused`, not dropped (FR-60).
 
 **Done when** the service is pure over injected rows and Runs, with no repository access of its own.
@@ -510,9 +533,10 @@ overlap warning.
 `OccurrenceChip.tsx`.
 
 Requirements: spec §6.6–§6.9. The grid is a semantic table with row and column headers; each chip's
-accessible name reads "{schedule}, {expected time}, {outcome}"; past chips link to the Run receipt;
-over-limit copy is rendered per Schedule; filters are shared with the List view; an over-wide range
-snaps back without losing filters.
+accessible name reads "{schedule}, {expected time}, {outcome}"; a past chip links to the Run receipt
+when `evidence === 'run'` and to the occurrence's `ownerLink` otherwise — a `mission_tick` chip opens
+the Mission and never offers a receipt; over-limit copy is rendered per Schedule; filters are shared
+with the List view; an over-wide range snaps back without losing filters.
 
 **Done when** all six occurrence outcomes render with a text marker as well as a colour.
 
@@ -543,7 +567,9 @@ plan §8. Same rules as T16: camelCase leaves, no literal dot, nothing renamed.
 
 **Modify** `packages/agent/src/schedules/__tests__/cadence.spec.ts` — the next-three-fires helper.
 
-**Must cover:** the 500/2 000 caps; ±10 minute matching and the `unknown` retention rule; paused
+**Must cover:** the 500/2 000 caps; ±10 minute matching and the `unknown` retention rule; a
+`mission_tick` occurrence resolved from its `MISSION_TICK` activity row, and reading `unknown` —
+never `did-not-run` — when no such row exists; paused
 occurrences emitted, not dropped; coincidence at exactly 1 vs 2 fires; duty score at 0.34 vs 0.35;
 announce defaults at exactly 7 vs 8 fires per week; forced failure announcement on the second
 consecutive failure; auto-pause at exactly 5; streak reset on resume; idempotency key preventing a
@@ -553,7 +579,9 @@ double post.
 
 **Create**
 
-- `apps/api/src/schedules/schedules.controller.calendar.spec.ts`
+- `apps/api/src/schedules/schedules.controller.calendar.spec.ts` — including that a `mission_tick`
+  occurrence returns `evidence: 'sourceRecord'` with an `ownerLink` and no `runId`, and `unknown`
+  rather than `did-not-run` when the tick record is absent.
 - extend `apps/api/src/schedules/schedules.controller.controls.spec.ts` for edit / duplicate /
   reassign, including every `409`.
 - extend `apps/api/src/agents/agents.controller.heartbeat-pause.spec.ts` for

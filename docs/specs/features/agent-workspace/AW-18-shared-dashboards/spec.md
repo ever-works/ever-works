@@ -10,7 +10,7 @@
 **Status**: `Draft`
 **Created**: 2026-09-06
 **Last updated**: 2026-09-06
-**Size**: M · **Blocking dependencies**: [AW-02 Mission board](../AW-02-mission-board/)
+**Size**: M · **Blocking dependencies**: [AW-02 Task board](../AW-02-task-board/)
 **Extends**: Organizations, Teams, Knowledge Base, Notification channels (all existing)
 **Adjacent epics**: [AW-03 My Decisions](../README.md#3-epics), [AW-04 Live Feed](../README.md#3-epics), [AW-06 Knowledge library](../AW-06-knowledge-library/), [AW-12 Chat channels](../README.md#3-epics), [AW-15 Connections & scopes](../AW-15-connections-scopes/)
 
@@ -46,14 +46,14 @@ This epic adds the two cheap access shapes that sit either side of full membersh
    │   (no account)        channel. Can ask for work, ask for status, answer   │
    │                       an Agent's question. Cannot decide, cannot sign in. │
    │                                                                          │
-   │   Link visitor     ── NEW. Opens a share link. Reads the mission board    │
+   │   Link visitor     ── NEW. Opens a share link. Reads the Task board       │
    │   (no account)        and (optionally) the knowledge library. Nothing     │
    │                       else. No writes, ever.                              │
    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **The Shared view** — one regenerable read-only link per Workspace that publishes a
-  live mission board and, if the owner opts in, a searchable knowledge library.
+  live Task board and, if the owner opts in, a searchable knowledge library.
   Search-engine indexing is off until the owner turns it on. Regenerating kills the
   previous link on the very next request — no grace period, no cache.
 - **Channel guests** — a per-channel allowlist of external people who may talk to the
@@ -77,10 +77,10 @@ Three phases, each independently shippable and each leaving `develop` green:
 
 A workspace owner opens **Settings → Sharing**, turns on the Shared view, and copies a
 link. Anyone who opens that link — with no account, no sign-in, and no cookie — sees
-the workspace's mission board updating live: four lanes, a card per Mission with its
-priority, its labels and how recently it moved, the roster of Agents that are working,
-and a short strip of what has happened recently. If the owner has opted the knowledge
-section in, the visitor can also list, open and search the workspace's published
+the workspace's Task board updating live: the four Focus columns, a card per Task with
+its priority, its labels and how recently it moved, the roster of Agents that are
+working, and a short strip of what has happened recently. If the owner has opted the
+knowledge section in, the visitor can also list, open and search the workspace's published
 Knowledge Base documents. Nothing else is reachable from that link: no chat, no
 decisions, no runs, no costs, no email, no settings, no connections, no memory facts,
 no agent instructions. Search engines are told to stay away until the owner says
@@ -92,9 +92,9 @@ its allowlist by their identifier on that service, giving them a display name. F
 then on that person can message the workspace's Agents in that channel exactly the way
 the owner does — hand over work, ask for status, answer a question an Agent asked.
 Every request they make is attributed to them by name: in the activity log, in the
-context the Agent reads, and on every Mission, Task, Approval and Escalation that
-comes out of it. When the work reaches something only a human with authority can
-settle, the platform raises it to the **owner** — never to the guest — and the Agent
+context the Agent reads, and on every Task, Approval and Escalation that comes out of
+it. When the work reaches something only a human with authority can settle, the
+platform raises it to the **owner** — never to the guest — and the Agent
 tells the guest that it has done so. Guests cannot sign in, cannot see the decision
 queue, cannot approve anything, cannot see billing, and cannot change a single
 setting.
@@ -119,7 +119,7 @@ setting.
 | Give a colleague visibility | Invite them as an Organization member | They get a dashboard sign-in and, because membership is resolved tenant-wide, visibility into *every* Organization in the Tenant — the members panel says so verbatim in its own disclosure copy |
 | Let a colleague hand work to an Agent | The same invitation — there is no lighter option | Same over-grant, plus the colleague now needs to learn the dashboard |
 | Take that access back | Remove the member | Nothing lighter exists; there is no revocable link and no per-channel revocation |
-| Know who asked for a piece of work | Nothing. A Mission records the owning user, not the person who requested it | Every Mission looks like the owner asked for it |
+| Know who asked for a piece of work | Nothing. A Task records the owning user, not the person who requested it | Every Task looks like the owner asked for it |
 | Stop a stranger from messaging the workspace's Agents through a connected channel | Nothing — the inbound path admits any sender the provider's signature validates | Anyone in the connected workspace can spend the owner's tokens |
 
 ### 2.3 The five concrete gaps
@@ -134,8 +134,8 @@ setting.
    connected chat workspace is admitted on the strength of the workspace binding
    alone. Whoever is in that external workspace can talk to the Agents, and their
    turns are attributed to the binding's owner.
-4. **Nothing records who asked.** Missions, Tasks, Approvals and Escalations carry
-   the owning user. There is no field anywhere that says "this came from Priya".
+4. **Nothing records who asked.** Tasks, Approvals and Escalations carry the owning
+   user. There is no field anywhere that says "this came from Priya".
 5. **Decisions have no routing rule.** Approvals and Escalations are owner-scoped by
    accident of ownership, not by an explicit rule — so the moment a second human can
    originate work, there is nothing in the product that says who is allowed to settle
@@ -170,7 +170,7 @@ becomes a role that has no dashboard.
 ### 3.1 Primary scenarios
 
 **S-1 — Publish the board in under a minute.**
-**Given** an owner of a Workspace with 18 Missions,
+**Given** an owner of a Workspace with 18 Tasks,
 **when** they open **Settings → Sharing**, read the summary of exactly what will be
 published, and press **Turn on sharing**,
 **then** a link is generated and shown in full with a **Copy** button, the Board
@@ -181,16 +181,16 @@ page shows `Board · on · Knowledge · off · Search engines · blocked`.
 **Given** a live share link and a visitor with no Ever Works account, in a private
 browser window,
 **when** they open it,
-**then** within 2 seconds they see the Workspace's display name, four lanes with up to
-50 Mission cards each, an Agent roster, a recent-activity strip, a footer reading
+**then** within 2 seconds they see the Workspace's display name, four columns with up to
+50 Task cards each, an Agent roster, a recent-activity strip, a footer reading
 "Read-only view · updated just now", and no sign-in prompt, no cookie banner and no
 writable control anywhere on the page.
 
 **S-3 — It is genuinely live.**
 **Given** an open share link,
-**when** an Agent moves a Mission from *In flight* to *Done* while the visitor is
+**when** an Agent moves a Task from *In flight* to *Done* while the visitor is
 watching,
-**then** the card moves lanes within 20 seconds without the visitor reloading, and the
+**then** the card moves columns within 20 seconds without the visitor reloading, and the
 footer timestamp updates.
 
 **S-4 — Regenerate kills the old link instantly.**
@@ -218,7 +218,7 @@ counter reads `1 of 25`, and an activity entry records who was admitted and by w
 **S-7 — A guest hands work to an Agent, and gets credited for it.**
 **Given** `Priya` is on the allowlist,
 **when** she messages the channel asking for a round-up of supplier pricing,
-**then** an Agent picks the request up, replies in the channel, and the Mission it
+**then** an Agent picks the request up, replies in the channel, and the Task it
 creates carries `Requested by Priya · <channel name>` on its card, in its detail
 header, and in the activity log — visible to the owner in the dashboard and never on
 the shared view.
@@ -250,11 +250,11 @@ of date — refreshed" and re-reads the current link, and no visitor is ever ser
 link that two tabs disagree about.
 
 **S-11 — Sharing is on but the board is empty.**
-**Given** a Workspace with zero Missions,
+**Given** a Workspace with zero Tasks,
 **when** a visitor opens the link,
-**then** the four lanes render with a single centred message "Nothing on the board yet."
+**then** the four columns render with a single centred message "Nothing on the board yet."
 and the Agent roster and activity strip still render; the page does **not** 404 and
-does not leak the number of archived or deleted Missions.
+does not leak the number of cancelled or board-hidden Tasks.
 
 **S-12 — The Knowledge section is on but no classes are selected.**
 **Given** the owner enabled Knowledge but selected no document classes,
@@ -275,7 +275,7 @@ and the burst is not counted against the view counter.
 **when** the owner presses **Turn off sharing**,
 **then** the visitor's next poll returns the inactive response, the page replaces its
 content with "This link is no longer active." within 20 seconds, and no already-loaded
-Mission titles are re-fetched or re-rendered.
+Task titles are re-fetched or re-rendered.
 
 **S-15 — A document is unpublished mid-view.**
 **Given** a visitor is reading a published Knowledge document,
@@ -330,12 +330,12 @@ signature-verified delivery and is never accepted as a user-typed claim.
 reads "Remove someone to add someone new."
 
 **S-22 — The shared view is asked for something it does not publish.**
-**Given** any request against a share link for a Mission's comments, a Run, a receipt,
+**Given** any request against a share link for a Task's comments, a Run, a receipt,
 an Approval, an Escalation, an email, a memory fact, an Agent's instructions, a Node,
 a Connection, a Team roster of humans, or a Settings value,
 **when** the request is made — including by guessing an identifier,
 **then** it answers `404`, and the response body is identical to the body for a
-Mission that genuinely does not exist.
+Task that genuinely does not exist.
 
 **S-23 — Indexing is turned on and then off again.**
 **Given** an owner turns indexing on for a week and then off,
@@ -360,7 +360,7 @@ number.
 ### 4.1 The Shared view — existence and ownership
 
 - **FR-1.** A Workspace (Organization) has **at most one** Shared view. There is no
-  second link, no per-Mission link and no per-section link.
+  second link, no per-Task link and no per-section link.
 - **FR-2.** A Shared view is created lazily: it does not exist until an owner turns
   sharing on for the first time.
 - **FR-3.** Only the **Tenant owner** — the single user the Tenant is owned by — may
@@ -395,17 +395,21 @@ number.
 ### 4.3 What the Board section publishes
 
 - **FR-13.** The Board section is **on by default** when sharing is first turned on.
-- **FR-14.** When on, it publishes, per Mission: title, lane, priority, labels, the
+- **FR-14.** When on, it publishes, per Task: title, column, priority, labels, the
   relative time since the work last progressed, the staleness flag, and the display
   name and avatar of the Agent currently working it.
-- **FR-15.** Lanes are the four the private mission board uses, in the same order, with
-  the same membership rule, so the shared view and the owner's board never disagree.
-- **FR-16.** Each lane publishes at most **50** cards, ordered exactly as on the private
-  board. A lane with more shows `+N more` as plain text and offers no pagination.
-- **FR-17.** Archived Missions, trashed Missions and Missions the owner has marked
-  private are **never** published, and their existence is not implied by any count.
+- **FR-15.** The published columns are the four of the private Task board's **Focus**
+  layout — `Backlog`, `In flight`, `Needs you`, `Done` — in that order, grouping exactly
+  the `TaskStatus` values the private board groups into them, so the shared view and the
+  owner's board never disagree. The seven-column `Status` layout, the `Cancelled`
+  column and every board filter are not published.
+- **FR-16.** Each column publishes at most **50** cards, ordered exactly as on the private
+  board. A column with more shows `+N more` as plain text and offers no pagination.
+- **FR-17.** Cancelled Tasks, recurring Task templates, and Tasks a Trigger has asked to
+  keep off the board are **never** published, and their existence is not implied by any
+  count.
 - **FR-18.** The Agent roster publishes, per Agent: display name, avatar, a status of
-  `working` / `idle` / `paused`, and the number of Missions it currently has in flight.
+  `working` / `idle` / `paused`, and the number of Tasks it currently has in flight.
 - **FR-19.** The activity strip publishes at most the **20** most recent events, each
   reduced to actor, verb, object title and a relative timestamp.
 - **FR-20.** Only events on an explicit **publishable allowlist** appear in the strip.
@@ -413,12 +417,14 @@ number.
   event kind is unpublished until it is deliberately added.
 - **FR-21.** The Board section **never** publishes: a budget, a cost, a token count, a
   model name, an Agent's instructions or system prompt, a Run, a run log, tool output,
-  an error message, a Mission's comments, a Task list, a Work, an Idea, a repository
-  name, a file path, a URL that resolves inside the product, a human's name, or an
-  email address.
-- **FR-22.** A Mission in the *Needs you* lane publishes only that it is waiting on a
-  decision. The decision's own subject, body, options and risk flags are never
-  published.
+  an error message, a Task's comments, its sub-tasks, the Mission, Work, Idea, Team or
+  Goal it is filed against, a repository name, a file path, a URL that resolves inside
+  the product, a human's name, or an email address. Provenance is not published at all:
+  a card on the shared view carries no "raised by Mission X" chip even though the
+  private board's card does.
+- **FR-22.** A Task in the *Needs you* column publishes only that it is waiting on a
+  person. Which of the two grouped statuses it holds, and any Approval or Escalation
+  attached to it — its subject, body, options and risk flags — are never published.
 - **FR-23.** The shared view publishes **no human identity at all** — not the owner's
   name, not a member's name, not a Channel guest's name.
 - **FR-24.** The shared view is **read-only end to end**: it exposes no endpoint that
@@ -496,7 +502,7 @@ number.
 - **FR-48.** The Sharing settings page shows the view count, the last-viewed time and
   the time the link was last regenerated.
 - **FR-49.** Time-to-first-paint of the public board page must be under **2 seconds** at
-  the 95th percentile for a Workspace with 200 Missions and 20 Agents.
+  the 95th percentile for a Workspace with 200 Tasks and 20 Agents.
 
 ### 4.7 Channel guests — the allowlist
 
@@ -553,9 +559,10 @@ number.
 
 - **FR-67.** Every admitted guest request produces a **requester label** of the form
   `<display name> · <channel name>`.
-- **FR-68.** The requester label is stamped on every Mission and Task the resulting Run
-  creates, and is shown on the Mission card, in the Mission detail header, and in the
-  Task detail header.
+- **FR-68.** The requester label is stamped on every Task the resulting Run creates, and
+  is shown on the Task card and in the Task detail header. When the Run sets up a
+  standing Mission at the guest's request, the same label is stamped on that Mission and
+  shown in its detail header.
 - **FR-69.** The requester label is stamped on every Approval and Escalation the
   resulting Run raises, and is shown on that item in **My Decisions**.
 - **FR-70.** The requester label appears in the activity log entry for the request and
@@ -594,11 +601,11 @@ number.
 - **FR-82.** Every user-visible string on every new surface — the owner's settings, the
   public page, and every Agent reply the gate produces — is translatable. No string is
   hard-coded.
-- **FR-83.** The public page is fully keyboard navigable, announces lane and section
+- **FR-83.** The public page is fully keyboard navigable, announces column and section
   changes to assistive technology through a polite live region, and meets WCAG 2.1 AA
   contrast in both light and dark themes.
 - **FR-84.** The public page renders usably from **360 px** wide, collapsing the four
-  lanes into a single scrollable column with sticky lane headers.
+  columns into a single scrollable list with sticky column headers.
 - **FR-85.** The public page renders its full first view without JavaScript; the live
   poll is a progressive enhancement.
 - **FR-86.** Every destructive owner action — regenerate, turn off sharing, revoke a
@@ -616,8 +623,8 @@ number.
 | **Organization** (the Workspace) | Owns at most one Shared view. Nothing about it changes. |
 | **Tenant** | Supplies the single owner user that every owner-only check resolves against. Unchanged. |
 | **Organization member** | Unchanged. Members keep exactly the access they have today, and gain the ability to *see* that a Shared view exists. |
-| **Mission** | Projected into the published board. Gains an optional requester label. No status, lane or lifecycle change. |
-| **Task** | Gains an optional requester label. Nothing else. |
+| **Task** | Projected into the published board — one card per Task. Gains an optional requester label. No status, column or lifecycle change. |
+| **Mission** | Unchanged: a standing initiative and a source of Tasks. Nothing about a Mission is published on the shared view, not even as a provenance chip on a card. Gains an optional requester label for the case where a guest asks for a standing initiative to be set up. |
 | **Agent** | Projected into the published roster as name, avatar, status and in-flight count. Nothing about an Agent changes. |
 | **Knowledge Base document** | Projected into the published library when its class is selected and its status permits. Gains an optional per-document exclusion flag (P3). |
 | **Activity log entry** | Gains new entry kinds for share and guest events, and carries the requester label in its detail. Existing kinds are untouched. |
@@ -711,7 +718,7 @@ terminates in a User row and a dashboard session. Both nouns below exist precise
 | Sharing settings | **Settings → Sharing** (new entry, below *Organization*) | Owner: full. Member: read-only. |
 | Who can message this | A panel inside each connected channel's settings | Owner only |
 | The published page | A public route under `/share/<token>` | Anyone with the link |
-| Requester label | Mission card, Mission detail, Task detail, My Decisions row | Signed-in users only |
+| Requester label | Task card, Task detail, Mission detail, My Decisions row | Signed-in users only |
 
 ### 6.2 Settings → Sharing — sharing off (first run)
 
@@ -725,12 +732,12 @@ terminates in a User row and a dashboard session. Both nouns below exist precise
 │   │  Sharing is off                                                │      │
 │   │                                                                │      │
 │   │  Turn it on and you get one link. Anyone who opens it sees     │      │
-│   │  your mission board updating live — and nothing else until     │      │
+│   │  your Task board updating live — and nothing else until        │      │
 │   │  you say otherwise.                                            │      │
 │   │                                                                │      │
 │   │  Visitors will see        Visitors will never see              │      │
 │   │  ─────────────────        ──────────────────────               │      │
-│   │  · Mission board          · Chat and messages                  │      │
+│   │  · Task board             · Chat and messages                  │      │
 │   │  · Agents and status      · My Decisions                       │      │
 │   │  · Recent activity        · Runs, receipts and costs           │      │
 │   │                           · Email, memory, settings            │      │
@@ -757,7 +764,7 @@ terminates in a User row and a dashboard session. Both nouns below exist precise
 │                                                                          │
 │  ── What's published ──────────────────────────────────────────────────  │
 │                                                                          │
-│   [x] Mission board          Lanes, cards, agents, recent activity        │
+│   [x] Task board             Columns, cards, agents, recent activity      │
 │   [ ] Knowledge library      Documents you choose, listed and searchable  │
 │                                                                          │
 │  ── Search engines ────────────────────────────────────────────────────  │
@@ -799,7 +806,7 @@ With the Knowledge library ticked, the section expands in place:
 ```
 │  ⓘ  Only the workspace owner can change sharing.                        │
 │                                                                          │
-│  Sharing is on. The mission board is published; the knowledge library    │
+│  Sharing is on. The Task board is published; the knowledge library       │
 │  is not. Search engines are blocked.                                     │
 │                                                    (link hidden)         │
 ```
@@ -833,7 +840,7 @@ With the Knowledge library ticked, the section expands in place:
 ┌───────────────────────────────────────────────────────────┐
 │  Let search engines index this page?                       │
 │                                                            │
-│  Your mission board — and the documents you've published   │
+│  Your Task board — and the documents you've published      │
 │  — may start appearing in search results for anyone.       │
 │                                                            │
 │                       [ Cancel ]  [ Allow indexing ]       │
@@ -914,7 +921,7 @@ detail drawer.
 │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                                                        │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐                    │
 │  │ ▓▓▓▓▓▓▓▓ │ │ ▓▓▓▓▓▓▓▓ │ │ ▓▓▓▓▓▓▓▓ │ │ ▓▓▓▓▓▓▓▓ │   (four skeleton    │
-│  │ ▓▓▓▓     │ │ ▓▓▓▓     │ │ ▓▓▓▓     │ │ ▓▓▓▓     │    lanes)           │
+│  │ ▓▓▓▓     │ │ ▓▓▓▓     │ │ ▓▓▓▓     │ │ ▓▓▓▓     │    columns)         │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘                    │
 ```
 
@@ -982,7 +989,7 @@ detail drawer.
 │ │ Board │  Knowledge    │ │
 │ └───────┴───────────────┘ │
 ├───────────────────────────┤
-│ Backlog                 9 │  ← sticky lane header
+│ Backlog                 9 │  ← sticky column header
 │ ┌───────────────────────┐ │
 │ │ Q4 pricing review     │ │
 │ │ High · pricing        │ │
@@ -1049,7 +1056,7 @@ detail drawer.
 
 ### 6.9 Attribution where it shows up
 
-**On a Mission card (extends the AW-02 card)**
+**On a Task card (extends the AW-02 card)**
 
 ```
 ┌────────────────────────────┐
@@ -1094,8 +1101,8 @@ detail drawer.
 | Live badge | `Live` |
 | Counters line | `Regenerated {date} · Opened {n} times · Last opened {relative}` |
 | Never-opened counters line | `Regenerated {date} · Not opened yet` |
-| Section toggles | `Mission board` · `Knowledge library` |
-| Section helper, board | `Lanes, cards, agents, recent activity` |
+| Section toggles | `Task board` · `Knowledge library` |
+| Section helper, board | `Columns, cards, agents, recent activity` |
 | Section helper, knowledge | `Documents you choose, listed and searchable` |
 | Class picker helper | `Choose which kinds of document are published. Nothing is published until you choose at least one.` |
 | Class picker footer | `{n} documents will be public.` |
@@ -1114,7 +1121,7 @@ detail drawer.
 | --- | --- | --- |
 | Sharing settings | `c` | Copy the share link (owner only, when the link is focusable) |
 | Sharing settings | `Esc` | Dismiss the open confirmation dialog without acting |
-| Published page | `Tab` / `Shift+Tab` | Move through tabs, then lanes, then cards, then documents |
+| Published page | `Tab` / `Shift+Tab` | Move through tabs, then columns, then cards, then documents |
 | Published page | `←` / `→` | Move between the Board and Knowledge tabs |
 | Published page | `/` | Focus the document search box (Knowledge tab only) |
 | Published page | `r` | Refresh now |
@@ -1122,8 +1129,8 @@ detail drawer.
 | Allowlist panel | `Enter` | Submit the add-someone form when both fields are filled |
 | Allowlist panel | `Esc` | Cancel the revoke confirmation |
 
-All lane and section changes are announced through a polite live region so a screen
-reader user hears "In flight, 4 missions" rather than nothing.
+All column and section changes are announced through a polite live region so a screen
+reader user hears "In flight, 4 tasks" rather than nothing.
 
 ---
 
@@ -1139,7 +1146,8 @@ omission.
 3. **Password-protected or email-gated share links.** A single bearer link with instant
    revocation is the whole design. Adding a second factor to a link nobody signs into
    would be theatre.
-4. **Per-Mission, per-Agent or per-lane share links.** One Workspace, one link.
+4. **Per-Task, per-Mission, per-Agent or per-column share links.** One Workspace, one
+   link.
 5. **Embeddable widgets, iframes or an OG-image renderer** for the shared view.
 6. **A custom domain, vanity slug or white-label chrome** for the published page.
 7. **Analytics beyond a view count and a last-viewed timestamp.** No per-visitor
@@ -1173,12 +1181,12 @@ A reviewer can run this checklist top to bottom.
       Knowledge section off, and indexing blocked.
 - [ ] The link opens in a private window with no account, no cookie set, and no sign-in
       prompt.
-- [ ] The published board's lanes, order and card membership match the owner's private
-      board exactly for the same Workspace.
+- [ ] The published board's four Focus columns, their order and their card membership
+      match the owner's private Task board exactly for the same Workspace.
 - [ ] No card, roster row, activity line or response field anywhere on the published
       page contains a cost, a budget, a token count, a model name, a run identifier, a
       file path, an internal URL, an email address or a human's name.
-- [ ] Moving a Mission on the private board is reflected on an open public page within
+- [ ] Moving a Task on the private board is reflected on an open public page within
       20 seconds without a manual reload.
 
 **Revocation**
@@ -1197,7 +1205,7 @@ A reviewer can run this checklist top to bottom.
       change any sharing setting; direct calls answer `404`, never `403`.
 - [ ] Every share-link request for a run, a receipt, an approval, an escalation, an
       email, a memory fact, an agent instruction, a node, a connection or a settings
-      value answers `404` with the same body as a non-existent Mission.
+      value answers `404` with the same body as a non-existent Task.
 - [ ] No share-link endpoint accepts any write verb.
 
 **Search engines and caching**
@@ -1226,7 +1234,7 @@ A reviewer can run this checklist top to bottom.
 - [ ] The first view of a fresh link notifies the owner exactly once; the second does
       not.
 - [ ] Time-to-first-paint of the published board is under 2 seconds at p95 with 200
-      Missions and 20 Agents.
+      Tasks and 20 Agents.
 
 **Channel guests**
 
@@ -1256,7 +1264,7 @@ A reviewer can run this checklist top to bottom.
 
 **Attribution and decisions**
 
-- [ ] A Mission created from a guest request shows `Requested by {name} · {channel}` on
+- [ ] A Task created from a guest request shows `Requested by {name} · {channel}` on
       its card, in its detail header, and in the activity log.
 - [ ] The same label appears on any Approval or Escalation the run raises, in My
       Decisions.
@@ -1273,11 +1281,11 @@ A reviewer can run this checklist top to bottom.
 **Craft**
 
 - [ ] The published page renders its full first view with JavaScript disabled.
-- [ ] The published page is usable at 360 px wide with sticky lane headers.
+- [ ] The published page is usable at 360 px wide with sticky column headers.
 - [ ] Every string on every new surface, including every Agent reply the gate produces,
       resolves through the translation layer.
 - [ ] The published page meets WCAG 2.1 AA contrast in light and dark themes and
-      announces lane changes politely.
+      announces column changes politely.
 - [ ] Every destructive action is behind a confirmation that names its consequence.
 
 ---
@@ -1307,10 +1315,10 @@ A reviewer can run this checklist top to bottom.
   Is that acceptable until roles land, or does this epic need an explicit "share
   managers" list?
 - **[NEEDS CLARIFICATION: activity strip on the published page]** FR-19 publishes 20
-  recent events with object titles. A Mission title is user-authored free text and may
+  recent events with object titles. A Task title is user-authored free text and may
   contain something the owner would not want public. Should the strip publish titles at
-  all, or only "a mission finished"? Proposal: publish titles, because a board that
-  already shows every Mission title makes hiding them in the strip pointless — but say
+  all, or only "a task finished"? Proposal: publish titles, because a board that
+  already shows every Task title makes hiding them in the strip pointless — but say
   so explicitly in the turn-on dialog.
 - **[NEEDS CLARIFICATION: per-document exclusion]** FR-28 reserves a per-document
   "never publish this one" flag for P3. Is class-level control enough for P1 and P2, or
@@ -1322,7 +1330,7 @@ A reviewer can run this checklist top to bottom.
 
 | Concern | Requirement |
 | --- | --- |
-| Latency | Published board first paint < 2 s at p95 (200 Missions, 20 Agents); poll response < 400 ms at p95 |
+| Latency | Published board first paint < 2 s at p95 (200 Tasks, 20 Agents); poll response < 400 ms at p95 |
 | Throughput | 60 requests/min/token, 600/hour/client, enforced before any database read beyond the token lookup |
 | Availability | The published page degrades to its last successful render plus a "couldn't refresh" line rather than blanking |
 | Data retention | View counters are cumulative; the salted client bucket lives ≤ 24 h and is never persisted |
@@ -1354,7 +1362,7 @@ A reviewer can run this checklist top to bottom.
 
 - [Program overview](../README.md) — vocabulary (§1), the operating loop (§2), and the
   rules every epic in this program follows (§5).
-- [AW-02 Mission board](../AW-02-mission-board/spec.md) — the lanes, cards, priority,
+- [AW-02 Task board](../AW-02-task-board/spec.md) — the Focus columns, cards, priority,
   labels, staleness and progress signals this epic publishes. **Blocking dependency.**
 - [AW-06 Knowledge library](../AW-06-knowledge-library/) — the library surface whose
   documents this epic publishes a subset of.

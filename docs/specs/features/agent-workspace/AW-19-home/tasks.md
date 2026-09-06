@@ -47,7 +47,7 @@
       `HOME_TITLE_MAX_CHARS = 120`, `HOME_ACTIVITY_MAX_CHARS = 120`,
       `HOME_RUN_ACTIVITY_MAX_CHARS = 100`, `HOME_SCHEDULE_NAME_MAX_CHARS = 60`,
       `HOME_COMPOSER_MAX_CHARS = 2000`, `HOME_COMPOSER_MIN_CHARS = 3`,
-      `HOME_MISSION_TITLE_MAX_CHARS = 80`, `HOME_OVERDUE_HOURS = 72`,
+      `HOME_TASK_TITLE_MAX_CHARS = 80`, `HOME_OVERDUE_HOURS = 72`,
       `HOME_WAITING_WARN_HOURS = 24`, `HOME_LONG_RUN_MINUTES = 30`,
       `HOME_STILL_GOING_MINUTES = 120`, `HOME_REFRESH_MS = 60_000`,
       `HOME_BLOCK_BUDGET_MS = 1500`, `HOME_CACHE_TTL_MS = 10_000`,
@@ -249,10 +249,10 @@
 - [ ] **T14.** Add the shared client-safe helpers.
     - Create `apps/web/src/components/home/home.shared.ts` (no directive, so both
       RSC and client components can import it) with `formatWaiting`,
-      `formatElapsed`, `formatCount`, `greetingKeyForHour`, `deriveMissionTitle`,
+      `formatElapsed`, `formatCount`, `greetingKeyForHour`, `deriveTaskTitle`,
       and a re-export of the `HOME_*` constants from `@ever-works/contracts`.
-    - `deriveMissionTitle` takes the first sentence, truncates at the last word
-      boundary at or before `HOME_MISSION_TITLE_MAX_CHARS`, appends a single `…`
+    - `deriveTaskTitle` takes the first sentence, truncates at the last word
+      boundary at or before `HOME_TASK_TITLE_MAX_CHARS`, appends a single `…`
       when it truncated, and falls back to the whole text when the first sentence
       is shorter than `HOME_COMPOSER_MIN_CHARS`.
     - **Test**: `apps/web/src/components/home/home.shared.unit.spec.ts` — every
@@ -282,10 +282,11 @@
       newline, `Escape` blurs; `Send` disabled under
       `HOME_COMPOSER_MIN_CHARS`; counter from 1800; hard stop at
       `HOME_COMPOSER_MAX_CHARS`.
-    - Submit calls `createMissionAction` from
-      `apps/web/src/app/actions/dashboard/missions.ts` with
-      `{ type: 'one-shot', description: text, title: deriveMissionTitle(text) }`.
-    - Success: clear, push a chip (max 3, 60 s each) linking to the Mission.
+    - Submit calls `createTaskAction` from
+      `apps/web/src/app/actions/tasks.ts` with
+      `{ title: deriveTaskTitle(text), description: text }` — no owner ids and no
+      `status`, so the Task is unscoped and takes the entity default `backlog`.
+    - Success: clear, push a chip (max 3, 60 s each) linking to the Task.
     - Failure: keep the text, restore focus, show the inline error; a `429`
       renders the throttle-specific copy.
     - Draft persistence in `localStorage` under `ew:v1:home:composer-draft`, every
@@ -393,9 +394,9 @@
       kinds, the spend headline and cap bar, the working-now rows, the activity
       tail.
     - Create `apps/web/e2e/home-composer.spec.ts` — spec scenarios S2, S13, S14,
-      S20: one sentence creates a Mission and the chip links to it; a forced
-      failure preserves the text and restores focus; the throttle copy; the 3 and
-      2000 character bounds; the no-runtime suffix.
+      S20: one sentence creates a Task in the Backlog lane and the chip links to
+      it; a forced failure preserves the text and restores focus; the throttle
+      copy; the 3 and 2000 character bounds; the no-runtime suffix.
     - **Done when**: both specs pass in the authenticated Chromium project.
 
 - [ ] **T28.** Phase 1 gate.
@@ -482,10 +483,11 @@
 
 - [ ] **T34.** Composer `Expand`.
     - Add an `Expand` affordance to `apps/web/src/components/home/HomeComposer.tsx`
-      navigating to the full Mission form
-      (`apps/web/src/app/[locale]/(dashboard)/missions/new/page.tsx`) with the
-      typed text carried into the description field, and clear the local draft
-      only once the form has it.
+      navigating to the full Task form
+      (`apps/web/src/app/[locale]/(dashboard)/tasks/new/page.tsx`), which already
+      pre-fills from a `?prompt=` param (first line becomes the title, the
+      remainder seeds the description), and clear the local draft only once the
+      form has it.
 
 - [ ] **T35.** Phase 2 end-to-end coverage.
     - Create `apps/web/e2e/home-decisions.spec.ts` — spec scenarios S3, S12, S15,

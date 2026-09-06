@@ -320,7 +320,7 @@ Indexes:
 
 | Column | Type | Written by |
 | --- | --- | --- |
-| `missionId` | `uuid` nullable | `AgentEscalationService.record()`, derived from `tasks.missionId`; backfilled by the migration |
+| `missionId` | `uuid` nullable | `AgentEscalationService.record()`, derived from `tasks.missionId`; backfilled by the migration. **Provenance only** — it drives the Mission filter and the chip; nothing about a Mission is ever resolved, paused or unblocked from here. `taskId` already exists on this table |
 | `archivedAt` | `PortableDateColumn` nullable | Archive / bulk archive / orphan sweep |
 | `archivedByUserId` | `uuid` nullable | NULL when the sweeper archived it |
 | `archivedReason` | `varchar(32)` nullable | `'user' \| 'bulk' \| 'source-gone'` |
@@ -337,14 +337,20 @@ needs **no** migration for width. Every existing read filters `status='open'` or
 ### 3.3 P1 — additive columns on `agent_action_proposals`
 
 The same five columns (`missionId`, `archivedAt`, `archivedByUserId`,
-`archivedReason`, `firstViewedAt`) plus index
+`archivedReason`, `firstViewedAt`) **plus `taskId`** — six in total. This table has
+no `taskId` today, and the queue's Task filter (spec FR-5) and its
+"what is this blocking" line (FR-11) both need one; `agent_escalations` already
+carries it. Two indexes:
+`idx_agent_action_proposals_task_status` on `(taskId, status)` and
 `idx_agent_action_proposals_mission_status` on `(missionId, status)`.
 `AgentActionProposalStatus` gains `'archived'` in
 [`agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts)
 and in `AGENT_ACTION_PROPOSAL_STATUSES`; the column is `varchar(16)` already.
 
-`missionId` is derived from `runId → agent_runs.taskId → tasks.missionId` at
-creation, and backfilled the same way.
+`taskId` is derived from `runId → agent_runs.taskId`, and `missionId` one hop
+further through `tasks.missionId`, both at creation and both backfilled the same
+way. The Task is what a decision blocks; the Mission is only where the Task came
+from.
 
 ### 3.4 P3 — health-band overrides and the daily roll-up
 
@@ -388,10 +394,12 @@ Authored from `apps/api/`, landing in
 
 1. **`<ts>-CreateDecisionAsks.ts`** (P1) — `CREATE TABLE decision_asks` + its three
    indexes; `ALTER TABLE agent_escalations` ADD 5 columns + 1 index;
-   `ALTER TABLE agent_action_proposals` ADD 5 columns + 1 index; then two
-   `UPDATE … FROM tasks` backfills for `missionId`, and a batched insert of one
-   derived ask per currently-open escalation and pending proposal.
-   `down` drops only what `up` created.
+   `ALTER TABLE agent_action_proposals` ADD 6 columns + 2 indexes; then the
+   provenance backfills — `agent_escalations.missionId` from `tasks.missionId`
+   over the existing `taskId`, and `agent_action_proposals.taskId` from
+   `agent_runs.taskId` followed by `missionId` from `tasks.missionId` — and a
+   batched insert of one derived ask per currently-open escalation and pending
+   proposal. `down` drops only what `up` created.
 2. **`<ts>-CreateDecisionHealthSnapshots.ts`** (P3) — `CREATE TABLE
    decision_health_snapshots` + 2 indexes; `ALTER TABLE work_agent_preferences`
    ADD 2 nullable int columns.
@@ -427,7 +435,7 @@ and **404-never-403** in line with every sibling controller in this area.
 
 | Method | Path | Body / query | Returns | Throttle |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/decisions` | `status` (`open`\|`answered`\|`archived`\|`all`, default `open`), `agentId`, `missionId`, `kind`, `q`, `limit` (1–100, default 25), `offset` | `{ data: DecisionDto[], meta: { total, limit, offset, openCount, blockingCount } }` | 60/min |
+| `GET` | `/api/decisions` | `status` (`open`\|`answered`\|`archived`\|`all`, default `open`), `agentId`, `taskId`, `missionId`, `kind`, `q`, `limit` (1–100, default 25), `offset` | `{ data: DecisionDto[], meta: { total, limit, offset, openCount, blockingCount } }` | 60/min |
 | `GET` | `/api/decisions/:decisionId` | `decisionId` = `escalation:<uuid>` \| `approval:<uuid>`, validated by a dedicated pipe | `DecisionDto` (stamps `firstViewedAt` on the first human read) | 60/min |
 | `POST` | `/api/decisions/:decisionId/asks/:askId/answer` | `{ answer: HitlAnswer, rationale?: string }` | `{ decision: DecisionDto, resolution: DecisionResolutionOutcome \| null }` | 30/min |
 
@@ -490,7 +498,7 @@ manually in the web client exactly as `agent-approvals.ts` mirrors its DTO today
 | `POST` | `/api/decisions/:decisionId/asks/:askId/undo` | `{ note?: string }` | `{ decision: DecisionDto, withdrawal: { posted: 'injected' \| 'recorded', runCancelled: boolean } }` | 30/min |
 | `POST` | `/api/decisions/:decisionId/archive` | — | `DecisionDto` | 30/min |
 | `POST` | `/api/decisions/:decisionId/restore` | — | `DecisionDto` | 30/min |
-| `POST` | `/api/decisions/archive-all` | `{ ids?: string[], agentId?, missionId?, kind? }` | `{ archived: number, skipped: number }` | **5/min** |
+| `POST` | `/api/decisions/archive-all` | `{ ids?: string[], agentId?, taskId?, missionId?, kind? }` | `{ archived: number, skipped: number }` | **5/min** |
 
 `archive-all` caps at `DECISION_ARCHIVE_ALL_MAX = 200` per invocation, ordered
 oldest-first, and skips rows that are no longer open (mirroring
@@ -523,7 +531,7 @@ shapes do not move.
 ### 5.1 Route and shell
 
 - `apps/web/src/app/[locale]/(dashboard)/decisions/page.tsx` — RSC entry. Reads
-  `?tab`, `?id`, `?agentId`, `?missionId`, `?kind`, `?q`, `?offset`; fetches the
+  `?tab`, `?id`, `?agentId`, `?taskId`, `?missionId`, `?kind`, `?q`, `?offset`; fetches the
   first page plus the health snapshot with `Promise.allSettled` so a failed health
   read hides the line instead of failing the page; hands a failed **list** read to
   the client as an error rather than an empty array (FR-9).
@@ -600,9 +608,11 @@ server's view of the other asks.
 - [`components/inbox/InboxClient.tsx`](../../../../../apps/web/src/components/inbox/InboxClient.tsx)
   — an **Open in My Decisions** link on `escalation` and `approval` items.
 - The Task detail escalation feed — the same link per row.
-- AW-02's `Needs you` lane links to `ROUTES.DASHBOARD_DECISIONS` with
-  `?missionId=`. That link is added by AW-02; this epic only guarantees the
-  filter exists.
+- AW-02's per-card **Decision** chip links to `ROUTES.DASHBOARD_DECISIONS` with
+  `?taskId=` — the board's cards are Tasks, so its decision chip scopes to a Task,
+  not to a Mission. That link is added by AW-02; this epic only guarantees the
+  filter exists. The `?missionId=` filter also exists, for "everything this
+  standing initiative has asked me".
 
 ---
 
@@ -614,7 +624,7 @@ exported from [`index.ts`](../../../../../packages/tasks/src/tasks/trigger/index
 each booting a `NestApplicationContext(TriggerInternalModule)` and delegating to an
 agent-package service — the shape
 [`agent-run-sweeper.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts)
-already uses. **No call site imports a vendor SDK** (Constitution IV).
+already uses. **No call site imports a job-runtime SDK directly** (Constitution IV).
 
 | Task id | Cron | Delegates to | Does |
 | --- | --- | --- | --- |
@@ -677,6 +687,7 @@ dashboard.decisions
     archived                  "Archived"
   filters
     agent                     "Agent"
+    task                      "Task"
     mission                   "Mission"
     kind                      "Kind"
     search                    "Search decisions"
@@ -1014,7 +1025,7 @@ and the write-to-instructions action; one line in the daily digest.
 | I — Plugin-first | ✓ | No external integration is added. The access ask links to existing connection surfaces and never calls a provider |
 | II — Capability-driven | ✓ | An access ask names a capability or tool pattern; no plugin id appears anywhere outside a plugin package, and the service rejects an empty capability |
 | III — Source-of-truth repos | ✓ | Decisions are platform metadata; no work content moves into the database |
-| IV — Job runtime | ✓ | The restart rides `RunSteeringService` → `AGENT_TASK_EXECUTE_DISPATCHER`; the sweeper and the health tick are `schedules.task` registrations. No call site imports a vendor SDK |
+| IV — Job runtime | ✓ | The restart rides `RunSteeringService` → `AGENT_TASK_EXECUTE_DISPATCHER`; the sweeper and the health tick are `schedules.task` registrations. No call site imports a job-runtime SDK directly |
 | V — Forward-only migrations | ✓ | Two migrations: one `CREATE TABLE` + additive nullable columns + a chunked backfill; one `CREATE TABLE` + two nullable columns. No drop, no rename, no type change |
 | VI — Tests | ✓ | 10 unit suites, 3 controller specs (two of which cover controllers that have none today), 8 e2e specs, 4 web unit specs |
 | VII — Secrets | ✓ | An access ask stores a capability name and a link; the DTO has no value-bearing field and a service guard rejects secret-shaped hints. Answers and rationales never reach the activity log or analytics |
@@ -1055,5 +1066,5 @@ and the write-to-instructions action; one line in the daily digest.
   substrate audit: [`../EXISTING-SUBSTRATE.md`](../EXISTING-SUBSTRATE.md) (row **S2**)
 - Constitution: [`../../../../../.specify/memory/constitution.md`](../../../../../.specify/memory/constitution.md)
 - House-style example: [`../../schedules/spec.md`](../../schedules/spec.md)
-- Adjacent plans: [`../AW-02-mission-board/plan.md`](../AW-02-mission-board/plan.md),
+- Adjacent plans: [`../AW-02-task-board/plan.md`](../AW-02-task-board/plan.md),
   [`../AW-04-live-feed/`](../AW-04-live-feed/), [`../AW-19-home/`](../AW-19-home/)

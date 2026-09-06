@@ -1,11 +1,11 @@
-# AW-02 — Mission board · Task breakdown
+# AW-02 — Task board · Task breakdown
 
 > Ordered, executable tasks derived from [`plan.md`](./plan.md). Each carries
 > explicit file paths and a definition of done. Every task ships with its tests
-> (Constitution VI). Work top to bottom; tasks marked `(parallel)` may run
-> alongside the task immediately above them.
+> (Constitution VI). Work top to bottom; tasks marked `(parallel)` may run alongside
+> the task immediately above them.
 
-**Feature ID**: `aw-02-mission-board`
+**Feature ID**: `aw-02-task-board`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
 **Status**: `Draft`
 **Last updated**: 2026-09-06
@@ -16,551 +16,595 @@
 
 - All paths are repo-relative to the monorepo root.
 - Run everything with `pnpm` from the root unless a task says otherwise.
-- Migrations are **authored** from `apps/api/`; nothing is run by hand on deploy —
-  the API self-applies on boot.
+- **No task in this breakdown adds an entity, a table, a column or a migration.** If
+  a task appears to need one, stop and re-read [`plan.md`](./plan.md) §3 — the signal
+  it wants already exists. The single exception is deferred to T39 and gated on a
+  product decision.
 - Add new tasks at the bottom; never renumber.
-- Commit style: `feat(missions): …`, `test(missions): …`, `chore(i18n): …`.
+- Commit style: `feat(tasks): …`, `test(tasks): …`, `chore(i18n): …`.
 
 ---
 
-# PHASE 1 — The board
+## The three standing constraints
 
-## P1.A — Schema and domain model
+Re-read these before every task. They are what makes this epic additive.
 
-- [ ] **T1. Add the board columns to the Mission entity.**
-    - Modify `packages/agent/src/entities/mission.entity.ts`:
-        - Export string-union types beside the existing enums:
-          `export type MissionOriginType = 'user' | 'schedule' | 'agent';`
-          `export type MissionProgressKind = 'run_started' | 'run_completed' | 'run_failed' | 'tick' | 'task_transition' | 'decision_opened' | 'decision_resolved' | 'comment';`
-        - Add columns exactly as specified in [`plan.md`](./plan.md) §3.1:
-          `priority` `varchar(4)` default `'p3'`; `labels` `simple-json` nullable;
-          `archivedAt` / `deletedAt` / `lastProgressAt` as `PortableDateColumn({ nullable: true })`;
-          `lastProgressSummary` `varchar(280)` nullable; `lastProgressKind` `varchar(32)` nullable;
-          `commentCount` `int` default `0`; `createdByType` `varchar(16)` default `'user'`;
-          `createdById` `uuid` nullable.
-        - Add `@Index('idx_missions_board_scan', ['userId', 'deletedAt', 'archivedAt', 'status'])`
-          and `@Index('idx_missions_progress', ['userId', 'lastProgressAt'])` on the class.
-        - Reuse `TaskPriority` from `packages/agent/src/entities/task.entity.ts` for the
-          `priority` field's TS type — do **not** declare a second priority enum.
-    - **Done when**: `pnpm --filter @ever-works/agent build` is clean and every new column
-      carries a doc comment explaining what writes it.
-
-- [ ] **T2. Add the staleness preference column.**
-    - Modify `packages/agent/src/entities/work-agent-preference.entity.ts`: add
-      `missionStaleAfterDays?: number | null` as `@Column({ type: 'int', nullable: true })`,
-      documented as "NULL = inherit the platform default of 2; clamped 1–30 at the service
-      layer", mirroring the neighbouring `missionDefaultOutstandingCap` comment.
-    - **Done when**: the column exists with its comment and the package builds.
-
-- [ ] **T3. Generate and hand-review the P1 migration.**
-    - From `apps/api/`:
-      `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddMissionBoardColumns`
-    - Land the file in `apps/api/src/migrations/<timestamp>-AddMissionBoardColumns.ts`.
-    - Hand-check: 10 `ADD COLUMN` on `missions`, 1 on `work_agent_preferences`,
-      2 `CREATE INDEX`. **No** `DROP`, no `ALTER … TYPE`, no `NOT NULL` without a default.
-      The `down` drops only what `up` added, in reverse.
-    - **Done when**: `pnpm typeorm migration:run -d typeorm.config.ts` applies on a fresh
-      database and again on a database that already has data, and the generated diff is
-      empty afterwards.
-
-- [ ] **T4. Extend the Mission DTO and mapper.**
-    - Modify `packages/agent/src/missions/types.ts`: add the ten new fields to `MissionDto`
-      and to `toMissionDto()`. This is the only place a Mission field reaches the wire.
-    - **Test**: extend `packages/agent/src/missions/__tests__/missions.service.spec.ts` with a
-      mapper case asserting every new field round-trips, including `labels: null → []`.
-    - **Done when**: no caller of `toMissionDto` needs a change and the API returns the new
-      fields.
-
-## P1.B — Lane derivation (the heart of the feature)
-
-- [ ] **T5. Write the pure lane function.**
-    - Create `packages/agent/src/missions/mission-lane.ts` exporting:
-        - `export type MissionLane = 'backlog' | 'in_flight' | 'needs_you' | 'done';`
-        - `export const MISSION_LANE_ORDER: readonly MissionLane[]`
-        - `export const DEFAULT_MISSION_STALE_AFTER_DAYS = 2;`
-        - `export const IN_FLIGHT_RECENCY_MS = 24 * 60 * 60 * 1000;`
-        - `deriveLane(input: { status; archivedAt; deletedAt; lastProgressAt; openDecisionCount; liveRunCount; now }): MissionLane | null`
-          (`null` = not on the board), implementing spec FR-3's precedence exactly.
-        - `isStale(input: { lane; lastProgressAt; now; staleAfterDays }): boolean`
-        - `clampStaleAfterDays(value: number | null | undefined): number` — 1–30, default 2.
-    - No imports from TypeORM, NestJS or any service. Pure functions only.
-    - **Test**: `packages/agent/src/missions/__tests__/mission-lane.spec.ts` — a truth table
-      over every precedence branch, `lastProgressAt = null`, the paused case, the 24-hour
-      recency boundary at ±1 ms, the staleness boundary at 47 h / 49 h, and the clamp at
-      0 / 1 / 30 / 31 / null.
-    - **Done when**: the spec covers all six branches of FR-3 and passes.
-
-- [ ] **T6. Export the new module surface.**
-    - Modify `packages/agent/src/missions/index.ts`: `export * from './mission-lane';`
-      (and, as later tasks land, the board / staleness / trash services).
-    - **Done when**: `apps/api` can import `MissionLane` from `@ever-works/agent/missions`.
-
-## P1.C — Board read model
-
-- [ ] **T7. Add `MissionBoardService`.**
-    - Create `packages/agent/src/missions/mission-board.service.ts`.
-    - Constructor injects `Repository<Mission>`, `Repository<Task>`,
-      `Repository<AgentEscalation>`, `Repository<AgentActionProposal>` and the
-      work-agent preference repository (for the staleness threshold).
-    - `getBoard(userId, filter, scope)` runs exactly the four queries in
-      [`plan.md`](./plan.md) §2.1 — the Mission scan, two grouped decision counts, one
-      grouped live-run count — then maps through `deriveLane`.
-    - Ownership uses `ownershipWhere` from
-      `packages/agent/src/database/ownership-scope.ts`. The Mission scan always adds
-      `deletedAt IS NULL AND archivedAt IS NULL`.
-    - Each of the three auxiliary queries is individually `try/catch`-guarded: a failure
-      degrades that signal (decision counts → `degraded: 'decision-counts'` on the
-      `Needs you` lane; live runs → treated as 0) and never fails the board.
-    - Lane totals are computed unbounded; only the card arrays are capped by `laneLimit`.
-    - `doneTodayCount` is computed from a validated IANA timezone, falling back to UTC.
-    - **Test**: `packages/agent/src/missions/__tests__/mission-board.service.spec.ts` —
-      filters compose, lane cap vs. true total, `doneTodayCount` across a timezone
-      boundary, per-source degradation, foreign-user rows never appear.
-    - **Done when**: a board for 500 Missions issues exactly 4 queries (assert with a
-      query spy).
-
-- [ ] **T8. Add archive / trash / restore and label + priority writes to `MissionsService`.**
-    - Modify `packages/agent/src/missions/missions.service.ts`:
-        - `archive`, `unarchive`, `trash`, `restore` — all idempotent, all owner-scoped
-          through the existing `findOrThrow`, each writing an activity row via the
-          existing private `recordActivity`.
-        - `trash` also clears `archivedAt`; `restore` clears both markers.
-        - `normalizeLabels(input)` — trim, lower-case, de-duplicate, reject > 8 or a value
-          failing `/^[a-z0-9][a-z0-9._-]{0,31}$/`, throwing `BadRequestException`.
-        - `create` / `update` accept `priority` and `labels`; `create` defaults `priority`
-          to `p3` and stamps `createdByType = 'user'`, `createdById = userId`.
-        - `listForUser` gains `include?: 'active' | 'archived' | 'trashed' | 'all'`,
-          defaulting to `'active'` (excludes both markers).
-    - **Test**: extend `packages/agent/src/missions/__tests__/missions.service.spec.ts` —
-      idempotent repeats, label normalisation and every rejection case, the `include`
-      filter's four values, and that archiving does not touch any Task or Run.
-    - **Done when**: all four shelf verbs are idempotent and 404-no-leak on a foreign id.
-
-- [ ] **T9. Wire the new services into the module.**
-    - Modify `packages/agent/src/missions/missions.module.ts`: register
-      `MissionBoardService` (and, from T13/T14, the staleness and trash services), add the
-      `TypeOrmModule.forFeature` entries for `Task`, `AgentEscalation` and
-      `AgentActionProposal`, and export what the API layer needs.
-    - **Done when**: `pnpm --filter ever-works-api build` boots the DI graph without a
-      missing-provider error.
-
-## P1.D — Progress writers
-
-- [ ] **T10. Add the progress-recording helper.**
-    - Add `recordProgress(missionId, kind, summary)` to `MissionsService` (or a small
-      `MissionProgressService` in `packages/agent/src/missions/mission-progress.service.ts`
-      if the service is already too large). It issues one `UPDATE missions SET
-      lastProgressAt = now(), lastProgressSummary = :summary, lastProgressKind = :kind`,
-      truncating the summary to 280 characters and stripping control characters.
-    - Wrapped in `try/catch` + `logger.warn` — a failure must never fail the caller.
-    - **Test**: truncation at 279 / 280 / 281 characters; control-character stripping; a
-      throwing repository does not propagate.
-
-- [ ] **T11. Call the helper from the six existing event owners.**
-    - `packages/agent/src/tasks-domain/task-run-denorm.service.ts` — when it writes
-      `Task.latestRunStatus`, and the Task has a `missionId`, record `run_started` /
-      `run_completed` / `run_failed`.
-    - `packages/agent/src/tasks-domain/task-transition.service.ts` — record
-      `task_transition` with the Task title and its new status.
-    - `packages/agent/src/missions/mission-tick.service.ts` — record `tick` with the number
-      of Ideas produced.
-    - The escalation writer path in `packages/agent/src/agents/` — record
-      `decision_opened` / `decision_resolved` for the escalation's Task's Mission.
-    - The proposal writer path in `packages/agent/src/agents/` — same, for approvals.
-    - (Comment posting is wired in Phase 2, T32.)
-    - **Test**: extend each touched service's existing spec in
-      `packages/agent/src/tasks-domain/__tests__/` and
-      `packages/agent/src/missions/__tests__/` with one case asserting the progress write
-      fires with the right `kind`, and one asserting a Task with no `missionId` writes
-      nothing.
-    - **Done when**: a user edit to a Mission's title still does **not** write progress
-      (spec FR-27) — assert that explicitly.
-
-## P1.E — API surface
-
-- [ ] **T12. Add the board and shelf endpoints.**
-    - Modify `apps/api/src/missions/missions.controller.ts`:
-        - `@Get('board')` → `MissionBoardService.getBoard`, `@Throttle` 120/min.
-        - `@Post(':id/archive')`, `@Post(':id/unarchive')`, `@Post(':id/trash')`,
-          `@Post(':id/restore')` → the T8 methods, `@Throttle` 30/min, `@HttpCode(200)`.
-        - `@Get()` passes the new `include` query through.
-        - Every route gets `@ApiOperation` + `@ApiResponse` so the MCP whitelist derivation
-          picks it up.
-    - Modify `apps/api/src/missions/dto/mission.dto.ts`: add `MissionBoardQueryDto` exactly
-      as specified in [`plan.md`](./plan.md) §4.1, and add optional `priority` + `labels`
-      to `CreateMissionDto` and `UpdateMissionDto`.
-    - `apps/api/src/missions/missions.module.ts`: no new module, only the provider wiring
-      that T9 exported.
-    - **Test**:
-        - `apps/api/src/missions/missions.controller.board.spec.ts` — response shape, query
-          validation (bad priority value, `laneLimit` 0 and 201, `doneWindowDays` 0 and 91,
-          a hostile `tz` string), throttle metadata present.
-        - `apps/api/src/missions/missions.controller.shelf.spec.ts` — happy path, idempotent
-          repeat, and identical 404 bodies for a foreign id across all four verbs.
-        - `apps/api/src/missions/missions.controller.scope.spec.ts` — Organization scoping
-          on every new route.
-        - Extend `apps/api/src/missions/dto/mission.dto.spec.ts` for `priority` and `labels`.
-    - **Done when**: `curl` against a running API returns four lanes in board order for a
-      seeded user and `404` for another user's Mission id.
-
-- [ ] **T13. Add the staleness service.**
-    - Create `packages/agent/src/missions/mission-staleness.service.ts` with
-      `sweep(): Promise<{ scanned; flagged }>`: select Missions the lane function puts in
-      `in_flight` with `lastProgressAt < now - effectiveThreshold`, and raise one
-      notification each through `NotificationService` with
-      `category: NotificationCategory.MISSION`, `type: WARNING`,
-      `deduplicationKey: mission-stale:${missionId}:${Math.floor(lastProgressAt/1000)}`,
-      and an `actionUrl` to the Mission.
-    - Add `MISSION = 'mission'` to `NotificationCategory` in
-      `packages/agent/src/entities/notification.types.ts` (no migration — `category` is
-      `varchar(100)`).
-    - Add `MISSION_STALE_FLAGGED` to `ActivityActionType` in
-      `packages/agent/src/entities/activity-log.types.ts` (no migration — `actionType` is
-      `varchar(50)`), and emit it on first flag.
-    - **Test**: `packages/agent/src/missions/__tests__/mission-staleness.service.spec.ts` —
-      47 h / 49 h boundaries at the default, the clamp, one notification per streak (a
-      second sweep is a no-op), a new key after the Mission moves, no flag for Backlog /
-      Needs you / Done / archived / trashed.
-
-- [ ] **T14. Add the trash-retention service.**
-    - Create `packages/agent/src/missions/mission-trash.service.ts` with
-      `purgeDue(now, batchSize = 200)`: hard-delete Missions with
-      `deletedAt < now - 30 days`, cascading `mission_comments` (once the P2 table exists —
-      until then there is nothing to cascade), and emit `MISSION_PURGED` to the activity log
-      with the Mission title and its `trashedAt`.
-    - Add `MISSION_ARCHIVED`, `MISSION_UNARCHIVED`, `MISSION_TRASHED`, `MISSION_RESTORED`,
-      `MISSION_PURGED` to `ActivityActionType`.
-    - **Test**: `packages/agent/src/missions/__tests__/mission-trash.service.spec.ts` —
-      the 30-day cutoff either side, batch cap respected, a re-run finds nothing, the
-      activity row carries the title.
-
-- [ ] **T15. Add the two background tasks.**
-    - Create `packages/tasks/src/tasks/trigger/mission-staleness-sweep.task.ts`
-      (`schedules.task({ id: 'mission-staleness-sweep', cron: '7 * * * *' })`) and
-      `packages/tasks/src/tasks/trigger/mission-trash-purge.task.ts`
-      (`cron: '23 4 * * *'`), both copying the `NestApplicationContext(TriggerInternalModule)`
-      shape of `packages/tasks/src/tasks/trigger/mission-tick.task.ts` and returning a
-      structured summary.
-    - Register both in `packages/tasks/src/tasks/trigger/index.ts`.
-    - **Done when**: `pnpm --filter @ever-works/tasks build` is clean and neither file
-      imports anything from the agent package other than its service class.
-
-## P1.F — Web
-
-- [ ] **T16. Extend the web API client and server actions.**
-    - Modify `apps/web/src/lib/api/missions.ts`: add `board(input)`, `archive(id)`,
-      `unarchive(id)`, `trash(id)`, `restore(id)`, and the `include` param on `list`. Add
-      the `MissionBoardDto` / `MissionBoardLaneDto` / `MissionBoardCardDto` /
-      `MissionLane` / `MissionOriginType` types alongside the existing `Mission` type.
-    - Modify `apps/web/src/app/actions/dashboard/missions.ts`: add
-      `getMissionBoardAction`, `archiveMissionAction`, `unarchiveMissionAction`,
-      `trashMissionAction`, `restoreMissionAction`, `setMissionPriorityAction`,
-      `setMissionLabelsAction`, each matching the file's existing error-shaping style.
-    - **Done when**: `pnpm --filter ever-works-web type-check` is clean.
-
-- [ ] **T17. Turn `/missions` into a tabbed page.**
-    - Modify `apps/web/src/app/[locale]/(dashboard)/missions/page.tsx`: read `?tab=`
-      (`board` default, then `list`, `archived`, `trashed`), fetch the matching data with
-      the existing `try/catch` discipline, and render the matching client component. Keep
-      the current list path byte-for-byte behind `tab=list`.
-    - Add the tab strip to a new
-      `apps/web/src/components/missions/board/MissionsTabs.tsx`, persisting the choice to
-      `localStorage['missions-tab']` and mirroring it into the URL.
-    - **Done when**: `/missions` renders the board, `/missions?tab=list` renders exactly
-      today's page, and a hard refresh on either keeps the tab.
-
-- [ ] **T18. Build the board shell.**
-    - Create under `apps/web/src/components/missions/board/`:
-      `MissionBoard.tsx`, `MissionBoardHeader.tsx`, `MissionLane.tsx`,
-      `MissionBoardSkeleton.tsx`, `MissionBoardEmpty.tsx`.
-    - `MissionBoard` owns filter state, drag state and optimistic mutations; lanes are
-      keyed by mission id so a refresh never remounts an unchanged card.
-    - Lane headers carry the name, the true total, and the sort tooltip; each lane is a
-      labelled region with a polite live count.
-    - `MissionBoardEmpty` wraps `apps/web/src/components/common/EmptyState.tsx`.
-    - **Test**: `MissionLane.unit.spec.tsx` — empty line per lane, `Show N more` appears
-      only when `hasMore`, the header count shows the true total not the rendered count,
-      the degraded decision-count copy renders.
-
-- [ ] **T19. Build the card and its menu.**
-    - Create `apps/web/src/components/missions/board/MissionBoardCard.tsx` and
-      `MissionCardMenu.tsx`.
-    - Card renders: priority chip, Stale flag (In flight only), Paused chip, title (2-line
-      clamp, full title in the accessible name), live status line (In flight only, 140
-      characters shown, `title` attribute for the full value), up to 3 labels + `+N`,
-      origin chip, comment chip (`99+` above 99), relative last-move time with the absolute
-      value in its tooltip.
-    - Menu items and their handlers per spec §6.4; unavailable items are disabled with a
-      reason in their tooltip.
-    - **Test**: `MissionBoardCard.unit.spec.tsx` — a status line containing `<script>` and a
-      markdown link renders as literal text; 5 labels render 3 + `+2`; 150 comments render
-      `99+`; a Backlog card renders no status line; a card is a single link target.
-
-- [ ] **T20. Build filters and the poll hook.**
-    - Create `apps/web/src/components/missions/board/MissionBoardFilters.tsx` (search,
-      priority, label, origin, `Clear filters` shown only while a filter is active, all
-      URL-synced) and `apps/web/src/components/missions/board/useMissionBoardPoll.ts`
-      (15 s while visible with anything in flight, 60 s while visible otherwise, stopped
-      while `document.hidden`), modelled on
-      `apps/web/src/lib/hooks/use-task-run-polling.ts`.
-    - **Test**: `MissionBoardFilters.unit.spec.tsx` for URL round-tripping; a hook test for
-      the three interval regimes and the visibility teardown.
-
-- [ ] **T21. Build drag-and-drop moves.**
-    - In `MissionBoard.tsx` / `MissionLane.tsx`, use the same native HTML5 handlers as
-      `apps/web/src/components/tasks/TasksKanbanView.tsx`.
-    - Backlog → In flight calls `runMissionNowAction`; In flight → Backlog calls
-      `pauseMissionAction`; any → Done opens the existing completion dialog; the
-      `Needs you` lane omits `onDragOver`/`onDrop` and shows the explanatory toast.
-    - A refused or failed move reverts the card and surfaces the server message.
-    - **Done when**: every drag has an equivalent card-menu item (spec FR-75).
-
-- [ ] **T22. Build the quick-create dialog.**
-    - Create `apps/web/src/components/missions/board/NewMissionDialog.tsx` on
-      `apps/web/src/components/ui/dialog.tsx` (Headless UI). Fields, copy and layout per
-      spec §6.10; opens on the `+ New Mission` button and on the `n` key.
-    - On failure it restores the dialog with the entered values and an inline error.
-    - Links to `ROUTES.DASHBOARD_MISSIONS_NEW` for the full form.
-    - **Test**: `NewMissionDialog.unit.spec.tsx` — 9-character description is refused
-      client-side, a 9th label is refused inline, a failed submit preserves the text.
-
-- [ ] **T23. Build the Archived and Trash tabs.**
-    - Create `apps/web/src/components/missions/board/MissionShelf.tsx` (a `variant` prop for
-      `archived` | `trash`) and `MissionPurgeDialog.tsx` (type-the-title confirmation, which
-      calls the existing `deleteMissionAction`).
-    - Trash rows show `Deleted {date} · purged in {days} days`.
-    - **Test**: `MissionShelf.unit.spec.tsx` — both empty states, the purge-date arithmetic,
-      and that `Delete forever` stays disabled until the typed title matches exactly.
-
-- [ ] **T24. Add the archived / trashed banner to the Mission detail page.**
-    - Modify `apps/web/src/components/missions/MissionDetailClient.tsx`: render the banner
-      from spec §6.14 above the existing sections when `archivedAt` or `deletedAt` is set,
-      with a `Restore` action.
-    - Export every new board component from
-      `apps/web/src/components/missions/index.ts`.
-    - **Test**: extend `MissionDetailClient.unit.spec.tsx` with both banner cases.
-
-- [ ] **T25. Add the keyboard layer.**
-    - Roving tabindex inside each lane, one tab stop per lane. Bindings per spec §6.16
-      (`n`, `/`, arrows, `Home`/`End`, `Enter`, menu key, `1`–`5`, `e`, `Delete`, `r`,
-      `Esc`). `e` and `Delete` are inert while any input, textarea, select or
-      contenteditable has focus — reuse the guard shape in
-      `apps/web/src/lib/hooks/use-keyboard-shortcuts.ts`, but keep these bindings local to
-      the board rather than registering them globally.
-    - **Done when**: the board is fully operable with the pointer unplugged.
-
-## P1.G — i18n, tests, docs
-
-- [ ] **T26. Add the P1 message keys.**
-    - Modify `apps/web/messages/en.json`: add every key in [`plan.md`](./plan.md) §8 except
-      the `dashboard.missionDetail.comments.*` block, under the existing
-      `dashboard.missionsPage` namespace plus the two `dashboard.settings.workAgent.*` keys.
-    - Mirror the same key tree into all 20 sibling locale files in `apps/web/messages/`
-      (`ar, bg, de, es, fr, he, hi, id, it, ja, ko, nl, pl, pt, ru, th, tr, uk, vi, zh`),
-      translated — not copied English.
-    - **Hard rule**: leaf key names are camelCase and contain **no literal dot**. next-intl
-      rejects dotted leaves at runtime and the hydration spec turns that into a
-      multi-shard failure.
-    - **Done when**: all 21 files have identical key trees (add a small script under
-      `apps/web/scripts/` if one does not already exist) and `pnpm --filter ever-works-web build`
-      is clean.
-
-- [ ] **T27. Add the P1 end-to-end specs.**
-    - Create in `apps/web/e2e/`:
-      `flow-mission-board-ui-journey.spec.ts`,
-      `flow-mission-board-quick-create.spec.ts`,
-      `flow-mission-board-archive-trash.spec.ts`,
-      `flow-mission-board-lane-moves.spec.ts`,
-      `flow-mission-board-empty-and-error.spec.ts`,
-      `flow-mission-board-keyboard.spec.ts`,
-      `flow-mission-board-a11y.spec.ts`.
-    - Scope each per [`plan.md`](./plan.md) §10.3. Prefer role- and text-based locators over
-      `*ByRole` chains that are known to be load-sensitive in this suite.
-    - **Done when**: all seven pass locally three times in a row and in CI.
-
-- [ ] **T28. Document the board.**
-    - Create `docs/features/mission-board.md` describing lanes, priority, staleness,
-      archive/trash and steering in user language.
-    - Cross-link from `docs/features/index.md` and add it to
-      `apps/docs/sidebarsPlatform.ts` (the sidebar is manual — an unlisted file renders as
-      an orphan page).
-    - **Done when**: `pnpm --filter ever-works-docs build` reports no broken links.
-
-- [ ] **T29. P1 green gate.**
-    - Run `pnpm format`, `pnpm lint`, `pnpm type-check`, `pnpm test`, `pnpm build`.
-    - Update [`../TRACKER.md`](../TRACKER.md): AW-02 spec `Approved`, implementation
-      `P1 shipped`.
-    - **Done when**: `develop` is green with the board live and comments absent.
+1. **`TasksKanbanView.tsx` keeps its export and its props.** Every existing caller —
+   `TasksList`, `TasksScopedSection`, and through them `/tasks`,
+   `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks` — must keep
+   compiling and keep working with no change on their side.
+2. **`GET /api/tasks` does not change.** Its existing controller specs must pass
+   untouched. Any diff in them means an additive promise was broken.
+3. **Every new default that changes what a user sees has a one-action toggle back.**
+   Board-as-landing-view, top-level-only, templates-out-of-columns.
 
 ---
 
-# PHASE 2 — The thread and steering
+# PHASE 1 — Make the board true
 
-- [ ] **T30. Add the Mission comment entity.**
-    - Create `packages/agent/src/entities/mission-comment.entity.ts` per
-      [`plan.md`](./plan.md) §3.3 — `@Entity('mission_comments')`,
-      `@ManyToOne(() => Mission, { onDelete: 'CASCADE' })`, indexes
-      `idx_mission_comment_mission_created` and `idx_mission_comment_author`, Tier C
-      `tenantId`/`organizationId`.
-    - Export it from `packages/agent/src/entities/index.ts`.
-    - **Done when**: the agent package builds and TypeORM picks the entity up.
+## P1.A — Pure domain logic (no I/O, no framework)
 
-- [ ] **T31. Generate and hand-review the P2 migration.**
-    - From `apps/api/`:
-      `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateMissionComments`
-    - Verify it is one `CREATE TABLE` plus two indexes plus the FK; no other table is
-      touched.
-    - **Done when**: it applies cleanly on a database that already ran the P1 migration.
+- [ ] **T1. Column tables and drop resolution.**
+    - Create `packages/agent/src/tasks-domain/task-board-columns.ts` exporting:
+        - `export type BoardLayout = 'status' | 'focus';`
+        - `export interface BoardColumnDef { key: string; statuses: readonly TaskStatus[]; terminal: boolean; }`
+        - `STATUS_COLUMNS: readonly BoardColumnDef[]` — seven entries, one status
+          each, in the order `backlog, todo, in_progress, in_review, blocked, done,
+          cancelled`.
+        - `FOCUS_COLUMNS: readonly BoardColumnDef[]` — `backlog` (`backlog`, `todo`),
+          `in_flight` (`in_progress`), `needs_you` (`in_review`, `blocked`), `done`
+          (`done`), plus a `cancelled` entry marked as toggle-only.
+        - `columnsFor(layout, opts: { includeCancelled: boolean }): BoardColumnDef[]`
+        - `columnForStatus(layout, status): string`
+        - `resolveDrop(from: TaskStatus, column: BoardColumnDef, allowed: Record<TaskStatus, TaskStatus[]>): { kind: 'apply'; to: TaskStatus } | { kind: 'ask'; options: TaskStatus[] } | { kind: 'refuse' }`
+    - **No imports** from TypeORM, NestJS, or any service. `TaskStatus` is imported
+      as a type only.
+    - Add a file-header comment stating the invariant: *every `TaskStatus` value
+      appears in exactly one column of each layout; a column is never derived from
+      anything but status.*
+    - **Test**: `packages/agent/src/tasks-domain/__tests__/task-board-columns.spec.ts`
+        - Both layouts cover all seven statuses exactly once (assert by set equality
+          against `Object.values(TaskStatus)`, so adding a status to the enum without
+          adding a column fails the suite).
+        - `resolveDrop` over the full 7 × 5 matrix, asserting the verdict for every
+          pair.
+        - `in_progress → needs_you` is the **only** `ask` in the whole matrix.
+        - Every drop out of `cancelled` is `refuse`.
+    - **Done when**: `pnpm --filter @ever-works/agent test task-board-columns` is
+      green and the file imports nothing outside `entities/task.entity`.
 
-- [ ] **T32. Add `MissionCommentService`.**
-    - Create `packages/agent/src/missions/mission-comment.service.ts`, modelled closely on
-      `packages/agent/src/tasks-domain/task-chat.service.ts`:
-      `MAX_COMMENT_BYTES = 16 * 1024`, `EDIT_WINDOW_MS = 5 * 60_000`, the same `MENTION_RE`,
-      the same optional-injection posture for `RUN_STEERING_PORT`,
-      `AGENT_CHAT_REPLY_DISPATCHER` and `RunDispatchGateService`.
-    - `post()` persists the row, bumps `missions.commentCount`, calls
-      `recordProgress(..., 'comment', ...)`, then resolves the newest non-terminal
-      `AgentRun` among the Mission's Tasks and follows the decision tree in
-      [`plan.md`](./plan.md) §2.3, writing `deliveryOutcome` / `deliveryDetail` /
-      `deliveredRunId` back onto the row.
-    - `list()` paginates 50 per page, oldest first. `edit()` enforces the 5-minute window.
-    - Emit `MISSION_COMMENT_POSTED` to the activity log with the outcome but **never** the
-      body.
-    - **Test**: `packages/agent/src/missions/__tests__/mission-comment.service.spec.ts` —
-      the 16 KB cap, the edit window either side, mention parsing, all four delivery
-      outcomes including a refusal from the dispatch gate, the `commentCount` and
-      `lastProgressAt` side effects, and that an unbound steering port degrades rather than
-      throwing.
+- [ ] **T2. The stall predicate.** *(parallel with T1)*
+    - Create `packages/agent/src/tasks-domain/task-board-stall.ts` exporting:
+        - `export const DEFAULT_STALL_AFTER_DAYS = 2;`
+        - `clampStallAfterDays(value: number | null | undefined): number` — 1..30,
+          default 2.
+        - `stallCutoff(now: Date, days: number): Date`
+        - `isStalled(input: { status; latestRunStatus; updatedAt; now; stallAfterDays }): boolean`
+          exactly as [`plan.md`](./plan.md) §2.4.
+    - Add the header comment stating what the predicate costs: it derives "no
+      progress" from `updatedAt`, so an unrelated edit clears the flag. It
+      **under-reports and never over-reports**, and that asymmetry is why no new
+      column is stored.
+    - **Test**: `.../__tests__/task-board-stall.spec.ts` — 47 h vs 49 h at the default
+      threshold; `latestRunStatus` of `queued` and `running` (not stalled) vs each
+      terminal value and `null` (stalled); every non-`in_progress` status (never
+      stalled); the clamp at `0`, `1`, `30`, `31`, `null`, `undefined`, `NaN`.
+    - **Done when**: green, and the file has no framework import.
 
-- [ ] **T33. Add the comment endpoints.**
-    - Create `apps/api/src/missions/mission-comments.controller.ts`
-      (`@Controller('api/me/missions/:id/comments')`, `@ApiTags('missions')`), registered in
-      `apps/api/src/missions/missions.module.ts` — mirroring how
-      `apps/api/src/tasks/task-chat.controller.ts` sits beside `tasks.controller.ts`.
-    - `GET` (120/min), `POST` (20/min, `PostMissionCommentDto`), `PATCH :commentId`
-      (20/min). No delete endpoint.
-    - **Test**: `apps/api/src/missions/mission-comments.controller.spec.ts` — post/list/edit
-      happy paths, a 16 KB + 1 body rejected, `409` after the edit window, `404`-no-leak on
-      a foreign Mission and on a comment id from another Mission, and the throttle metadata.
+- [ ] **T3. Provenance ordering.** *(parallel with T1)*
+    - Create `packages/agent/src/tasks-domain/task-board-provenance.ts` exporting:
+        - `export type ProvenanceKind = 'trigger' | 'recurringTemplate' | 'scheduled' | 'mission' | 'idea' | 'work' | 'team' | 'goal' | 'agent' | 'raisedByAgent' | 'delegated' | 'creator';`
+        - `PROVENANCE_PRECEDENCE: readonly ProvenanceKind[]` in spec FR-28's order.
+        - `orderProvenance(entries: ProvenanceEntry[]): ProvenanceEntry[]` — sorted by
+          precedence, with entries whose `name` is `null` **dropped** (spec FR-29).
+    - **Test**: `.../__tests__/task-board-provenance.spec.ts` — all twelve present
+      returns all twelve in precedence order; an unresolvable name is dropped, not
+      rendered as an id; an empty input returns empty.
+    - **Done when**: green.
 
-- [ ] **T34. Build the comment thread UI.**
-    - Create `apps/web/src/components/missions/MissionCommentThread.tsx` per spec §6.13:
-      the thread, the delivery annotation under each comment, the 5-minute `Edit`
-      affordance, `(edited)`, `Load older comments`, `Ctrl`/`Cmd`+`Enter` to send, and the
-      `Insert a change of direction` button that populates the box with the editable
-      template.
-    - Mount it from `apps/web/src/components/missions/MissionDetailClient.tsx`; export it
-      from the barrel.
-    - Add `listMissionCommentsAction`, `postMissionCommentAction`,
-      `editMissionCommentAction` to `apps/web/src/app/actions/dashboard/missions.ts` and the
-      matching client methods to `apps/web/src/lib/api/missions.ts`.
-    - **Test**: `MissionCommentThread.unit.spec.tsx` — each of the four annotations renders
-      its copy, the Edit link disappears after 5 minutes, the template inserts editable text
-      rather than sending, and a comment body containing markup renders as literal text.
+- [ ] **T4. Export the new module surface.**
+    - Modify `packages/agent/src/tasks-domain/index.ts`: re-export T1, T2 and T3.
+    - **Done when**: `apps/api` and `apps/web` can both import them, and
+      `pnpm --filter @ever-works/agent build` is clean.
 
-- [ ] **T35. Light up comment counts on cards.**
-    - `MissionBoardCard` already reads `commentCount` (T19); confirm it now renders for
-      Missions with a thread and assert it in the card unit spec.
+## P1.B — Filter options (additive, no schema)
 
-- [ ] **T36. Add the P2 message keys.**
-    - Add the `dashboard.missionDetail.comments.*` block from [`plan.md`](./plan.md) §8 to
-      `apps/web/messages/en.json` and all 20 sibling locales. Same camelCase / no-dot rule.
+- [ ] **T5. Three optional fields on `ListTasksFilter`.**
+    - Modify `packages/agent/src/database/repositories/task.repository.ts`:
+        - Widen `parentTaskId?: string` to `parentTaskId?: string | 'none'`.
+        - Add `isRecurring?: boolean`.
+        - Add `orderBy?: 'updatedAt' | 'priorityThenUpdated' | 'stalledThenPriority'`.
+        - Add `stallCutoff?: Date` (only read when `orderBy` is
+          `'stalledThenPriority'`).
+    - In `list()`:
+        - `parentTaskId === 'none'` → `andWhere('task.parentTaskId IS NULL')`; a uuid
+          keeps today's meaning; `undefined` adds no predicate.
+        - `isRecurring` defined → `andWhere('task.isRecurring = :isRecurring', …)`;
+          `undefined` adds no predicate.
+        - Replace the single `qb.orderBy('task.updatedAt', 'DESC')` with a switch
+          whose **`undefined` and `'updatedAt'` branches emit the identical clause**.
+        - `'stalledThenPriority'` emits the three-key `ORDER BY` of
+          [`plan.md`](./plan.md) §3.2.
+    - Add the comment explaining why `task.priority ASC` is correct: the column is a
+      `varchar(4)` holding `p0`–`p4`, so lexicographic order **is** priority order.
+      Without that note it reads as an accident and someone will "fix" it.
+    - **Test**: `.../__tests__/task-repository-board-filters.spec.ts` — assert the
+      generated SQL for each option, and one regression case asserting that
+      **omitting all four new fields produces the exact SQL the repository produces
+      today**.
+    - **Done when**: green, and every existing `task.repository` test passes
+      untouched.
 
-- [ ] **T37. Add the steering end-to-end spec.**
-    - Create `apps/web/e2e/flow-mission-comment-steering.spec.ts` covering: delivered into a
-      live Run, queued with no live Run, refused with the job runtime unconfigured (assert
-      the settings link), edit at 4 minutes succeeds, at 6 minutes the affordance is gone,
-      and the 21st comment in a minute is refused without dispatching a Run.
+## P1.C — The board read model
 
-- [ ] **T38. P2 green gate.**
-    - `pnpm format && pnpm lint && pnpm type-check && pnpm test && pnpm build`.
-    - Update [`../TRACKER.md`](../TRACKER.md) to `P2 shipped`.
-    - Add **Mission comment** to the vocabulary table in [`../README.md`](../README.md) §1
-      in this same PR (program rule #2).
+- [ ] **T6. `TaskBoardService` — counts, cards and templates.**
+    - Create `packages/agent/src/tasks-domain/task-board.service.ts`.
+    - Injects the task repository and the ownership-scope helper from
+      `packages/agent/src/database/ownership-scope.ts`.
+    - `getBoard(userId, input: BoardInput, scope): Promise<BoardResult>` runs exactly
+      the three queries of [`plan.md`](./plan.md) §2.1:
+        - **Q1** grouped `COUNT(*) … GROUP BY status` under the shared predicate →
+          the true per-status totals.
+        - **Q2** per-column top-N rows via the repository's `list()` with
+          `orderBy: 'stalledThenPriority'`, `includeRun: true`.
+        - **Q3** recurring templates: `isRecurring: true` ordered by
+          `nextOccurrenceAt`.
+    - **The predicate for Q1 and Q2 is built once** by a private
+      `buildBoardFilter(input)` and passed to both, so a count and its cards can
+      never disagree. Assert this in the test.
+    - Terminal columns (`done`, `cancelled`) get
+      `updatedAt >= now - terminalWindowDays` applied to **both** Q1 and Q2.
+    - Defaults: `layout: 'status'`, `columnLimit: 50` (clamped 1..100),
+      `terminalWindowDays: 7` (clamped 1..90), sub-tasks excluded
+      (`parentTaskId: 'none'`), templates excluded (`isRecurring: false`), hidden
+      excluded.
+    - `getColumn(userId, input, columnKey, offset, scope)` returns one column only.
+    - **Test**: `.../__tests__/task-board.service.spec.ts`
+        - `total` comes from Q1 and is **not** `cards.length` — seed 140 rows in one
+          status with `columnLimit: 50` and assert `total === 140`,
+          `cards.length === 50`.
+        - Every toggle flips exactly one predicate.
+        - The terminal window applies to the count as well as the cards.
+        - `getColumn` returns the same rows Q2 would have returned at that offset.
+    - **Done when**: green and the service has no enrichment code in it yet.
+
+- [ ] **T7. Wire the service into DI.**
+    - Modify `packages/agent/src/tasks-domain/tasks.module.ts` — provide and export
+      `TaskBoardService`.
+    - **Done when**: `apps/api/src/tasks/tasks.module.ts` resolves it, and
+      `tasks.module.di-contract.spec.ts` is extended with the new provider and passes.
+
+## P1.D — API surface
+
+- [ ] **T8. `GET /api/tasks/board`.**
+    - Modify `apps/api/src/tasks/tasks.controller.ts`. Place the route **above**
+      `@Get(':id')` — the existing file already warns that a later static segment is
+      shadowed by the param route, and `run-batch` carries that comment; follow it.
+    - Declare **every** query parameter with an explicit `@ApiQuery({ required:
+      false })`. The file's own comment explains why: without the CLI plugin, a bare
+      `@Query('x') x?: string` is emitted as required and the MCP tool schema then
+      forces every filter.
+    - Parameters and defaults exactly as [`plan.md`](./plan.md) §4.1. Reuse the
+      controller's existing `parsePriorityList` helper; do not write a second parser.
+    - Throttle: match the existing list route.
+    - Ownership: `@CurrentUser()` + `this.scopeContext.getScope()`, same as every
+      neighbour.
+    - **Test**: `apps/api/src/tasks/tasks.controller.board.spec.ts` — defaults;
+      `layout=focus` returns four columns; `columnLimit` clamps at 1 and 100;
+      `terminalWindowDays` clamps at 1 and 90; each `include*` flag flips one
+      predicate; malformed values fall back to the default rather than 500ing.
+    - **Done when**: green **and** `tasks.controller.scope.spec.ts` and
+      `tasks.controller.board-visibility.spec.ts` still pass unmodified.
+
+- [ ] **T9. `GET /api/tasks/board/column`.**
+    - Same file, same placement rule. Adds `status` (one column key, validated
+      against `columnsFor()`) and `offset`.
+    - Returns `{ key, statuses, total, cards }`.
+    - **Test**: extend `tasks.controller.board.spec.ts` — an unknown column key is a
+      400, not a 500; the offset pages within that column only.
+    - **Done when**: green.
+
+- [ ] **T10. Board scope isolation spec.**
+    - Create `apps/api/src/tasks/tasks.controller.board-scope.spec.ts`, modelled on
+      the existing `tasks.controller.scope.spec.ts`.
+    - Assert: another user's Task appears in **no column and in no count**; a Task in
+      another Organization scope likewise; `board/column` for a foreign scope returns
+      the same empty shape rather than leaking a total.
+    - **Done when**: green. This spec is the guard on spec FR-65 and FR-66 and must
+      not be skipped to a later phase.
+
+- [ ] **T11. Extend the existing board-visibility spec.**
+    - Modify `apps/api/src/tasks/tasks.controller.board-visibility.spec.ts`: add cases
+      proving `hiddenFromBoard` rows are absent from the **board read's** columns and
+      its **counts**, and present under `includeHidden=true` — the file already
+      covers the list route; this extends it to the board route rather than starting
+      a parallel file.
+    - **Done when**: green.
+
+- [ ] **T12. Typed web client.**
+    - Modify `apps/web/src/lib/api/tasks.ts`: add `tasksAPI.board(input)` and
+      `tasksAPI.boardColumn(input)` plus the `BoardResult` / `BoardColumn` /
+      `BoardCard` types. Do not change the existing `Task` type — the `board` block is
+      an additive optional field on it.
+    - **Done when**: `pnpm --filter @ever-works/web type-check` is clean.
+
+- [ ] **T13. Server actions.**
+    - Modify `apps/web/src/app/actions/tasks.ts`: append `getTaskBoardAction`,
+      `getTaskBoardColumnAction`, `setTasksViewAction`. Change nothing that is already
+      there.
+    - **Done when**: the existing actions' specs pass untouched.
+
+## P1.E — Web: extract, then improve
+
+- [ ] **T14. Extract the card, the column and the shell — behaviour identical.**
+    - Create `apps/web/src/components/tasks/board/`:
+        - `TaskBoardCard.tsx` — lift `TaskKanbanCard` **verbatim**, including the
+          `r` handler's four guards (modifier, repeat, text input, open diff sheet),
+          the drag handlers, `RunWithAgentMenu`, `TaskBranchChip`, `TaskPrPill`,
+          `TaskRunChip`, `GateChip`, `TaskDiffSheet`, and the per-card error line.
+        - `TaskBoardColumn.tsx` — lift `TaskKanbanColumn` verbatim, including
+          `RUN_ALL_MAX = 20`, the `runAllEligible` rule, and the batch summary.
+        - `TaskBoard.tsx` — lift the `TasksKanbanView` body verbatim, including
+          `useTaskRunPolling` and its merge rules, the optimistic move with rollback,
+          and the post-drop agent-picker logic.
+    - `TasksKanbanView.tsx` becomes a thin adapter rendering `TaskBoard` from a plain
+      `Task[]`, keeping its export name and prop shape (standing constraint 1).
+    - **This task changes no behaviour.** Commit it on its own so the diff of T15
+      onward is readable.
+    - **Test**: the existing e2e specs that exercise the board must pass with no edit.
+    - **Done when**: green with a zero-behaviour-change diff.
+
+- [ ] **T15. True totals and independent per-column paging.**
+    - `TaskBoardColumn` takes `total` from the server rather than `tasks.length`, and
+      its **Show more** calls `getTaskBoardColumnAction` and appends to that column's
+      array only.
+    - Delete the client-side `MAX_VISIBLE` slice; the server's `columnLimit` owns it.
+    - **Test (e2e)**: seed 120 Tasks across seven statuses; assert each header total
+      matches the seed and that the largest column renders 50 cards; assert **Show 50
+      more** leaves the other columns' rendered counts and scroll positions unchanged.
+    - **Done when**: green.
+
+- [ ] **T16. The board is an address.**
+    - Modify `apps/web/src/components/tasks/TasksList.tsx`: move `view` out of
+      `useState` into the URL (`?view=`), falling back to a `tasks.view` cookie, then
+      to `'board'`. Write the cookie through `setTasksViewAction` on change.
+    - Modify `apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx`: add a
+      `resolveTasksView()` helper; for `view=board` call `tasksAPI.board(...)`, for
+      `cards` and `table` keep calling `tasksAPI.list(...)` **unchanged**.
+    - Keep the page's existing server-rendered filter `<form>` working and in sync
+      with the board's filters (spec FR-22).
+    - **Test (e2e)**: no preference → board; `?view=table` → table; the choice
+      survives a reload; a filtered board URL reproduces the same board and counts.
+    - **Test (Vitest)**: view resolution — URL beats cookie beats default.
+    - **Done when**: green, and the Cards and Table views render exactly as before.
+
+- [ ] **T17. Empty, error and loading states.**
+    - Per-column empty copy (spec §6.9), the whole-board empty state (§6.8), the
+      inline error panel with **Try again** and the Table link (§6.11), and RSC
+      skeleton frames (§6.7).
+    - A single column's failed read shows the panel in that column only.
+    - **Test (e2e)**: zero Tasks → the empty board, not seven empty columns; a forced
+      read failure → the panel with the column frames intact and the page not blank.
+    - **Done when**: green.
+
+- [ ] **T18. Explain the refusals the board already performs.**
+    - The board already refuses illegal drops silently. Add the toast: dragging out of
+      `cancelled` explains that a cancelled Task cannot be reopened (spec S15).
+    - Surface the server's reason on a refused transition rather than the generic
+      `Transition failed` string.
+    - **Test (Vitest)**: a rejected transition renders the server's message.
+    - **Done when**: green.
+
+## P1.F — i18n (a P1 gate, not a P3 nicety)
+
+- [ ] **T19. Move every hardcoded board string into the catalogue.**
+    - Modify `apps/web/messages/en.json`: add the `dashboard.tasksPage.board` parent
+      and the leaves listed in [`plan.md`](./plan.md) §8.
+    - **Reuse, do not re-declare**: the seven column names must read from the existing
+      `dashboard.tasksPage.status.*` leaves and the five priority labels from the
+      existing `dashboard.tasksPage.priority.*` leaves. Copying those strings into
+      `board.*` is a review-blocking mistake — they are already translated across
+      every locale.
+    - Replace in `TasksKanbanView.tsx` / the new `board/*` files and in
+      `TasksList.tsx`: `Backlog`, `Todo`, `In Progress`, `In Review`, `Blocked`,
+      `Done`, `Cancelled`, `Cards`, `Table`, `Kanban`, `All`, `Move →`, `Run all`,
+      `Run N Task(s) in X`, `empty`, `Show N more`, `Preview the changes on this
+      Task's branch`, `n/m started`, `Transition failed`.
+    - Every leaf name camelCase, **no literal dot**, and the `board` parent added in
+      the same change so no subtree can collapse.
+    - **Done when**: `grep` for each of those literals in
+      `apps/web/src/components/tasks/` returns nothing, and the board renders in
+      English through the catalogue.
+
+- [ ] **T20. Locale structure.**
+    - Run the catalogue's existing locale-sync script, then the translation pass.
+    - **Test (Vitest)**: extend the hydration spec so a missing parent key fails
+      here rather than reddening every e2e shard.
+    - **Done when**: every locale file is structurally identical to `en.json` and the
+      hydration spec is green.
+
+## P1.G — Ordering
+
+- [ ] **T21. Priority ordering on the board.**
+    - `TaskBoardService` passes `orderBy: 'stalledThenPriority'` with a `stallCutoff`
+      from `DEFAULT_STALL_AFTER_DAYS` (the flag itself lands in P3; the ordering key
+      is already correct and costs nothing now).
+    - Column header tooltip: `board.sortTooltip`.
+    - **Test (e2e)**: a `p0` Task seeded with an old `updatedAt` renders first in its
+      column.
+    - **Done when**: green.
 
 ---
 
-# PHASE 3 — The whole queue
+# PHASE 2 — Make the card legible
 
-- [ ] **T39. Add `targetKind` to inbound Triggers.**
-    - Modify `packages/agent/src/entities/inbound-trigger.entity.ts`: add
-      `targetKind` `varchar(16)` default `'task'`, documented as immutable after create
-      like the neighbouring `mode` and `sourceType`.
-    - Generate `apps/api/src/migrations/<timestamp>-AddInboundTriggerTargetKind.ts` from
-      `apps/api/` and hand-review it as one `ADD COLUMN` with a default.
+## P2.A — The enrichment layer
 
-- [ ] **T40. Branch the Trigger fire path on `targetKind`.**
-    - In the inbound-trigger fire service under `packages/agent/src/` (the one
-      `apps/api/src/triggers/inbound-triggers.controller.ts` delegates to): when
-      `targetKind === 'mission'`, create a Mission with `createdByType = 'schedule'` and
-      `createdById = trigger.id`, reusing the existing `taskTitleTemplate` /
-      `taskDescriptionTemplate` placeholder expansion and the existing dedupe ledger.
-    - Reject a `targetKind` change on `PATCH /api/inbound-triggers/:id` with a 400, the
-      same way `mode` is protected today.
-    - **Test**: a fire with `targetKind: 'mission'` creates exactly one Mission with origin
-      `schedule`; a duplicate delivery id creates none; a `PATCH` attempting to change
-      `targetKind` is refused.
+- [ ] **T22. Batched, independently-guarded enrichment.**
+    - Extend `packages/agent/src/tasks-domain/task-board.service.ts` with a private
+      `enrich(cards)` running the six reads of [`plan.md`](./plan.md) §2.1 (E1–E6).
+    - **Each read is one query over the whole page of cards** — `WHERE taskId IN (…)`
+      with up to `7 × columnLimit` ids — never one query per card.
+    - Each read is individually `try/catch`-wrapped; a failure sets the corresponding
+      field to absent and appends its name to `degraded[]`.
+    - Owner-name lookups are scope-filtered, so an unresolvable or invisible name
+      comes back `null` and is dropped by `orderProvenance` (T3).
+    - **Test**: extend `task-board.service.spec.ts` — assert **one call per source**
+      with an `IN` list (not N calls); assert each source's failure degrades only
+      itself and names itself in `degraded[]`; assert a scope-invisible owner yields
+      no chip rather than an id.
+    - **Done when**: green.
 
-- [ ] **T41. Let an Agent propose a Mission.**
-    - Add a `mission.create` member to `AgentActionProposalActionType` in
-      `packages/agent/src/entities/agent-action-proposal.entity.ts` (and its contracts type)
-      with a payload of `{ title?, description, priority?, labels? }`.
-    - The approval handler in `apps/api/src/agent-approvals/` creates the Mission on approve
-      with `createdByType = 'agent'`, `createdById = proposal.agentId`.
-    - An unapproved proposal creates **no** Mission and does **not** appear on the board
-      (spec §9 open question — confirm the recommendation before building).
-    - **Test**: approve → one Mission with origin `agent` and the Agent's name resolved on
-      the card; reject → no Mission; the risk scorer runs on the proposal like any other.
+- [ ] **T23. The `board` block on the wire.**
+    - Add the additive `board` block of [`plan.md`](./plan.md) §4.1 to each card in
+      the board response. `provenance` arrives **already ordered and already
+      filtered**, so the client renders the first two and menus the rest without
+      knowing the precedence rules.
+    - **Test**: extend `tasks.controller.board.spec.ts` — the block is present on
+      every card; `provenance` respects FR-28; the existing `Task` shape is
+      unchanged.
+    - **Done when**: green.
 
-- [ ] **T42. Make origin real in the UI.**
-    - `MissionBoardCard` resolves the origin chip's display name: `You` for `user`,
-      `Schedule` for `schedule`, the Agent's name for `agent` (resolved server-side in the
-      board DTO so the client stays dumb).
-    - `MissionBoardFilters` origin filter becomes meaningful; assert lane counts update.
+## P2.B — The card
 
-- [ ] **T43. Add the staleness threshold setting.**
-    - Add the `missionStaleAfterDays` control to the work-agent settings page under
-      `apps/web/src/app/[locale]/(dashboard)/settings/work-agent/`, with the copy from
-      [`plan.md`](./plan.md) §8 and client-side clamping to 1–30.
-    - Wire it through the existing work-agent preference update action and API route.
-    - **Test**: raising the threshold clears the Stale flag on the next board read and sends
-      no new notification for an already-flagged Mission (spec S25).
+- [ ] **T24. Provenance chips.**
+    - Create `apps/web/src/components/tasks/board/TaskProvenanceChips.tsx`. Renders
+      the first two entries; the rest go to the card menu's bottom block (spec §6.4).
+    - Each chip links to the thing it names **and** applies the corresponding board
+      filter on click.
+    - **Test (Vitest)**: two chips rendered, third menued; an entry with a null name
+      never reaches the component (it was dropped server-side) and the component
+      tolerates it anyway.
+    - **Test (e2e)**: a Mission-owned, a trigger-fired, a recurrence-cloned and a
+      hand-filed Task each show the expected chip; clicking the Mission chip filters
+      the board and updates every count; **assert no Mission renders as a card in any
+      column**.
+    - **Done when**: green.
 
-- [ ] **T44. Add bulk archive.**
-    - `POST /api/me/missions/bulk/archive` (`{ ids: string[] }`, `@ArrayMaxSize(100)`,
-      10/min) on `apps/api/src/missions/missions.controller.ts`, backed by a batched
-      `MissionsService.archiveMany` that skips ids the caller does not own rather than
-      failing the batch.
-    - Web: an `Archive all Done older than 30 days` action in the Done lane header, behind a
-      confirmation naming the count.
-    - **Test**: a batch containing one foreign id archives the rest and reports the skip;
-      101 ids is rejected.
+- [ ] **T25. Sub-task roll-up and the top-level default.** *(parallel with T24)*
+    - Card shows `▣ done/total` when the Task has sub-tasks, linking to the parent's
+      existing sub-task checklist.
+    - **Show sub-tasks** toggle flips `includeSubtasks`, restoring today's flat
+      behaviour exactly.
+    - A sub-task matching the active filters whose parent does not match renders as
+      its own card with a `Sub-task of {parent}` chip (spec FR-42, S24) — implement
+      this as a second, filter-scoped query in the service, not as a client fix-up.
+    - **Test (e2e)**: a parent with five sub-tasks, two done, renders one card with
+      `2/5`; the toggle restores six cards; the FR-42 case renders the extra card.
+    - **Done when**: green.
 
-- [ ] **T45. Add the P3 message keys and specs.**
-    - The origin, settings and bulk-archive copy into all 21 message files.
-    - `apps/web/e2e/flow-mission-board-origins.spec.ts` — a Schedule-filed Mission and an
-      Agent-filed Mission both appear in Backlog with their chips, and the origin filter
-      narrows the board and its counts.
+- [ ] **T26. Decision chip and the two header counters.** *(parallel with T24)*
+    - Chip with the open-decision count and an **Open decision** action, rendered in
+      whatever column the Task's status puts it in.
+    - Header: `N waiting on you` (clicking filters the board to exactly those) and
+      `N done today`, counted since the viewer's local midnight.
+    - The board **counts and links**; it renders no decision content
+      ([AW-03](../AW-03-decision-queue/) owns that).
+    - **Test (e2e)**: a Task with an open escalation shows the chip while staying in
+      `In progress`; the counter matches; clicking it filters.
+    - **Done when**: green.
 
-- [ ] **T46. P3 green gate and close-out.**
-    - `pnpm format && pnpm lint && pnpm type-check && pnpm test && pnpm build`.
-    - Set `spec.md` status to `Implemented`; set `plan.md` and `tasks.md` to `Done`.
-    - Update [`../TRACKER.md`](../TRACKER.md) to `P3 shipped`.
-    - File the four follow-ups from [`plan.md`](./plan.md) §13 as separate issues — in
-      particular the shared board primitive and the Constitution §V migration-path drift.
+- [ ] **T27. Comment count and reply.** *(parallel with T24)*
+    - Chip when the thread has ≥ 1 message, `99+` above 99, opening the existing
+      thread. A reply composed from the board posts through the **existing**
+      `POST /api/tasks/:id/chat`.
+    - Introduce **no** new comment endpoint, service, entity or rate limit. If a task
+      here seems to need one, re-read [`spec.md`](./spec.md) §5.4.
+    - **Test (e2e)**: posting from the board increments the chip and — when the
+      mentioned Agent has a live run — is delivered into that run rather than
+      starting a second, exactly as the detail page already behaves.
+    - **Done when**: green.
+
+- [ ] **T28. Untrusted text.** *(parallel with T24)*
+    - Every Agent-authored string a card renders — title, branch name, label — is
+      plain text, never markup, never auto-linked, truncated for display with the full
+      value in the accessible name.
+    - **Test (Vitest)**: a title containing markup renders as literal text.
+    - **Done when**: green.
+
+## P2.C — Recurrence
+
+- [ ] **T29. Templates out of the columns.**
+    - The board's default filter already excludes them (T6). Add the `⟳ Template`
+      chip and the drag-disable for the **Show templates** path.
+    - **Test (e2e)**: a template is in no column by default; the toggle puts it back,
+      chipped and not draggable.
+    - **Done when**: green.
+
+- [ ] **T30. The recurring strip.**
+    - Create `apps/web/src/components/tasks/board/TaskRecurringStrip.tsx` — collapsed
+      and expanded forms of spec §6.5.
+    - Cadence text comes from the **existing** describers in
+      `packages/agent/src/schedules/cadence.ts`. Do not re-derive human-readable cron
+      or RRULE text; there is already an implementation and a second one will drift.
+    - Ended templates are listed as ended with their last fire (spec FR-46, S23), not
+      omitted.
+    - **Schedules** links to the platform's existing schedules view.
+    - **Test (e2e)**: the strip names each template, its cadence and its next fire; an
+      ended template is listed as ended; the strip's failure hides the strip without
+      putting templates back into the columns.
+    - **Done when**: green.
+
+- [ ] **T31. Instance and scheduled chips.** *(parallel with T30)*
+    - An instance carries `⟳ {template title}` linking to its template; a one-shot
+      scheduled Task carries `🕑 Scheduled {when}` until it fires. Both are ordinary,
+      draggable cards.
+    - **Test (e2e)**: an instance is draggable and chipped; a scheduled Task is not
+      treated as a template.
+    - **Done when**: green.
+
+- [ ] **T32. Hidden-work toggle.** *(parallel with T30)*
+    - **Show trigger-hidden Tasks** reveals `hiddenFromBoard` rows with a `Hidden`
+      chip. Off by default; absent from every column and every count while off.
+    - **Test**: covered by T11 server-side; add the e2e for the toggle.
+    - **Done when**: green.
+
+---
+
+# PHASE 3 — Make it say when it is stuck
+
+- [ ] **T33. The stalled flag on the card.**
+    - Add `board.stalled` to the response (the predicate is already in the ordering
+      from T21) and the flag with its tooltip to `TaskBoardFlags`.
+    - The client recomputes with the **same** `isStalled()` from T2 so the flag and
+      the ordering cannot drift.
+    - **Test (e2e)**: 49 h with no live run is flagged; 47 h is not; 49 h with a
+      running run is not; a `blocked` Task at any age is not.
+    - **Done when**: green.
+
+- [ ] **T34. The stall sweep job.**
+    - Create `packages/tasks/src/tasks/trigger/task-stall-sweep.task.ts` following the
+      shape of the existing `task-recurrence-dispatcher` and `task-pr-status-sync`
+      tasks: `schedules.task({ id, cron: '17 */6 * * *', run })` spinning a transient
+      `TriggerInternalModule` Nest context and closing it.
+    - Register it in `packages/tasks/src/tasks/trigger/index.ts`.
+    - Cap rows per sweep, in the same way the mission tick caps itself.
+    - **Done when**: the task is registered and a local invocation produces
+      notifications for seeded stalled Tasks and none for fresh ones.
+
+- [ ] **T35. The `task_stalled` notification kind.**
+    - Modify `packages/agent/src/tasks-domain/task-notification.service.ts`: add
+      `task_stalled` to the existing kind→severity map (warning). **No migration** —
+      `NotificationCategory.TASK` already exists and the column is a free `varchar`.
+    - `deduplicationKey = ${taskId}:stalled:${startedAt ?? updatedAt}` — this is what
+      makes "once per stalled streak" true with no new state, because the key changes
+      only when the Task moves.
+    - Add `notifications.taskStalled.title` / `.body` to `en.json` and run the locale-sync script.
+    - **Test**: two sweeps over the same stalled Task produce **one** notification; a
+      Task that moves and stalls again produces a second.
+    - **Done when**: green.
+
+- [ ] **T36. The Focus layout.**
+    - Layout switcher; four columns plus the **Show cancelled** toggle; each column
+      names the statuses it groups directly under its label (spec §6.6).
+    - Drops resolve through `resolveDrop` (T1). The two-target picker of spec S16.
+    - **Test (e2e)**: dragging `in_progress` onto `Needs you` opens the picker;
+      choosing `Blocked` moves the card; cancelling changes nothing; `cancelled` is
+      reachable via the toggle and is still visible without any toggle in the Status
+      layout and in the Cards and Table views.
+    - **Done when**: green.
+
+- [ ] **T37. Keyboard navigation.**
+    - Roving focus: one tab stop per column, `←` `→` `↑` `↓` `Home` `End` within and
+      between columns, `Enter` opens, `Shift`+`F10` opens the card menu, `n` and `/`
+      on the board, `Esc` closes the topmost overlay.
+    - **The existing `r` handler is the model** — it already ignores modifiers, key
+      repeat, text inputs and the open diff sheet. Every new shortcut must apply the
+      same four guards.
+    - **Test (e2e)**: the board is fully operable with no pointer; every drag action
+      has a card-menu equivalent.
+    - **Done when**: green.
+
+- [ ] **T38. Saved views.**
+    - Named URLs stored with the user's existing preferences. No new entity (spec
+      §5.4).
+    - **Done when**: a saved view restores layout, filters and toggles, and is
+      shareable as a plain link.
+
+- [ ] **T39. (Gated) A configurable stall threshold.**
+    - **Do not start this without a product decision on [`spec.md`](./spec.md) §9.**
+      P1–P3 use `DEFAULT_STALL_AFTER_DAYS = 2`.
+    - If adopted: one nullable `int` column on
+      `packages/agent/src/entities/work-agent-preference.entity.ts`, documented like
+      its neighbour `missionDefaultOutstandingCap` ("NULL = inherit the platform
+      default of 2; clamped 1–30 at the service layer"), plus **one additive
+      forward-only migration** in `apps/api/src/migrations/` in the same PR.
+    - Hand-check the generated migration: one `ADD COLUMN`, no `DROP`, no
+      `ALTER … TYPE`, no `NOT NULL` without a default; `down` reverses only what `up`
+      added.
+    - **This is the only migration this epic may ever produce.**
+    - **Done when**: the migration applies on a fresh database and on one with data,
+      and the generated diff is empty afterwards.
+
+---
+
+## Documentation and hygiene
+
+- [ ] **T40. Correct the program vocabulary table.**
+    - Modify `docs/specs/features/agent-workspace/README.md` §1.1: the Task priority
+      row reads `p0 · p1 · p2 · p3`. The entity and the message catalogue both carry
+      **five** steps, `p0`–`p4`, with `p4` labelled Low. Change it to
+      `p0 · p1 · p2 · p3 · p4`.
+    - Also in §3: this epic is sized `M`, not `L` — the working board in
+      `TasksKanbanView.tsx` removes the largest chunk.
+    - **Done when**: both edits land in the same PR as P1.
+
+- [ ] **T41. Fix the stale doc comments this epic touched.** *(parallel with T40)*
+    - `apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx` — its header says
+      "Kanban + per-target tabs land in Phase 14"; Kanban shipped.
+    - **Done when**: the comment describes what the file does.
+
+- [ ] **T42. Update the program tracker.**
+    - Modify `docs/specs/features/agent-workspace/TRACKER.md`: AW-02's spec and
+      implementation status per phase.
+    - **Done when**: the tracker reflects reality at each phase's merge.
 
 ---
 
 ## Definition of done
 
-- Every checkbox above is ticked.
-- All three migrations applied cleanly on a database with pre-existing data, and the
-  entity-to-schema diff is empty afterwards.
-- `pnpm format:check`, `pnpm lint`, `pnpm type-check` green.
-- Agent-package Jest, API Jest and the touched Playwright shards green in CI.
-- All 21 message files carry identical key trees; no leaf key contains a literal dot.
-- `pnpm --filter ever-works-docs build` reports no broken links.
-- Every constitution gate in [`spec.md`](./spec.md) §11 confirmed satisfied, and the
-  provider-name grep over the diff is empty (Constitution II review gate).
-- **Mission comment** is present in the vocabulary table in [`../README.md`](../README.md) §1.
-</content>
+**Phase 1**
+
+- Column header totals are true totals under the active filters, verified against a
+  direct count on a 120-Task fixture.
+- Columns page independently.
+- `?view=` and every filter are in the URL; the choice is remembered; the board is
+  the default.
+- Cards sort `p0` first within a column.
+- **No string on the board is hardcoded**, and the seven status names and five
+  priority labels resolve from the keys that already existed.
+- The Cards view, the Table view, `GET /api/tasks` and its specs, and every scoped
+  Task list are unchanged.
+- No entity, table, column or migration was added.
+
+**Phase 2**
+
+- Provenance chips name the right source for a Mission-raised, trigger-fired,
+  recurrence-cloned, agent-delegated and hand-filed Task, and **no Mission appears as
+  a card**.
+- Sub-tasks roll up by default and flatten on one toggle.
+- Recurring templates are in the strip and not in the columns, and one toggle puts
+  them back.
+- The Decision chip and the two header counters are correct, and the board renders no
+  decision content of its own.
+- The comment chip opens the **existing** thread; no second comment noun exists
+  anywhere in the diff.
+- Every enrichment degrades independently and names itself in `degraded[]`.
+
+**Phase 3**
+
+- The stalled flag matches the predicate at both boundaries and never fires outside
+  `in_progress`.
+- Exactly one notification per stalled streak.
+- The Focus layout maps all seven statuses, asks rather than guesses on an ambiguous
+  drop, and leaves `cancelled` reachable.
+- The board is fully operable by keyboard.
+
+**All phases**
+
+- `pnpm lint`, `pnpm type-check`, the Jest suites in `packages/agent` and
+  `apps/api`, the Vitest suites in `apps/web`, the locale-sync check, and the
+  Playwright specs are green.
+- The Constitution gate table in [`spec.md`](./spec.md) §11 and
+  [`plan.md`](./plan.md) §12 is still accurate — in particular gate V, which claims
+  this epic ships no migration.

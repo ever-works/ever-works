@@ -1,80 +1,109 @@
-# AW-02 — Mission board
+# AW-02 — Task board
 
 > Behaviour-first spec per [Constitution Principle IX](../../../../../.specify/memory/constitution.md#ix-specs-are-behaviour-first).
 > This document describes **what a user sees and can do**. No class names, no file
 > paths, no code — those live in [`plan.md`](./plan.md).
 
-**Feature ID**: `aw-02-mission-board`
+**Feature ID**: `aw-02-task-board`
 **Program**: [Agent Workspace](../README.md)
-**Branch**: `feat/aw-02-mission-board`
+**Branch**: `feat/aw-02-task-board`
 **Status**: `Draft`
 **Created**: 2026-09-06
 **Last updated**: 2026-09-06
-**Size**: L · **Blocking dependencies**: none
-**Extends**: Missions (existing) · **Adjacent epics**: [AW-03 My Decisions](../AW-03-decision-queue/), [AW-04 Live Feed](../AW-04-live-feed/), [AW-09 Runs & receipts](../AW-09-runs-receipts/), [AW-19 Home](../AW-19-home/)
+**Size**: M · **Blocking dependencies**: none
+**Extends**: the existing `/tasks` surface and its Kanban view · **Adjacent epics**: [AW-03 My Decisions](../AW-03-decision-queue/), [AW-04 Live Feed](../AW-04-live-feed/), [AW-09 Runs & receipts](../AW-09-runs-receipts/), [AW-10 Schedules](../AW-10-schedules-calendar/), [AW-19 Home](../AW-19-home/)
 
-> **Additive by default (program rule #1).** Nothing in this epic removes, renames
-> or consolidates an existing surface. The Missions catalog list that ships today
-> survives as a tab. Every existing Mission endpoint keeps its current behaviour.
-> One new noun is introduced (Mission comment) and is justified in §5.3.
+> **Additive by default (program rule #1).** Nothing here removes, renames or
+> consolidates an existing surface. The Cards and Table views on `/tasks` keep
+> working unchanged; every existing Task filter, endpoint and response field keeps
+> its behaviour; the Missions pages — `/missions`, `/missions/[id]`,
+> `/missions/[id]/tasks` — are untouched. Every new API parameter is optional and
+> defaults to today's behaviour.
+
+> **This epic introduces no new entity, no new table and no new column.** Every
+> signal it needs already exists in the platform. §5.4 justifies each candidate
+> noun that was considered and rejected.
 
 ---
 
 ## 0. TL;DR
 
 ```
-   /missions
-   ┌───────────────────────────────────────────────────────────────────────┐
-   │  Missions            3 need you · 7 done today          [+ New Mission]│
-   │  ┌──────┬──────┬──────────┬───────┐                                    │
-   │  │Board │ List │ Archived │ Trash │   ← tab strip (Board is default)   │
-   │  └──────┴──────┴──────────┴───────┘                                    │
-   ├──────────────┬──────────────┬──────────────┬──────────────────────────┤
-   │ Backlog   12 │ In flight  4 │ Needs you  3 │ Done                  7  │
-   │              │              │              │                          │
-   │ [card]       │ [card]       │ [card]       │ [card]                   │
-   │ [card]       │ [card] STALE │ [card]       │ [card]                   │
-   │ …            │ …            │ …            │ …                        │
-   └──────────────┴──────────────┴──────────────┴──────────────────────────┘
+   /tasks?view=board
+   ┌────────────────────────────────────────────────────────────────────────────┐
+   │  Tasks                        4 waiting on you · 7 done today   [+ New Task]│
+   │  ┌───────┬──────────┐              ┌──────────────────────────────────────┐ │
+   │  │ Tasks │ Triggers │              │ Cards │ Table │ ▣ Board │ ← view      │ │
+   │  └───────┴──────────┘              └──────────────────────────────────────┘ │
+   │  ⟳ 4 recurring Tasks · next fires in 2h                              [Show] │
+   ├──────────┬──────────┬─────────────┬────────────┬─────────┬──────┬──────────┤
+   │Backlog 12│ To do  31│In progress 4│In review  2│Blocked 1│Done 9│Cancelled3│
+   │          │          │             │            │         │      │          │
+   │ [card]   │ [card]   │ [card]      │ [card]     │ [card]  │[card]│ [card]   │
+   │ [card]   │ [card]   │ [card]STALLED│ [card]    │         │[card]│          │
+   └──────────┴──────────┴─────────────┴────────────┴─────────┴──────┴──────────┘
 ```
 
-Missions already exist, already run on a cadence, already spawn Ideas, Works and
-Tasks, and already carry a budget. What they do not have is a place that answers
-**"what are my agents doing right now, and which of it is waiting on me?"** in one
-screen. Today `/missions` is a 24-per-page catalog grid sorted by last-update,
-with a status dropdown. It answers "which Missions exist", not "what is moving".
+**A board already ships.** `/tasks` has a working drag-and-drop Kanban view with one
+column per `TaskStatus`, cards carrying branch, run, gate and pull-request chips,
+a per-card **Run**, a per-column **Run all**, and drag-to-transition wired through
+the same gated transition path the detail page uses. This epic does not build a
+board. It fixes the four things that stop the shipped board from answering the
+question the program exists to answer.
 
-This epic turns `/missions` into a four-lane board over the same Missions, adds
-the small amount of state a board needs to be legible (priority, labels, a live
-status line, a staleness flag, a comment count, provenance), gives Missions an
-archive and a trash with restore, and makes the Mission's comment thread the
-place a human redirects a running agent without cancelling and re-creating work.
+1. **It is a view of one page, not of the work.** The page fetches the first 50
+   Tasks ordered by last-update and buckets them client-side. Every column count is
+   a count of *what happened to be fetched*. With 300 Tasks the board is wrong and
+   says nothing about being wrong.
+2. **Priority is decorative.** Nothing anywhere sorts by it. A `p0` and a `p3` are
+   interleaved by last-update.
+3. **A card has no provenance and no shape.** A Task raised by a Mission, fired by
+   a Trigger, cloned from a recurring template, delegated by an Agent or typed by a
+   person all render identically — and recurring *templates* and *sub-tasks* render
+   as ordinary, draggable cards alongside the real work.
+4. **Nothing says "this needs me" and nothing says "this is stuck."** Open
+   escalations are reachable one Task at a time; there is no stall signal anywhere
+   in the product.
 
-Three phases, each independently shippable:
+Three phases, each independently shippable and each with **no schema change**:
 
-- **P1 — The board.** Lanes, cards, counters, filters, quick-create, Archived and
-  Trash tabs with restore, staleness flag.
-- **P2 — The thread.** Mission comments, comment counts on cards, and mid-flight
-  steering: a comment that addresses a working Agent reaches the live Run.
-- **P3 — The whole queue.** Missions filed by a Schedule or by an Agent land in the
-  same lanes with an origin chip; staleness notifications; bulk archive.
+- **P1 — Make the board true.** A server-side board read with real per-column
+  totals and priority ordering, the board as an addressable, shareable, remembered
+  view, and every string through the message catalogue.
+- **P2 — Make the card legible.** Provenance chips, sub-task roll-up, the recurring
+  template strip, the decision chip and the "waiting on you" counter, comment count
+  and reply-from-the-card.
+- **P3 — Make it say when it is stuck.** The stalled flag and its notification, the
+  four-group Focus layout, and saved board views.
 
 ---
 
 ## 1. Overview
 
-A user opens **Missions** and sees every unit of delegated work laid out in four
-lanes — **Backlog**, **In flight**, **Needs you**, **Done** — with a card per
-Mission carrying its priority, its labels, its comment count, and, while it is
-being worked, a one-line live status of what the Agent last reported. A Mission
-that has been in flight for two days without moving is flagged. A header line
-keeps two scores: how many Missions are waiting on the user, and how many
-finished today. The user can create a Mission in one dialog without leaving the
-lane view, archive what is stale, move what is finished to a trash that keeps it
-recoverable for 30 days, and — from a Mission's own comment thread — redirect an
-Agent that is mid-flight, without cancelling the Run or re-creating the Mission.
-Missions filed by a human, raised by a Schedule, or proposed by an Agent all land
-in the same four lanes and compete under the same priority.
+A user opens **Tasks**, and the board is what they land on. Every Task they own sits
+in the column of its real status — `Backlog`, `To do`, `In progress`, `In review`,
+`Blocked`, `Done`, `Cancelled` — with the true count of that column in its header,
+not the count of one fetched page, and with `p0` work at the top of each column
+rather than scattered by last-edit.
+
+Each card says where its work came from: *raised by the Mission "Keep pricing
+current"*, *fired by the "Stripe webhook" Trigger*, *the 14th run of a weekly
+recurring Task*, *delegated by the Editor Agent*, or *filed by you*. Recurring
+templates are not cards at all — they sit in a strip above the board that says when
+the next one fires. Sub-tasks are not cards either; their parent carries a `▣ 3/5`
+roll-up, and one toggle brings them back if the user wants the flat view they have
+today.
+
+A header line keeps two scores: how many Tasks are waiting on a decision from the
+user, and how many finished today. A Task with an open escalation carries a
+**Decision** chip and an **Open decision** action wherever it sits. A Task that has
+been claimed as in-progress for days with nothing running is flagged **Stalled**.
+
+Everything the board already does keeps working: drag a card and it transitions
+through the same gated path; press `r` on a focused card and it runs; **Run all** at
+the top of a column dispatches up to 20; the run, branch, gate and pull-request
+chips keep their behaviour; the Cards and Table views are untouched and still one
+click away.
 
 ---
 
@@ -84,46 +113,77 @@ in the same four lanes and compete under the same priority.
 
 > *"What are my agents doing right now, and what needs me?"*
 
-That question is asked several times a day by exactly the person Ever Works is
-built for: an owner who has delegated work and now has to decide whether to
-trust it. It is the single most-asked question of an agent platform, and today it
-has no single answer surface.
+That question is asked several times a day by exactly the person Ever Works is built
+for: an owner who has delegated work and now has to decide whether to trust it. The
+board is where it should be answered. Today it is answered wrongly, quietly.
 
-### 2.2 What a user does today instead
+### 2.2 What is already built — and must not be rebuilt
 
-| To find out… | Today they must… |
+Read this before sizing anything below. The following all ship today and this epic
+extends, rather than replaces, every one of them:
+
+| Already shipped | Where the user meets it |
 | --- | --- |
-| Which Missions exist | Open `/missions` — a 24-per-page grid, newest-updated first |
-| Whether a Mission is actually moving | Open the Mission, read its live-runs panel, or open `/activity` and correlate by time |
-| Whether anything is blocked on them | Open the Home page's approval block, or `/tasks?status=blocked`, or a Task's escalation feed — three different places, none of which is Mission-shaped |
-| Which Mission matters most | Nothing to read — Missions have no priority at all |
-| Whether a Mission has silently wedged | Nothing. There is no "nothing has happened here in a while" signal anywhere in the product |
-| To stop looking at a finished Mission | Complete it (it stays in the grid) or hard-delete it (irreversible, and the only removal we have) |
-| To redirect a running Agent | Cancel or wait for the Run, then edit the Mission, then run it again — losing the in-flight work |
+| A drag-and-drop Kanban view with one column per `TaskStatus` | `/tasks`, and every scoped Task list — `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks` |
+| Card chips for the Task's branch, its latest run, its acceptance-gate verdict and its pull request with a CI dot | Every card |
+| Drag-to-transition through the real transition lattice, with the illegal targets refused before the drop | Every card |
+| A per-card **Run** with an agent picker, an `r` keyboard shortcut, and a per-column **Run all** capped at 20 | Every card and column header |
+| A diff sheet showing the changes on a Task's branch | The `± N files` affordance on a card |
+| Live run polling that refreshes run and CI state without a page reload | Automatic while any card has a queued or running run |
+| A per-Task comment thread with `@agent` and `[[kb]]` mentions, a 5-minute edit window, and delivery **into a live run** rather than restarting it | `/tasks/[id]` |
+| Watchers, assignees, reviewers, approvers, blockers, relations, attachments, escalations and a per-Task activity feed | `/tasks/[id]` |
+| Recurrence (RRULE **xor** cron) and one-shot scheduling, both dispatching through the same gated run path a board **Run** click uses | `/tasks/[id]` |
+| Filters for status, priority, label, free text, and every owner — Mission, Idea, Work, Team, Agent, Goal, parent Task | The `/tasks` filter bar and the list API |
+| A `hiddenFromBoard` marker so trigger-spawned work can be kept off the human board without being deleted | Set by a Trigger; respected by every default list |
 
-### 2.3 The four concrete gaps
+The correct reading of this epic is the one [EXISTING-SUBSTRATE.md](../EXISTING-SUBSTRATE.md)
+§4 asks for: **most of it is binding a finished backend to a screen, and finishing
+a last mile that was never finished.**
 
-1. **No priority on a Mission.** Missions carry status, type, cadence, cap and
-   guardrails — but no ordering signal. Tasks have a five-step priority; Missions
-   have none, so there is nothing for a human *or* an Agent to sort by.
-2. **No "is it moving?" signal.** A Mission's freshness today is `updatedAt`,
-   which changes when a user edits the title. Nothing records *when the work last
-   progressed*, so nothing can tell a stalled Mission from a slow one.
-3. **No reversible removal.** Deleting a Mission is permanent and immediate.
-   Users therefore do not clear the list, so the list is never a useful view of
-   current work.
-4. **No steering channel on a Mission.** Tasks have a comment thread that can
-   reach a live Run. Missions — the coarser, longer-lived unit the user actually
-   delegates — have no thread at all. The user's only lever is stop/start.
+### 2.3 The five concrete gaps
 
-### 2.4 Why a board and not a better list
+1. **The board renders one page and counts it as the whole.** The Tasks page
+   fetches a single 50-row page ordered by last-update, with no status filter, and
+   the board buckets those rows into seven columns. Each column header shows the
+   length of its bucket. A user with 300 Tasks sees seven wrong numbers and no
+   indication that anything is missing. There is no per-column read and no
+   per-column pagination.
+2. **Nothing sorts by priority.** The list is ordered by last-update and only by
+   last-update. The five-step priority scale is stored, filterable and rendered as
+   a chip — and it changes nothing about what the user sees first.
+3. **The board is not addressable.** Which view is showing lives in component state
+   only. It is not in the URL, it is not remembered between visits, and it is not
+   the default — the user lands on Cards and must re-choose the board every time.
+   A filtered board cannot be linked to a colleague or bookmarked.
+4. **Every string on the board is hardcoded English** — the column names, `Move →`,
+   `Run all`, `empty`, `Show N more`, the diff tooltip — while the message
+   catalogue already carries `Backlog · To do · In progress · In review · Blocked ·
+   Done · Cancelled` and `Urgent · High · Medium · Normal · Low`, already
+   translated across the platform's locales. This breaks program rule #8 and wastes
+   translation that is already paid for.
+5. **A card carries no provenance, and the wrong rows are cards.** Nothing on a card
+   says a Mission raised it, a Trigger fired it, a recurrence produced it or an
+   Agent delegated it. Meanwhile a recurring *template* — a row that never moves and
+   whose whole job is to clone instances — renders as a draggable card, and a
+   workflow template instantiated as a parent plus five sub-tasks renders as six
+   cards for one piece of work.
 
-A list orders by one axis. The question above has two: *state* (is it queued,
-moving, blocked, finished) and *urgency* (which one first). Lanes carry state
-positionally, so a glance is enough — and "Needs you" as a lane, rather than a
-filter, makes the user's own latency visible instead of ambient. The two header
-counters make the exchange explicit: what the user owes the Agents, and what the
-Agents produced for the user today.
+And one gap that is upstream of the board but shows up here first:
+
+6. **Nothing in the product says "this has stopped moving."** A Task sitting in
+   `in_progress` for three days with no run in flight looks exactly like one that
+   started ten minutes ago.
+
+### 2.4 Why extend the board rather than replace it
+
+The shipped board is a real, non-trivial implementation of the hard parts: the
+transition lattice mirrored client-side, drop-target refusal, optimistic move with
+rollback on failure, run-state polling that merges only run fields so it cannot
+clobber an in-flight drag, and batch dispatch with a hard cap. None of that is worth
+rewriting. What it is missing is a **read model** — a server that answers "give me
+this board" instead of a client that guesses from a page of rows — and the last mile
+of legibility on the card. This epic supplies both and leaves the interaction model
+where it is.
 
 ---
 
@@ -132,546 +192,588 @@ Agents produced for the user today.
 ### 3.1 Primary scenarios
 
 **S1 — Morning glance.**
-**Given** a user with 26 Missions, 4 of which have a Run executing and 3 of which
-have an open decision,
-**when** they open `/missions`,
-**then** the Board tab renders four lanes, the header reads `3 need you · 7 done
-today`, the In-flight lane shows 4 cards each with a one-line live status of what
-the Agent last reported, and the Needs-you lane shows 3 cards each with an
-"Open decision" affordance.
+**Given** a user with 300 Tasks, 4 of which have a run executing and 3 of which have
+an open escalation,
+**when** they open `/tasks`,
+**then** the board is the view they land on, each of the seven column headers shows
+that column's true total across all 300 Tasks, the first cards in each column are
+its `p0` work, the header reads `3 waiting on you · 7 done today`, and the three
+Tasks with escalations each carry a **Decision** chip with an **Open decision**
+action, in whichever column their status puts them.
 
-**S2 — Quick-create.**
-**Given** a user on the Board tab,
-**when** they press `n` (or click **+ New Mission**), type a description of at
-least 10 characters, set priority **Urgent**, add the label `seo`, and submit,
-**then** the dialog closes, a card appears at the top of the Backlog lane within
-one refresh, the card shows the `Urgent` chip and the `seo` label, and the
-Backlog lane count increases by one.
-
-**S3 — Priority is real.**
-**Given** two Missions in Backlog, one `Urgent` and one `Normal`,
-**when** the user views the Backlog lane,
-**then** the `Urgent` card sorts above the `Normal` card, and when the lane is
-re-sorted the ordering key is documented on the lane header tooltip as
-"Priority, then oldest first".
-
-**S4 — A Mission starts moving.**
-**Given** a Mission in Backlog whose first Run is dispatched,
-**when** the board next refreshes,
-**then** the card moves to the In-flight lane, gains a live status line, and the
-lane counts on both lanes update without a full page reload.
-
-**S5 — A Mission blocks on the user.**
-**Given** an in-flight Mission whose Agent raises an escalation,
-**when** the board next refreshes,
-**then** the card moves to the Needs-you lane, the header "need you" count
-increases, the card shows how many decisions are open, and the card's primary
-action reads **Open decision** and links to that decision.
-
-**S6 — Steering mid-flight.**
-**Given** a Mission in flight with a live Run,
-**when** the user opens the Mission, posts a comment in its thread that addresses
-the working Agent, and submits,
-**then** the comment is appended to the thread, the thread shows
-**"Delivered to the running Agent"** under the comment, the Run is **not**
-restarted, and the comment count on the Mission's card increases by one.
-
-**S7 — Staleness.**
-**Given** an in-flight Mission whose last progress was 50 hours ago and a
-workspace staleness threshold of 2 days,
+**S2 — Priority is real.**
+**Given** a `To do` column holding one `p0` Task edited a month ago and forty `p3`
+Tasks edited today,
 **when** the board renders,
-**then** the card carries a **Stale** flag reading "No progress for 2 days", the
-flag's tooltip names the exact last-progress timestamp, and the card sorts to the
-top of the In-flight lane.
+**then** the `p0` card is first in the column, and the column header's tooltip states
+the ordering as "Urgent first, then oldest first".
 
-**S8 — Archive and restore.**
-**Given** a completed Mission the user no longer wants on the board,
-**when** they choose **Archive** from the card menu,
-**then** the card leaves the Done lane immediately, a toast reads
-"Mission archived · Undo", the Mission appears under the **Archived** tab, and
-choosing **Restore** there returns it to whichever lane its state puts it in.
+**S3 — The board is a link.**
+**Given** a user filtered to `label=pricing` on the board,
+**when** they copy the address bar and send it to a colleague with access,
+**then** the colleague opens the same board, in the board view, with the same filter
+applied and every column count reflecting the filter.
 
-**S9 — Trash and permanent delete.**
-**Given** a Mission the user wants gone,
-**when** they choose **Move to Trash**,
-**then** the Mission leaves the board and every default list, appears under
-**Trash** with the copy "Deleted 6 Sep · purged in 30 days", can be restored from
-there, and can be permanently deleted from there behind a typed confirmation.
+**S4 — Provenance on the card.**
+**Given** four Tasks in `To do` — one raised by the Mission "Keep pricing current",
+one created by the "Stripe webhook" Trigger, one cloned this morning from the
+"Weekly link sweep" recurring template, and one typed by the user,
+**when** the board renders,
+**then** each card carries a chip naming its origin — `Mission · Keep pricing
+current`, `Trigger · Stripe webhook`, `⟳ Weekly link sweep`, `You` — each chip links
+to the thing it names, and clicking a Mission chip filters the board to that
+Mission's Tasks.
 
-**S10 — Everything lands in one queue.**
-**Given** a Schedule that files a Mission and an Agent that proposes one,
-**when** the user opens the board,
-**then** both appear in the Backlog lane alongside human-created Missions, each
-carrying an origin chip (**Schedule** / the Agent's name), and no lane, filter or
-count excludes them by default.
+**S5 — Sub-tasks roll up.**
+**Given** a Task instantiated from a workflow template as a parent plus five
+sub-tasks, two of which are done,
+**when** the board renders with its default settings,
+**then** exactly one card appears — the parent — carrying `▣ 2/5`, the five
+sub-tasks do not appear as their own cards, and the roll-up links to the parent's
+sub-task checklist.
+**And when** the user turns on **Show sub-tasks**,
+**then** all six cards appear, each in the column of its own status, exactly as they
+do today.
+
+**S6 — A recurring template is not a card.**
+**Given** a recurring template that fires weekly and has produced 14 instances,
+**when** the board renders,
+**then** the template is not in any column; the strip above the board reads
+`⟳ 4 recurring Tasks · next fires in 2h` and expands to name each template, its
+cadence in plain language, and when it next fires; and the most recent instance is
+an ordinary card in its own column carrying the chip `⟳ Weekly link sweep`.
+
+**S7 — Something needs the user.**
+**Given** a Task in `in_progress` whose Agent raises an escalation,
+**when** the board next refreshes,
+**then** the card gains a **Decision** chip reading `1 decision`, the header
+"waiting on you" count increases by one, the card does **not** change column — its
+status is still `in_progress` — and the chip's action opens that decision.
+
+**S8 — Something is stuck.**
+**Given** a Task that has been `in_progress` for three days with no run in flight and
+a workspace stall threshold of 2 days,
+**when** the board renders,
+**then** the card carries a **Stalled** flag reading "No run for 3 days", the flag's
+tooltip names the exact last-change timestamp, the card sorts above the rest of its
+column, and the user receives at most one notification about it.
+
+**S9 — Everything the board already does still works.**
+**Given** a user on the board,
+**when** they drag a card from `To do` to `In progress`, press `r` on a focused card,
+click **Run all** on a column, or open the `±` diff sheet,
+**then** each behaves exactly as it does today — the same gated transition, the same
+agent picker when a dragged card has no agent, the same 20-Task batch cap, the same
+capped diff.
+
+**S10 — The other views are untouched.**
+**Given** a user who prefers the table,
+**when** they switch to **Table**,
+**then** the table renders as it does today, the choice is remembered and reflected
+in the URL, and returning later lands them on the table rather than the board.
+
+**S11 — A Mission as a filter, not as a card.**
+**Given** a user who wants to see only what the Mission "Keep pricing current"
+raised,
+**when** they pick that Mission in the board's owner filter (or click a Mission chip
+on a card),
+**then** the board shows only Tasks whose Mission is that one, every column count
+reflects the filter, the filter is in the URL — and no Mission appears as a card in
+any column, because a Mission is a source of work, not a unit of it.
 
 ### 3.2 Edge cases, failures and races
 
-**S11 — Board read fails.**
+**S12 — Board read fails.**
 **Given** the board request errors,
 **when** the page renders,
-**then** the four lane frames still render with an inline error panel reading
-"Couldn't load the board." plus a **Try again** button and a link to the List
-tab; the page does not blank, does not 500, and does not present an empty board
-as "you have no Missions".
+**then** the column frames still render with an inline error panel reading "Couldn't
+load the board." plus a **Try again** button and a link to the Table view; the page
+does not blank, does not 500, and does not present an empty board as "you have no
+Tasks".
 
-**S12 — A lane is over its cap.**
-**Given** a Backlog lane holding 140 Missions and a per-lane cap of 50,
-**when** the lane renders,
-**then** it shows the first 50 cards, a footer reads
-"Showing 50 of 140 · Show 50 more", and the lane header count shows the true
-total (140), never the truncated one.
+**S13 — A column is over its cap.**
+**Given** a `To do` column holding 140 Tasks and a per-column cap of 50,
+**when** the column renders,
+**then** it shows the first 50 cards, a footer reads "Showing 50 of 140 · Show 50
+more", each **Show more** fetches the next page **for that column only**, and the
+column header count always shows 140.
 
-**S13 — Empty board vs empty lane.**
-**Given** a user with zero Missions,
+**S14 — Empty board vs empty column.**
+**Given** a user with zero Tasks,
 **when** the board renders,
-**then** the four lane frames are replaced by a single empty state
-("No Missions yet." + **New Mission** + a link to the unified creator).
-**Given** a user with Missions but none in flight,
+**then** the seven column frames are replaced by a single empty state ("No Tasks
+yet." + **New Task** + a link to the template browser).
+**Given** a user with Tasks but none in progress,
 **when** the board renders,
-**then** the In-flight lane keeps its frame and shows the per-lane empty line
-"Nothing in flight." — the board never collapses a lane.
+**then** the `In progress` column keeps its frame and shows its one-line empty copy
+— the board never collapses a column.
 
-**S14 — Drop into a lane that cannot be set.**
-**Given** a user dragging a Backlog card,
-**when** they drag it over the **Needs you** lane,
-**then** the lane refuses the drop, shows a "not a drop target" cursor, and on
-release a toast reads "Needs you is set by the work, not by hand." — the card
-returns to its lane with no state change.
+**S15 — An illegal drop.**
+**Given** a user dragging a card out of `Cancelled`,
+**when** they drag it over any column,
+**then** no column accepts the drop, because the transition lattice permits nothing
+out of `cancelled`; on release a toast explains that a cancelled Task cannot be
+reopened, and the card returns unchanged. This is today's behaviour, made
+explainable rather than silent.
 
-**S15 — Drag to Done requires a verdict.**
-**Given** a user dragging an in-flight card onto **Done**,
-**when** they release,
-**then** the existing Complete dialog opens with its outcome picker; cancelling
-the dialog returns the card to In flight unchanged; confirming completes the
-Mission and moves the card.
+**S16 — A drop into a grouped column with two legal targets.**
+**Given** the Focus layout, whose `Needs you` column groups `In review` and
+`Blocked`,
+**when** the user drags a card from `In progress` onto it — where both `in_review`
+and `blocked` are legal,
+**then** the board asks which, in a two-item picker, and applies the chosen
+transition; cancelling the picker returns the card unchanged. The board never
+guesses a status on the user's behalf.
 
-**S16 — Concurrent move.**
-**Given** two browser tabs on the board and a card archived in tab A,
-**when** tab B attempts to archive the same Mission,
-**then** tab B's request is accepted as a no-op (the Mission is already
-archived), the card disappears from tab B on its next refresh, and no error is
-shown.
+**S17 — Concurrent move.**
+**Given** two browser tabs on the board and a card moved to `Done` in tab A,
+**when** tab B drags the same card to `In review`,
+**then** the server refuses the now-illegal transition, tab B returns the card to its
+displayed column, surfaces the server's reason, and the next refresh shows the card
+in `Done`.
 
-**S17 — Someone else's Mission.**
-**Given** a Mission id belonging to another user or another Organization,
-**when** the current user requests it, archives it, trashes it, restores it or
-comments on it,
-**then** every one of those responses is a 404 with the same body — the API never
-distinguishes "does not exist" from "not yours".
+**S18 — Someone else's Task.**
+**Given** a Task belonging to another user or another Organization,
+**when** the current user requests it through any board read or mutation,
+**then** the response is a 404 with the same body in every case — the API never
+distinguishes "does not exist" from "not yours". This is the existing posture and
+the board does not weaken it.
 
-**S18 — Steering with no live Run.**
-**Given** a Mission with no non-terminal Run,
-**when** the user posts a comment addressing an Agent,
-**then** the comment is still stored and shown, the thread annotates it
-**"No Run in flight — queued for the next one"**, and a new Run is dispatched
-through the normal gated path rather than silently dropping the instruction.
+**S19 — Hidden work stays hidden.**
+**Given** a Trigger configured with `showOnBoard` off, whose fires produce Tasks,
+**when** the board renders,
+**then** those Tasks appear in no column and in no column count, they remain fully
+reachable at their own detail page and in the Trigger's fire log, and a **Show
+trigger-hidden Tasks** toggle reveals them with a `Hidden` chip. The board never
+deletes; it hides what the Trigger asked to hide.
 
-**S19 — Steering refused by the dispatch gate.**
-**Given** a workspace whose background job runtime is not configured,
-**when** the user posts a steering comment,
-**then** the comment is stored, the thread shows
-**"Couldn't reach the Agent — background jobs are not configured"** with a link
-to the job-runtime settings, and the failure is never rendered as success.
-
-**S20 — Comment storm.**
-**Given** a user posting comments rapidly,
-**when** they exceed 20 comments per minute on one Mission,
-**then** the 21st is refused with "You're commenting too fast. Try again in a
-moment." and no partial Run dispatch occurs.
-
-**S21 — Restoring into a lane that changed.**
-**Given** an archived Mission that was in Backlog when archived and whose Agent
-has since raised an escalation,
-**when** the user restores it,
-**then** it lands in **Needs you**, not Backlog — lanes are always derived from
-current state, never from where the card was when it left.
-
-**S22 — Trash retention boundary.**
-**Given** a Mission trashed 30 days and 1 hour ago,
-**when** the retention sweep runs,
-**then** the Mission and its comments are permanently deleted, an activity entry
-records the purge, and the Trash tab no longer lists it. A Mission trashed 29
-days ago is untouched.
-
-**S23 — Label limits.**
-**Given** a Mission with 8 labels,
-**when** the user adds a 9th,
-**then** the input refuses it inline with "Up to 8 labels per Mission." and the
-save is not attempted.
-
-**S24 — Long live status.**
-**Given** an Agent reporting a 4,000-character status,
+**S20 — Agent-supplied text on a card.**
+**Given** an Agent that names a branch or writes a title containing markup,
 **when** the card renders,
-**then** the card shows the first 140 characters on one line with an ellipsis,
-the full stored value is capped at 280 characters, the text is rendered as plain
-text (never as markup or a link), and the untruncated line is available on hover
-and to screen readers.
+**then** the text renders as literal plain text, is never interpreted as markup, is
+never auto-linked, and is truncated for display with the full value available on
+hover and to screen readers.
 
-**S25 — Staleness threshold changed.**
-**Given** a workspace that raises its staleness threshold from 2 to 7 days,
+**S21 — A provenance source the user cannot see.**
+**Given** a Task whose Mission has since been deleted,
+**when** the card renders,
+**then** the Mission chip is omitted rather than rendered as a broken link or a raw
+identifier, and the card still renders everything else.
+
+**S22 — A stall threshold change.**
+**Given** a workspace that raises its stall threshold from 2 days to 7,
 **when** the board next renders,
-**then** cards between 2 and 7 days without progress lose the Stale flag
-immediately, and no notification is re-sent for a Mission that was already
-flagged.
+**then** cards between 2 and 7 days lose the Stalled flag immediately, and no
+notification is re-sent for a Task that was already flagged.
+
+**S23 — A recurring template with no upcoming fire.**
+**Given** a recurring template whose end date has passed or whose maximum occurrence
+count is exhausted,
+**when** the strip renders,
+**then** the template is listed as `Ended` with its last fire date rather than being
+silently dropped, and it is not counted in "next fires in".
+
+**S24 — A sub-task whose parent the user filtered away.**
+**Given** **Show sub-tasks** off and a filter that matches a sub-task but not its
+parent,
+**when** the board renders,
+**then** the sub-task is shown as its own card carrying a `Sub-task of {parent}`
+chip — a filter must never hide a matching Task behind a roll-up on a card that is
+not being shown.
+
+**S25 — A very long column read.**
+**Given** a workspace whose `Done` column holds 20,000 Tasks,
+**when** the board renders,
+**then** the `Done` column defaults to Tasks completed within a bounded recent
+window, the header states the window, and the window is adjustable — the board never
+attempts to count or render an unbounded terminal column.
 
 ---
 
 ## 4. Functional requirements
 
-### 4.1 Lanes and the board read
+### 4.1 Columns and the board read
 
-- **FR-1** The system MUST place every visible Mission in exactly one of four
-  lanes: `Backlog`, `In flight`, `Needs you`, `Done`.
-- **FR-2** The lane MUST be derived from current state at read time and MUST NOT
-  be stored on the Mission, so that a lane can never disagree with the work.
-- **FR-3** The system MUST apply this precedence, first match wins:
-  1. Not visible on the board at all — the Mission is in Trash.
-  2. Not visible on the board at all — the Mission is Archived.
-  3. `Done` — the Mission's lifecycle status is `completed` or `failed`.
-  4. `Needs you` — the Mission has ≥ 1 open decision attributable to it.
-  5. `In flight` — the Mission has ≥ 1 non-terminal Run attributable to it, **or**
-     its last recorded progress is within the last 24 hours.
-  6. `Backlog` — everything else.
-- **FR-4** A decision is attributable to a Mission when it is an open Escalation
-  or a pending Approval raised by work that belongs to that Mission.
-- **FR-5** A Run is attributable to a Mission when it was dispatched for a Task
-  that belongs to that Mission.
-- **FR-6** A Mission whose lifecycle status is `paused` MUST appear in `Backlog`
-  (or `Needs you`, per precedence) with a visible **Paused** chip, and MUST NOT
-  be presented as if an Agent will pick it up.
-- **FR-7** Each lane MUST render at most 50 cards per request by default; the
-  caller MAY request up to 200. The lane header count MUST always report the true
-  unbounded total for that lane, not the number rendered.
-- **FR-8** The `Done` lane MUST default to Missions completed or failed within the
-  last 7 days; the window MUST be adjustable from 1 to 90 days.
-- **FR-9** Cards within a lane MUST sort by: stale first (In flight only), then
-  priority ascending (`p0` first), then oldest last-progress first. The sort key
-  MUST be stated in the lane header's tooltip.
-- **FR-10** The board MUST refresh itself every 15 seconds while the browser tab
-  is visible and at least one card is in `In flight`, every 60 seconds while
-  visible with nothing in flight, and MUST stop polling entirely while the tab is
-  hidden.
-- **FR-11** A board refresh MUST NOT reset scroll position, lose an open card
-  menu, or discard unsaved dialog input.
+- **FR-1** Every column on the board MUST correspond to one or more real
+  `TaskStatus` values, and a card MUST appear in the column its stored status maps
+  to. A column MUST NOT be derived from anything other than status.
+- **FR-2** The default layout, **Status**, MUST provide exactly seven columns, one
+  per status, in this order and with this mapping:
 
-### 4.2 The card
+  | Column | `TaskStatus` |
+  | --- | --- |
+  | Backlog | `backlog` |
+  | To do | `todo` |
+  | In progress | `in_progress` |
+  | In review | `in_review` |
+  | Blocked | `blocked` |
+  | Done | `done` |
+  | Cancelled | `cancelled` |
 
-- **FR-12** A card MUST show: the Mission title, its priority chip, up to 3
-  labels (with `+N` for the remainder), its origin chip, and its comment count
-  when that count is ≥ 1.
-- **FR-13** A card in `In flight` MUST additionally show a **live status line**:
-  one line of plain text describing what most recently happened, truncated to 140
-  displayed characters.
-- **FR-14** The live status line MUST be rendered as plain text. The system MUST
-  NOT render markup, links or images supplied by an Agent inside a card.
-- **FR-15** A card in `Needs you` MUST show the count of open decisions and a
-  primary action labelled **Open decision**.
-- **FR-16** A card in `Done` MUST show the recorded outcome when one exists and
-  the completion date.
-- **FR-17** A comment count of 100 or more MUST display as `99+`.
-- **FR-18** Every card MUST link to its Mission detail page, and the whole card
-  MUST be a single link target for pointer and keyboard alike.
+  This is the layout that ships today and it MUST remain available and MUST remain
+  the default until a workspace chooses otherwise.
+- **FR-3** The board MUST additionally offer a **Focus** layout of four columns
+  grouping the same seven statuses, for the user who wants the coarse read:
 
-### 4.3 Priority and labels
+  | Column | `TaskStatus` values it groups |
+  | --- | --- |
+  | Backlog | `backlog`, `todo` |
+  | In flight | `in_progress` |
+  | Needs you | `in_review`, `blocked` |
+  | Done | `done` |
 
-- **FR-19** A Mission MUST carry a priority on the same five-step scale Tasks
-  already use: `p0` Urgent, `p1` High, `p2` Medium, `p3` Normal, `p4` Low.
-- **FR-20** A Mission created without an explicit priority MUST default to `p3`
-  (Normal).
-- **FR-21** Priority MUST be settable at create time, from the Mission detail
-  page, and from the card menu, and every change MUST be reflected on the board
-  within one refresh.
-- **FR-22** A Mission MUST accept up to 8 labels. Each label MUST be 1–32
-  characters, lower-cased on save, and MUST match `[a-z0-9][a-z0-9._-]*`.
-- **FR-23** Labels are free-form. The system MUST NOT require a label to exist
-  before it is used and MUST NOT delete a label because nothing uses it.
-- **FR-24** Labels on a Mission are distinct from Work taxonomy tags and MUST NOT
-  be shown, filtered or stored as the same thing.
+- **FR-4** `cancelled` MUST NOT be dropped by the Focus layout. It MUST be reachable
+  as a collapsed **Cancelled** column shown by a **Show cancelled** toggle, and
+  cancelled Tasks MUST remain visible without any toggle in the Status layout, in
+  the Cards and Table views, and in every list result that asks for them. No status
+  is ever unreachable from the board.
+- **FR-5** A drop onto a Focus column MUST resolve to exactly one status. When the
+  transition lattice permits exactly one of the column's statuses from the card's
+  current status, that status MUST be applied. When it permits more than one, the
+  board MUST ask which (S16). When it permits none, the column MUST refuse the drop.
+- **FR-6** Every transition the board performs MUST go through the same gated
+  transition path the Task detail page uses. The board MUST NOT define its own
+  legality rules server-side, and its client-side affordance MUST mirror, never
+  replace, the server's lattice.
+- **FR-7** Each column header MUST show the **true total** of Tasks matching that
+  column and the active filters, independent of how many cards are rendered.
+- **FR-8** Each column MUST render at most 50 cards initially and MUST page
+  independently: fetching more of one column MUST NOT re-fetch or re-order any other.
+- **FR-9** Cards within a column MUST sort by: stalled first, then priority
+  ascending (`p0` first), then oldest last-update first. The sort key MUST be stated
+  in the column header's tooltip.
+- **FR-10** The `Done` and `Cancelled` columns MUST default to a bounded recent
+  window of 7 days, adjustable from 1 to 90 days, with the active window stated in
+  the column header.
+- **FR-11** Tasks marked hidden-from-board by a Trigger MUST be excluded from every
+  column and every column count by default, MUST be revealable by an explicit
+  toggle, and MUST carry a `Hidden` chip when revealed.
+- **FR-12** The board MUST refresh itself while the browser tab is visible and at
+  least one card carries a queued or running run, and MUST stop polling while the
+  tab is hidden. A refresh MUST NOT reset scroll position, close an open card menu,
+  discard an in-flight drag, or lose an unsaved dialog input.
+- **FR-13** A failure of any one enrichment — provenance, decision counts, sub-task
+  roll-ups, comment counts — MUST degrade that element to absent and MUST NOT fail
+  the board.
 
-### 4.4 Progress, staleness
+### 4.2 The view, the filters and the address
 
-- **FR-25** The system MUST record, per Mission, the time of its most recent
-  progress and a ≤ 280-character summary of it.
-- **FR-26** Progress MUST be recorded when any of the following happens for that
-  Mission: a Run is dispatched, a Run reaches a terminal state, a scheduled tick
-  produces Ideas, a Task belonging to it changes status, a decision on it is
-  opened or resolved, or a comment is posted on it.
-- **FR-27** A user editing a Mission's title, description or cadence MUST NOT
-  count as progress.
-- **FR-28** A Mission in `In flight` whose last progress is older than the
-  workspace staleness threshold MUST be flagged **Stale** on its card.
-- **FR-29** The default staleness threshold MUST be **2 days**, settable per
-  workspace between **1 and 30 days**.
-- **FR-30** Missions in `Backlog`, `Needs you`, `Done`, Archived or Trash MUST
-  NOT be flagged stale.
-- **FR-31** The system MUST send at most **one** staleness notification per
-  Mission per stale streak; a Mission that moves and goes stale again MUST be
-  eligible for one more.
-- **FR-32** A staleness notification MUST link directly to the Mission.
-
-### 4.5 Origin — one queue
-
-- **FR-33** Every Mission MUST record its origin: `user`, `schedule`, or `agent`,
-  plus the identifier of the originator where one exists.
-- **FR-34** Missions created before this feature ships MUST be treated as origin
-  `user` and MUST NOT be re-attributed by guesswork.
-- **FR-35** The board MUST NOT exclude any origin by default, and the header
-  counters MUST count all origins alike.
-- **FR-36** The board MUST offer an origin filter with all three values; the
-  filter MUST be off by default.
-- **FR-37** A Trigger MAY be configured to file a Mission instead of a Task; when
-  it does, the resulting Mission MUST land on the board with origin `schedule`.
-- **FR-38** An Agent MAY propose a Mission; the proposal MUST pass through the
-  existing approval and guardrail rails before a Mission exists, and the created
-  Mission MUST carry origin `agent` and name the Agent.
-
-### 4.6 Header counters and filters
-
-- **FR-39** The board header MUST show exactly two counters: **N need you** and
-  **N done today**, in that order.
-- **FR-40** "need you" MUST equal the number of Missions in the `Needs you` lane.
-- **FR-41** "done today" MUST count Missions completed or failed since local
-  midnight in the viewer's timezone, and MUST reset at local midnight.
-- **FR-42** The board MUST offer filters for text search (title and description),
-  priority, label, and origin, all combinable, all reflected in the URL so a
-  filtered board is shareable.
-- **FR-43** Applying a filter MUST filter every lane and MUST update every lane
+- **FR-14** The board MUST be one of the views on the existing `/tasks` surface,
+  alongside the Cards and Table views, which MUST keep their current behaviour.
+- **FR-15** The active view MUST be reflected in the URL and MUST be restorable from
+  it, so any view of `/tasks` is linkable and bookmarkable.
+- **FR-16** The active view MUST be remembered per browser between visits. The board
+  MUST be the default for a user who has never chosen.
+- **FR-17** Every board filter MUST be reflected in the URL, and opening that URL
+  MUST reproduce the same board.
+- **FR-18** The board MUST offer filters for: free text, priority, label, and each
+  existing owner — Mission, Idea, Work, Team, Agent, Goal. All MUST be combinable.
+- **FR-19** Applying a filter MUST filter every column and MUST update every column
   count to the filtered total.
-- **FR-44** Clearing all filters MUST be reachable in one action labelled
-  **Clear filters**, shown only while at least one filter is active.
+- **FR-20** Clicking a label chip or a provenance chip on a card MUST apply the
+  corresponding filter.
+- **FR-21** Clearing all filters MUST be reachable in one action, shown only while at
+  least one filter is active.
+- **FR-22** The `/tasks` page's existing server-rendered filter form MUST keep
+  working and MUST stay in sync with the board's filters — one set of filters, two
+  ways to set them.
+- **FR-23** Every scoped Task list that renders the same component today —
+  `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks` — MUST keep
+  working, with its scope pre-applied and locked as a filter.
 
-### 4.7 Quick-create
+### 4.3 The card
 
-- **FR-45** The board MUST offer a create dialog reachable by button and by the
-  `n` key that collects: description (required, 10–10,000 characters), title
-  (optional, ≤ 200 characters, derived from the description when omitted),
-  priority (default Normal), and labels.
-- **FR-46** The dialog MUST NOT require cadence, cap, guardrails, template or
-  Work selection; a Mission created there is a one-shot Mission and everything
-  else keeps its existing default.
-- **FR-47** Submitting MUST close the dialog optimistically, show the new card in
-  `Backlog`, and — on failure — restore the dialog with the entered values and an
-  inline error rather than discarding the user's text.
-- **FR-48** The dialog MUST link to the full creation form for anyone who wants
-  cadence and guardrails, without losing what they have typed.
+- **FR-24** A card MUST show: the Task's slug, its title, its priority chip, and its
+  labels up to 3 with `+N` for the remainder. This is today's card and it is
+  preserved.
+- **FR-25** A card MUST keep every chip it carries today when the underlying state is
+  present: the branch chip, the pull-request pill with its CI dot, the run chip, the
+  acceptance-gate chip, the `± N files` diff affordance, the **Run** control and the
+  **Move →** menu.
+- **FR-26** A card MUST show up to two **provenance chips** — one *origin* (how this
+  Task came to exist) and one *owner* (what it belongs to) — with any remainder
+  behind a `+N` that expands in the card menu.
+- **FR-27** Provenance MUST be derived exclusively from state that already exists.
+  No new column may be added to a Task to carry it. The derivations are:
 
-### 4.8 Archive and Trash
+  | Chip | Derived from |
+  | --- | --- |
+  | `Mission · {name}` | the Task's Mission owner |
+  | `Idea · {title}` | the Task's Idea owner |
+  | `Work · {name}` | the Task's Work owner |
+  | `Team · {name}` | the Task's Team owner |
+  | `Goal · {name}` | the Task's Goal owner |
+  | `Agent · {name}` | the Task's Agent owner — the Agent it is worked by |
+  | `⟳ {template title}` | the Task points at the recurring template that cloned it |
+  | `🕑 Scheduled {when}` | the Task carries a one-shot scheduled time |
+  | `Trigger · {name}` | an inbound-trigger fire recorded this Task as its result |
+  | `Raised by {agent name}` | the Task was created by an Agent rather than a person |
+  | `Delegated · depth {n}` | the Task carries a sub-agent delegation depth above zero |
+  | `You` / `{person}` | the Task was created by a person |
 
-- **FR-49** A Mission MUST be archivable from any lane and restorable from the
-  **Archived** tab.
-- **FR-50** A Mission MUST be movable to Trash from any lane and from the
-  Archived tab, and restorable from the **Trash** tab.
-- **FR-51** Archiving and trashing MUST be reversible with a single **Undo** in
-  the confirming toast for at least 10 seconds.
-- **FR-52** Restoring MUST re-derive the lane from current state (FR-2), never
-  from the lane the Mission occupied when it left.
-- **FR-53** Archived and trashed Missions MUST be excluded from the board, from
-  the List tab, and from the default Mission list results.
-- **FR-54** Archived and trashed Missions MUST remain fully readable at their own
-  detail URL, with a banner naming their state and offering **Restore**.
-- **FR-55** Archiving or trashing a Mission MUST NOT stop, cancel or alter any
-  Run, Task, Idea or Work belonging to it.
-- **FR-56** A Mission in Trash MUST be permanently deleted **30 days** after it
-  was trashed.
-- **FR-57** Permanent deletion MUST also be available on demand from the Trash
-  tab, behind a confirmation in which the user types the Mission's title.
-- **FR-58** Permanent deletion MUST record an entry in the activity history
-  naming what was deleted and when.
-- **FR-59** The Trash tab MUST state each Mission's purge date in plain language.
+- **FR-28** Chip precedence when more than two apply MUST be: Trigger, then
+  recurring template, then Mission, then Idea, then Work, then Team, then Goal, then
+  Agent, then creator. The two shown MUST be the two highest-precedence that apply.
+- **FR-29** A provenance chip whose target no longer exists or is not visible to the
+  caller MUST be omitted, never rendered as a raw identifier or a broken link.
+- **FR-30** A card MUST show a **Decision** chip with the count of open decisions
+  attributable to that Task, and a primary **Open decision** action, whenever that
+  count is at least one — in whichever column the Task's status places it.
+- **FR-31** A card MUST show a comment-count chip whenever the Task's thread holds at
+  least one message, displayed as `99+` above 99, linking to the thread.
+- **FR-32** A parent Task MUST show a sub-task roll-up of the form `▣ {done}/{total}`
+  whenever it has at least one sub-task, linking to its sub-task checklist.
+- **FR-33** All text a card renders that originated with an Agent MUST be rendered as
+  plain text — never as markup, never auto-linked — truncated for display with the
+  full value in the accessible name.
+- **FR-34** Every card MUST link to its Task detail page and MUST be operable by
+  keyboard alone, preserving the existing `r`-to-run shortcut.
 
-### 4.9 Comments and steering
+### 4.4 Priority
 
-- **FR-60** A Mission MUST have a comment thread, ordered oldest-first, paginated
-  at 50 messages per page.
-- **FR-61** A comment body MUST be at most 16 KB of UTF-8 and MUST be stored and
-  rendered as plain text with mentions resolved to chips.
-- **FR-62** A comment author MUST be able to edit their own comment within **5
-  minutes** of posting; after that the comment is immutable.
-- **FR-63** Posting a comment MUST increment the Mission's comment count and MUST
-  count as progress (FR-26).
-- **FR-64** A comment that mentions an Agent which currently has a non-terminal
-  Run attributable to this Mission MUST be delivered into that Run rather than
-  starting a new one.
-- **FR-65** When such a comment is delivered into a live Run, the thread MUST say
-  so under the comment, and the Run MUST NOT be restarted.
-- **FR-66** When no live Run exists, the system MUST dispatch a new Run through
-  the same gated path a manual run uses, and MUST say so under the comment.
-- **FR-67** When dispatch is refused (no job runtime, budget exhausted, guardrail
-  refusal), the comment MUST still be stored and the thread MUST show the refusal
-  reason and a link to the setting that would fix it.
-- **FR-68** Comment posting MUST be limited to **20 per minute per Mission** per
-  user.
-- **FR-69** The Mission detail page MUST offer a one-click insert of a
-  change-of-direction template into the comment box, which the user then edits
-  before sending. The template MUST ask the Agent to state what still applies,
-  what is dropped, what previous work is invalidated, and to estimate the rework
-  rather than silently starting over.
-- **FR-70** Deleting a Mission permanently MUST delete its comments.
+- **FR-35** The board MUST use the platform's existing Task priority scale and its
+  existing labels, unchanged: `p0` Urgent · `p1` High · `p2` Medium · `p3` Normal
+  (the stored default) · `p4` Low.
+- **FR-36** The board MUST NOT introduce a second priority vocabulary, a different
+  number of steps, or its own labels. The labels above already exist in the message
+  catalogue and MUST be reused.
+- **FR-37** Priority MUST order cards within a column (FR-9) and MUST be settable
+  from the card menu without leaving the board, taking effect within one refresh.
+- **FR-38** The board MUST offer priority as a multi-select filter.
 
-### 4.10 Moving a card
+### 4.5 Sub-tasks
 
-- **FR-71** Dragging a card from `Backlog` to `In flight` MUST run the Mission
-  now, using the existing run path and its existing caps.
-- **FR-72** Dragging a card from `In flight` to `Backlog` MUST pause the Mission.
-- **FR-73** Dragging a card to `Done` MUST open the existing completion dialog
-  with its outcome picker; cancelling MUST leave the Mission unchanged.
-- **FR-74** `Needs you` MUST NOT be a drop target, and an attempted drop MUST
-  explain why.
-- **FR-75** Every drag action MUST have a keyboard-reachable equivalent in the
-  card menu.
-- **FR-76** A refused or failed move MUST return the card to its original lane
-  and surface the server's reason.
+- **FR-39** By default the board MUST show **top-level Tasks only** — Tasks with no
+  parent Task.
+- **FR-40** A **Show sub-tasks** toggle MUST flatten sub-tasks into the columns as
+  their own cards, each in the column of its own status. This is today's behaviour
+  and MUST remain reachable in one action.
+- **FR-41** With sub-tasks hidden, a parent MUST carry the roll-up of FR-32, counting
+  its direct sub-tasks only.
+- **FR-42** A sub-task that matches the active filters while its parent does not MUST
+  be shown as its own card carrying a `Sub-task of {parent}` chip, regardless of the
+  toggle (S24).
+- **FR-43** The board MUST NOT introduce nesting, indentation or expandable cards.
+  The sub-task detail view is the parent Task's existing checklist.
 
-### 4.11 Permissions, scope and limits
+### 4.6 Recurrence
 
-- **FR-77** Every board read and every board mutation MUST be scoped to the
-  calling user and, when an Organization scope is active, to that Organization.
-- **FR-78** A request for a Mission the caller does not own MUST return 404 for
-  read, archive, trash, restore, delete and comment alike, with an identical body
-  in every case.
-- **FR-79** Board reads MUST be limited to **120 requests per minute** per user.
-- **FR-80** Board mutations (archive, trash, restore, priority, labels) MUST be
-  limited to **30 requests per minute** per user, matching the existing Mission
-  write limit.
-- **FR-81** The board MUST NOT expose any Mission field that the Mission detail
-  page does not already expose to the same caller.
+- **FR-44** A recurring **template** — a Task row whose recurrence is switched on —
+  MUST NOT appear as a card in any column by default. A template is a schedule, not
+  a unit of work: it never transitions, and dragging it would move a row the
+  dispatcher owns.
+- **FR-45** Templates MUST instead be summarised in a **recurring strip** above the
+  board, collapsed by default, reading the number of templates and when the next one
+  fires. Expanding it MUST list each template with its cadence in plain language, its
+  next fire time, and a link to its detail page.
+- **FR-46** A template whose recurrence has ended or exhausted its occurrence count
+  MUST be listed in the strip as ended, with its last fire, rather than omitted.
+- **FR-47** A **Show templates** toggle MUST put template rows back into the columns
+  — today's behaviour — where they MUST carry a `⟳ Template` chip and MUST NOT be
+  draggable.
+- **FR-48** An **instance** — a Task cloned from a template — MUST be an ordinary
+  card, MUST be fully draggable, and MUST carry a `⟳ {template title}` provenance
+  chip linking to its template.
+- **FR-49** A one-shot **scheduled** Task — one carrying a future scheduled time — is
+  a card, not a template, and MUST carry a `🕑 Scheduled {when}` chip until it fires.
+- **FR-50** The recurring strip MUST link to the platform's existing schedules view
+  rather than re-implementing a schedule list.
 
-### 4.12 Accessibility and internationalisation
+### 4.7 Attention — decisions and stalls
 
-- **FR-82** Every lane MUST be a labelled region announcing its name and its live
+- **FR-51** The board header MUST show exactly two counters: **N waiting on you** and
+  **N done today**, in that order.
+- **FR-52** "waiting on you" MUST count Tasks with at least one open decision
+  attributable to them, across every column and under the active filters.
+- **FR-53** A decision is attributable to a Task when it is an open escalation raised
+  on that Task, or a pending approval raised by a run dispatched for that Task.
+- **FR-54** "done today" MUST count Tasks that reached `done` since local midnight in
+  the viewer's timezone, and MUST reset at local midnight.
+- **FR-55** Clicking "waiting on you" MUST filter the board to exactly those Tasks.
+- **FR-56** The board MUST NOT render, rank or resolve a decision. It counts them,
+  flags them and links out to them; the queue itself is [AW-03](../AW-03-decision-queue/).
+- **FR-57** A Task MUST be flagged **Stalled** when all of the following hold: its
+  status is `in_progress`; it has no run in a non-terminal state; and it has not
+  changed for longer than the workspace stall threshold.
+- **FR-58** The default stall threshold MUST be **2 days**, settable per workspace
+  between **1 and 30 days**.
+- **FR-59** A Task in any status other than `in_progress` MUST NOT be flagged
+  stalled.
+- **FR-60** The system MUST send at most **one** stall notification per Task per
+  stalled streak; a Task that moves and stalls again MUST be eligible for one more.
+  The notification MUST link directly to the Task.
+- **FR-61** The stall signal MUST be derived from state the platform already stores.
+  Deriving it from last-update time is permitted and is understood to under-report
+  rather than over-report: an edit to a Task resets its last-update time and
+  therefore clears the flag. The system MUST NOT report a Task as stalled when it is
+  not.
+
+### 4.8 Comments from the card
+
+- **FR-62** The comment-count chip (FR-31) MUST open the Task's existing thread. The
+  board MUST NOT introduce a second thread, a second comment noun, or a second set
+  of comment rules.
+- **FR-63** A reply composed from the board MUST behave identically to one composed
+  on the Task detail page — same body limit, same edit window, same mention parsing,
+  same delivery **into a live run** when the mentioned Agent already has one, same
+  refusal message when dispatch is refused.
+- **FR-64** The board MUST NOT change, relax or duplicate the existing rate limit on
+  posting to a Task's thread.
+
+### 4.9 Permissions, scope and limits
+
+- **FR-65** Every board read and every board mutation MUST be scoped to the calling
+  user and, when an Organization scope is active, to that Organization, using the
+  platform's existing ownership filter.
+- **FR-66** A request for a Task the caller does not own MUST return 404 with an
+  identical body for every operation.
+- **FR-67** The board read MUST be rate-limited no more permissively than the
+  existing Task list endpoint, and board mutations MUST reuse the existing per-route
+  limits on transition, run and batch-run. No new limit may be more permissive than
+  the one it sits beside.
+- **FR-68** The board MUST NOT expose any Task field that the Task detail page does
+  not already expose to the same caller.
+- **FR-69** Provenance resolution MUST be owner-scoped: the board MUST NOT reveal the
+  name of a Mission, Work, Team, Goal or Agent the caller cannot otherwise see.
+
+### 4.10 Accessibility and internationalisation
+
+- **FR-70** Every column MUST be a labelled region announcing its name and its live
   count; count changes MUST be announced politely, not assertively.
-- **FR-83** Every card MUST be reachable and operable by keyboard alone: arrow
-  keys move focus within and between lanes, `Enter` opens the Mission, and the
-  card menu is reachable without a pointer.
-- **FR-84** The Stale flag, priority chip and origin chip MUST each carry a text
-  alternative; colour MUST NOT be the only carrier of any of them.
-- **FR-85** Every user-visible string MUST come from the message catalogue, with
-  no literal dot inside a leaf key name.
-- **FR-86** All dates on the board MUST render in the viewer's locale and
-  timezone, and relative times ("2 days ago") MUST carry the absolute time in
-  their tooltip and accessible name.
+- **FR-71** Every card MUST be reachable and operable by keyboard alone: focus moves
+  within and between columns, `Enter` opens the Task, `r` runs it, and the card menu
+  is reachable without a pointer. Every drag action MUST have a card-menu equivalent.
+- **FR-72** The Stalled flag, the Decision chip, the priority chip and every
+  provenance chip MUST each carry a text alternative; colour MUST NOT be the only
+  carrier of any of them.
+- **FR-73** Every user-visible string on the board MUST come from the message
+  catalogue. No string may be hardcoded, including the ones hardcoded today.
+- **FR-74** Every leaf key name added to the catalogue MUST be camelCase and MUST NOT
+  contain a literal dot, and every parent key on the path MUST exist, so that a
+  missing key can never collapse a subtree.
+- **FR-75** All dates on the board MUST render in the viewer's locale and timezone,
+  and relative times MUST carry the absolute time in their tooltip and accessible
+  name.
 
 ---
 
 ## 5. Key entities
 
-### 5.1 Already in Ever Works — extended, not replaced
+### 5.1 Already in Ever Works — used as-is
 
-| Concept | What it is today | What this epic adds |
+| Concept | What it is today | What this epic does with it |
 | --- | --- | --- |
-| **Mission** | A long-running unit of delegated work with a lifecycle (`active`, `paused`, `completed`, `failed`), a type (one-shot / scheduled), a cadence, an outstanding-Ideas cap, guardrail overrides, attachments, Work and Goal links, and a budget | Priority, labels, archive marker, trash marker, last-progress time + summary, comment count, origin |
-| **Task** | A step inside a Mission; already has priority, labels, a board, a comment thread, and a live Run | Nothing. Tasks are the source of a Mission's In-flight and Needs-you signal |
-| **Run** | One Agent execution, already linked to a Task | Nothing. Runs remain the unit of execution; the board reads them |
-| **Approval / Escalation** | The two shapes of "a human must decide", surfaced as My Decisions | Nothing. The board reads them to derive `Needs you` and links out to them |
-| **Schedule / Trigger** | Recurring definitions and inbound firing | P3: a Trigger may target a Mission instead of a Task |
-| **Agent** | The worker | P3: may propose a Mission, through existing approval rails |
-| **Notification** | Existing in-product notifications | A staleness notification kind |
+| **Task** | A trackable work item assigned to people or Agents. Status (`backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled`), priority (`p0`–`p4`), labels, slug, six independent nullable owners (Mission, Idea, Work, Team, Agent, Goal), a parent Task, recurrence, one-shot scheduling, branch and pull-request state, a latest-run denormalisation, acceptance gates, a hidden-from-board marker, and eleven side tables | **Nothing is added.** The board is a read over what is there |
+| **Mission** | A long-running initiative that continuously drives Idea generation and, via Ideas, Work creation. Statuses `active`, `paused`, `completed`, `failed`; type one-shot or scheduled; no priority; ticks on a cron | Appears on the board only as a **filter** and as a **provenance chip on a card**. Never as a card. Never given a priority, a comment thread or a board column |
+| **Run** | One Agent execution, already linked to a Task and already denormalised onto it | Read for the run chip and for the stall signal. Unchanged |
+| **Escalation / Approval** | The two shapes of "a human must decide", already readable per Task | Counted for the Decision chip and the header counter. The board links out; [AW-03](../AW-03-decision-queue/) owns the queue |
+| **Task chat message** | The per-Task comment thread, with mentions, a 5-minute edit window, and delivery into a live run through the existing steering seam | Surfaced as a card chip and a reply affordance. **No new comment noun** |
+| **Task watcher** | An explicit subscription to a Task's transitions | Not surfaced by this epic. See §5.4 |
+| **Inbound trigger / trigger fire** | Signed webhook delivery that creates Tasks, with a fire log recording which Task each fire produced | The fire log is read backwards to attribute a `Trigger` chip. Unchanged |
+| **Notification** | Existing in-product notifications, with a Task category and a per-user deduplication key | Gains one stall kind. The category and the dedupe mechanism already exist |
+| **Activity log** | Already records Task created, updated, transitioned, commented, completed and recurrence-fired | Read only. The board writes no new activity type of its own beyond what the existing transition and run paths already write |
 
-### 5.2 Mission — states and transitions
+### 5.2 Task — status, and what the board does with it
 
-The **lifecycle status** (existing) and the **board lane** (new, derived) are two
-different things. The lifecycle status is what the user and the runtime set. The
-lane is what the board computes.
+The **stored status** and the **board column** are almost the same thing, and that is
+deliberate. A column is a status (Status layout) or a named group of statuses (Focus
+layout), and nothing else. A board whose columns are derived from anything but status
+can disagree with the work, and the moment it does the user stops trusting it.
 
 ```
-  LIFECYCLE STATUS (existing, stored, unchanged by this epic)
+  TASK STATUS (existing, stored, unchanged by this epic)
 
-      create
-        │
-        ▼
-    ┌────────┐  pause   ┌────────┐
-    │ ACTIVE │─────────►│ PAUSED │
-    │        │◄─────────│        │
-    └───┬────┘  resume  └───┬────┘
-        │                   │
-        │ complete          │ complete
-        ▼                   ▼
-    ┌───────────┐      ┌────────┐
-    │ COMPLETED │      │ FAILED │◄── runtime, on a fatal error
-    └───────────┘      └───┬────┘
-                           │ resume (recovery)
-                           ▼
-                       ACTIVE
+     backlog ──► todo ──► in_progress ──► in_review ──► done
+        │         │  ▲         │  ▲  ▲        │  │        │
+        │         │  │         │  │  └────────┘  │        │
+        │         ▼  │         ▼  │              │        │
+        │      blocked─┘    blocked              │        │
+        │         │            │                 │        │
+        └─────────┴────────────┴─────────────────┴────► cancelled
+                                                          (terminal)
+                                              done ──► in_progress (reopen)
+
+  Entering `blocked` stashes the previous status; leaving it restores.
+  `cancelled` permits no outgoing transition.
 
 
-  BOARD PRESENCE (new, stored as two nullable markers)
+  BOARD COLUMN (a presentation of status, never a second state)
 
-    on board ──archive──► ARCHIVED ──restore──► on board
-        │                     │
-        │                     │ trash
-        │ trash               ▼
-        └───────────────► TRASHED ──restore──► on board
-                              │
-                              │ 30 days, or explicit "Delete forever"
-                              ▼
-                          PURGED (row and comments gone)
+    Status layout (default, 7 columns)      Focus layout (4 columns + toggle)
+
+      backlog      → Backlog                  backlog, todo    → Backlog
+      todo         → To do                    in_progress      → In flight
+      in_progress  → In progress              in_review,       → Needs you
+      in_review    → In review                  blocked
+      blocked      → Blocked                   done             → Done
+      done         → Done                      cancelled        → Cancelled
+      cancelled    → Cancelled                                    (toggle)
 
 
-  BOARD LANE (new, derived at read time, never stored)
+  CARD FLAGS (derived at read time, never stored, never a column)
 
-    trashed? ──yes──► not on the board
-        │no
-    archived? ──yes─► not on the board
-        │no
-    status completed|failed? ──yes──► DONE
-        │no
-    open decisions > 0? ──yes──────► NEEDS YOU
-        │no
-    live run, or progress < 24h? ──► IN FLIGHT
-        │no
-        └──────────────────────────► BACKLOG
+    open decisions ≥ 1                     → Decision chip + "waiting on you"
+    in_progress, no live run, no change    → Stalled flag
+      for longer than the threshold
 ```
 
-**Priority** is an ordering attribute, not a state: `p0` Urgent · `p1` High ·
-`p2` Medium · `p3` Normal (default) · `p4` Low. It uses the same five steps and
-the same labels Tasks already use, so a user learns one scale for the whole
-product.
+**Priority** is an ordering attribute, not a state, and it is the platform's existing
+one: `p0` Urgent · `p1` High · `p2` Medium · `p3` Normal (stored default) · `p4` Low.
 
-**Staleness** is derived, never set: a Mission is stale when it is in `In flight`
-and its last progress is older than the workspace threshold. It has no stored
-flag, so it cannot go out of date.
+> **A correction to the program vocabulary table.** [README §1.1](../README.md) lists
+> the Task priority scale as `p0 · p1 · p2 · p3`. The entity and the message
+> catalogue both carry **five** steps, `p0`–`p4`, with `p4` labelled Low and already
+> translated. Five is the truth; §9 asks for README §1.1 to be corrected in the same
+> PR that lands this epic.
 
-### 5.3 New concept — Mission comment
+### 5.3 What "needs you" means here, and what it does not
 
-**Definition.** A message on a Mission's thread, authored by a person or by an
-Agent, which is both a durable record of *why* the work changed direction and the
-channel through which a person redirects an Agent that is mid-flight.
+The program's operating loop needs one place that answers *what is waiting on me*.
+This epic supplies the **signal** and the **count**; it does not supply the queue.
 
-**Why this is a new noun and not a reuse.** The three candidates were all wrong:
-
-- *Activity history* is append-only, machine-authored, and has no author-reply or
-  edit affordance — it records what happened, it cannot carry an instruction.
-- *The Task comment thread* is the right shape but the wrong scope. A Mission
-  spans many Tasks; steering "the Mission" through one arbitrary Task's thread
-  would put the reason for a change of direction on a step rather than on the
-  work, and would break the moment that Task finished.
-- *Chat* is a conversation surface, not an object-scoped record. A chat thread is
-  not attached to the Mission and does not survive as its provenance.
-
-Mission comment therefore mirrors the Task comment thread's shape and limits
-exactly — same 16 KB body cap, same 5-minute edit window, same mention syntax,
-same delivery-into-a-live-Run behaviour — so there is one behaviour to learn, at
-two scopes. It is added to the program's vocabulary table in the same change.
-
-**States.** A comment is `posted`, becomes `edited` within the 5-minute window,
-and is thereafter immutable. It carries a **delivery outcome** describing what
-happened to the instruction it contained: `not-addressed` (no Agent mentioned),
-`delivered` (reached a live Run), `dispatched` (started a new Run), or `refused`
-(with a reason).
+- A Task in `in_review` or `blocked` is work that has **stopped and needs a person**.
+  That is a status, and in the Focus layout it is a column.
+- A Task with an **open decision** is work that is running and has hit something only
+  a human can answer. That is not a status — it can happen in any column — so it is a
+  **chip and a counter**, never a column. Making it a column would put the board in
+  the position of disagreeing with the Task's own status.
+- The **decision itself** — its content, its ranking, its resolution — belongs to
+  [AW-03](../AW-03-decision-queue/). The board counts and links; it does not render.
 
 ### 5.4 Explicitly not new entities
 
-- **No `MissionProgressEvent`.** The live status line is a projection of signals
-  that already exist (Runs, Task transitions, ticks, decisions) denormalised onto
-  the Mission for one-query board reads. The full trail is the Live Feed's job
-  (AW-04) and the Run receipt's job (AW-09).
-- **No `MissionWatcher`.** Watching is a notification concern and belongs to
-  AW-13. Until then the Mission owner is the audience.
-- **No `Label` table.** Labels are free-form strings on the Mission, exactly as
-  they are on a Task.
-- **No board or swimlane entity.** There is one board per user per Organization
-  scope; it is a view, not a thing that can be created.
+This epic adds **no entity, no table and no column**. Each candidate was considered
+and rejected on the same test: does Ever Works already have this?
+
+- **No Task comment noun.** The platform already has a per-Task thread with mentions,
+  an edit window, and — the hard part — delivery into a live run through an existing
+  steering seam rather than restarting it. Everything a board comment would need is
+  built. The board surfaces it; it does not re-declare it.
+- **No board watcher.** A Task watcher entity already exists and already drives
+  transition notifications. It is currently unreachable from any UI, which is a real
+  gap — but it is a *notification* gap, and notification surfaces belong to
+  [AW-13](../AW-13-attention-controls/). This epic does not claim it, and explicitly
+  records it as an unbound backend so it is not rediscovered as missing.
+- **No last-progress column.** A twelfth denormalised column on Task to carry "when
+  did this last really move" is tempting and wrong. The Task already carries a
+  latest-run status and a last-update time, and the platform already records every
+  transition, comment and run in the activity log. The stall signal is derived from
+  those (FR-57, FR-61), and it deliberately under-reports rather than adding storage
+  that can drift. If a precise progress timestamp is ever needed, it belongs on the
+  run or in the activity trail, not on the Task.
+- **No comment-count column.** The count is a grouped read over the existing thread
+  table. Denormalising it means a writer on every post path and a repair job when it
+  drifts, for a chip.
+- **No board, swimlane or saved-view entity.** A board is a view of Tasks under a
+  filter. The filter lives in the URL, and P3's saved views are named URLs stored
+  with the user's existing preferences.
+- **No Task origin column.** Every origin the card shows is already recoverable:
+  from the Task's owners, from its recurrence pointer, from its scheduled time, from
+  its creator type, from its delegation depth, or from the trigger fire log that
+  already records which Task each fire produced.
+- **No Mission priority, Mission comment, Mission watcher or Mission staleness.** A
+  Mission is not a unit of work and does not belong on this board as a card. If any
+  of those are ever wanted, they belong on Task, where they already exist.
 
 ---
 
@@ -679,142 +781,189 @@ happened to the instruction it contained: `not-addressed` (no Agent mentioned),
 
 ### 6.1 Where it lives
 
-`/missions` gains a tab strip. The Missions catalog that ships today becomes the
-**List** tab, unchanged. **Board** is the default tab; the choice is remembered
-per browser and is deep-linkable as `?tab=board|list|archived|trash`.
+`/tasks` — the surface that exists today, under the tab strip that already carries
+**Tasks** and **Triggers**. The view switcher that already carries **Cards** and
+**Table** gains nothing new: **Board** is already there. What changes is that the
+switcher's state lives in the URL and is remembered, and that Board is the default.
 
-### 6.2 Board tab — populated
+The same component renders on every scoped Task list that mounts it today —
+`/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks` — with the scope
+pre-applied and locked.
+
+### 6.2 Board — populated (Status layout)
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ Missions                                                                       │
-│ Everything your Agents are working on, in one queue.                           │
-│                                                                                │
-│  ● 3 need you   ·   ✓ 7 done today                       [ + New Mission ]     │
-│                                                                                │
-│ ┌──────┬──────┬──────────┬───────┐   ┌──────────────────────────────────────┐ │
-│ │Board │ List │ Archived │ Trash │   │ 🔍 Search   Priority▾ Label▾ Origin▾ │ │
-│ └══════┴──────┴──────────┴───────┘   └──────────────────────────────────────┘ │
-├────────────────────┬────────────────────┬───────────────┬─────────────────────┤
-│ ○ Backlog       12 │ ◐ In flight      4 │ ● Needs you 3 │ ✓ Done            7 │
-├────────────────────┼────────────────────┼───────────────┼─────────────────────┤
-│ ┌────────────────┐ │ ┌────────────────┐ │ ┌───────────┐ │ ┌─────────────────┐ │
-│ │ Urgent  ⏱      │ │ │ High    ⚠ Stale│ │ │ Urgent    │ │ │ Normal          │ │
-│ │ Refresh the    │ │ │ Weekly link    │ │ │ Publish   │ │ │ Migrate the     │ │
-│ │ pricing pages  │ │ │ health sweep   │ │ │ the Q3    │ │ │ old item feed   │ │
-│ │                │ │ │ ▸ Drafting sec-│ │ │ changelog │ │ │                 │ │
-│ │ seo  pricing   │ │ │   tion 3 of 5  │ │ │           │ │ │ ✓ Succeeded     │ │
-│ │ 👤 You    💬 4 │ │ │ 🗓 Schedule 💬2│ │ │ 2 open    │ │ │ Completed 5 Sep │ │
-│ └────────────────┘ │ └────────────────┘ │ │ decisions │ │ └─────────────────┘ │
-│ ┌────────────────┐ │ ┌────────────────┐ │ │[Open      │ │ ┌─────────────────┐ │
-│ │ Normal  Paused │ │ │ Normal         │ │ │ decision] │ │ │ Low             │ │
-│ │ Audit outbound │ │ │ Keep the docs  │ │ └───────────┘ │ │ Retire the beta │ │
-│ │ links monthly  │ │ │ site current   │ │ ┌───────────┐ │ │ landing page    │ │
-│ │                │ │ │ ▸ Waiting on a │ │ │ High      │ │ │                 │ │
-│ │ 🗓 Schedule    │ │ │   page fetch   │ │ │ …         │ │ │ ⚠ Failed        │ │
-│ └────────────────┘ │ │ 🤖 Editor 💬 1 │ │ └───────────┘ │ └─────────────────┘ │
-│ … 10 more          │ └────────────────┘ │               │ Last 7 days ▾       │
-└────────────────────┴────────────────────┴───────────────┴─────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ Tasks                                                                           │
+│ Everything you and your Agents are working on.                                  │
+│                                                                                 │
+│  ● 3 waiting on you   ·   ✓ 7 done today       [Browse templates] [+ New Task]  │
+│                                                                                 │
+│ ┌───────┬──────────┐   ┌──────────────────────────────────────────────────────┐ │
+│ │ Tasks │ Triggers │   │ 🔍 Search  Priority▾ Label▾ Mission▾ Work▾ Agent▾    │ │
+│ └═══════┴──────────┘   └──────────────────────────────────────────────────────┘ │
+│                        ┌───────┬───────┬─────────┐  ┌──────────┬────────┐       │
+│                        │ Cards │ Table │ ▣ Board │  │ Status ▾ │ ⚙ View │       │
+│                        └───────┴───────┴═════════┘  └──────────┴────────┘       │
+│ ⟳ 4 recurring Tasks · next fires in 2h                                   [Show] │
+├───────────┬──────────┬─────────────┬───────────┬─────────┬────────┬────────────┤
+│○Backlog 12│○ To do 31│◐In progress4│👁In review2│⊘Blocked1│✓ Done 9│✕Cancelled 3│
+├───────────┼──────────┼─────────────┼───────────┼─────────┼────────┼────────────┤
+│┌─────────┐│┌────────┐│┌───────────┐│┌─────────┐│         │        │            │
+││T-104 p0 ││T-88  p0 ││T-91     p1 ││T-77   p2││         │        │            │
+││Refresh  ││Rewrite ││Weekly link ││Publish  ││         │        │            │
+││pricing  ││the FAQ ││health sweep││the Q3   ││         │        │            │
+││▣ 2/5    ││        ││⚠ Stalled   ││changelog││         │        │            │
+││Mission ·││Trigger·││⟳ Weekly    ││● 1 dec. ││         │        │            │
+││ Pricing ││ Stripe ││ Agent·Edit ││[Open    ││         │        │            │
+││💬 3     ││        ││± 12 files  ││ decision]│         │        │            │
+││Move→  ▶r││Move→ ▶r││Move→    ▶r ││Move→  ▶r││         │        │            │
+│└─────────┘│└────────┘│└───────────┘│└─────────┘│         │        │            │
+│ … 11 more │ … 30 more│             │           │  empty  │        │ Last 7d ▾  │
+└───────────┴──────────┴─────────────┴───────────┴─────────┴────────┴────────────┘
 ```
 
-Lane header glyphs are decorative; each lane's accessible name is its label plus
-its count ("Backlog, 12 Missions").
+Column header glyphs are decorative; each column's accessible name is its label plus
+its count ("To do, 31 Tasks").
 
 ### 6.3 Card anatomy
 
 ```
-┌──────────────────────────────────────────────┐
-│  [Urgent]  [⚠ Stale]                    [⋯]  │  priority · flags · menu
-│  Weekly link health sweep                    │  title (2 lines max, then …)
-│  ▸ Drafting section 3 of 5                   │  live status (In flight only)
-│  [seo] [content] [+2]                        │  up to 3 labels, then +N
-│  🗓 Schedule            💬 12      2d ago    │  origin · comments · last move
-└──────────────────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│  T-91                            [p1]     [⋯]  │  slug · priority · menu
+│  Weekly link health sweep                      │  title (2 lines max, then …)
+│  ⚠ Stalled                                     │  flags
+│  [⟳ Weekly link sweep] [Agent · Editor]        │  provenance, max 2, then +N
+│  [branch] [PR #412 ●] [run] [gate]             │  existing chips, unchanged
+│  ± 12 files                                    │  existing diff affordance
+│  ▣ 2/5      💬 3      [seo] [content] [+2]     │  sub-tasks · comments · labels
+│  Move →                       [▶ Run]   2d ago │  existing footer, unchanged
+└────────────────────────────────────────────────┘
 ```
 
-| Element | Rule |
-| --- | --- |
-| Priority chip | Always present. Text label, not colour alone |
-| Stale flag | In flight only, over threshold only. Tooltip: "Last progress 4 Sep, 09:12" |
-| Paused chip | Whenever the lifecycle status is paused |
-| Title | Up to 2 lines, then ellipsis; full title in the accessible name |
-| Live status | In flight only; 140 characters shown, plain text, prefixed `▸` |
-| Labels | Up to 3, then `+N`; clicking one filters the board by it |
-| Origin | `👤 You` / `🗓 Schedule` / `🤖 <agent name>` |
-| Comments | Shown only when ≥ 1; `99+` above 99 |
-| Last move | Relative; absolute in the tooltip |
+| Element | Rule | New? |
+| --- | --- | --- |
+| Slug, title, priority chip, labels, `Move →`, `▶ Run`, updated date | As today | — |
+| Branch chip, PR pill with CI dot, run chip, gate chip, `± N files` | As today | — |
+| Stalled flag | `In progress` only, over threshold only. Tooltip: "No run since 3 Sep, 09:12" | new |
+| Decision chip | Whenever open decisions ≥ 1, in any column. Carries the **Open decision** action | new |
+| Provenance chips | Up to 2 by the precedence of FR-28; the rest under `+N` in the menu | new |
+| Sub-task roll-up | `▣ done/total` when the Task has sub-tasks | new |
+| Comment count | Shown when ≥ 1; `99+` above 99 | new |
+| `⟳ Template` chip | Only when **Show templates** is on. Card is not draggable | new |
+| `Hidden` chip | Only when **Show trigger-hidden Tasks** is on | new |
 
 ### 6.4 Card menu
 
 ```
                         ┌─────────────────────────────┐
-                        │  Open Mission               │
-                        │  Chat about it              │
+                        │  Open Task                  │
+                        │  Open thread                │
                         ├─────────────────────────────┤
                         │  Priority              ▸    │
-                        │  Labels…                    │
+                        │  Move to               ▸    │
                         ├─────────────────────────────┤
                         │  Run now                    │
-                        │  Pause                      │
-                        │  Complete…                  │
+                        │  Open decision (1)          │
                         ├─────────────────────────────┤
-                        │  Archive                    │
-                        │  Move to Trash              │
+                        │  Raised by Mission · Pricing│
+                        │  Belongs to Work · Docs     │
+                        │  Filed by you · 2 Sep       │
                         └─────────────────────────────┘
 ```
 
-Items that cannot apply are disabled with a reason in their tooltip — "Run now
-is unavailable: this Mission is completed."
+The bottom block is the `+N` expansion of FR-26 — the provenance the card could not
+fit — and each row links to the thing it names. Items that cannot apply are disabled
+with the reason in their tooltip.
 
-### 6.5 Loading
+### 6.5 The recurring strip
 
-```
-├────────────────────┬────────────────────┬───────────────┬─────────────────────┤
-│ ○ Backlog       ▁▁ │ ◐ In flight     ▁▁ │ ● Needs you ▁▁│ ✓ Done           ▁▁ │
-├────────────────────┼────────────────────┼───────────────┼─────────────────────┤
-│ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ │ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ │ ▁▁▁▁▁▁▁▁▁▁▁▁▁ │ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ │
-│ ▁▁▁▁▁▁▁▁▁▁▁▁       │ ▁▁▁▁▁▁▁▁▁▁▁▁       │ ▁▁▁▁▁▁▁▁     │ ▁▁▁▁▁▁▁▁▁▁▁▁        │
-│ ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ │                    │               │                     │
-└────────────────────┴────────────────────┴───────────────┴─────────────────────┘
-```
-
-Four lane frames with three skeleton cards each. The header counters render as
-`— need you · — done today` until the data lands. Never a spinner over the whole
-page; the tab strip and **+ New Mission** stay usable.
-
-### 6.6 Empty board
+Collapsed, above the columns:
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                                    🗂                                          │
-│                            No Missions yet.                                    │
-│    A Mission is a piece of work you hand to your Agents. Describe what you     │
-│    want kept done, and it lands in Backlog for an Agent to pick up.            │
-│                                                                                │
-│                 [ + New Mission ]    Open the unified creator                  │
-└───────────────────────────────────────────────────────────────────────────────┘
+│ ⟳ 4 recurring Tasks · next fires in 2h                                   [Show] │
 ```
 
-### 6.7 Empty lane
+Expanded:
 
 ```
-│ ◐ In flight      0 │
-├────────────────────┤
-│                    │
-│  Nothing in flight.│
-│                    │
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ ⟳ Recurring Tasks                                            [Hide]  [Schedules]│
+│  Weekly link health sweep      Every Monday at 09:00      next in 2h            │
+│  Monthly pricing audit         1st of the month, 06:00    next in 12 days       │
+│  Daily inbox triage            Every day at 07:30         next in 19h           │
+│  Old blog backfill             Every Friday               ended 22 Aug          │
+│  These produce Tasks. They are not Tasks you move.        [Show as cards]       │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Per-lane empty copy, one line each:
+**Schedules** links to the platform's existing schedules view, which already unifies
+recurring Tasks with the platform's other cadences.
 
-| Lane | Copy |
+### 6.6 Focus layout
+
+```
+├──────────────────────┬────────────────────┬─────────────────┬────────────────────┤
+│ ○ Backlog         43 │ ◐ In flight      4 │ ● Needs you   3 │ ✓ Done           9 │
+│   backlog · to do    │   in progress      │  in review ·    │   done             │
+│                      │                    │  blocked        │  Last 7 days ▾     │
+```
+
+Each Focus column names the statuses it groups, directly under its label, so the
+mapping is never a guess. **Show cancelled** appends a fifth column.
+
+The two-target drop picker (S16):
+
+```
+        ┌──────────────────────────────────┐
+        │ Move "Weekly link sweep" to…     │
+        │   ( In review )   ( Blocked )    │
+        │                       [ Cancel ] │
+        └──────────────────────────────────┘
+```
+
+### 6.7 Loading
+
+```
+├───────────┬──────────┬─────────────┬───────────┬─────────┬────────┬────────────┤
+│ ○Backlog ▁│○ To do  ▁│◐In progress▁│👁In review▁│⊘Blocked▁│✓ Done ▁│✕Cancelled ▁│
+├───────────┼──────────┼─────────────┼───────────┼─────────┼────────┼────────────┤
+│ ▁▁▁▁▁▁▁▁▁ │ ▁▁▁▁▁▁▁▁ │ ▁▁▁▁▁▁▁▁▁▁▁ │ ▁▁▁▁▁▁▁▁▁ │         │        │            │
+│ ▁▁▁▁▁▁    │ ▁▁▁▁▁▁   │ ▁▁▁▁▁▁      │           │         │        │            │
+```
+
+Column frames with skeleton cards. The header counters render as `— waiting on you ·
+— done today` until the data lands. Never a spinner over the whole page; the tab
+strip, the view switcher and **+ New Task** stay usable.
+
+### 6.8 Empty board
+
+```
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                                     ▣                                           │
+│                              No Tasks yet.                                      │
+│    A Task is a piece of work you hand to an Agent or take on yourself. File     │
+│    one and it lands in Backlog, ready to run.                                   │
+│                                                                                 │
+│                  [ + New Task ]      Browse templates                           │
+└────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 6.9 Empty column
+
+Per-column empty copy, one line each:
+
+| Column | Copy |
 | --- | --- |
-| Backlog | `Nothing queued.` |
-| In flight | `Nothing in flight.` |
-| Needs you | `Nothing needs you. 🎉` |
-| Done | `Nothing finished in the last 7 days.` |
+| Backlog | `Nothing in the backlog.` |
+| To do | `Nothing queued.` |
+| In progress | `Nothing running.` |
+| In review | `Nothing to review.` |
+| Blocked | `Nothing blocked. 🎉` |
+| Done | `Nothing finished in the last {days} days.` |
+| Cancelled | `Nothing cancelled in the last {days} days.` |
 
-### 6.8 Over the lane cap
+### 6.10 Over the column cap
 
 ```
 │ ┌────────────────┐ │
@@ -824,468 +973,385 @@ Per-lane empty copy, one line each:
 │   [Show 50 more]   │
 ```
 
-### 6.9 Error
+**Show 50 more** fetches the next page of that column only. The header keeps showing
+140 throughout.
+
+### 6.11 Error
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ ⚠  Couldn't load the board.                                                    │
-│    Your Missions are safe — this is a display problem.                          │
-│    [ Try again ]      Open the List tab instead                                │
-└───────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│ ⚠  Couldn't load the board.                                                     │
+│    Your Tasks are safe — this is a display problem.                             │
+│    [ Try again ]      Open the Table view instead                               │
+└────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Rendered inside the board area, below the still-visible tab strip and header. If
-one lane's data fails and the others succeed, only that lane shows the panel; the
-other three render normally.
+Rendered inside the board area, below the still-visible tab strip, view switcher and
+header. If one column's read fails and the others succeed, only that column shows the
+panel.
 
-### 6.10 Quick-create dialog
+### 6.12 The stalled flag and its notification
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  New Mission                                        [✕] │
-├─────────────────────────────────────────────────────────┤
-│  What should your Agents keep doing?                    │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ Check every pricing page each Monday and file     │  │
-│  │ an opportunity whenever a number on it goes       │  │
-│  │ stale.                                            │  │
-│  └───────────────────────────────────────────────────┘  │
-│  At least 10 characters.                        96/10000│
-│                                                          │
-│  Title (optional)                                        │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ Leave blank and we'll write one from the above    │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                          │
-│  Priority   ( Urgent ) ( High ) (•Normal ) ( Low )       │
-│  Labels     [seo ✕] [+ Add label]                        │
-│                                                          │
-│  Need a cadence, a cap or guardrails? Use the full form. │
-├─────────────────────────────────────────────────────────┤
-│                          [ Cancel ]  [ Create Mission ]  │
-└─────────────────────────────────────────────────────────┘
-```
-
-Error state inside the dialog, with the user's text preserved:
+On the card:
 
 ```
-│  ⚠ Couldn't create the Mission. Please try again.        │
+│  ⚠ Stalled                                     │
+│    tooltip: In progress since 3 Sep. No run    │
+│             for 3 days.                        │
 ```
 
-### 6.11 Archived tab
+The notification, once per stalled streak:
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│  Archived                                            🔍 Search   Priority▾    │
-│  Archived Missions stay out of the board but keep everything they produced.    │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  Normal   Q2 pricing refresh                     Archived 2 Sep    [Restore] ⋯ │
-│  Low      Old blog backfill                      Archived 28 Aug   [Restore] ⋯ │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                                Nothing archived.                               │
-│         Archive a Mission from its card menu when it is no longer live.        │
-└───────────────────────────────────────────────────────────────────────────────┘
+   {title} hasn't moved in {days} days
+   It's been in progress since {date} with nothing running. Open it to see
+   where it stopped.
 ```
 
-### 6.12 Trash tab
+### 6.13 Narrow viewports
 
-```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│  Trash                                                                         │
-│  Missions here are deleted for good 30 days after you trash them.              │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  Normal   Duplicate pricing checks     Deleted 6 Sep · purged in 30 days       │
-│                                                    [Restore] [Delete forever]  │
-│  Low      Test mission                 Deleted 20 Aug · purged in 13 days      │
-│                                                    [Restore] [Delete forever]  │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                                 Trash is empty.                                │
-└───────────────────────────────────────────────────────────────────────────────┘
-```
-
-**Delete forever** confirmation:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Delete "Duplicate pricing checks" forever?             │
-│                                                          │
-│  This removes the Mission and its comments permanently.  │
-│  Ideas, Works and Tasks it created are not deleted.      │
-│  This cannot be undone.                                  │
-│                                                          │
-│  Type the Mission title to confirm                       │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │                                                   │  │
-│  └───────────────────────────────────────────────────┘  │
-│                     [ Cancel ]  [ Delete forever ]       │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 6.13 Mission comment thread and steering
-
-On the Mission detail page, below the existing sections:
-
-```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│  Comments                                                            12        │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  👤 You · 4 Sep, 09:12                                                         │
-│  Focus on the pricing pages first, the blog can wait.                          │
-│  ↳ Delivered to the running Agent                                              │
-│                                                                                │
-│  🤖 Editor · 4 Sep, 09:13                                                      │
-│  Understood. Dropping the blog sweep. Section 3 of 5 already drafted stays;    │
-│  sections 4–5 are re-scoped. Redo estimate: ~6 minutes.                        │
-│                                                                                │
-│  👤 You · 5 Sep, 16:40                                                         │
-│  Where did the keyword list come from?                                         │
-│  ↳ No Run in flight — queued for the next one                                  │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  ┌───────────────────────────────────────────────────────────────────────────┐│
-│  │ Reply to steer the Agent…                                                 ││
-│  └───────────────────────────────────────────────────────────────────────────┘│
-│  [ Insert a change of direction ]                              [ Send ]        │
-└───────────────────────────────────────────────────────────────────────────────┘
-```
-
-**Insert a change of direction** puts this editable text into the box (it is a
-starting point, not a submitted message):
-
-```
-Change of direction: <what changed>.
-Keep <what still applies>. Drop <what no longer applies>.
-If this invalidates work you have already done, say so and estimate the
-rework before you redo it — do not silently start over.
-```
-
-Delivery annotations under a comment, one of:
-
-| Outcome | Copy |
-| --- | --- |
-| Delivered into a live Run | `↳ Delivered to the running Agent` |
-| New Run dispatched | `↳ No Run in flight — queued for the next one` |
-| Dispatch refused | `↳ Couldn't reach the Agent — <reason>` + a link to the setting |
-| No Agent addressed | *(nothing)* |
-
-Edit affordance: an **Edit** link on the author's own comment, visible for 5
-minutes, replaced afterwards by nothing. An edited comment is marked `(edited)`.
-
-### 6.14 Banner on an archived or trashed Mission's detail page
-
-```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 🗄 This Mission is archived. It is hidden from the board.        [ Restore ]   │
-└───────────────────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ 🗑 This Mission is in Trash and will be deleted on 6 Oct.        [ Restore ]   │
-└───────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 6.15 Narrow viewports
-
-Below 1024 px the four lanes become a horizontally scrolling strip with the lane
-headers pinned. Below 640 px the board collapses to a single-lane accordion with
-the lane picker at the top; **Needs you** is the default open lane whenever it is
-non-empty, otherwise **In flight**.
+The board already scrolls horizontally with a minimum width. Below 640 px it collapses
+to a single-column accordion with a column picker at the top; the default open column
+is the first non-empty of `In progress`, `In review`, `To do`.
 
 ```
 ┌──────────────────────────────┐
-│ ( Backlog 12 ) (In flight 4) │
-│ (•Needs you 3) ( Done 7 )    │
+│ (Backlog 12) (To do 31)      │
+│ (•In progress 4) (Done 9)    │
 ├──────────────────────────────┤
 │ ┌──────────────────────────┐ │
-│ │ Urgent                   │ │
-│ │ Publish the Q3 changelog │ │
-│ │ 2 open decisions         │ │
-│ │ [ Open decision ]        │ │
+│ │ T-91                  p1 │ │
+│ │ Weekly link health sweep │ │
+│ │ ⚠ Stalled                │ │
+│ │ ⟳ Weekly link sweep      │ │
 │ └──────────────────────────┘ │
 ```
 
-### 6.16 Keyboard affordances
+### 6.14 Keyboard affordances
 
-| Key | Where | Action |
-| --- | --- | --- |
-| `n` | Board tab, no field focused | Open the New Mission dialog |
-| `/` | Board tab, no field focused | Focus the board search box |
-| `←` `→` | Card focused | Move focus to the adjacent lane, same index |
-| `↑` `↓` | Card focused | Move focus within the lane |
-| `Home` `End` | Card focused | First / last card in the lane |
-| `Enter` | Card focused | Open the Mission |
-| `Shift`+`F10` or menu key | Card focused | Open the card menu |
-| `1`…`5` | Card menu → Priority | Set Urgent…Low |
-| `e` | Card focused | Archive, with an Undo toast |
-| `Delete` | Card focused | Move to Trash, with a confirm |
-| `r` | Archived / Trash row focused | Restore |
-| `Esc` | Anywhere | Close the topmost dialog, menu or filter popover |
-| `Ctrl`/`Cmd`+`Enter` | Comment box | Send the comment |
+| Key | Where | Action | New? |
+| --- | --- | --- | --- |
+| `r` | Card focused | Run the Task | existing |
+| `n` | Board, no field focused | New Task | new |
+| `/` | Board, no field focused | Focus the search box | new |
+| `←` `→` | Card focused | Move focus to the adjacent column, same index | new |
+| `↑` `↓` | Card focused | Move focus within the column | new |
+| `Home` `End` | Card focused | First / last card in the column | new |
+| `Enter` | Card focused | Open the Task | new |
+| `Shift`+`F10` or menu key | Card focused | Open the card menu | new |
+| `1`…`5` | Card menu → Priority | Set Urgent…Low | new |
+| `Esc` | Anywhere | Close the topmost dialog, menu or popover | new |
 
-The board uses a single tab stop per lane with roving focus inside it, so tabbing
-across the board is four stops, not 200. `Delete` and `e` are ignored while any
-text input has focus.
+The board uses one tab stop per column with roving focus inside it, so tabbing across
+seven columns is seven stops, not 350. Shortcuts are ignored while a text input has
+focus and while the diff sheet is open — the existing `r` handler already does both
+and is the model.
 
-### 6.17 Exact user-visible copy
+### 6.15 Exact user-visible copy
+
+Every string below is a catalogue key. Ones marked **†** replace a string hardcoded in
+the board today; ones marked **‡** already exist in the catalogue and are reused, not
+re-declared.
 
 | Where | String |
 | --- | --- |
-| Page subtitle | `Everything your Agents are working on, in one queue.` |
-| Header counters | `{count} need you` · `{count} done today` |
-| Tabs | `Board` · `List` · `Archived` · `Trash` |
-| Lane names | `Backlog` · `In flight` · `Needs you` · `Done` |
-| Lane tooltips | `Queued — an Agent will pick it up.` · `Being worked right now.` · `Waiting on a decision from you.` · `Finished in the last {days} days.` |
-| Sort tooltip | `Sorted by priority, then oldest first.` |
-| Create button | `+ New Mission` |
-| Priority labels | `Urgent` · `High` · `Medium` · `Normal` · `Low` |
-| Origin labels | `You` · `Schedule` · `{agentName}` |
-| Stale flag | `Stale` — tooltip `No progress for {days} days. Last progress {timestamp}.` |
-| Paused chip | `Paused` |
-| Needs-you action | `Open decision` |
-| Decision count | `{count} open decisions` / `1 open decision` |
-| Lane overflow | `Showing {shown} of {total}` · `Show {n} more` |
-| Board error | `Couldn't load the board.` / `Your Missions are safe — this is a display problem.` / `Try again` / `Open the List tab instead` |
-| Empty board | `No Missions yet.` / `A Mission is a piece of work you hand to your Agents. Describe what you want kept done, and it lands in Backlog for an Agent to pick up.` |
-| Archive toast | `Mission archived` · `Undo` |
-| Trash toast | `Moved to Trash` · `Undo` |
-| Restore toast | `Mission restored` |
-| Archived tab lead | `Archived Missions stay out of the board but keep everything they produced.` |
-| Trash tab lead | `Missions here are deleted for good 30 days after you trash them.` |
-| Trash row | `Deleted {date} · purged in {n} days` |
-| Delete-forever title | `Delete "{title}" forever?` |
-| Delete-forever body | `This removes the Mission and its comments permanently. Ideas, Works and Tasks it created are not deleted. This cannot be undone.` |
-| Delete-forever confirm | `Type the Mission title to confirm` |
-| Not-a-drop-target | `Needs you is set by the work, not by hand.` |
-| Comments heading | `Comments` |
-| Comment placeholder | `Reply to steer the Agent…` |
-| Steering template button | `Insert a change of direction` |
-| Delivered | `Delivered to the running Agent` |
-| Queued | `No Run in flight — queued for the next one` |
-| Refused | `Couldn't reach the Agent — {reason}` |
-| Comment rate limit | `You're commenting too fast. Try again in a moment.` |
-| Label limit | `Up to 8 labels per Mission.` |
-| Label format | `Labels use lower-case letters, numbers, dots, dashes and underscores.` |
-| Archived banner | `This Mission is archived. It is hidden from the board.` |
-| Trashed banner | `This Mission is in Trash and will be deleted on {date}.` |
-| Stale notification | `{title} hasn't moved in {days} days` / `It's been in flight since {date} with no progress. Open it to see where it stopped.` |
+| Page subtitle | `Everything you and your Agents are working on.` |
+| Header counters | `{count} waiting on you` · `{count} done today` |
+| View switcher | `Cards` **†** · `Table` **†** · `Board` **†** |
+| Layout switcher | `Status` · `Focus` |
+| Status column names | `Backlog` · `To do` · `In progress` · `In review` · `Blocked` · `Done` · `Cancelled` **‡** |
+| Focus column names | `Backlog` · `In flight` · `Needs you` · `Done` |
+| Focus column subtitles | `backlog · to do` · `in progress` · `in review · blocked` · `done` |
+| Priority labels | `Urgent` · `High` · `Medium` · `Normal` · `Low` **‡** |
+| Sort tooltip | `Urgent first, then oldest first.` |
+| Column window | `Last {days} days` |
+| Card move menu | `Move →` **†** |
+| Column batch run | `Run all` **†** · `Run {count} Tasks in {column}` **†** |
+| Column overflow | `Showing {shown} of {total}` · `Show {n} more` **†** |
+| Column empty | `Nothing running.` etc. — see §6.9 **†** (today: `empty`) |
+| Diff affordance tooltip | `Preview the changes on this Task's branch` **†** |
+| Stalled flag | `Stalled` — tooltip `In progress since {date}. No run for {days} days.` |
+| Decision chip | `{count} decisions` / `1 decision` · action `Open decision` |
+| Sub-task roll-up | `{done}/{total} sub-tasks` |
+| Comment count | `{count} comments` / `1 comment` |
+| Provenance chips | `Mission · {name}` · `Idea · {title}` · `Work · {name}` · `Team · {name}` · `Goal · {name}` · `Agent · {name}` · `Trigger · {name}` · `Scheduled {when}` · `Raised by {agentName}` · `Delegated · depth {n}` · `Filed by you` |
+| Recurring instance chip | `⟳ {templateTitle}` |
+| Recurring strip | `{count} recurring Tasks · next fires {when}` · `Show` · `Hide` |
+| Recurring strip lead | `These produce Tasks. They are not Tasks you move.` |
+| Recurring strip ended | `ended {date}` |
+| Template chip | `Template` — tooltip `A recurring template. It creates Tasks; it isn't one you move.` |
+| Toggles | `Show sub-tasks` · `Show templates` · `Show cancelled` · `Show trigger-hidden Tasks` |
+| Hidden chip | `Hidden` — tooltip `A Trigger keeps this off the board.` |
+| Sub-task-of chip | `Sub-task of {parentTitle}` |
+| Board error | `Couldn't load the board.` / `Your Tasks are safe — this is a display problem.` / `Try again` / `Open the Table view instead` |
+| Empty board | `No Tasks yet.` / `A Task is a piece of work you hand to an Agent or take on yourself. File one and it lands in Backlog, ready to run.` |
+| Cancelled drop refusal | `A cancelled Task can't be reopened.` |
+| Two-target drop picker | `Move "{title}" to…` |
+| Clear filters | `Clear filters` |
+| Stall notification | `{title} hasn't moved in {days} days` / `It's been in progress since {date} with nothing running. Open it to see where it stopped.` |
 
 ---
 
 ## 7. Out of scope
 
-- **The decision queue itself.** The board links to decisions; it does not render,
-  rank or resolve them. That is AW-03.
-- **The activity trail.** The board shows one live status line, not a history.
-  Full narration is AW-04; per-execution receipts are AW-09.
-- **Cost on the card.** A Mission already has a budget summary on its detail page.
-  Putting a live spend figure on every card is a per-card fan-out and belongs with
-  the cost meters in AW-17.
-- **Assigning a Mission to a specific Agent from the board.** Missions already
-  have an Agents tab. Routing and assignment are AW-23's problem.
-- **Manual ordering inside a lane.** Cards sort by rule (FR-9). Drag-to-reorder
-  within a lane is not offered; it would create an ordering the runtime ignores.
-- **Work-in-progress limits per lane.** No lane caps the number of Missions in it.
-- **Sub-Missions, dependencies between Missions, due dates, estimates.** Missions
-  are flat and priority is the only scheduling input this epic adds.
-- **A chat rail docked beside the lanes.** The dashboard already has a chat panel
-  in its shell; AW-12 owns chat surfaces.
-- **Shared or read-only boards for teammates.** That is AW-18.
-- **Auto-archiving old Done Missions.** Archiving stays a deliberate act in this
-  epic; a bulk action ships in P3, an automatic rule does not ship at all.
-- **Changing the existing hard-delete endpoint's behaviour.** It keeps deleting
-  permanently for any caller that uses it directly.
-- **Renaming, merging or retiring the Missions List tab, the unified creator, or
-  the Mission detail page.**
+- **The decision queue itself.** The board counts decisions, flags them and links to
+  them. Rendering, ranking and resolving them is [AW-03](../AW-03-decision-queue/).
+- **The activity trail.** The board shows state, not history. Narration is
+  [AW-04](../AW-04-live-feed/); per-execution receipts are [AW-09](../AW-09-runs-receipts/).
+- **The schedules surface.** The recurring strip summarises and links out. The
+  calendar, the heartbeats and the never-run detection are [AW-10](../AW-10-schedules-calendar/).
+- **Watchers.** The entity exists and is unreachable from any UI. Binding it is a
+  notification concern and belongs to [AW-13](../AW-13-attention-controls/); this
+  epic records the gap and does not claim it.
+- **Cost on the card.** A per-Task spend rollup already exists at the Task's own
+  endpoint. Putting a live figure on every card is a per-card fan-out and belongs
+  with the cost meters in [AW-17](../AW-17-costs-caps/).
+- **Anything about Missions as work.** No Mission priority, no Mission comment
+  thread, no Mission watcher, no Mission staleness, no Mission on a board column. A
+  Mission is a source of Tasks and appears here only as a filter and a chip.
+- **Manual ordering inside a column.** Cards sort by rule (FR-9). Drag-to-reorder
+  would create an ordering the runtime ignores.
+- **Work-in-progress limits per column.** No column caps how much may sit in it.
+- **Swimlanes.** One board, one set of columns, filters for everything else.
+- **Archive and trash for Tasks.** Tasks already have `cancelled` as their
+  reversible-by-status exit and a delete endpoint for the permanent one. A second
+  removal concept would be a duplicate noun.
+- **Extracting a shared board primitive.** Three Kanban views exist in the product
+  and share no primitive. Unifying them is a refactor with its own blast radius and
+  is recorded as a follow-up, not done here.
+- **Renaming, retiring or changing the Cards view, the Table view, the `/tasks/new`
+  form, the templates browser, the Triggers tab, or any Missions page.**
 
 ---
 
 ## 8. Acceptance criteria
 
-**Lanes and reads**
+**Columns and reads**
 
-- [ ] Opening `/missions` shows the Board tab by default, with four lanes in the
-      order Backlog · In flight · Needs you · Done.
-- [ ] A Mission with an open decision appears in Needs you even while a Run is
-      executing (precedence, FR-3).
-- [ ] A paused Mission appears in Backlog with a Paused chip.
-- [ ] A completed Mission appears in Done with its outcome and completion date.
-- [ ] Lane header counts report the unbounded total even when the lane is capped.
-- [ ] The board polls at 15 s with work in flight, 60 s otherwise, and 0 while the
-      tab is hidden.
+- [ ] Opening `/tasks` with no stored preference lands on the board.
+- [ ] With 300 Tasks spread across statuses, every column header shows that status's
+      true total, verified against a direct count.
+- [ ] Fetching more of one column leaves every other column's rendered cards and
+      scroll position untouched.
+- [ ] The `Done` column defaults to a 7-day window, states it, and the window is
+      adjustable between 1 and 90 days.
+- [ ] Every column in the Status layout maps to exactly one `TaskStatus`, and all
+      seven statuses have a column.
+- [ ] In the Focus layout, `cancelled` is reachable via **Show cancelled**, and every
+      cancelled Task is still visible without any toggle in the Status layout and in
+      the Cards and Table views.
+- [ ] A drop onto a Focus column with two legal targets opens the picker and applies
+      only what the user chose.
+- [ ] A drop the server refuses returns the card to its column and shows the server's
+      reason.
 
-**Card**
+**Ordering and priority**
 
-- [ ] An in-flight card shows a live status line; a Backlog card does not.
-- [ ] An Agent-supplied status containing markup renders as literal text.
-- [ ] A card with 5 labels shows 3 and `+2`.
-- [ ] A card with 150 comments shows `99+`.
-- [ ] Every card is reachable and openable by keyboard alone.
+- [ ] A `p0` Task last edited a month ago sorts above a `p3` edited today, in the same
+      column.
+- [ ] A stalled Task sorts above every non-stalled Task in its column.
+- [ ] The board uses `p0`–`p4` with the labels Urgent, High, Medium, Normal, Low, and
+      declares no priority vocabulary of its own.
 
-**Priority and labels**
+**Addressability**
 
-- [ ] A Mission created without a priority is Normal.
-- [ ] Setting priority from the card menu reorders the lane on the next refresh.
-- [ ] Adding a 9th label is refused inline.
-- [ ] `SEO` typed as a label is stored and displayed as `seo`.
+- [ ] Switching to Table puts the choice in the URL; reloading that URL lands on
+      Table.
+- [ ] A filtered board's URL, opened by another user with access, reproduces the same
+      filter and the same counts for their own Tasks.
+- [ ] Clicking a label chip filters the board by that label and updates every count.
+- [ ] Clicking a Mission provenance chip filters the board to that Mission's Tasks,
+      and no Mission renders as a card.
+- [ ] The page's existing server-rendered filter form and the board's filters stay in
+      sync.
 
-**Staleness**
+**The card**
 
-- [ ] An in-flight Mission with no progress for 49 hours is flagged at the default
-      threshold; one with 47 hours is not.
-- [ ] Editing a Mission's title does not clear the stale flag.
-- [ ] A dispatched Run does clear it.
-- [ ] Exactly one staleness notification is sent per stale streak.
+- [ ] Every chip the card carries today — branch, PR with CI dot, run, gate, diff —
+      still renders under the same conditions.
+- [ ] A Task raised by a Mission, one produced by a Trigger fire, one cloned from a
+      recurring template and one filed by a person each show a distinct provenance
+      chip naming the right thing.
+- [ ] A Task with three applicable provenance sources shows the two highest by the
+      declared precedence and the rest in its menu.
+- [ ] A Task whose Mission was deleted renders without a Mission chip and without an
+      error.
+- [ ] A Task with an open escalation shows a Decision chip and an **Open decision**
+      action while staying in the column of its own status.
+- [ ] A Task with 150 thread messages shows `99+`.
+- [ ] An Agent-supplied title containing markup renders as literal text.
 
-**Origin**
+**Sub-tasks**
 
-- [ ] Missions that existed before the migration report origin `You`.
-- [ ] A Trigger configured to file a Mission produces a Backlog card with the
-      Schedule origin chip.
-- [ ] Filtering by origin `Agent` shows only Agent-originated Missions and every
-      lane count updates.
+- [ ] A parent with five sub-tasks, two done, renders as one card carrying `2/5`, and
+      its sub-tasks are not separate cards.
+- [ ] **Show sub-tasks** restores today's flat behaviour exactly.
+- [ ] A sub-task matching an active filter whose parent does not match renders as its
+      own card with a `Sub-task of` chip.
 
-**Archive and Trash**
+**Recurrence**
 
-- [ ] Archiving removes the card and the Mission stops appearing in default list
-      results, while its detail page still loads with a banner.
-- [ ] Undo in the toast restores it within the window.
-- [ ] Restoring a Mission that gained a decision while archived lands it in
-      Needs you.
-- [ ] A trashed Mission shows its purge date, and the retention sweep deletes it
-      and its comments after 30 days.
-- [ ] Delete forever requires the typed title and writes an activity entry.
-- [ ] Archiving does not stop any Run, Task or Work belonging to the Mission.
+- [ ] A recurring template appears in the strip and in no column.
+- [ ] The strip states the next fire time and the cadence in plain language.
+- [ ] An ended template is listed as ended rather than omitted.
+- [ ] **Show templates** puts template rows back in the columns, chipped as templates
+      and not draggable.
+- [ ] An instance is an ordinary, draggable card carrying its template's name.
+- [ ] A one-shot scheduled Task shows a scheduled chip and is not treated as a
+      template.
 
-**Comments and steering**
+**Attention**
 
-- [ ] A comment addressing an Agent with a live Run on that Mission is annotated
-      "Delivered to the running Agent" and no second Run starts.
-- [ ] The same comment with no live Run dispatches one and says so.
-- [ ] With no job runtime configured, the comment is stored and the refusal is
-      shown with a link to settings.
-- [ ] Editing at 4 minutes succeeds; at 6 minutes the Edit affordance is gone and
-      the API refuses.
-- [ ] The 21st comment in a minute is refused without dispatching a Run.
-- [ ] Posting a comment bumps the card's comment count and its last-progress time.
+- [ ] "waiting on you" equals the number of Tasks with at least one open decision,
+      under the active filters, and clicking it filters the board to exactly those.
+- [ ] "done today" counts Tasks that reached `done` since the viewer's local midnight
+      and resets at local midnight.
+- [ ] A Task `in_progress` for 49 hours with no live run is flagged at the default
+      threshold; one at 47 hours is not; one at 49 hours with a running run is not.
+- [ ] A Task in `blocked` for a week is not flagged stalled.
+- [ ] Exactly one stall notification is sent per stalled streak, and it links to the
+      Task.
 
-**Moves**
+**Hidden and scoped work**
 
-- [ ] Dragging Backlog → In flight runs the Mission now and respects its caps.
-- [ ] Dragging In flight → Backlog pauses it.
-- [ ] Dragging to Done opens the completion dialog; cancelling changes nothing.
-- [ ] Needs you refuses drops and explains why.
-- [ ] Every drag has an equivalent card-menu item.
+- [ ] Trigger-hidden Tasks appear in no column and no count until the toggle is on,
+      and are chipped when revealed.
+- [ ] `/missions/[id]/tasks`, `/works/[id]/tasks` and `/ideas/[id]/tasks` render the
+      board with their scope locked, and their existing behaviour is unchanged.
 
 **Isolation and limits**
 
-- [ ] Read, archive, trash, restore, delete and comment on another user's Mission
-      all return 404 with identical bodies.
-- [ ] Board reads over 120/min and mutations over 30/min are throttled.
+- [ ] Every board read and mutation for another user's Task returns 404 with an
+      identical body.
+- [ ] Provenance never names a Mission, Work, Team, Goal or Agent the caller cannot
+      otherwise see.
+- [ ] Board reads and mutations are throttled no more permissively than the endpoints
+      they sit beside.
 
 **Failure and empty states**
 
-- [ ] A failed board read renders the error panel with the lane frames intact.
-- [ ] A user with zero Missions sees the empty board, not four empty lanes.
-- [ ] A user with Missions but none in flight sees the In-flight lane frame with
-      its one-line empty copy.
+- [ ] A failed board read renders the error panel with the column frames intact.
+- [ ] A failed decision-count read drops the Decision chips and leaves the rest of the
+      board working.
+- [ ] A user with zero Tasks sees the empty board, not seven empty columns.
 
 **Cross-cutting**
 
-- [ ] Every string on every new surface resolves from the message catalogue in
-      English and falls back cleanly in the other locales.
+- [ ] No string on the board is hardcoded; the seven status names and the five
+      priority labels resolve from the keys that already exist rather than from new
+      duplicates.
+- [ ] Every added leaf key is camelCase, contains no literal dot, and has an existing
+      parent, verified by the catalogue's locale-structure check across all locales.
 - [ ] The board passes an automated accessibility scan with no serious or critical
       violations.
-- [ ] All functional requirements have a passing unit, controller or end-to-end
-      test.
+- [ ] No migration ships with this epic, and the entity files are unchanged.
+- [ ] All functional requirements have a passing unit, controller or end-to-end test.
 
 ---
 
 ## 9. Open questions
 
-- `[NEEDS CLARIFICATION: In-flight recency window.]` FR-3 places a Mission in
-  `In flight` when it has a live Run **or** progress within the last 24 hours.
-  The second clause exists so a Mission whose Run just finished does not snap back
-  to Backlog before the user notices. Is 24 hours right, should it be shorter (say
-  4 hours), or should the clause be dropped entirely so `In flight` means only
-  "a Run is executing"?
-- `[NEEDS CLARIFICATION: Where the staleness threshold is configured.]` The
-  proposal is one workspace-level number alongside the existing Mission defaults.
-  Should it instead be per Mission (so a monthly Mission can say "flag me after
-  35 days"), or both with the Mission overriding the workspace?
-- `[NEEDS CLARIFICATION: Failed Missions in Done.]` A failed Mission currently
-  lands in `Done` with a Failed marker. Product may prefer a fifth lane, or may
-  prefer failed Missions to sit in `Needs you` on the grounds that a failure is
-  something only a human can resolve. Four lanes is the recommendation; confirm.
-- `[NEEDS CLARIFICATION: Trash retention.]` 30 days is proposed to match common
-  expectation. Confirm against any data-retention commitment, and confirm whether
-  a workspace should be able to shorten it.
-- `[NEEDS CLARIFICATION: Agent-originated Missions.]` P3 lets an Agent propose a
-  Mission through the existing approval rails. Should a proposed-but-unapproved
-  Mission be visible on the board (a fifth, "Proposed" state) or invisible until
-  approved? Recommendation: invisible — the decision belongs in My Decisions, and
-  the board should never show work nobody agreed to.
-- `[NEEDS CLARIFICATION: Comment authorship by Agents.]` Agents will post into the
-  thread when they answer. Do their replies count toward the card's comment count,
-  or should the card count only human comments so the number reads as "how much
-  conversation do I owe"? Recommendation: count both, and label the count
-  "comments", not "unread".
-- `[NEEDS CLARIFICATION: Board scope under an Organization.]` The board is
-  user-owned and Organization-scoped like every other Mission read. Confirm there
-  is no near-term requirement for an Organization-wide board showing every
-  member's Missions before AW-18 lands.
-- `[NEEDS CLARIFICATION: Progress from Ideas.]` A scheduled Mission tick that
-  produces Ideas counts as progress (FR-26). Should an Idea being *accepted* or
-  *built* also count, given those are downstream of the Mission but not performed
-  by it?
+- `[NEEDS CLARIFICATION: the program vocabulary table says p0–p3.]`
+  [README §1.1](../README.md) lists Task priority as four steps. The entity and the
+  message catalogue both carry five, `p0`–`p4`, with `p4` already labelled Low and
+  already translated. This spec follows the code. **Recommendation:** correct README
+  §1.1 to `p0 · p1 · p2 · p3 · p4` in the PR that lands this epic.
+- `[NEEDS CLARIFICATION: which layout is the default.]` This spec keeps the shipped
+  seven-column Status layout as the default and offers Focus as an option, on the
+  grounds that the shipped behaviour should not change under a user without their
+  asking. The program README's four-column reading argues for Focus as the default.
+  **Recommendation:** ship Status as the default in P1 and revisit after the first
+  usage read, rather than deciding it here.
+- `[NEEDS CLARIFICATION: whether "waiting on you" should also count in_review and
+  blocked.]` As specified, the counter counts open decisions only, and `in_review` /
+  `blocked` are visible as columns. An owner may reasonably read "waiting on you" as
+  all three. **Recommendation:** decisions only — the counter should mean "something
+  is asking you a question", which a blocked Task is not.
+- `[NEEDS CLARIFICATION: where the stall threshold is configured.]` The proposal is
+  one workspace-level number alongside the existing Task and Mission defaults.
+  Should it instead be per Work, so a long-running research Work can say "flag me
+  after 14 days"?
+- `[NEEDS CLARIFICATION: the accuracy of the derived stall signal.]` FR-61 derives
+  "no progress" from last-update time, which an edit resets. This under-reports and
+  never over-reports. Is that acceptable for v1, or is a precise progress timestamp
+  wanted immediately — in which case it belongs on the run or the activity trail, not
+  as a new Task column?
+- `[NEEDS CLARIFICATION: the Done column's default window.]` Seven days is proposed,
+  to match the other terminal windows in the product. A one-day window would instead
+  make the "done today" counter and the Done column agree with each other.
+- `[NEEDS CLARIFICATION: sub-task roll-up depth.]` FR-41 counts direct sub-tasks only.
+  Delegation can nest deeper. Should the roll-up count the whole subtree, at the cost
+  of a recursive read on every board load?
+- `[NEEDS CLARIFICATION: board scope under an Organization.]` The board is user-owned
+  and Organization-scoped like every other Task read. Confirm there is no near-term
+  requirement for an Organization-wide board showing every member's Tasks before
+  [AW-18](../AW-18-shared-dashboards/) lands.
+- `[NEEDS CLARIFICATION: saved views.]` P3 proposes named URLs stored with the user's
+  existing preferences. Confirm that is enough, or whether saved views need to be
+  shareable objects — which would be a new noun and would need its own justification.
 
 ---
 
 ## 10. Non-functional requirements
 
 - **Performance.** The board read must serve P95 under 400 ms for a workspace with
-  500 Missions, 5,000 Tasks and 200 open decisions, on a single round trip. The
-  page must render its first lane frames before the board data arrives.
-- **Correctness under concurrency.** Lane derivation is a pure function of stored
-  state; two clients reading the same instant must place a Mission in the same
-  lane. Archive, trash and restore are idempotent.
-- **Reliability.** A failure in the decision-count query must degrade the
-  `Needs you` lane to "count unavailable" rather than fail the whole board.
+  5,000 Tasks, 200 open decisions and 50 recurring templates, in a bounded number of
+  queries that does not grow with the number of cards. Provenance, decision counts,
+  sub-task roll-ups and comment counts must each be one batched read across the whole
+  page of cards, never one read per card. The page must render its column frames
+  before the board data arrives.
+- **Correctness.** A column is a pure function of stored status and the active
+  filters. Two clients reading the same instant place a Task in the same column. The
+  board never displays a count it did not compute from the same predicate that
+  produced the cards.
+- **Reliability.** Every enrichment degrades independently (FR-13). A failure in the
+  decision-count query drops the Decision chips and the header counter to
+  "unavailable"; it never fails the board.
 - **Security and privacy.** Every read and write is owner- and scope-filtered.
-  Agent-authored text on a card is untrusted content: plain text only, never
-  interpreted as markup, never auto-linked.
-- **Observability.** Board opens, lane composition, staleness flags raised,
-  archive / trash / restore / purge, comment posts and each steering outcome are
-  recorded (see [`plan.md`](./plan.md) §9).
-- **Compatibility.** No existing Mission endpoint changes its response shape
-  incompatibly; new fields are additive and nullable.
+  Provenance resolution is scope-filtered, so the board cannot be used to enumerate
+  names of objects the caller cannot see. Agent-authored text on a card is untrusted:
+  plain text only, never interpreted as markup, never auto-linked.
+- **Observability.** Board opens by layout, column composition, stall flags raised,
+  decision chips shown, per-column paging, filter use and every transition performed
+  from the board are recorded (see [`plan.md`](./plan.md) §9).
+- **Compatibility.** No existing Task endpoint changes its response shape
+  incompatibly. Every new request parameter is optional and its absence reproduces
+  today's behaviour exactly. The Cards and Table views, every scoped Task list, and
+  every Missions page are unchanged.
 
 ---
 
 ## 11. Constitution gates
 
-- [x] **I — Plugin-first.** No external integration is introduced. Nothing here
-      talks to a third-party service.
-- [x] **II — Capability-driven.** No plugin id appears anywhere in this feature.
-      Agent execution is reached through the existing dispatch and steering
-      seams, not a named provider.
-- [x] **III — Source-of-truth repos.** Board metadata is platform metadata:
-      priority, labels, board markers, comments. No Work content moves into the
-      database.
-- [x] **IV — Job-runtime provider.** The two recurring jobs this epic adds
-      (staleness notification, trash retention) and every Run dispatched from a
-      comment go through the configured job-runtime provider.
-- [x] **V — Forward-only migrations.** Every new column and the comment table ship
-      as additive forward-only migrations, one per phase.
-- [x] **VI — Tests first-class.** Lane derivation, staleness and steering outcomes
-      get unit tests; every new endpoint gets a controller spec; the board,
-      archive/restore and steering flows get end-to-end coverage.
-- [x] **VII — Secrets.** No secret is introduced, read or logged.
+- [x] **I — Plugin-first.** No external integration is introduced. Nothing here talks
+      to a third-party service.
+- [x] **II — Capability-driven.** No plugin id appears anywhere in this feature. Agent
+      execution is reached through the existing dispatch and transition seams the
+      board already uses, not a named provider.
+- [x] **III — Source-of-truth repos.** The board reads platform metadata only. No Work
+      content moves into the database, and no Task content moves out of it.
+- [x] **IV — Job-runtime provider.** The one recurring job this epic adds — the stall
+      sweep — goes through the configured job-runtime provider, in the same shape as
+      the recurrence and pull-request-status dispatchers that already run. Every run
+      the board dispatches continues to go through the existing gated path.
+- [x] **V — Forward-only migrations.** **No schema change ships with this epic**, so
+      no migration is required. Should a stored progress timestamp later be adopted
+      (§9), it ships as a forward-only additive migration in the API's migrations
+      directory, in the same PR as the column.
+- [x] **VI — Tests first-class.** Column mapping, drop-target resolution, provenance
+      precedence, the stall predicate and the sub-task roll-up get unit tests; the
+      board read endpoint and each new query parameter get controller specs; the
+      board, its filters, its provenance and its recurring strip get end-to-end
+      coverage.
+- [x] **VII — Secrets.** No secret is introduced, read or logged. The board never
+      surfaces a trigger secret; it surfaces only a trigger's name.
 - [x] **VIII — Plugin counts.** No plugin is added; the canonical plugin doc is
       untouched.
-- [x] **IX — Behaviour-first spec.** This document names no class, file or
-      library.
-- [x] **X — Backwards compatibility.** New request and response fields are
-      additive and optional. The default Mission list gains an exclusion for
-      archived and trashed rows, which cannot affect any existing consumer because
-      no such row can exist before this feature's migration.
+- [x] **IX — Behaviour-first spec.** This document names no class, file or library.
+- [x] **X — Backwards compatibility.** Every new request and response field is
+      additive and optional. Every new default that changes what a user sees — the
+      board as the landing view, top-level Tasks only, templates out of the columns —
+      has an explicit toggle that restores today's behaviour in one action.
 
 ---
 
@@ -1293,13 +1359,14 @@ text input has focus.
 
 - Implementation plan: [plan.md](./plan.md)
 - Task breakdown: [tasks.md](./tasks.md)
-- Program overview and vocabulary: [../README.md](../README.md)
-- My Decisions (the queue this board links into): [../AW-03-decision-queue/](../AW-03-decision-queue/)
-- Live Feed (the trail this board summarises to one line): [../AW-04-live-feed/](../AW-04-live-feed/)
-- Runs and receipts (what a live status line links to): [../AW-09-runs-receipts/](../AW-09-runs-receipts/)
+- Program overview and the `Task` vs `Mission` distinction: [../README.md](../README.md) §1, §1.1
+- What is already built and unbound: [../EXISTING-SUBSTRATE.md](../EXISTING-SUBSTRATE.md)
+- My Decisions (the queue this board counts and links into): [../AW-03-decision-queue/](../AW-03-decision-queue/)
+- Live Feed (the history this board deliberately does not show): [../AW-04-live-feed/](../AW-04-live-feed/)
+- Runs and receipts (what a run chip links to): [../AW-09-runs-receipts/](../AW-09-runs-receipts/)
+- Schedules and calendar (where the recurring strip hands off): [../AW-10-schedules-calendar/](../AW-10-schedules-calendar/)
+- Attention controls (where watchers and notification routing belong): [../AW-13-attention-controls/](../AW-13-attention-controls/)
 - Home (which embeds a board summary): [../AW-19-home/](../AW-19-home/)
-- Missions, Ideas and Works today: [../../missions-ideas-works/](../../missions-ideas-works/)
-- Task tracking (the priority scale and comment thread reused here): [../../task-tracking/](../../task-tracking/)
+- Task tracking as it exists today: [../../task-tracking/](../../task-tracking/)
+- Missions, Ideas and Works — the source side: [../../missions-ideas-works/](../../missions-ideas-works/)
 - Schedules: [../../schedules/spec.md](../../schedules/spec.md)
-</content>
-</invoke>

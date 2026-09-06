@@ -73,7 +73,7 @@ Every path below was opened in this worktree before being cited.
 | --- | --- | --- |
 | 1 · provider | `GET /api/plugins/:pluginId/connection-status`, `POST /api/plugins/:pluginId/validate-connection` | `apps/api/src/plugins/plugins.controller.ts:233,411` |
 | 2 · agents | the roster provisioning record on the checklist row | new |
-| 3 · mission | `POST /api/me/missions`, `GET /api/me/missions`, `POST /api/agents/:id/assign-task` | `apps/api/src/missions/missions.controller.ts:75,112`; `apps/api/src/agents/agents.controller.ts` |
+| 3 · task | `POST /api/tasks`, `GET /api/tasks`, `POST /api/agents/:id/assign-task` | `apps/api/src/tasks/tasks.controller.ts:271,174`; `apps/api/src/agents/agents.controller.ts:1475` |
 | 4 · decision | `GET /api/agent-approvals`, `GET /api/escalations` | `apps/api/src/agent-approvals/agent-approvals.controller.ts`; `apps/api/src/escalations/escalations.controller.ts:47,51` |
 | 5 · schedule | `GET /api/schedules` — one read normalising every cadence source the platform runs | `apps/api/src/schedules/schedules.controller.ts:27,34` |
 
@@ -165,7 +165,7 @@ flowchart TB
     RC --> DISP --> TASK --> RS --> AG
     RS --> CL
     CC --> CS --> CL
-    CS -. reads .-> EXT["missions · agent-approvals · escalations<br/>schedules · plugins connection-status"]
+    CS -. reads .-> EXT["tasks · agent-approvals · escalations<br/>schedules · plugins connection-status"]
     STEP --> RC
     PANEL --> RC
     CARD --> CC
@@ -271,7 +271,7 @@ gain an optional `@IsOptional() @Matches(/^[a-z0-9][a-z0-9-]{0,31}$/) lane?: str
 export const ONBOARDING_MILESTONES = [
     'connectProvider',
     'meetAgents',
-    'shipMission',
+    'shipTask',
     'resolveDecision',
     'scheduleJob'
 ] as const;
@@ -491,7 +491,7 @@ than `ROSTER_MAX_LANES` entries.
 | `POST /api/onboarding/checklist/hide` | — | `ChecklistResponse` | Sets `hiddenAt`. Idempotent (FR-41). |
 | `POST /api/onboarding/checklist/show` | — | `ChecklistResponse` | Clears `hiddenAt` and `dismissedAt`. The Help-drawer entry point. |
 | `POST /api/onboarding/checklist/dismiss` | — | `ChecklistResponse` | Completed-state dismissal (FR-42). |
-| `POST /api/onboarding/checklist/starter-mission` | `StarterMissionDto` | `201` + `{ missionId, taskId, agentId, dispatched }` | §4.3. `@Throttle({ long: { limit: 10, ttl: 3_600_000 } })` (FR-50) |
+| `POST /api/onboarding/checklist/starter-task` | `StarterTaskDto` | `201` + `{ taskId, agentId, runId, dispatched }` | §4.3. `@Throttle({ long: { limit: 10, ttl: 3_600_000 } })` (FR-50) |
 | `POST /api/onboarding/checklist/starter-schedule` | `{ option }` | `{ armed, kind, nextRunAt }` | §4.4 |
 
 `ChecklistResponse`:
@@ -519,42 +519,73 @@ interface ChecklistResponse {
 }
 ```
 
-### 4.3 The starter mission
+### 4.3 The starter task
 
-`StarterMissionDto`: `{ briefId?: string; customBrief?: string; laneKey: RosterLaneKey }`
-with `@MaxLength(10_000)` on `customBrief` — the same ceiling
-`CreateMissionDto.description` already carries.
+**Why this creates a `Task` and not a `Mission`.**
+`packages/agent/src/entities/mission.entity.ts` describes a Mission as a
+long-running initiative that continuously drives Idea generation and, via Ideas,
+Work creation: its statuses are `active · paused · completed · failed`, it has no
+priority and no assignee, and a tick worker polls every Mission with
+`status = active` and `type = scheduled` for as long as it lives.
+`packages/agent/src/entities/task.entity.ts` describes a Task as
+"a trackable work item assigned to people or Agents": it moves
+`backlog → todo → in_progress → in_review → done`, carries `TaskPriority`, and is
+the only thing `POST /api/agents/:id/assign-task` will accept (it resolves
+`body.taskId` through `TasksService.getOne`). The first hour hands over one piece
+of work, so it writes one `Task` row and nothing else.
+
+`StarterTaskDto`: `{ briefId?: string; customBrief?: string; laneKey: RosterLaneKey }`
+with `@MaxLength(10_000)` on `customBrief`. `CreateTaskDto.description` in
+`apps/api/src/tasks/tasks.dto.ts` is an unbounded `text` column, so this ceiling
+is this endpoint's own and is enforced here rather than inherited.
 
 The handler, in order, reusing existing services rather than re-implementing:
 
 1. Resolve the brief — catalogue entry or the caller's text.
-2. `MissionsService.create` with the brief as the description.
-3. `TasksService.create` under that Mission, carrying the brief's acceptance
-   checks as the Task's acceptance criteria.
-4. Resolve the lane's Agent from `agents.lane`.
-5. `AgentsService.assignTask` — the **existing** path that pre-creates an
-   `AgentRun`, passes the concurrency-valve admission gate and enqueues
-   `agent-task-execute`. No new dispatch path is introduced.
-6. Return the ids and whether dispatch actually happened (`dispatched: false`
+2. `TasksService.create` (`packages/agent/src/tasks-domain/tasks.service.ts`)
+   with the brief's short title as `title` (the
+   `CreateTaskDto` 200-character limit) and the brief plus its "finished =" line
+   as `description`. `status` stays at its `backlog` default, `priority` at `p3`,
+   and every owner column (`workId` / `missionId` / `ideaId` / `teamId` /
+   `goalId`) is left `null`. **`Task.acceptanceChecks` is not written** — that
+   field is a runnable command gate (`TaskAcceptanceCheck.command`, exit code
+   decides green/red, `packages/contracts/src/tasks/task-gates.types.ts`), and a
+   starter brief's definition of done is prose.
+3. Resolve the lane's Agent from `agents.lane`.
+4. The **existing** `POST /api/agents/:id/assign-task` orchestration
+   (`apps/api/src/agents/agents.controller.ts:1475`), which resolves the Task,
+   pre-creates the `AgentRun` for the `(taskId, agentId)` pair, passes the
+   concurrency-valve admission gate — parking the run `queued: true` when the
+   valve is full — and enqueues `agent-task-execute`. No new dispatch path is
+   introduced.
+5. Return the ids and whether dispatch actually happened (`dispatched: false`
    when no provider is connected — FR-49).
 
-If step 5 fails, steps 2–4 are **kept**: a Mission with an unassigned Task is a
-recoverable state the user can see and fix; deleting it would silently discard
-what they wrote.
+If step 4 fails, steps 2–3 are **kept**: an unassigned Task sitting in `backlog`
+is a recoverable state the user can see and fix; deleting it would silently
+discard what they wrote.
 
 ### 4.4 The starter schedule
 
-`option` is one of `dailyDigest | weeklyMissionReview | coordinatorCadence`.
+`option` is one of `dailyDigest | weeklyReview | coordinatorCadence`.
 
 | Option | Mechanism used | Default |
 | --- | --- | --- |
 | `dailyDigest` | `POST /api/tasks/:id/recurring` on a created digest Task, `recurrenceCron` + `recurrenceTimezone` | `0 8 * * *`, caller's timezone |
-| `weeklyMissionReview` | same | `0 9 * * 1` |
+| `weeklyReview` | same | `0 9 * * 1` |
 | `coordinatorCadence` | `PATCH /api/agents/:id` setting `heartbeatCadence` on the coordinator | `0 * * * *` |
 
-All three are read back through `GET /api/schedules`, which is what milestone 5
-evaluates — so arming one anywhere else in the product completes it identically
-(FR-57).
+All three are read back through `GET /api/schedules`, whose aggregation already
+normalises recurring Tasks, agent heartbeats, Work schedules and Mission ticks
+into one list; that read is what milestone 5 evaluates, so arming a cadence
+anywhere else in the product completes the milestone identically (FR-57).
+
+**Why none of the three is a Mission.** Two are recurring `Task`s — the
+`isRecurring` template plus `recurrenceCron`/`recurrenceTimezone` that the
+existing `task-recurrence-dispatcher` cron clones instances from — and the third
+sets `Agent.heartbeatCadence`. All three put *existing, bounded* work on a clock.
+A Mission is the opposite shape: an open-ended initiative that keeps generating
+*new* work until its owner ends it. Nothing in this epic creates one.
 
 ### 4.5 Milestone evaluation
 
@@ -567,7 +598,7 @@ the request.
 | --- | --- |
 | `connectProvider` | plugin connection status for capability `ai-provider` / `ai-gateway`, accepting a successful check `< 24 h` old |
 | `meetAgents` | `provisioning.state ∈ {ready, partial}` **and** `rosterAcknowledgedAt != null` |
-| `shipMission` | any Mission of the caller with ≥1 `completed` `AgentRun`, or a completed Mission |
+| `shipTask` | any Task of the caller with ≥1 `completed` `AgentRun`, or a Task in `TaskStatus.DONE` |
 | `resolveDecision` | any `AgentActionProposal` with `status ∈ {approved, rejected}`, or any `AgentEscalation` with `status = resolved` |
 | `scheduleJob` | `GET /api/schedules?enabledOnly=true` returns ≥1 row |
 
@@ -622,7 +653,7 @@ adding a bespoke one.
 
 | File | Change |
 | --- | --- |
-| `apps/web/src/lib/api/onboarding.ts` | Add `getChecklist`, `skipMilestone`, `unskipMilestone`, `hideChecklist`, `showChecklist`, `dismissChecklist`, `startStarterMission`, `armStarterSchedule`, `getRosterBlueprints`, `getRoster`, `provisionRoster`, `acknowledgeRoster` — all on the existing `serverFetch` / `serverMutation` helpers, keeping the file's `import 'server-only'` posture. |
+| `apps/web/src/lib/api/onboarding.ts` | Add `getChecklist`, `skipMilestone`, `unskipMilestone`, `hideChecklist`, `showChecklist`, `dismissChecklist`, `startStarterTask`, `armStarterSchedule`, `getRosterBlueprints`, `getRoster`, `provisionRoster`, `acknowledgeRoster` — all on the existing `serverFetch` / `serverMutation` helpers, keeping the file's `import 'server-only'` posture. |
 | `apps/web/src/app/actions/onboarding/roster.ts` **(new)** | `'use server'` wrappers returning `{ success, data?, error? }` result objects rather than throwing — the shape `apps/web/src/app/actions/onboarding/state.ts` already uses. |
 | `apps/web/src/app/actions/onboarding/checklist.ts` **(new)** | Same. |
 
@@ -826,15 +857,15 @@ dashboard.getSetUp.milestones.meetAgents.sub             "A small team, each wit
 dashboard.getSetUp.milestones.meetAgents.action          "Set up my agents"
 dashboard.getSetUp.milestones.meetAgents.doneLine        "{count} agents · {names}"
 dashboard.getSetUp.milestones.meetAgents.seeIntro        "See the introduction"
-dashboard.getSetUp.milestones.shipMission.title          "Ship your first mission"
-dashboard.getSetUp.milestones.shipMission.sub            "Hand your agents one real piece of work."
-dashboard.getSetUp.milestones.shipMission.action         "Pick a brief"
-dashboard.getSetUp.milestones.shipMission.blurb          "Pick something real. A brief that says what \"finished\" means is the difference between work that lands and work that comes back to ask."
-dashboard.getSetUp.milestones.shipMission.writeOwn       "Write my own instead"
-dashboard.getSetUp.milestones.shipMission.send           "Send it"
-dashboard.getSetUp.milestones.shipMission.noRoster       "You need an agent before you can hand out work."
-dashboard.getSetUp.milestones.shipMission.noProvider     "Nothing will run until you connect a provider. You can send this now and it'll start as soon as one is connected."
-dashboard.getSetUp.milestones.shipMission.tooLong        "That's longer than a mission brief can be. Trim it by {count} characters."
+dashboard.getSetUp.milestones.shipTask.title             "Ship your first task"
+dashboard.getSetUp.milestones.shipTask.sub               "Hand your agents one real piece of work."
+dashboard.getSetUp.milestones.shipTask.action            "Pick a brief"
+dashboard.getSetUp.milestones.shipTask.blurb             "Pick something real. A brief that says what \"finished\" means is the difference between work that lands and work that comes back to ask."
+dashboard.getSetUp.milestones.shipTask.writeOwn          "Write my own instead"
+dashboard.getSetUp.milestones.shipTask.send              "Send it"
+dashboard.getSetUp.milestones.shipTask.noRoster          "You need an agent before you can hand out work."
+dashboard.getSetUp.milestones.shipTask.noProvider        "Nothing will run until you connect a provider. You can send this now and it'll start as soon as one is connected."
+dashboard.getSetUp.milestones.shipTask.tooLong           "That's longer than a brief can be. Trim it by {count} characters."
 dashboard.getSetUp.milestones.resolveDecision.title      "Answer your first decision"
 dashboard.getSetUp.milestones.resolveDecision.sub        "Your agents ask before anything leaves the workspace."
 dashboard.getSetUp.milestones.resolveDecision.action     "Open decisions"
@@ -846,7 +877,7 @@ dashboard.getSetUp.milestones.scheduleJob.sub            "Something that runs to
 dashboard.getSetUp.milestones.scheduleJob.action         "Choose a job"
 dashboard.getSetUp.milestones.scheduleJob.turnOn         "Turn it on"
 dashboard.getSetUp.milestones.scheduleJob.dailyDigest    "A daily summary of the workspace"
-dashboard.getSetUp.milestones.scheduleJob.weeklyReview   "A weekly look at your missions"
+dashboard.getSetUp.milestones.scheduleJob.weeklyReview   "A weekly look at your open work"
 dashboard.getSetUp.milestones.scheduleJob.coordinator    "Give {name} a cadence"
 
 dashboard.getSetUp.briefs.mapTheField.title              "Map the field"
@@ -887,7 +918,7 @@ already strips PostHog `$`-keys and caps properties at 4096 bytes.
 | `onboarding_checklist_hidden` | `doneCount` | Is it hidden because it is finished or because it is noise? |
 | `onboarding_first_hour_completed` | `minutesSinceSignup`, `skippedCount` | The number this epic exists to move. |
 
-**Never recorded:** brief text, custom brief text, agent names, mission titles,
+**Never recorded:** brief text, custom brief text, agent names, Task titles,
 lane display labels, provider names, credential values, or any provider reason
 string (FR-65). `blueprintSlug`, `laneKey`, `milestone`, outcome enums and counts
 are all closed vocabularies defined in contracts.
@@ -908,7 +939,7 @@ activity and must not appear in an audit trail.
 | Skill binding fails | Recorded in `skillWarnings`; the lane still succeeds | FR-23 |
 | Two provisioning requests race | The unique `(userId, scopeKey)` row plus a compare-and-set on `provisioning.state` means the second gets `409` | FR-16, scenario 3.8 |
 | The lane unique index rejects a write | Treated as "already filled" → `reused` | FR-15/FR-28 |
-| Starter-mission assignment fails | The Mission and Task are kept; the response reports `dispatched: false`; the user can assign it by hand | §4.3 |
+| Starter-task assignment fails | The Task is kept in `backlog`; the response reports `dispatched: false`; the user can assign it by hand | §4.3 |
 | Caller lacks agent-create permission | Roster preview is read-only; provisioning is refused before any write; milestone 2 reads *waiting on an admin* | FR-63, scenario 3.12 |
 
 ---
@@ -931,7 +962,7 @@ activity and must not appear in an audit trail.
 | File | Covers |
 | --- | --- |
 | `apps/api/src/onboarding/onboarding-roster.controller.spec.ts` | `202` + `queued` under a second; `409` when in flight; `400` on an unknown lane key, a duplicate lane, a missing coordination lane, or more than 8 lanes; throttle metadata is 5/hour; acknowledge is idempotent (FR-9, FR-16, FR-17, FR-33, scenario 3.15) |
-| `apps/api/src/onboarding/onboarding-checklist.controller.spec.ts` | Lazy row creation on first read; skip/unskip changes the denominator; hide/show/dismiss transitions; `private, no-store`; the starter-mission handler creates Mission + Task + assignment and keeps both when assignment fails; the 10 000-character rejection; the starter-schedule handler arms each of the three options (FR-34…FR-50) |
+| `apps/api/src/onboarding/onboarding-checklist.controller.spec.ts` | Lazy row creation on first read; skip/unskip changes the denominator; hide/show/dismiss transitions; `private, no-store`; the starter-task handler creates exactly one Task and no Mission, assigns it, and keeps the Task when assignment fails; the 10 000-character rejection; the starter-schedule handler arms each of the three options (FR-34…FR-50) |
 | `apps/api/src/onboarding/onboarding-checklist.service.spec.ts` | Each milestone flips only on its documented fact; a rejected read yields `unknown` and never `done`; the 60 s cache is honoured and bypassed after an action; an already-set-up account evaluates to complete without creating anything (FR-36, FR-37, FR-38, FR-44, FR-59) |
 | `apps/api/src/onboarding/dto/onboarding-telemetry.dto.spec.ts` **(new — mirrors the existing `onboarding-state.dto.spec.ts`)** | The nine new events are accepted and an unlisted one is rejected |
 
@@ -953,7 +984,7 @@ activity and must not appear in an audit trail.
 | `apps/web/e2e/onboarding-roster-idempotent.spec.ts` | Provision twice; exactly one set of agents; the second run reports **Reused** throughout |
 | `apps/web/e2e/onboarding-roster-partial.spec.ts` | A partial run renders the plans link and **Finish setting up** attempts only the missing lanes |
 | `apps/web/e2e/onboarding-first-hour-checklist.spec.ts` | The card renders on Home with the right count; skip/undo; hide and reopen from Help; the `/get-started` page renders every section |
-| `apps/web/e2e/onboarding-first-mission.spec.ts` | Picking a brief creates a Mission and a Task and links to the Mission |
+| `apps/web/e2e/onboarding-first-task.spec.ts` | Picking a brief creates exactly one Task, assigns it to the lane agent, and links to it |
 
 Existing onboarding e2e specs
 (`apps/web/e2e/flow-onboarding-wizard.spec.ts`,
@@ -975,7 +1006,7 @@ dispatcher and task, the roster controller, the wizard step, the progress panel
 and the introduction.
 
 **Ships:** a new user finishes setup with a wired roster instead of nothing.
-**Does not ship:** any checklist, any Home surface, any starter mission.
+**Does not ship:** any checklist, any Home surface, any starter task.
 **Green because:** the wizard step is skippable, the column is nullable, the
 dispatcher is additive, and every existing onboarding e2e spec still passes.
 

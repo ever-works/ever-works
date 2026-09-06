@@ -1,12 +1,16 @@
-# AW-02 — Mission board · Implementation plan
+# AW-02 — Task board · Implementation plan
 
-> Translates [`spec.md`](./spec.md) into architecture, schema, endpoints and
+> Translates [`spec.md`](./spec.md) into architecture, endpoints, components and
 > phasing. The plan owns implementation detail; the spec owns behaviour.
 
-**Feature ID**: `aw-02-mission-board`
+**Feature ID**: `aw-02-task-board`
 **Spec**: [`./spec.md`](./spec.md) · **Tasks**: [`./tasks.md`](./tasks.md)
 **Status**: `Draft`
 **Last updated**: 2026-09-06
+
+> **This plan ships no entity change, no new table, no new column and therefore no
+> migration.** Every signal the board needs is already stored. Where that constrains
+> a design, §3 says so and says what the constraint costs.
 
 ---
 
@@ -14,443 +18,422 @@
 
 Every path below was opened before being cited.
 
-### 1.1 Missions — domain
+### 1.1 The board that already exists
 
-| Concern | File | What is there today |
-| --- | --- | --- |
-| Entity | [`packages/agent/src/entities/mission.entity.ts`](../../../../../packages/agent/src/entities/mission.entity.ts) | `@Entity('missions')`. `MissionStatus` (`active`/`paused`/`completed`/`failed`), `MissionType` (`one-shot`/`scheduled`), `MissionOutcome`, `completedAt`, `schedule` (cron), `autoBuildWorks`, `outstandingIdeasCap`, `guardrailsOverride`, `missionTemplateRepo`, `missionRepo`, `sourceMissionId`, Tier-A `tenantId`/`organizationId`, `createdAt`/`updatedAt`. Index `idx_missions_user_status (userId, status)`. **No priority, no labels, no archive/trash marker, no progress timestamp, no origin, no comment thread.** |
-| Service | [`packages/agent/src/missions/missions.service.ts`](../../../../../packages/agent/src/missions/missions.service.ts) | `listForUser` (899-line service; list is `find({ where, order: { updatedAt: 'DESC' }, take, skip })`), `getForUser`, `create`, `update`, `pause`, `resume`, `complete`, `delete`, `runNow`, attachments, Work relations, and a private `recordActivity()` that writes through the activity log. Ownership comes from `ownershipWhere` / `OwnershipScope`. |
-| DTO + mapper | [`packages/agent/src/missions/types.ts`](../../../../../packages/agent/src/missions/types.ts) | `MissionDto` + `toMissionDto()` — the single place a new Mission field must be added to reach the wire. |
-| Barrel | [`packages/agent/src/missions/index.ts`](../../../../../packages/agent/src/missions/index.ts) | Re-exports service, module, types, tick service, clone service, template config. |
-| Module | [`packages/agent/src/missions/missions.module.ts`](../../../../../packages/agent/src/missions/missions.module.ts) | DI graph for the above. |
-| Tick worker | [`packages/agent/src/missions/mission-tick.service.ts`](../../../../../packages/agent/src/missions/mission-tick.service.ts) | `tickDue()` — loads `ACTIVE` + `SCHEDULED` Missions (cap 500/tick), JS cron-match via [`cron-matcher.ts`](../../../../../packages/agent/src/missions/cron-matcher.ts), generates up to 5 Ideas per tick against the outstanding cap. Also backs `POST /run-now`. |
-| Ownership helper | [`packages/agent/src/database/ownership-scope.ts`](../../../../../packages/agent/src/database/ownership-scope.ts) | `OwnershipScope`, `ownershipWhere<T>()` — the canonical user + Organization filter. |
+[`apps/web/src/components/tasks/TasksKanbanView.tsx`](../../../../../apps/web/src/components/tasks/TasksKanbanView.tsx)
+— 712 lines. This is the feature. What is in it:
 
-### 1.2 Missions — API
+| Concern | What is there |
+| --- | --- |
+| Columns | A `COLUMNS: ColumnDef[]` table with one entry per `TaskStatus` — `backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled` — each with an icon, a dot class, a header class, a count class, a card-border class. **`label` is a hardcoded English string** on every entry |
+| Transition affordance | `NEXT_STATUS: Record<TaskStatus, TaskStatus[]>`, a client-side mirror of the server lattice, used for both the `Move →` menu and drop-target refusal. Its own comment says the server stays authoritative |
+| Drag and drop | Native HTML5 DnD — `draggable`, `onDragStart` (`text/x-task-id`), `onDragOver` (refuses when `NEXT_STATUS` disallows), `onDragLeave` with a bounding-rect check, `onDrop`. Optimistic move with rollback and a per-card error line |
+| Post-drop dispatch | A drop into `in_progress` calls `listTaskRunCandidatesAction` and, when the Task has neither a `task_assignees` row nor its own `agentId`, opens the agent picker rather than moving silently |
+| Per-card run | `RunWithAgentMenu` plus an `r` key handler that ignores modifiers, key repeat, text inputs and the open diff sheet |
+| Per-column batch | `Run all`, capped at `RUN_ALL_MAX = 20` to mirror the API's `RUN_BATCH_MAX_TASKS`, offered only on `todo` / `backlog` / `in_progress`, reporting `n/m started` |
+| Card chips | `TaskBranchChip`, `TaskPrPill` (with the CI dot), `TaskRunChip`, `GateChip`, and a `± N files` button opening `TaskDiffSheet` |
+| Polling | `useTaskRunPolling` merging **only** run and PR fields by id, explicitly never status or title, so a poll cannot clobber an in-flight optimistic drag |
+| Paging | `MAX_VISIBLE = 15` per column with a `Show N more` button — a client-side slice of an already-fetched array |
+| Priority | `PRIORITY_TONES: Record<TaskPriority, string>` for all five of `p0`–`p4`. Rendered. Never sorted by |
 
-[`apps/api/src/missions/missions.controller.ts`](../../../../../apps/api/src/missions/missions.controller.ts)
-(`@Controller('api/me/missions')`, `@ApiTags('missions')`) already exposes list,
-create, get, patch, delete, `pause`, `resume`, `complete`, `clone`, `run-now`,
-`budget`, `works`, `attachments`, `goals`. Writes are `@Throttle` 30/min, clone
-and run-now 10/min. Ownership is `@CurrentUser()` plus an optional
-[`ScopeContextService`](../../../../../apps/api/src/scope/index.ts).
-Request DTOs and their `class-validator` rules live in
-[`apps/api/src/missions/dto/mission.dto.ts`](../../../../../apps/api/src/missions/dto/mission.dto.ts)
-(`title` ≤ 200, `description` 1–10,000, cron ≤ 64).
+**The interaction model is done and this plan does not touch it.** What is missing is
+a read model behind it and a card that says where its work came from.
 
-### 1.3 Missions — web
+### 1.2 How the board is reached, and what it is given
 
 | File | Today |
 | --- | --- |
-| [`apps/web/src/app/[locale]/(dashboard)/missions/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/missions/page.tsx>) | RSC. `PAGE_SIZE = 24`, `status`/`search`/`offset` search-params, calls `missionsAPI.list`, hands a load error to the client rather than faking an empty list. |
-| [`apps/web/src/components/missions/MissionsList.tsx`](../../../../../apps/web/src/components/missions/MissionsList.tsx) | Client. `PageHeader` + `PromptComposer` quick-add + status `Select` + a grid of `MissionCard`. |
-| [`apps/web/src/components/missions/MissionCard.tsx`](../../../../../apps/web/src/components/missions/MissionCard.tsx) | The existing catalog card. |
-| [`apps/web/src/components/missions/MissionDetailClient.tsx`](../../../../../apps/web/src/components/missions/MissionDetailClient.tsx) | The many-section detail view the comment thread hangs off. |
-| [`apps/web/src/components/missions/index.ts`](../../../../../apps/web/src/components/missions/index.ts) | Barrel for the above. |
-| [`apps/web/src/lib/api/missions.ts`](../../../../../apps/web/src/lib/api/missions.ts) | `missionsAPI` — server-only typed client over the endpoints in §1.2. |
-| [`apps/web/src/app/actions/dashboard/missions.ts`](../../../../../apps/web/src/app/actions/dashboard/missions.ts) | Server actions: `listMissionsAction`, `createMissionAction`, `updateMissionAction`, `deleteMissionAction`, `pauseMissionAction`, `resumeMissionAction`, `completeMissionAction`, `runMissionNowAction`, `cloneMissionAction`, attachment actions. |
-| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) | `ROUTES.DASHBOARD_MISSIONS = '/missions'` (line 125), `DASHBOARD_MISSIONS_NEW` (126). |
-| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) | Hardcoded nav array; "Missions" already points at `ROUTES.DASHBOARD_MISSIONS`. **No sidebar change is needed** — the board is a tab on the route the sidebar already links to. |
+| [`apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx>) | RSC. Reads `status` / `priority` / `search` / `label` / `offset` search params, builds **one** query with `limit: 50` and `includeRun: true`, calls `tasksAPI.list`, renders `PageHeader` + `TasksTabsNav` + a filter `<form>` + `<TasksList tasks={result.data} />` + offset pagination. Its own doc comment ("Kanban + per-target tabs land in Phase 14") is stale |
+| [`apps/web/src/components/tasks/TasksList.tsx`](../../../../../apps/web/src/components/tasks/TasksList.tsx) | Client, 328 lines. `VIEW_TABS = [cards, table, kanban]` with **hardcoded labels**, `useState<ViewKey>('cards')` — not in the URL, not persisted, not defaulting to the board — plus a `STATUS_FILTERS` strip with **hardcoded labels**, and its own `STATUS_TONES` / `PRIORITY_TONES` / `STATUS_DOT` maps. Renders `<TasksKanbanView tasks={filtered} />` when the view is `kanban` |
+| [`apps/web/src/components/tasks/TasksScopedSection.tsx`](../../../../../apps/web/src/components/tasks/TasksScopedSection.tsx) | The reusable scoped list every parent entity mounts — `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks`. It wraps the same `TasksList`, so **the board is already live on all of them** |
+| [`apps/web/src/components/tasks/TasksTabsNav.tsx`](../../../../../apps/web/src/components/tasks/TasksTabsNav.tsx) | Server component, two tabs (`Tasks` / `Triggers`), i18n via `dashboard.taskTriggers.tabs`. Its comment says adding a tab is a one-line change |
+| [`apps/web/src/lib/api/tasks.ts`](../../../../../apps/web/src/lib/api/tasks.ts) | `tasksAPI` — the server-only typed client. `Task`, `TaskStatus`, `TaskPriority` types |
+| [`apps/web/src/app/actions/tasks.ts`](../../../../../apps/web/src/app/actions/tasks.ts) | `transitionTaskAction`, `runTasksBatchAction`, `listTaskRunCandidatesAction`, and the rest |
+| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) | `DASHBOARD_TASKS: '/tasks'` (214), `DASHBOARD_TASK_NEW` (215), `DASHBOARD_TASK_TRIGGERS` (216), `DASHBOARD_TASK_TRIGGER(id)` (217), `DASHBOARD_TASK(id)` (218), `DASHBOARD_TASK_TEMPLATES` (220). **No new route constant is needed** — the board is a view on `/tasks` |
+| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) | Hardcoded nav array; "Tasks" already points at `ROUTES.DASHBOARD_TASKS`. **No sidebar change is needed** |
 
-### 1.4 The board pattern that already exists
+**The consequence of one 50-row fetch.** `page.tsx` asks for `limit: 50` with no
+status filter; `TasksList` slices client-side; `TasksKanbanView` groups the array by
+status and renders `{tasks.length}` as each column's header count. Every column count
+on the board today is a count of one page, and nothing on screen says so. This is
+spec §2.3 gap 1, and it is the whole reason P1 exists.
 
-[`apps/web/src/components/tasks/TasksKanbanView.tsx`](../../../../../apps/web/src/components/tasks/TasksKanbanView.tsx)
-is a working 712-line drag-and-drop board over `TaskStatus`, using native HTML5
-DnD (`draggable` / `onDragStart` / `onDragOver` / `onDrop`), a `ColumnDef[]`
-table, a `MAX_VISIBLE = 15` per-column cap, and a `RUN_ALL_MAX = 20` batch cap.
-It is the reference implementation for lane rendering, card chips and drop
-handling. Two sibling boards exist —
-[`WorksKanbanView.tsx`](../../../../../apps/web/src/components/works/WorksKanbanView.tsx)
-and
-[`ActivityKanbanView.tsx`](../../../../../apps/web/src/components/activity-log/ActivityKanbanView.tsx)
-— and there is **no shared board primitive** in `apps/web/src/components/ui/`.
-This plan does not extract one (that is a refactor with its own blast radius); it
-adds a fourth, and records the extraction as a follow-up in §13.
+### 1.3 Task — the entity, and what it already carries
 
-### 1.5 The signals the lanes derive from
+[`packages/agent/src/entities/task.entity.ts`](../../../../../packages/agent/src/entities/task.entity.ts).
+The board needs nothing added to it. What is already there and what the board reads:
 
-| Lane input | Where it lives | Note |
+| Need | Column already present |
+| --- | --- |
+| Column | `status` (`TaskStatus`, 7 values), `previousStatus` |
+| Ordering | `priority` (`TaskPriority`, **five** values `p0`–`p4`), `updatedAt`, `createdAt` |
+| Card identity | `slug` (per-user `T-n` via `UserTaskCounter`), `title`, `description`, `labels` |
+| Provenance — owners | `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` — all nullable, all independent, all separately indexed with `(ownerId, status)`, **no `@ManyToOne` by design** (entity import-cycle avoidance) |
+| Provenance — creator | `createdByType` (`'user'` or `'agent'`), `createdById` |
+| Provenance — delegation | `delegationDepth` (server-written; null reads as 0) |
+| Provenance — recurrence | `parentRecurringTaskId` (instance → its template) |
+| Provenance — scheduling | `scheduledAt`, `scheduleClaimedAt` |
+| Sub-tasks | `parentTaskId`, indexed by `idx_tasks_parent` |
+| Recurring template | `isRecurring`, `recurrenceRule` xor `recurrenceCron`, `recurrenceTimezone`, `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`, `recurrenceOccurredCount`; indexed by `idx_tasks_recurrence_due (isRecurring, nextOccurrenceAt)` |
+| Stall signal | `latestRunStatus` (`queued` / `running` / `completed` / `failed` / `cancelled`), `latestRunId`, `startedAt`, `updatedAt` |
+| Hidden work | `hiddenFromBoard` (server-written by a Trigger with `showOnBoard: false`) |
+| Existing chips | `branchRef`, `branchState`, `prNumber`, `prUrl`, `prState`, `ciState`, `prChecks`, `conflictPaths`, `linkedPullRequests` |
+| Scope | `userId`, `tenantId`, `organizationId` |
+
+> The established pattern in this domain, stated in the capability map §7.3, is that
+> **new Task metadata becomes a new `task_*` side table, not a new column**. This
+> epic needs neither.
+
+### 1.4 The Task API — what the board can already ask for
+
+[`apps/api/src/tasks/tasks.controller.ts`](../../../../../apps/api/src/tasks/tasks.controller.ts)
+(`@Controller('api/tasks')`), 37 routes. Relevant today:
+
+- `GET /api/tasks` — `status` (comma list), `priority` (comma list), `missionId`,
+  `ideaId`, `workId`, `teamId`, `agentId`, `goalId`, `parentTaskId`, `label`,
+  `search`, `limit` (max 200), `offset`, `includeRun`, `includeHidden`. Returns
+  `{ data, meta: { total, limit, offset } }`.
+- `POST /api/tasks/:id/transition` — the gated state machine the board already drags
+  through.
+- `POST /api/tasks/:id/run`, `GET /api/tasks/:id/run-candidates`,
+  `POST /api/tasks/run-batch` (capped, 20/min) — the board's run path.
+- `GET /api/tasks/:id/subtasks` — the checklist projection the roll-up will link to.
+- `GET /api/tasks/:id/escalations`, `POST /api/tasks/:id/escalations/:eid/resolve`.
+- `GET /api/tasks/:id/chat`, `POST /api/tasks/:id/chat` (60/min) and
+  [`task-chat.controller.ts`](../../../../../apps/api/src/tasks/task-chat.controller.ts)'s
+  `PATCH /:id` for the 5-minute edit.
+
+[`packages/agent/src/database/repositories/task.repository.ts`](../../../../../packages/agent/src/database/repositories/task.repository.ts)
+`list()` builds the query, counts with `getCount()`, then:
+
+```
+qb.orderBy('task.updatedAt', 'DESC').take(limit).skip(offset);
+```
+
+**That single `orderBy` is spec §2.3 gap 2.** There is no ordering option on
+`ListTasksFilter`, so nothing in the product can ask for priority order.
+`ListTasksFilter` (same file, line 12) has no `parentTaskId: null` form, no
+`isRecurring` predicate, and no ordering field — the three additive filter gaps P1
+and P2 close.
+
+### 1.5 The signals the card flags derive from
+
+| Flag | Source | Note |
 | --- | --- | --- |
-| Live Run | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts) | Has `taskId` + `workId`, **no `missionId`** — a Mission's Runs are reached through its Tasks |
-| Task → Mission | [`packages/agent/src/entities/task.entity.ts`](../../../../../packages/agent/src/entities/task.entity.ts) | `missionId` (nullable, no `@ManyToOne` by design), plus the denormalised `latestRunId` / `latestRunStatus` used by the Task board's run chips |
-| Open escalation | [`packages/agent/src/entities/agent-escalation.entity.ts`](../../../../../packages/agent/src/entities/agent-escalation.entity.ts) | `status`, `taskId`, `runId`, `userId`; indexes `idx_agent_escalation_task_status` and `idx_agent_escalation_user_status` |
-| Pending approval | [`packages/agent/src/entities/agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts) | `status` (`pending` default), `runId`, `agentId`, `userId`; index `idx_agent_action_proposals_user_status` |
-| Read surfaces for both | [`apps/api/src/escalations/escalations.controller.ts`](../../../../../apps/api/src/escalations/escalations.controller.ts), [`apps/api/src/agent-approvals/agent-approvals.controller.ts`](../../../../../apps/api/src/agent-approvals/agent-approvals.controller.ts) | The board links out to these; it does not re-implement them |
+| Decision — escalation | [`packages/agent/src/entities/agent-escalation.entity.ts`](../../../../../packages/agent/src/entities/agent-escalation.entity.ts) | `status`, `taskId`, `runId`, `userId`; index `idx_agent_escalation_task_status` — a grouped count by `taskId` is an index-only scan |
+| Decision — approval | [`packages/agent/src/entities/agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts) | `status` (`pending` default), `runId`, `agentId`, `userId`; reached from a Task through its runs |
+| Stalled | `Task.status`, `Task.latestRunStatus`, `Task.updatedAt` | All three are on the row already. No join, no new column |
+| Comment count | [`packages/agent/src/entities/task-chat-message.entity.ts`](../../../../../packages/agent/src/entities/task-chat-message.entity.ts) | `idx_task_chat_task_created (taskId, createdAt)` — a grouped count by `taskId` rides the leading column |
+| Sub-task roll-up | `Task.parentTaskId` | `idx_tasks_parent` — one grouped `(parentTaskId, status)` count |
+| Trigger provenance | [`packages/agent/src/entities/inbound-trigger.entity.ts`](../../../../../packages/agent/src/entities/inbound-trigger.entity.ts) and its fire row | The fire row records the `taskId` it produced. A reverse lookup by `taskId IN (…)` attributes the chip **without a `triggerId` column on Task** |
 
-### 1.6 The steering seam that already exists
+### 1.6 The comment and steering seam — already solved at Task scope
 
-- [`packages/agent/src/tasks-domain/task-dispatcher.ts`](../../../../../packages/agent/src/tasks-domain/task-dispatcher.ts)
-  declares the DI tokens `AGENT_TASK_EXECUTE_DISPATCHER` and
-  `AGENT_CHAT_REPLY_DISPATCHER` — the only sanctioned way to start background
-  work from the agent package (Constitution IV).
-- [`packages/agent/src/tasks-domain/run-steering-port.ts`](../../../../../packages/agent/src/tasks-domain/run-steering-port.ts)
-  declares `RUN_STEERING_PORT` with `steer({ runId, userId, message })` returning
-  `{ dispatched: 'injected' | 'new-run', runId, queuedCount? }`. Bound to
-  [`packages/agent/src/agents/run-steering.service.ts`](../../../../../packages/agent/src/agents/run-steering.service.ts).
-  **Mid-flight steering is already solved at Task scope** — this epic reuses it at
-  Mission scope rather than inventing a second mechanism.
 - [`packages/agent/src/tasks-domain/task-chat.service.ts`](../../../../../packages/agent/src/tasks-domain/task-chat.service.ts)
-  is the model to copy: `MAX_CHAT_BYTES = 16 * 1024`, `EDIT_WINDOW_MS = 5 * 60_000`,
-  `MENTION_RE`, `KB_LINK_RE`, dedupe key `${task.id}:${mention.id}:${row.id}`,
-  and an optional
-  [`RunDispatchGateService`](../../../../../packages/agent/src/agents/run-dispatch-gate.service.ts)
-  admission check before dispatch.
-- HTTP surface for the Task equivalent:
-  [`apps/api/src/tasks/task-chat.controller.ts`](../../../../../apps/api/src/tasks/task-chat.controller.ts).
+  — `MAX_CHAT_BYTES = 16 * 1024`, a 5-minute edit window, `@mention` and `[[kb]]`
+  parsing with unknown tokens stripped, and a fan-out to `agent-chat-reply`.
+- [`packages/agent/src/tasks-domain/run-steering-port.ts`](../../../../../packages/agent/src/tasks-domain/run-steering-port.ts)
+  — `RUN_STEERING_PORT`, `steer({ runId, userId, message }) → { dispatched:
+  'injected' | 'new-run', runId, queuedCount? }`. When a chat message mentions an
+  Agent that already has a live run, the message is **injected into that run's
+  pending-input queue** rather than starting a second one. Bound by the API-side
+  `@Global()` agents module; unbound in unit tests, where the service falls back to
+  dispatching a new run.
+
+**Everything the spec's §4.8 asks for is this seam, already built.** The board opens
+the existing thread and posts through the existing endpoint. No new service.
 
 ### 1.7 Cross-cutting infrastructure
 
 | Concern | File | Note |
 | --- | --- | --- |
-| Migrations | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) (175 files) | **Not** `packages/agent/src/migrations/` — that directory does not exist. [`apps/api/typeorm.config.ts`](../../../../../apps/api/typeorm.config.ts) globs `src/migrations/**/*{.js,.ts}` and the API self-applies on boot. The Constitution's §V text says `apps/api/src/database/migrations/`; the code says `apps/api/src/migrations/`. Follow the code and raise the doc drift separately (§13). |
-| Entity barrel | [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts) | Every new entity must be exported here or TypeORM will not see it. |
-| Activity log | [`packages/agent/src/activity-log/activity-log.service.ts`](../../../../../packages/agent/src/activity-log/activity-log.service.ts) + [`activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts) | `ActivityActionType` already has `MISSION_CREATED/PAUSED/RESUMED/COMPLETED/FAILED/DELETED/TICK_CAPPED` and `MISSION_TICK`. `actionType` is a free `varchar(50)`, so appending members needs **no** migration. |
-| Notifications | [`packages/agent/src/entities/notification.types.ts`](../../../../../packages/agent/src/entities/notification.types.ts) + [`notification.service.ts`](../../../../../packages/agent/src/notifications/notification.service.ts) | `NotificationCategory` has no `MISSION` member; `category` is `varchar(100)`, so adding one needs no migration. `deduplicationKey` is uniquely indexed per user — the staleness "once per streak" rule rides on it. |
-| Job runtime | [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/) (44 tasks) + [`index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts) | Shape to copy: [`mission-tick.task.ts`](../../../../../packages/tasks/src/tasks/trigger/mission-tick.task.ts) — `schedules.task({ id, cron, run })` spinning a `NestApplicationContext(TriggerInternalModule)`. |
-| Preferences | [`packages/agent/src/entities/work-agent-preference.entity.ts`](../../../../../packages/agent/src/entities/work-agent-preference.entity.ts) | Already holds `missionDefaultOutstandingCap` — the natural home for the staleness threshold. |
-| Triggers | [`packages/agent/src/entities/inbound-trigger.entity.ts`](../../../../../packages/agent/src/entities/inbound-trigger.entity.ts) + [`apps/api/src/triggers/inbound-triggers.controller.ts`](../../../../../apps/api/src/triggers/inbound-triggers.controller.ts) | `mode: single-task | template` (immutable). P3 adds a `targetKind` alongside it. |
-| i18n | [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) | `dashboard.missionsPage` and `dashboard.missionDetail` already exist; 20 sibling locales must be kept structurally identical. |
+| Migrations | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) | Timestamp-prefixed, forward-only, self-applied by the API on boot. **Not** `packages/agent/src/migrations/`, which does not exist. **This epic adds none** |
+| Entity barrel | [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts) | Untouched — no entity is added |
+| Activity log | [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts) | `TASK_CREATED/UPDATED/DELETED/ASSIGNED/TRANSITIONED/COMMENTED/COMPLETED/RECURRENCE_FIRED/MERGED` already exist. `actionType` is a free `varchar(50)`, so appending a member needs no migration |
+| Notifications | [`packages/agent/src/entities/notification.types.ts`](../../../../../packages/agent/src/entities/notification.types.ts) + [`task-notification.service.ts`](../../../../../packages/agent/src/tasks-domain/task-notification.service.ts) | `NotificationCategory.TASK` **already exists**. The kind→severity map already holds `task_assigned`, `task_mentioned`, `task_status_changed`, `task_blocked`, `task_due_soon`, `task_recurrence_fired`, `task_run_no_agent`. Adding `task_stalled` is one map entry. `deduplicationKey` is uniquely indexed per user — the "once per stalled streak" rule rides on it |
+| Job runtime | [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/) | Shape to copy: the existing `task-recurrence-dispatcher` and `task-pr-status-sync` tasks — `schedules.task({ id, cron, run })` spinning a transient `TriggerInternalModule` Nest context |
+| Schedules read model | [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts) + [`cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts) | `sourceType: 'recurring_task'` already exists, and `describeCron` / `describeRrule` already render a cadence in plain language. **The recurring strip reads this, it does not re-derive cadence text** |
+| i18n | [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) | `dashboard.tasksPage.status.*` already holds all seven column names; `dashboard.tasksPage.priority.*` already holds all five priority labels; both are already translated across the platform's locales. Leaf keys are camelCase and must never contain a literal `.`; a missing **parent** key collapses a whole subtree |
+| Ownership | [`packages/agent/src/database/ownership-scope.ts`](../../../../../packages/agent/src/database/ownership-scope.ts) | `OwnershipScope`, `ownershipWhere`, `ownershipSqlPredicate` — the canonical user + Organization filter every board query uses |
 
 ---
 
 ## 2. Architecture and the seam
 
-### 2.1 One read, four lanes, no stored lane
+### 2.1 One board read, N column reads, no derived state
 
 ```
-   Browser (Board tab)
-        │  server action  getMissionBoardAction(filters)
+   Browser  /tasks?view=board&layout=status&label=pricing
+        │
+        │  RSC first paint: column frames + counters skeleton
         ▼
-   apps/web/src/lib/api/missions.ts   missionsAPI.board(filters)
-        │  GET /api/me/missions/board          (X-Scope-Slug attached)
+   apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx
+        │  tasksAPI.board(filters)
         ▼
-   apps/api/src/missions/missions.controller.ts   @Get('board')
+   GET /api/tasks/board?…                     (X-Scope-Slug attached)
         │
         ▼
-   packages/agent/src/missions/mission-board.service.ts
+   apps/api/src/tasks/tasks.controller.ts   @Get('board')
         │
-        ├─► 1. missions  WHERE ownershipWhere(userId, scope)
-        │                AND deletedAt IS NULL AND archivedAt IS NULL
-        │                (+ text / priority / label / origin filters)
+        ▼
+   packages/agent/src/tasks-domain/task-board.service.ts
         │
-        ├─► 2. decision counts, ONE grouped query per source, restricted to
-        │      the mission ids from (1):
-        │        agent_escalations  e JOIN tasks t ON t.id = e.taskId
-        │          WHERE e.status='open'  GROUP BY t.missionId
-        │        agent_action_proposals p JOIN agent_runs r ON r.id = p.runId
-        │          JOIN tasks t ON t.id = r.taskId
-        │          WHERE p.status='pending' GROUP BY t.missionId
+        ├── Q1  per-status COUNT(*) GROUP BY status        → the 7 true totals
+        ├── Q2  per-status top-N rows, priority-ordered     → the cards
+        ├── Q3  recurring templates due next                → the strip
+        └── enrich(cards)  ── one batched read each, all independently guarded:
+              ├── E1 open escalations   GROUP BY taskId
+              ├── E2 pending approvals  via runs, GROUP BY taskId
+              ├── E3 chat messages      GROUP BY taskId
+              ├── E4 sub-tasks          GROUP BY parentTaskId, status
+              ├── E5 trigger fires      taskId IN (…) → triggerId, name
+              └── E6 owner names        one IN-query per distinct owner kind
         │
-        ├─► 3. live-run counts, ONE grouped query:
-        │        tasks WHERE missionId IN (…) AND latestRunStatus IN
-        │          ('queued','running') GROUP BY missionId
-        │
-        └─► 4. deriveLane(mission, decisions, liveRuns, now)   ← PURE FUNCTION
-                    in packages/agent/src/missions/mission-lane.ts
-                    ↓
-              { lanes: { backlog[], inFlight[], needsYou[], done[] },
-                counts, needYouCount, doneTodayCount, filtersEcho }
+        ▼
+   { columns: [{ status, total, cards[] }], recurring[], counters, window }
 ```
 
-Four queries total, all bounded, none per-card. `deriveLane` is a pure function
-of `(missionRow, openDecisionCount, liveRunCount, now, staleAfterDays)` so it is
-unit-testable without a database and cannot disagree between two readers.
+Three properties this shape buys:
 
-### 2.2 Why the lane is derived and not a column
+1. **A column count is never a page count.** Q1 answers the header; Q2 answers the
+   cards; they share one predicate builder so they cannot disagree.
+2. **Columns page independently.** `GET /api/tasks/board/column?status=todo&offset=50`
+   returns only that column, so **Show 50 more** never re-reads or re-orders another.
+3. **Every enrichment is optional.** E1–E6 each run in their own `try/catch` and each
+   failure degrades exactly one chip family. This is the same per-source fault
+   isolation the existing schedules aggregator uses, and it satisfies spec FR-13.
 
-A stored lane would need a writer on every one of: run dispatch, run completion,
-escalation open, escalation resolve, approval create, approval decide, task
-transition, mission pause/resume/complete, tick. Nine writers, nine chances to
-drift, and a repair job. Deriving costs three extra grouped queries on indexed
-columns and can never be wrong. The only denormalised fields this epic adds are
-the two that genuinely have no cheap query —
-`lastProgressAt` / `lastProgressSummary` (§3.1) — and those are additive hints,
-not authority: if a writer misses one, the card shows a staler line, never a
-wrong lane.
+The enrichment reads are **batched over the page of cards**, never per card: at most
+`7 × 50 = 350` ids in one `IN (…)` per source, six sources, six queries. Not 350 × 6.
 
-### 2.3 Steering seam (P2)
+### 2.2 Why the column is status and nothing else
+
+A column that is derived — from decisions, from run state, from freshness — can
+disagree with the Task's own status, and the first time a user sees a card in
+"Needs you" whose detail page says `in_progress`, the board stops being believable.
+So:
+
+- **Status layout** — column ↔ status, 1:1, all seven. This is today's board.
+- **Focus layout** — column ↔ a named group of statuses, declared in one table, four
+  groups plus the toggled `Cancelled`. Still nothing but status.
+- **Decisions and stalls are card flags and header counters**, never columns. They
+  can occur in any column, which is precisely why they cannot be one.
+
+A shared `packages/agent/src/tasks-domain/task-board-columns.ts` owns both layouts as
+pure data, so client and server compute the same mapping from the same table.
+
+### 2.3 Drop resolution in the Focus layout
+
+The existing board's `NEXT_STATUS` mirror handles the seven-column case: a column *is*
+a status, so a drop is unambiguous. A grouped column needs a resolution rule:
 
 ```
-   POST /api/me/missions/:id/comments   { body }
-        ▼
-   MissionCommentService.post()
-        ├─ persist mission_comments row (+ parsed mentions)
-        ├─ bump missions.commentCount, missions.lastProgressAt/Summary
-        └─ for each @agent mention:
-              resolve the newest NON-TERMINAL AgentRun among the Mission's Tasks
-                 ├─ found  ─► RUN_STEERING_PORT.steer({runId, userId, message})
-                 │              └─ 'injected'  → outcome = delivered
-                 │              └─ 'new-run'   → fall through
-                 └─ none   ─► RunDispatchGateService.admit(…)
-                                 ├─ admitted → AGENT_CHAT_REPLY_DISPATCHER.enqueue
-                                 │               outcome = dispatched
-                                 └─ refused  → outcome = refused(reason)
+resolveDrop(from: TaskStatus, column: FocusColumn): Resolution
+  legal = column.statuses.filter(s => ALLOWED[from].includes(s))
+  legal.length === 0  → { kind: 'refuse', reason }
+  legal.length === 1  → { kind: 'apply',  to: legal[0] }
+  legal.length  >  1  → { kind: 'ask',    options: legal }
 ```
 
-`RUN_STEERING_PORT` and `AGENT_CHAT_REPLY_DISPATCHER` are both `@Optional()`
-injections in the Task path today; the Mission path mirrors that so unit tests
-and installs without the API layer degrade to "store the comment, mark it
-`not-addressed`" instead of throwing.
+Against the real lattice, `ask` arises in exactly one place — `in_progress` dropped
+on `Needs you`, where both `in_review` and `blocked` are legal — which is a genuine
+question, not an implementation wart. Everything else resolves or refuses. The
+function is pure and lives beside the column table, unit-tested against the full
+7 × 5 matrix.
 
-### 2.4 What this epic does **not** touch
+**The server is unchanged.** Every resolved drop calls the existing
+`POST /api/tasks/:id/transition`, which re-checks the lattice. The client rule is an
+affordance, exactly as `NEXT_STATUS` is today.
 
-- `MissionTickService` keeps its cron, its 500-per-tick cap and its 5-Ideas-per-
-  tick cap. The board reads its output; it does not change its behaviour.
-- `DELETE /api/me/missions/:id` keeps hard-deleting. Trash is a new verb.
-- `TasksKanbanView` and the Task board are untouched.
-- The sidebar, the shell and the Home page are untouched by P1. (AW-19 will
-  consume the board summary later; that is its epic, not this one.)
+### 2.4 The stall predicate
+
+```
+isStalled({ status, latestRunStatus, updatedAt, now, thresholdDays }):
+     status === 'in_progress'
+  && (latestRunStatus === null || TERMINAL.has(latestRunStatus))
+  && now - updatedAt > thresholdDays × 86_400_000
+```
+
+Pure, three fields, all on the row. Pushed into SQL for the column ordering (stalled
+first) and recomputed in the same function on the client for the flag, so the two
+cannot drift.
+
+**What this costs, stated plainly.** `updatedAt` moves when anything on the row
+changes, including a title edit or a PR-status cache refresh. So the predicate
+**under-reports**: a stalled Task that gets touched loses its flag until the
+threshold elapses again. It never over-reports — it cannot claim a Task is stalled
+when something is running or something changed. That asymmetry is the reason this is
+acceptable without a new column, and §13 records the alternative if it stops being.
+
+### 2.5 What this epic does **not** touch
+
+- `TasksKanbanView`'s drag handlers, optimistic move, rollback, `r` shortcut,
+  `RunWithAgentMenu`, `Run all`, diff sheet, or `useTaskRunPolling` merge rules.
+- The Cards and Table views in `TasksList`.
+- `POST /api/tasks/:id/transition`, `/run`, `/run-batch`, `/chat` — used as-is, not
+  modified.
+- Any Missions file, route, endpoint, entity or component.
+- `apps/web/src/app/[locale]/(dashboard)/tasks/{new,templates,triggers}/`.
+- The `Task` entity, the entity barrel, and `apps/api/src/migrations/`.
 
 ---
 
 ## 3. Data model
 
-### 3.1 P1 — new columns on `missions`
+**No entity, table or column is added by this epic.** This section records what was
+needed, where it comes from instead, and what each substitution costs.
 
-All additive, all nullable or defaulted, no column removed or renamed.
-Added to [`packages/agent/src/entities/mission.entity.ts`](../../../../../packages/agent/src/entities/mission.entity.ts)
-and mirrored into `MissionDto` + `toMissionDto()` in
-[`types.ts`](../../../../../packages/agent/src/missions/types.ts).
+### 3.1 Every board signal, and the stored state it comes from
 
-| Column | Type | Default | Purpose |
+| Board signal | Comes from | Cost of not storing it |
+| --- | --- | --- |
+| Column | `Task.status` | — |
+| Order | `Task.priority`, `Task.updatedAt` + the stall predicate | Needs an `orderBy` option on the list filter (§3.2) |
+| True column total | `COUNT(*) GROUP BY status` under the filter predicate | One extra grouped query per board read; index-only on `idx_tasks_user_status` |
+| Mission / Idea / Work / Team / Goal / Agent chip | The six owner columns + one name lookup per distinct kind | Six small `IN` queries; each is a PK read |
+| `Raised by {agent}` | `createdByType = 'agent'` + `createdById` | Shares the Agent name lookup |
+| `Delegated · depth n` | `delegationDepth` | — |
+| `⟳ {template}` on an instance | `parentRecurringTaskId` + a title lookup | One `IN` on `tasks` |
+| `Template` on a template | `isRecurring` | Needs an `isRecurring` predicate on the list filter (§3.2) |
+| `Scheduled {when}` | `scheduledAt` | — |
+| `Trigger · {name}` | Reverse lookup on the trigger fire log by `taskId` | One `IN` on the fire table. Cheaper than a `triggerId` column on `tasks`, which would need a migration, a backfill, and a writer on every fire path |
+| Sub-task roll-up | `COUNT(*) GROUP BY parentTaskId, status` | One grouped query on `idx_tasks_parent` |
+| Top-level only | `parentTaskId IS NULL` | Needs a "no parent" form on the list filter (§3.2) |
+| Decision count | Grouped counts over escalations and pending approvals | Two grouped queries, both index-backed |
+| Comment count | `COUNT(*) GROUP BY taskId` on the chat table | One grouped query on `idx_task_chat_task_created`. A denormalised counter would need a writer on post, edit and delete plus a repair job — for a chip |
+| Stalled | `status`, `latestRunStatus`, `updatedAt` | Under-reports after an unrelated edit (§2.4) |
+| Hidden | `hiddenFromBoard` | — |
+
+### 3.2 Additive filter options — types only, no schema
+
+Three additions to `ListTasksFilter` in
+[`packages/agent/src/database/repositories/task.repository.ts`](../../../../../packages/agent/src/database/repositories/task.repository.ts).
+All optional; omitting all three reproduces today's query byte for byte.
+
+| Field | Shape | Predicate | Default |
 | --- | --- | --- | --- |
-| `priority` | `varchar(4)` | `'p3'` | Same five-step scale as `Task.priority`. Reuses `TaskPriority` values verbatim — no new enum |
-| `labels` | `simple-json` | `NULL` | `string[]`, ≤ 8 entries, each `[a-z0-9][a-z0-9._-]{0,31}`. Mirrors `Task.labels` exactly |
-| `archivedAt` | `PortableDateColumn` nullable | `NULL` | Archive marker. Precedent: `Goal.archivedAt` |
-| `deletedAt` | `PortableDateColumn` nullable | `NULL` | Trash marker. Precedent: `GithubAppInstallation.deletedAt`. **Soft** — the hard delete stays `DELETE …/:id` |
-| `lastProgressAt` | `PortableDateColumn` nullable | `NULL` | Staleness anchor and In-flight recency clause |
-| `lastProgressSummary` | `varchar(280)` nullable | `NULL` | The live status line. Plain text, never markup |
-| `lastProgressKind` | `varchar(32)` nullable | `NULL` | `run_started` \| `run_completed` \| `run_failed` \| `tick` \| `task_transition` \| `decision_opened` \| `decision_resolved` \| `comment` — drives the card icon |
-| `commentCount` | `int` | `0` | Denormalised; the thread is the authority, this is the card's chip |
-| `createdByType` | `varchar(16)` | `'user'` | `user` \| `schedule` \| `agent` |
-| `createdById` | `uuid` nullable | `NULL` | User id, Trigger id, or Agent id, matching `createdByType`. `NULL` allowed for pre-existing rows |
+| `parentTaskId` | widen from `string` to `string \| 'none'` | `'none'` → `task.parentTaskId IS NULL`; a uuid keeps today's meaning | unchanged |
+| `isRecurring` | `boolean \| undefined` | `true` → `isRecurring = true`; `false` → `isRecurring = false`; `undefined` → no predicate, today's behaviour | `undefined` |
+| `orderBy` | `'updatedAt' \| 'priorityThenUpdated' \| 'stalledThenPriority'` | `'updatedAt'` is today's `ORDER BY task.updatedAt DESC` and stays the default for every existing caller | `'updatedAt'` |
 
-`MissionOriginType` and `MissionProgressKind` are declared as string-union types
-next to `MissionStatus` in the entity file — not TypeScript enums — so a new
-member never needs a migration, matching how `TaskActorType` is declared.
-
-**New indexes** (the board's hot path):
+`'stalledThenPriority'` compiles to:
 
 ```sql
-CREATE INDEX idx_missions_board_scan
-    ON missions (userId, deletedAt, archivedAt, status);
-CREATE INDEX idx_missions_progress
-    ON missions (userId, lastProgressAt);
+ORDER BY
+  CASE WHEN task.status = 'in_progress'
+        AND (task.latestRunStatus IS NULL
+             OR task.latestRunStatus IN ('completed','failed','cancelled'))
+        AND task.updatedAt < :stallCutoff
+       THEN 0 ELSE 1 END ASC,
+  task.priority ASC,          -- 'p0' < 'p1' < … < 'p4' lexicographically
+  task.updatedAt ASC
 ```
 
-`idx_missions_board_scan` covers the board's primary filter; `idx_missions_progress`
-covers the staleness sweep and the In-flight sort.
+`task.priority` is a `varchar(4)` holding `p0`–`p4`, so lexicographic order **is**
+priority order. No `CASE` mapping and no numeric column are needed; the comment on
+the ordering must say so, because it looks accidental and is not.
 
-### 3.2 P1 — new column on `work_agent_preferences`
+### 3.3 The stall threshold
 
-| Column | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `missionStaleAfterDays` | `int` nullable | `NULL` | `NULL` = inherit the platform default of `2`. Clamped 1–30 at the service layer, exactly like `missionDefaultOutstandingCap`'s clamp pattern |
+Read from the existing preference row —
+[`packages/agent/src/entities/work-agent-preference.entity.ts`](../../../../../packages/agent/src/entities/work-agent-preference.entity.ts),
+the same row that already holds `missionDefaultOutstandingCap`. P3 reads it; **if a
+dedicated column is wanted rather than a platform constant, that column is the one
+schema change in the whole epic and it ships as an additive forward-only migration in
+`apps/api/src/migrations/` in the same PR.** P1 and P2 use the constant and touch
+nothing.
 
-### 3.3 P2 — new table `mission_comments`
+Default `2` days, clamped `1..30` in a pure `clampStallAfterDays()` beside the
+predicate.
 
-New entity `packages/agent/src/entities/mission-comment.entity.ts`, exported from
-[`entities/index.ts`](../../../../../packages/agent/src/entities/index.ts).
-Deliberately isomorphic to
-[`task-chat-message.entity.ts`](../../../../../packages/agent/src/entities/task-chat-message.entity.ts).
+### 3.4 Enum-shaped additions that need no migration
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | `uuid` PK | |
-| `missionId` | `uuid` | `@ManyToOne(() => Mission, { onDelete: 'CASCADE' })` — Mission is already imported by nothing in the entities cycle path, so the relation is safe here (unlike Task's owner columns) |
-| `authorType` | `varchar(8)` | `'user'` \| `'agent'` — reuses `TaskActorType` |
-| `authorId` | `uuid` | |
-| `body` | `text` | ≤ 16 KB enforced at the service layer, matching `MAX_CHAT_BYTES` |
-| `mentions` | `simple-json` nullable | `{ type: 'user'\|'agent'\|'kb', id?, slug? }[]` — same shape as `TaskChatMention` |
-| `deliveryOutcome` | `varchar(16)` nullable | `not-addressed` \| `delivered` \| `dispatched` \| `refused` |
-| `deliveryDetail` | `varchar(200)` nullable | Refusal reason, safe free text. **Never** a payload value or a secret |
-| `deliveredRunId` | `uuid` nullable | The Run the message reached |
-| `editedAt` | `PortableDateColumn` nullable | 5-minute window |
-| `tenantId`, `organizationId` | `uuid` nullable | Tier C scope denormalisation, stamped from the parent Mission |
-| `createdAt`, `updatedAt` | | |
-
-```sql
-CREATE INDEX idx_mission_comment_mission_created
-    ON mission_comments (missionId, createdAt);
-CREATE INDEX idx_mission_comment_author
-    ON mission_comments (authorType, authorId);
-```
-
-### 3.4 P3 — new column on `inbound_triggers`
-
-| Column | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `targetKind` | `varchar(16)` | `'task'` | `task` \| `mission`. **Immutable after create**, like the existing `mode` and `sourceType` |
-
-When `targetKind = 'mission'`, the fire path creates a Mission (origin
-`schedule`, `createdById` = the Trigger id) instead of a Task, reusing
-`taskTitleTemplate` / `taskDescriptionTemplate` placeholder expansion verbatim.
-
-### 3.5 Migrations (Constitution V, forward-only)
-
-Authored from `apps/api/` with
-`pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>`,
-reviewed by hand, and landing in
-[`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/).
-
-| Phase | File | Contents |
-| --- | --- | --- |
-| P1 | `<ts>-AddMissionBoardColumns.ts` | 10 `ADD COLUMN` on `missions`, 1 on `work_agent_preferences`, 2 `CREATE INDEX`. No `DROP`, no `ALTER … TYPE`, no `NOT NULL` without a default |
-| P2 | `<ts>-CreateMissionComments.ts` | `CREATE TABLE mission_comments` + 2 indexes + FK to `missions` with `ON DELETE CASCADE` |
-| P3 | `<ts>-AddInboundTriggerTargetKind.ts` | 1 `ADD COLUMN` on `inbound_triggers` with default `'task'` |
-
-**Backfill.** None is required and none is written. `createdByType` defaults to
-`'user'`, which is factually correct for every row that can exist before P1
-(spec FR-34). `priority` defaults to `'p3'`. `lastProgressAt` stays `NULL`, which
-`deriveLane` reads as "no recorded progress" — never as "stale" — so no Mission
-is retroactively flagged.
-
-**Down migrations** drop only what the up migration added, in reverse order.
-
-### 3.6 Enum-shaped additions that need no migration
-
-- `ActivityActionType` gains `MISSION_ARCHIVED`, `MISSION_UNARCHIVED`,
-  `MISSION_TRASHED`, `MISSION_RESTORED`, `MISSION_PURGED`, `MISSION_STALE_FLAGGED`,
-  `MISSION_COMMENT_POSTED` in
-  [`activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts).
-  `actionType` is `varchar(50)`; the enum is a TypeScript-side constraint only.
-- `NotificationCategory` gains `MISSION = 'mission'` in
-  [`notification.types.ts`](../../../../../packages/agent/src/entities/notification.types.ts).
-  `category` is `varchar(100)`.
+- `NotificationCategory.TASK` — **already exists**.
+- The stall notification kind `task_stalled` — one entry in the existing kind map in
+  `task-notification.service.ts`; the column is a free `varchar`.
+- `ActivityActionType` — the board writes none of its own; every transition it
+  performs already writes `TASK_TRANSITIONED` through the existing service.
 
 ---
 
 ## 4. API surface
 
-All new routes hang off the existing
-[`apps/api/src/missions/missions.controller.ts`](../../../../../apps/api/src/missions/missions.controller.ts)
-(`api/me/missions`) except the comment thread, which gets its own controller in
-the same module — mirroring how
-[`task-chat.controller.ts`](../../../../../apps/api/src/tasks/task-chat.controller.ts)
-sits beside `tasks.controller.ts`.
-
-Every route: authenticated (`@CurrentUser()`), Organization-scoped via
-`ScopeContextService`, 404-no-leak on a foreign id, Swagger-decorated
-(`@ApiTags('missions')` + `@ApiOperation`) so the MCP whitelist derivation picks
-it up.
+`@Controller('api/tasks')` gains **two** read routes. Every existing route is
+unchanged.
 
 ### 4.1 P1
 
-| Method | Path | Throttle | Purpose |
+**`GET /api/tasks/board`** — the board read model.
+
+| Query | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/me/missions/board` | 120/min | The four-lane read model |
-| `POST` | `/api/me/missions/:id/archive` | 30/min | Set `archivedAt`; idempotent |
-| `POST` | `/api/me/missions/:id/unarchive` | 30/min | Clear `archivedAt`; idempotent |
-| `POST` | `/api/me/missions/:id/trash` | 30/min | Set `deletedAt`; also clears `archivedAt`; idempotent |
-| `POST` | `/api/me/missions/:id/restore` | 30/min | Clear `deletedAt` **and** `archivedAt`; idempotent |
+| `layout` | `status \| focus` | `status` | Which column table to group by |
+| `columnLimit` | int 1–100 | 50 | Cards per column |
+| `terminalWindowDays` | int 1–90 | 7 | Bounds `done` and `cancelled` (spec FR-10, S25) |
+| `priority`, `label`, `search` | as the list route | — | Same parsing helpers |
+| `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` | uuid | — | Same `ParseUUIDPipe({ optional: true })` |
+| `includeSubtasks` | `'true'` | off | Off → `parentTaskId: 'none'` |
+| `includeTemplates` | `'true'` | off | Off → `isRecurring: false` |
+| `includeHidden` | `'true'` | off | Same meaning as the list route |
+| `includeCancelled` | `'true'` | layout-dependent | `focus` only; `status` always includes it |
 
-`GET /api/me/missions/board` query DTO (`MissionBoardQueryDto`):
+Response:
 
-```ts
-class MissionBoardQueryDto {
-  @IsOptional() @IsString() @MaxLength(200)          search?: string;
-  @IsOptional() @IsIn(['p0','p1','p2','p3','p4'], { each: true })
-                @Transform(csvToArray)                priority?: TaskPriority[];
-  @IsOptional() @IsString({ each: true }) @ArrayMaxSize(8)
-                @Transform(csvToArray)                label?: string[];
-  @IsOptional() @IsIn(['user','schedule','agent'], { each: true })
-                @Transform(csvToArray)                origin?: MissionOriginType[];
-  @IsOptional() @IsInt() @Min(1) @Max(200)            laneLimit?: number;   // default 50
-  @IsOptional() @IsInt() @Min(1) @Max(90)             doneWindowDays?: number; // default 7
-  @IsOptional() @IsIn(['backlog','in_flight','needs_you','done'])
-                                                      lane?: MissionLane;  // fetch one lane (Show more)
-  @IsOptional() @IsInt() @Min(0)                      laneOffset?: number;
+```jsonc
+{
+  "layout": "status",
+  "columns": [
+    { "key": "todo", "statuses": ["todo"], "total": 140,
+      "cards": [ /* Task rows, run-embedded, plus the enrichment block below */ ] }
+  ],
+  "recurring": [
+    { "id": "…", "title": "Weekly link sweep", "cadenceText": "Every Monday at 09:00",
+      "nextOccurrenceAt": "…", "ended": false }
+  ],
+  "counters": { "waitingOnYou": 3, "doneToday": 7 },
+  "terminalWindowDays": 7,
+  "degraded": []            // names of enrichments that failed this read
 }
 ```
 
-Response (`MissionBoardDto`, declared beside `MissionDto` in
-[`packages/agent/src/missions/types.ts`](../../../../../packages/agent/src/missions/types.ts)):
+Each card carries an additive `board` block — never a change to the existing `Task`
+shape:
 
-```ts
-interface MissionBoardCardDto {
-  id: string;
-  title: string;
-  priority: TaskPriority;            // 'p0'…'p4'
-  labels: string[];
-  status: MissionStatus;             // for the Paused chip
-  outcome: MissionOutcome | null;
-  completedAt: Date | null;
-  origin: { type: MissionOriginType; id: string | null; name: string | null };
-  lastProgressAt: Date | null;
-  lastProgressSummary: string | null;   // <= 280, plain text
-  lastProgressKind: MissionProgressKind | null;
-  liveRunCount: number;
-  openDecisionCount: number;
-  commentCount: number;
-  isStale: boolean;
-  href: string;                      // computed server-side from ROUTES
-}
-
-interface MissionBoardLaneDto {
-  lane: MissionLane;
-  total: number;                     // UNBOUNDED true count (spec FR-7)
-  cards: MissionBoardCardDto[];      // <= laneLimit
-  hasMore: boolean;
-  degraded?: 'decision-counts';      // this lane's decision query failed
-}
-
-interface MissionBoardDto {
-  lanes: MissionBoardLaneDto[];      // always 4, always in board order
-  needYouCount: number;
-  doneTodayCount: number;
-  staleAfterDays: number;            // the effective threshold, echoed for copy
-  generatedAt: Date;
+```jsonc
+"board": {
+  "stalled": true,
+  "openDecisions": 1,
+  "commentCount": 3,
+  "subtasks": { "done": 2, "total": 5 },
+  "provenance": [
+    { "kind": "recurringTemplate", "id": "…", "name": "Weekly link sweep" },
+    { "kind": "agent", "id": "…", "name": "Editor" }
+  ]
 }
 ```
 
-`doneTodayCount` needs the viewer's day boundary. The client sends its IANA zone
-as `?tz=`; the server validates it against `Intl.supportedValuesOf('timeZone')`
-and falls back to UTC on anything unrecognised, so a hostile value can never
-reach a query.
+`provenance` is returned **fully ordered by the FR-28 precedence and already
+scope-filtered**, so the client renders the first two and menus the rest without
+knowing the rules. Throttle: matches the existing list route.
 
-**Additive DTO changes**: `CreateMissionDto` and `UpdateMissionDto` in
-[`dto/mission.dto.ts`](../../../../../apps/api/src/missions/dto/mission.dto.ts)
-each gain optional `priority` (`@IsIn` the five values) and `labels`
-(`@IsArray` + `@ArrayMaxSize(8)` + `@Matches(/^[a-z0-9][a-z0-9._-]{0,31}$/, { each: true })`).
-Normalisation to lower case happens in `MissionsService`, not the DTO, so every
-caller (API, MCP, CLI) gets the same behaviour.
-
-**Behaviour change to an existing route, and why it is safe.**
-`GET /api/me/missions` starts excluding rows with `archivedAt` or `deletedAt` set,
-and gains `?include=archived|trashed|all`. No such row can exist before the P1
-migration runs, so no existing consumer can observe a change (spec §11,
-Constitution X).
+**`GET /api/tasks/board/column`** — one column, for **Show 50 more**.
+Same query parameters plus `status` (a single column key) and `offset`; returns
+`{ key, statuses, total, cards }`. This is what makes FR-8's independent paging true.
 
 ### 4.2 P2
 
-| Method | Path | Throttle | Purpose |
-| --- | --- | --- | --- |
-| `GET` | `/api/me/missions/:id/comments` | 120/min | Paginated thread, oldest first, 50/page |
-| `POST` | `/api/me/missions/:id/comments` | 20/min | Post; returns the row **with its delivery outcome** |
-| `PATCH` | `/api/me/missions/:id/comments/:commentId` | 20/min | Edit within 5 minutes; 409 after |
-
-```ts
-class PostMissionCommentDto {
-  @IsString() @MinLength(1) @MaxLength(16_384) body: string;
-}
-```
-
-Response rows carry `deliveryOutcome`, `deliveryDetail`, `deliveredRunId` so the
-UI renders the annotation without a second call. There is deliberately **no**
-delete endpoint — matching the Task thread, which has none either.
+No new route. P2 is enrichment inside the P1 response (provenance, sub-task roll-up,
+comment count, decision count) plus the client work in §5. The one server change is
+the enrichment layer itself in `task-board.service.ts`.
 
 ### 4.3 P3
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/inbound-triggers` | Accepts `targetKind` (immutable) |
-| `POST` | `/api/me/missions/bulk/archive` | `{ ids: string[] }`, ≤ 100 ids, 10/min |
+No new route. P3 adds:
 
-Agent-proposed Missions do **not** get a new public endpoint: an Agent proposes
-through the existing `agent_action_proposals` path with a new
-`AgentActionProposalActionType` member, and the Mission is created by the
-approval handler once a human approves. That keeps every Agent-initiated write on
-the one rail that already has risk scoring and guardrails.
+- the stall flag to the P1 response's `board` block (the predicate is already in the
+  ordering);
+- a scheduled job, not an endpoint, for the notification (§6);
+- the Focus layout, which is a `layout=focus` value on the existing route.
 
 ---
 
@@ -458,485 +441,393 @@ the one rail that already has risk scoring and guardrails.
 
 ### 5.1 Route and shell
 
-No new route. `/missions` gains a tab strip.
-[`apps/web/src/app/[locale]/(dashboard)/missions/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/missions/page.tsx>)
-becomes a dispatcher on `?tab=`:
+`/tasks` — no new route, no new route constant, no sidebar change.
+`page.tsx` changes shape: it reads `view` and the board's filters from search params
+and, for `view=board`, calls `tasksAPI.board(...)` instead of `tasksAPI.list(...)`.
+For `view=cards|table` it keeps calling `tasksAPI.list(...)` exactly as today.
 
-```
-missions/page.tsx (RSC)
-  ├─ tab=board     (default) → board data via getMissionBoardAction  → <MissionBoard/>
-  ├─ tab=list                → today's missionsAPI.list path         → <MissionsList/>   (unchanged)
-  ├─ tab=archived            → missionsAPI.list({ include:'archived' })→ <MissionShelf variant="archived"/>
-  └─ tab=trashed             → missionsAPI.list({ include:'trashed' })→ <MissionShelf variant="trash"/>
-```
+View resolution order, implemented once in a small `resolveTasksView()`:
+`?view=` → a `tasks.view` cookie → `'board'`.
 
-The tab choice persists to `localStorage['missions-tab']` (same pattern as the
-Activity page's view-mode persistence) and is mirrored into the URL so a board is
-shareable. Every fetch keeps the existing page's discipline: `try/catch` at the
-call site, the error handed to the client component, never a fake empty state.
+### 5.2 New and changed components
 
-### 5.2 New components — `apps/web/src/components/missions/board/`
+Under `apps/web/src/components/tasks/`:
 
-| File | Role |
+| File | Kind | What |
+| --- | --- | --- |
+| `board/TaskBoard.tsx` | new, client | The board shell: layout switcher, toggles, recurring strip, column strip, error panel. Owns the column state and the per-column paging |
+| `board/TaskBoardColumn.tsx` | new, client | One column. **Extracted from the existing `TaskKanbanColumn`** and given a true total, an independent `Show more`, the empty copy, and the drop rules of §2.3 |
+| `board/TaskBoardCard.tsx` | new, client | **Extracted from the existing `TaskKanbanCard`**, unchanged in behaviour, plus the flag row, the provenance row, the roll-up and the comment chip |
+| `board/TaskProvenanceChips.tsx` | new, client | Renders the `board.provenance` array; each chip is a filter link |
+| `board/TaskBoardFlags.tsx` | new, client | Stalled flag, Decision chip and its `Open decision` action, Hidden and Template chips |
+| `board/TaskRecurringStrip.tsx` | new, client | The collapsed/expanded strip of §6.5 |
+| `board/TaskBoardFilters.tsx` | new, client | The board's filter bar, writing to the URL; kept in sync with the page's existing server-rendered `<form>` |
+| `TasksKanbanView.tsx` | **kept** | Becomes a thin adapter that renders `TaskBoard` from a plain `Task[]`, so every existing caller — `TasksList`, `TasksScopedSection` and the three scoped routes — keeps compiling and keeps working with no change |
+| `TasksList.tsx` | changed | `VIEW_TABS` labels and `STATUS_FILTERS` labels move to the catalogue; the view state moves from `useState` to the URL + cookie; `kanban` renders the new board |
+
+In `packages/agent/src/tasks-domain/`:
+
+| File | What |
 | --- | --- |
-| `MissionBoard.tsx` | Client shell. Owns filter state, the poll, drag state, optimistic mutations. Renders the header counters, `MissionBoardFilters`, and four `MissionLane`s |
-| `MissionLane.tsx` | One lane: header (name, count, sort tooltip), scroll body, `Show N more` footer, per-lane empty line, per-lane error panel |
-| `MissionBoardCard.tsx` | The card in §6.3 of the spec. Chips, live status line (plain text, `title` attribute for the untruncated value), `MissionCardMenu` |
-| `MissionCardMenu.tsx` | The card menu; each action maps to an existing or new server action |
-| `MissionBoardFilters.tsx` | Search + priority + label + origin, URL-synced, `Clear filters` |
-| `MissionBoardHeader.tsx` | `N need you · N done today` + `+ New Mission` |
-| `NewMissionDialog.tsx` | Quick-create. Built on [`components/ui/dialog.tsx`](../../../../../apps/web/src/components/ui/dialog.tsx) (Headless UI), not a new modal system |
-| `MissionBoardSkeleton.tsx` | Four lane frames, three skeleton cards each |
-| `MissionBoardEmpty.tsx` | Whole-board empty; wraps the shared [`components/common/EmptyState.tsx`](../../../../../apps/web/src/components/common/EmptyState.tsx) |
-| `MissionShelf.tsx` | The Archived and Trash tabs (one component, a `variant` prop) |
-| `MissionPurgeDialog.tsx` | Type-the-title confirmation |
-| `useMissionBoardPoll.ts` | The refresh policy in spec FR-10, modelled on [`use-task-run-polling.ts`](../../../../../apps/web/src/lib/hooks/use-task-run-polling.ts) but visibility-aware |
-
-P2 adds `apps/web/src/components/missions/MissionCommentThread.tsx`, mounted from
-[`MissionDetailClient.tsx`](../../../../../apps/web/src/components/missions/MissionDetailClient.tsx).
-Note the Task equivalent is currently inlined inside `TaskDetailClient.tsx` with
-no extracted component, so there is nothing to reuse; the Mission thread is built
-standalone and the shared extraction is recorded as a follow-up (§13).
-
-All exports go through
-[`apps/web/src/components/missions/index.ts`](../../../../../apps/web/src/components/missions/index.ts).
+| `task-board-columns.ts` | Both layout tables, `resolveDrop()`, `columnForStatus()`. Pure, no imports from TypeORM or NestJS. **Imported by both the API and the web client**, so the two cannot disagree |
+| `task-board-stall.ts` | `isStalled()`, `clampStallAfterDays()`, `stallCutoff()`. Pure |
+| `task-board-provenance.ts` | `orderProvenance()` implementing FR-28's precedence. Pure |
+| `task-board.service.ts` | The read model of §2.1. The only new service |
 
 ### 5.3 State and data fetching
 
-- **First paint** is server-rendered from the RSC page, so lanes have data on
-  load; the client hook takes over for refreshes.
-- **Refresh** re-invokes `getMissionBoardAction` with the current filters and
-  diffs by mission id. Card DOM identity is keyed on the id so a refresh never
-  remounts a card that did not change (spec FR-11).
-- **Optimism**: archive, trash, restore, priority and label edits apply locally
-  first, then reconcile. A rejected mutation reverts the card and raises a
-  `sonner` toast with the server's message — the existing toast mechanism, no new
-  dependency.
-- **Undo**: the toast's action calls the inverse endpoint (`unarchive` / `restore`).
-  All four are idempotent, so a double-click cannot corrupt state.
-- **Drag** uses the same native HTML5 handlers `TasksKanbanView` uses; the
-  `Needs you` lane simply omits `onDragOver`/`onDrop` and renders the explanatory
-  toast on `onDragEnter` release.
+- First paint is RSC: the column frames, headers and skeletons render before the
+  board data lands (spec §6.7).
+- The board is a client component from there on. Filters and view live in the URL;
+  changing one is a shallow route push, not a full navigation.
+- Per-column paging calls the column route through a new server action and appends to
+  that column's array only.
+- `useTaskRunPolling` is reused unchanged — its merge already touches only run and PR
+  fields, which is exactly what a board refresh must not widen.
 
-### 5.4 New server actions — `apps/web/src/app/actions/dashboard/missions.ts`
+### 5.4 New server actions — `apps/web/src/app/actions/tasks.ts`
 
-Appended to the existing file, matching its shape exactly:
-`getMissionBoardAction`, `archiveMissionAction`, `unarchiveMissionAction`,
-`trashMissionAction`, `restoreMissionAction`, `setMissionPriorityAction`,
-`setMissionLabelsAction`, and (P2) `listMissionCommentsAction`,
-`postMissionCommentAction`, `editMissionCommentAction`.
-Each delegates to a new method on `missionsAPI` in
-[`apps/web/src/lib/api/missions.ts`](../../../../../apps/web/src/lib/api/missions.ts).
+Appended beside the existing ones, none of which change:
+
+- `getTaskBoardAction(filters)` → the P1 read.
+- `getTaskBoardColumnAction(filters, status, offset)` → the column read.
+- `setTasksViewAction(view)` → writes the `tasks.view` cookie.
 
 ---
 
 ## 6. Background work
 
-Both jobs are Trigger.dev-shaped files under
-[`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/),
-registered in its `index.ts`, each spinning a `NestApplicationContext(TriggerInternalModule)`
-and delegating to a service in the agent package — the shape
-[`mission-tick.task.ts`](../../../../../packages/tasks/src/tasks/trigger/mission-tick.task.ts)
-already uses. Neither imports `@trigger.dev/sdk` from the agent package; the
-agent package only ever sees its own service classes and the `*_DISPATCHER`
-tokens (Constitution IV).
+One scheduled task, P3 only, following the shape of the existing
+`task-recurrence-dispatcher` and `task-pr-status-sync` tasks in
+`packages/tasks/src/tasks/trigger/`:
 
-| Task file | Cron | Delegates to | What it does | Idempotency |
-| --- | --- | --- | --- | --- |
-| `mission-staleness-sweep.task.ts` | `7 * * * *` (hourly, offset to avoid the minute-boundary pile-up) | `MissionStalenessService.sweep()` in `packages/agent/src/missions/mission-staleness.service.ts` | Scans Missions that `deriveLane` puts in `In flight` with `lastProgressAt` older than the effective threshold, and raises **one** notification each | `Notification.deduplicationKey = mission-stale:${missionId}:${floor(lastProgressAt/1000)}` — the unique `(userId, deduplicationKey)` index makes a re-run a no-op, and a Mission that moves gets a new key, satisfying spec FR-31 |
-| `mission-trash-purge.task.ts` | `23 4 * * *` (daily, beside the existing `task-branch-gc` at `41 4 * * *`) | `MissionTrashService.purgeDue()` | Hard-deletes Missions whose `deletedAt` is older than 30 days, cascading `mission_comments`; writes a `MISSION_PURGED` activity row per deletion | Batched at 200 per run with a `deletedAt < cutoff` predicate; a re-run finds nothing |
+**`task-stall-sweep`** — `17 */6 * * *` (four times a day, offset off the hour so it
+never collides with the minute-cadence dispatchers).
 
-**No new dispatcher token.** Comment-triggered Runs use the existing
-`AGENT_CHAT_REPLY_DISPATCHER`; live-Run injection uses the existing
-`RUN_STEERING_PORT`. Nothing in this epic calls a queue directly.
+1. Select Tasks where `status = 'in_progress'` AND `updatedAt < cutoff` AND
+   (`latestRunStatus IS NULL` OR terminal), capped per sweep in the same way
+   `MISSION_TICK_MAX_PER_TICK` caps the mission tick.
+2. For each, call the existing `TaskNotificationService` with kind `task_stalled` and
+   `deduplicationKey = ${taskId}:stalled:${startedAt ?? updatedAt}`.
 
-**Progress writers** (§3.1 `lastProgressAt/Summary/Kind`) are **not** jobs. They
-are single-statement updates issued in-line by the services that already own each
-event, guarded so a failure logs and continues rather than failing the caller —
-the same posture `MissionsService.recordActivity()` already takes:
+The dedupe key is what makes spec FR-60's "once per stalled streak" true without any
+new state: the key changes only when the Task moves, because moving it changes
+`updatedAt` and clears the condition; the next stall produces a new key. The
+notification table's per-user unique index on `deduplicationKey` does the rest.
 
-| Event | Writer |
-| --- | --- |
-| Run dispatched / terminal for a Task with a `missionId` | `packages/agent/src/tasks-domain/task-run-denorm.service.ts` (already writes `Task.latestRunStatus`; extend the same call) |
-| Task status transition | `packages/agent/src/tasks-domain/task-transition.service.ts` |
-| Scheduled tick produced Ideas | `packages/agent/src/missions/mission-tick.service.ts` |
-| Escalation opened / resolved | the escalation writer path in `packages/agent/src/agents/` |
-| Approval created / decided | the proposal writer path in `packages/agent/src/agents/` |
-| Comment posted | `MissionCommentService` (P2) |
+Constitution IV: dispatched through the configured job-runtime provider, in a
+transient `TriggerInternalModule` context, exactly as its neighbours are.
 
 ---
 
 ## 7. Plugin boundaries
 
-**No plugin package is added and none is touched.** This feature reads
-first-party tables, writes first-party tables, and reaches Agent execution only
-through DI tokens declared in the agent package. Specifically:
+None. This epic introduces no external integration, reads no third-party API, and
+adds no plugin package. Constitution I and II are satisfied vacuously, and the
+canonical plugin count is untouched.
 
-- **Constitution I** — nothing external is integrated. The board calls no third
-  party.
-- **Constitution II** — no plugin id appears anywhere in the diff. Agent
-  execution goes through `AGENT_CHAT_REPLY_DISPATCHER` / `RUN_STEERING_PORT`,
-  which resolve to whatever the workspace has configured. A grep for a provider
-  name in this epic's files must return nothing; that grep is a review gate.
-- **Constitution III** — priority, labels, board markers and comments are
-  platform metadata about delegated work, not Work content. No item, category or
-  config moves into the database.
-
-If a future workspace wants a third-party board mirror (an issue tracker, say),
-that is a plugin declaring a capability, not a branch inside `MissionBoardService`.
-Nothing in this design blocks that; nothing in this design starts it.
+The only place a provider is even adjacent is the pull-request CI dot on a card,
+which is fed by the existing `task-pr-status-sync` cron through the existing git
+provider plugin. The board reads the cached verdict off the Task row and makes no
+provider call of its own.
 
 ---
 
 ## 8. i18n
 
-All keys land in
-[`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) under the
-**existing** `dashboard.missionsPage` namespace (plus a small addition to
-`dashboard.missionDetail` in P2), then are mirrored structurally into the 20
-sibling locale files. Leaf names are camelCase and contain **no literal dot** —
-next-intl rejects dotted leaves at runtime and the hydration spec turns that into
-a multi-shard red.
+All keys go under the **existing** `dashboard.tasksPage` namespace, in a new `board`
+child. Leaf names are camelCase and contain no literal dot; the parent `board` key is
+added in the same change so no subtree can collapse.
+
+**Reused, not re-declared** — these already exist and are already translated:
+
+- `dashboard.tasksPage.status.{backlog,todo,inProgress,inReview,blocked,done,cancelled}`
+  — the seven column names. *(The catalogue's existing leaves are keyed by the status
+  value; the board must read them through the same accessor the list already uses,
+  not copy the strings.)*
+- `dashboard.tasksPage.priority.{p0,p1,p2,p3,p4}` — Urgent, High, Medium, Normal, Low.
+- `dashboard.tasksPage.list.*` — the existing filter, pagination and new-Task strings.
+- `dashboard.taskTriggers.tabs.*` — the Tasks/Triggers tab strip.
+
+**New, under `dashboard.tasksPage.board`:**
 
 ```
-dashboard.missionsPage.tabs.board            "Board"
-dashboard.missionsPage.tabs.list             "List"
-dashboard.missionsPage.tabs.archived         "Archived"
-dashboard.missionsPage.tabs.trash            "Trash"
-
-dashboard.missionsPage.board.subtitle        "Everything your Agents are working on, in one queue."
-dashboard.missionsPage.board.needYou         "{count} need you"
-dashboard.missionsPage.board.doneToday       "{count} done today"
-dashboard.missionsPage.board.sortTooltip     "Sorted by priority, then oldest first."
-dashboard.missionsPage.board.showMore        "Show {count} more"
-dashboard.missionsPage.board.showingOf       "Showing {shown} of {total}"
-dashboard.missionsPage.board.notADropTarget  "Needs you is set by the work, not by hand."
-dashboard.missionsPage.board.refreshedAt     "Updated {time}"
-
-dashboard.missionsPage.board.lanes.backlog          "Backlog"
-dashboard.missionsPage.board.lanes.inFlight         "In flight"
-dashboard.missionsPage.board.lanes.needsYou         "Needs you"
-dashboard.missionsPage.board.lanes.done             "Done"
-dashboard.missionsPage.board.lanes.backlogHint      "Queued — an Agent will pick it up."
-dashboard.missionsPage.board.lanes.inFlightHint     "Being worked right now."
-dashboard.missionsPage.board.lanes.needsYouHint     "Waiting on a decision from you."
-dashboard.missionsPage.board.lanes.doneHint         "Finished in the last {days} days."
-dashboard.missionsPage.board.lanes.emptyBacklog     "Nothing queued."
-dashboard.missionsPage.board.lanes.emptyInFlight    "Nothing in flight."
-dashboard.missionsPage.board.lanes.emptyNeedsYou    "Nothing needs you."
-dashboard.missionsPage.board.lanes.emptyDone        "Nothing finished in the last {days} days."
-dashboard.missionsPage.board.lanes.countLabel       "{name}, {count} Missions"
-
-dashboard.missionsPage.board.error.title       "Couldn't load the board."
-dashboard.missionsPage.board.error.body        "Your Missions are safe — this is a display problem."
-dashboard.missionsPage.board.error.retry       "Try again"
-dashboard.missionsPage.board.error.openList    "Open the List tab instead"
-dashboard.missionsPage.board.error.laneCounts  "Decision count unavailable"
-
-dashboard.missionsPage.card.stale              "Stale"
-dashboard.missionsPage.card.staleTooltip       "No progress for {days} days. Last progress {timestamp}."
-dashboard.missionsPage.card.paused             "Paused"
-dashboard.missionsPage.card.openDecision       "Open decision"
-dashboard.missionsPage.card.openDecisionCount  "{count, plural, one {# open decision} other {# open decisions}}"
-dashboard.missionsPage.card.commentCount       "{count} comments"
-dashboard.missionsPage.card.commentOverflow    "99+"
-dashboard.missionsPage.card.moreLabels         "+{count}"
-dashboard.missionsPage.card.completedOn        "Completed {date}"
-
-dashboard.missionsPage.priority.p0             "Urgent"
-dashboard.missionsPage.priority.p1             "High"
-dashboard.missionsPage.priority.p2             "Medium"
-dashboard.missionsPage.priority.p3             "Normal"
-dashboard.missionsPage.priority.p4             "Low"
-
-dashboard.missionsPage.origin.user             "You"
-dashboard.missionsPage.origin.schedule         "Schedule"
-dashboard.missionsPage.origin.agent            "{agentName}"
-dashboard.missionsPage.origin.filterLabel      "Origin"
-
-dashboard.missionsPage.filters.search          "Search"
-dashboard.missionsPage.filters.priority        "Priority"
-dashboard.missionsPage.filters.label           "Label"
-dashboard.missionsPage.filters.clear           "Clear filters"
-
-dashboard.missionsPage.menu.open               "Open Mission"
-dashboard.missionsPage.menu.chat               "Chat about it"
-dashboard.missionsPage.menu.priority           "Priority"
-dashboard.missionsPage.menu.labels             "Labels…"
-dashboard.missionsPage.menu.runNow             "Run now"
-dashboard.missionsPage.menu.pause              "Pause"
-dashboard.missionsPage.menu.complete           "Complete…"
-dashboard.missionsPage.menu.archive            "Archive"
-dashboard.missionsPage.menu.trash              "Move to Trash"
-dashboard.missionsPage.menu.disabledReason     "{action} is unavailable: {reason}"
-
-dashboard.missionsPage.quickCreate.title         "New Mission"
-dashboard.missionsPage.quickCreate.descLabel     "What should your Agents keep doing?"
-dashboard.missionsPage.quickCreate.descHint      "At least 10 characters."
-dashboard.missionsPage.quickCreate.titleLabel    "Title (optional)"
-dashboard.missionsPage.quickCreate.titleHint     "Leave blank and we'll write one from the above"
-dashboard.missionsPage.quickCreate.priorityLabel "Priority"
-dashboard.missionsPage.quickCreate.labelsLabel   "Labels"
-dashboard.missionsPage.quickCreate.addLabel      "+ Add label"
-dashboard.missionsPage.quickCreate.fullForm      "Need a cadence, a cap or guardrails? Use the full form."
-dashboard.missionsPage.quickCreate.submit        "Create Mission"
-dashboard.missionsPage.quickCreate.cancel        "Cancel"
-dashboard.missionsPage.quickCreate.error         "Couldn't create the Mission. Please try again."
-dashboard.missionsPage.quickCreate.labelLimit    "Up to 8 labels per Mission."
-dashboard.missionsPage.quickCreate.labelFormat   "Labels use lower-case letters, numbers, dots, dashes and underscores."
-
-dashboard.missionsPage.shelf.archivedLead      "Archived Missions stay out of the board but keep everything they produced."
-dashboard.missionsPage.shelf.trashLead         "Missions here are deleted for good 30 days after you trash them."
-dashboard.missionsPage.shelf.archivedOn        "Archived {date}"
-dashboard.missionsPage.shelf.deletedOn         "Deleted {date} · purged in {days} days"
-dashboard.missionsPage.shelf.restore           "Restore"
-dashboard.missionsPage.shelf.deleteForever     "Delete forever"
-dashboard.missionsPage.shelf.emptyArchived     "Nothing archived."
-dashboard.missionsPage.shelf.emptyArchivedHint "Archive a Mission from its card menu when it is no longer live."
-dashboard.missionsPage.shelf.emptyTrash        "Trash is empty."
-
-dashboard.missionsPage.purge.title             "Delete \"{title}\" forever?"
-dashboard.missionsPage.purge.body              "This removes the Mission and its comments permanently. Ideas, Works and Tasks it created are not deleted. This cannot be undone."
-dashboard.missionsPage.purge.confirmLabel      "Type the Mission title to confirm"
-dashboard.missionsPage.purge.confirm           "Delete forever"
-
-dashboard.missionsPage.toasts.archived         "Mission archived"
-dashboard.missionsPage.toasts.trashed          "Moved to Trash"
-dashboard.missionsPage.toasts.restored         "Mission restored"
-dashboard.missionsPage.toasts.undo             "Undo"
-dashboard.missionsPage.toasts.moveFailed       "Couldn't move that Mission."
-
-dashboard.missionsPage.banner.archived         "This Mission is archived. It is hidden from the board."
-dashboard.missionsPage.banner.trashed          "This Mission is in Trash and will be deleted on {date}."
-
-dashboard.missionDetail.comments.heading       "Comments"
-dashboard.missionDetail.comments.placeholder   "Reply to steer the Agent…"
-dashboard.missionDetail.comments.send          "Send"
-dashboard.missionDetail.comments.edit          "Edit"
-dashboard.missionDetail.comments.edited        "(edited)"
-dashboard.missionDetail.comments.template      "Insert a change of direction"
-dashboard.missionDetail.comments.templateBody  "Change of direction: <what changed>.\nKeep <what still applies>. Drop <what no longer applies>.\nIf this invalidates work you have already done, say so and estimate the rework before you redo it — do not silently start over."
-dashboard.missionDetail.comments.delivered     "Delivered to the running Agent"
-dashboard.missionDetail.comments.queued        "No Run in flight — queued for the next one"
-dashboard.missionDetail.comments.refused       "Couldn't reach the Agent — {reason}"
-dashboard.missionDetail.comments.rateLimited   "You're commenting too fast. Try again in a moment."
-dashboard.missionDetail.comments.empty         "No comments yet. Reply here to steer the Agent."
-dashboard.missionDetail.comments.loadMore      "Load older comments"
-
-dashboard.missionsPage.notifications.staleTitle "{title} hasn't moved in {days} days"
-dashboard.missionsPage.notifications.staleBody  "It's been in flight since {date} with no progress. Open it to see where it stopped."
-
-dashboard.settings.workAgent.missionStaleAfterDays        "Flag a Mission as stale after"
-dashboard.settings.workAgent.missionStaleAfterDaysHint    "Between 1 and 30 days. Applies to Missions that are in flight."
+board.viewCards            board.viewTable            board.viewBoard
+board.layoutStatus         board.layoutFocus
+board.focusBacklog         board.focusInFlight        board.focusNeedsYou
+board.focusDone            board.focusCancelled
+board.focusBacklogStatuses board.focusInFlightStatuses
+board.focusNeedsYouStatuses board.focusDoneStatuses
+board.counterWaitingOnYou  board.counterDoneToday
+board.sortTooltip          board.terminalWindow
+board.moveTo               board.runAll               board.runAllTitle
+board.showMore             board.showingOf
+board.diffTooltip
+board.emptyBoardTitle      board.emptyBoardBody
+board.emptyBacklog         board.emptyTodo            board.emptyInProgress
+board.emptyInReview        board.emptyBlocked         board.emptyDone
+board.emptyCancelled
+board.errorTitle           board.errorBody            board.errorRetry
+board.errorOpenTable
+board.stalled              board.stalledTooltip
+board.decisionOne          board.decisionMany         board.openDecision
+board.subtaskRollup        board.subtaskOf
+board.commentOne           board.commentMany
+board.provenanceMission    board.provenanceIdea       board.provenanceWork
+board.provenanceTeam       board.provenanceGoal       board.provenanceAgent
+board.provenanceTrigger    board.provenanceScheduled  board.provenanceRaisedBy
+board.provenanceDelegated  board.provenanceFiledByYou board.provenanceRecurring
+board.recurringSummary     board.recurringShow        board.recurringHide
+board.recurringLead        board.recurringEnded       board.recurringSchedules
+board.templateChip         board.templateTooltip
+board.hiddenChip           board.hiddenTooltip
+board.toggleSubtasks       board.toggleTemplates
+board.toggleCancelled      board.toggleHidden
+board.dropRefusedCancelled board.dropPickerTitle
+board.clearFilters
 ```
 
-The 20 sibling locales get the same key tree in the same PR; a missing key in one
-locale is a build-visible regression, so they land together.
+And one notification pair beside the existing Task notification strings:
+
+```
+notifications.taskStalled.title     notifications.taskStalled.body
+```
+
+Every one of these replaces or extends a string that is **hardcoded English in
+`TasksKanbanView.tsx` and `TasksList.tsx` today** — `Backlog`, `Todo`,
+`In Progress`, `In Review`, `Blocked`, `Done`, `Cancelled`, `Cards`, `Table`,
+`Kanban`, `All`, `Move →`, `Run all`, `Run N Task(s) in X`, `empty`,
+`Show N more`, `Preview the changes on this Task's branch`, `n/m started`,
+`Transition failed`. Removing every one of them is a P1 acceptance criterion, not a
+P3 nicety, because program rule #8 is not optional and because the seven status names
+are already translated and simply unused.
+
+After editing `en.json`, run the catalogue's existing locale-sync and translation scripts
+so all sibling locales stay structurally identical.
 
 ---
 
 ## 9. Telemetry and failure modes
 
-### 9.1 Activity log (`ActivityLogService.log`)
+### 9.1 Activity log
 
-| Action type | When | Payload |
-| --- | --- | --- |
-| `mission_archived` / `mission_unarchived` | archive / unarchive | `{ missionId }` |
-| `mission_trashed` / `mission_restored` | trash / restore | `{ missionId }` |
-| `mission_purged` | retention sweep or Delete forever | `{ missionId, title, trashedAt, commentsDeleted }` |
-| `mission_stale_flagged` | first flag of a streak | `{ missionId, lastProgressAt, thresholdDays }` |
-| `mission_comment_posted` | comment posted | `{ missionId, commentId, deliveryOutcome }` — **never the body** |
-
-Every emitter stamps `userId`, `tenantId` and `organizationId` from the parent
-Mission, as the cron-emitter rule requires, and wraps the write in `try/catch`
-so a logging failure never fails the user's action.
+The board writes **no new activity type**. Every transition it performs already
+writes `TASK_TRANSITIONED` through the existing transition service; every run it
+dispatches already writes through the existing run path. Adding a board-specific
+type would double-count the same event.
 
 ### 9.2 Product analytics
 
-Fired client-side through the existing PostHog wiring in
-[`packages/monitoring/`](../../../../../packages/monitoring/):
-`mission_board_opened` (with lane counts and whether any filter is active),
-`mission_board_filter_applied`, `mission_card_dragged` (from lane → to lane →
-accepted/refused), `mission_quick_created`, `mission_archived`,
-`mission_restored`, `mission_comment_posted` (with `deliveryOutcome`, no body),
-`mission_steering_template_inserted`.
+| Event | Properties |
+| --- | --- |
+| `task_board_opened` | `layout`, `columnCount`, `totalTasks`, `filtersActive[]`, `degraded[]` |
+| `task_board_column_paged` | `status`, `offset` |
+| `task_board_filter_applied` | `filter`, `source` (`chip` / `bar` / `url`) |
+| `task_board_provenance_clicked` | `kind` |
+| `task_board_decision_opened` | — |
+| `task_board_stall_flag_shown` | `days` |
+| `task_board_layout_switched` | `from`, `to` |
+| `task_board_drop_picker_shown` | `from`, `column`, `options[]` |
+
+`filtersActive` carries filter **names**, never values — a label or a search term is
+user content and does not belong in analytics.
 
 ### 9.3 Sentry
 
-A `mission_board` tag on the board read span; breadcrumbs for each of the four
-queries so a slow board is attributable to one of them; the lane-derivation
-inputs (counts only, never titles) on the error context.
+The board read is instrumented as one span with the six enrichments as child spans,
+so a slow board is attributable to the query that caused it. A degraded enrichment is
+a breadcrumb, not an exception — it is an expected state (FR-13), and paging it would
+train the team to ignore it.
 
 ### 9.4 Failure modes and the chosen degradation
 
-| Failure | Behaviour |
+| Failure | Degradation |
 | --- | --- |
-| Mission query fails | Whole-board error panel (spec §6.9). Lane frames stay. Never an empty board |
-| Decision-count query fails | The other three lanes render normally; `Needs you` renders with `degraded: 'decision-counts'` and the copy "Decision count unavailable". Missions are **not** silently demoted to `In flight` |
-| Live-run query fails | `liveRunCount` treated as 0; the 24-hour progress clause still places recently-active Missions in `In flight`. A card can under-report, never over-report |
-| Progress writer throws | Logged at `warn`, swallowed. The user's action succeeds; the card shows a staler line |
-| Steering port unbound | `deliveryOutcome = 'dispatched'` via the chat dispatcher, or `'not-addressed'` if that is also unbound. The comment is always stored |
-| No job runtime configured | `deliveryOutcome = 'refused'`, `deliveryDetail` names it, the UI links to `/settings/job-runtime`. The existing shell-level degraded banner already warns globally |
-| Staleness sweep fails mid-batch | Per-Mission `try/catch`; the dedup key makes the next run idempotent |
-| Purge sweep fails mid-batch | Same. `deletedAt < cutoff` is re-evaluated each run |
-| Two tabs mutate the same Mission | All four board mutations are idempotent set/clear operations; the loser is a no-op, not a 409 |
-| Clock skew on `doneToday` | Server computes the day boundary from the validated `tz`; a client with a wrong clock changes nothing server-side |
+| The whole board read fails | Column frames + the error panel of spec §6.11. Never an empty board presented as "no Tasks" |
+| One column's read fails | That column shows the panel; the others render |
+| Decision counts fail | Decision chips absent, `waiting on you` reads `—`. Board works |
+| Comment counts fail | Comment chips absent. Board works |
+| Sub-task roll-up fails | Roll-up absent; nothing is double-counted, because the top-level filter is a predicate on the card query, not on the roll-up |
+| Provenance name lookup fails | Chips absent for that kind (FR-29's rule already omits an unresolvable name) |
+| Trigger fire lookup fails | Trigger chips absent; the other provenance kinds still render |
+| The recurring strip read fails | The strip is hidden. Templates remain out of the columns — the exclusion is a predicate on the card query, not a consequence of the strip |
+| The stall sweep fails | Flags still render (they are computed at read time); only the notification is missed, and the next sweep sends it |
 
 ---
 
 ## 10. Test plan
 
-### 10.1 Unit — agent package (Jest)
+### 10.1 Unit — agent package (Jest, `packages/agent`)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/missions/__tests__/mission-lane.spec.ts` | `deriveLane` truth table: all six precedence branches, the paused case, the 24-hour recency clause, `lastProgressAt = NULL`, and that trashed beats archived beats done |
-| `packages/agent/src/missions/__tests__/mission-board.service.spec.ts` | Filter composition, lane caps vs. true totals, `doneTodayCount` across a timezone boundary, per-source degradation, ownership scoping |
-| `packages/agent/src/missions/__tests__/mission-staleness.service.spec.ts` | Threshold boundaries (47 h / 49 h at default 2 days), clamp 1–30, one notification per streak, re-flag after movement, no flag outside `In flight` |
-| `packages/agent/src/missions/__tests__/mission-trash.service.spec.ts` | 30-day cutoff either side, cascade of comments, batch cap, idempotent re-run |
-| `packages/agent/src/missions/__tests__/mission-comment.service.spec.ts` (P2) | 16 KB cap, 5-minute edit window either side, mention parsing, all four delivery outcomes, `commentCount` and `lastProgressAt` side effects, the 20/min limiter |
-| `packages/agent/src/missions/__tests__/missions.service.spec.ts` (extend) | Label normalisation and the 8-label cap, priority default, archive/trash/restore idempotency, the `include` filter on `listForUser` |
+- `task-board-columns.spec.ts` — the Status table covers all seven statuses exactly
+  once; the Focus table covers all seven across its groups plus the toggle;
+  `resolveDrop()` against the full 7 × 5 matrix, asserting `apply` / `ask` / `refuse`
+  for every pair, and specifically that `in_progress → Needs you` is the only `ask`.
+- `task-board-stall.spec.ts` — the predicate at 47 h / 49 h; with a running run;
+  with a null `latestRunStatus`; in every non-`in_progress` status; the clamp at
+  0 / 1 / 30 / 31 / null.
+- `task-board-provenance.spec.ts` — precedence with all twelve sources present; with
+  ties; with an unresolvable name (omitted, not rendered as an id); the two-shown /
+  rest-menued split.
+- `task.repository.spec.ts` — the three new filter options: `parentTaskId: 'none'`
+  emits `IS NULL`; `isRecurring: false` emits the predicate; `isRecurring:
+  undefined` emits none; each `orderBy` value emits the expected clause; **omitting
+  all three reproduces the current SQL exactly** (the regression that matters most).
+- `task-board.service.spec.ts` — totals come from the grouped count and not from
+  `cards.length`; each enrichment failure degrades only itself and names itself in
+  `degraded[]`; the enrichment reads are batched (assert one call per source with an
+  `IN` list, not N calls).
 
-### 10.2 Controller specs — API (Jest, colocated)
+### 10.2 Controller specs — API (Jest, colocated in `apps/api/src/tasks/`)
 
-Matching the existing pattern
-(`apps/api/src/tasks/tasks.controller.scope.spec.ts`,
-`tasks.controller.board-visibility.spec.ts`):
+Following the existing `tasks.controller.*.spec.ts` files:
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/missions/missions.controller.board.spec.ts` | `GET /board` shape, query validation (bad priority, `laneLimit` 0 and 201, hostile `tz`), throttle wiring |
-| `apps/api/src/missions/missions.controller.shelf.spec.ts` | archive / unarchive / trash / restore: happy path, idempotent repeat, 404-no-leak for a foreign id, identical bodies across all four |
-| `apps/api/src/missions/missions.controller.scope.spec.ts` | Organization scoping on every new route |
-| `apps/api/src/missions/dto/mission.dto.spec.ts` (extend) | `priority` and `labels` validation on create and update |
-| `apps/api/src/missions/mission-comments.controller.spec.ts` (P2) | Post / list / edit, 16 KB rejection, 409 after the edit window, 404-no-leak |
+- `tasks.controller.board.spec.ts` — default parameters reproduce the documented
+  defaults; `layout=focus` returns four columns plus the toggle behaviour;
+  `columnLimit` clamps at 1 and 100; `terminalWindowDays` clamps at 1 and 90;
+  `includeSubtasks` / `includeTemplates` / `includeHidden` each flip exactly one
+  predicate; the `board` block is present on every card.
+- `tasks.controller.board-scope.spec.ts` — another user's Task is absent from every
+  column and every count; a provenance name the caller cannot see is omitted;
+  cross-user column paging 404s in the same shape as the existing scope specs.
+- `tasks.controller.board-visibility.spec.ts` — **extend the existing file**:
+  `hiddenFromBoard` rows are absent from the board read's columns *and* its counts,
+  and present with `includeHidden=true`.
+- Regression: the existing `GET /api/tasks` controller specs must pass untouched.
+  Any diff there means the additive promise was broken.
 
 ### 10.3 End-to-end — web (Playwright, `apps/web/e2e/`)
 
-Named to match the existing `flow-mission-*` family:
+- Board is the landing view with no stored preference; `?view=table` overrides;
+  switching persists across a reload.
+- Column header totals match a seeded fixture of 120 Tasks across seven statuses,
+  while only 50 cards render in the largest column.
+- **Show 50 more** on one column leaves the other columns' rendered card counts and
+  scroll positions unchanged.
+- A `p0` Task seeded with an old `updatedAt` renders first in its column.
+- A Mission-owned, a trigger-fired, a recurrence-cloned and a hand-filed Task each
+  render their expected provenance chip; clicking the Mission chip filters the board
+  and updates every count; **no Mission renders as a card**.
+- A parent with five sub-tasks renders one card with `2/5`; **Show sub-tasks**
+  restores six cards.
+- A recurring template is in the strip and in no column; **Show templates** puts it
+  back, chipped and not draggable.
+- A Task with an open escalation shows the Decision chip while staying in
+  `In progress`.
+- Focus layout: dragging `in_progress` onto `Needs you` opens the picker; choosing
+  `Blocked` moves the card; cancelling changes nothing.
+- The board's existing behaviours still pass: drag to transition, the `r` shortcut,
+  `Run all`, the diff sheet.
 
-| File | Covers |
-| --- | --- |
-| `apps/web/e2e/flow-mission-board-ui-journey.spec.ts` | Open `/missions`, assert four lanes and both header counters, apply a filter, clear it, open a card, `Show 50 more` |
-| `apps/web/e2e/flow-mission-board-quick-create.spec.ts` | `n` opens the dialog, validation on a 9-character description, create, the card appears in Backlog with its chips, the error path preserves the typed text |
-| `apps/web/e2e/flow-mission-board-archive-trash.spec.ts` | Archive → Undo → archive → Archived tab → Restore; trash → Trash tab → purge date copy → Delete forever behind the typed title |
-| `apps/web/e2e/flow-mission-board-lane-moves.spec.ts` | Drag Backlog → In flight, In flight → Backlog, drop on Done opens the completion dialog and cancelling changes nothing, `Needs you` refuses with its toast |
-| `apps/web/e2e/flow-mission-board-empty-and-error.spec.ts` | Zero-Mission empty board, single empty lane keeps its frame, forced board error keeps the lane frames and offers the List tab |
-| `apps/web/e2e/flow-mission-board-keyboard.spec.ts` | Arrow navigation across lanes, `Enter`, `e`, `Delete`, `/`, `Esc`, and that `e` and `Delete` are inert while a text input has focus |
-| `apps/web/e2e/flow-mission-comment-steering.spec.ts` (P2) | Post a comment with a live Run → "Delivered"; with none → "queued"; with the runtime unconfigured → refusal with the settings link; edit at 4 min, refused at 6 |
-| `apps/web/e2e/flow-mission-board-a11y.spec.ts` | axe scan of the Board, Archived and Trash tabs and the quick-create dialog; lane regions carry names and live counts |
+### 10.4 Web unit specs (Vitest, `apps/web`)
 
-### 10.4 Web unit specs
-
-Colocated `*.unit.spec.tsx` beside each component, matching
-`MissionCard.unit.spec.tsx` and friends: `MissionBoardCard`, `MissionLane`,
-`MissionBoardFilters`, `NewMissionDialog`, `MissionShelf`,
-`MissionCommentThread` (P2). The card spec must assert that a status line
-containing `<script>` and a markdown link renders as literal text.
+- `TaskBoardCard` renders an Agent-supplied title containing markup as literal text.
+- `TaskProvenanceChips` renders two chips and menus the third.
+- `TasksList` view resolution: URL beats cookie beats the board default.
+- A hydration spec over the new keys — a missing parent key must fail the suite here
+  rather than reddening every e2e shard.
 
 ### 10.5 What must be green before merge
 
-`pnpm format:check`, `pnpm lint`, `pnpm type-check`, the agent + api Jest suites,
-the touched Playwright shards, and a locale-key consistency check across the 21
-message files.
+`pnpm lint`, `pnpm type-check`, `pnpm --filter @ever-works/agent test`,
+`pnpm --filter @ever-works/api test`, `pnpm --filter @ever-works/web test`, the
+locale-sync check, and the Playwright specs above.
 
 ---
 
 ## 11. Phasing
 
-Each phase is independently shippable, leaves `develop` green, and is useful on
-its own.
+Each phase is independently shippable, is additive, and **adds no migration**.
 
-### P1 — The board (the bulk of the value)
+### P1 — Make the board true
 
-Schema: `AddMissionBoardColumns` (10 columns on `missions`, 1 on
-`work_agent_preferences`, 2 indexes).
-Domain: `mission-lane.ts` (pure), `MissionBoardService`, `MissionStalenessService`,
-`MissionTrashService`; progress writers wired into the six existing event owners;
-`MissionsService` gains archive / unarchive / trash / restore, label
-normalisation and the `include` filter.
-API: `GET /board`, the four shelf verbs, additive create/update DTO fields.
-Web: the tab strip, `MissionBoard` and its nine sibling components, the shelf,
-the quick-create dialog, the poll hook, the new server actions.
-Jobs: the staleness sweep and the trash purge.
-i18n: everything in §8 except the `missionDetail.comments.*` block.
+The board stops lying and becomes a place you can link to.
 
-**Ships without**: comments (the card's comment chip is simply absent while the
-count is 0), non-human origins (every Mission is origin `user`, which is true),
-and the staleness settings control (the platform default of 2 days applies).
+- `task-board-columns.ts` and the three filter options.
+- `task-board.service.ts` with Q1–Q3 only (no enrichment yet).
+- `GET /api/tasks/board` and `GET /api/tasks/board/column`.
+- `TaskBoard` / `TaskBoardColumn` / `TaskBoardCard` extracted from the shipped view,
+  behaviour unchanged, plus true totals, per-column paging, the empty and error
+  states.
+- View and filters in the URL, remembered per browser, board as the default.
+- **Every hardcoded string on the board moved to the catalogue**, reusing the seven
+  status names and five priority labels that already exist.
+- Priority ordering.
 
-### P2 — The thread and steering
+Ships without: provenance, roll-ups, decision chips, comment chips, stall flags, the
+Focus layout, the recurring strip.
 
-Schema: `CreateMissionComments`.
-Domain: `MissionCommentService` reusing `RUN_STEERING_PORT`,
-`AGENT_CHAT_REPLY_DISPATCHER` and `RunDispatchGateService`.
-API: the three comment routes.
-Web: `MissionCommentThread` on the detail page, the change-of-direction template
-button, live comment counts on cards.
-i18n: `dashboard.missionDetail.comments.*`.
+### P2 — Make the card legible
 
-### P3 — The whole queue
+- The six enrichment reads and the `board` block on each card.
+- Provenance chips with their precedence and their filter links.
+- Sub-task roll-up and the top-level-only default with its toggle.
+- The recurring strip, reading the existing cadence describers, plus the templates
+  toggle.
+- Decision chip, `Open decision` action, and the two header counters.
+- Comment count and the reply affordance, opening the existing thread.
 
-Schema: `AddInboundTriggerTargetKind`.
-Domain: the Trigger fire path branches on `targetKind`; a new
-`AgentActionProposalActionType` member lets an Agent propose a Mission through the
-existing approval rail.
-API: `targetKind` on trigger create; bulk archive.
-Web: origin chips light up with real non-`user` values; the origin filter becomes
-meaningful; the staleness threshold control lands in the work-agent settings page;
-`Archive all Done older than 30 days` bulk action.
+### P3 — Make it say when it is stuck
 
-**Sequencing.** P1 has no dependency. P2 depends on P1 only for the
-`commentCount` column. P3 depends on P1 for the origin columns. Nothing here
-blocks or is blocked by another epic; AW-03 and AW-04 consume the same underlying
-signals but through their own surfaces.
+- The stall predicate in the ordering and on the card.
+- `task-stall-sweep` and the `task_stalled` notification kind.
+- The Focus layout and its drop picker.
+- Saved views as named URLs on the user's existing preferences.
 
 ---
 
 ## 12. Constitution compliance
 
-| Principle | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | No external integration is added; nothing in this epic calls a third party. |
-| **II — Capability-driven** | ✅ | No plugin id anywhere. Agent execution is reached only via `AGENT_CHAT_REPLY_DISPATCHER` and `RUN_STEERING_PORT`; a provider-name grep over the diff must be empty, and that is a review gate. |
-| **III — Source-of-truth repos** | ✅ | Priority, labels, board markers and comments are metadata about delegated work. No Work item, category or config moves into the database. |
-| **IV — Job runtime** | ✅ | Both new crons are Trigger-shaped files in `packages/tasks/src/tasks/trigger/` delegating to agent-package services; every Run started from a comment goes through the existing dispatcher token. The agent package never imports a vendor SDK. |
-| **V — Forward-only migrations** | ✅ | Three additive migrations in `apps/api/src/migrations/`, one per phase, no `DROP`, no type change, no `NOT NULL` without a default, no backfill needed. |
-| **VI — Tests** | ✅ | §10: 6 agent-package unit suites, 5 controller specs, 8 Playwright specs, 6 colocated web unit specs. `deriveLane` is pure precisely so its truth table is exhaustively testable. |
-| **VII — Secrets** | ✅ | No secret is introduced, read, logged or returned. `deliveryDetail` carries a reason string, never a payload value. |
-| **VIII — Plugin counts** | ✅ | No plugin added; `docs/plugin-system/built-in-plugins.md` untouched. |
-| **IX — Behaviour-first spec** | ✅ | `spec.md` names no class, file or library; every implementation detail is in this document. |
-| **X — Backwards compatibility** | ✅ | All new request and response fields are optional and additive. The one default change (`GET /api/me/missions` excluding archived and trashed rows) cannot be observed by any existing consumer, because no such row can exist before P1's migration. `DELETE /api/me/missions/:id` keeps its current hard-delete semantics for direct callers. |
+| Gate | How this plan satisfies it |
+| --- | --- |
+| **I — Plugin-first** | No external integration. No provider client. §7 |
+| **II — Capability-driven** | No plugin id anywhere. Runs go through the existing gated dispatch path the board already uses |
+| **III — Source-of-truth repos** | Reads platform metadata only. No Work content enters the database; no Task content leaves it |
+| **IV — Job-runtime provider** | The one scheduled job (`task-stall-sweep`) is a `schedules.task` in `packages/tasks/src/tasks/trigger/`, dispatched through the configured provider, in a transient `TriggerInternalModule` context. §6 |
+| **V — Forward-only migrations** | **No schema change ships.** If §3.3's threshold column is later adopted it ships as an additive forward-only migration in `apps/api/src/migrations/` in the same PR as the column. `packages/agent/src/migrations/` does not exist and is never cited |
+| **VI — Tests first-class** | Pure logic has Jest unit specs; every endpoint has a colocated controller spec; every new user-visible flow has a Playwright spec; the existing list-route specs must pass untouched. §10 |
+| **VII — Secrets** | No secret is introduced, read or logged. The Trigger provenance chip carries a trigger's **name**, never its secret |
+| **VIII — Plugin counts** | No plugin added; the canonical plugin doc is untouched |
+| **IX — Behaviour-first spec** | The spec names no class, file or library; every path in this document was opened before being cited |
+| **X — Backwards compatibility** | Every new request parameter is optional and its absence reproduces today's SQL; every new response field is additive; `TasksKanbanView` is kept as an adapter so every existing caller compiles; every changed default has a one-action toggle back |
 
 ---
 
 ## 13. Follow-ups deliberately not taken here
 
-1. **Extract a shared board primitive.** Four independent board implementations
-   will exist after P1 (`TasksKanbanView`, `WorksKanbanView`,
-   `ActivityKanbanView`, `MissionBoard`). Consolidating them is a real refactor
-   with its own regression surface and should be its own change.
-2. **Extract a shared comment-thread component.** The Task thread is inlined in
-   `TaskDetailClient.tsx`; the Mission thread is built standalone in P2. Merging
-   them afterwards is cheap and safe; merging them during P2 is not.
-3. **Constitution §V path drift.** The Constitution names
-   `apps/api/src/database/migrations/`; the code and `typeorm.config.ts` use
-   `apps/api/src/migrations/`. Raise a one-line constitution amendment rather
-   than silently following one or the other.
-4. **Cursor pagination for `GET /board`.** Offset paging within a lane is
-   adequate at the 50/200 caps; revisit if a workspace exceeds a few thousand
-   Missions.
+- **Extract a shared board primitive.** Three Kanban views exist —
+  `TasksKanbanView`, [`WorksKanbanView`](../../../../../apps/web/src/components/works/WorksKanbanView.tsx)
+  and [`ActivityKanbanView`](../../../../../apps/web/src/components/activity-log/ActivityKanbanView.tsx)
+  — sharing no primitive. Unifying them is a refactor with its own blast radius across
+  three domains; it should be its own change with its own tests.
+- **A stored last-progress timestamp.** §2.4 states what the derived signal costs. If
+  under-reporting proves unacceptable, the right home is the run or the activity
+  trail, **not** a twelfth denormalised column on `Task` — the domain's own
+  convention (capability map §7.3) is a `task_*` side table for new Task metadata.
+- **Bind the Task watcher entity to a UI.** `TaskWatcher` exists, is indexed, and has
+  no endpoint and no screen. Surfacing it is [AW-13](../AW-13-attention-controls/)'s
+  work; this plan records it so it is not rediscovered as missing.
+- **Cursor pagination on the schedules aggregation.** The recurring strip reads a
+  read model the schedules service already caps per source at 500 rows and documents
+  as un-paginated for v1. [AW-10](../AW-10-schedules-calendar/) owns that.
+- **Reconcile the two inbound-trigger management UIs.** `/tasks/triggers` and the
+  Activity page's schedules tab both manage the same entity with two i18n namespaces.
+  The board only reads trigger **names**, so it is unaffected, but the duplication is
+  real and belongs to whoever owns that IA decision.
+- **Update the stale doc comments.** `tasks/page.tsx` says Kanban "lands in Phase 14"
+  and `tasks/new/page.tsx` says the scope picker "lands in a follow-up tick"; both
+  shipped. A one-line comment fix, not this epic's job to bundle.
+- **Correct README §1.1's priority scale** from four steps to five (spec §9). One
+  line, and it should ride with this epic's PR.
 
 ---
 
 ## 14. References
 
-- Spec: [`./spec.md`](./spec.md)
-- Tasks: [`./tasks.md`](./tasks.md)
-- Program overview: [`../README.md`](../README.md)
-- Constitution: [`../../../../../.specify/memory/constitution.md`](../../../../../.specify/memory/constitution.md)
-- Missions, Ideas and Works: [`../../missions-ideas-works/`](../../missions-ideas-works/)
-- Task tracking (priority scale, comment thread, board precedent): [`../../task-tracking/`](../../task-tracking/)
+- Spec: [`./spec.md`](./spec.md) · Tasks: [`./tasks.md`](./tasks.md)
+- Program overview and the `Task` vs `Mission` distinction: [`../README.md`](../README.md) §1, §1.1, §3
+- Existing substrate: [`../EXISTING-SUBSTRATE.md`](../EXISTING-SUBSTRATE.md)
+- Task tracking as specified today: [`../../task-tracking/`](../../task-tracking/)
+- Missions, Ideas and Works — the source side: [`../../missions-ideas-works/`](../../missions-ideas-works/)
 - Schedules: [`../../schedules/spec.md`](../../schedules/spec.md)
-- Tenants and Organizations (scope columns): [`../../tenants-and-organizations/`](../../tenants-and-organizations/)
-</content>
+- Constitution: [`.specify/memory/constitution.md`](../../../../../.specify/memory/constitution.md)
