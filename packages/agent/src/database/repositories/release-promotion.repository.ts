@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
 import {
     PROMOTION_LANE_OPEN,
+    RELEASE_VERIFY_STATES,
+    isReleaseVerifyTerminal,
     promotionLaneKey,
     type PromotionGateVerdict,
     type PromotionRung,
     type PromotionState,
+    type ReleaseVerifyState,
 } from '@ever-works/contracts';
 import { ReleasePromotion } from '../../entities/release-promotion.entity';
 
@@ -346,7 +349,361 @@ export class ReleasePromotionRepository {
             .execute();
         return (result.affected ?? 0) > 0;
     }
+
+    // ── Post-deploy verification (slice AJ, EW-809) ───────────────────
+    //
+    // Every write below is a CONDITIONAL update whose WHERE clause
+    // restates the precondition, the same posture `FleetJobService` uses
+    // for the lease protocol and `recordGateVerdict` uses for the gate.
+    // Two API replicas run this sweep and this listener, and the row is
+    // the only thing that can arbitrate between them.
+
+    /**
+     * Start a verification, but only for a promotion that has never had
+     * one.
+     *
+     * `WHERE verifyState IS NULL` is what makes "exactly once per
+     * promotion" a database fact rather than an argument about call sites.
+     * The merge-detection block that calls this frees the lane in the same
+     * pass, so in practice it runs once anyway — but "in practice" is how
+     * two Inbox notices for one event get shipped.
+     */
+    async beginVerification(
+        id: string,
+        patch: {
+            verifyState: ReleaseVerifyState;
+            verifyExpectedSha: string | null;
+            verifyTargetUrl: string | null;
+            verifyStartedAt: Date;
+            verifyDeadlineAt: Date | null;
+            verifyRetryAt: Date | null;
+            verifyDetail: string | null;
+        },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({
+                verifyState: patch.verifyState,
+                verifyExpectedSha: patch.verifyExpectedSha,
+                verifyTargetUrl: patch.verifyTargetUrl,
+                verifyStartedAt: patch.verifyStartedAt,
+                verifyDeadlineAt: patch.verifyDeadlineAt,
+                verifyRetryAt: patch.verifyRetryAt,
+                verifyDetail: patch.verifyDetail,
+                verifyAttempts: 0,
+                verifyStreak: 0,
+                verifyJobId: null,
+            })
+            .where('id = :id', { id })
+            .andWhere('verifyState IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Rows the verification sweep should look at: still being verified,
+     * and due.
+     *
+     * Deliberately NOT filtered on `verifyJobId IS NULL`. A row whose
+     * browser check never comes back must still be able to reach its
+     * deadline and settle, or one wedged fleet job would hold a promotion
+     * in `awaiting-rollout` for ever — exactly the unbounded state this
+     * lane is not allowed to have. The sweep decides per row whether it is
+     * claiming an attempt or expiring the row.
+     */
+    async findVerificationsDue(now: Date, limit = 25): Promise<ReleasePromotion[]> {
+        return this.repository.find({
+            where: {
+                // DERIVED, not restated. A verification state added later is
+                // live unless `isReleaseVerifyTerminal` says otherwise, so a
+                // new state cannot be introduced into a lane the sweep
+                // silently never visits — which would be a promotion stuck
+                // for ever with nothing to notice it.
+                verifyState: In(LIVE_VERIFY_STATES),
+                verifyRetryAt: LessThanOrEqual(now),
+            },
+            order: { verifyRetryAt: 'ASC' },
+            take: Math.max(1, Math.min(limit, 100)),
+        });
+    }
+
+    /** The promotion a browser check belongs to, so a completion can be routed back. */
+    async findByVerifyJobId(jobId: string): Promise<ReleasePromotion | null> {
+        return this.repository.findOne({ where: { verifyJobId: jobId } });
+    }
+
+    /**
+     * Take ownership of the next probe.
+     *
+     * The caller enqueues FIRST (with a key deterministic in
+     * `(promotion, attempt)`) and claims second. Both orderings leak
+     * something; this one leaks the harmless thing. A crash between the
+     * two leaves an enqueued job nobody recorded, and the next sweep
+     * computes the SAME attempt number, re-enqueues the SAME key, is
+     * handed the SAME job row back by `FleetJobService`, and records it.
+     * Claiming first and enqueuing second would instead leave a row
+     * pointing at a job that does not exist, which nothing can complete.
+     *
+     * `WHERE verifyJobId IS NULL AND verifyState = :state` is the mutual
+     * exclusion: at most one browser is ever pointed at one environment
+     * for one promotion.
+     *
+     * `reconsiderAt` is when the sweep should LOOK at this row again — not
+     * when it may enqueue again, which is gated on the job coming back. See
+     * the note on `verifyRetryAt` below.
+     */
+    async claimVerifyAttempt(
+        id: string,
+        state: ReleaseVerifyState,
+        patch: { jobId: string; attempts: number; targetUrl: string; reconsiderAt: Date },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({
+                verifyJobId: patch.jobId,
+                verifyAttempts: patch.attempts,
+                verifyTargetUrl: patch.targetUrl,
+                // NOT null, and this is load-bearing. `verifyRetryAt` is the
+                // sweep's WHERE clause, so a row that nulled it while a
+                // check was out would become invisible to the only thing
+                // that can enforce the deadline — and a browser job that
+                // never came back would hold the promotion open for ever,
+                // which is precisely the unbounded state this lane is not
+                // allowed to have. Instead the row stays sweepable: the
+                // sweep re-reads it, sees `verifyJobId` set, and declines to
+                // enqueue a second check while still being able to expire
+                // the row. (The fleet settles a stuck job on its own — a
+                // lease it exhausts or a queue SLA it expires both emit a
+                // completion — but "the other subsystem will notice" is not
+                // a bound, it is a hope.)
+                verifyRetryAt: patch.reconsiderAt,
+            })
+            .where('id = :id', { id })
+            .andWhere('verifyState = :state', { state })
+            .andWhere('verifyJobId IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Burn an attempt WITHOUT binding a job to it.
+     *
+     * Added during the slice-AJ review, for the one case
+     * {@link claimVerifyAttempt}'s recovery argument does not cover:
+     * `FleetJobService.enqueue` short-circuits on the idempotency key with
+     * a bare `findOne({ where: { idempotencyKey } })` that has no status
+     * filter and no owner scope, so re-deriving the same key can hand back
+     * a job that has ALREADY SETTLED (its completion fired while nothing
+     * was bound to it, and no second one will ever arrive) or a job
+     * somebody else created under that key. Binding either would wedge the
+     * verification until its deadline for a reason nobody recorded.
+     *
+     * Advancing `verifyAttempts` is what breaks the loop: the next sweep
+     * derives attempt N+1, therefore a DIFFERENT idempotency key,
+     * therefore a genuinely new job. The attempt cap still bounds it.
+     *
+     * `WHERE verifyJobId IS NULL AND verifyState = :state` for the same
+     * reason the claim has it: this must never overwrite a live claim.
+     */
+    async burnVerifyAttempt(
+        id: string,
+        state: ReleaseVerifyState,
+        patch: { attempts: number; reconsiderAt: Date; detail: string | null },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({
+                verifyAttempts: patch.attempts,
+                verifyRetryAt: patch.reconsiderAt,
+                verifyDetail: patch.detail,
+            })
+            .where('id = :id', { id })
+            .andWhere('verifyState = :state', { state })
+            .andWhere('verifyJobId IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Push a row with a check STILL IN FLIGHT further down the sweep queue.
+     *
+     * Added during the slice-AJ review. {@link findVerificationsDue} pages
+     * a platform-wide 25 rows ordered `verifyRetryAt ASC` and deliberately
+     * keeps in-flight rows in the result set so their deadline can still be
+     * enforced — but the sweep used to skip such a row without rescheduling
+     * it, so once a check had been out for longer than one interval the row
+     * was permanently `verifyRetryAt <= now` and drifted further into the
+     * past on every pass. Twenty-five of those — one owner whose fleet has
+     * no browser-capable node is enough — filled the page for ever and no
+     * other tenant's verification was enqueued or expired again.
+     *
+     * Pinned to the job it is waiting on, so this cannot silently reschedule
+     * a row whose check came back in the meantime.
+     */
+    async deferVerification(
+        id: string,
+        state: ReleaseVerifyState,
+        jobId: string,
+        reconsiderAt: Date,
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({ verifyRetryAt: reconsiderAt })
+            .where('id = :id', { id })
+            .andWhere('verifyState = :state', { state })
+            .andWhere('verifyJobId = :jobId', { jobId })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Let go of a job binding without settling the row.
+     *
+     * Added during the slice-AJ review for the wedge case: the row points
+     * at a fleet job that has reached a terminal state but whose result
+     * could not be recorded (the in-process listener's transient failure,
+     * or an API replica that restarted between the fleet write and the
+     * handler). Nothing would ever complete that job again, and the sweep
+     * declines to enqueue while `verifyJobId` is set, so the promotion
+     * burned its whole eight-hour budget having checked nothing.
+     *
+     * Releases the binding and burns the attempt in ONE write, so the next
+     * sweep enqueues a fresh check under a fresh idempotency key.
+     */
+    async releaseVerifyJob(
+        id: string,
+        state: ReleaseVerifyState,
+        jobId: string,
+        patch: { attempts: number; reconsiderAt: Date; detail: string | null },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({
+                verifyJobId: null,
+                verifyAttempts: patch.attempts,
+                verifyRetryAt: patch.reconsiderAt,
+                verifyDetail: patch.detail,
+            })
+            .where('id = :id', { id })
+            .andWhere('verifyState = :state', { state })
+            .andWhere('verifyJobId = :jobId', { jobId })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Record one probe result and schedule (or not) the following one.
+     *
+     * Pinned to the job that produced it, so a late completion from a
+     * superseded job cannot advance a row that has already moved on. The
+     * state is pinned too: a result read against `checking-app` cannot
+     * land on a row that has since become `confirming-failure`.
+     */
+    async recordVerifyResult(
+        id: string,
+        from: { jobId: string; state: ReleaseVerifyState },
+        patch: {
+            verifyState: ReleaseVerifyState;
+            verifyStreak: number;
+            verifyCheckedAt: Date;
+            verifyRetryAt: Date | null;
+            verifyDetail: string | null;
+        },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({
+                verifyState: patch.verifyState,
+                verifyStreak: patch.verifyStreak,
+                verifyCheckedAt: patch.verifyCheckedAt,
+                verifyRetryAt: patch.verifyRetryAt,
+                verifyDetail: patch.verifyDetail,
+                verifyJobId: null,
+            })
+            .where('id = :id', { id })
+            .andWhere('verifyJobId = :jobId', { jobId: from.jobId })
+            .andWhere('verifyState = :state', { state: from.state })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Settle a verification, from a state it is still in.
+     *
+     * The `from` pin is what makes "exactly one process narrates this
+     * verdict" true, and therefore what makes "exactly one Inbox notice"
+     * true: the caller files the notice only when this returned `true`.
+     * Clears `verifyRetryAt` and `verifyJobId` in the same write, so a
+     * settled row is invisible to the sweep and deaf to a late completion.
+     */
+    async settleVerification(
+        id: string,
+        from: ReleaseVerifyState,
+        patch: {
+            verifyState: ReleaseVerifyState;
+            verifyCheckedAt: Date;
+            verifyDetail: string | null;
+        },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({
+                verifyState: patch.verifyState,
+                verifyCheckedAt: patch.verifyCheckedAt,
+                verifyDetail: patch.verifyDetail,
+                verifyRetryAt: null,
+                verifyJobId: null,
+                verifyStreak: 0,
+            })
+            .where('id = :id', { id })
+            .andWhere('verifyState = :from', { from })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Claim the right to file the ONE revert offer for this promotion.
+     *
+     * `WHERE revertTaskId IS NULL AND verifyState = 'failed'` carries two
+     * separate guarantees, both load-bearing:
+     *
+     *   - a promotion is offered a revert AT MOST ONCE, ever, however many
+     *     replicas notice the failure;
+     *   - a revert can only be offered for a verification that actually
+     *     reached `failed`. An `inconclusive` or `unsupported` promotion
+     *     cannot be handed a revert offer even by a caller that asks for
+     *     one, because the database refuses the write. That is the last
+     *     line of the "an inconclusive verdict does not trigger a revert"
+     *     rule, underneath the service check and the contracts predicate.
+     */
+    async claimRevertOffer(id: string, taskId: string, at: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ReleasePromotion)
+            .set({ revertTaskId: taskId, revertOfferedAt: at })
+            .where('id = :id', { id })
+            .andWhere('revertTaskId IS NULL')
+            .andWhere('verifyState = :failed', { failed: 'failed' })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
 }
+
+/**
+ * The verification states the sweep must keep looking at.
+ *
+ * Computed from the contract rather than typed out, so the sweep's query
+ * and `isReleaseVerifyTerminal` cannot disagree about what "finished"
+ * means.
+ */
+const LIVE_VERIFY_STATES = RELEASE_VERIFY_STATES.filter((state) => !isReleaseVerifyTerminal(state));
 
 /**
  * An open lane nobody can ever free: no pull request bound, and older

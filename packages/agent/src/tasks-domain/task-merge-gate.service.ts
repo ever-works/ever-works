@@ -1,6 +1,13 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { GitPullRequestStatus } from '@ever-works/plugin';
-import { isPromotionTask, normalizeCommitSha } from '@ever-works/contracts';
+import {
+    isPromotionTask,
+    isReleaseRevertTask,
+    normalizeCommitSha,
+    releaseRevertRungFromLabels,
+    resolvePromotionBranches,
+} from '@ever-works/contracts';
+import type { ReleaseLadder } from '@ever-works/contracts';
 import { Task } from '../entities/task.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { MergePolicyService } from '../policy/merge-policy.service';
@@ -163,6 +170,41 @@ export class TaskMergeGateService {
         const work = await this.works.findById(task.workId);
         if (!work) return { action: 'skipped', reason: 'no-work' };
 
+        // Post-deploy verification and revert (slice AJ, EW-809) — the
+        // SECOND narrowing, and it exists because undoing a promotion is
+        // the same class of act as making one.
+        //
+        // A revert Task is deliberately an ORDINARY Task: it carries no
+        // `release:promotion` label, so `assessPromotion` above answers
+        // `{ promotion: null }` for it and, without this, `needsApproval`
+        // below would collapse back to the operator's policy flag —
+        // `requireHumanApproval: false` is a legitimate setting for
+        // ordinary agent work, and the release lane additionally REQUIRES
+        // `allowAgentMerge: true` with `main` unprotected or slice AI's own
+        // promotion merges are refused. On that configuration a revert
+        // pull request would have merged into production with no
+        // `merge_pull_request` approval ever raised, verified or recorded.
+        //
+        // It also resolves the branch the revert actually lands on. Every
+        // other Task pull request targets the Work's isolation base; a
+        // revert lands where the promotion landed, and that value is what
+        // the protected-branch rule is evaluated against AND what the
+        // approving human reads. Resolved from the Work's LADDER and the
+        // Task's own rung label — platform state on both sides, never
+        // anything a caller supplied.
+        //
+        // Fails closed: a revert Task whose rung or ladder cannot be
+        // resolved is not merged at all, rather than merged against a base
+        // this gate had to guess.
+        const revertBase = resolveRevertBase(task, work);
+        if (isReleaseRevertTask(task.labels) && !revertBase) {
+            this.logger.warn(
+                `Task ${task.id}: release revert Task has no resolvable base branch ` +
+                    '(missing rung label or unusable release ladder) — refusing the merge.',
+            );
+            return { action: 'skipped', reason: 'revert-base-unresolved' };
+        }
+
         // The Agent that owns this Task's runs. Without one there is no
         // scope to resolve an Agent-level policy against and nobody to
         // attribute the merge to, so the gate stands down rather than
@@ -197,7 +239,11 @@ export class TaskMergeGateService {
         // and `attemptMergeForOpenPullRequest` additionally RAISES the
         // requirement inside the facade so the property does not rest on
         // this branch alone.
-        const needsApproval = resolved.policy.requireHumanApproval || promotion !== null;
+        // `revertBase !== null` carries the slice-AJ half of the same
+        // property: a revert is never merged without a recorded human
+        // approval either.
+        const needsApproval =
+            resolved.policy.requireHumanApproval || promotion !== null || revertBase !== null;
 
         if (!needsApproval) {
             // The operator opted out of approvals for this scope. Green
@@ -227,10 +273,11 @@ export class TaskMergeGateService {
                 agentId,
                 gateStatus: 'green',
                 headSha,
-                // The promotion's own base, not the Work's default — see
+                // The promotion's own base — or, for a revert, the branch
+                // the promotion landed on. Never the Work's default; see
                 // `attemptMergeForOpenPullRequest`.
-                baseRef: promotion?.baseBranch ?? null,
-                requireHumanApproval: promotion !== null,
+                baseRef: promotion?.baseBranch ?? revertBase,
+                requireHumanApproval: promotion !== null || revertBase !== null,
             });
             return { action: 'merge-attempted', merge };
         }
@@ -252,6 +299,7 @@ export class TaskMergeGateService {
             // request targets the Work's isolation base.
             targetBranch:
                 promotion?.baseBranch ??
+                revertBase ??
                 ((work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || null),
             repository: `${work.getRepoOwner()}/${work.getDataRepo()}`,
             ciState: status.ciState,
@@ -345,4 +393,24 @@ export class TaskMergeGateService {
         );
         return { blocked: { action: 'skipped', reason: verdict.code }, promotion: null };
     }
+}
+
+/**
+ * The branch a release revert Task lands on, or `null` when this is not a
+ * revert Task (or is one whose base cannot be resolved).
+ *
+ * Post-deploy verification and revert (slice AJ, EW-809). BOTH inputs are
+ * platform state: the rung comes from the labels the verification service
+ * filed the Task with, and the branch comes from the Work's release
+ * ladder — the same `resolvePromotionBranches` slice AI opened the
+ * promotion with, so a revert and the promotion it undoes can never
+ * disagree about which branch is production.
+ */
+function resolveRevertBase(
+    task: Pick<Task, 'labels'>,
+    work: { releaseLadder?: ReleaseLadder | null },
+): string | null {
+    const rung = releaseRevertRungFromLabels(task.labels);
+    if (!rung) return null;
+    return resolvePromotionBranches(work.releaseLadder, rung)?.base ?? null;
 }

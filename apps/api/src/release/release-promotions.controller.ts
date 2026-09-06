@@ -13,12 +13,16 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { sanitizeReleaseLadder } from '@ever-works/contracts';
+import { sanitizeReleaseLadder, sanitizeReleaseVerificationTargets } from '@ever-works/contracts';
 import { ReleasePromotionService } from '@ever-works/agent/tasks-domain';
 import { WorkRepository } from '@ever-works/agent/database';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { OpenPromotionDto, SetReleaseLadderDto } from './release-promotions.dto';
+import {
+    OpenPromotionDto,
+    SetReleaseLadderDto,
+    SetReleaseVerificationDto,
+} from './release-promotions.dto';
 
 /**
  * Release promotion lane (self-build slice AI, EW-808) — the operator's
@@ -39,6 +43,19 @@ import { OpenPromotionDto, SetReleaseLadderDto } from './release-promotions.dto'
  * lane measured at 215–243 minutes. Six a minute is already far more than
  * a human performs; the lane's UNIQUE index is the real duplicate guard,
  * and this is the cheap one in front of it.
+ *
+ * ## Post-deploy verification (slice AJ, EW-809)
+ *
+ * `PUT/GET verification-targets` declares WHERE each environment can be
+ * observed, as platform state, exactly as `release-ladder` declares which
+ * branches a promotion may touch. `GET promotions` then reports what the
+ * verification found.
+ *
+ * There is still no endpoint here that reverts anything, and there is no
+ * endpoint that starts, retries or forces a verification. A verification
+ * begins when a promotion is observed merged and advances on a cron; a
+ * failed one files an inert Task offering a revert for a human to decide
+ * on. Nothing a caller can say to this controller reverts a deployment.
  */
 @ApiTags('release')
 @Controller('api/works/:workId')
@@ -86,6 +103,54 @@ export class ReleasePromotionsController {
             throw new NotFoundException(`Work ${workId} not found.`);
         }
         return { workId, releaseLadder: sanitizeReleaseLadder(work.releaseLadder) };
+    }
+
+    @Put('verification-targets')
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Declare where this Work’s deployed environments can be observed',
+        description:
+            'PLATFORM STATE. Set by the owner; every post-deploy verification reads it. A promotion request can never name the URL its deployment is checked against.',
+    })
+    async setVerificationTargets(
+        @CurrentUser() user: AuthenticatedUser,
+        @Param('workId', ParseUUIDPipe) workId: string,
+        @Body() body: SetReleaseVerificationDto,
+    ) {
+        const work = await this.works.findById(workId);
+        if (!work || work.userId !== user.userId) {
+            // Same answer for "no such Work" and "not yours".
+            throw new NotFoundException(`Work ${workId} not found.`);
+        }
+        const targets = sanitizeReleaseVerificationTargets(body);
+        if (!targets) {
+            throw new BadRequestException(
+                'A verification target needs an https versionUrl, an https appUrl and a non-trivial ' +
+                    'appExpectText, on a public DNS hostname, for at least one environment.',
+            );
+        }
+        await this.works.update(workId, { releaseVerification: targets });
+        // Echo the SANITIZED value, never the request body: what comes back
+        // is what a verification will actually load.
+        return { workId, releaseVerification: targets };
+    }
+
+    @Get('verification-targets')
+    @ApiOperation({
+        summary: 'Read this Work’s verification targets (null when none are configured)',
+    })
+    async getVerificationTargets(
+        @CurrentUser() user: AuthenticatedUser,
+        @Param('workId', ParseUUIDPipe) workId: string,
+    ) {
+        const work = await this.works.findById(workId);
+        if (!work || work.userId !== user.userId) {
+            throw new NotFoundException(`Work ${workId} not found.`);
+        }
+        return {
+            workId,
+            releaseVerification: sanitizeReleaseVerificationTargets(work.releaseVerification),
+        };
     }
 
     @Post('promotions')
@@ -170,6 +235,14 @@ function view(promotion: {
     gateRunUrl?: string | null;
     gateOverridden?: boolean | null;
     refusalCode?: string | null;
+    verifyState?: string | null;
+    verifyExpectedSha?: string | null;
+    verifyTargetUrl?: string | null;
+    verifyAttempts?: number | null;
+    verifyCheckedAt?: Date | null;
+    verifyDetail?: string | null;
+    revertTaskId?: string | null;
+    revertOfferedAt?: Date | null;
     createdAt: Date;
 }) {
     return {
@@ -196,6 +269,27 @@ function view(promotion: {
             // promoting.
             overridden: promotion.gateOverridden === true,
         },
+        // Post-deploy verification (slice AJ). `state: null` means the
+        // deployment was never checked — which a reader must not round up
+        // to "fine", so the field is always present rather than omitted.
+        verification: {
+            state: promotion.verifyState ?? null,
+            // The commit the deployment was held to. Not `headSha`: the
+            // merge produced a new commit, and this is the base branch's
+            // tip read straight afterwards.
+            expectedSha: promotion.verifyExpectedSha ?? null,
+            lastUrl: promotion.verifyTargetUrl ?? null,
+            attempts: promotion.verifyAttempts ?? 0,
+            checkedAt: promotion.verifyCheckedAt ?? null,
+            detail: promotion.verifyDetail ?? null,
+        },
+        // A revert that was OFFERED. There is deliberately no field here
+        // saying a revert happened, because nothing in this platform
+        // reverts: this is a Task id a human may act on, and landing what
+        // it produces still needs a merge approval.
+        revertOffer: promotion.revertTaskId
+            ? { taskId: promotion.revertTaskId, offeredAt: promotion.revertOfferedAt ?? null }
+            : null,
         refusalCode: promotion.refusalCode ?? null,
         createdAt: promotion.createdAt,
     };

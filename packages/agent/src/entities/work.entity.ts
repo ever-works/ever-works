@@ -27,7 +27,7 @@ import type {
     WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
 // Release promotion lane (self-build slice AI, EW-808).
-import type { ReleaseLadder } from '@ever-works/contracts';
+import type { ReleaseLadder, ReleaseVerificationTargets } from '@ever-works/contracts';
 import type { PRUpdate } from '@src/generators/data-generator';
 import { WorkGenerationHistory } from './work-generation-history.entity';
 import { TimestampColumn } from './_types';
@@ -451,6 +451,36 @@ export class Work {
      */
     @Column('simple-json', { nullable: true })
     releaseLadder?: ReleaseLadder | null;
+
+    /**
+     * Where this Work's deployed environments can be OBSERVED from
+     * outside, per environment (self-build slice AJ, EW-809).
+     *
+     * The other half of the release lane's platform state. The ladder says
+     * which branches a promotion may touch; this says which URLs a
+     * post-deploy verification may load, and it is read for the
+     * environment the promoted rung DEPLOYS (its base branch) — merging
+     * `develop -> stage` is verified against staging, never production.
+     *
+     * NULL — the default, and the value on every existing Work — means a
+     * merged promotion for this Work is recorded `unsupported` and
+     * reported to the owner as NOT VERIFIED. It is never treated as a
+     * pass: "nobody configured a URL" and "the deployment is healthy" must
+     * not be the same reading.
+     *
+     * NEVER accepted on a promotion or verification request. A caller that
+     * could name the URL a verification loads could point a green verdict
+     * at a page it controls, and that verdict is the only thing standing
+     * between a bad release and a human being told everything is fine.
+     *
+     * Read through `sanitizeReleaseVerificationTargets` on every use,
+     * never raw: the column is `simple-json` and therefore holds whatever
+     * was written to it, and these URLs are loaded by a real browser on an
+     * enrolled fleet node — somebody's actual PC, inside their actual
+     * network.
+     */
+    @Column('simple-json', { nullable: true })
+    releaseVerification?: ReleaseVerificationTargets | null;
 
     // ── Memory recall (memory upgrades M3) ───────────────────────────
 

@@ -1,8 +1,19 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+    IsIn,
+    IsObject,
+    IsOptional,
+    IsString,
+    IsUUID,
+    MaxLength,
+    ValidateNested,
+} from 'class-validator';
 import {
     PROMOTION_RUNGS,
     RELEASE_BRANCH_MAX_LENGTH,
+    RELEASE_VERIFY_EXPECT_MAX_LENGTH,
+    RELEASE_VERIFY_URL_MAX_LENGTH,
     type PromotionRung,
 } from '@ever-works/contracts';
 
@@ -64,4 +75,75 @@ export class SetReleaseLadderDto {
     @IsString()
     @MaxLength(RELEASE_BRANCH_MAX_LENGTH)
     production: string;
+}
+
+/**
+ * Where ONE deployed environment can be observed from outside.
+ *
+ * PLATFORM STATE, set deliberately by the Work's owner and read by every
+ * later verification. It is not accepted anywhere on the promotion or
+ * verification path: a request that could name the URL a check loads could
+ * point a green verdict at a page it controls, and that verdict is the
+ * only thing standing between a bad release and a human being told
+ * everything is fine.
+ *
+ * Re-validated server-side with `sanitizeReleaseVerificationTargets`,
+ * which is much stricter than these decorators — https only, no
+ * credentials, no fragment, and a public DNS hostname, because these URLs
+ * are loaded by a real browser on an enrolled fleet node.
+ */
+export class ReleaseVerificationTargetDto {
+    @ApiProperty({
+        maxLength: RELEASE_VERIFY_URL_MAX_LENGTH,
+        example: 'https://api.ever.works/api/version',
+        description:
+            'A URL whose rendered DOM contains the deployed commit sha. THE artefact-identity probe: it is what lets a verification claim to have checked the build that was just promoted rather than the one that happened to be running. A plain health endpoint with no version in it will not do.',
+    })
+    @IsString()
+    @MaxLength(RELEASE_VERIFY_URL_MAX_LENGTH)
+    versionUrl: string;
+
+    @ApiProperty({
+        maxLength: RELEASE_VERIFY_URL_MAX_LENGTH,
+        example: 'https://app.ever.works/api/health',
+        description: 'The page that must actually render once the rollout has landed.',
+    })
+    @IsString()
+    @MaxLength(RELEASE_VERIFY_URL_MAX_LENGTH)
+    appUrl: string;
+
+    @ApiProperty({
+        maxLength: RELEASE_VERIFY_EXPECT_MAX_LENGTH,
+        example: '"status":"OK"',
+        description:
+            'Text that must appear in the app page. Required: a browser check with no expectation passes on any document the browser managed to render, including a CDN error page.',
+    })
+    @IsString()
+    @MaxLength(RELEASE_VERIFY_EXPECT_MAX_LENGTH)
+    appExpectText: string;
+}
+
+/**
+ * The per-environment verification targets, keyed by the environment a
+ * rung DEPLOYS — `develop → stage` is verified against staging, and
+ * `stage → main` against production.
+ *
+ * Both are optional and independent. An environment with no target makes a
+ * promotion into it `unsupported`, reported to the owner as NOT VERIFIED,
+ * which is never read as a pass.
+ */
+export class SetReleaseVerificationDto {
+    @ApiPropertyOptional({ type: ReleaseVerificationTargetDto })
+    @IsOptional()
+    @IsObject()
+    @ValidateNested()
+    @Type(() => ReleaseVerificationTargetDto)
+    staging?: ReleaseVerificationTargetDto;
+
+    @ApiPropertyOptional({ type: ReleaseVerificationTargetDto })
+    @IsOptional()
+    @IsObject()
+    @ValidateNested()
+    @Type(() => ReleaseVerificationTargetDto)
+    production?: ReleaseVerificationTargetDto;
 }
