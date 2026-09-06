@@ -368,15 +368,15 @@
 		"description": "The title of the tag list page"
 	},
 	"users.title": {
-		"message": "Qui utilise ce projet ?",
+		"message": "Qui utilise Ever Works ?",
 		"description": "Users page heading"
 	},
 	"users.subtitle": {
-		"message": "Ce projet est utilisé par de nombreuses personnes",
+		"message": "Ever Works propulse des annuaires, des blogs et d'autres sites riches en contenu que des agents IA construisent, déploient et maintiennent à jour.",
 		"description": "Users page subtitle"
 	},
 	"users.callToAction": {
-		"message": "Utilisez-vous ce projet ?",
+		"message": "Utilisez-vous Ever Works ? Parlez-nous en et nous vous ajouterons à cette page.",
 		"description": "Users page call to action"
 	},
 	"users.addCompany": {
@@ -406,5 +406,33 @@
 	"help.stayUpToDate.description": {
 		"message": "Découvrez les nouveautés de ce projet",
 		"description": "Help page feature description for staying up to date"
+	},
+	"homepage.features.build.title": {
+		"message": "Créez un Work en quelques minutes",
+		"description": "Homepage feature title for creating a work"
+	},
+	"homepage.features.build.description": {
+		"message": "Décrivez ce que vous voulez et Ever Works recherche, génère et déploie le site pour vous.",
+		"description": "Homepage feature description for creating a work"
+	},
+	"homepage.features.own.title": {
+		"message": "Maîtrisez le contenu et le code",
+		"description": "Homepage feature title for owning content and code"
+	},
+	"homepage.features.own.description": {
+		"message": "Chaque Work s'appuie sur un dépôt Git que vous contrôlez : rien n'est enfermé chez un fournisseur.",
+		"description": "Homepage feature description for owning content and code"
+	},
+	"homepage.features.extend.title": {
+		"message": "Étendez-le avec des plugins",
+		"description": "Homepage feature title for the plugin system"
+	},
+	"homepage.features.extend.description": {
+		"message": "Fournisseurs d'IA, recherche, déploiement et pipelines sont des plugins : remplacez-les ou écrivez les vôtres.",
+		"description": "Homepage feature description for the plugin system"
+	},
+	"footer.companyInfo.copyright": {
+		"message": "Copyright © 2024-Présent Ever Co. LTD. Tous droits réservés.",
+		"description": "The copyright line rendered at the bottom of the site footer"
 	}
 }

@@ -34,7 +34,7 @@ workIds[] }`. The relaxation only adds "all Works in one org", it does not open 
 ### P1.2 — Facade: cross-Work semantic search
 
 - Add `VectorStoreFacadeService.queryChunksAcrossWorks(workIds: string[], queryEmbedding, opts)`
-  ([`vector-store-facade.service.ts`](../../../../packages/agent/src/facades/vector-store-facade.service.ts)).
+  ([`vector-store.facade.ts`](../../../../packages/agent/src/facades/vector-store.facade.ts)).
     - `pgvector` (default/core): single `workId IN (…)` row-filter query.
     - namespace/collection-per-Work backends (`qdrant`): fan out per Work, merge by
       `normalizedScore`. Branch on `VectorStoreCapabilities.namespacePerWork`.
@@ -115,7 +115,7 @@ existing `vector-store`/`content-extractor` categories.
 
 ### P2.3 — First-party `memory` plugin (promote `agentmemory`)
 
-- Update [`packages/plugins/agentmemory/`](../../../../packages/plugins/agentmemory) manifest to
+- Update [`packages/plugins/agentmemory/`](https://github.com/ever-works/ever-works/tree/develop/packages/plugins/agentmemory) manifest to
   declare `category: 'memory'`, `capabilities: ['memory', 'agent-memory']` — **additive**: it
   keeps the `agent-memory` capability so the shipped agent-memory pipeline is unbroken, and gains
   the org-aware `memory` capability. `defaultForCapabilities: ['memory']`.

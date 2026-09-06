@@ -44,6 +44,34 @@ const config: Config = {
 			name: 'disable-webpack-persistent-cache',
 			configureWebpack: () => ({ cache: false })
 		}),
+		// EW-266 — legacy `/docs/*` URLs.
+		//
+		// The docs are served from the SITE ROOT (`presets.classic.docs.routeBasePath`
+		// is '/' below, and docs/index.md carries `slug: /`), so the landing page of
+		// https://docs.ever.works IS the documentation — there is no separate marketing
+		// homepage to redirect away from. What did NOT work were the older
+		// https://docs.ever.works/docs and /docs/<page> links that are still out there in
+		// issues, blog posts, READMEs and bookmarks: nginx's `try_files` answered them
+		// with a 404 (see .deploy/docker/docs/nginx.conf).
+		//
+		// Emit a static client-side redirect page for `/docs` and for `/docs/<every doc
+		// route>` so those links land on the real page instead of the 404. The plugin
+		// hands `createRedirects` route paths with the baseUrl already stripped, so this
+		// works unchanged for every locale build (en at '/', fr at '/fr/', ...).
+		[
+			'@docusaurus/plugin-client-redirects',
+			{
+				redirects: [{ from: '/docs', to: '/' }],
+				createRedirects(existingPath: string) {
+					// '/' is already covered by the explicit '/docs' -> '/' redirect above,
+					// and anything that genuinely lives under /docs/ must not shadow itself.
+					if (existingPath === '/' || existingPath === '/docs' || existingPath.startsWith('/docs/')) {
+						return undefined;
+					}
+					return [`/docs${existingPath}`];
+				}
+			}
+		],
 		SENTRY_DNS &&
 			process.env.NODE_ENV === 'production' && [
 				'docusaurus-plugin-sentry',
@@ -101,7 +129,17 @@ const config: Config = {
 					sidebarPath: './sidebarsPlatform.ts',
 					path: '../../docs/',
 					routeBasePath: '/',
-					editUrl: 'https://github.com/ever-works/ever-works/tree/main/'
+					// EW-266 — the string form of `editUrl` is appended to the doc path as
+					// Docusaurus sees it, i.e. relative to THIS folder. Because `path` reaches
+					// out of the app (`../../docs/`), the string form produced dead links like
+					// `.../tree/main/../../docs/index.md` on the "Edit this page" control of
+					// every page. The callback form gets `docPath` relative to the docs folder,
+					// so the URL can be built correctly — and non-default locales can point at
+					// the translation file they would actually edit.
+					editUrl: ({ locale, docPath }: { locale: string; docPath: string }) =>
+						locale === 'en'
+							? `https://github.com/ever-works/ever-works/edit/develop/docs/${docPath}`
+							: `https://github.com/ever-works/ever-works/edit/develop/apps/docs/i18n/${locale}/docusaurus-plugin-content-docs/current/${docPath}`
 				},
 				theme: {
 					customCss: './src/css/custom.css'
@@ -180,7 +218,7 @@ const config: Config = {
 							},
 							{
 								label: 'Stack Overflow',
-								href: 'https://stackoverflow.com/questions/tagged/ever-works-website-template'
+								href: 'https://stackoverflow.com/questions/tagged/ever-works'
 							},
 							{
 								label: 'Discord Chat',
@@ -202,7 +240,11 @@ const config: Config = {
 						]
 					}
 				],
-				copyright: `Copyright © 2024-Present <a href="https://ever.co/" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">Ever Co. LTD.</a>`
+				// Fallback for the stock Docusaurus footer. The site renders the
+				// swizzled footer instead, which reads
+				// `customFields.footerData.companyInfo.copyright` below — keep the
+				// two in sync (EW-266).
+				copyright: `Copyright © 2024-Present <a href="https://ever.co/" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: underline;">Ever Co. LTD.</a> All Rights Reserved.`
 			},
 			algolia: HAS_ALGOLIA_CREDENTIALS
 				? {
@@ -288,7 +330,14 @@ const config: Config = {
 				}
 			],
 			companyInfo: {
-				copyright: `Copyright © ${new Date().getFullYear()} Ever Co. LTD. All Rights Reserved.`,
+				// EW-266 — this is the copyright line the site actually renders: the
+				// swizzled footer (src/theme/Footer/index.tsx) draws from
+				// `customFields.footerData`, not from `themeConfig.footer.copyright`
+				// above (that one only feeds the stock Docusaurus footer). Keep the two
+				// strings in sync. It is a fixed range rather than
+				// `new Date().getFullYear()` so the footer reads
+				// "© 2024-Present", not just the current year.
+				copyright: 'Copyright © 2024-Present Ever Co. LTD. All Rights Reserved.',
 				disclaimer:
 					'*All product names, logos, and brands are property of their respective owners. All company, product and service names used in this website are for identification purposes only. Use of these names, logos, and brands does not imply endorsement.',
 				legalLinks: [

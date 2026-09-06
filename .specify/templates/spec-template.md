@@ -1,6 +1,9 @@
 # Feature Specification: [FEATURE NAME]
 
-> Behaviour-first spec per [Constitution Principle IX](../memory/constitution.md#ix-specs-are-behaviour-first).
+> Behaviour-first spec per [Constitution Principle IX](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md#ix-specs-are-behaviour-first).
+> (Absolute on purpose: a spec generated from this template lands under `docs/specs/`,
+> which the docs site renders — a relative link into `.specify/` cannot resolve from there
+> and shows up as a broken-link warning in `pnpm --filter ever-works-docs build`.)
 > Describe **what** the system does, not how it's structured. Save implementation
 > details for `plan.md`. Mark any unresolved questions with `[NEEDS CLARIFICATION: …]`.
 
