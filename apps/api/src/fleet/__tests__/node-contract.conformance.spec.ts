@@ -230,7 +230,17 @@ describe('fleet node contract — the wire a deployed node actually speaks', () 
         // an older node simply never calls it. Admitting it is the deliberate
         // act this gate exists to demand; the failure that brought us here was
         // the gate working.
-        expect(declared.sort()).toEqual(['complete', 'envFiles', 'heartbeat', 'lease']);
+        // Slice Z (EW-782) adds the run-scoped MCP credential pair. Both are
+        // node verbs on the same credential and the same lease proof, and an
+        // older node simply never calls either, so they are admitted by name.
+        expect(declared.sort()).toEqual([
+            'complete',
+            'envFiles',
+            'heartbeat',
+            'lease',
+            'mintMcpCredential',
+            'revokeMcpCredential',
+        ]);
     });
 
     it('keeps every node-facing fleet route @Public() — a node has no session to present', () => {
@@ -652,7 +662,24 @@ function buildRealJobsController(options: { stopped?: boolean } = {}) {
             throw new Error('the node-contract routes must not resolve run secrets');
         },
     };
-    return { controller: new FleetJobsController(service, runSecrets as never), secret, job };
+    // Slice Z (EW-782) added a third argument, the run-credential service.
+    // Stubbed to REFUSE for the same reason as the run-secrets stub above:
+    // this suite drives the protocol routes and none of them should mint or
+    // revoke a credential, so a refusal surfaces a future mistake instead of
+    // a permissive mock quietly satisfying it.
+    const runCredentials = {
+        mint: async () => {
+            throw new Error('the node-contract routes must not mint a run credential');
+        },
+        revokeForNode: async () => {
+            throw new Error('the node-contract routes must not revoke a run credential');
+        },
+    };
+    return {
+        controller: new FleetJobsController(service, runSecrets as never, runCredentials as never),
+        secret,
+        job,
+    };
 }
 
 /** The pinned job object a lease answers with, for key-set comparison. */

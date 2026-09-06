@@ -20,6 +20,8 @@ export * from './fleet-cost-policy.repository';
 export * from './fleet-kill-switch.service';
 export * from './fleet-kill-switch.repository';
 export * from './fleet-audit.service';
+// Fleet MCP bridge (self-build slice Z / EW-796) — run-scoped credentials.
+export * from './fleet-run-credential.service';
 export * from './agent-fleet-tools';
 export { FleetNode } from '../entities/fleet-node.entity';
 export { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';

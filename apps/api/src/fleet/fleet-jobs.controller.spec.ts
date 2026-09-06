@@ -8,7 +8,7 @@ import { FLEET_JOB_STALE_LEASE_REASON } from '@ever-works/contracts';
 import { FleetJobsController } from './fleet-jobs.controller';
 import { FleetRunSecretsError, FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetJobStaleLeaseError } from '@ever-works/agent/fleet';
-import type { FleetJobService } from '@ever-works/agent/fleet';
+import type { FleetJobService, FleetRunCredentialService } from '@ever-works/agent/fleet';
 
 /**
  * The node work channel.
@@ -53,13 +53,21 @@ function jobView(overrides: Partial<FleetJobView> = {}): FleetJobView {
     };
 }
 
+// Slice Y (EW-781) owns the SECOND argument and slice Z (EW-782) the third.
+// Both slices independently appended a controller dependency, so a call that
+// passes a credential stub positionally in slot 2 type-checks as a run-secrets
+// stub and the feature silently does nothing — the failure this repo has now
+// hit four times. Pass `undefined` for a slot you do not care about rather
+// than shifting the one you do.
 function makeController(
     service: Partial<FleetJobService>,
     runSecrets: Partial<FleetRunSecretsService> = { resolve: jest.fn(async () => null) },
+    runCredentials: Partial<FleetRunCredentialService> = {},
 ): FleetJobsController {
     return new FleetJobsController(
         service as FleetJobService,
         runSecrets as FleetRunSecretsService,
+        runCredentials as FleetRunCredentialService,
     );
 }
 
@@ -353,6 +361,120 @@ describe('FleetJobsController', () => {
             expect((error as ConflictException).getResponse()).toMatchObject({
                 reason: FLEET_JOB_STALE_LEASE_REASON,
             });
+        });
+    });
+});
+
+/**
+ * Self-build slice Z (EW-796) — the run-credential routes on the node
+ * channel.
+ *
+ * Same edge contract as every other route here: the service decides, and
+ * every refusal it returns becomes ONE undifferentiated 401. That matters
+ * more on these routes than anywhere else, because the caller is asking
+ * "may I have a credential for job X" — and a differentiated answer would
+ * turn a valid node secret into a probe for which jobs exist, which are
+ * active, and which have the bridge enabled.
+ */
+describe('FleetJobsController — MCP run credentials', () => {
+    const body = { nodeId: NODE_ID, secret: SECRET };
+
+    describe('POST /api/fleet/jobs/:id/mcp-credential', () => {
+        it('returns the minted credential for the node holding the lease', async () => {
+            const credential = {
+                token: 'ew_run_0123456789abcdef',
+                expiresAt: '2026-07-26T00:05:00.000Z',
+                serverUrl: 'https://mcp.ever.works/mcp',
+            };
+            const mint = jest.fn(async () => credential);
+            const controller = makeController({}, undefined, { mint });
+
+            await expect(controller.mintMcpCredential(JOB_ID, body)).resolves.toEqual(credential);
+            expect(mint).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                jobId: JOB_ID,
+            });
+        });
+
+        it('scopes the mint to the id in the PATH, never to one in the body', async () => {
+            const mint = jest.fn(async () => null);
+            const controller = makeController({}, undefined, { mint });
+
+            await expect(
+                controller.mintMcpCredential(JOB_ID, {
+                    ...body,
+                    // A body field the DTO does not declare cannot reach the
+                    // service; this pins that the path param is the source.
+                    jobId: 'someone-elses-job',
+                } as never),
+            ).rejects.toThrow(UnauthorizedException);
+            expect(mint).toHaveBeenCalledWith(expect.objectContaining({ jobId: JOB_ID }));
+        });
+
+        it('collapses EVERY refusal to one undifferentiated 401', async () => {
+            // The service returns `null` for a foreign node, a missing job, a
+            // settled job, a cancel-pending job, a bridge-disabled payload and
+            // an operator switch that is off. The controller must not be able
+            // to tell them apart, so there is exactly one message.
+            const controller = makeController({}, undefined, { mint: jest.fn(async () => null) });
+
+            await expect(controller.mintMcpCredential(JOB_ID, body)).rejects.toThrow(
+                new UnauthorizedException('Invalid node credential'),
+            );
+        });
+
+        it('uses the SAME 401 message the lease and complete routes use', async () => {
+            const mintController = makeController({}, undefined, {
+                mint: jest.fn(async () => null),
+            });
+            const leaseController = makeController({ lease: jest.fn(async () => null) });
+
+            const mintError = await mintController
+                .mintMcpCredential(JOB_ID, body)
+                .catch((error: Error) => error);
+            const leaseError = await leaseController.lease(body).catch((error: Error) => error);
+
+            expect((mintError as Error).message).toBe((leaseError as Error).message);
+        });
+    });
+
+    describe('POST /api/fleet/jobs/:id/mcp-credential/revoke', () => {
+        it('reports how many credentials were dropped', async () => {
+            const revokeForNode = jest.fn(async () => 2);
+            const controller = makeController({}, undefined, { revokeForNode });
+
+            await expect(controller.revokeMcpCredential(JOB_ID, body)).resolves.toEqual({
+                ok: true,
+                revoked: 2,
+            });
+            expect(revokeForNode).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                jobId: JOB_ID,
+            });
+        });
+
+        it('answers ok with 0 — not a 401 — when there was nothing to revoke', async () => {
+            // The distinction that must survive: `null` (refused) vs `0` (a
+            // valid node whose job had no live credential). Collapsing those
+            // would make an ordinary double-revoke look like an auth failure.
+            const controller = makeController({}, undefined, {
+                revokeForNode: jest.fn(async () => 0),
+            });
+            await expect(controller.revokeMcpCredential(JOB_ID, body)).resolves.toEqual({
+                ok: true,
+                revoked: 0,
+            });
+        });
+
+        it('collapses a refused revoke to the same 401', async () => {
+            const controller = makeController({}, undefined, {
+                revokeForNode: jest.fn(async () => null),
+            });
+            await expect(controller.revokeMcpCredential(JOB_ID, body)).rejects.toThrow(
+                new UnauthorizedException('Invalid node credential'),
+            );
         });
     });
 });

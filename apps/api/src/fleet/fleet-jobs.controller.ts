@@ -17,13 +17,16 @@ import type {
     FleetJobEnvFilesResponse,
     FleetJobHeartbeatResponse,
     FleetJobLeaseResponse,
+    FleetJobMcpCredentialResponse,
+    FleetJobMcpCredentialRevokeResponse,
 } from '@ever-works/contracts';
-import { FleetJobService } from '@ever-works/agent/fleet';
+import { FleetJobService, FleetRunCredentialService } from '@ever-works/agent/fleet';
 import { Public } from '../auth/decorators/public.decorator';
 import {
     CompleteFleetJobDto,
     FleetJobEnvFilesDto,
     FleetJobHeartbeatDto,
+    FleetJobNodeCredentialDto,
     LeaseFleetJobsDto,
 } from './dto/fleet-job.dto';
 import { FleetRunSecretsError, FleetRunSecretsService } from './fleet-run-secrets.service';
@@ -71,6 +74,9 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  * list: a run that starts with half its environment fails as if the code
  * were broken, which is the failure this route exists to remove.
  *
+ *   POST /api/fleet/jobs/:id/mcp-credential          mint a run-scoped token
+ *   POST /api/fleet/jobs/:id/mcp-credential/revoke   drop it early
+ *
  * Throttles are sized for polling: a node with a 5-second idle poll
  * needs ~12 lease calls/minute, and job heartbeats fire at a third of
  * the lease TTL, so the limits accommodate a busy multi-node fleet
@@ -96,6 +102,7 @@ export class FleetJobsController {
     constructor(
         private readonly service: FleetJobService,
         private readonly runSecrets: FleetRunSecretsService,
+        private readonly runCredentials: FleetRunCredentialService,
     ) {}
 
     @Public()
@@ -144,6 +151,80 @@ export class FleetJobsController {
             throw new UnauthorizedException('Invalid node credential');
         }
         return { ok: true, job };
+    }
+
+    /**
+     * Self-build slice Z (EW-796) — mint the run-scoped credential the
+     * node's loopback MCP proxy authenticates with.
+     *
+     * Authorised by exactly one fact: this node currently HOLDS the lease
+     * on this job. Everything else — a foreign node with a perfectly valid
+     * secret, a finished job, a job with a cancel pending, a job whose
+     * plan never enabled the bridge — returns the same undifferentiated
+     * 401 the rest of this controller uses, so a node cannot probe which
+     * jobs exist or what state they are in.
+     *
+     * The minted token expires with the lease it was minted under (plus a
+     * small grace). A long model step therefore RE-MINTS as its lease is
+     * renewed, which is why the throttle is sized like the heartbeat's
+     * rather than like complete's.
+     *
+     * The response carries the raw token exactly once. It is never
+     * readable again, never written to disk by either side, and never
+     * echoed by any other endpoint.
+     */
+    @Public()
+    @Post(':id/mcp-credential')
+    @ApiOperation({
+        summary:
+            'Mint a run-scoped MCP credential for a job this node holds (public, node-secret-authenticated). Bound to the job, run, owner and Organization, expiring with the lease. Returned once; never recoverable.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 240, ttl: 60_000 } })
+    async mintMcpCredential(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetJobNodeCredentialDto,
+    ): Promise<FleetJobMcpCredentialResponse> {
+        const credential = await this.runCredentials.mint({
+            nodeId: body.nodeId,
+            secret: body.secret,
+            jobId: id,
+        });
+        if (!credential) {
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return credential;
+    }
+
+    /**
+     * Early revoke, called by the node the moment the model step ends.
+     *
+     * Not the ONLY revoke — the API-side completion listener revokes again
+     * whatever happens, including for a node that crashed and never got
+     * here — but it shortens the window from "until the job settles" to
+     * "until the model stopped running", which is most of the value.
+     */
+    @Public()
+    @Post(':id/mcp-credential/revoke')
+    @ApiOperation({
+        summary:
+            'Revoke the run-scoped MCP credentials of a job this node holds (public, node-secret-authenticated). Idempotent; the platform also revokes at completion.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 240, ttl: 60_000 } })
+    async revokeMcpCredential(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetJobNodeCredentialDto,
+    ): Promise<FleetJobMcpCredentialRevokeResponse> {
+        const revoked = await this.runCredentials.revokeForNode({
+            nodeId: body.nodeId,
+            secret: body.secret,
+            jobId: id,
+        });
+        if (revoked === null) {
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return { ok: true, revoked };
     }
 
     @Public()

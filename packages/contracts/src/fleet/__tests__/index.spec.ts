@@ -199,6 +199,27 @@ const QUESTION_EXPORTS = [
 	'FLEET_KILL_SWITCH_REASON_MAX_LENGTH'
 ] as const;
 
+/**
+ * Self-build slice Z (EW-796) — fleet-run-credential.types.ts.
+ *
+ * The run-scoped credential the fleet MCP bridge mints: its token prefix
+ * and api-key kinds, the lease-bound expiry helper, and the route
+ * allowlist that is the fail-closed half of the design (enforced by the
+ * API, mirrored against the MCP whitelist by an apps/mcp spec).
+ */
+const RUN_CREDENTIAL_EXPORTS = [
+	'FLEET_RUN_TOKEN_PREFIX',
+	'FLEET_RUN_TOKEN_GRACE_SEC',
+	'FLEET_RUN_API_KEY_KIND',
+	'PERSONAL_API_KEY_KIND',
+	'FLEET_RUN_MCP_SERVER_NAME',
+	'FLEET_RUN_MCP_TOOL_FAMILIES',
+	'FLEET_RUN_TOKEN_ALLOWED_PREFIXES',
+	'FLEET_RUN_TOKEN_ALLOWED_FLEET_READ_PREFIXES',
+	'isFleetRunTokenRouteAllowed',
+	'fleetRunTokenExpiryFromLease'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
@@ -208,7 +229,8 @@ const ALL_EXPORTS = [
 	...RUNNER_STATUS_EXPORTS,
 	...WORKSPACE_EXPORTS,
 	...RUN_SECRETS_EXPORTS,
-	...QUESTION_EXPORTS
+	...QUESTION_EXPORTS,
+	...RUN_CREDENTIAL_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -247,7 +269,9 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetRunEnvGrants',
 	'parseFleetAgentTaskQuestionMarkdown',
 	'normalizeFleetAgentTaskQuestion',
-	'normalizeFleetNodeWorkerState'
+	'normalizeFleetNodeWorkerState',
+	'isFleetRunTokenRouteAllowed',
+	'fleetRunTokenExpiryFromLease'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -262,7 +286,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 138 runtime symbols', () => {
+	it('exposes exactly these 148 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -274,9 +298,11 @@ describe('fleet barrel', () => {
 		// overlap bounds. Both groups live in `fleet-node.types.ts`, an
 		// existing module, so the witness table below needs no new row.
 		// → 138 with run secrets (EW-781): the twelve constants and five
-		// helpers of `fleet-run-secrets.types.ts`, pinned in their own spec.
+		// helpers of `fleet-run-secrets.types.ts`.
+		// → 148 with the node MCP bridge (EW-782): the run-credential
+		// symbols, pinned in `fleet-run-credential.spec.ts`.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(138);
+		expect(Object.keys(fleet)).toHaveLength(148);
 	});
 
 	it.each([
@@ -287,7 +313,8 @@ describe('fleet barrel', () => {
 		['fleet-panic.types.js', 'FLEET_KILL_SWITCH_ID'],
 		['fleet-run-secrets.types.js', 'FLEET_RUN_ENV_FILE_MAX_COUNT'],
 		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
-		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS']
+		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS'],
+		['fleet-run-credential.types.js', 'FLEET_RUN_TOKEN_PREFIX']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up
