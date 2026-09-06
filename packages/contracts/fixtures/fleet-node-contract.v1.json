@@ -512,10 +512,23 @@
 			"diskFreeBytes",
 			"modelIdentity",
 			"workerState",
-			"workerStateReason"
+			"workerStateReason",
+			"minFreeDiskBytes",
+			"workspaceCount",
+			"workspaceBytes",
+			"lastReclaimAt",
+			"lastReclaimFreedBytes"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
-		"nodeEmitsOptional": ["workerState", "workerStateReason"],
+		"nodeEmitsOptional": [
+			"workerState",
+			"workerStateReason",
+			"minFreeDiskBytes",
+			"workspaceCount",
+			"workspaceBytes",
+			"lastReclaimAt",
+			"lastReclaimFreedBytes"
+		],
 		"controllerForwards": {
 			"enroll": [
 				"platform",
@@ -525,7 +538,12 @@
 				"diskFreeBytes",
 				"modelIdentity",
 				"workerState",
-				"workerStateReason"
+				"workerStateReason",
+				"minFreeDiskBytes",
+				"workspaceCount",
+				"workspaceBytes",
+				"lastReclaimAt",
+				"lastReclaimFreedBytes"
 			],
 			"heartbeat": [
 				"platform",
@@ -535,7 +553,12 @@
 				"diskFreeBytes",
 				"modelIdentity",
 				"workerState",
-				"workerStateReason"
+				"workerStateReason",
+				"minFreeDiskBytes",
+				"workspaceCount",
+				"workspaceBytes",
+				"lastReclaimAt",
+				"lastReclaimFreedBytes"
 			]
 		}
 	},
