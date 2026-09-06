@@ -1,11 +1,13 @@
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import type { GitDiffResult, GitPullRequestStatus } from '@ever-works/plugin';
 import { DEFAULT_DIFF_MAX_BYTES, DEFAULT_DIFF_MAX_FILES, capChecks } from '@ever-works/plugin';
+import { normalizeCommitSha } from '@ever-works/contracts';
 import { Task, TaskStatus } from '../entities/task.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
+import { TaskMergeGateService } from './task-merge-gate.service';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -37,6 +39,13 @@ import { TaskTransitionService } from './task-transition.service';
  *     status write, so the approver + blocker gates keep holding. A Task
  *     whose approvals are still pending simply stays in review — the
  *     merge is recorded, the transition is not forced.
+ *  6. **This is also where the MERGE question gets re-asked** (merge
+ *     approval, self-build slice AE). A provider read is the only moment
+ *     the platform knows whether a pull request is green, so every
+ *     successful refresh hands the LIVE status to
+ *     `TaskMergeGateService`, which raises the human approval for a green
+ *     pull request and lands an approved one. Best-effort, per rule 4:
+ *     the gate can never fail a status refresh.
  */
 
 /** Minimum seconds between two provider reads for the same Task. */
@@ -96,6 +105,11 @@ export class TaskPrStatusService {
         private readonly works: WorkRepository,
         @Optional() private readonly gitFacade?: GitFacadeService,
         @Optional() private readonly transitions?: TaskTransitionService,
+        // Merge approval (self-build slice AE, EW-805) — the post-CI
+        // re-evaluation of the merge. Appended LAST + @Optional() per the
+        // positional-spec arity rule; absent, this service behaves exactly
+        // as it did before the slice (refresh the cache, land merged PRs).
+        @Optional() private readonly mergeGate?: TaskMergeGateService,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -292,7 +306,27 @@ export class TaskPrStatusService {
                     .catch(() => undefined);
                 Object.assign(task, { branchState: 'merged' });
             }
-            return Object.assign(task, patch);
+            Object.assign(task, patch);
+
+            // Merge approval (self-build slice AE) — THIS is the moment
+            // the merge question can finally be answered: the provider has
+            // just told us the pull request's state, head commit and CI
+            // verdict. Best-effort by contract (rule 4 above): the gate
+            // never fails a status refresh, and it is deliberately given
+            // the LIVE `status` rather than the Task's cache.
+            if (this.mergeGate) {
+                await this.mergeGate
+                    .onPullRequestStatusRefreshed(task, status)
+                    .catch((error: unknown) => {
+                        this.logger.warn(
+                            `Task ${task.id}: merge gate threw after a PR status refresh: ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                        );
+                        return undefined;
+                    });
+            }
+            return task;
         })().finally(() => {
             this.inFlight.delete(task.id);
         });
@@ -304,11 +338,17 @@ export class TaskPrStatusService {
     private toCachePatch(
         status: GitPullRequestStatus,
         checkedAt: Date,
-    ): Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks'> {
+    ): Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks' | 'prHeadSha'> {
         return {
             prState: status.state,
             ciState: status.ciState,
             ciCheckedAt: checkedAt,
+            // Merge approval (slice AE): the head the PROVIDER reports.
+            // `recordRemotePush` still refuses to persist the head a run
+            // pushed — the remote owns the branch head — and this is the
+            // same rule from the other side: the only head worth caching
+            // is the one the provider just named.
+            prHeadSha: normalizeCommitSha(status.headSha),
             prChecks: capChecks(status.checks).map((check) => ({
                 name: check.name,
                 status: check.status,

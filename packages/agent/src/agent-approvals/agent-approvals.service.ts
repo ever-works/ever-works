@@ -36,6 +36,14 @@ export interface CreateAgentActionProposalInput {
     payload?: AgentActionProposalPayload | null;
     /** Optional originating `agent_runs.id`. */
     runId?: string | null;
+    /**
+     * Merge approval (self-build slice AE) — the canonical subject this
+     * decision is about, so an approved row can be looked up by equality
+     * later. PLATFORM-SUPPLIED ONLY: there is no route that creates a
+     * proposal, and the merge gate derives this from provider state, never
+     * from anything a model wrote.
+     */
+    subjectKey?: string | null;
 }
 
 export interface ListAgentActionProposalsFilter {
@@ -120,6 +128,7 @@ export class AgentApprovalsService {
             title: title.slice(0, 200),
             payload,
             riskFlags,
+            subjectKey: input.subjectKey ?? null,
             status: 'pending',
             decidedById: null,
             decidedAt: null,
@@ -243,22 +252,44 @@ export class AgentApprovalsService {
      * one per row). Already-decided rows in the subset are skipped
      * rather than 409ing: bulk approval is best-effort by design.
      * Cross-user / unknown ids are silently ignored (no existence leak).
+     *
+     * `merge_pull_request` proposals are NEVER decided here (merge
+     * approval, self-build slice AE). Bulk approve is a "clear the queue"
+     * gesture; a merge onto a real branch is the one thing in this queue
+     * that cannot be undone by a follow-up commit, so it has to be the
+     * human's deliberate, per-pull-request act — through `decide` or the
+     * Inbox reply, where they have the repository, the base branch and the
+     * head commit in front of them.
+     *
+     * They are counted as `excluded`, NOT as `skipped`. The two mean
+     * opposite things to the person reading the toast: `skipped` is
+     * "somebody already decided this, there is nothing left to do", and
+     * the web client renders it as exactly that. A still-pending merge
+     * counted there would tell the user the one irreversible item in their
+     * queue had been handled while it sits there untouched — the precise
+     * misreport that makes an unattended merge approval expire, or get
+     * clicked later without being read.
      */
     async approveAll(
         userId: string,
         ids?: string[],
-    ): Promise<{ approved: number; skipped: number }> {
+    ): Promise<{ approved: number; skipped: number; excluded: number }> {
         if (ids && ids.length === 0) {
-            return { approved: 0, skipped: 0 };
+            return { approved: 0, skipped: 0, excluded: 0 };
         }
         const where: FindOptionsWhere<AgentActionProposal> = ids
             ? { userId, id: In(ids) }
             : { userId, status: 'pending' };
         const rows = await this.proposals.find({ where });
-        const pending = rows.filter((row) => row.status === 'pending');
-        const skipped = rows.length - pending.length;
+        const excluded = rows.filter(
+            (row) => row.status === 'pending' && row.actionType === 'merge_pull_request',
+        ).length;
+        const pending = rows.filter(
+            (row) => row.status === 'pending' && row.actionType !== 'merge_pull_request',
+        );
+        const skipped = rows.length - pending.length - excluded;
         if (pending.length === 0) {
-            return { approved: 0, skipped };
+            return { approved: 0, skipped, excluded };
         }
 
         const now = new Date();
@@ -270,7 +301,7 @@ export class AgentApprovalsService {
             row.updatedAt = now;
         }
         await this.proposals.save(pending);
-        return { approved: pending.length, skipped };
+        return { approved: pending.length, skipped, excluded };
     }
 
     // ── internals ─────────────────────────────────────────────────

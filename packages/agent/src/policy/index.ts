@@ -5,6 +5,9 @@
 // facade consumes, and the `resolve_merge_policy` chat-tool factory.
 export * from './merge-policy';
 export * from './merge-policy.enforcer';
+// Merge approval (self-build slice AE) — token + contract for the
+// "is there a real, current, human approval for this merge?" question.
+export * from './merge-approval.port';
 export * from './merge-policy.repository';
 export * from './merge-policy.service';
 // Quality gates — the PR gate every non-worker `createPullRequest` caller

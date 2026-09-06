@@ -623,6 +623,7 @@
                 "schedule_task": "Planifier une tâche",
                 "send_message": "Envoyer un message",
                 "budget_override": "Dépassement de budget",
+                "merge_pull_request": "Fusionner la pull request",
                 "other": "Action"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Action rejetée",
                 "bulkApproved": "{count} actions approuvées",
                 "bulkApprovedSkipped": "{approved} actions approuvées, {skipped} déjà décidées",
+                "bulkApprovedExcluded": "{approved} actions approuvées ; {excluded} nécessitent une décision individuelle",
                 "error": "Une erreur s'est produite. Veuillez réessayer."
             }
         },
@@ -1160,6 +1162,7 @@
                     "schedule_task": "Planifier une tâche",
                     "send_message": "Envoyer un message",
                     "budget_override": "Dérogation de budget",
+                    "merge_pull_request": "Fusionner la pull request",
                     "other": "Autre"
                 },
                 "save": "Enregistrer les garde-fous",

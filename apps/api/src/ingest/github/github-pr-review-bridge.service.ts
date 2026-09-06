@@ -9,7 +9,11 @@ import {
 } from '@ever-works/agent/ingest';
 import { PrReviewService } from '@ever-works/agent/pr-review';
 import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/plugins';
-import { TaskGitLinkService, TaskReviewRejectionService } from '@ever-works/agent/tasks-domain';
+import {
+    TaskGitLinkService,
+    TaskReviewApprovalService,
+    TaskReviewRejectionService,
+} from '@ever-works/agent/tasks-domain';
 import type { TaskGitLink } from '@ever-works/agent/tasks-domain';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
 import { config } from '../../config/constants';
@@ -215,7 +219,16 @@ export interface GitHubWebhookBody {
         state?: string;
         body?: string;
         html_url?: string;
+        /**
+         * The commit the reviewer actually looked at. Load-bearing for
+         * merge approval (slice AE): an approval recorded against the
+         * branch head "now" rather than against this would silently
+         * launder a review of an old diff into a review of whatever has
+         * been pushed since.
+         */
+        commit_id?: string;
         user?: { login?: string; type?: string };
+        submitted_at?: string;
     };
 }
 
@@ -396,6 +409,13 @@ export class GitHubPrReviewBridgeService {
         // and, like `rejections`, deliberately NOT @Optional(): the same
         // TasksDomainModule provides it.
         private readonly taskLinks: TaskGitLinkService,
+        // Merge approval (self-build slice AE, EW-805) - persist a HUMAN
+        // `approved` review against the commit it was given for. Appended
+        // LAST and, like the two above, deliberately NOT @Optional(): the
+        // same TasksDomainModule provides it, and an approval recorder
+        // that silently did nothing would leave the merge approval UI
+        // saying "nobody has reviewed this" forever.
+        private readonly approvals: TaskReviewApprovalService,
     ) {}
 
     /**
@@ -620,7 +640,29 @@ export class GitHubPrReviewBridgeService {
         // react to being reviewed), so it is handled and returned before
         // normalize() is consulted.
         if (eventName === 'pull_request_review') {
-            await this.recordReviewRejection(binding, body);
+            // Merge approval (slice AE): an `approved` review used to be
+            // dropped on the floor here - `recordReviewRejection` returns
+            // immediately for any state other than `changes_requested`,
+            // and its spec pinned that ("ignores an approval - only a
+            // rejection carries feedback for the next run"). That was
+            // right about the FEEDBACK loop and it left the platform
+            // unable to answer "has a person read this pull request?",
+            // which is the first thing somebody authorising a merge wants
+            // to know. Both states are now recorded, on separate paths,
+            // and neither enters the review loop.
+            const reviewState = body.review?.state?.toLowerCase();
+            if (reviewState === 'approved') {
+                await this.recordReviewApproval(binding, body);
+            } else {
+                // A reviewer who DISMISSES their approval, or replaces it
+                // with `changes_requested`, has withdrawn the one signal
+                // the merge Inbox offers about whether a person read the
+                // diff. The head-SHA binding covers a new commit; it does
+                // not cover the reviewer changing their mind about the
+                // same one, which is precisely this case.
+                await this.withdrawReviewApproval(binding, body);
+                await this.recordReviewRejection(binding, body);
+            }
             return { ingested: null };
         }
 
@@ -723,6 +765,122 @@ export class GitHubPrReviewBridgeService {
         } catch (error) {
             this.logger.warn(
                 `PR rejection record failed for ${fullName}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Merge approval (self-build slice AE, EW-805) — persist an
+     * `approved` PR review as provider-side review context for the Task.
+     *
+     * HUMANS ONLY, and that is the security property. `classifyReviewer`
+     * checks the platform's own `<slug>[bot]` identity BEFORE the
+     * trusted-bot allow-list, so the loop cannot launder its own review
+     * into a sign-off; and an allow-listed reviewer bot is dropped here
+     * too, even though its REJECTIONS are trusted. A bot saying "looks
+     * good" is not a person having looked.
+     *
+     * What is recorded is deliberately narrow: the commit the reviewer
+     * saw (`review.commit_id`), when, and their provider login as an
+     * untrusted display string. It is never an authorization — this repo
+     * has no provider-login → platform-user mapping on the review path,
+     * so an approval here cannot establish that somebody entitled to
+     * approve for the Task's Organization approved it. The authorising
+     * decision is the platform-side one in the Inbox.
+     *
+     * Best-effort, exactly like its rejection twin.
+     */
+    private async recordReviewApproval(
+        binding: GitHubEventsBinding,
+        body: GitHubWebhookBody,
+    ): Promise<void> {
+        const review = body.review;
+        if (!review || review.state?.toLowerCase() !== 'approved') return;
+        if (classifyReviewer(review.user, this.reviewBotPolicy()) !== 'human') return;
+
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        const prNumber = body.pull_request?.number;
+        if (!owner || !repo || typeof prNumber !== 'number') return;
+
+        const submittedAt = review.submitted_at ? new Date(review.submitted_at) : null;
+        try {
+            await this.approvals.recordPullRequestApproval({
+                userId: binding.userId,
+                owner,
+                repo,
+                prNumber,
+                // `review.commit_id` ONLY — never `pull_request.head.sha`.
+                // The branch head at delivery time may already be several
+                // commits past what the reviewer read, and storing it
+                // would launder an approval of an old diff into an
+                // approval of whatever has been pushed since. That is the
+                // exact invariant `TaskReviewApprovalService` states, and
+                // its no-commit-id branch already drops the record — a
+                // delivery without `commit_id` (a replay, a trimmed
+                // payload, a GHES variant) is simply not attributable.
+                headSha: review.commit_id ?? null,
+                reviewerLabel: review.user?.login ?? null,
+                approvedAt:
+                    submittedAt && !Number.isNaN(submittedAt.getTime()) ? submittedAt : new Date(),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `PR approval record failed for ${fullName}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Merge approval (self-build slice AE, EW-805) — retract a recorded
+     * provider-side approval when its author takes it back.
+     *
+     * GitHub delivers a `pull_request_review` with `state: 'dismissed'`
+     * when a review is dismissed, and a fresh `changes_requested` review
+     * when the same person reverses themselves at the same commit.
+     * Neither moves the head, so the SHA binding that protects against a
+     * new commit does nothing here — and without this the Inbox goes on
+     * telling whoever is authorising the merge that "alice reviewed this"
+     * long after alice explicitly withdrew that sign-off.
+     *
+     * Scoped to the SAME reviewer on purpose. Bob requesting changes does
+     * not unmake the fact that Alice read the diff; Alice withdrawing does.
+     * A delivery with no reviewer login cannot be attributed to the
+     * recorded approver and clears nothing.
+     *
+     * Best-effort, like everything else on this path.
+     */
+    private async withdrawReviewApproval(
+        binding: GitHubEventsBinding,
+        body: GitHubWebhookBody,
+    ): Promise<void> {
+        const review = body.review;
+        const state = review?.state?.toLowerCase();
+        if (!review || (state !== 'dismissed' && state !== 'changes_requested')) return;
+        // Bots never wrote one of these records, so they can never clear
+        // one either — the same rule, from the other side.
+        if (classifyReviewer(review.user, this.reviewBotPolicy()) !== 'human') return;
+
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        const prNumber = body.pull_request?.number;
+        if (!owner || !repo || typeof prNumber !== 'number') return;
+
+        try {
+            await this.approvals.clearPullRequestApproval({
+                userId: binding.userId,
+                owner,
+                repo,
+                prNumber,
+                reviewerLabel: review.user?.login ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `PR approval withdrawal failed for ${fullName}#${prNumber}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );

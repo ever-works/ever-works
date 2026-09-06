@@ -623,6 +623,7 @@
                 "schedule_task": "Планування завдання",
                 "send_message": "Надсилання повідомлення",
                 "budget_override": "Перевищення бюджету",
+                "merge_pull_request": "Злити пул-реквест",
                 "other": "Дія"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Дію відхилено",
                 "bulkApproved": "Затверджено дій: {count}",
                 "bulkApprovedSkipped": "Затверджено дій: {approved}, вже вирішено: {skipped}",
+                "bulkApprovedExcluded": "Схвалено дій: {approved}; {excluded} потребують окремого рішення",
                 "error": "Щось пішло не так. Будь ласка, спробуйте ще раз."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "Запланувати завдання",
                     "send_message": "Надіслати повідомлення",
                     "budget_override": "Перевизначення бюджету",
+                    "merge_pull_request": "Злити пул-реквест",
                     "other": "Інше"
                 },
                 "save": "Зберегти обмежувачі",

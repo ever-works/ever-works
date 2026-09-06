@@ -146,6 +146,28 @@ export interface MergeOptions {
 	readonly commitTitle?: string;
 	readonly commitMessage?: string;
 	readonly mergeMethod?: 'merge' | 'squash' | 'rebase';
+	/**
+	 * OPTIMISTIC-CONCURRENCY GUARD (merge approval, self-build slice AE).
+	 *
+	 * The commit the caller believes is the pull request's head. When set,
+	 * an implementation MUST ask the provider to refuse the merge if the
+	 * head has moved since — GitHub's `PUT /pulls/{n}/merge` takes exactly
+	 * this as its `sha` parameter and answers 409.
+	 *
+	 * It exists because everything the platform decides about a pull
+	 * request — CI is green, a human approved it, the diff is what was
+	 * reviewed — is a statement about ONE commit, and between the decision
+	 * and the merge call a push can replace it. Re-reading the head and
+	 * then merging without pinning it just narrows the race; pinning
+	 * closes it, because the provider evaluates the guard atomically with
+	 * the merge.
+	 *
+	 * Optional on the contract so providers that cannot express the guard
+	 * still compile. A provider that ignores it silently downgrades the
+	 * guarantee to "recently checked", which is why the agent-side merge
+	 * path ALSO re-reads the head immediately before calling.
+	 */
+	readonly expectedHeadSha?: string;
 }
 
 export interface MergeResult {
@@ -284,9 +306,32 @@ export interface GitPullRequestStatus {
 	readonly mergeable?: boolean | null;
 	readonly headSha?: string | null;
 	readonly reviewDecision?: GitReviewDecision | null;
+	/**
+	 * Roll-up over EVERY check the provider reports for the head commit —
+	 * never over the bounded `checks` sample below.
+	 *
+	 * Merge approval (slice AE) turned this from a display value into an
+	 * authorization input (`GitFacadeService.assertAgentMayMerge` and
+	 * `TaskMergeGateService` both refuse a merge unless it is `passing`),
+	 * so an implementation that rolled up its own truncated display list
+	 * would report a red pull request green. Roll up first, cap second.
+	 */
 	readonly ciState: GitCiState;
 	/** Bounded list — implementations cap it (see `MAX_PR_CHECKS`). */
 	readonly checks: readonly GitPullRequestCheck[];
+	/**
+	 * False when the implementation could NOT read the provider's whole
+	 * check set for this commit (a source it lacks scope for, more checks
+	 * than it is willing to page through), so `ciState` is a roll-up over
+	 * a subset and a failure may be hiding in the part it never saw.
+	 *
+	 * Undefined means "not reported", which older implementations and
+	 * simple doubles will leave as-is; only an explicit `false` is a
+	 * warning. Display surfaces may ignore it — a mostly-right dot is
+	 * still useful — but anything using `ciState` to AUTHORIZE (the merge
+	 * gate) must treat `false` as "not green".
+	 */
+	readonly checksComplete?: boolean;
 	readonly url?: string;
 	readonly title?: string;
 }

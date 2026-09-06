@@ -623,6 +623,7 @@
                 "schedule_task": "Планирование задачи",
                 "send_message": "Отправка сообщения",
                 "budget_override": "Превышение бюджета",
+                "merge_pull_request": "Слить пул-реквест",
                 "other": "Действие"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Действие отклонено",
                 "bulkApproved": "Утверждено действий: {count}",
                 "bulkApprovedSkipped": "Утверждено действий: {approved}, уже решено: {skipped}",
+                "bulkApprovedExcluded": "Одобрено действий: {approved}; {excluded} требуют отдельного решения",
                 "error": "Что-то пошло не так. Пожалуйста, попробуйте ещё раз."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "Запланировать задачу",
                     "send_message": "Отправить сообщение",
                     "budget_override": "Переопределение бюджета",
+                    "merge_pull_request": "Слить пул-реквест",
                     "other": "Другое"
                 },
                 "save": "Сохранить ограничители",

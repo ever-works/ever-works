@@ -247,6 +247,70 @@ export class Task {
         detailsUrl?: string;
     }> | null;
 
+    // ── Merge approval (self-build slice AE, EW-805) ─────────────────
+    // The pull request's head commit and the provider-side human review
+    // of it. Written by `TaskPrStatusService` (head) and the GitHub
+    // review bridge (review), both alongside the columns above.
+    //
+    // `prHeadSha` closes a documented gap: `recordRemotePush` deliberately
+    // does NOT persist the head a run pushed ("the remote owns the branch
+    // head"), and that is still right — this column holds the head the
+    // PROVIDER reported, which is the only head anybody should reason
+    // about. It is a cache for display and for deciding whether an
+    // approval is worth raising; the merge gate always re-reads live.
+
+    /** Head commit of the pull request as last observed from the provider. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    prHeadSha?: string | null;
+
+    /**
+     * Head commit a HUMAN reviewer approved on the git provider. Never
+     * written for a bot review of any kind — not the platform's own app,
+     * not an allow-listed reviewer bot: the whole point is that a person
+     * looked. Compare against `prHeadSha` to know whether the approval
+     * still covers the current head.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    prReviewApprovedSha?: string | null;
+
+    /** When that provider-side approval arrived. */
+    @PortableDateColumn({ nullable: true })
+    prReviewApprovedAt?: Date | null;
+
+    /**
+     * Provider login of the approving reviewer. UNTRUSTED display string —
+     * a provider login is not a platform identity and is never an
+     * entitlement input. The authorising decision is the platform-side
+     * approval on `agent_action_proposals`.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    prReviewApprovedBy?: string | null;
+
+    // The last merge REFUSAL the agent-merge path recorded, so it is
+    // recorded ONCE rather than once every two minutes.
+    //
+    // The merge attempt now lives on the PR-status sweep, which runs on a
+    // two-minute cron for as long as the pull request stays open. A
+    // stable refusal — a protected base branch, a required CODEOWNERS
+    // review, a merge method the policy forbids — therefore repeats
+    // forever, and `recordMergeFailure` posts a task-chat message and an
+    // activity row for each one: ~720 of each per Task per day. These two
+    // columns are the memory that turns that into one message per
+    // (commit, reason). A new head commit, or a different reason, is
+    // genuinely new news and is reported again.
+    //
+    // Deliberately NOT a suppression of the ATTEMPT: a provider fault is
+    // indistinguishable from a policy refusal at this level, and retrying
+    // is how a transient one clears itself.
+
+    /** Head commit the last recorded merge refusal was about. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    mergeRefusedSha?: string | null;
+
+    /** Stable refusal code of that refusal (or `not-merged` when untyped). */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    mergeRefusedCode?: string | null;
+
     // ── Latest-run denorm (kanban run cockpit, Wave 2) ───────────────
     // Maintained by `TaskRunDenormService` on queued creation, claim and
     // terminal transition of task-kind AgentRuns. Denormalized so the

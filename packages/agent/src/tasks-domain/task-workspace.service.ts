@@ -9,6 +9,7 @@ import type {
     MergeRefusalCode,
 } from '@ever-works/contracts';
 import {
+    normalizeCommitSha,
     normalizeFleetRunEnvFileRefs,
     normalizeFleetRunEnvGrants,
     normalizeFleetTaskWorkspaceMounts,
@@ -69,6 +70,23 @@ export interface TaskAgentMergeOutcome {
     policySource?: MergePolicySource;
     /** Merge commit SHA when the provider reported one. */
     sha?: string;
+    /**
+     * Merge approval (self-build slice AE): nothing was attempted because
+     * the effective policy requires a human approval, and that decision
+     * cannot exist yet — the pull request was opened seconds ago and CI
+     * has not run. The merge is re-evaluated after CI reports, by
+     * `TaskMergeGateService`. Distinct from `attempted: false` alone,
+     * which means the policy does not allow agent merges at all.
+     */
+    awaitingApproval?: boolean;
+    /**
+     * Merge approval (self-build slice AE): nothing was attempted because
+     * provider CI has not reported yet. Set on EVERY deferral from
+     * pull-request-open time, including for an operator whose policy asks
+     * for no human approval — they opted out of a person, not out of CI,
+     * and a pull request opened one second ago has no checks to be green.
+     */
+    awaitingCi?: boolean;
 }
 
 export interface TaskWorkspaceFinalizeOutcome {
@@ -1316,22 +1334,16 @@ export class TaskWorkspaceService {
                 `${await this.describeMergePolicy(args.agentId, work.id)}.`,
         );
 
-        // Merge-policy matrix (Wave 3, D4) — the agent-merge path. The PR
-        // exists and the gate has already spoken; ask the policy whether
-        // THIS agent may land it. Everything below is best-effort by
-        // contract: an open pull request is the promise this method made,
-        // and no merge outcome may retroactively fail it.
-        const merge = await this.attemptAgentMerge({
+        // Merge approval (slice AE) — the PR exists and the gate has
+        // already spoken, but nothing is merged from here any more. This
+        // only reports WHY the merge is being left to the post-CI gate.
+        // Best-effort by contract: an open pull request is the promise
+        // this method made, and no merge outcome may retroactively fail it.
+        const merge = await this.evaluateMergeAtPullRequestOpen({
             task,
             work,
-            userId,
             agentId: args.agentId,
-            owner,
-            repo,
-            gitOptions,
             prNumber: pr.number,
-            baseRef,
-            gateStatus: args.gateStatus,
         });
 
         return {
@@ -1340,6 +1352,148 @@ export class TaskWorkspaceService {
             prUrl: pr.url,
             ...(merge ? { merge } : {}),
         };
+    }
+
+    /**
+     * Merge approval (self-build slice AE, EW-805) — what happens at
+     * PULL-REQUEST OPEN time, which is now almost always "nothing yet".
+     *
+     * The bug this replaces: `attemptAgentMerge` was called from here,
+     * six lines after `createPullRequest`, and it passed
+     * `humanApproved: false` as a literal. Under the shipped default
+     * (`requireHumanApproval: true`) that produced a guaranteed refusal
+     * on every single agent pull request, recorded as a chat message and
+     * a `task_merge_refused` activity row — the platform telling the user
+     * it would not do a thing it was never going to be able to do. And
+     * the timing was wrong regardless: no CI has run one second after a
+     * branch is pushed, so "is this mergeable?" cannot be answered here
+     * even in principle.
+     *
+     * So NOTHING is merged here, under any policy. The merge question is
+     * asked exactly once, by `TaskMergeGateService`, after the PR-status
+     * sweep has read provider CI:
+     *
+     *  - **Approval required** (the shipped default): the gate raises the
+     *    Inbox approval for a GREEN pull request and merges once a human
+     *    has decided.
+     *  - **Approval NOT required** (an operator who opted out): the gate
+     *    merges on green, with no human in the loop. That operator opted
+     *    out of a PERSON, not out of CI — and an early attempt here could
+     *    only ever be judged against zero check runs, because the branch
+     *    was pushed seconds ago. An intermediate revision of this slice
+     *    did attempt the merge here for that policy; it merged pull
+     *    requests before a single check had started, and disagreed with
+     *    the gate about what "no approval required" means.
+     *
+     * All this method still does is decide whether there is anything to
+     * wait FOR, so the outcome it reports is honest. A policy read that
+     * fails, or one that forbids agent merges, says so and stops.
+     */
+    private async evaluateMergeAtPullRequestOpen(args: {
+        task: Task;
+        work: { id: string; organizationId?: string | null; tenantId?: string | null };
+        agentId: string;
+        prNumber: number;
+    }): Promise<TaskAgentMergeOutcome | undefined> {
+        if (!this.mergePolicy || !this.gitFacade) return undefined;
+
+        let resolved;
+        try {
+            resolved = await this.mergePolicy.resolve({
+                agentId: args.agentId,
+                workId: args.work.id,
+                organizationId: args.work.organizationId ?? null,
+                tenantId: args.work.tenantId ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${args.task.id} merge-policy read failed before the merge attempt (no merge attempted): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return { attempted: false, merged: false };
+        }
+
+        if (!resolved.policy.allowAgentMerge) {
+            // The conservative default. Nothing attempted, nothing said.
+            return { attempted: false, merged: false, policySource: resolved.source };
+        }
+
+        // Silent by design in both directions: the human has not been
+        // asked yet, and the thing that will ask them (the post-CI gate)
+        // files an Inbox item. A refusal message here would be noise about
+        // a decision nobody has been given the chance to make.
+        this.logger.log(
+            `Task ${args.task.id} PR #${args.prNumber}: merge deferred until provider CI reports` +
+                `${resolved.policy.requireHumanApproval ? ' and a human approves' : ''} ` +
+                `(policy source: ${resolved.source}).`,
+        );
+        return {
+            attempted: false,
+            merged: false,
+            ...(resolved.policy.requireHumanApproval ? { awaitingApproval: true } : {}),
+            awaitingCi: true,
+            policySource: resolved.source,
+        };
+    }
+
+    /**
+     * Merge approval (self-build slice AE) — the POST-CI entry point.
+     *
+     * `TaskMergeGateService` calls this once provider CI has reported
+     * green for a Task's pull request and (when the policy requires it) a
+     * human approval is on record. It resolves the repository coordinates
+     * the same way finalize does and hands off to the one merge path, so
+     * a merge triggered by CI and a merge triggered at finalize are
+     * indistinguishable downstream — same policy, same approval gate,
+     * same head pin, same recording.
+     *
+     * Returns `undefined` when the Task is not in a mergeable shape (no
+     * Work, no pull request, no facade); that is an ordinary outcome for
+     * a sweep, not an error.
+     */
+    async attemptMergeForOpenPullRequest(input: {
+        task: Task;
+        agentId: string;
+        gateStatus?: GateStatus | null;
+        /**
+         * The head commit the caller just read LIVE from the provider.
+         * Used only to key the "have we already told the human about this
+         * refusal?" record — the facade re-reads and pins the head itself,
+         * and never trusts this value.
+         */
+        headSha?: string | null;
+    }): Promise<TaskAgentMergeOutcome | undefined> {
+        const { task } = input;
+        if (!this.gitFacade || !this.mergePolicy) return undefined;
+        if (!task.workId || !task.prNumber) return undefined;
+
+        const work = await this.works.findById(task.workId);
+        if (!work) return undefined;
+
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        const gitOptions = {
+            userId: task.userId,
+            providerId: work.gitProvider,
+            workId: work.id,
+        };
+        const baseRef =
+            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || 'main';
+
+        return this.attemptAgentMerge({
+            task,
+            work,
+            userId: task.userId,
+            agentId: input.agentId,
+            owner,
+            repo,
+            gitOptions,
+            prNumber: task.prNumber,
+            baseRef,
+            gateStatus: input.gateStatus ?? null,
+            headSha: input.headSha ?? task.prHeadSha ?? null,
+        });
     }
 
     /**
@@ -1359,11 +1513,24 @@ export class TaskWorkspaceService {
      *    `AgentMergeActor`, and the facade routes it through
      *    `MergePolicyService.canAgentMerge`. Gate status, protected
      *    branches, allowed methods and human approval are evaluated THERE.
-     *    No rule is duplicated here.
-     * 3. **Refusals are recorded, never swallowed.** A refusal posts a task
-     *    chat message naming the stable code, the human reason and the
-     *    governing scope, and writes a `task_merge_refused` activity row.
-     *    A user can always answer "why did the agent not merge this?"
+     *    No rule is duplicated here. Merge approval (slice AE): the actor
+     *    says WHICH merge this is (`taskId` + the PR number); it does not
+     *    and cannot claim that a human approved it. The facade reads the
+     *    live head from the provider, verifies the recorded approval
+     *    against that head, and pins the merge to it.
+     *
+     *    ONE caller reaches this method:
+     *    {@link attemptMergeForOpenPullRequest}, the post-CI gate. Nothing
+     *    merges at pull-request-open time under any policy — see
+     *    {@link evaluateMergeAtPullRequestOpen}.
+     * 3. **Refusals are recorded ONCE, never swallowed.** A refusal posts a
+     *    task chat message naming the stable code, the human reason and
+     *    the governing scope, and writes a `task_merge_refused` activity
+     *    row — the first time it is seen for a given (head commit, code).
+     *    The attempt itself is on a two-minute sweep, so a stable refusal
+     *    like a protected base branch would otherwise report itself ~720
+     *    times a day; the same refusal at a NEW head, or a different
+     *    refusal at the same head, is news and is reported again.
      */
     private async attemptAgentMerge(args: {
         task: Task;
@@ -1376,6 +1543,8 @@ export class TaskWorkspaceService {
         prNumber: number;
         baseRef: string;
         gateStatus: GateStatus | null;
+        /** Head commit the refusal record is keyed by. Never an input to the decision. */
+        headSha?: string | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task, work, userId, agentId, owner, repo, prNumber, baseRef } = args;
         if (!this.mergePolicy || !this.gitFacade) return undefined;
@@ -1425,11 +1594,20 @@ export class TaskWorkspaceService {
                     organizationId: work.organizationId ?? null,
                     tenantId: work.tenantId ?? null,
                     gateStatus: args.gateStatus,
-                    // No human-approval record exists for an agent-opened PR
-                    // at finalize time. A policy that requires one therefore
-                    // refuses here BY DESIGN — the approval lives with the
-                    // human who gives it, not with the agent asking.
-                    humanApproved: false,
+                    // Merge approval (self-build slice AE, EW-805): this
+                    // used to be `humanApproved: false`, a literal, with a
+                    // comment explaining that a policy requiring approval
+                    // therefore refused here BY DESIGN — "the approval
+                    // lives with the human who gives it, not with the
+                    // agent asking". That was honest and it was a dead
+                    // end: no surface existed for the human to give one.
+                    //
+                    // The claim is gone entirely. The actor now says WHICH
+                    // merge this is (`taskId` + `prNumber`), and the
+                    // facade looks the approval up itself against the live
+                    // head commit. An asker that could assert its own
+                    // approval would not be a gate.
+                    taskId: task.id,
                     targetBranch: baseRef,
                 },
             );
@@ -1510,8 +1688,24 @@ export class TaskWorkspaceService {
 
     /**
      * The "recorded, not swallowed" half: one task chat message a human can
-     * read plus one activity row a feed can render, for every merge that
-     * was attempted and did not land.
+     * read plus one activity row a feed can render, for a merge that was
+     * attempted and did not land.
+     *
+     * ONE, not one per attempt (merge approval, slice AE). The attempt sits
+     * on the two-minute PR-status sweep now, and a refusal that is a
+     * property of the repository rather than of the moment — a protected
+     * base branch, a required CODEOWNERS review, a merge method the policy
+     * forbids — is still true two minutes later and every two minutes
+     * after that. Reporting it each time buries the Task's chat under
+     * hundreds of identical messages a day and writes as many activity
+     * rows, which is how a correct refusal becomes an outage.
+     *
+     * The dedup key is (head commit, refusal code), read from and written
+     * to the Task row so it holds across the API process and the cron
+     * worker. A new commit is a new situation and is reported again; so is
+     * a DIFFERENT refusal at the same commit. The ATTEMPT is never
+     * suppressed — a provider fault is indistinguishable from a policy
+     * refusal here, and retrying is how a transient one clears.
      */
     private async recordMergeFailure(
         args: {
@@ -1520,6 +1714,7 @@ export class TaskWorkspaceService {
             agentId: string;
             prNumber: number;
             baseRef: string;
+            headSha?: string | null;
         },
         outcome: TaskAgentMergeOutcome,
     ): Promise<TaskAgentMergeOutcome> {
@@ -1533,6 +1728,32 @@ export class TaskWorkspaceService {
                     outcome.policySource ?? 'default'
                 }).`,
         );
+
+        const refusalSha = normalizeCommitSha(args.headSha) ?? null;
+        const refusalCode = outcome.refusalCode ?? 'not-merged';
+        const alreadyTold =
+            (task.mergeRefusedSha ?? null) === refusalSha &&
+            (task.mergeRefusedCode ?? null) === refusalCode;
+        if (alreadyTold) {
+            this.logger.debug(
+                `Task ${task.id}: PR #${prNumber} refusal '${refusalCode}' at ` +
+                    `${refusalSha ?? 'unknown head'} was already reported — not repeating it.`,
+            );
+            return outcome;
+        }
+        // Written BEFORE the message so a crash between the two repeats at
+        // most one message rather than looping forever on the next sweep.
+        try {
+            await this.tasks.recordMergeRefusal(task.id, { sha: refusalSha, code: refusalCode });
+            Object.assign(task, { mergeRefusedSha: refusalSha, mergeRefusedCode: refusalCode });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: could not record the merge refusal marker (the message is still posted): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+
         await this.postSystemMessage(
             { task, userId, agentId },
             [

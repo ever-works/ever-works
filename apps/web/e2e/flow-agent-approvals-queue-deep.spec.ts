@@ -25,7 +25,7 @@
  *     404 too — existence is never leaked); malformed uuid → 400 via
  *     ParseUUIDPipe ("Validation failed (uuid is expected)").
  *   • approve-all is best-effort: no body / empty ids / unknown ids →
- *     { approved: 0, skipped: 0 } (never 404); 200 ids is the ArrayMaxSize
+ *     { approved: 0, skipped: 0, excluded: 0 } (never 404); 200 ids is the ArrayMaxSize
  *     boundary; a malformed / non-array / >200-element `ids` or an unknown key
  *     → 400.
  *   • the global AuthSessionGuard runs BEFORE the pipes, so an unauthenticated
@@ -309,7 +309,7 @@ test.describe('Agent Approval Queue — approve / reject a single proposal', () 
 });
 
 test.describe('Agent Approval Queue — bulk approve-all', () => {
-    test('an empty body, an absent body, and ids:[] all no-op to { approved: 0, skipped: 0 } (200)', async ({
+    test('an empty body, an absent body, and ids:[] all no-op to { approved: 0, skipped: 0, excluded: 0 } (200)', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -317,21 +317,21 @@ test.describe('Agent Approval Queue — bulk approve-all', () => {
 
         const emptyObj = await request.post(`${AQ_BASE}/approve-all`, { headers: H, data: {} });
         expect(emptyObj.status()).toBe(200);
-        expect(await emptyObj.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await emptyObj.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
 
         const noBody = await request.post(`${AQ_BASE}/approve-all`, { headers: H });
         expect(noBody.status()).toBe(200);
-        expect(await noBody.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await noBody.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
 
         const emptyIds = await request.post(`${AQ_BASE}/approve-all`, {
             headers: H,
             data: { ids: [] },
         });
         expect(emptyIds.status()).toBe(200);
-        expect(await emptyIds.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await emptyIds.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
     });
 
-    test('an unknown-id subset is silently ignored (never 404) → { approved: 0, skipped: 0 }', async ({
+    test('an unknown-id subset is silently ignored (never 404) → { approved: 0, skipped: 0, excluded: 0 }', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -342,7 +342,7 @@ test.describe('Agent Approval Queue — bulk approve-all', () => {
         expect(res.status()).toBe(200);
         // Cross-user / unknown ids don't match the owner-scoped query, so they
         // are neither approved nor counted as skipped — both counters stay 0.
-        expect(await res.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await res.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
     });
 
     test('a 200-id subset is accepted (the ArrayMaxSize boundary) and no-ops when none are owned', async ({
@@ -357,7 +357,7 @@ test.describe('Agent Approval Queue — bulk approve-all', () => {
         expect(res.status(), `approve-all 200 ids body=${await res.text().catch(() => '')}`).toBe(
             200,
         );
-        expect(await res.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await res.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
     });
 
     test('body validation: 201 ids, a non-uuid id, a non-array ids, and an unknown key are all rejected (400)', async ({

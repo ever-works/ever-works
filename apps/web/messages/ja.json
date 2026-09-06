@@ -623,6 +623,7 @@
                 "schedule_task": "タスクのスケジュール",
                 "send_message": "メッセージ送信",
                 "budget_override": "予算の上書き",
+                "merge_pull_request": "プルリクエストをマージ",
                 "other": "アクション"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "アクションを却下しました",
                 "bulkApproved": "{count} 件のアクションを承認しました",
                 "bulkApprovedSkipped": "{approved} 件のアクションを承認、{skipped} 件は決定済み",
+                "bulkApprovedExcluded": "{approved} 件を承認しました。{excluded} 件は個別の判断が必要です",
                 "error": "問題が発生しました。もう一度お試しください。"
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "タスクのスケジュール",
                     "send_message": "メッセージ送信",
                     "budget_override": "予算の上書き",
+                    "merge_pull_request": "プルリクエストをマージ",
                     "other": "その他"
                 },
                 "save": "ガードレールを保存",

@@ -623,6 +623,7 @@
                 "schedule_task": "Taak inplannen",
                 "send_message": "Bericht versturen",
                 "budget_override": "Budgetoverschrijving",
+                "merge_pull_request": "Pull request samenvoegen",
                 "other": "Actie"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Actie afgewezen",
                 "bulkApproved": "{count} acties goedgekeurd",
                 "bulkApprovedSkipped": "{approved} acties goedgekeurd, {skipped} al beslist",
+                "bulkApprovedExcluded": "{approved} acties goedgekeurd; {excluded} vereisen een afzonderlijk besluit",
                 "error": "Er is iets misgegaan. Probeer het opnieuw."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "Taak inplannen",
                     "send_message": "Bericht versturen",
                     "budget_override": "Budgetoverschrijving",
+                    "merge_pull_request": "Pull request samenvoegen",
                     "other": "Overig"
                 },
                 "save": "Vangrails opslaan",

@@ -217,7 +217,7 @@ describe('AgentApprovalsService', () => {
 
             const result = await svc.approveAll('u1', ['p1', 'p2', 'p3']);
 
-            expect(result).toEqual({ approved: 2, skipped: 1 });
+            expect(result).toEqual({ approved: 2, skipped: 1, excluded: 0 });
             expect(proposals.find).toHaveBeenCalledWith({
                 where: expect.objectContaining({ userId: 'u1' }),
             });
@@ -237,7 +237,7 @@ describe('AgentApprovalsService', () => {
 
             const result = await svc.approveAll('u1');
 
-            expect(result).toEqual({ approved: 1, skipped: 0 });
+            expect(result).toEqual({ approved: 1, skipped: 0, excluded: 0 });
             expect(proposals.find).toHaveBeenCalledWith({
                 where: { userId: 'u1', status: 'pending' },
             });
@@ -248,16 +248,92 @@ describe('AgentApprovalsService', () => {
 
             const result = await svc.approveAll('u1', ['p1']);
 
-            expect(result).toEqual({ approved: 0, skipped: 1 });
+            expect(result).toEqual({ approved: 0, skipped: 1, excluded: 0 });
             expect(proposals.save).not.toHaveBeenCalled();
         });
 
         it('short-circuits on an explicit empty subset', async () => {
             const result = await svc.approveAll('u1', []);
 
-            expect(result).toEqual({ approved: 0, skipped: 0 });
+            expect(result).toEqual({ approved: 0, skipped: 0, excluded: 0 });
             expect(proposals.find).not.toHaveBeenCalled();
             expect(proposals.save).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('approveAll — merge approval carve-out (slice AE)', () => {
+        // CONTRACT REVERSAL (AE review). These two used to assert
+        // `{ approved: 1, skipped: 1 }` — counting a still-PENDING merge
+        // proposal in the same bucket as a row somebody had already
+        // decided. The web client renders `skipped` verbatim as
+        // "N already decided", so that pinned a lie about the one
+        // irreversible item in the queue: the user was told their merge
+        // approval had been handled while it sat there untouched, waiting
+        // to expire. `excluded` is the honest counter — deliberately not
+        // decided, still pending, still needs you.
+        it('never bulk-approves a merge, and counts it as EXCLUDED not skipped', async () => {
+            // "Approve all" is a clear-the-queue gesture. A merge onto a
+            // real branch is the one thing in this queue no follow-up
+            // commit can undo, so it has to be a deliberate per-pull-request
+            // act with the repository and the head commit in view.
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'spawn_agent', status: 'pending' }),
+                makeProposal({
+                    id: 'p2',
+                    actionType: 'merge_pull_request',
+                    status: 'pending',
+                    subjectKey: 'merge:task-1:7:' + 'a'.repeat(40),
+                }),
+            ]);
+
+            const result = await svc.approveAll('u1');
+
+            expect(result).toEqual({ approved: 1, skipped: 0, excluded: 1 });
+            const saved = proposals.save.mock.calls[0][0] as unknown as Array<{ id: string }>;
+            expect(saved.map((row) => row.id)).toEqual(['p1']);
+        });
+
+        it('excludes a merge even when its id is named explicitly', async () => {
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p2', actionType: 'merge_pull_request', status: 'pending' }),
+            ]);
+            await expect(svc.approveAll('u1', ['p2'])).resolves.toEqual({
+                approved: 0,
+                skipped: 0,
+                excluded: 1,
+            });
+            expect(proposals.save).not.toHaveBeenCalled();
+        });
+
+        it('keeps `skipped` for genuinely already-decided rows, alongside an exclusion', async () => {
+            // The two counters have to be independently readable: one says
+            // "nothing left to do", the other says "you still have to do
+            // this one". Collapsing them is what made the toast wrong.
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'spawn_agent', status: 'pending' }),
+                makeProposal({ id: 'p2', actionType: 'send_message', status: 'approved' }),
+                makeProposal({ id: 'p3', actionType: 'merge_pull_request', status: 'pending' }),
+            ]);
+
+            await expect(svc.approveAll('u1')).resolves.toEqual({
+                approved: 1,
+                skipped: 1,
+                excluded: 1,
+            });
+        });
+
+        it('counts an already-DECIDED merge as skipped, not excluded', async () => {
+            // Nothing to exclude about a row that is no longer pending —
+            // it really has been decided, and saying so is correct.
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'merge_pull_request', status: 'approved' }),
+            ]);
+
+            await expect(svc.approveAll('u1', ['p1'])).resolves.toEqual({
+                approved: 0,
+                skipped: 1,
+                excluded: 0,
+            });
         });
     });
 

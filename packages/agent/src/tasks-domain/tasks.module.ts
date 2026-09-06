@@ -49,11 +49,14 @@ import { TaskGraphFanoutService } from './task-graph-fanout.service';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
 import { TaskReviewRejectionService } from './task-review-rejection.service';
+import { TaskReviewApprovalService } from './task-review-approval.service';
+import { TaskMergeGateService } from './task-merge-gate.service';
 import { TaskGitLinkService } from './task-git-link.service';
 import { TaskWorkspaceService } from './task-workspace.service';
 import { TaskPrStatusService } from './task-pr-status.service';
 import { FacadesModule } from '../facades/facades.module';
 import { PolicyModule } from '../policy/policy.module';
+import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -118,6 +121,10 @@ import { DatabaseModule } from '../database/database.module';
         // Wave 3 D4 — TaskWorkspaceService.finalizeRun records the scope
         // that governs this Work's merges in its PR-opened log line.
         PolicyModule,
+        // Merge approval (self-build slice AE, EW-805) — TaskMergeGate
+        // raises the human approval for a green pull request and verifies
+        // one before it asks for a merge.
+        MergeApprovalModule,
     ],
     providers: [
         TaskRepository,
@@ -153,6 +160,15 @@ import { DatabaseModule } from '../database/database.module';
         // TaskReviewRejectionRepository, which AgentsModule (imported
         // above) owns and exports alongside AgentRunRepository.
         TaskReviewRejectionService,
+        // Merge approval (slice AE) — the approval twin of the rejection
+        // recorder above: a HUMAN provider review approval, stamped with
+        // the commit it was given for. Context for the person who makes
+        // the real (platform-side) merge decision; never an authorization.
+        TaskReviewApprovalService,
+        // Merge approval (slice AE) — the post-CI re-evaluation of the
+        // merge. Consumed by TaskPrStatusService right after every
+        // successful provider read.
+        TaskMergeGateService,
         // Git activity ingestion (audit item j) — read-only branch/PR →
         // Task resolver the GitHub receiver stamps onto push / commit /
         // merge events. Reads TaskRepository + WorkRepository, both
@@ -198,6 +214,8 @@ import { DatabaseModule } from '../database/database.module';
         TaskRunDenormService,
         TaskWorkspaceService,
         TaskReviewRejectionService,
+        TaskReviewApprovalService,
+        TaskMergeGateService,
         TaskGitLinkService,
         TaskPrStatusService,
         TaskGateRunnerService,

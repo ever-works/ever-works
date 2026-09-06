@@ -623,6 +623,7 @@
                 "schedule_task": "Görev zamanla",
                 "send_message": "Mesaj gönder",
                 "budget_override": "Bütçe aşımı",
+                "merge_pull_request": "Pull request birleştir",
                 "other": "Eylem"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Eylem reddedildi",
                 "bulkApproved": "{count} eylem onaylandı",
                 "bulkApprovedSkipped": "{approved} eylem onaylandı, {skipped} zaten karara bağlandı",
+                "bulkApprovedExcluded": "{approved} eylem onaylandı; {excluded} ayrı ayrı karar gerektiriyor",
                 "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "Görev planla",
                     "send_message": "Mesaj gönder",
                     "budget_override": "Bütçe geçersiz kılma",
+                    "merge_pull_request": "Pull request birleştir",
                     "other": "Diğer"
                 },
                 "save": "Korkulukları kaydet",

@@ -623,6 +623,7 @@
                 "schedule_task": "Pianifica attività",
                 "send_message": "Invia messaggio",
                 "budget_override": "Sostituzione del budget",
+                "merge_pull_request": "Unisci la pull request",
                 "other": "Azione"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Azione rifiutata",
                 "bulkApproved": "{count} azioni approvate",
                 "bulkApprovedSkipped": "{approved} azioni approvate, {skipped} già decise",
+                "bulkApprovedExcluded": "Approvate {approved} azioni; {excluded} richiedono una decisione singola",
                 "error": "Qualcosa è andato storto. Riprova."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "Pianifica attività",
                     "send_message": "Invia messaggio",
                     "budget_override": "Deroga al budget",
+                    "merge_pull_request": "Unisci la pull request",
                     "other": "Altro"
                 },
                 "save": "Salva guardrail",
