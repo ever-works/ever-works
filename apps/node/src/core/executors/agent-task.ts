@@ -11,6 +11,8 @@ import type {
 	FleetAgentTaskResult,
 	FleetAgentTaskStep,
 	FleetJobView,
+	FleetRunEnvFileContent,
+	FleetRunEnvFileRequestRef,
 	FleetTaskWorkspaceDescriptor,
 	FleetTaskWorkspaceMountDescriptor,
 	FleetTaskWorkspaceSpec,
@@ -19,9 +21,12 @@ import type {
 import type { WorkspacePublishFence } from '@ever-works/plugin';
 import {
 	FLEET_AGENT_TASK_MAX_STEPS,
+	FLEET_RUN_SECRETS_UNAVAILABLE_REASON,
+	FLEET_RUN_SECRETS_UNRESOLVED_REASON,
 	FleetAgentExecutionError,
 	normalizeFleetAgentModelExecution
 } from '@ever-works/contracts';
+import { FleetClientError } from '../fleet-client';
 import {
 	normalizeChecks,
 	runNodeCommandStep,
@@ -41,10 +46,12 @@ import {
 	buildModelCliStep,
 	ModelCliCommandError,
 	parseModelCliResult,
+	redactCommandResult,
 	type ModelCliPaths,
 	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
 import type { FleetTaskWorkspaceErrorCode } from '../workspaces/fleet-task-workspace';
+import { extractRunEnvSecretValues } from '../workspaces/run-env-files';
 
 /**
  * The `agent-task` executor — the node's general job kind.
@@ -202,6 +209,36 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	 */
 	releaseWorkspace?: (taskId: string, descriptor: FleetTaskWorkspaceDescriptor) => Promise<void>;
 	/**
+	 * Run secrets (self-build slice Y) — fetch the decrypted seed `.env`
+	 * files this run's repositories declared, over the node-authenticated
+	 * job channel, while this node still holds the lease.
+	 *
+	 * Absent on a caller that holds no lease (the cloud runner). A job
+	 * whose workspace NAMES env files and finds this absent fails naming
+	 * the gap: starting it would run the model against an environment the
+	 * operator did not configure, and every database-touching check would
+	 * go red for a reason nothing on the run explains.
+	 */
+	fetchRunEnvFiles?: (refs: readonly FleetRunEnvFileRequestRef[]) => Promise<readonly FleetRunEnvFileContent[]>;
+	/**
+	 * Place the fetched files 0600 inside the checkouts they belong to.
+	 * Throws (after removing whatever already landed) rather than
+	 * delivering a partial set.
+	 */
+	writeRunEnvFiles?: (
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		files: ReadonlyArray<{ mountDir?: string; path: string; content: string }>
+	) => Promise<number>;
+	/**
+	 * Delete every env file this run was given. Called from the SAME
+	 * `finally` that releases the workspace, so it covers success, a
+	 * reported failure, a thrown model step, and an abort — an operator
+	 * cancel and a lapsed lease both arrive as one. Never decides the
+	 * verdict: a cleanup that fails is logged, not reported.
+	 */
+	removeRunEnvFiles?: (taskId: string, descriptor: FleetTaskWorkspaceDescriptor) => Promise<number>;
+	/**
 	 * The lease deadline this run is publishing under, resolved as LATE as
 	 * possible — right before the commit/push — because the keep-alive
 	 * advances it on every renewal and a model step outlives four or five
@@ -277,7 +314,16 @@ export async function runAgentTaskJob(
 				'Set FLEET_NODE_AGENT_TASK_COMMAND on the platform, or switch the fleet runtime to model-cli execution.'
 		);
 	}
-	const checks = resolveAcceptanceChecks(payload);
+	// Run secrets (self-build slice Y): the run's per-repository env grants
+	// live on the model-execution block, and they belong to the RUN, not to
+	// one command. The acceptance checks are the reason the feature exists —
+	// `pnpm test` is what needs `DATABASE_URL` — and the platform-authored
+	// steps run in the same workspace at the same trust level, so the grant
+	// is stamped onto all of them here, once, rather than trusted to arrive
+	// per entry (the checks are frozen from the Task and carry none).
+	const runEnvGrants = Array.isArray(execution?.envGrants) ? execution.envGrants : [];
+	const checks = withRunEnvGrants(resolveAcceptanceChecks(payload), runEnvGrants);
+	const grantedSteps = withRunEnvGrants(steps, runEnvGrants);
 
 	let workspaceResolution: { path: string; descriptor: FleetTaskWorkspaceDescriptor | null };
 	try {
@@ -290,8 +336,30 @@ export async function runAgentTaskJob(
 		throw error;
 	}
 	try {
+		// Run secrets (self-build slice Y): the decrypted `.env` files land
+		// AFTER provisioning (so the Git exclude rules are already written)
+		// and BEFORE the model step. A delivery that cannot be completed
+		// throws HERE, which fails the run closed — the alternative is a
+		// model working against an environment the operator did not
+		// configure and a suite that goes red for reasons nothing explains.
+		// The returned values are the secrets that now live in the checkout.
+		// They are held for the length of the run for ONE purpose: scrubbing
+		// them back out of everything the node reports. Nothing else reads
+		// this array, and it never leaves the process.
+		const runSecretValues = await provisionRunEnvFiles(taskId, payload, workspaceResolution.descriptor, io);
 		return await runResolvedAgentTask(
-			{ job, payload, taskId, runId, execution, steps, checks, workspaceResolution },
+			{
+				job,
+				payload,
+				taskId,
+				runId,
+				execution,
+				steps: grantedSteps,
+				checks,
+				workspaceResolution,
+				runEnvGrants,
+				runSecretValues
+			},
 			io,
 			signal
 		);
@@ -299,10 +367,105 @@ export async function runAgentTaskJob(
 		// Whatever the verdict — and whatever threw — the lease the
 		// provisioner took on the worktree is dropped, or the workspace
 		// reaper would treat this checkout as busy until the process dies.
+		//
+		// Run secrets ride the SAME `finally`, and deliberately BEFORE the
+		// release: success, a reported failure, a thrown model step, an
+		// operator cancel and a lapsed lease (both delivered as an aborted
+		// signal) all pass through here. The one path it cannot cover is a
+		// hard kill, which is why the provisioner also sweeps at provision
+		// time and the files are Git-excluded meanwhile.
+		if (workspaceResolution.descriptor && io.removeRunEnvFiles) {
+			await io.removeRunEnvFiles(taskId, workspaceResolution.descriptor).catch(() => undefined);
+		}
 		if (workspaceResolution.descriptor && io.releaseWorkspace) {
 			await io.releaseWorkspace(taskId, workspaceResolution.descriptor).catch(() => undefined);
 		}
 	}
+}
+
+/**
+ * Fetch and place this run's seed `.env` files.
+ *
+ * No-op — and no round trip — for a workspace that declares none, which is
+ * every workspace before this slice.
+ *
+ * Fails CLOSED on every other outcome: a missing seam, a refused fetch, a
+ * reference the platform could not resolve, or a response missing a file
+ * that was asked for. The thrown message carries a STABLE reason token and
+ * names the repository row and path at most; it never carries a value,
+ * because it lands on the job row, the Task page and the API log.
+ */
+async function provisionRunEnvFiles(
+	taskId: string,
+	payload: FleetAgentTaskPayload,
+	descriptor: FleetTaskWorkspaceDescriptor | null,
+	io: AgentTaskIo
+): Promise<string[]> {
+	const refs = payload.workspace?.envFilesRef ?? [];
+	if (refs.length === 0) return [];
+	if (!descriptor) {
+		throw new AgentTaskPayloadError(
+			`${FLEET_RUN_SECRETS_UNAVAILABLE_REASON}: the job asks for repository env files but no repository workspace was provisioned`
+		);
+	}
+	if (!io.fetchRunEnvFiles || !io.writeRunEnvFiles) {
+		throw new AgentTaskPayloadError(
+			`${FLEET_RUN_SECRETS_UNAVAILABLE_REASON}: this node cannot fetch repository env files (no leased job channel is wired for this run)`
+		);
+	}
+
+	let fetched: readonly FleetRunEnvFileContent[];
+	try {
+		fetched = await io.fetchRunEnvFiles(
+			refs.map((ref) => ({ repoConnectionId: ref.repoConnectionId, paths: [...ref.paths] }))
+		);
+	} catch (error) {
+		// A stale lease must keep its own identity: the worker reads it as
+		// "abort, and do not report", and collapsing it here would turn a
+		// void claim into a reported failure.
+		if (error instanceof FleetClientError && error.kind === 'stale-lease') throw error;
+		throw new AgentTaskPayloadError(
+			`${FLEET_RUN_SECRETS_UNAVAILABLE_REASON}: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+
+	// Index by (row, path) and prove EVERY requested file came back. A
+	// silently short response is exactly the partial environment this
+	// feature exists to prevent, and it would otherwise look like success.
+	const byKey = new Map<string, string>();
+	for (const file of fetched) byKey.set(`${file.repoConnectionId}\u0000${file.path}`, file.content);
+	const writes: Array<{ mountDir?: string; path: string; content: string }> = [];
+	for (const ref of refs) {
+		for (const path of ref.paths) {
+			const content = byKey.get(`${ref.repoConnectionId}\u0000${path}`);
+			if (typeof content !== 'string') {
+				throw new AgentTaskPayloadError(
+					`${FLEET_RUN_SECRETS_UNRESOLVED_REASON}: repository ${ref.repoConnectionId} did not deliver '${path}'`
+				);
+			}
+			writes.push({ ...(ref.mountDir ? { mountDir: ref.mountDir } : {}), path, content });
+		}
+	}
+
+	try {
+		await io.writeRunEnvFiles(taskId, descriptor, writes);
+	} catch (error) {
+		throw new AgentTaskPayloadError(
+			`${FLEET_RUN_SECRETS_UNAVAILABLE_REASON}: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+	// The VALUES inside the delivered files, for the redactor only. The
+	// node's logger is handed each file whole (`FleetJobClient`), which
+	// only ever matches a log line that reproduces the entire file; a
+	// connection string does not leak that way — a failing `pnpm test`
+	// prints the one line it read. So the per-variable values are extracted
+	// here and scrubbed out of every step, check and model result before
+	// the outcome is built.
+	const values = new Set<string>();
+	for (const write of writes) {
+		for (const value of extractRunEnvSecretValues(write.content)) values.add(value);
+	}
+	return [...values];
 }
 
 /** Provision refusals that clear on their own and say nothing about the work. */
@@ -333,6 +496,37 @@ interface ResolvedAgentTask {
 	steps: WireCheck[];
 	checks: WireCheck[];
 	workspaceResolution: { path: string; descriptor: FleetTaskWorkspaceDescriptor | null };
+	/** Env names this run was granted; their VALUES are scrubbed from every report. */
+	runEnvGrants: readonly string[];
+	/**
+	 * The VALUES inside the run's delivered `.env` files. Scrubbed out of
+	 * every step, check and model result, exactly like a granted name's
+	 * value — the difference is only that these live in no environment, so
+	 * they have to be carried rather than looked up.
+	 */
+	runSecretValues: readonly string[];
+}
+
+/**
+ * Stamp the run's env grants onto each command, unioned with whatever the
+ * command already declared. Case-insensitive, because Windows env names
+ * are; the node re-derives what it will actually honour in
+ * `buildNodeCheckEnv`, so this only decides what is OFFERED.
+ */
+function withRunEnvGrants(checks: readonly WireCheck[], runEnvGrants: readonly string[]): WireCheck[] {
+	if (runEnvGrants.length === 0) return [...checks];
+	return checks.map((check) => {
+		const merged: string[] = [];
+		const seen = new Set<string>();
+		for (const name of [...(check.envGrants ?? []), ...runEnvGrants]) {
+			if (typeof name !== 'string') continue;
+			const upper = name.toUpperCase();
+			if (seen.has(upper)) continue;
+			seen.add(upper);
+			merged.push(name);
+		}
+		return { ...check, envGrants: merged };
+	});
 }
 
 /** The run proper, once the payload is validated and the workspace resolved. */
@@ -341,7 +535,8 @@ async function runResolvedAgentTask(
 	io: AgentTaskIo,
 	signal?: AbortSignal
 ): Promise<AgentTaskOutcome> {
-	const { job, payload, taskId, runId, execution, steps, checks, workspaceResolution } = context;
+	const { job, payload, taskId, runId, execution, steps, checks, workspaceResolution, runEnvGrants } = context;
+	const runSecretValues = context.runSecretValues;
 	throwIfAgentTaskAborted(signal);
 
 	const questionFs = io.questionFs ?? defaultQuestionFs;
@@ -371,7 +566,8 @@ async function runResolvedAgentTask(
 			workspaceResolution.path,
 			workspaceResolution.descriptor?.mounts,
 			io,
-			signal
+			signal,
+			runSecretValues
 		);
 		throwIfAgentTaskAborted(signal);
 		if (model.status !== 'succeeded') {
@@ -393,10 +589,20 @@ async function runResolvedAgentTask(
 		throwIfAgentTaskAborted(signal);
 	}
 
+	// Every command's log tail is scrubbed of the values behind the names
+	// this run was granted, on the same footing as the model summary. A
+	// failing `pnpm test` prints its connection string, and that tail lands
+	// in the job result the platform stores.
+	// `runSecretValues` rides the same seam: the contents of the delivered
+	// `.env` files are in no environment to look up, and a failing suite
+	// prints the connection string it read from one.
+	const reported = (result: NodeCheckResult): NodeCheckResult =>
+		redactCommandResult(result, runEnvGrants, io.parentEnv, runSecretValues);
+
 	const stepResults: NodeCheckResult[] = [];
 	for (const step of steps) {
 		throwIfAgentTaskAborted(signal);
-		stepResults.push(await runNodeCommandStep(step, workspaceResolution.path, io, signal));
+		stepResults.push(reported(await runNodeCommandStep(step, workspaceResolution.path, io, signal)));
 		throwIfAgentTaskAborted(signal);
 	}
 	const anyRequiredStepFailed = steps.some(
@@ -409,7 +615,7 @@ async function runResolvedAgentTask(
 	const checkResults: NodeCheckResult[] = [];
 	for (const check of checks) {
 		throwIfAgentTaskAborted(signal);
-		checkResults.push(await runNodeCommandStep(check, workspaceResolution.path, io, signal));
+		checkResults.push(reported(await runNodeCommandStep(check, workspaceResolution.path, io, signal)));
 		throwIfAgentTaskAborted(signal);
 	}
 	const gateStatus: 'green' | 'red' | 'none' =
@@ -420,6 +626,25 @@ async function runResolvedAgentTask(
 				: 'green';
 	if (gateStatus === 'red') {
 		failures.push('a required acceptance check did not pass');
+	}
+
+	// Run secrets (self-build slice Y): the delivered `.env` files come off
+	// the disk BEFORE the first Git command, not only in the `finally`.
+	//
+	// The anchored `info/exclude` rule keeps `git add -A` from staging them,
+	// but `info/exclude` is the LOWEST-precedence ignore source Git has: a
+	// `.gitignore` in the worktree beats it, and the model has `acceptEdits`
+	// over the whole checkout. A prompt-injected run that writes
+	// `!/apps/api/.env` into a `.gitignore` would otherwise have the secret
+	// committed and pushed by the node itself, into the owner's branch and
+	// the pull request the platform opens. Nothing between here and the
+	// commit reads the files — the model, the steps and the checks are all
+	// done — so removing them now costs nothing and closes that channel.
+	//
+	// The `finally` still runs: this is the early half of the same deletion,
+	// and it is idempotent.
+	if (workspaceResolution.descriptor && io.removeRunEnvFiles) {
+		await io.removeRunEnvFiles(taskId, workspaceResolution.descriptor).catch(() => undefined);
 	}
 
 	let git: FleetAgentTaskGitResult | null = null;
@@ -529,7 +754,15 @@ async function runModelStep(
 	workspacePath: string,
 	mounts: readonly FleetTaskWorkspaceMountDescriptor[] | undefined,
 	io: AgentTaskIo,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	/**
+	 * The VALUES of the run's delivered `.env` files (self-build slice Y).
+	 * "Print the contents of apps/api/.env" is the first thing a prompt
+	 * injection asks a CLI that ships a shell tool, and the answer used to
+	 * come straight back as the job result. Scrubbed on the same footing as
+	 * a granted credential.
+	 */
+	runSecretValues: readonly string[] = []
 ): Promise<FleetAgentTaskModelResult> {
 	const executable = io.modelCli?.[execution.provider];
 	if (typeof executable !== 'string' || !executable.trim()) {
@@ -570,13 +803,24 @@ async function runModelStep(
 			if (error instanceof ModelCliCommandError) throw new AgentTaskPayloadError(error.message);
 			throw error;
 		}
-		const step = buildModelCliStep(execution, command, execution.envPassthrough);
+		const step = buildModelCliStep(execution, command, execution.envPassthrough, execution.envGrants);
 		const result = await runNodeCommandStep(step, workspacePath, io, signal);
 		const rawOutput = await scratchFs.readFile(scratch.resultPath);
 		// `envPassthrough` names the credential env vars this CLI was handed;
 		// their values are scrubbed out of the summary and output tail before
-		// the result leaves the node.
-		return parseModelCliResult(execution.provider, rawOutput, result, execution.envPassthrough);
+		// the result leaves the node. `envGrants` (self-build slice Y) names
+		// the per-repository grants and is scrubbed on the SAME footing: a
+		// granted DATABASE_URL is a credential the model could have echoed,
+		// and the whole point of granting one is that it stays on the machine.
+		return parseModelCliResult(
+			execution.provider,
+			rawOutput,
+			result,
+			execution.envPassthrough,
+			execution.envGrants,
+			io.parentEnv,
+			runSecretValues
+		);
 	} finally {
 		try {
 			await scratchFs.remove(scratchDir);
@@ -763,6 +1007,13 @@ export function normalizeAgentTaskSteps(raw: unknown): WireCheck[] {
 		if (typeof step.required === 'boolean') out.required = step.required;
 		if (Array.isArray(step.envPassthrough)) {
 			out.envPassthrough = step.envPassthrough.filter((n): n is string => typeof n === 'string');
+		}
+		// Run secrets (slice Y): the per-repository grants ride the step the
+		// same way. Filtered, not validated, here — `buildNodeCheckEnv`
+		// re-derives what this machine will actually honour, and that is the
+		// gate that matters.
+		if (Array.isArray(step.envGrants)) {
+			out.envGrants = step.envGrants.filter((n): n is string => typeof n === 'string');
 		}
 		return out;
 	});

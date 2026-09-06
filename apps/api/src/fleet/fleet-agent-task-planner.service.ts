@@ -335,12 +335,24 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             settings,
         });
 
+        // Run secrets (self-build slice Y): the union of the env var NAMES
+        // every repository of this run granted. NAMES only — the values are
+        // read from the node's own environment and scrubbed back out of
+        // everything the node reports. Read fresh on every plan, which is
+        // what makes a revoked grant stop applying from the next run on.
+        const envGrants = await this.taskWorkspace.resolveFleetRunEnvGrants({
+            task,
+            userId: payload.userId,
+            agentId: payload.agentId,
+        });
+
         const execution: FleetAgentModelExecution = {
             provider: settings.provider,
             instructions,
             permissionMode: settings.permissionMode,
             timeoutSec: settings.timeoutSec,
             envPassthrough: config.fleetNode.getAgentTaskEnvPassthrough(),
+            ...(envGrants.length > 0 ? { envGrants } : {}),
         };
         if (settings.model) execution.model = settings.model;
         if (settings.effort) execution.effort = settings.effort;

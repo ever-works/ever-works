@@ -1,5 +1,6 @@
 import { INBOX_MAX_TITLE_CHARS } from '../inbox/inbox.types.js';
 import type { TaskAcceptanceCheck, TaskCheckResult } from '../tasks/task-gates.types.js';
+import { normalizeFleetRunEnvGrants } from './fleet-run-secrets.types.js';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
 
 /**
@@ -385,6 +386,19 @@ export interface FleetAgentTaskStep {
 	required?: boolean;
 	/** Extra env names this step may see; never platform-owned ones. */
 	envPassthrough?: string[];
+	/**
+	 * Per-repository env grants (self-build slice Y). Env var NAMES an
+	 * operator explicitly bound to a repository of this run, which the node
+	 * admits THROUGH the platform-owned refusal — exact names only, never a
+	 * prefix, never a family, and never one of the un-grantable core
+	 * namespaces (`FLEET_`, `EVER_WORKS_`, `PLUGIN_`, `AUTH_`,
+	 * `BETTER_AUTH_`, `PLATFORM_`).
+	 *
+	 * Names, not values: the VALUE is read from the node's own environment
+	 * and scrubbed out of everything the node reports back, exactly as
+	 * `envPassthrough` values already are.
+	 */
+	envGrants?: string[];
 }
 
 /**
@@ -589,6 +603,12 @@ export interface FleetAgentModelExecution {
 	 * (its credential), same semantics as `FleetAgentTaskStep.envPassthrough`.
 	 */
 	envPassthrough?: string[];
+	/**
+	 * Per-repository env grants, same semantics as
+	 * `FleetAgentTaskStep.envGrants` — NAMES the run's repositories were
+	 * granted, which the node admits through the platform-owned refusal.
+	 */
+	envGrants?: string[];
 }
 
 /** What the node does with the working tree after the model ran. */
@@ -695,6 +715,16 @@ export function normalizeFleetAgentModelExecution(raw: unknown): FleetAgentModel
 			throw new FleetAgentExecutionError('Fleet agent execution envPassthrough must be an array of names');
 		}
 		out.envPassthrough = input.envPassthrough.filter((name): name is string => typeof name === 'string');
+	}
+	if (input.envGrants !== undefined && input.envGrants !== null) {
+		if (!Array.isArray(input.envGrants)) {
+			throw new FleetAgentExecutionError('Fleet agent execution envGrants must be an array of names');
+		}
+		// Normalized, not filtered: a grant naming the un-grantable core, a
+		// wildcard or a malformed name is DROPPED here as well as on the
+		// node, so nothing downstream has to re-decide what a grant may say.
+		const grants = normalizeFleetRunEnvGrants(input.envGrants);
+		if (grants.length > 0) out.envGrants = grants;
 	}
 	return out;
 }
