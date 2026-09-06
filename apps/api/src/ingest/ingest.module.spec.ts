@@ -55,6 +55,21 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskRepository: class TaskRepository {},
     TasksService: class TasksService {},
     TaskPriority: { P0: 'p0', P1: 'p1', P2: 'p2', P3: 'p3', P4: 'p4' },
+    // `triage-task-filer.service.ts` reads `TaskStatus.DONE` at MODULE SCOPE
+    // (`CLOSED_TASK_STATUSES`), so leaving it out of this mock is not a
+    // missing-value problem at call time — the file throws
+    // "Cannot read properties of undefined" while it is still being
+    // imported, and the whole suite fails to run. Mirrors the real enum in
+    // `task.entity.ts` exactly.
+    TaskStatus: {
+        BACKLOG: 'backlog',
+        TODO: 'todo',
+        IN_PROGRESS: 'in_progress',
+        IN_REVIEW: 'in_review',
+        BLOCKED: 'blocked',
+        DONE: 'done',
+        CANCELLED: 'cancelled',
+    },
     classifyCheckResult: () => 'pending',
     computeCiFailureKey: () => 'k',
 }));
