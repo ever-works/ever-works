@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { admitByResourceLimits } from '../resource-limits';
 import {
+	acquireWorkspaceLease,
 	FleetTaskWorkspaceProvisioner,
 	readWorkspaceLease,
 	readWorkspaceUsage,
@@ -59,7 +61,9 @@ describe('FleetTaskWorkspaceProvisioner — disk floor re-check', () => {
 
 		const failure = await provisioner.provision('task-0001', valid).catch((error: unknown) => error);
 		expect(failure).toMatchObject({ code: 'disk-low' });
-		expect(String((failure as Error).message)).toContain('100 MB');
+		// `MiB`, not `MB`: both halves of this sentence are binary and both
+		// now say so (review AO-14).
+		expect(String((failure as Error).message)).toContain('100 MiB');
 		expect(String((failure as Error).message)).toContain('2.0 GiB');
 		expect(plugin.provision).not.toHaveBeenCalled();
 		// The root does not exist yet: the reading was taken on its nearest
@@ -88,15 +92,69 @@ describe('FleetTaskWorkspaceProvisioner — disk floor re-check', () => {
 		expect(off.provision).toHaveBeenCalledOnce();
 	});
 
-	it('admits when the reading is unknown — an unreadable volume must not fail every job', async () => {
+	// CONTRACT REVERSAL, stated so the next reader does not "fix" it back.
+	//
+	// This case used to assert the opposite — that an unknown reading
+	// ADMITS, on the argument that an unreadable volume must not fail every
+	// job. It was the wrong rule HERE: this is the last check before a
+	// clone, a fetch and a model's entire budget land on a volume whose free
+	// space nobody can name, and nothing checks again afterwards — the
+	// failure it used to allow was a run dying inside git or pnpm with the
+	// lease, the plan and part of the spend already gone. Controls fail
+	// closed: a limit that cannot be EVALUATED refuses. And refusing costs
+	// little, because `disk-low` is a deferral, not a verdict.
+	//
+	// A SECOND reversal followed (review AO-11), on the sibling case below:
+	// the LEASE gate now refuses the same unknown reading too. It was
+	// admitting, and the pair did not compose — the node leased every job
+	// and deferred it here, and each deferral silently spent one of the
+	// job's attempts (nothing is reported; the claim simply lapses) until
+	// the platform failed it for "attempt budget exhausted", a message that
+	// never mentions disk. The original concern — "a broken `statfs` must
+	// not idle a machine" — is answered by `--no-disk-floor`, an explicit
+	// decision, rather than by a silent one that costs jobs.
+	it('refuses when the reading is unknown — a floor it cannot evaluate fails closed', async () => {
 		const plugin = { provision: vi.fn(async () => null) } as unknown as FleetWorkspacePlugin;
 		const provisioner = new FleetTaskWorkspaceProvisioner({
 			rootPath,
 			plugin,
 			diskProbe: { freeBytes: () => null }
 		});
-		await expect(provisioner.provision('task-0001', valid)).rejects.toMatchObject({ code: 'provision-failed' });
-		expect(plugin.provision).toHaveBeenCalledOnce();
+
+		const failure = await provisioner.provision('task-0001', valid).catch((error: unknown) => error);
+		expect(failure).toMatchObject({ code: 'disk-low' });
+		// The message must say the reading FAILED, not that the disk is
+		// full: an operator sent to clear space on a half-empty volume
+		// never finds the real fault.
+		expect(String((failure as Error).message)).toContain('could not be measured');
+		expect(plugin.provision).not.toHaveBeenCalled();
+	});
+
+	it('refuses at the LEASE too, so the pair cannot loop (review AO-11)', () => {
+		// The other half, driven through the real admission function rather
+		// than restated: same floor, same unknown reading, and now the SAME
+		// answer one gate earlier — which is what makes the composition
+		// terminate. A gate that admits what the next gate refuses turns
+		// every won job into a deferral and burns its attempt budget.
+		const limits = { maxCpuPercent: null, maxMemoryMb: null };
+		const sample = { cpuPercent: 5, usedMemoryMb: 100, totalMemoryMb: 16_000 };
+		expect(admitByResourceLimits(limits, { ...sample, diskFreeBytes: null })).toMatchObject({
+			admit: false,
+			dimension: 'disk'
+		});
+		expect(admitByResourceLimits(limits, { ...sample, diskFreeBytes: Number.NaN })).toMatchObject({
+			admit: false,
+			dimension: 'disk'
+		});
+		// A dimension that was never SAMPLED still admits — that is the case
+		// the original rule was really protecting, and it is untouched.
+		expect(admitByResourceLimits(limits, sample)).toMatchObject({ admit: true });
+		// And a reading it CAN take is still refused on the same defaults,
+		// so the cases above are not passing merely because the floor is off.
+		expect(admitByResourceLimits(limits, { ...sample, diskFreeBytes: 100 * MIB })).toMatchObject({
+			admit: false,
+			dimension: 'disk'
+		});
 	});
 
 	it('keeps a pre-cancelled request from reading the disk or reaching Git', async () => {
@@ -249,6 +307,75 @@ describe.sequential('FleetTaskWorkspaceProvisioner — lease and usage files (re
 		expect(failure).toMatchObject({ code: 'workspace-busy' });
 		expect(String((failure as Error).message)).toContain('reaper');
 		expect(String((failure as Error).message)).toContain(String(process.pid));
+	});
+
+	it('treats a lease it cannot PARSE as held, and never takes the slot (review AO-3)', async () => {
+		// The lease is the only cross-process evidence that a job is running
+		// in a worktree, and `removeWorktree` takes it immediately before
+		// `git worktree remove --force`. It used to DELETE any lease it could
+		// not read and take the slot — so the single file gating an
+		// irreversible delete opened exactly when it became unknown. Two
+		// builds on one machine is the shipped pattern (the worker runs as a
+		// Windows service while an operator runs `gc` from a shell), so a
+		// lease this build does not recognise is a live job at least as often
+		// as it is litter.
+		const owner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await owner.provision('task-lease-6', workspace('task/lease-6'));
+		await owner.release('task-lease-6', descriptor);
+		const gitDir = gitDirOf(descriptor.path);
+		writeFileSync(join(descriptor.path, 'in-progress.txt'), 'the running job\n');
+
+		for (const content of [
+			// A future build's format.
+			JSON.stringify({ version: 2, purpose: 'job', pid: 4242, since: '2026-09-01T00:00:00.000Z' }),
+			// A purpose this build has never heard of.
+			JSON.stringify({ version: 1, purpose: 'audit', pid: 4242, since: '2026-09-01T00:00:00.000Z' }),
+			// Torn by a hard kill.
+			'{"version":1,"purpose":"jo'
+		]) {
+			await fs.writeFile(join(gitDir, 'ew-workspace-lease.json'), content);
+			// `isProcessAlive` says NOTHING is running: the old rule would
+			// have called this stale and reclaimed it on that basis.
+			const contended = new FleetTaskWorkspaceProvisioner({
+				rootPath: workspaceRoot,
+				isProcessAlive: () => false
+			});
+			const failure = await contended
+				.provision('task-lease-6', workspace('task/lease-6'))
+				.catch((error: unknown) => error);
+			expect(failure).toMatchObject({ code: 'path-collision' });
+			expect(String((failure as Error).message)).toContain('could not be read as a lease');
+			// Nothing was written through, and the file itself was preserved
+			// so an operator can see what it actually is.
+			expect(await fs.readFile(join(descriptor.path, 'in-progress.txt'), 'utf8')).toBe('the running job\n');
+			expect(await fs.readFile(join(gitDir, 'ew-workspace-lease.json'), 'utf8')).toBe(content);
+		}
+
+		// And `acquireWorkspaceLease` says so in its own words, so the reaper
+		// (which reads the acquisition, not the exception) sees it too.
+		const acquisition = await acquireWorkspaceLease(
+			gitDir,
+			{ version: 1, purpose: 'gc', pid: process.pid, since: new Date().toISOString() },
+			() => false
+		);
+		expect(acquisition).toMatchObject({ acquired: false });
+		expect('unreadable' in acquisition).toBe(true);
+
+		await fs.unlink(join(gitDir, 'ew-workspace-lease.json'));
+	});
+
+	it('writes the lease atomically, so a crash cannot leave a torn one', async () => {
+		// The complement of the rule above: because an unreadable lease is
+		// now a permanent keep, the node must never PRODUCE one. The usage
+		// file already wrote temp-then-rename for exactly this reason while
+		// the gating file did not.
+		const owner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await owner.provision('task-lease-7', workspace('task/lease-7'));
+		const gitDir = gitDirOf(descriptor.path);
+		expect(await readWorkspaceLease(gitDir)).toMatchObject({ pid: process.pid, purpose: 'job' });
+		// No temp file left behind by the atomic create.
+		expect((await fs.readdir(gitDir)).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+		await owner.release('task-lease-7', descriptor);
 	});
 
 	it('drops the lease again when the provision fails after taking it', async () => {

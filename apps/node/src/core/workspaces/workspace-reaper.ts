@@ -16,8 +16,10 @@ import {
 } from './fleet-task-workspace';
 import {
 	FLEET_WORKSPACE_INTENTS_DIR,
+	hasFleetExcludedOutput,
+	inspectMountsDir,
 	intentPath,
-	listMountLinks,
+	POOL_UNPUSHED_REVISION_ARGS,
 	scanWorkspaceRoot,
 	type WorkspaceInventory,
 	type WorkspacePoolRecord,
@@ -37,9 +39,13 @@ import {
  *
  *   1. ownership — the provider's stamp AND an exact Git registration;
  *   2. no provisioning intent pending (a provision may be mid-way);
- *   3. no live lease (a job is running in it — this process or another);
+ *   3. no live lease (a job is running in it — this process or another),
+ *      and none this build cannot READ, which is the same thing;
  *   4. not a binding this process is using right now;
  *   5. no uncommitted or untracked changes, no Git lock file;
+ *   5b. `.mounts` is a plain directory, and nothing is sitting in the
+ *      fleet's own excluded `.ever-works` — `git status` cannot see either
+ *      of those, so rule 5 is not a proof without them;
  *   6. no commit on HEAD that is not reachable from a remote ref;
  *   7. the remote was reachable, AND the branch is gone from it or merged
  *      into its default branch — a branch still open there stays;
@@ -57,9 +63,11 @@ import {
  * `.mounts/*` link has been unlinked, because a recursive delete that
  * followed a junction would empty ANOTHER Task's checkout. A bare pool is
  * deleted only once Git lists no worktree for it, no intent is pending, its
- * remote was refreshed by this scan, and no commit on any of its LOCAL
- * branches is missing from the remote — `git worktree remove` leaves the
- * branch behind, so an emptied pool can still hold unpushed work.
+ * remote was refreshed by this scan, and nothing it can still reach —
+ * branches, tags, the stash, the REFLOG — is missing from the remote.
+ * `git worktree remove` leaves the branch behind, and the provider's
+ * `worktree add -B` force-resets one, so an emptied pool can still hold
+ * the only copy of unpushed work (see `POOL_UNPUSHED_REVISION_ARGS`).
  */
 
 export interface WorkspaceReapPolicy {
@@ -199,7 +207,7 @@ export function planWorkspaceReap(
 			} else if (pool.unpushedCount > 0) {
 				plan.keepPools.push({
 					pool,
-					reason: `${pool.unpushedCount} commit(s) on local branches not on any remote`
+					reason: `${pool.unpushedCount} commit(s) on local refs not on any remote`
 				});
 			} else if (pool.lastUsedAt === null) {
 				plan.keepPools.push({ pool, reason: 'last use unknown' });
@@ -236,6 +244,15 @@ function whyUnsafe(
 	if (record.bindingKey !== null && activeBindings.has(record.bindingKey)) return 'in use by this process';
 	if (record.dirty === 'unknown') return 'working tree state unknown';
 	if (record.dirty) return 'uncommitted changes';
+	// `.mounts` is the model's to replace and the provisioner deliberately
+	// leaves a link there for a single-repository task. Removal enumerates
+	// and unlinks inside it, so anything but a plain directory is a keep.
+	if (record.mountsDir === 'foreign') return '`.mounts` is a link or a file, not a directory';
+	if (record.mountsDir === 'unknown') return '`.mounts` state unknown';
+	// `git status` cannot see these — the node excludes them itself — so
+	// they need their own rule or the "clean" above is not a proof.
+	if (record.excludedOutput === 'unknown') return 'fleet-excluded output state unknown';
+	if (record.excludedOutput) return 'unreported output in `.ever-works` (owner question or agent metadata)';
 	if (record.hasLocks) return 'git lock file present';
 	if (record.unpushedCount === 'unknown') return 'unpushed commit count unknown';
 	if (record.unpushedCount > 0) return `${record.unpushedCount} commit(s) not on any remote`;
@@ -409,6 +426,12 @@ async function removeWorktree(
 				reason: `leased by pid ${acquisition.heldBy.pid} (${acquisition.heldBy.purpose === 'gc' ? 'reaper' : 'running job'})`
 			};
 		}
+		// A lease that exists and cannot be read names no holder — and is
+		// therefore exactly the case where a worktree must be kept, not the
+		// case where the gate opens (review AO-3).
+		if ('unreadable' in acquisition) {
+			return { ok: false, reason: `lease present but unreadable: ${acquisition.unreadable}` };
+		}
 		return { ok: false, reason: `lease could not be taken: ${describeError(acquisition.failure)}`, error: true };
 	}
 	try {
@@ -421,7 +444,26 @@ async function removeWorktree(
 		const status = await gitOutput(['status', '--porcelain', '--untracked-files=all'], record.path, deps.signal);
 		if (status === null) return { ok: false, reason: 'working tree state could not be re-read' };
 		if (status.trim().length > 0) return { ok: false, reason: 'uncommitted changes appeared' };
-		for (const link of await listMountLinks(record.path)) {
+		// Neither of these is visible to `git status` — the node's own
+		// exclude rules hide them — so both are re-proven here, live.
+		const excluded = await hasFleetExcludedOutput(record.path);
+		if (excluded !== false) {
+			return {
+				ok: false,
+				reason:
+					excluded === 'unknown'
+						? '`.ever-works` state could not be re-read'
+						: 'unreported output appeared in `.ever-works`'
+			};
+		}
+		// `lstat`-ed, not enumerated blind: a `.mounts` that is itself a
+		// junction would otherwise have this loop unlink entries inside the
+		// junction's TARGET — another Task's live checkout (review AO-1).
+		const mounts = await inspectMountsDir(record.path);
+		if (mounts.state === 'foreign' || mounts.state === 'unknown') {
+			return { ok: false, reason: `'.mounts' is not a plain directory (${mounts.state})` };
+		}
+		for (const link of mounts.links) {
 			await removeMountLink(link);
 		}
 		await deps.plugin.teardown({
@@ -447,8 +489,9 @@ async function removeWorktree(
 
 /**
  * Delete a bare pool only when Git lists nothing for it, no intent is
- * pending and no local branch carries a commit missing from every
- * remote-tracking ref — all re-proven right now, not from the scan.
+ * pending and nothing it can still reach — branches, tags, stash, reflog —
+ * carries a commit missing from every remote-tracking ref. All re-proven
+ * right now, not from the scan: this is the one irreversible `fs.rm` here.
  */
 async function removePool(pool: WorkspacePoolRecord, signal: AbortSignal | undefined): Promise<RemovalOutcome> {
 	try {
@@ -475,12 +518,12 @@ async function removePool(pool: WorkspacePoolRecord, signal: AbortSignal | undef
 			intents = [];
 		}
 		if (intents.length > 0) return { ok: false, reason: `${intents.length} provisioning intent(s) pending` };
-		const counted = await gitOutput(['rev-list', '--count', '--branches', '--not', '--remotes'], pool.path, signal);
+		const counted = await gitOutput(POOL_UNPUSHED_REVISION_ARGS, pool.path, signal);
 		if (counted === null || !/^\d+$/.test(counted.trim())) {
 			return { ok: false, reason: 'local branch state could not be re-read' };
 		}
 		if (Number(counted.trim()) > 0) {
-			return { ok: false, reason: `${counted.trim()} commit(s) on local branches not on any remote` };
+			return { ok: false, reason: `${counted.trim()} commit(s) on local refs not on any remote` };
 		}
 		await fs.rm(pool.path, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 		return { ok: true };
@@ -489,12 +532,35 @@ async function removePool(pool: WorkspacePoolRecord, signal: AbortSignal | undef
 	}
 }
 
-/** Drop the `repos/`, `worktrees/` and repository directories once they are empty — non-recursive, so a surprise stays. */
+/**
+ * Drop the `repos/`, `worktrees/` and repository directories once they are
+ * empty — non-recursive, so a surprise stays.
+ *
+ * Each name is `lstat`-ed first (review AO-5). The scanner classifies a
+ * `repos`/`worktrees` that is NOT a plain directory as unrecognised and
+ * promises unrecognised entries are "reported, never touched"; on Windows
+ * `rmdir` on a junction succeeds unconditionally and removes the reparse
+ * point, so an operator who relocated a repository cache onto a larger
+ * volume would have had the only path to those checkouts deleted while
+ * being told a pool was reclaimed. `rmdir` still refuses a non-empty
+ * directory, which is what keeps this non-recursive.
+ */
 async function removeEmptyRepositoryRoot(repositoryRoot: string): Promise<void> {
 	for (const child of ['repos', 'worktrees']) {
-		await fs.rmdir(join(repositoryRoot, child)).catch(() => undefined);
+		if (await isPlainDirectory(join(repositoryRoot, child))) {
+			await fs.rmdir(join(repositoryRoot, child)).catch(() => undefined);
+		}
 	}
-	await fs.rmdir(repositoryRoot).catch(() => undefined);
+	if (await isPlainDirectory(repositoryRoot)) await fs.rmdir(repositoryRoot).catch(() => undefined);
+}
+
+async function isPlainDirectory(path: string): Promise<boolean> {
+	try {
+		const stats = await fs.lstat(path);
+		return stats.isDirectory() && !stats.isSymbolicLink();
+	} catch {
+		return false;
+	}
 }
 
 async function gitOutput(
@@ -556,6 +622,16 @@ export interface WorkspaceReaperTimerOptions {
 	scan?: typeof scanWorkspaceRoot;
 	reap?: typeof runWorkspaceReap;
 	now?: () => number;
+	/**
+	 * Called with the outcome of every completed cycle (node housekeeping,
+	 * EW-803) — how the heartbeat learns what this machine reclaimed.
+	 *
+	 * Best-effort and never allowed to break the cycle: a reporting hook
+	 * that throws must not stop the thing that reclaims disk, so it is
+	 * called inside its own try/catch. Not called for a cycle that was
+	 * skipped (busy) or that threw, because neither produced a result.
+	 */
+	onResult?: (result: WorkspaceReapResult) => void;
 }
 
 export interface WorkspaceReaperTimer {
@@ -596,6 +672,12 @@ export function startWorkspaceReaperTimer(options: WorkspaceReaperTimerOptions):
 				const inventory = await scan(options.rootPath, { refreshRemote: true, now });
 				const plan = planWorkspaceReap(inventory, options.policy, now(), options.activeBindings?.());
 				const result = await reap(plan, { logger: options.logger, now });
+				try {
+					options.onResult?.(result);
+				} catch (error) {
+					// Reporting is a courtesy; reclaiming disk is the job.
+					options.logger?.warn(`Workspace reaper could not report its result: ${describeError(error)}`);
+				}
 				options.logger?.info(
 					`Workspace reaper: removed ${result.removed.length} worktree(s) and ${result.removedPools.length} pool(s) (${formatBytes(
 						result.freedBytes

@@ -109,7 +109,10 @@ const NODE_EXPORTS = [
 	// Covered in `fleet-node.spec.ts`.
 	'FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS',
 	'FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS',
-	'FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS'
+	'FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS',
+	// Node housekeeping visibility (EW-803): the cap on a reported
+	// workspace count. Covered in `fleet-node.spec.ts`.
+	'FLEET_MAX_WORKSPACE_COUNT'
 ] as const;
 
 /** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
@@ -286,7 +289,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 148 runtime symbols', () => {
+	it('exposes exactly these 149 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -301,8 +304,10 @@ describe('fleet barrel', () => {
 		// helpers of `fleet-run-secrets.types.ts`.
 		// → 148 with the node MCP bridge (EW-782): the run-credential
 		// symbols, pinned in `fleet-run-credential.spec.ts`.
+		// → 149 with node housekeeping visibility (EW-803): the cap on a
+		// reported workspace count, in an existing module.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(148);
+		expect(Object.keys(fleet)).toHaveLength(149);
 	});
 
 	it.each([

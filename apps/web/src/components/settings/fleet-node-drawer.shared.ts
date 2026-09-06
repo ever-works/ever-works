@@ -235,3 +235,73 @@ export function fleetJobOutcomeText(job: FleetNodeJobHistoryEntry, maxLength = 2
     if (!trimmed) return null;
     return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}…` : trimmed;
 }
+
+// ---------------------------------------------------------------------------
+// Node housekeeping (EW-803)
+// ---------------------------------------------------------------------------
+
+/**
+ * How the node's free disk stands against the floor it enforces on
+ * itself.
+ *
+ * `unknown` covers three different silences that all render the same way
+ * — no reading, no floor reported, or an older daemon that reports
+ * neither — because the operator's next step is identical in all three:
+ * there is nothing here to act on.
+ *
+ * `below` is the one that matters. It is the machine-side explanation for
+ * a node that reads online, holds no jobs and quietly leases nothing, and
+ * it is deliberately derived from the two REPORTED numbers rather than
+ * from `workerState`: a node that has fallen under its floor since its
+ * last state transition is already refusing work before the throttle is
+ * reported, and the numbers say so first.
+ */
+export type FleetNodeDiskState = 'unknown' | 'ok' | 'below';
+
+export function fleetNodeDiskState(
+    node: Pick<FleetNodeView, 'diskFreeBytes' | 'minFreeDiskBytes'>,
+): FleetNodeDiskState {
+    const free = node.diskFreeBytes;
+    const floor = node.minFreeDiskBytes;
+    if (typeof free !== 'number' || !Number.isFinite(free)) return 'unknown';
+    // A null floor is "the operator switched it off", which is a real
+    // answer — but not one that makes a free-space figure a pass or a
+    // fail. There is no line to be under.
+    if (typeof floor !== 'number' || !Number.isFinite(floor)) return 'unknown';
+    return free < floor ? 'below' : 'ok';
+}
+
+/** Badge classes for the disk state. Only `below` is an event worth colouring. */
+export function fleetNodeDiskBadgeClass(state: FleetNodeDiskState): string {
+    return state === 'below'
+        ? 'bg-danger/10 text-danger'
+        : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark';
+}
+
+/**
+ * Has this node ever told us anything about its housekeeping?
+ *
+ * False for an older daemon and for a visibility-only node, and the
+ * drawer uses it to say "not reported" ONCE rather than printing four
+ * dashes — four unknowns read as four separate faults.
+ *
+ * A `null` floor deliberately does NOT count. On the wire it collapses
+ * two different facts — "never reported" and "the operator switched the
+ * floor off" — and the storage layer says so explicitly: the column
+ * cannot tell them apart, so neither can this. Treating null as evidence
+ * would make every node ever enrolled claim to have reported, since
+ * `toView` emits null for an unset column.
+ */
+export function hasFleetNodeHousekeeping(
+    node: Pick<
+        FleetNodeView,
+        'minFreeDiskBytes' | 'workspaceCount' | 'workspaceBytes' | 'lastReclaimAt'
+    >,
+): boolean {
+    return (
+        typeof node.minFreeDiskBytes === 'number' ||
+        typeof node.workspaceCount === 'number' ||
+        typeof node.workspaceBytes === 'number' ||
+        typeof node.lastReclaimAt === 'string'
+    );
+}

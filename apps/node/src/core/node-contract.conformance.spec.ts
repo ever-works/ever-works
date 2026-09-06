@@ -121,7 +121,11 @@ describe('what the node actually puts on the wire', () => {
 			expect(Object.keys(baseline.routes[route].requests).sort()).toEqual([...variants].sort());
 		}
 		expect(baseline.selfDescription.nodeEmits).toHaveLength(6);
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(2);
+		// 2 → 7 with node housekeeping (EW-803): the disk floor the node is
+		// enforcing plus the four reclaim figures. All conditional for the
+		// same reason as slice T's pair — a node that has never reported one
+		// sends nothing rather than a null, so an older platform is unaffected.
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(7);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -185,7 +189,7 @@ describe('what the node actually puts on the wire', () => {
 		expect(emitted.sort()).toEqual([...baseline.selfDescription.nodeEmits].sort());
 	});
 
-	it('adds the optional health fields only when the node has a worker state', async () => {
+	it('adds every optional field only when the node actually has one', async () => {
 		// Slice T's two fields are CONDITIONAL, and that is the compatibility
 		// property worth pinning in both directions: a node with nothing to say
 		// about its worker must not start sending nulls at a platform that
@@ -205,7 +209,17 @@ describe('what the node actually puts on the wire', () => {
 			diskFreeBytes: 1,
 			modelIdentity: 'x',
 			workerState: 'quarantined',
-			workerStateReason: 'helper trust check failed'
+			workerStateReason: 'helper trust check failed',
+			// Node housekeeping (EW-803). Supplied here for the same reason as
+			// the pair above: this case exists to prove that EVERY field the
+			// contract lists as optional is actually put on the wire when the
+			// node has one, so it has to supply all of them or the equality
+			// below stops meaning anything as the list grows.
+			minFreeDiskBytes: 5_000_000_000,
+			workspaceCount: 3,
+			workspaceBytes: 12_000_000_000,
+			lastReclaimAt: '2026-09-06T00:00:00.000Z',
+			lastReclaimFreedBytes: 4_000_000_000
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(
@@ -213,6 +227,8 @@ describe('what the node actually puts on the wire', () => {
 		);
 		expect(bodyOf(sent).workerState).toBe('quarantined');
 		expect(bodyOf(sent).workerStateReason).toBe('helper trust check failed');
+		expect(bodyOf(sent).workspaceCount).toBe(3);
+		expect(bodyOf(sent).lastReclaimAt).toBe('2026-09-06T00:00:00.000Z');
 	});
 
 	it('pause and unenroll send exactly the pinned bodies', async () => {
