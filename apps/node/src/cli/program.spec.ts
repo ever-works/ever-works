@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CapabilityEnvironment, CommandRunner } from '../core/capabilities';
 import { parseConfig, type ConfigFileSystem } from '../core/config-store';
 import type { FetchLike } from '../core/fleet-client';
@@ -269,6 +269,44 @@ describe('ever-works-node status', () => {
 	it('treats a corrupt config as not enrolled rather than crashing', async () => {
 		const h = harness({ files: { [CONFIG_PATH]: '{ truncated' } });
 		expect(await runCli(['status'], h.deps)).toBe(EXIT_NOT_ENROLLED);
+	});
+});
+
+describe('ever-works-node status — the pinned control plane (EW-779)', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it('names the source of the API base when nothing is pinned', async () => {
+		// Printing the bare URL made a pinned node indistinguishable from an
+		// unpinned one, which is the state an operator most needs to see during
+		// a fleet-wide outage.
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('api          https://api.ever.works (from the enrolled config)');
+	});
+
+	it('shows the pin and warns loudly when it is not the enrolled origin', async () => {
+		vi.stubEnv('EVER_WORKS_NODE_API_URL', 'https://apistage.ever.works');
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('https://apistage.ever.works (PINNED via EVER_WORKS_NODE_API_URL)');
+		// The enrolled origin is still named: it is what the secret was minted
+		// against, and a mismatch 401s every call.
+		expect(h.output()).toContain('enrolled against https://api.ever.works');
+		expect(h.output()).toContain('401');
+	});
+
+	it('still prints a status when the pin itself is malformed', async () => {
+		// `status` is the command an operator is told to run when nothing works.
+		// It must not be the thing that also fails.
+		vi.stubEnv('EVER_WORKS_NODE_API_URL', 'not a url');
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain(`node id      ${NODE_ID}`);
+		expect(h.output()).toContain('EVER_WORKS_NODE_API_URL is set to an invalid URL');
 	});
 });
 

@@ -210,6 +210,7 @@ POST /api/fleet/rotate-all   → { queuedNodes, skippedNodes, nodes, auditFailed
 This **queues**: it marks every enrolled node of the account (those still `enrolling` are skipped — revoke their unused token instead) and mints nothing. Each machine learns of it from `rotationRequested: true` on its next heartbeat response and calls `/api/fleet/rotate-credential` itself. The field is additive, so a daemon built before it existed simply ignores it and keeps working; its owner can still re-key it the old way. One `fleet_audit` row records the decision — `rotate-all`, with the actor, the count and the node ids — and each machine's own rotation records a `node.rotate-self` row when it happens.
 
 The plaintext secret exists in exactly three places and never a fourth: in the response body (once), in the node's own storage, and as a SHA-256 in `fleet_nodes`. It is not logged, and the audit row carries only timestamps, ids and the overlap duration — the writer additionally drops the value of any field whose name mentions a secret, token, credential or hash, so a call site that passed one by accident still could not store it.
+None of these help when the break is in the protocol itself — when the platform the nodes talk to is the thing that stopped working. That case has its own runbook, written to be followed with no working fleet at all: [Fleet break-glass](../runbooks/FLEET_BREAK_GLASS.md).
 
 ## Capabilities
 
@@ -418,6 +419,36 @@ node apps/node/dist/cli.js start --work
 
 A node also looks after its own disk. It refuses to lease (and to provision) while the volume holding its workspace root has less than a **disk floor** free — 2 GiB by default, `--min-free-disk <mb>` to change it — and shows up as `throttled` with the reason, so a full machine stops taking work before a job fails halfway through a fetch. With `--work` it also runs a **workspace reaper** that removes Task worktrees it can prove are safe to remove (owned, not in use, clean, fully pushed, and with a branch that is gone from the remote or merged) once they are older than `--workspace-max-age` (14 days by default); anything it cannot prove stays. `ever-works-node doctor` prints the free space against the floor and what the reaper would do, `ever-works-node gc [--dry-run]` runs it by hand. Details and the exact rules: `apps/node/README.md`, "Disk floor and workspace GC".
 
+#### Pinning the control plane
+
+A node's API origin is fixed at `enroll` and stored in its config file, which means a bad build on
+the origin every machine points at can take the whole fleet out at once — and the fix then has to
+travel develop → stage → main before the machines can come back. `EVER_WORKS_NODE_API_URL` is the
+way out: set it, restart the node, and **every** later call (heartbeat, lease, job heartbeat,
+complete, pause, unenroll) goes to that origin instead.
+
+```bash
+EVER_WORKS_NODE_API_URL=https://apistage.ever.works   # stage
+EVER_WORKS_NODE_API_URL=https://api.ever.works        # prod
+```
+
+It is an operator override, in the same family as `EVER_WORKS_NODE_CONFIG`, and it is deliberately
+narrow:
+
+- it does **not** apply to `enroll` — that mints a credential against the origin you name with
+  `--api-url`, and silently redirecting it would store a secret as belonging to a platform that
+  never issued it;
+- it is **never written back** to the config file, so unsetting the variable is a complete undo;
+- an empty or whitespace value counts as unset, so `EVER_WORKS_NODE_API_URL=` in a unit file turns
+  the override off rather than bricking the node;
+- a malformed value stops the node at startup with a URL error instead of becoming a mystifying
+  403/404 at the first request.
+
+`ever-works-node status` and `ever-works-node doctor` both print the effective origin and where it
+came from, and say so explicitly when a pin points somewhere the node is **not** enrolled — that
+combination authenticates against a platform that has never seen this machine, so every call is
+refused with 401. Full procedure: [Fleet break-glass](../runbooks/FLEET_BREAK_GLASS.md).
+
 ### Pin an agent to a node
 
 Open the agent → **Capabilities** → **Execution** and pick a **Preferred node**. The binding (`PUT` / `DELETE /api/fleet/agents/:agentId/node-affinity`) is scoped to the active Organization on top of your account, so it is available for Organization agents; a personal workspace cannot pin an agent, and the section says so.
@@ -611,3 +642,4 @@ but is not reported as a question.
 - [Desktop App](./desktop-app.md) · [Workers](./workers.md) · [Kubernetes Deployment](./k8s-deployment.md)
 - [Job Runtimes](./job-runtimes.md) · [Agents](./agents.md) · [Tasks](./tasks.md) · [Quality Gates](./quality-gates.md)
 - [Task Isolation](./task-isolation.md) · [Agent Terminals](./agent-terminals.md) · [Sessions & Steering](./sessions-and-steering.md)
+- [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down
