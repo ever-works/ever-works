@@ -26,7 +26,8 @@ import type {
 	GitDiffResult,
 	GitPullRequestCheck,
 	GitPullRequestStatus,
-	GitReviewDecision
+	GitReviewDecision,
+	GitWorkflowRun
 } from '@ever-works/plugin/git';
 import { capChecks, capDiffFiles, deriveCiState, resolveDiffCaps } from '@ever-works/plugin/git';
 import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
@@ -64,6 +65,63 @@ const REVIEW_DECISION_MAP: Record<string, GitReviewDecision> = {
 	CHANGES_REQUESTED: 'changes_requested',
 	REVIEW_REQUIRED: 'review_required'
 };
+
+/**
+ * How many of a commit's workflow runs to read when looking for one named
+ * workflow (release promotion lane, slice AI). A single commit in this
+ * monorepo triggers well under a dozen workflows; 100 is one page and
+ * covers every realistic repository without a second round trip.
+ */
+const WORKFLOW_RUNS_PER_PAGE = 100;
+
+/** The subset of GitHub's workflow-run payload this reads. */
+interface WorkflowRunPayload {
+	id?: number;
+	path?: string;
+	head_sha?: string;
+	status?: string | null;
+	conclusion?: string | null;
+	html_url?: string;
+	run_attempt?: number;
+	/** `pull_requests[]` on a workflow run — present for `pull_request` events. */
+	pull_requests?: Array<{ number?: number } | null> | null;
+}
+
+/** GitHub's label shape, as it appears on a pull-request payload. */
+interface LabelPayload {
+	name?: string | null;
+}
+
+/**
+ * Label NAMES off a pull-request payload.
+ *
+ * Returns `undefined` — not `[]` — when the payload carried no `labels`
+ * key at all, because `GitPullRequest.labels` is absence-ambiguous by
+ * contract: "this read did not report labels" and "this pull request has
+ * none" are different facts and must not render identically.
+ */
+function labelNames(raw: unknown): readonly string[] | undefined {
+	if (!Array.isArray(raw)) return undefined;
+	return raw
+		.map((label) => (typeof label === 'string' ? label : ((label as LabelPayload)?.name ?? null)))
+		.filter((name): name is string => typeof name === 'string' && name.length > 0);
+}
+
+/**
+ * Last path segment of a workflow reference, lowercased.
+ *
+ * Callers name the gate as `promotion-gate.yml` while GitHub reports
+ * `.github/workflows/promotion-gate.yml`; comparing file names makes both
+ * forms work and keeps a repository that moves its workflows directory
+ * from silently reading as "gate absent".
+ */
+function workflowFileName(reference: string | null | undefined): string {
+	if (typeof reference !== 'string') return '';
+	const trimmed = reference.trim().toLowerCase();
+	if (!trimmed) return '';
+	const segments = trimmed.split('/');
+	return segments[segments.length - 1] ?? '';
+}
 
 /** Pages of check-runs/statuses to read before giving up (rate budget). */
 const CHECKS_PER_PAGE = 100;
@@ -614,6 +672,7 @@ export class GitHubApiService {
 			});
 
 			const author = await this.buildPrAuthor(data.user, token, baseUrl);
+			const labels = labelNames(data.labels);
 			return {
 				number: data.number,
 				title: data.title,
@@ -624,7 +683,8 @@ export class GitHubApiService {
 				createdAt: data.created_at,
 				updatedAt: data.updated_at,
 				body: data.body ?? undefined,
-				...(author ? { author } : {})
+				...(author ? { author } : {}),
+				...(labels ? { labels } : {})
 			};
 		} catch (err) {
 			if (err instanceof RequestError && err.status === 404) {
@@ -694,6 +754,7 @@ export class GitHubApiService {
 		const result: GitPullRequest[] = [];
 		for (const pr of data) {
 			const author = await this.buildPrAuthor(pr.user, token, baseUrl);
+			const labels = labelNames(pr.labels);
 			result.push({
 				number: pr.number,
 				title: pr.title,
@@ -704,7 +765,8 @@ export class GitHubApiService {
 				createdAt: pr.created_at,
 				updatedAt: pr.updated_at,
 				body: pr.body ?? undefined,
-				...(author ? { author } : {})
+				...(author ? { author } : {}),
+				...(labels ? { labels } : {})
 			});
 		}
 		return result;
@@ -806,6 +868,89 @@ export class GitHubApiService {
 			checksComplete: read.complete,
 			url: pr.html_url,
 			title: pr.title
+		};
+	}
+
+	/**
+	 * Release promotion lane (slice AI) — the most recent
+	 * `promotion-gate.yml`-style workflow run for one commit.
+	 *
+	 * ONE request: `GET /repos/{owner}/{repo}/actions/runs?head_sha=…`,
+	 * then filter by workflow file. The alternative — asking
+	 * `/actions/workflows/{file}/runs` directly — 404s whenever the
+	 * workflow file is not on the repository's default branch, which is
+	 * exactly the situation a release lane is in the day the workflow is
+	 * introduced, and a 404 there is indistinguishable from "no runs".
+	 * Filtering client-side keeps "the workflow has no run for this
+	 * commit" (`null`) separate from "the lookup failed" (a throw), which
+	 * the caller renders differently.
+	 *
+	 * A 404 on the repository itself resolves to `null`; every other error
+	 * propagates, because a token without `actions:read` must surface as a
+	 * BROKEN GATE and not as a missing run.
+	 */
+	async getWorkflowRunForCommit(
+		owner: string,
+		repo: string,
+		workflowPath: string,
+		headSha: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitWorkflowRun | null> {
+		const wanted = workflowFileName(workflowPath);
+		if (!wanted || !headSha) return null;
+
+		const octokit = this.createOctokit(token, baseUrl);
+		let runs: WorkflowRunPayload[];
+		try {
+			const response = await octokit.rest.actions.listWorkflowRunsForRepo({
+				owner,
+				repo,
+				head_sha: headSha,
+				per_page: WORKFLOW_RUNS_PER_PAGE
+			});
+			runs = (response.data?.workflow_runs ?? []) as WorkflowRunPayload[];
+		} catch (err) {
+			// Only a missing REPOSITORY is an answer. A 403 (no
+			// `actions:read`) or a 5xx is a broken lookup and must throw.
+			if (err instanceof RequestError && err.status === 404) return null;
+			throw err;
+		}
+
+		const matches = runs.filter((run) => workflowFileName(run.path) === wanted);
+		if (matches.length === 0) return null;
+
+		// Newest wins: a re-run of a red gate is the verdict that counts.
+		// Ordered explicitly rather than trusting the API's default sort —
+		// run id first (a later trigger is a later run), then `run_attempt`
+		// as the tie-break, because a re-run keeps the run id and only bumps
+		// the attempt.
+		const newest = matches.reduce((best, run) => {
+			const bestId = best.id ?? 0;
+			const runId = run.id ?? 0;
+			if (runId !== bestId) return runId > bestId ? run : best;
+			return (run.run_attempt ?? 1) > (best.run_attempt ?? 1) ? run : best;
+		});
+
+		return {
+			id: newest.id ?? 0,
+			workflowPath: newest.path ?? workflowPath,
+			headSha: newest.head_sha ?? headSha,
+			status: CHECK_STATUS_MAP[newest.status ?? ''] ?? 'unknown',
+			conclusion: newest.conclusion ? (CHECK_CONCLUSION_MAP[newest.conclusion] ?? null) : null,
+			...(newest.html_url ? { url: newest.html_url } : {}),
+			...(typeof newest.run_attempt === 'number' ? { runAttempt: newest.run_attempt } : {}),
+			// Which pull request(s) this run was for. A run is keyed by
+			// COMMIT, and one commit can head two pull requests; the caller
+			// needs to be able to tell "this run is not about my pull
+			// request" from "there is no run".
+			...(Array.isArray(newest.pull_requests)
+				? {
+						pullRequestNumbers: newest.pull_requests
+							.map((pr) => pr?.number)
+							.filter((n): n is number => typeof n === 'number')
+					}
+				: {})
 		};
 	}
 

@@ -231,7 +231,18 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
             taskId: '123e4567-e89b-12d3-a456-426614174000',
             // The Work's configured base branch, not the repo default —
             // the protected-branch rule is worthless against the wrong one.
+            // (Release promotion lane, slice AI: a PROMOTION overrides this
+            // with its own base, because a promotion is the first pull
+            // request on this platform whose base is not the Work's
+            // isolation base. An ordinary Task is unaffected.)
             targetBranch: 'release',
+            // Release promotion lane (slice AI) — a caller-side RAISE of
+            // the approval requirement, asserted as `false` for an ordinary
+            // merge rather than omitted. The facade ORs it with the
+            // resolved policy, so it can only ever add a requirement; a
+            // `true` reaching here from a non-promotion path would be a
+            // caller quietly re-imposing a gate the operator turned off.
+            requireHumanApproval: false,
         });
     });
 
@@ -574,6 +585,43 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
                 targetBranch: 'release',
             }),
         );
+    });
+
+    it('attemptMergeForOpenPullRequest merges into the base the CALLER names, when it names one', async () => {
+        // Release promotion lane (slice AI). A promotion's pull request is
+        // the first on this platform whose base is not the Work's
+        // `taskIsolationBaseBranch`, and `git.facade` uses
+        // `agentActor.targetBranch` VERBATIM — it only reads the pull
+        // request's real base when the value is absent. So a promotion
+        // reported with the Work default would have the protected-branch
+        // rule evaluated against a branch it is not merging into, and the
+        // post-merge audit line would name the wrong one too.
+        const task = { ...makeTask(), prNumber: 7, prUrl: 'https://x/pull/7' };
+        await build().attemptMergeForOpenPullRequest({
+            task: task as never,
+            agentId: 'agent-1',
+            gateStatus: 'green',
+            baseRef: 'main',
+            requireHumanApproval: true,
+        });
+
+        const [, , , , , actor] = gitFacade.mergePullRequest.mock.calls[0];
+        expect(actor).toEqual(
+            expect.objectContaining({ targetBranch: 'main', requireHumanApproval: true }),
+        );
+    });
+
+    it('attemptMergeForOpenPullRequest ignores a blank caller base and keeps the Work default', async () => {
+        const task = { ...makeTask(), prNumber: 7, prUrl: 'https://x/pull/7' };
+        await build().attemptMergeForOpenPullRequest({
+            task: task as never,
+            agentId: 'agent-1',
+            gateStatus: 'green',
+            baseRef: '   ',
+        });
+
+        const [, , , , , actor] = gitFacade.mergePullRequest.mock.calls[0];
+        expect(actor).toEqual(expect.objectContaining({ targetBranch: 'release' }));
     });
 
     it('attemptMergeForOpenPullRequest does nothing for a Task with no pull request', async () => {

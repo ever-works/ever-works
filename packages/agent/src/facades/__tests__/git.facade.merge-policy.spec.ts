@@ -382,6 +382,65 @@ describe('GitFacadeService.mergePullRequest — merge approval gate (slice AE)',
         });
     });
 
+    // Release promotion lane (slice AI). `AgentMergeActor.requireHumanApproval`
+    // is a caller-side RAISE, in one direction only. It exists because "an
+    // operator turned approvals off for this scope" must not extend to a
+    // release promotion, and it is enforced HERE as well as in
+    // `TaskMergeGateService` so the property does not rest on one caller
+    // remembering.
+    describe('a caller may RAISE the approval requirement, never clear it', () => {
+        it('requires an approval under a policy that does not, when the actor asks', async () => {
+            const { facade, verifier, plugin } = makeFacade({
+                policy: NO_APPROVAL_NEEDED,
+                verdict: {
+                    approved: false,
+                    code: 'approval-missing',
+                    reason: 'No human approval is on record.',
+                },
+            });
+            await expect(
+                facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, {
+                    ...ACTOR,
+                    requireHumanApproval: true,
+                }),
+            ).rejects.toMatchObject({ code: 'approval-missing' });
+            expect(verifier.verifyMergeApproval).toHaveBeenCalled();
+            expect(plugin.mergePullRequest).not.toHaveBeenCalled();
+        });
+
+        it('merges once the approval it insisted on verifies', async () => {
+            const { facade, plugin } = makeFacade({ policy: NO_APPROVAL_NEEDED });
+            await facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, {
+                ...ACTOR,
+                requireHumanApproval: true,
+            });
+            expect(plugin.mergePullRequest).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            ['false', false],
+            ['undefined', undefined],
+        ])('cannot CLEAR the requirement with %s', async (_label, value) => {
+            // The direction that must not work: a policy that demands an
+            // approval still demands one whatever the caller says.
+            const { facade, plugin } = makeFacade({
+                policy: NEEDS_APPROVAL,
+                verdict: {
+                    approved: false,
+                    code: 'approval-missing',
+                    reason: 'No human approval is on record.',
+                },
+            });
+            await expect(
+                facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, {
+                    ...ACTOR,
+                    requireHumanApproval: value,
+                }),
+            ).rejects.toMatchObject({ code: 'approval-missing' });
+            expect(plugin.mergePullRequest).not.toHaveBeenCalled();
+        });
+    });
+
     // An INCOMPLETE check read is not green. `ciState` is documented as
     // the roll-up for the whole head commit while `checks` is a bounded
     // display sample; a provider that says it could not read the full set

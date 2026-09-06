@@ -1,10 +1,15 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { GitPullRequestStatus } from '@ever-works/plugin';
-import { normalizeCommitSha } from '@ever-works/contracts';
+import { isPromotionTask, normalizeCommitSha } from '@ever-works/contracts';
 import { Task } from '../entities/task.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { MergePolicyService } from '../policy/merge-policy.service';
 import { MergeApprovalService } from '../agent-approvals/merge-approval.service';
+import {
+    PROMOTION_MERGE_GUARD,
+    type PromotionMergeGuard,
+    type PromotionMergeVerdict,
+} from '../policy/promotion-merge-guard.port';
 import { TaskWorkspaceService, type TaskAgentMergeOutcome } from './task-workspace.service';
 
 /** What one post-CI evaluation did, for logs and for the sweep summary. */
@@ -68,6 +73,19 @@ export class TaskMergeGateService {
         // per the positional-spec arity rule; absent, the gate degrades to
         // "never raise, never merge", which is the safe direction.
         @Optional() private readonly mergeApprovals?: MergeApprovalService,
+        // Release promotion lane (self-build slice AI, EW-808) — the
+        // NARROWING for a promotion pull request. Appended LAST +
+        // @Optional() per the positional-spec arity rule, and injected by
+        // TOKEN so `TasksDomainModule` does not have to import the module
+        // that imports it.
+        //
+        // Unbound does NOT mean "degrade gracefully" here: the check below
+        // recognises a promotion Task off its own labels and stands down,
+        // so a deployment that cannot evaluate promotions never merges one
+        // through the ordinary agent path.
+        @Optional()
+        @Inject(PROMOTION_MERGE_GUARD)
+        private readonly promotionGuard?: PromotionMergeGuard,
     ) {}
 
     /**
@@ -119,6 +137,29 @@ export class TaskMergeGateService {
             return { action: 'skipped', reason: 'head-sha-unknown' };
         }
 
+        // Release promotion lane (slice AI) — the extra refusal, applied
+        // BEFORE any approval is raised and before any merge is attempted.
+        //
+        // It exists because the `ciState === 'passing'` check above cannot
+        // answer a release question: the roll-up treats `skipped`,
+        // `cancelled`, `neutral` and `stale` as non-blocking, and
+        // `promotion-gate.yml` SKIPS its e2e job by design on any head that
+        // is not `stage`. Without this, a promotion whose gate never
+        // evaluated would reach a human as an Approve button next to a
+        // green badge the platform manufactured.
+        //
+        // It can only ever say NO. A Task that is not a promotion returns
+        // `{ promotion: false }` and the path below is unchanged.
+        const assessed = await this.assessPromotion(task, headSha);
+        if (assessed.blocked) return assessed.blocked;
+        // A live promotion this merge may proceed with. It carries the
+        // promotion's OWN branches and pull request, which is what the
+        // protected-branch rule and the human's Inbox line are computed
+        // from below — the Work's `taskIsolationBaseBranch` is the right
+        // answer for every Task pull request and the wrong answer for
+        // every promotion.
+        const promotion = assessed.promotion;
+
         const work = await this.works.findById(task.workId);
         if (!work) return { action: 'skipped', reason: 'no-work' };
 
@@ -142,7 +183,23 @@ export class TaskMergeGateService {
             return { action: 'skipped', reason: 'agent-merge-disabled' };
         }
 
-        if (!resolved.policy.requireHumanApproval) {
+        // Release promotion lane (slice AI) — THE property the slice
+        // exists for: a promotion is never merged without a recorded human
+        // approval, whatever the scope's policy says.
+        //
+        // `requireHumanApproval: false` is a legitimate operator choice for
+        // ordinary agent work ("agents land their own green work"). It is
+        // not a choice about releases: a promotion moves a whole batch onto
+        // `stage` or into production, the stage e2e gate has been
+        // unreliable for weeks, and a bad promotion is a multi-hour outage
+        // on a build lane measured at 215-243 minutes. So a promotion
+        // ignores the shortcut below and always takes the approval path,
+        // and `attemptMergeForOpenPullRequest` additionally RAISES the
+        // requirement inside the facade so the property does not rest on
+        // this branch alone.
+        const needsApproval = resolved.policy.requireHumanApproval || promotion !== null;
+
+        if (!needsApproval) {
             // The operator opted out of approvals for this scope. Green
             // provider CI is the trigger; the facade still pins the head
             // and still applies the branch / method / gate rules.
@@ -170,6 +227,10 @@ export class TaskMergeGateService {
                 agentId,
                 gateStatus: 'green',
                 headSha,
+                // The promotion's own base, not the Work's default — see
+                // `attemptMergeForOpenPullRequest`.
+                baseRef: promotion?.baseBranch ?? null,
+                requireHumanApproval: promotion !== null,
             });
             return { action: 'merge-attempted', merge };
         }
@@ -185,8 +246,13 @@ export class TaskMergeGateService {
             prNumber: task.prNumber,
             prUrl: task.prUrl ?? null,
             headSha,
+            // The branch this pull request MERGES INTO, as the human will
+            // read it in the Inbox ("Merge PR #7 into <branch> in <repo>").
+            // A promotion carries its own base; only an ordinary Task pull
+            // request targets the Work's isolation base.
             targetBranch:
-                (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || null,
+                promotion?.baseBranch ??
+                ((work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || null),
             repository: `${work.getRepoOwner()}/${work.getDataRepo()}`,
             ciState: status.ciState,
             // Provider-side human review, surfaced to the approver as
@@ -206,5 +272,77 @@ export class TaskMergeGateService {
         return request.reason === 'already-open' || request.reason === 'already-decided'
             ? { action: 'approval-pending' }
             : { action: 'skipped', reason: request.reason ?? 'not-raised' };
+    }
+
+    /**
+     * Release promotion lane (slice AI) — decides whether this Task's pull
+     * request may go on to the approval path, and hands back the
+     * promotion's own coordinates when it may.
+     *
+     * `blocked` is a SKIP outcome the caller returns verbatim.
+     * `promotion` is the allowing verdict for a live promotion, or `null`
+     * when this is an ordinary Task — the ordinary path is then exactly
+     * what it was before this slice existed.
+     *
+     * Three fail-closed properties, all load-bearing:
+     *
+     *   1. **Unbound guard.** A Task whose labels say it is a promotion is
+     *      refused when no guard is bound, without consulting the guard —
+     *      so the refusal does not depend on the service that is missing.
+     *   2. **A throwing guard.** Treated as a refusal, not as a pass. The
+     *      port says implementations must not throw for "no"; if one does,
+     *      the answer we did not get is not assumed to be yes.
+     *   3. **The pull request is named.** The guard is told WHICH pull
+     *      request is about to be merged, so a verdict recorded for the
+     *      promotion's pull request can never authorise a merge of some
+     *      other one that later took over `tasks.prNumber`.
+     */
+    private async assessPromotion(
+        task: Task,
+        headSha: string,
+    ): Promise<{
+        blocked?: TaskMergeGateOutcome;
+        promotion: Extract<PromotionMergeVerdict, { allowed: true }> | null;
+    }> {
+        if (!this.promotionGuard) {
+            return isPromotionTask(task.labels)
+                ? {
+                      blocked: { action: 'skipped', reason: 'promotion-guard-unbound' },
+                      promotion: null,
+                  }
+                : { promotion: null };
+        }
+        let verdict: PromotionMergeVerdict;
+        try {
+            verdict = await this.promotionGuard.assessPromotionForMerge({
+                taskId: task.id,
+                labels: task.labels,
+                // Non-null by the `!task.prNumber` guard at the top of
+                // `evaluate`; the guard refuses when it is not the pull
+                // request the promotion opened.
+                prNumber: task.prNumber as number,
+                headSha,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: promotion guard threw; treating as a refusal: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return {
+                blocked: { action: 'skipped', reason: 'promotion-guard-failed' },
+                promotion: null,
+            };
+        }
+        if (!verdict.promotion) return { promotion: null };
+        // `=== true`, not a truthiness check: this package compiles with
+        // `strictNullChecks: false`, under which truthiness narrowing on a
+        // boolean-literal discriminant does not exclude the `true` member
+        // and `verdict.code` below stops type-checking.
+        if (verdict.allowed === true) return { promotion: verdict };
+        this.logger.log(
+            `Task ${task.id}: promotion not mergeable — ${verdict.code}: ${verdict.reason}`,
+        );
+        return { blocked: { action: 'skipped', reason: verdict.code }, promotion: null };
     }
 }

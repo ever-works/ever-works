@@ -8,6 +8,10 @@ export * from './merge-policy.enforcer';
 // Merge approval (self-build slice AE) — token + contract for the
 // "is there a real, current, human approval for this merge?" question.
 export * from './merge-approval.port';
+// Release promotion lane (self-build slice AI) — token + contract for the
+// extra refusal a promotion pull request carries on top of slice AE. It
+// can only ever say NO.
+export * from './promotion-merge-guard.port';
 export * from './merge-policy.repository';
 export * from './merge-policy.service';
 // Quality gates — the PR gate every non-worker `createPullRequest` caller
