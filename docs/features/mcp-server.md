@@ -143,7 +143,9 @@ Add the MCP server to your project's `.mcp.json`:
 
 ## Available Tools
 
-The MCP server exposes 127 tools organized by domain. Each tool's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
+The MCP server exposes 127 tools from the OpenAPI whitelist, organized by domain below. Each one's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
+
+Eight more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the six `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`, `kb.unlock`), `register_work` and `ping`. A connected client therefore sees **135 tools** in all.
 
 ### Human-in-the-loop gates are not tools
 

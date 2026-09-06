@@ -42,8 +42,8 @@ Steps 1, 2, 4 and 5 need only the first two rows. Step 3 is optional.
 
 1. Open **+ New** in the sidebar (`/new`), or go straight to `/works/new`.
 2. Type what the page is for, then pick the **Landing Page** chip. The composer's placeholder examples show the level of detail that works well — _"Waitlist landing page for an AI customer-support copilot with a hero demo and FAQ"_, _"Webinar registration page with speaker bios, agenda, and a countdown timer"_.
-3. Fill in the name and, under **Advanced Settings**, the Git provider, repository owner and deploy provider if you want to override your defaults.
-4. Press **Create**. Three repositories are provisioned — `{slug}-data`, `{slug}` and `{slug}-website` — and you land on the Work workspace at `/works/:id`.
+3. Fill in the name — the slug follows it automatically, and you can edit it to override. The right-hand sidebar carries **Git Provider** and, if you want a deploy target now, **Deploy Provider**; the account or organization goes in the **Repository Owner** card. **Advanced Settings** — present when the kind has a generator form schema — holds the pipeline and the AI / search / screenshot / content-extractor plugin slots; leave them alone unless you have a reason to override the defaults.
+4. Press **Generate with AI**. Three repositories are provisioned — `{slug}-data`, `{slug}` and `{slug}-website` — and you land on the Work workspace at `/works/:id`.
 
 The chip you picked is persisted as `work.kind = 'landing-page'`. `landing` is accepted as an alias and normalized to the same value. **Kind is create-only**: `UpdateWorkDto` has no `kind` field, so if you pick the wrong chip, create a new Work rather than trying to convert this one.
 
@@ -217,7 +217,7 @@ A landing page is the surface where tone matters most, and the knowledge base is
 
 ### Load the Memory tab with copy guidance
 
-Open `/works/:id/kb` and use **Add doc**, or drop files into the upload zone. Classify each document — the class is what decides how Agents use it:
+Open `/works/:id/kb` and drop your copy files into the upload zone — a plain `.md` file is passed through verbatim. To create a document without a file, use one of the three paths in [Knowledge Base and Memory → How to: create a document without uploading a file](./knowledge-base-and-memory.md#how-to-create-a-document-without-uploading-a-file). Classify each document — the class is what decides how Agents use it:
 
 | Class      | What to put there for a landing page                           | How Agents treat it                       |
 | ---------- | -------------------------------------------------------------- | ----------------------------------------- |

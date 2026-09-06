@@ -154,14 +154,18 @@ Comparison pages ("A vs B") are one of the strongest SEO surfaces a directory ha
 
 ### How to: generate your first comparison
 
-1. Go to `/works/:id/generator`. On an already-generated Work, press **Show Advanced Options** to reveal the dynamic plugin fields.
-2. Set **`comparison_enabled`** to on. While you are there you can set **`comparison_cadence`** (Use Work Schedule / Daily / Weekly / Monthly) and **`comparison_max_mode`** with **`comparison_max`** (a custom limit of 1–500, or all pairs).
-3. Open the **Comparisons** sub-tab (`/works/:id/generator/comparisons`).
-4. Press **Generate Next** to let the pair-selector pick the best un-compared pair — featured items first, then by `order`, then alphabetically — or **Compare Items** to choose two items yourself.
-5. Watch the stages: _Researching A vs B → Analyzing comparison data → Writing comparison article → Saving and publishing._
-6. Press **Generate All** to batch the remaining pairs. The dialog states how many are left; a progress bar counts them off, you can **Stop** at any point, and it stops itself after 3 consecutive errors.
+1. Open the **Comparisons** sub-tab (`/works/:id/generator/comparisons`). Nothing has to be switched on first — generation only needs a category holding at least `min_items_for_comparison` items (default 3).
+2. Press **Generate Next** to let the pair-selector pick the best un-compared pair — featured items first, then by `order`, then alphabetically — or **Compare Items** to choose two items yourself.
+3. Watch the stages: _Researching A vs B → Analyzing comparison data → Writing comparison article → Saving and publishing._
+4. Press **Generate All** to batch the remaining pairs. The dialog states how many are left; a progress bar counts them off, you can **Stop** at any point, and it stops itself after 3 consecutive errors.
 
 Each comparison is stored in the data repository as `comparisons/<slug>/<slug>.yml` plus a markdown article, and carries a summary, a verdict with a winner, and 3–8 scored dimensions. The **AI Model** panel on the same page overrides the provider and model for comparisons only, and toggles the optional 7-section **Extended Analysis**. A scheduler also runs every 6 hours for every Work with comparisons enabled, generating the next best pair. Full reference: [Comparisons](../features/comparisons.md).
+
+:::note Where the comparison settings live
+
+Not on the generator form. The four settings that shape generation belong to the **Comparison Generator** plugin, and you edit them on the Work's **Plugins** tab (`/works/:id/plugins`) → **Comparison Generator**, where the settings modal is rendered from the plugin's own schema: **Generation Cadence** (`cadence_override` — Use Work Schedule, Daily, Weekly or Monthly; **Use Work Schedule** by default), **Max Comparisons Mode** (`max_comparisons_mode` — custom or unlimited), **Max Comparisons** (`max_comparisons`, 1–500, default 50, used only in custom mode) and **Min Items for Comparison** (`min_items_for_comparison`, 2–20, default 3). The **AI Model** panel on the Comparisons page writes a different subset of the same plugin's settings — provider, model, custom prompt and Extended Analysis — which is why those four are not on it. The 6-hourly scheduler keys off a separate, Work-level `comparisons_enabled` flag that belongs to the Work's website settings, not to the generator screen.
+
+:::
 
 ## 6. Deploy it
 

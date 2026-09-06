@@ -247,7 +247,7 @@ An imported Organization is a plain Organization: no registration provider, no l
 "Company" and "Organization" are the same row wearing two labels — **Organization** in Settings and the switcher, **Company** on the create surface. Registering is a second door into the same object, with one extra thing attached: a backing Work of kind `company` that stands for the registration record.
 
 1. Open **`/new`** (the **+ New** button under the workspace switcher).
-2. Pick the **Company** chip. The **Register Company** dialog opens immediately — the prompt box above it is ignored for this chip. Landing on `/new?type=company` opens the dialog for you.
+2. Pick the **Company** chip, then submit the composer (the send button or Enter). Picking the chip seeds an example into the prompt box — which is what satisfies the composer's 10-character send gate — but the text itself is ignored for this chip. The **Register Company** dialog opens on submit. Landing on `/new?type=company` opens it directly, without submitting.
 3. Fill in **Company name** (1–200 characters) and, optionally, **Country (ISO 3166-1)** — a two-letter code such as `US` or `DE`, normalized to uppercase server-side.
 4. Click **Register**.
 

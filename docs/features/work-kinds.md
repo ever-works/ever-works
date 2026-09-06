@@ -6,22 +6,23 @@ sidebar_label: Work Kinds
 
 # Work Kinds & Capabilities
 
-Every [Work](./creating-a-work.md) carries a **kind** — `website`, `landing-page`, `blog`, `directory`, `awesome-repo`, plus a few the platform mints for you. You pick it once, at creation, and it decides what the Work _has_: which tabs appear in its workspace, which metric tiles the Overview shows, which repositories are provisioned, and which [website template](./website-templates.md) the generator reaches for when you have not chosen one yourself.
+Every [Work](./creating-a-work.md) carries a **kind** — `website`, `landing-page`, `blog`, `directory`, `awesome-repo`, `repo`, plus a few the platform mints for you. You pick it once, at creation, and it decides what the Work _has_: which tabs appear in its workspace, which metric tiles the Overview shows, which repositories are provisioned, and which [website template](./website-templates.md) the generator reaches for when you have not chosen one yourself.
 
 The vocabulary and the per-kind capability registry live in one shared package (`@ever-works/contracts`: `work-kind.ts` and `work-capabilities.ts`), so the API, the agent runtime and the dashboard all give the same answer to "what does this Work support?". A Landing Page never shows an Items tab or a "Total Items: 0" tile, and a Directory keeps everything it always had.
 
 ## The vocabulary
 
-| Kind           | Label on screen | How it is created                                                                                                                      | What it is                                                                                                                                            |
-| -------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `website`      | Website         | **Website** chip on `/new` or `/works/new`                                                                                             | A multi-page site for a business, service, or brand — generated content + code.                                                                       |
-| `landing-page` | Landing Page    | **Landing Page** chip on `/new` or `/works/new`                                                                                        | A focused one-pager — waitlists, product launches, webinar signups, lead capture. `landing` is accepted as an alias and normalized to `landing-page`. |
-| `blog`         | Blog            | **Blog** chip on `/new` or `/works/new`                                                                                                | A blog with categories, RSS, code highlighting, and SEO-ready content.                                                                                |
-| `directory`    | Directory       | **Directory** chip on `/new` or `/works/new`                                                                                           | A curated directory site with search, filters, and structured item data.                                                                              |
-| `awesome-repo` | Awesome Repo    | **Awesome Repo** chip on `/new` or `/works/new`                                                                                        | An awesome-list repo — markdown index, categorized links, and refreshable metadata.                                                                   |
-| `company`      | Company         | The live **Company** chip is on `/new` only → opens the Register-Company dialog (on `/works/new` it renders as an inert **Soon** chip) | An organizational shell that backs an Organization. It is never produced by the general create path — see [Company Builder](./company-builder.md).    |
-| `campaign`     | Campaign        | **Start a campaign** button on `/works/new` → `/works/new/campaign`                                                                    | The artifact home for a go-to-market pipeline: lead lists, drafts waiting at the review gate, period reports. Minted only by campaign activation.     |
-| `default`      | Work            | Any Work created before kinds shipped, or created without a `kind` (the CLI's `work create`, the REST API with `kind` omitted)         | The column default. Behaves **exactly like `directory`** — every existing Work keeps the full directory feature set.                                  |
+| Kind           | Label on screen | How it is created                                                                                                                                                               | What it is                                                                                                                                                      |
+| -------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `website`      | Website         | **Website** chip on `/new` or `/works/new`                                                                                                                                      | A multi-page site for a business, service, or brand — generated content + code.                                                                                 |
+| `landing-page` | Landing Page    | **Landing Page** chip on `/new` or `/works/new`                                                                                                                                 | A focused one-pager — waitlists, product launches, webinar signups, lead capture. `landing` is accepted as an alias and normalized to `landing-page`.           |
+| `blog`         | Blog            | **Blog** chip on `/new` or `/works/new`                                                                                                                                         | A blog with categories, RSS, code highlighting, and SEO-ready content.                                                                                          |
+| `directory`    | Directory       | **Directory** chip on `/new` or `/works/new`                                                                                                                                    | A curated directory site with search, filters, and structured item data.                                                                                        |
+| `awesome-repo` | Awesome Repo    | **Awesome Repo** chip on `/new` or `/works/new`                                                                                                                                 | An awesome-list repo — markdown index, categorized links, and refreshable metadata.                                                                             |
+| `repo`         | Repository      | **Repository** chip on `/new` or `/works/new` — both route to `/works/new?mode=manual&kind=repo`, which opens the Repository form; the composer text is treated as the repo URL | An existing code repository registered as a Work so Tasks, Goals and fleet runs attach to it. Nothing is generated: its data repository IS the code repository. |
+| `company`      | Company         | The live **Company** chip is on `/new` only → opens the Register-Company dialog (on `/works/new` it renders as an inert **Soon** chip)                                          | An organizational shell that backs an Organization. It is never produced by the general create path — see [Company Builder](./company-builder.md).              |
+| `campaign`     | Campaign        | **Start a campaign** button on `/works/new` → `/works/new/campaign`                                                                                                             | The artifact home for a go-to-market pipeline: lead lists, drafts waiting at the review gate, period reports. Minted only by campaign activation.               |
+| `default`      | Work            | Any Work created before kinds shipped, or created without a `kind` (the CLI's `work create`, the REST API with `kind` omitted)                                                  | The column default. Behaves **exactly like `directory`** — every existing Work keeps the full directory feature set.                                            |
 
 Three rules apply everywhere a kind is read or written:
 
@@ -39,19 +40,21 @@ Each chip is gated by a `works-<kind>` PostHog flag evaluated server-side (`apps
 
 The registry (`WORK_KIND_CAPABILITIES`) is a **hide-list for the new kinds, never an allow-list for the old ones**: `default` and `directory` share one capability object, and it carries everything.
 
-| Capability                                              | `directory` / `default` | `awesome-repo`  | `blog`          | `website`       | `landing-page` | `company` | `campaign` |
-| ------------------------------------------------------- | ----------------------- | --------------- | --------------- | --------------- | -------------- | --------- | ---------- |
-| Items surface (tab, `/items` routes, submissions)       | Yes — **Items**         | Yes — **Items** | Yes — **Posts** | Yes — **Pages** | No             | No        | No         |
-| Taxonomy (categories, tags, collections + tiles)        | Yes                     | Yes             | Yes             | No              | No             | No        | No         |
-| Comparisons (generator sub-tab + endpoints)             | Yes                     | No              | No              | No              | No             | No        | No         |
-| Community pull-request intake                           | Yes                     | Yes             | No              | No              | No             | No        | No         |
-| CSV / Excel item import & export                        | Yes                     | Yes             | No              | No              | No             | No        | No         |
-| Source-URL validation for items                         | Yes                     | Yes             | No              | No              | No             | No        | No         |
-| Deploy (tab + deployment endpoints)                     | Yes                     | Yes             | Yes             | Yes             | Yes            | No        | No         |
-| Knowledge base (the **Memory** tab)                     | Yes                     | Yes             | Yes             | Yes             | Yes            | Yes       | Yes        |
-| Data repository (`{slug}-data`)                         | Yes                     | Yes             | Yes             | Yes             | Yes            | Yes       | Yes        |
-| Provider repository (`{slug}`, the browsable markdown)  | Yes                     | Yes             | Yes             | Yes             | Yes            | Yes       | Yes        |
-| Work repository (`{slug}-website`, the template output) | Yes                     | Yes             | Yes             | Yes             | Yes            | No        | No         |
+| Capability                                              | `directory` / `default` | `awesome-repo`  | `blog`          | `website`       | `landing-page` | `repo` | `company` | `campaign` |
+| ------------------------------------------------------- | ----------------------- | --------------- | --------------- | --------------- | -------------- | ------ | --------- | ---------- |
+| Items surface (tab, `/items` routes, submissions)       | Yes — **Items**         | Yes — **Items** | Yes — **Posts** | Yes — **Pages** | No             | No     | No        | No         |
+| Taxonomy (categories, tags, collections + tiles)        | Yes                     | Yes             | Yes             | No              | No             | No     | No        | No         |
+| Comparisons (generator sub-tab + endpoints)             | Yes                     | No              | No              | No              | No             | No     | No        | No         |
+| Community pull-request intake                           | Yes                     | Yes             | No              | No              | No             | No     | No        | No         |
+| CSV / Excel item import & export                        | Yes                     | Yes             | No              | No              | No             | No     | No        | No         |
+| Source-URL validation for items                         | Yes                     | Yes             | No              | No              | No             | No     | No        | No         |
+| Deploy (tab + deployment endpoints)                     | Yes                     | Yes             | Yes             | Yes             | Yes            | No     | No        | No         |
+| Knowledge base (the **Memory** tab)                     | Yes                     | Yes             | Yes             | Yes             | Yes            | Yes    | Yes       | Yes        |
+| Data repository (`{slug}-data`)                         | Yes                     | Yes             | Yes             | Yes             | Yes            | Yes    | Yes       | Yes        |
+| Provider repository (`{slug}`, the browsable markdown)  | Yes                     | Yes             | Yes             | Yes             | Yes            | No     | Yes       | Yes        |
+| Work repository (`{slug}-website`, the template output) | Yes                     | Yes             | Yes             | Yes             | Yes            | No     | No        | No         |
+
+`repo` is the only kind that provisions just the one repository — and it does not provision even that one: a Repository Work is pointed at a code repository you already own, and that existing repository _is_ its data repository. Nothing is created for it, nothing is generated into it, and there is no Deploy tab.
 
 The three repository rows use the persisted `RepositoryRole` names. On screen they are labelled **Data Repository**, **{provider} Repository** (for example "GitHub Repository") and **Work Repository**; the last one is the template checkout and is not always a website.
 
@@ -66,6 +69,7 @@ The Overview tile set is also per kind (`metrics` in the registry, rendered by `
 | `blog`                  | Posts · Page Views\* · Registered Users · Deploy Status · Days Active            |
 | `website`               | Page Views\* · Registered Users · Sessions\* · Deploy Status · Generation Status |
 | `landing-page`          | Page Views\* · Conversions\* · Deploy Status · Days Active                       |
+| `repo`                  | Agents · Open Tasks · Days Active                                                |
 | `company`               | Works · Team Members · Agents · Open Tasks · Days Active                         |
 | `campaign`              | Agents · Open Tasks · Conversions\* · Days Active                                |
 
@@ -78,7 +82,7 @@ The Work workspace (`/works/:id`) draws its tab strip from the registry (`WorkTa
 - **Website Works** show **Pages** instead of Items.
 - **Landing Page Works have no Items tab at all.** The tab disappears rather than showing an empty list that can never be filled. The `/works/:id/items` route stays mounted, so a bookmarked URL still opens.
 - **Company and Campaign Works** have `deploy` switched off. They are created without a website repository and with `deployProvider: null` (they also do not count against the Ever Works Deploy quota), so there is nothing to deploy and no Deploy tab; the Memory tab stays, because the company manifest or the campaign brief belongs in the knowledge base.
-- The **{provider} Repository** opt-out card in **Settings** only renders when the kind provisions that repository (`repos.work`), which today is every kind.
+- The **{provider} Repository** opt-out card in **Settings** only renders when the kind provisions that repository (`repos.work`), which today is every kind except `repo`.
 
 ## Kind-aware default website template
 

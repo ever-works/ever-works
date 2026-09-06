@@ -181,6 +181,8 @@ than by editing this list in place.
 - **G-97 — Preference learning from human corrections** · missing · **M** — Diff what the agent proposed against what the human actually shipped, require a verbatim evidence span for any inferred preference, and harden it only once it recurs across separate sessions, so agents stop repeating corrected mistakes. _Home:_ correction capture on merge, writing into the review queue.
 - **G-98 — Zero-setup first output and one-command local bootstrap** · partial · **M** — Produce a few real artifacts before the provider, storage, database and deployment wizard so a prospect sees output before committing configuration; and ship a single command that scaffolds and starts the whole stack locally with no account. _Home:_ extends `docs/features/onboarding.md` and the desktop installer.
 
+- **G-99 — Finish or retire the Knowledge Base create-document control** · partial · **S** — `KbAddDocButton.tsx` and `KbAddDocModal.tsx` are unreferenced dead code, and their `dashboard.workDetail.kb.addDoc` strings still ship, so the control reads as real in the source while a user cannot reach it. Four docs pages told readers to click it before that was corrected; the underlying split remains. Either wire the button into the workbench (the API and MCP paths it would call already exist) or delete the components and their strings — leaving a third state is what produced the wrong documentation. _Home:_ `apps/web/src/components/works/detail/kb/`; touches `docs/features/knowledge-base.md`.
+
 ## Checked and removed
 
 Every row above was re-checked against this repository before it was listed. These
