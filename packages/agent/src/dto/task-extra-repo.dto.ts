@@ -24,7 +24,9 @@ import {
 // gets a 400 naming `mountDir` at the request boundary instead of one layer
 // later, and the three gates cannot drift apart.
 @ValidatorConstraint({ name: 'isNotReservedMountDir', async: false })
-class IsNotReservedMountDirConstraint implements ValidatorConstraintInterface {
+// Exported so the acceptance-check DTO (EW-807) applies the SAME rule to
+// its own `mountDir` selector rather than growing a second copy of it.
+export class IsNotReservedMountDirConstraint implements ValidatorConstraintInterface {
     validate(value: unknown): boolean {
         return typeof value === 'string' && !isReservedMountDir(value);
     }

@@ -24,6 +24,9 @@ export * from './task-recurrence-dispatcher.service';
 export * from './task-graph-fanout.service';
 // THE extraRepos validator, shared by Tasks and Task Template steps.
 export * from './task-extra-repos';
+// Repository-declared commands (EW-807) — the strict reader for
+// `.works/works.yml` `spec.tasks`, and the owner allow-list that admits it.
+export * from './repo-declared-commands';
 export * from './task-notification.service';
 export * from './task-templates.service';
 export { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';

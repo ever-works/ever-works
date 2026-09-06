@@ -914,6 +914,16 @@ export function parseAgentTaskResult(
     const checks = Array.isArray(raw.checks)
         ? (raw.checks as TaskCheckResult[]).filter(isCheckResult)
         : null;
+    // Setup phase (EW-807). Parsed exactly like `checks` — same defensive
+    // filter, same untrusted-wire posture — and kept in its OWN key so
+    // nothing downstream can mistake a failed install for a failed test.
+    const setup = Array.isArray(raw.setup)
+        ? (raw.setup as TaskCheckResult[]).filter(isCheckResult)
+        : null;
+    const setupStatus =
+        raw.setupStatus === 'green' || raw.setupStatus === 'red' || raw.setupStatus === 'none'
+            ? raw.setupStatus
+            : null;
     const git =
         raw.git && typeof raw.git === 'object' ? (raw.git as FleetAgentTaskResult['git']) : null;
     const model =
@@ -937,6 +947,8 @@ export function parseAgentTaskResult(
         taskId: typeof raw.taskId === 'string' ? raw.taskId : '',
         runId: typeof raw.runId === 'string' ? raw.runId : null,
         checks,
+        setup,
+        setupStatus,
         git: git && typeof git.branch === 'string' ? git : null,
         model,
         mountGit,
@@ -1287,13 +1299,29 @@ function composeFailureMessage(
         '',
         reason,
     ];
+    const describe = (entry: TaskCheckResult): string =>
+        `- ${entry.id}: ${entry.status}${entry.exitCode !== null && entry.exitCode !== undefined ? ` (exit ${entry.exitCode})` : ''}`;
+    // Setup FIRST, and under its own heading (EW-807). When setup went red
+    // nothing after it ran, so there are no failing checks to list and the
+    // reader must not be left hunting for one: the workspace was never
+    // prepared, which is a different problem with a different fix.
+    const failingSetup = result?.setup?.filter((entry) => entry.status !== 'green') ?? [];
+    if (result?.setupStatus === 'red' && failingSetup.length > 0) {
+        lines.push(
+            '',
+            'Setup failed — the workspace was never prepared, so no acceptance check ran:',
+            ...failingSetup.map(describe),
+        );
+        const setupTail = failingSetup.find((entry) => entry.logTail)?.logTail;
+        if (setupTail) {
+            lines.push('', 'Setup output tail:', '```', truncate(setupTail, MAX_TAIL_CHARS), '```');
+        }
+    }
     const failing = result?.checks?.filter((check) => check.status !== 'green') ?? [];
     if (failing.length > 0) {
         lines.push('', 'Failing checks:');
         for (const check of failing) {
-            lines.push(
-                `- ${check.id}: ${check.status}${check.exitCode !== null && check.exitCode !== undefined ? ` (exit ${check.exitCode})` : ''}`,
-            );
+            lines.push(describe(check));
         }
     }
     const tail = result?.model?.outputTail ?? result?.model?.summary ?? null;

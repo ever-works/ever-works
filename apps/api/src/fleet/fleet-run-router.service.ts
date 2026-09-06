@@ -387,6 +387,14 @@ export class FleetRunRouterService {
             jobPayload.execution = plan.execution;
             jobPayload.workspace = plan.workspace;
             jobPayload.acceptanceChecks = plan.acceptanceChecks;
+            // EW-807: THE freeze. Both phases are embedded in the immutable
+            // enqueued payload here, and the node never reads them from
+            // anywhere else — which is what makes "a model editing
+            // `.works/works.yml` mid-run cannot widen what runs" a property
+            // of the system rather than a promise.
+            if (plan.setup && plan.setup.length > 0) {
+                jobPayload.setup = plan.setup;
+            }
             jobPayload.git = plan.git;
             // Self-build slice Z (EW-796) — only when the planner actually
             // enabled the bridge. The node reads THIS field to decide

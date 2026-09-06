@@ -30,6 +30,14 @@ export interface FleetAgentTaskPlan {
     execution: FleetAgentModelExecution;
     workspace: FleetTaskWorkspaceSpec;
     acceptanceChecks: TaskAcceptanceCheck[];
+    /**
+     * Dispatch-frozen SETUP phase (EW-807): the dependency install a
+     * freshly provisioned worktree needs before any command in it means
+     * anything. Absent for every plan that declares none, which is every
+     * plan until an owner (or, through the allow-list, their repository)
+     * declares one.
+     */
+    setup?: TaskAcceptanceCheck[];
     git: FleetAgentTaskGitPolicy;
     /**
      * Self-build slice Z (EW-796) — the platform-MCP bridge for this run,

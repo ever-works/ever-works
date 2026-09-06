@@ -1,4 +1,5 @@
 import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import * as yaml from 'yaml';
 import type {
     FleetRunEnvFileRef,
     FleetTaskWorkspaceMountSpec,
@@ -7,12 +8,14 @@ import type {
     MergeMethod,
     MergePolicySource,
     MergeRefusalCode,
+    TaskAcceptanceCheck,
 } from '@ever-works/contracts';
 import {
     normalizeCommitSha,
     normalizeFleetRunEnvFileRefs,
     normalizeFleetRunEnvGrants,
     normalizeFleetTaskWorkspaceMounts,
+    normalizeWorkRepoDeclaredCommandPolicy,
 } from '@ever-works/contracts';
 import { TaskStatus, type Task, type TaskLinkedPullRequest } from '../entities/task.entity';
 import type { Work } from '../entities/work.entity';
@@ -38,6 +41,14 @@ import {
     type AdvisoryAttachedRepoSpec,
     type ResolvedAgentRepo,
 } from '../services/repo-registry.service';
+import {
+    admitRepoDeclaredCommands,
+    parseRepoDeclaredCommands,
+    RepoDeclaredCommandsError,
+} from './repo-declared-commands';
+
+/** The ONE path a Work's config lives at; mirrors `WORKS_CONFIG_FILEPATHS`. */
+const WORKS_CONFIG_FILEPATH = '.works/works.yml';
 
 export interface ProvisionedTaskWorkspace {
     /** Filesystem path of the checkout — the run's working directory. */
@@ -482,6 +493,135 @@ export class TaskWorkspaceService {
             }
         }
         return normalizeFleetRunEnvGrants(sources.flatMap((source) => source.envGrants));
+    }
+
+    /**
+     * Read the commands this Task's PRIMARY repository declares in
+     * `.works/works.yml` (EW-807), or refuse.
+     *
+     * ## Where and when
+     *
+     * At PLAN time, on the platform, over the Git provider API, at the
+     * workspace's BASE REF — the branch the Task worktree is cut from.
+     * Deliberately not on the node and deliberately not from the checkout:
+     *
+     *  - the node never parses this file, so it needs no YAML parser and
+     *    has no repository content on an execution path of its own;
+     *  - the result is folded into the frozen check set and sealed into the
+     *    immutable job payload before the job is even enqueued, so a MODEL
+     *    THAT REWRITES THE FILE MID-RUN changes nothing about the run it is
+     *    in. That is what makes "the frozen set" a real guarantee here
+     *    rather than a name.
+     *
+     * The base ref, not the default branch: a run is judged by the config
+     * of the branch it started from. And not the TASK branch, which is the
+     * branch the model is about to write to.
+     *
+     * ## Refusal posture
+     *
+     * The opposite of `WorksConfigService`, which is advisory by design and
+     * must never take a Work offline over a schema quibble. Here every
+     * failure throws: a malformed `spec.tasks`, a provider error, a
+     * command the owner's allow-list does not admit, a `mount:` naming a
+     * repository the Task does not mount. Reporting a green run that
+     * verified less than the repository asked for is the defect; a run
+     * that fails on its own row naming the line to fix is not.
+     *
+     * Returns EMPTY without a round trip when the Work's policy is `off`,
+     * which is every Work until its owner opts in. A missing file, or a
+     * file with no `spec.tasks`, is also empty — a repository that declares
+     * nothing declares nothing.
+     *
+     * KNOWN LIMIT: the git facade returns `null` both for "no such file"
+     * and for a provider plugin with no file-read capability, so a Work on
+     * such a provider silently gets no declarations. Every provider that
+     * can host a Work implements `getFileContent` (the whole works.yml
+     * import path depends on it), so this is a theoretical gap rather than
+     * a live one — but it is a gap, and it is why the FEATURE is opt-in
+     * per Work rather than inferred from the file's presence.
+     */
+    async readFleetRepoDeclaredCommands(input: {
+        task: Task;
+        userId: string;
+        workspace: FleetTaskWorkspaceSpec;
+    }): Promise<{ setup: TaskAcceptanceCheck[]; checks: TaskAcceptanceCheck[] }> {
+        const empty = { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] };
+        if (!input.task.workId) return empty;
+        const work = await this.works.findById(input.task.workId);
+        if (!work) return empty;
+
+        const policy = normalizeWorkRepoDeclaredCommandPolicy(work.repoDeclaredCommands);
+        // `off` is the whole point of the opt-in: the file is not read at
+        // all, so a repository cannot make a Work do work by writing to it.
+        if (policy.mode !== 'allowlist') return empty;
+
+        if (!this.gitFacade) {
+            throw new RepoDeclaredCommandsError(
+                `Work ${work.id} reads repository-declared commands, but no git facade is available in this runtime to read .works/works.yml`,
+            );
+        }
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        if (!owner || !repo) {
+            // NOT an empty set. Control only reaches here for a Work that
+            // OPTED IN — the policy gate and the git-facade gate are both
+            // already behind us — so returning `{ setup: [], checks: [] }`
+            // would grade the run by the owner's checks alone and report it
+            // green having verified less than the repository asked for. That
+            // is the same silent fallback every other branch on this read
+            // path throws over (a provider error, invalid YAML, a denied
+            // command); a Work whose repository coordinates do not resolve
+            // is a configuration failure, and it belongs on the run row.
+            throw new RepoDeclaredCommandsError(
+                `Work ${work.id} reads repository-declared commands, but its repository coordinates do not ` +
+                    `resolve (owner='${owner ?? ''}', repo='${repo ?? ''}') — ${WORKS_CONFIG_FILEPATH} cannot be ` +
+                    `read. Reconnect the Work's repository, or turn repository-declared commands off.`,
+            );
+        }
+
+        let file: { content: string; encoding: string } | null;
+        try {
+            file = await this.gitFacade.getFileContent(
+                owner,
+                repo,
+                WORKS_CONFIG_FILEPATH,
+                { userId: input.userId, providerId: work.gitProvider, workId: work.id },
+                input.workspace.baseRef,
+            );
+        } catch (error) {
+            // NOT swallowed. "We could not read the file that says how to
+            // verify this change, so we verified it with nothing" is the
+            // silent fallback this slice exists to remove.
+            throw new RepoDeclaredCommandsError(
+                `Could not read ${WORKS_CONFIG_FILEPATH} from ${owner}/${repo}@${input.workspace.baseRef}, and this ` +
+                    `Work reads repository-declared commands: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+        if (!file?.content) return empty;
+
+        let parsed: unknown;
+        try {
+            parsed = yaml.parse(file.content);
+        } catch (error) {
+            throw new RepoDeclaredCommandsError(
+                `${WORKS_CONFIG_FILEPATH} in ${owner}/${repo}@${input.workspace.baseRef} is not valid YAML: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new RepoDeclaredCommandsError(
+                `${WORKS_CONFIG_FILEPATH} in ${owner}/${repo} must contain a YAML mapping at the root`,
+            );
+        }
+
+        const declared = parseRepoDeclaredCommands((parsed as Record<string, unknown>).spec);
+        return admitRepoDeclaredCommands({
+            declared,
+            policy,
+            mountDirs: (input.workspace.mounts ?? []).map((mount) => mount.mountDir),
+            repositoryId: `${owner}/${repo}`,
+        });
     }
 
     /** The enabled registry row for `primaryRepositoryId`, or null. Never throws. */
