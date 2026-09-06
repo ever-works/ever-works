@@ -5,6 +5,7 @@ import {
     EventIngestService,
     IngestInstallBindingRepository,
     type IngestResult,
+    type RecordIngestBindingData,
 } from '@ever-works/agent/ingest';
 import { PrReviewService } from '@ever-works/agent/pr-review';
 import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/plugins';
@@ -129,7 +130,12 @@ export interface GitHubPushCommit {
 export interface GitHubWebhookBody {
     action?: string;
     installation?: {
-        id?: number;
+        /**
+         * GitHub sends a number; the field is typed wider because the
+         * body is unverified JSON when `extractGitHubWorkspaceRef` reads
+         * it (see `normalizeInstallationId`).
+         */
+        id?: number | string;
     };
     organization?: {
         login?: string;
@@ -214,6 +220,32 @@ export interface GitHubWebhookBody {
 }
 
 /**
+ * Canonical `installation.id` out of whatever JSON the body carried.
+ *
+ * GitHub always sends a JSON NUMBER, but the body is attacker-shaped
+ * until the signature verifies, and a caller can send `"4242"` instead.
+ * A type-narrow check (`typeof === 'number'`) would then find no id, the
+ * workspace ref would come back WITHOUT the `installation:` key, and the
+ * exact-binding step of `resolveBinding` would have nothing to look up —
+ * while `GitHubAppSyncService.handleWebhook` happily `String()`s the very
+ * same field and acts on it. That divergence is a way to make the
+ * ownership check blind to the id the delivery is about to act on, so
+ * both string and number forms normalize to the same key here.
+ */
+function normalizeInstallationId(value: unknown): string | undefined {
+    if (typeof value === 'number') {
+        return Number.isSafeInteger(value) && value > 0 ? String(value) : undefined;
+    }
+    if (typeof value === 'string' && /^[0-9]{1,19}$/.test(value.trim())) {
+        // Strip leading zeros textually — `Number()` would lose precision
+        // on a 19-digit id and re-introduce the divergence this closes.
+        const digits = value.trim().replace(/^0+(?=[0-9])/, '');
+        return digits === '0' ? undefined : digits;
+    }
+    return undefined;
+}
+
+/**
  * Read the installation identity off a delivery body.
  *
  * The body is NOT yet signature-verified here, and that is safe: the
@@ -225,8 +257,8 @@ export function extractGitHubWorkspaceRef(
     body: GitHubWebhookBody | undefined,
 ): GitHubWorkspaceRef | undefined {
     const keys: string[] = [];
-    const installationId = body?.installation?.id;
-    if (typeof installationId === 'number' && Number.isFinite(installationId)) {
+    const installationId = normalizeInstallationId(body?.installation?.id);
+    if (installationId) {
         keys.push(`installation:${installationId}`);
     }
     const owner =
@@ -396,10 +428,26 @@ export class GitHubPrReviewBridgeService {
             if (!bound) continue;
             const owner = candidates.find((c) => c.userId === bound.userId);
             if (owner) {
-                return {
-                    status: 'resolved',
-                    binding: { ...owner, matchedBy: 'binding', workspace },
-                };
+                // The binding names an owner; the SIGNATURE decides whether
+                // it is the owner of THIS delivery. A stored row is a much
+                // weaker claim than a live HMAC: `owner:<login>` keys are
+                // written from an unverified body (see `recordBinding`), so
+                // one tenant can squat a workspace key they do not hold. If
+                // the bound install's secret does not verify this delivery,
+                // fall through to the signature proof below rather than
+                // resolving to a user who demonstrably did not send it —
+                // otherwise the squatted row 401s the real owner's webhook
+                // forever with no way for them to evict it.
+                if (!lookup.verifySignature || lookup.verifySignature(owner.webhookSecret)) {
+                    return {
+                        status: 'resolved',
+                        binding: { ...owner, matchedBy: 'binding', workspace },
+                    };
+                }
+                this.logger.warn(
+                    `GitHub delivery for ${key} does not verify against the bound install's secret; falling through to signature proof`,
+                );
+                break;
             }
             // The bound install was removed or lost its webhook secret.
             // Attributing its events to ANOTHER user is exactly the defect
@@ -478,20 +526,49 @@ export class GitHubPrReviewBridgeService {
      * signature verification, so the deployment self-migrates off the
      * legacy single-install path onto exact resolution.
      *
+     * ## What the delivery actually proved
+     *
+     * `IngestInstallBindingRepository.record` re-POINTS an existing row
+     * and documents the invariant it needs: the caller must have proven
+     * OWNERSHIP of the workspace, not merely authenticity of the sender.
+     * Only one of the paths here clears that bar:
+     *
+     *  * `app-install` — the owner came from platform state
+     *    (`github_app_installations`), so re-pointing is proven and uses
+     *    `record`;
+     *  * `single-install` / `signature` — the HMAC proves the sender knows
+     *    THEIR OWN webhook secret. The workspace key next to it
+     *    (`owner:<login>`, `installation:<id>`) was read out of the
+     *    UNVERIFIED body, so it is a claim, not a proof: any tenant with
+     *    an enabled `github` install can sign a body naming somebody
+     *    else's org. Those paths therefore go through `recordIfAbsent`,
+     *    which inserts only when the key is unheld — a squatter can never
+     *    take a binding away from whoever legitimately holds it, and a
+     *    row that is already right is never overwritten by a forgery.
+     *
      * Best-effort: a failure here must never break a webhook that has
      * already been verified and handled.
      */
     async recordBinding(binding: GitHubEventsBinding): Promise<void> {
         const key = binding.workspace?.keys[0];
         if (binding.matchedBy === 'binding' || !key) return;
+        const write: RecordIngestBindingData = {
+            provider: GITHUB_BINDING_PROVIDER,
+            externalWorkspaceId: key,
+            userId: binding.userId,
+            pluginId: GITHUB_PLUGIN_ID,
+            externalWorkspaceName: binding.workspace?.label ?? null,
+        };
         try {
-            await this.installBindings.record({
-                provider: GITHUB_BINDING_PROVIDER,
-                externalWorkspaceId: key,
-                userId: binding.userId,
-                pluginId: GITHUB_PLUGIN_ID,
-                externalWorkspaceName: binding.workspace?.label ?? null,
-            });
+            const proven = binding.matchedBy === 'app-install';
+            const recorded = proven
+                ? await this.installBindings.record(write)
+                : await this.installBindings.recordIfAbsent(write);
+            if (!proven && recorded && recorded.userId !== binding.userId) {
+                this.logger.warn(
+                    `GitHub workspace ${key} is already bound to another account; leaving the existing binding in place`,
+                );
+            }
         } catch (error) {
             this.logger.warn(
                 `Failed to record GitHub installation binding for ${key}: ${

@@ -6,11 +6,13 @@ import {
     TRIAGE_SOURCE_TEXT_MAX_CHARS,
     TRIAGE_TASK_TITLE_MAX_CHARS,
     renderTriageBody,
+    renderTriageSupersededNote,
     renderTriageTitle,
     renderTriageUpdate,
     triageExternalKeyOf,
     triageFactsOf,
     triagePriorityOf,
+    triageRegressionOf,
 } from './triage-task-body';
 
 const storedEvent = (overrides: Partial<IngestedEvent> = {}): IngestedEvent =>
@@ -380,6 +382,203 @@ describe('triage-task-body (pure rendering)', () => {
             });
             expect(comment).not.toContain('- Title:');
             expect(comment).toContain('**GitHub issue update** — opened');
+        });
+
+        it('calls out a regression on the comment, whatever the Task’s state', () => {
+            const reopened = storedEvent({
+                payload: { ...storedEvent().payload, action: 'reopened', state: 'open' },
+            });
+            expect(renderTriageUpdate(reopened)).toContain(
+                '- **Regression** — the GitHub issue was reopened.',
+            );
+        });
+    });
+
+    /**
+     * Regression detection is the ONE thing that lets dedup yield, so it
+     * is pinned per vendor and in both directions: the signals that must
+     * fire, and — more important — the chatty ones that must NOT, since
+     * a false positive here is what turns 2000 Sentry alerts into 2000
+     * Tasks.
+     */
+    describe('triageRegressionOf', () => {
+        const github = (action: string) =>
+            storedEvent({ payload: { ...storedEvent().payload, action } });
+
+        const incident = (payload: Record<string, unknown>) =>
+            storedEvent({
+                source: 'sentry',
+                kind: 'incident',
+                subjectExternalId: '4501',
+                payload: {
+                    provider: 'sentry',
+                    externalId: '4501',
+                    title: 'TypeError',
+                    resource: 'issue',
+                    issueId: '4501',
+                    ...payload,
+                },
+            });
+
+        const jiraTransition = (payload: Record<string, unknown>) =>
+            storedEvent({
+                source: 'jira-connector',
+                kind: 'jira.issue',
+                subjectExternalId: '10001',
+                payload: {
+                    issueId: '10001',
+                    issueKey: 'ENG-42',
+                    summary: 'Login button does nothing on Safari',
+                    ...payload,
+                },
+            });
+
+        it('reads a reopened GitHub issue as a regression', () => {
+            expect(triageRegressionOf(github('reopened'))).toEqual({
+                signal: 'github.reopened',
+                summary: 'the GitHub issue was reopened',
+            });
+        });
+
+        it.each(['opened', 'closed', 'labeled', 'assigned', 'edited'])(
+            'does not read a GitHub %s as a regression',
+            (action) => {
+                expect(triageRegressionOf(github(action))).toBeNull();
+            },
+        );
+
+        it.each([
+            ['unresolved', 'the Sentry issue regressed (resolved → unresolved)'],
+            ['unarchived', 'the Sentry issue was unarchived'],
+        ])('reads a Sentry %s as a regression', (action, summary) => {
+            expect(triageRegressionOf(incident({ action }))).toEqual({
+                signal: `sentry.${action}`,
+                summary,
+            });
+        });
+
+        it.each(['created', 'resolved', 'ignored', 'archived', 'assigned'])(
+            'does not read a Sentry %s as a regression',
+            (action) => {
+                expect(triageRegressionOf(incident({ action }))).toBeNull();
+            },
+        );
+
+        it('never reads a repeated event_alert as a regression — that is how 2000 alerts stay one Task', () => {
+            expect(
+                triageRegressionOf(
+                    incident({ resource: 'event_alert', action: 'triggered', eventId: 'evt-9' }),
+                ),
+            ).toBeNull();
+        });
+
+        it.each(['reopened', 'reintroduced', 'auto_reopened'])(
+            'reads a Dependabot %s as a regression',
+            (action) => {
+                expect(
+                    triageRegressionOf(incident({ provider: 'dependabot', action })),
+                ).toMatchObject({ signal: `dependabot.${action}` });
+            },
+        );
+
+        it.each(['created', 'fixed', 'dismissed', 'auto_dismissed'])(
+            'does not read a Dependabot %s as a regression',
+            (action) => {
+                expect(triageRegressionOf(incident({ provider: 'dependabot', action }))).toBeNull();
+            },
+        );
+
+        it('reads a Jira transition back out of a done status as a regression', () => {
+            expect(
+                triageRegressionOf(
+                    jiraTransition({
+                        changeType: 'transitioned',
+                        statusFrom: 'Done',
+                        statusTo: 'In Progress',
+                    }),
+                ),
+            ).toEqual({
+                signal: 'jira.transitioned',
+                summary: 'the Jira issue moved back out of Done into In Progress',
+            });
+        });
+
+        it.each([
+            ['To Do', 'In Progress'],
+            ['In Progress', 'Done'],
+            ['Done', 'Closed'],
+            ['Resolved', "Won't Do"],
+        ])('does not read the Jira transition %s → %s as a regression', (statusFrom, statusTo) => {
+            expect(
+                triageRegressionOf(
+                    jiraTransition({ changeType: 'transitioned', statusFrom, statusTo }),
+                ),
+            ).toBeNull();
+        });
+
+        it('needs an actual transition — a plain Jira update is never a regression', () => {
+            expect(
+                triageRegressionOf(jiraTransition({ changeType: 'updated', status: 'To Do' })),
+            ).toBeNull();
+        });
+
+        it('ignores kinds it does not know', () => {
+            expect(
+                triageRegressionOf(
+                    storedEvent({ kind: 'github.pr', payload: { action: 'reopened' } }),
+                ),
+            ).toBeNull();
+        });
+    });
+
+    describe('regression rendering', () => {
+        const regression = {
+            signal: 'github.reopened',
+            summary: 'the GitHub issue was reopened',
+        } as const;
+        const reopened = storedEvent({
+            payload: { ...storedEvent().payload, action: 'reopened', state: 'open' },
+        });
+
+        it('marks the re-filed Task title so the board does not show two identical rows', () => {
+            expect(renderTriageTitle(reopened, true)).toBe(
+                '[octo/site#42] Regression: Login button does nothing on Safari',
+            );
+            expect(renderTriageTitle(reopened)).toBe(
+                '[octo/site#42] Login button does nothing on Safari',
+            );
+        });
+
+        it('opens the re-filed body by naming the reason, the superseded Task and the count', () => {
+            const body = renderTriageBody(reopened, {
+                regression,
+                supersedesTaskRef: 'T-14',
+                regressionCount: 2,
+            });
+            expect(body).toContain('**Filed automatically as a regression**');
+            expect(body).toContain('the GitHub issue was reopened');
+            expect(body).toContain('`T-14`');
+            expect(body).toContain('This is re-opening #2');
+            // Still the full facts table — a regression Task is not a stub.
+            expect(body).toContain('| Link | https://github.com/octo/site/issues/42 |');
+        });
+
+        it('leaves the ordinary body untouched when there is no regression context', () => {
+            const body = renderTriageBody(reopened);
+            expect(body).toContain('**Filed automatically** from a GitHub issue');
+            expect(body).not.toContain('as a regression');
+        });
+
+        it('leaves a two-way trail: the closed Task names its replacement', () => {
+            const note = renderTriageSupersededNote(reopened, {
+                regression,
+                newTaskRef: 'T-15',
+            });
+            expect(note).toContain('**GitHub issue regressed**');
+            expect(note).toContain('after this Task was closed');
+            expect(note).toContain('`T-15`');
+            expect(note).toContain('`octo/site#42`');
+            expect(note).toContain('_Seen 2026-09-01T09:00:00.000Z · ingested event row-1_');
         });
     });
 });

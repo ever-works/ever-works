@@ -136,6 +136,14 @@ describe('JiraIssueBridgeService', () => {
                 bindings.set(data.externalWorkspaceId, { userId: data.userId });
                 return data;
             }),
+            recordIfAbsent: jest.fn(
+                async (data: { externalWorkspaceId: string; userId: string }) => {
+                    const held = bindings.get(data.externalWorkspaceId);
+                    if (held) return { ...data, userId: held.userId };
+                    bindings.set(data.externalWorkspaceId, { userId: data.userId });
+                    return data;
+                },
+            ),
         };
         const service = new JiraIssueBridgeService(
             userPluginRepository as never,
@@ -335,6 +343,83 @@ describe('JiraIssueBridgeService', () => {
                     workspace: extractJiraSiteRef(issueBody()),
                 }),
             ).resolves.toBeUndefined();
+        });
+
+        /**
+         * `site:<host>` comes out of the UNVERIFIED body
+         * (`extractJiraSiteRef`), and on the `signature` /
+         * `single-install` paths the HMAC proves only that the sender
+         * knows THEIR OWN secret. Any tenant with a jira-connector
+         * install could therefore sign a body whose `issue.self` names
+         * somebody else's Atlassian site and take that site's binding —
+         * after which the real owner's genuine deliveries were verified
+         * against the SQUATTER's secret, failed, and 401'd forever with
+         * no path to evict the row.
+         *
+         * `site-match` is the one path corroborated by platform state
+         * (the candidate's own install declares that host), so it is the
+         * only one allowed to re-point.
+         */
+        it('CLAIMS insert-only on a signature match, and never takes a held site', async () => {
+            const { service, installBindings } = createService([ACME]);
+            const workspace = extractJiraSiteRef(issueBody());
+
+            await service.recordBinding({
+                userId: 'squatter',
+                webhookSecret: 'squatter-secret',
+                matchedBy: 'signature',
+                workspace,
+            });
+            expect(installBindings.recordIfAbsent).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    externalWorkspaceId: 'site:acme.atlassian.net',
+                    userId: 'squatter',
+                }),
+            );
+            expect(installBindings.record).not.toHaveBeenCalled();
+
+            // The victim's own site-match write is the one that may
+            // re-point; a second squat attempt cannot.
+            installBindings.recordIfAbsent.mockClear();
+            await service.recordBinding({
+                userId: 'thief',
+                webhookSecret: 'thief-secret',
+                matchedBy: 'single-install',
+                workspace,
+            });
+            expect(installBindings.record).not.toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * A stored `site:<host>` row is a weaker claim than a live HMAC — see
+     * `recordBinding` above. A squatted row used to resolve every
+     * delivery for that site to the squatter, whose secret then failed
+     * verification, so the real owner could never turn intake on.
+     */
+    describe('resolveBinding: the signature outranks a stored binding', () => {
+        it('falls through to the site-host match when the bound install cannot verify', async () => {
+            const { service, installBindings } = createService([
+                { userId: 'squatter', settings: { webhookSecret: 'squatter-secret' } },
+                {
+                    userId: 'victim',
+                    settings: {
+                        webhookSecret: 'victim-secret',
+                        baseUrl: 'https://acme.atlassian.net',
+                    },
+                },
+            ]);
+            installBindings.findByWorkspace.mockResolvedValue({ userId: 'squatter' });
+
+            const resolution = await service.resolveBinding({
+                workspace: extractJiraSiteRef(issueBody()),
+                verifySignature: (secret: string) => secret === 'victim-secret',
+            });
+
+            expect(resolution).toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'victim' },
+            });
         });
     });
 

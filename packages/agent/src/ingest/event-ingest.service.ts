@@ -53,6 +53,18 @@ export interface IngestResult {
     filtered: number;
 }
 
+/**
+ * Backoff ceiling for a row that keeps failing, in drain ticks (five
+ * minutes each, so 32 ticks is a little under three hours).
+ */
+export const MAX_FAILURE_BACKOFF_TICKS = 32;
+
+/** Attempts after which a stuck row is logged at ERROR, not WARN. */
+export const FAILURE_ALERT_ATTEMPTS = 5;
+
+/** Cap on the in-process failure map, so it cannot grow unbounded. */
+const MAX_TRACKED_FAILURES = 5_000;
+
 export interface ProcessBatchResult {
     /** Rows marked processed this run. */
     processed: number;
@@ -137,6 +149,26 @@ export class EventIngestService {
 
     /** Kind-bound domain processors (Meetings, …) — see the interface doc. */
     private readonly kindProcessors: IngestedEventKindProcessor[] = [];
+
+    /**
+     * The drain in flight, if any — see {@link processBatch}.
+     *
+     * `findUnprocessed` takes no row lock and `markProcessed` is the LAST
+     * step of the fan-out, so two overlapping drains select the SAME head
+     * rows and both run the kind processors on them. For the triage filer
+     * that means two `links.find()` misses, two `tasks.create()` calls and
+     * one orphaned Task that no `external_issue_links` row points at —
+     * invisible to dedup forever. Ticks overlap easily in practice: a
+     * batch that files 50 Tasks plus chat posts plus Memory writes can
+     * outrun the five-minute cron.
+     */
+    private inFlight: Promise<ProcessBatchResult> | null = null;
+
+    /**
+     * Consecutive failures per row id, and the tick from which the row
+     * may be attempted again — see {@link processBatch}.
+     */
+    private readonly failures = new Map<string, { count: number; skipTicks: number }>();
 
     constructor(
         private readonly repository: IngestedEventRepository,
@@ -251,8 +283,27 @@ export class EventIngestService {
      * Drain up to `limit` unprocessed rows through the processor
      * fan-out. Never throws for a single bad row — the row is either
      * retried next tick (Activity write failed) or completed.
+     *
+     * SINGLE-FLIGHT. A second call while a drain is running joins the
+     * one in flight instead of starting a competing pass. The row set is
+     * selected with a plain read and only marked processed at the END of
+     * the fan-out, so two concurrent passes would hand the same rows to
+     * the same idempotent-by-contract processors — and "idempotent"
+     * covers a RETRY (sequential), not a concurrent twin: two
+     * simultaneous triage filings both miss the dedup row and both create
+     * a Task. The worker-side guard is `queue: { concurrencyLimit: 1 }`
+     * on `event-ingest-tick`; this is the in-process floor under it.
      */
     async processBatch(limit = 50): Promise<ProcessBatchResult> {
+        if (this.inFlight) return this.inFlight;
+        const run = this.drainBatch(limit).finally(() => {
+            this.inFlight = null;
+        });
+        this.inFlight = run;
+        return run;
+    }
+
+    private async drainBatch(limit: number): Promise<ProcessBatchResult> {
         const result: ProcessBatchResult = {
             processed: 0,
             activities: 0,
@@ -260,7 +311,22 @@ export class EventIngestService {
             issueLinks: 0,
             failed: 0,
         };
-        const events = await this.repository.findUnprocessed(limit);
+        // Over-fetch by the number of rows currently serving a backoff so
+        // a wedged row cannot hold a slot that healthy work needs.
+        const backedOff = this.countBackedOff();
+        const candidates = await this.repository.findUnprocessed(
+            limit + Math.min(backedOff, limit),
+        );
+
+        const events: IngestedEvent[] = [];
+        for (const candidate of candidates) {
+            if (events.length >= limit) break;
+            if (this.isBackedOff(candidate.id)) continue;
+            events.push(candidate);
+        }
+        // Age the backoffs only AFTER the selection above, so a row with
+        // one tick left really sits this tick out.
+        this.ageBackoff();
 
         for (const event of events) {
             try {
@@ -273,11 +339,7 @@ export class EventIngestService {
                 await this.runKindProcessors(event);
             } catch (error) {
                 result.failed += 1;
-                this.logger.warn(
-                    `Kind processor failed for ingested event ${event.id} (${event.kind}): ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
+                this.recordFailure(event, 'kind processor', error);
                 continue;
             }
 
@@ -288,11 +350,7 @@ export class EventIngestService {
                 // REQUIRED processor failed — leave the row unprocessed so
                 // the next tick retries it, and keep draining the batch.
                 result.failed += 1;
-                this.logger.warn(
-                    `Activity write failed for ingested event ${event.id}: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
+                this.recordFailure(event, 'Activity write', error);
                 continue;
             }
 
@@ -309,10 +367,68 @@ export class EventIngestService {
             }
 
             await this.repository.markProcessed(event.id);
+            this.failures.delete(event.id);
             result.processed += 1;
         }
 
         return result;
+    }
+
+    /**
+     * Remember that a row failed, and put it on an exponential backoff.
+     *
+     * A row whose processor fails PERMANENTLY is never marked processed
+     * and always sorts to the head of its owner's oldest-first queue, so
+     * without this it is re-selected every tick for the life of the
+     * deployment and permanently consumes one of the batch's slots —
+     * fifty such rows wedge the drain outright. Worse, a filer that
+     * creates a Task and then fails to write its dedup row leaves one
+     * orphan Task behind per attempt: 288 a day at a five-minute tick.
+     *
+     * The counter is per PROCESS and deliberately not a schema column:
+     * skipping is a scheduling decision, not durable state, and a
+     * restart or a deploy re-attempts every row immediately — a wedged
+     * row must never become an invisibly dropped one. Rows that fail
+     * transiently (the common case) retry on the very next tick, because
+     * a single failure costs zero skipped ticks.
+     */
+    private recordFailure(event: IngestedEvent, stage: string, error: unknown): void {
+        const previous = this.failures.get(event.id)?.count ?? 0;
+        const count = previous + 1;
+        const skipTicks = Math.min(MAX_FAILURE_BACKOFF_TICKS, count <= 1 ? 0 : 2 ** (count - 2));
+        this.failures.set(event.id, { count, skipTicks });
+        if (this.failures.size > MAX_TRACKED_FAILURES) {
+            const oldest = this.failures.keys().next();
+            if (!oldest.done) this.failures.delete(oldest.value);
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        const suffix = skipTicks > 0 ? ` — skipping the next ${skipTicks} tick(s)` : '';
+        const line = `${stage} failed for ingested event ${event.id} (${event.kind}), attempt ${count}${suffix}: ${message}`;
+        if (count >= FAILURE_ALERT_ATTEMPTS) {
+            this.logger.error(line);
+        } else {
+            this.logger.warn(line);
+        }
+    }
+
+    /** How many rows are currently sitting a tick out. */
+    private countBackedOff(): number {
+        let waiting = 0;
+        for (const entry of this.failures.values()) {
+            if (entry.skipTicks > 0) waiting += 1;
+        }
+        return waiting;
+    }
+
+    /** Age every backoff by one tick. Called AFTER the batch is selected. */
+    private ageBackoff(): void {
+        for (const entry of this.failures.values()) {
+            if (entry.skipTicks > 0) entry.skipTicks -= 1;
+        }
+    }
+
+    private isBackedOff(id: string): boolean {
+        return (this.failures.get(id)?.skipTicks ?? 0) > 0;
     }
 
     /** Run every registered processor whose kinds include this event's (or `'*'`). */

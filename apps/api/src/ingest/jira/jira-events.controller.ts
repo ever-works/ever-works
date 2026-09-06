@@ -19,6 +19,13 @@ import {
 import { verifyJiraSignature } from './jira-signature.util';
 
 /**
+ * The ONE 401 body this receiver ever returns — an unconfigured
+ * deployment and a bad signature are indistinguishable from outside, so
+ * probing cannot map which integrations are live.
+ */
+export const INVALID_JIRA_SIGNATURE = 'Invalid Jira webhook signature';
+
+/**
  * Jira Cloud webhook receiver (self-build program note §6, R2) — the
  * platform-side endpoint a Jira Cloud webhook (created WITH a secret)
  * points at.
@@ -84,8 +91,14 @@ export class JiraEventsController {
         });
 
         // Fail-closed: nothing configured → reject.
+        //
+        // The message is deliberately the SAME one a bad signature gets:
+        // "not configured" here means no user on this deployment has an
+        // enabled jira-connector install with a webhook secret, and
+        // telling an unauthenticated prober that is a configuration
+        // oracle. Operators read the reason out of the logs.
         if (resolution.status === 'not-configured') {
-            throw new UnauthorizedException('Jira events receiver is not configured');
+            throw new UnauthorizedException(INVALID_JIRA_SIGNATURE);
         }
         // Unknown/ambiguous site → clean no-op. The bridge already logged
         // the refusal; 200 so Jira does not retry a delivery we will never
@@ -102,7 +115,7 @@ export class JiraEventsController {
             webhookSecret: binding.webhookSecret,
         });
         if (!verdict.valid) {
-            throw new UnauthorizedException('Invalid Jira webhook signature');
+            throw new UnauthorizedException(INVALID_JIRA_SIGNATURE);
         }
 
         // Verified — persist the site→user binding so subsequent

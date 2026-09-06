@@ -34,6 +34,26 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
 export const eventIngestTickTask = schedules.task({
     id: 'event-ingest-tick',
     cron: '*/5 * * * *',
+    /**
+     * STRICTLY ONE DRAIN AT A TIME.
+     *
+     * `findUnprocessed` takes no row lock and `markProcessed` is the last
+     * step of the fan-out, so a tick that outruns the five-minute cron —
+     * easy once a batch is filing 50 Tasks with chat posts, Memory writes
+     * and embeddings — would overlap the next one on the SAME head rows.
+     * Both passes then miss the triage filer's dedup row and both create
+     * a Task, and the loser is orphaned: no `external_issue_links` row
+     * points at it, so it is never updated and never deduped away.
+     *
+     * `concurrencyLimit: 1` is the same lever `kb-embed-document` uses
+     * for its per-Work serialisation; `EventIngestService.processBatch`
+     * carries the matching in-process guard for anything that calls it
+     * outside this task.
+     */
+    queue: {
+        name: 'event-ingest',
+        concurrencyLimit: 1,
+    },
     run: async () => {
         return withWorkerContext(
             'EventIngestTick',

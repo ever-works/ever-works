@@ -1,7 +1,11 @@
 import { Controller, Headers, Post, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../auth/decorators/public.decorator';
-import { GitHubWebhookDispatcherService } from './github-webhook-dispatcher.service';
+import {
+    GitHubWebhookDispatcherService,
+    INVALID_GITHUB_SIGNATURE,
+} from './github-webhook-dispatcher.service';
 
 /**
  * `POST /api/github-app/webhooks` — the platform GitHub App webhook URL,
@@ -22,10 +26,22 @@ import { GitHubWebhookDispatcherService } from './github-webhook-dispatcher.serv
  * receiver files all sit together and the module graph stays acyclic
  * (`IngestModule` → `GitHubAppModule`, never back).
  *
- * FAILURE CONTRACT (unchanged): this route has always 500'd when the App
- * sync leg threw, and GitHub's redelivery is load-bearing for
- * installation sync, so a sync-leg error is rethrown. The ingest/review
- * leg is NEW on this route, so its failures are logged, never thrown.
+ * FAILURE CONTRACT: this route has always 500'd when the App sync leg
+ * threw, and GitHub's redelivery is load-bearing for installation sync,
+ * so a sync-leg error is rethrown. The AI review leg is best-effort —
+ * its failures are logged, never thrown, exactly as when it was added.
+ *
+ * The INTAKE leg (`issues`, `dependabot_alert` → the ingest spine → the
+ * triage Task) is rethrown as well, and that is deliberate: this URL is
+ * the DEFAULT one for a GitHub App install, so it is the route the
+ * founder's "file an issue and the fleet picks it up" path actually
+ * arrives on. Swallowing a transient intake failure here answers GitHub
+ * 200, GitHub never redelivers, and the issue silently never becomes
+ * work — the precise defect this whole intake exists to close. Rethrowing
+ * costs nothing on the retry: the App sync leg is idempotent and the
+ * spine dedupes on `(source, sourceEventId)`, so a redelivered issue
+ * event inserts zero rows the second time.
+ *
  * Response shape is unchanged: `{ ok: true }` with the framework's
  * default 201, as before.
  *
@@ -47,6 +63,11 @@ export class GitHubAppWebhookController {
         summary:
             'GitHub App webhook receiver (legacy route) — forwards to the consolidated GitHub receiver: installation sync, event ingest and AI PR review.',
     })
+    // The same flood posture as the canonical `/api/ingest/github/events`
+    // route next door. Both URLs reach the SAME dispatcher and the same
+    // downstream work, so leaving one of them uncapped meant a flood
+    // simply chose the unthrottled door.
+    @Throttle({ long: { limit: 300, ttl: 60_000 } })
     async handleWebhook(
         @Req() req: { body: unknown; rawBody?: string },
         @Headers('x-hub-signature-256') signature: string | undefined,
@@ -60,11 +81,18 @@ export class GitHubAppWebhookController {
         });
 
         if (result.ignored) {
-            throw new UnauthorizedException('Invalid GitHub webhook signature');
+            throw new UnauthorizedException(INVALID_GITHUB_SIGNATURE);
         }
 
         if (result.errors.sync) {
             throw result.errors.sync;
+        }
+
+        // See FAILURE CONTRACT above: a dropped intake failure on THIS
+        // route is an issue that never becomes work, because GitHub only
+        // redelivers on a non-2xx.
+        if (result.errors.intake) {
+            throw result.errors.intake;
         }
 
         return { ok: true };

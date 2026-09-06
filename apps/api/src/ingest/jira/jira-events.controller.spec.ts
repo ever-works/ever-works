@@ -145,8 +145,13 @@ describe('JiraEventsController (POST /api/ingest/jira/events)', () => {
         await expect(controller.receiveEvents(req as never, signature)).rejects.toThrow(
             UnauthorizedException,
         );
+        // The 401 body is INDISTINGUISHABLE from the bad-signature one.
+        // This used to assert 'not configured', which told an
+        // unauthenticated prober that no account on this deployment has
+        // an enabled jira-connector install with a webhook secret — a
+        // per-deployment tenant oracle held by anyone who can POST.
         await expect(controller.receiveEvents(req as never, signature)).rejects.toThrow(
-            'not configured',
+            'Invalid Jira webhook signature',
         );
         expect(eventIngestService.ingest).not.toHaveBeenCalled();
     });
