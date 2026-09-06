@@ -175,3 +175,87 @@ describe('FleetJobClient lease cancellation', () => {
 		expect(observedSignal?.aborted).toBe(true);
 	});
 });
+
+/**
+ * Run secrets (self-build slice Y, EW-781) — `fetchRunEnvFiles`.
+ *
+ * The request is by REFERENCE (row ids and paths); the response is the
+ * one place in this client where a secret value appears, and it is
+ * handed to the logger's redactor before anything else can touch it. The
+ * client's standing rule — never surface a server body — still holds,
+ * including for the new 422.
+ */
+describe('FleetJobClient run env files', () => {
+	const ROW = '22222222-2222-4222-8222-222222222222';
+	const SENTINEL = 'sentinel-c0de-DATABASE_URL=postgres://u:p@db/app';
+
+	const clientWith = (fetchFn: FetchLike, logger?: { protect: (v: string) => void }) =>
+		new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0,
+			...(logger ? { logger: logger as never } : {})
+		});
+
+	it('sends only row ids, paths and the claim — never a value', async () => {
+		let sentBody = '';
+		const client = clientWith(async (_url, init) => {
+			sentBody = init.body;
+			return {
+				ok: true,
+				status: 200,
+				text: async () =>
+					JSON.stringify({ files: [{ repoConnectionId: ROW, path: '.env', content: SENTINEL }] })
+			};
+		});
+
+		await expect(
+			client.fetchRunEnvFiles('job-1', [{ repoConnectionId: ROW, paths: ['.env'] }], 3)
+		).resolves.toEqual([{ repoConnectionId: ROW, path: '.env', content: SENTINEL }]);
+
+		const parsed = JSON.parse(sentBody) as Record<string, unknown>;
+		expect(parsed).toMatchObject({
+			nodeId: NODE_ID,
+			leaseGeneration: 3,
+			refs: [{ repoConnectionId: ROW, paths: ['.env'] }]
+		});
+		expect(sentBody).not.toContain(SENTINEL);
+	});
+
+	it('registers every returned value with the redactor before returning it', async () => {
+		const protect = vi.fn();
+		const client = clientWith(
+			response(200, { files: [{ repoConnectionId: ROW, path: '.env', content: SENTINEL }] }),
+			{ protect }
+		);
+		await client.fetchRunEnvFiles('job-1', [{ repoConnectionId: ROW, paths: ['.env'] }], 3);
+		expect(protect).toHaveBeenCalledWith(SENTINEL);
+	});
+
+	it('maps 422 to `unresolved` without echoing what the server said', async () => {
+		const client = clientWith(response(422, { reason: 'run-secrets-decrypt-failed', detail: 'private' }));
+		const error = await client
+			.fetchRunEnvFiles('job-1', [{ repoConnectionId: ROW, paths: ['.env'] }], 3)
+			.catch((e: unknown) => e);
+		expect(error).toMatchObject({ kind: 'unresolved', status: 422 });
+		expect((error as Error).message).not.toContain('private');
+	});
+
+	it('keeps 409 as stale-lease, from the STATUS alone', async () => {
+		const client = clientWith(response(409, { reason: 'stale-lease' }));
+		await expect(
+			client.fetchRunEnvFiles('job-1', [{ repoConnectionId: ROW, paths: ['.env'] }], 3)
+		).rejects.toMatchObject({ kind: 'stale-lease' });
+	});
+
+	it('THROWS rather than resolving empty when the response is malformed', async () => {
+		// Resolving `[]` here would start the run with no environment at all
+		// and look like success.
+		const client = clientWith(response(200, { files: [{ repoConnectionId: ROW, path: '.env' }] }));
+		await expect(
+			client.fetchRunEnvFiles('job-1', [{ repoConnectionId: ROW, paths: ['.env'] }], 3)
+		).rejects.toMatchObject({ kind: 'malformed' });
+	});
+});

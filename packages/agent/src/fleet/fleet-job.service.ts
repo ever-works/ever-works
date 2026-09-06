@@ -631,6 +631,58 @@ export class FleetJobService {
     }
 
     /**
+     * Run secrets (self-build slice Y) — prove that THIS node holds an
+     * ACTIVE claim on THIS job right now, and say whose data the job is
+     * allowed to reach.
+     *
+     * This is the authorization half of `POST /api/fleet/jobs/:id/env-files`
+     * and nothing else: it reads no registry row, decrypts nothing and
+     * returns no content. The resolution half lives in the API service, so
+     * the agent-side fleet module gains no database dependency it did not
+     * already have.
+     *
+     * The four checks are the SAME four, in the same order, that
+     * `heartbeatJob` and `completeJob` perform, because delivering a
+     * decrypted `.env` to a machine is at least as consequential as letting
+     * it settle the job:
+     *
+     *   1. the node credential verifies (constant-time, against the stored
+     *      sha256) — intent `'report'`, so a node an operator has just
+     *      PAUSED can still finish the run it already started; refusing
+     *      here would strand a half-provisioned checkout rather than drain
+     *      it, and the node already holds the workspace either way;
+     *   2. the job's recorded holder IS this node;
+     *   3. the job is still `leased` or `running` — a terminal job's
+     *      secrets are nobody's;
+     *   4. the `leaseGeneration` echoed is the current one, or the claim
+     *      lapsed while the machine slept and was re-issued elsewhere.
+     *
+     * `userId` in the answer comes from the JOB, never from the request
+     * body — the caller must scope its registry read with it, or an
+     * authenticated node could name another tenant's connection id.
+     */
+    async authorizeRunSecretRequest(input: {
+        nodeId: unknown;
+        secret: unknown;
+        jobId: string;
+        leaseGeneration?: unknown;
+    }): Promise<{ jobId: string; userId: string; nodeId: string } | null> {
+        const node = await this.authenticateNode(input.nodeId, input.secret, 'report');
+        if (!node) return null;
+
+        const job = await this.jobs.findById(input.jobId);
+        if (!job || job.nodeId !== node.id) return null;
+        if (job.status !== 'leased' && job.status !== 'running') return null;
+        if (!isCurrentLeaseGeneration(job, input.leaseGeneration)) {
+            this.logger.log(
+                `Fleet job ${job.id}: run-secret request refused — stale lease generation from node ${node.id}`,
+            );
+            throw new FleetJobStaleLeaseError();
+        }
+        return { jobId: job.id, userId: job.userId, nodeId: node.id };
+    }
+
+    /**
      * Return lapsed claims to the pool (or fail them once the attempt
      * budget is spent). Scoped to one owner on the lease path, global on
      * the cron. Best-effort per row: one bad row must not abort the sweep.

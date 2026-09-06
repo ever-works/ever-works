@@ -315,14 +315,21 @@ export function assertMountGrantsInCommand(input: {
 export function buildModelCliStep(
 	execution: FleetAgentModelExecution,
 	command: string,
-	envPassthrough: readonly string[] | undefined
+	envPassthrough: readonly string[] | undefined,
+	/**
+	 * Per-repository env grants (self-build slice Y) — NAMES that open the
+	 * platform-owned refusal for this run. Carried onto the step so the ONE
+	 * command runner applies them the same way it applies `envPassthrough`.
+	 */
+	envGrants?: readonly string[]
 ): WireCheck {
 	return {
 		id: MODEL_CLI_STEP_ID,
 		command,
 		timeoutSec: execution.timeoutSec ?? FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC,
 		required: true,
-		...(envPassthrough && envPassthrough.length > 0 ? { envPassthrough: [...envPassthrough] } : {})
+		...(envPassthrough && envPassthrough.length > 0 ? { envPassthrough: [...envPassthrough] } : {}),
+		...(envGrants && envGrants.length > 0 ? { envGrants: [...envGrants] } : {})
 	};
 }
 
@@ -465,13 +472,85 @@ export function parseModelCliResult(
 	 * VALUES are read from this process and scrubbed out of everything the
 	 * node reports back — see {@link redactModelResult}.
 	 */
-	envPassthrough?: readonly string[]
+	envPassthrough?: readonly string[],
+	/**
+	 * Per-repository env grants (self-build slice Y). Scrubbed on exactly
+	 * the same footing as `envPassthrough`: a granted `DATABASE_URL` is a
+	 * credential the model could have echoed into its summary, and the
+	 * whole point of granting one is that it never leaves the machine.
+	 */
+	envGrants?: readonly string[],
+	/**
+	 * Where the values are read from. Defaults to this process, which is
+	 * what production uses; injectable so an embedder that supplies its own
+	 * `parentEnv` to the command runner scrubs the SAME values it granted,
+	 * rather than silently scrubbing nothing.
+	 */
+	parentEnv?: NodeJS.ProcessEnv,
+	/**
+	 * Values that are not in ANY environment — the run's delivered `.env`
+	 * file contents (self-build slice Y). The model can read those files,
+	 * and "print the contents of apps/api/.env" is exactly what a prompt
+	 * injection asks for, so they are scrubbed on the same footing as a
+	 * granted name's value.
+	 */
+	extraValues?: readonly string[]
 ): FleetAgentTaskModelResult {
-	return redactModelResult(parseModelCliOutcome(provider, rawOutput, step), collectProtectedValues(envPassthrough));
+	return redactModelResult(
+		parseModelCliOutcome(provider, rawOutput, step),
+		mergeProtectedValues(
+			collectProtectedValues([...(envPassthrough ?? []), ...(envGrants ?? [])], parentEnv),
+			extraValues
+		)
+	);
 }
 
 /** Placeholder left where a credential value was removed. */
 export const MODEL_CLI_REDACTED = '[redacted]';
+
+/**
+ * Scrub the values of `envNames` out of one command result's log tail.
+ *
+ * Run secrets (self-build slice Y): a granted `DATABASE_URL` is read by
+ * the acceptance checks and the platform-authored steps, not only by the
+ * model — and a failing `pnpm test` prints its connection string. The
+ * model result was already scrubbed; without this the SAME value would
+ * still reach the job result through a check's `logTail`.
+ *
+ * Values are read from this process at report time, exactly as
+ * `parseModelCliResult` does: the platform sends names, never values.
+ */
+export function redactCommandResult(
+	result: NodeCheckResult,
+	envNames?: readonly string[],
+	parentEnv?: NodeJS.ProcessEnv,
+	/**
+	 * Values that live in no environment: the run's delivered `.env` file
+	 * contents (self-build slice Y). A failing `pnpm test` prints the
+	 * connection string it read out of `apps/api/.env`, and that tail is
+	 * stored verbatim in `fleet_jobs.result` unless it is scrubbed here.
+	 */
+	extraValues?: readonly string[]
+): NodeCheckResult {
+	const values = mergeProtectedValues(collectProtectedValues(envNames, parentEnv), extraValues);
+	if (values.length === 0 || typeof result.logTail !== 'string') return result;
+	return { ...result, logTail: scrub(result.logTail, values) ?? result.logTail };
+}
+
+/**
+ * Union two protected-value lists, keeping the longest-first ordering
+ * {@link scrub} relies on so a value that contains another is replaced
+ * whole. Applies the same 8-character floor: a short value would redact
+ * ordinary prose out of every tail the node reports.
+ */
+function mergeProtectedValues(values: readonly string[], extra?: readonly string[]): string[] {
+	if (!extra?.length) return [...values];
+	const merged = new Set<string>(values);
+	for (const value of extra) {
+		if (typeof value === 'string' && value.trim().length >= 8) merged.add(value);
+	}
+	return [...merged].sort((a, b) => b.length - a.length);
+}
 
 /**
  * Credential values to scrub, longest first so a token that contains another
@@ -480,11 +559,23 @@ export const MODEL_CLI_REDACTED = '[redacted]';
  * Read from `process.env` at report time rather than carried on the payload:
  * the platform sends only NAMES, and the value never has to leave the node.
  */
-function collectProtectedValues(envPassthrough?: readonly string[]): string[] {
+function collectProtectedValues(
+	envPassthrough?: readonly string[],
+	parentEnv: NodeJS.ProcessEnv = process.env
+): string[] {
 	if (!envPassthrough?.length) return [];
 	const values = new Set<string>();
+	// Windows env names are case-insensitive, and the granted name may be
+	// spelled differently from the one the machine actually set.
+	const byUpperName = new Map<string, string>();
+	for (const key of Object.keys(parentEnv)) {
+		const upper = key.toUpperCase();
+		if (!byUpperName.has(upper)) byUpperName.set(upper, key);
+	}
 	for (const name of envPassthrough) {
-		const value = process.env[name];
+		if (typeof name !== 'string') continue;
+		const key = byUpperName.get(name.toUpperCase());
+		const value = key === undefined ? undefined : parentEnv[key];
 		// A short value would scrub ordinary prose. The node's own logger
 		// applies the same floor for the same reason.
 		if (typeof value === 'string' && value.trim().length >= 8) values.add(value);

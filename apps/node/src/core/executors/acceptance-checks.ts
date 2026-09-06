@@ -85,6 +85,12 @@ export interface WireCheck {
 	timeoutSec?: number;
 	required?: boolean;
 	envPassthrough?: string[];
+	/**
+	 * Per-repository env grants (self-build slice Y): env var NAMES an
+	 * operator explicitly bound to a repository of this run, which open the
+	 * platform-owned refusal for those EXACT names and nothing adjacent.
+	 */
+	envGrants?: string[];
 }
 
 /** Injected so the whole executor is testable without spawning processes. */
@@ -274,7 +280,7 @@ async function executeCheck(
 				shell: true,
 				detached: process.platform !== 'win32',
 				windowsHide: true,
-				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv)
+				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv, check.envGrants)
 			});
 		} catch (error) {
 			tail = error instanceof Error ? error.message : String(error);
@@ -624,6 +630,25 @@ export const NODE_SECRETISH_ENV_KEY_PATTERN =
 export const NODE_PLATFORM_OWNED_ENV_PATTERN =
 	/^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_)/i;
 
+/**
+ * The subset of the above that stays refused even WITH an explicit
+ * per-repository grant (self-build slice Y).
+ *
+ * `FLEET_` and `EVER_WORKS_` are this node's own credential namespace: a
+ * grant there would let model-driven code read the secret that leases
+ * work on this machine and then lease, complete or cancel jobs as the
+ * node. `PLUGIN_` holds the key that decrypts every tenant's env files.
+ * `AUTH_` / `BETTER_AUTH_` / `PLATFORM_` sign platform sessions. None of
+ * them is ever what an operator means by "let my test suite reach the
+ * database", so refusing them costs nothing and closes the escalation
+ * from "read one secret" to "become the platform".
+ *
+ * Mirrors `FLEET_RUN_ENV_UNGRANTABLE_PATTERN` in `@ever-works/contracts`;
+ * kept as a local literal so the refusal survives even if the payload,
+ * the platform, or the contracts package is the thing that is wrong.
+ */
+export const NODE_UNGRANTABLE_ENV_PATTERN = /^(FLEET_|EVER_WORKS_|PLUGIN_|AUTH_|BETTER_AUTH_|PLATFORM_)/i;
+
 const NODE_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const MAX_ENV_PASSTHROUGH = 32;
 const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
@@ -635,7 +660,14 @@ const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
  */
 export function buildNodeCheckEnv(
 	passthrough?: readonly string[] | null,
-	parentEnv: NodeJS.ProcessEnv = process.env
+	parentEnv: NodeJS.ProcessEnv = process.env,
+	/**
+	 * Per-repository env grants (self-build slice Y). Env var NAMES an
+	 * operator bound to a repository of THIS run, which may pass the
+	 * platform-owned refusal below. Absent / empty = today's behaviour
+	 * exactly: every platform-owned name is refused.
+	 */
+	platformOwnedGrants?: readonly string[] | null
 ): Record<string, string> {
 	// Windows env names are case-insensitive (`Path` vs `PATH`), so index
 	// the parent once by upper-cased name and look everything up through it.
@@ -679,7 +711,25 @@ export function buildNodeCheckEnv(
 	// both would bill the Console org for an agent meant to run on a Claude
 	// plan — silently. Keep one per family, preferring the
 	// subscription-backed credential, and say so in the log.
-	const granted = normalizePassthrough(passthrough);
+	// The instance-global passthrough and the per-repository grants meet in
+	// exactly ONE place, and the grant set is an explicit argument with an
+	// empty default. If the grants ever leaked into the global list, every
+	// repository would inherit every repository's grants.
+	//
+	// A grant is a permission in its own right, not a filter on the
+	// passthrough: a name an operator bound to a repository is admitted
+	// whether or not the instance-global list also mentions it. The two
+	// lists are capped independently (32 each, matching the registry) and
+	// merged case-insensitively here, first spelling wins.
+	const grants = normalizeGrantedPlatformOwnedNames(platformOwnedGrants);
+	const granted: string[] = [];
+	const grantedSeen = new Set<string>();
+	for (const name of [...normalizePassthrough(passthrough, grants), ...grants]) {
+		const upper = name.toUpperCase();
+		if (grantedSeen.has(upper)) continue;
+		grantedSeen.add(upper);
+		granted.push(name);
+	}
 	const { names: exclusiveNames, notes } = resolveExclusiveAgentCredentials(granted, parentEnv);
 	for (const note of notes) {
 		// eslint-disable-next-line no-console
@@ -706,8 +756,60 @@ export function buildNodeCheckEnv(
 	return env;
 }
 
-/** Shape-valid, de-duplicated, capped, never platform-owned. */
-export function normalizePassthrough(names: readonly string[] | null | undefined): string[] {
+/**
+ * Shape-valid, de-duplicated, capped, and platform-owned ONLY where an
+ * operator granted that exact name.
+ *
+ * `platformOwnedGrants` is the keyhole in {@link NODE_PLATFORM_OWNED_ENV_PATTERN},
+ * and the whole security of the feature is in one word: EXACT. The
+ * refusal pattern is a PREFIX regex, so if a grant were matched by prefix
+ * a single `DATABASE_` grant would open `DATABASE_URL`,
+ * `DATABASE_PASSWORD` and everything else that starts that way. A grant
+ * therefore admits `DATABASE_URL` and NOT `DATABASE_URL_REPLICA`, not
+ * `DATABASE_HOST`, not anything adjacent. Case-insensitive because
+ * Windows env names are.
+ *
+ * The un-grantable core (`FLEET_`, `EVER_WORKS_`, `PLUGIN_`, `AUTH_`,
+ * `BETTER_AUTH_`, `PLATFORM_`) is stripped from the grant set before it
+ * reaches here — see {@link normalizeGrantedPlatformOwnedNames} — so no
+ * grant can ever hand a check the credential that leases work on this
+ * machine.
+ */
+export function normalizePassthrough(
+	names: readonly string[] | null | undefined,
+	platformOwnedGrants?: readonly string[] | null
+): string[] {
+	if (!Array.isArray(names)) return [];
+	const grantedUpper = new Set(
+		normalizeGrantedPlatformOwnedNames(platformOwnedGrants).map((name) => name.toUpperCase())
+	);
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const raw of names) {
+		if (typeof raw !== 'string') continue;
+		const name = raw.trim();
+		if (!NODE_ENV_NAME_PATTERN.test(name)) continue;
+		const upper = name.toUpperCase();
+		// EXACT-name grant, never a prefix and never a pattern.
+		if (NODE_PLATFORM_OWNED_ENV_PATTERN.test(name) && !grantedUpper.has(upper)) continue;
+		if (seen.has(upper)) continue;
+		seen.add(upper);
+		out.push(name);
+		if (out.length >= MAX_ENV_PASSTHROUGH) break;
+	}
+	return out;
+}
+
+/**
+ * The grant list as this node will actually honour it: shape-valid,
+ * wildcard-free, outside the un-grantable core, de-duplicated and capped.
+ *
+ * Re-derived here rather than trusted from the payload. The platform
+ * normalizes grants too, but this is the machine the values live on, and
+ * "the platform said so" is not a reason to hand a model-driven process a
+ * credential.
+ */
+export function normalizeGrantedPlatformOwnedNames(names: readonly string[] | null | undefined): string[] {
 	if (!Array.isArray(names)) return [];
 	const out: string[] = [];
 	const seen = new Set<string>();
@@ -715,7 +817,8 @@ export function normalizePassthrough(names: readonly string[] | null | undefined
 		if (typeof raw !== 'string') continue;
 		const name = raw.trim();
 		if (!NODE_ENV_NAME_PATTERN.test(name)) continue;
-		if (NODE_PLATFORM_OWNED_ENV_PATTERN.test(name)) continue;
+		if (name.includes('*') || name.includes('?')) continue;
+		if (NODE_UNGRANTABLE_ENV_PATTERN.test(name)) continue;
 		const upper = name.toUpperCase();
 		if (seen.has(upper)) continue;
 		seen.add(upper);

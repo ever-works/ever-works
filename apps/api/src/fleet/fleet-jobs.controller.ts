@@ -7,18 +7,26 @@ import {
     ParseUUIDPipe,
     Post,
     UnauthorizedException,
+    UnprocessableEntityException,
     UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type {
     FleetJobCompleteResponse,
+    FleetJobEnvFilesResponse,
     FleetJobHeartbeatResponse,
     FleetJobLeaseResponse,
 } from '@ever-works/contracts';
 import { FleetJobService } from '@ever-works/agent/fleet';
 import { Public } from '../auth/decorators/public.decorator';
-import { CompleteFleetJobDto, FleetJobHeartbeatDto, LeaseFleetJobsDto } from './dto/fleet-job.dto';
+import {
+    CompleteFleetJobDto,
+    FleetJobEnvFilesDto,
+    FleetJobHeartbeatDto,
+    LeaseFleetJobsDto,
+} from './dto/fleet-job.dto';
+import { FleetRunSecretsError, FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
 import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
 
@@ -46,6 +54,22 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  *   POST /api/fleet/jobs/lease          atomic CAS claim, capability-filtered
  *   POST /api/fleet/jobs/:id/heartbeat  extend the claim (leased → running)
  *   POST /api/fleet/jobs/:id/complete   report success or failure
+ *   POST /api/fleet/jobs/:id/env-files  fetch the run's seed .env contents
+ *
+ * The fourth route (run secrets, self-build slice Y) takes the SAME
+ * posture, deliberately: it is the only place a decrypted secret leaves
+ * the platform for a node, so it proves the claim with the same four
+ * checks `complete` uses (credential, recorded holder, active status,
+ * current lease generation) rather than inventing a second scheme. Its
+ * REQUEST carries only registry row ids and file paths; the response body
+ * is the one value-bearing shape in the whole channel, and nothing about
+ * it is persisted, logged or echoed into the job.
+ *
+ * A resolution refusal (`FleetRunSecretsError` — unknown/disabled row, a
+ * path the row no longer carries, a decrypt failure, the instance kill
+ * switch) answers 422 with a STABLE machine token, never a partial file
+ * list: a run that starts with half its environment fails as if the code
+ * were broken, which is the failure this route exists to remove.
  *
  * Throttles are sized for polling: a node with a 5-second idle poll
  * needs ~12 lease calls/minute, and job heartbeats fire at a third of
@@ -69,7 +93,10 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
 @Controller('api/fleet/jobs')
 @UseGuards(FleetEnabledGuard, FleetNodeAuthGuard)
 export class FleetJobsController {
-    constructor(private readonly service: FleetJobService) {}
+    constructor(
+        private readonly service: FleetJobService,
+        private readonly runSecrets: FleetRunSecretsService,
+    ) {}
 
     @Public()
     @Post('lease')
@@ -144,5 +171,43 @@ export class FleetJobsController {
             throw new UnauthorizedException('Invalid node credential');
         }
         return { ok: true, job };
+    }
+
+    @Public()
+    @Post(':id/env-files')
+    @ApiOperation({
+        summary:
+            'Fetch the decrypted seed .env files this run needs (public, node-secret-authenticated). Request carries repository registry row ids and repository-relative PATHS; the response carries their contents, which the node writes 0600 inside the checkout, keeps out of Git, and deletes when the run ends. Only the recorded holder of an active job, echoing the current leaseGeneration, is served. A reference that cannot be resolved fails the delivery whole, with a stable reason.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async envFiles(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetJobEnvFilesDto,
+    ): Promise<FleetJobEnvFilesResponse> {
+        let response: FleetJobEnvFilesResponse | null;
+        try {
+            response = await this.runSecrets.resolve({
+                nodeId: body.nodeId,
+                secret: body.secret,
+                jobId: id,
+                leaseGeneration: body.leaseGeneration,
+                refs: body.refs,
+            });
+        } catch (error) {
+            // The stable token, and only the stable token. A refusal here
+            // has already been logged server-side with the job id; the node
+            // gets a reason it can report, never a crypto or row detail.
+            if (error instanceof FleetRunSecretsError) {
+                throw new UnprocessableEntityException({ reason: error.reason });
+            }
+            // `FleetJobStaleLeaseError` propagates untouched, as 409
+            // `{ reason: 'stale-lease' }` — same as heartbeat and complete.
+            throw error;
+        }
+        if (!response) {
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return response;
     }
 }

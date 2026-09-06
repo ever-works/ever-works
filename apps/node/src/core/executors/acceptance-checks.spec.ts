@@ -299,3 +299,83 @@ describe('buildNodeCheckEnv — a check never inherits this machine', () => {
 		expect(buildNodeCheckEnv(undefined, parent).CI).toBe('1');
 	});
 });
+
+/**
+ * Per-repository env grants (run secrets, self-build slice Y, EW-781).
+ *
+ * `NODE_PLATFORM_OWNED_ENV_PATTERN` is a PREFIX regex, and the grant that
+ * opens it is an EXACT name. That asymmetry is the entire security of the
+ * feature: matched by prefix, one `DATABASE_URL` grant would also hand
+ * over `DATABASE_PASSWORD`. Every adjacent-name case below exists because
+ * getting this wrong is silent.
+ */
+describe('buildNodeCheckEnv — per-repository grants open the platform-owned refusal', () => {
+	const parent: NodeJS.ProcessEnv = {
+		PATH: '/usr/bin',
+		DATABASE_URL: 'postgres://user:pw@host/db',
+		DATABASE_URL_REPLICA: 'postgres://user:pw@replica/db',
+		DATABASE_HOST: 'db.internal',
+		DATABASE_PASSWORD: 'pw',
+		database_url_extra: 'lowercase-adjacent',
+		GH_TOKEN: 'gho_realtoken',
+		FLEET_NODE_SECRET: 'the-node-credential',
+		EVER_WORKS_API_KEY: 'platform-key',
+		PLUGIN_SECRET_ENCRYPTION_KEY: 'the-key-that-decrypts-every-tenant',
+		BETTER_AUTH_SECRET: 'session-signing',
+		PLATFORM_ADMIN_TOKEN: 'admin'
+	};
+
+	it('admits EXACTLY the granted name and nothing adjacent to it', () => {
+		const env = buildNodeCheckEnv(undefined, parent, ['DATABASE_URL']);
+		expect(env.DATABASE_URL).toBe('postgres://user:pw@host/db');
+		expect(env.DATABASE_URL_REPLICA).toBeUndefined();
+		expect(env.DATABASE_HOST).toBeUndefined();
+		expect(env.DATABASE_PASSWORD).toBeUndefined();
+		expect(env.database_url_extra).toBeUndefined();
+	});
+
+	it('admits a granted name even when the instance passthrough never mentions it', () => {
+		// A grant is a permission in its own right, not a filter over the
+		// instance-global list.
+		expect(buildNodeCheckEnv([], parent, ['GH_TOKEN']).GH_TOKEN).toBe('gho_realtoken');
+	});
+
+	it('with NO grants, behaves exactly as it did before this slice', () => {
+		const env = buildNodeCheckEnv(['DATABASE_URL', 'GH_TOKEN'], parent);
+		expect(env.DATABASE_URL).toBeUndefined();
+		expect(env.GH_TOKEN).toBeUndefined();
+		expect(buildNodeCheckEnv(['DATABASE_URL'], parent, []).DATABASE_URL).toBeUndefined();
+		expect(buildNodeCheckEnv(['DATABASE_URL'], parent, null).DATABASE_URL).toBeUndefined();
+	});
+
+	it.each([
+		'FLEET_NODE_SECRET',
+		'EVER_WORKS_API_KEY',
+		'PLUGIN_SECRET_ENCRYPTION_KEY',
+		'BETTER_AUTH_SECRET',
+		'PLATFORM_ADMIN_TOKEN'
+	])('never admits %s, however explicitly it is granted', (name) => {
+		// The un-grantable core. `FLEET_`/`EVER_WORKS_` is the credential
+		// that leases work on this machine; `PLUGIN_` decrypts every
+		// tenant's env files; the rest sign platform sessions. Opening any
+		// of them turns "read one secret" into "become the platform".
+		const env = buildNodeCheckEnv([name], parent, [name]);
+		expect(env[name]).toBeUndefined();
+	});
+
+	it('ignores a wildcard grant rather than expanding it', () => {
+		const env = buildNodeCheckEnv(undefined, parent, ['DATABASE_*', '*']);
+		expect(env.DATABASE_URL).toBeUndefined();
+		expect(env.DATABASE_PASSWORD).toBeUndefined();
+	});
+
+	it('matches case-insensitively, because Windows env names are', () => {
+		expect(buildNodeCheckEnv(undefined, parent, ['database_url']).DATABASE_URL).toBe('postgres://user:pw@host/db');
+	});
+
+	it('does not let a grant leak into the instance-global list for other repositories', () => {
+		// Two calls, one grant set each: the second must not see the first's.
+		buildNodeCheckEnv(undefined, parent, ['DATABASE_URL']);
+		expect(buildNodeCheckEnv(undefined, parent, ['GH_TOKEN']).DATABASE_URL).toBeUndefined();
+	});
+});

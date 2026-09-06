@@ -37,6 +37,10 @@ function makeRow(overrides: Partial<RepoConnection> = {}): RepoConnection {
         credentialMode: 'inherit',
         credentialRef: null,
         envFiles: null,
+        // Explicit, not omitted: the `as RepoConnection` cast below would
+        // otherwise hide a missing column, and "this repository grants
+        // nothing" is the default every assertion here relies on.
+        envGrants: null,
         availableInAllProjects: true,
         sourceType: 'manual',
         sourceWorkId: null,
@@ -511,6 +515,7 @@ describe('provisioning resolver', () => {
                 mountPath: null,
                 defaultBranch: 'develop',
                 envFiles: { '.env': 'A=1' },
+                envGrants: ['DATABASE_URL'],
             }),
         },
         {
@@ -534,6 +539,11 @@ describe('provisioning resolver', () => {
                 branch: 'develop',
                 mountDir: 'api',
                 envFiles: [{ path: '.env', content: 'A=1' }],
+                // Run secrets (slice Y): the fleet planner describes a
+                // workspace from the PATHS and never touches `envFiles`, and
+                // the grants ride the payload as names.
+                envFilePaths: ['.env'],
+                envGrants: ['DATABASE_URL'],
                 provider: 'github',
             },
         ]);
@@ -579,5 +589,119 @@ describe('provisioning resolver', () => {
         );
         expect(specs).toEqual([{ url: 'https://github.com/acme/my-service', mountDir: 'web' }]);
         expect(specs[0]).not.toHaveProperty('branch');
+    });
+});
+
+/**
+ * Run secrets (self-build slice Y, EW-781) — per-repository env grants.
+ *
+ * A grant is the operator saying "agent-driven code running for this
+ * repository may read THIS variable's value from the runner's own
+ * environment". The refusals below are the whole security of the feature,
+ * so each is pinned rather than left to the shared normalizer.
+ */
+describe('per-repository env grants', () => {
+    it('persists an operator grant and returns it UNMASKED (a permission is not a secret)', async () => {
+        const { service, repoConnections } = makeMocks();
+        const view = await service.create(USER, {
+            name: 'platform',
+            url: 'https://github.com/ever-works/ever-works',
+            envGrants: ['DATABASE_URL', 'GH_TOKEN'],
+        });
+        expect(repoConnections.create).toHaveBeenCalledWith(
+            expect.objectContaining({ envGrants: ['DATABASE_URL', 'GH_TOKEN'] }),
+        );
+        expect(view.envGrants).toEqual(['DATABASE_URL', 'GH_TOKEN']);
+    });
+
+    it('defaults to granting nothing, which is exactly the pre-slice behaviour', async () => {
+        const { service, repoConnections } = makeMocks();
+        const view = await service.create(USER, {
+            name: 'plain',
+            url: 'https://github.com/acme/plain',
+        });
+        expect(repoConnections.create).toHaveBeenCalledWith(
+            expect.objectContaining({ envGrants: null }),
+        );
+        expect(view.envGrants).toEqual([]);
+    });
+
+    it.each([
+        ['the node credential namespace', 'FLEET_NODE_SECRET'],
+        ['the platform namespace', 'EVER_WORKS_API_KEY'],
+        ['the env-file decryption key', 'PLUGIN_SECRET_ENCRYPTION_KEY'],
+        ['session signing', 'BETTER_AUTH_SECRET'],
+    ])('refuses a grant naming %s', async (_label, name) => {
+        const { service } = makeMocks();
+        await expect(
+            service.create(USER, {
+                name: 'x',
+                url: 'https://github.com/acme/x',
+                envGrants: [name],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('refuses a wildcard rather than expanding it into a family', async () => {
+        const { service } = makeMocks();
+        await expect(
+            service.create(USER, {
+                name: 'x',
+                url: 'https://github.com/acme/x',
+                envGrants: ['DATABASE_*'],
+            }),
+        ).rejects.toThrow(/wildcard/i);
+    });
+
+    it('refuses a duplicate and an over-long list', async () => {
+        const { service } = makeMocks();
+        await expect(
+            service.create(USER, {
+                name: 'x',
+                url: 'https://github.com/acme/x',
+                envGrants: ['DATABASE_URL', 'database_url'],
+            }),
+        ).rejects.toThrow(/Duplicate env grant/);
+        await expect(
+            service.create(USER, {
+                name: 'x',
+                url: 'https://github.com/acme/x',
+                envGrants: Array.from({ length: 33 }, (_, i) => `VAR_${i}`),
+            }),
+        ).rejects.toThrow(/At most 32 env grants/);
+    });
+
+    it('REVOKES on update: an emptied list is persisted as null and stops applying', async () => {
+        const { service, repoConnections } = makeMocks();
+        const row = makeRow({ envGrants: ['DATABASE_URL'] });
+        repoConnections.findByIdAndUser.mockResolvedValue(row);
+        const view = await service.update(USER, 'rc-1', { envGrants: [] });
+        expect(repoConnections.save).toHaveBeenCalledWith(
+            expect.objectContaining({ envGrants: null }),
+        );
+        expect(view.envGrants).toEqual([]);
+        // And the provisioning resolver — the ONE place the fleet planner
+        // reads grants from — now reports nothing for this repository, so
+        // the next run is planned without it.
+        expect(
+            mapAttachmentEdgesToRepos([
+                { repoConnectionId: 'rc-1', enabled: true, repoConnection: row },
+            ] as never)[0].envGrants,
+        ).toEqual([]);
+    });
+
+    it('re-normalizes a row edited outside the API so the runner never sees an ungrantable name', () => {
+        // A row written straight into the database (or by an older build)
+        // must not be able to hand a runner a name the validator refuses.
+        const resolved = mapAttachmentEdgesToRepos([
+            {
+                repoConnectionId: 'rc-1',
+                enabled: true,
+                repoConnection: makeRow({
+                    envGrants: ['DATABASE_URL', 'FLEET_NODE_SECRET', '*'] as string[],
+                }),
+            },
+        ] as never);
+        expect(resolved[0].envGrants).toEqual(['DATABASE_URL']);
     });
 });

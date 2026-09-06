@@ -43,6 +43,17 @@ flowchart LR
     A --> D
 ```
 
+:::caution Before any of this runs — three gates
+
+Autonomy is real, but none of it is on by default. Three things stand between a new account and the loop above — the first refuses loudly, the second can answer success while doing nothing at all:
+
+1. **The Work agent is off until you switch it on.** **Enable Work agent** on `/settings/work-agent` is unchecked on every new account, and it gates both build paths — the **Build** button on an [Idea](./ideas.md) and a [Mission](./missions.md)'s auto-build alike. While it is off the API answers `400 "Work agent is disabled."`, and a Mission tick queues Ideas that never become Works without telling you.
+2. **The Idea → Work build executor is operator-gated.** `EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED` defaults off and `EVER_WORKS_IDEA_BUILD_EXECUTOR_DRY_RUN` defaults on, so **Build** can answer success while nothing executes. That flag is yours if you self-host; on managed hosting it is the platform operator's.
+3. **The first deploy is a human action.** No code path publishes a freshly generated Work on its own — you deploy it once from the Work's **Deploy** tab. [Scheduled Updates](./scheduled-updates.md) keep the site fresh only after that first deploy.
+
+[Build a Site Fully Autonomously from a Template](../guides/autonomous-site-from-template.md) walks all three end to end — where each switch lives, what to set it to, and what the loop looks like when one of them is still off.
+:::
+
 ## You stay in control
 
 Autonomy is opt-in and bounded:
@@ -62,3 +73,4 @@ Because code and content both live in **your Git repositories**, autonomous oper
 - [Missions](./missions.md) · [Ideas](./ideas.md) · [Agents](./agents.md)
 - [Scheduled Updates](./scheduled-updates.md) · [Workers](./workers.md)
 - [Knowledge Base & Memory](./knowledge-base.md) · [Budgets & Usage](./budgets-and-usage.md)
+- Guide: [Build a Site Fully Autonomously from a Template](../guides/autonomous-site-from-template.md) — the standing loop end to end, and the three gates that must be open first

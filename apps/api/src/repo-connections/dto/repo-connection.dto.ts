@@ -103,6 +103,26 @@ export class CreateRepoConnectionDto {
     @Type(() => RepoConnectionEnvFileDto)
     envFiles?: RepoConnectionEnvFileDto[];
 
+    @ApiPropertyOptional({
+        type: [String],
+        maxItems: 32,
+        description:
+            'Env var NAMES the runs of this repository may read from the runner own environment, THROUGH ' +
+            'the runner platform-owned refusal. One exact name each — there is no wildcard and no prefix ' +
+            'form — and never a platform-internal namespace (FLEET_, EVER_WORKS_, PLUGIN_, AUTH_, ' +
+            'BETTER_AUTH_, PLATFORM_). Names only; values never leave the machine that holds them.',
+        example: ['DATABASE_URL', 'GH_TOKEN'],
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(32)
+    @IsString({ each: true })
+    @Matches(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/, {
+        each: true,
+        message: 'each env grant must be an environment variable name (no wildcards)',
+    })
+    envGrants?: string[];
+
     @ApiPropertyOptional({ default: true })
     @IsOptional()
     @IsBoolean()
@@ -172,6 +192,26 @@ export class UpdateRepoConnectionDto {
     @ValidateNested({ each: true })
     @Type(() => RepoConnectionEnvFileDto)
     envFiles?: RepoConnectionEnvFileDto[];
+
+    @ApiPropertyOptional({
+        type: [String],
+        maxItems: 32,
+        description:
+            'Env var NAMES the runs of this repository may read from the runner own environment, THROUGH ' +
+            'the runner platform-owned refusal. One exact name each — there is no wildcard and no prefix ' +
+            'form — and never a platform-internal namespace (FLEET_, EVER_WORKS_, PLUGIN_, AUTH_, ' +
+            'BETTER_AUTH_, PLATFORM_). Names only; values never leave the machine that holds them.',
+        example: ['DATABASE_URL', 'GH_TOKEN'],
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(32)
+    @IsString({ each: true })
+    @Matches(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/, {
+        each: true,
+        message: 'each env grant must be an environment variable name (no wildcards)',
+    })
+    envGrants?: string[];
 
     @ApiPropertyOptional()
     @IsOptional()

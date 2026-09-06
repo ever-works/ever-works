@@ -40,7 +40,21 @@ export type FleetErrorKind =
 	 * the job than the one this node is renewing or finalizing (suspend-safe
 	 * leases). The claim is void; the worker aborts the run at once.
 	 */
-	| 'stale-lease';
+	| 'stale-lease'
+	/**
+	 * 422 from the run-secrets fetch (self-build slice Y): the node IS the
+	 * authenticated holder of an active job, and the platform still could
+	 * not resolve what the job asked for — an unknown or disabled
+	 * repository connection, a path the row no longer carries, a decrypt
+	 * failure, or the instance kill switch.
+	 *
+	 * Kept apart from `invalid-request` because it is not a malformed call
+	 * and retrying it unchanged will not help: the run must fail, closed,
+	 * rather than start with a partial environment. The precise reason is
+	 * logged platform-side against the job id; this client does not read
+	 * server bodies, here or anywhere else.
+	 */
+	| 'unresolved';
 
 export class FleetClientError extends Error {
 	readonly kind: FleetErrorKind;

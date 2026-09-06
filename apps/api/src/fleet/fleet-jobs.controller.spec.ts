@@ -1,7 +1,12 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+    ConflictException,
+    UnauthorizedException,
+    UnprocessableEntityException,
+} from '@nestjs/common';
 import type { FleetJobView } from '@ever-works/contracts';
 import { FLEET_JOB_STALE_LEASE_REASON } from '@ever-works/contracts';
 import { FleetJobsController } from './fleet-jobs.controller';
+import { FleetRunSecretsError, FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetJobStaleLeaseError } from '@ever-works/agent/fleet';
 import type { FleetJobService } from '@ever-works/agent/fleet';
 
@@ -22,6 +27,8 @@ import type { FleetJobService } from '@ever-works/agent/fleet';
 const NODE_ID = '11111111-1111-4111-8111-111111111111';
 const JOB_ID = '22222222-2222-4222-8222-222222222222';
 const SECRET = 'a'.repeat(43);
+/** A repository registry row id (run secrets, slice Y). */
+const ROW_ID = '33333333-3333-4333-8333-333333333333';
 /** The claim identity every heartbeat/complete body must carry (suspend-safe leases). */
 const GENERATION = 3;
 // Frozen: `jobView()` is called on both sides of several assertions, and a
@@ -46,8 +53,14 @@ function jobView(overrides: Partial<FleetJobView> = {}): FleetJobView {
     };
 }
 
-function makeController(service: Partial<FleetJobService>): FleetJobsController {
-    return new FleetJobsController(service as FleetJobService);
+function makeController(
+    service: Partial<FleetJobService>,
+    runSecrets: Partial<FleetRunSecretsService> = { resolve: jest.fn(async () => null) },
+): FleetJobsController {
+    return new FleetJobsController(
+        service as FleetJobService,
+        runSecrets as FleetRunSecretsService,
+    );
 }
 
 describe('FleetJobsController', () => {
@@ -253,11 +266,93 @@ describe('FleetJobsController', () => {
                     success: true,
                     leaseGeneration: GENERATION,
                 }),
+            // Run secrets (slice Y) is the FOURTH route on this channel and
+            // must not become the one that says something different.
+            () =>
+                controller.envFiles(JOB_ID, {
+                    nodeId: NODE_ID,
+                    secret: SECRET,
+                    leaseGeneration: GENERATION,
+                    refs: [{ repoConnectionId: ROW_ID, paths: ['.env'] }],
+                }),
         ]) {
             await call().catch((error: Error) => messages.push(error.message));
         }
 
-        expect(messages).toHaveLength(3);
+        expect(messages).toHaveLength(4);
         expect(new Set(messages).size).toBe(1);
+    });
+
+    /**
+     * Run secrets (self-build slice Y, EW-781) — the only route on this
+     * channel that returns a decrypted secret. It keeps the channel's two
+     * existing answers (one 401, one 409 stale-lease) and adds exactly one
+     * of its own: a 422 carrying a STABLE reason token, which is reachable
+     * only by the authenticated holder of an active job.
+     */
+    describe('POST /api/fleet/jobs/:id/env-files', () => {
+        const body = {
+            nodeId: NODE_ID,
+            secret: SECRET,
+            leaseGeneration: GENERATION,
+            refs: [{ repoConnectionId: ROW_ID, paths: ['apps/api/.env'] }],
+        };
+
+        it('returns the resolved files and forwards the claim as the node sent it', async () => {
+            const resolve = jest.fn(async () => ({
+                files: [{ repoConnectionId: ROW_ID, path: 'apps/api/.env', content: 'A=1' }],
+            }));
+            const controller = makeController({}, { resolve });
+            await expect(controller.envFiles(JOB_ID, body)).resolves.toEqual({
+                files: [{ repoConnectionId: ROW_ID, path: 'apps/api/.env', content: 'A=1' }],
+            });
+            expect(resolve).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                jobId: JOB_ID,
+                leaseGeneration: GENERATION,
+                refs: body.refs,
+            });
+        });
+
+        it('collapses a refused claim to the SAME 401 as every other route', async () => {
+            const controller = makeController({}, { resolve: jest.fn(async () => null) });
+            await expect(controller.envFiles(JOB_ID, body)).rejects.toBeInstanceOf(
+                UnauthorizedException,
+            );
+        });
+
+        it('answers 422 with the stable reason token, and nothing else', async () => {
+            const controller = makeController(
+                {},
+                {
+                    resolve: jest.fn(async () => {
+                        throw new FleetRunSecretsError('run-secrets-unresolved');
+                    }),
+                },
+            );
+            const error = await controller.envFiles(JOB_ID, body).catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(UnprocessableEntityException);
+            expect((error as UnprocessableEntityException).getStatus()).toBe(422);
+            expect((error as UnprocessableEntityException).getResponse()).toMatchObject({
+                reason: 'run-secrets-unresolved',
+            });
+        });
+
+        it('lets a stale lease surface as the channel-wide 409, not as a 422', async () => {
+            const controller = makeController(
+                {},
+                {
+                    resolve: jest.fn(async () => {
+                        throw new FleetJobStaleLeaseError();
+                    }),
+                },
+            );
+            const error = await controller.envFiles(JOB_ID, body).catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).getResponse()).toMatchObject({
+                reason: FLEET_JOB_STALE_LEASE_REASON,
+            });
+        });
     });
 });

@@ -345,6 +345,28 @@ describe('agent/config', () => {
             );
         });
 
+        describe('isRunEnvFilesEnabled (run secrets, self-build slice Y)', () => {
+            it('defaults ON — the feature is already opt-in per repository', () => {
+                expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(true);
+            });
+
+            it.each(['false', 'FALSE', '0', ' false '])(
+                'is switched off by %s, so a run that needs env files fails closed',
+                (value) => {
+                    process.env.FLEET_NODE_RUN_ENV_FILES = value;
+                    expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(false);
+                },
+            );
+
+            it.each(['true', '1', '', 'yes'])(
+                'stays ON for %s — only an explicit off switches it off',
+                (value) => {
+                    process.env.FLEET_NODE_RUN_ENV_FILES = value;
+                    expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(true);
+                },
+            );
+        });
+
         describe('getQueuedMaxAgeSeconds (queue SLA, self-build slice S)', () => {
             const KINDS = ['agent-task', 'acceptance-checks', 'browser-check'] as const;
 

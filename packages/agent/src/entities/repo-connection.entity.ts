@@ -44,6 +44,13 @@ export type RepoConnectionSourceType = 'manual' | 'work' | 'github-app';
 export const REPO_CONNECTION_ENV_FILE_MAX_COUNT = 8;
 export const REPO_CONNECTION_ENV_FILE_MAX_CONTENT_BYTES = 32 * 1024;
 
+/**
+ * Cap on the `envGrants` list (self-build slice Y). Mirrors the runner's
+ * own `MAX_ENV_PASSTHROUGH`, so a list the registry accepts can never be
+ * silently truncated on the machine that applies it.
+ */
+export const REPO_CONNECTION_ENV_GRANT_MAX_COUNT = 32;
+
 /** A single, traversal-free directory segment. */
 export const REPO_CONNECTION_MOUNT_DIR_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 
@@ -169,6 +176,26 @@ export class RepoConnection {
      */
     @EncryptedJsonColumn({ nullable: true })
     envFiles?: Record<string, string> | null;
+
+    /**
+     * Env var NAMES this repository's runs may read from the RUNNER's own
+     * environment, through the runner's platform-owned refusal (self-build
+     * slice Y). Names only — deliberately NOT encrypted, because a grant is
+     * not a secret and an operator (and an auditor) must be able to read,
+     * grep and diff exactly which variables a repository was allowed.
+     *
+     * `null` / `[]` is the default and reproduces today's behaviour: the
+     * runner refuses every platform-owned name. Each entry is one EXACT
+     * name; there is no wildcard and no prefix form, so granting
+     * `DATABASE_URL` admits `DATABASE_URL` and not `DATABASE_URL_REPLICA`.
+     * Names in the un-grantable core (`FLEET_`, `EVER_WORKS_`, `PLUGIN_`,
+     * `AUTH_`, `BETTER_AUTH_`, `PLATFORM_`) are refused at write time AND
+     * ignored at use time — see `FLEET_RUN_ENV_UNGRANTABLE_PATTERN`.
+     *
+     * Capped at {@link REPO_CONNECTION_ENV_GRANT_MAX_COUNT}.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    envGrants?: string[] | null;
 
     /** When true, the repo is offered everywhere without an explicit attach. */
     @Column({ type: 'boolean', default: true })

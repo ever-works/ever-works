@@ -14,9 +14,9 @@ curated public catalog from the [`ever-works/skills`](https://github.com/ever-wo
 GitHub repo.
 
 This page covers the catalog **format**, the first-party provider
-**plugin**, and how Skills **attach to Agents**. For the REST endpoints
-(catalog reads, per-user installs), see the
-[Skills API](/api/skills).
+**plugin**, the sixteen built-in **go-to-market Skills**, and how Skills
+**attach to Agents**. For the REST endpoints (catalog reads, per-user
+installs), see the [Skills API](/api/skills).
 
 :::note Where to find it
 Skills have no sidebar entry of their own — nobody browses Skills without an
@@ -35,6 +35,8 @@ the per-Agent **Skills** tab on an Agent's detail page.
 - `packages/plugins/everworks-skills/package.json` — plugin manifest (`autoEnable`, capability)
 - [`ever-works/skills`](https://github.com/ever-works/skills) — the public catalog repo (`manifest.json` + `skills/<slug>/SKILL.md`)
 - `ever-works/agents` → `schema/skills.schema.json` — the `skills.yml` attach schema
+- `packages/contracts/src/skills/gtm-skills.ts` — the sixteen first-party go-to-market Skills
+- `packages/plugins/everworks-skills/src/gtm-catalog.ts` — how those definitions become catalog entries
 
 ## The `SKILL.md` format
 
@@ -142,6 +144,66 @@ manual step, and `defaultForCapabilities` makes it the default resolver
 for the `skills-provider` capability — so the curated catalog is
 available out of the box.
 
+## Go-to-market Skills
+
+Sixteen first-party Skills ship **inside the platform** rather than in the
+catalog repo. They are typed definitions in `@ever-works/contracts`
+(`packages/contracts/src/skills/gtm-skills.ts`), projected into ordinary
+catalog entries by the first-party skills provider — so they install,
+render and attach through exactly the same path as a `SKILL.md` from the
+public [`ever-works/skills`](https://github.com/ever-works/skills) repo,
+and **a published Skill with the same slug wins over the built-in one**.
+
+Two things follow from that, both visible in
+`packages/plugins/everworks-skills/src/gtm-catalog.ts`:
+
+- **The contract becomes the body.** The projection renders each
+  definition's declared inputs and outputs as an **Inputs** table and an
+  **Outputs** table above the instruction text, and keeps `stage`, `inputs`
+  and `outputs` as extra frontmatter keys — which the parser preserves
+  verbatim — so a Skill's contract survives install and stays inspectable.
+- **The pack is served on both catalog paths.** The sixteen are unioned
+  into the live `manifest.json` listing _and_ into the `BUILTIN_CATALOG`
+  fallback described above, so they are available whether or not the
+  catalog repo is reachable.
+
+| Stage       | Skill                    | Slug                       | What it produces                                                                       |
+| ----------- | ------------------------ | -------------------------- | -------------------------------------------------------------------------------------- |
+| `research`  | Lead research            | `lead-research`            | `contacts` — name, company, title and a source reference; no source, no lead.          |
+| `research`  | Competitor watch         | `competitor-watch`         | `signals` — dated observations, each with a source URL and the focus area it hits.     |
+| `research`  | News signal detection    | `news-signal-detection`    | `signals` — relevance-ranked news items with source URL and publish date.              |
+| `qualify`   | Lead scoring             | `lead-scoring`             | `scored_contacts` — a `score` of 0–100 plus `scoreReasons` per contact.                |
+| `qualify`   | Risk filter              | `risk-filter`              | `scored_contacts` again, now carrying `riskScore`, `riskReasons` and an excluded flag. |
+| `draft`     | Outreach personalization | `outreach-personalization` | `drafts` — one per contact, each with `ref`, `channel`, `subject` and `body`.          |
+| `draft`     | Newsletter drafting      | `newsletter-drafting`      | `drafts` — a single issue: subject line plus sectioned body.                           |
+| `draft`     | Social scheduling        | `social-scheduling`        | `drafts` — channel-fit posts, each with its planned slot in the calendar.              |
+| `draft`     | Digest compilation       | `digest-compilation`       | `drafts` — a digest of sections, change highlights and a trend view.                   |
+| `act`       | CRM sync hygiene         | `crm-sync-hygiene`         | `action_log` — prepared record writes, each with its field diff and reason.            |
+| `follow-up` | Follow-up cadence        | `follow-up-cadence`        | `follow_up_queue` — queued touches with a due offset and the rationale for each.       |
+| `follow-up` | Reply detection          | `reply-detection`          | `reply_state` — per-thread classification, confidence and routing decision.            |
+| `enrich`    | Contact enrichment       | `contact-enrichment`       | `enriched_contacts` — filled fields with a source note recorded per fill.              |
+| `measure`   | Search-visibility audit  | `seo-audit`                | `campaign_report` — prioritized findings with page reference, impact and fix.          |
+| `measure`   | Campaign reporting       | `campaign-reporting`       | `campaign_report` — counted totals, insights and next-cycle variant hints.             |
+| `measure`   | Engagement analysis      | `engagement-analysis`      | `campaign_report` — per-variant and per-segment engagement with a confidence call.     |
+
+Output keys repeat on purpose: three `measure` Skills all write
+`campaign_report`, and `risk-filter` reads and rewrites the same
+`scored_contacts` that `lead-scoring` produced. The keys are the
+go-to-market pipeline's own stage vocabulary, so a Skill's contract can be
+read straight against the stage that invokes it.
+
+:::note No Skill for the `review` stage
+The pack covers seven of the pipeline's eight stages. There is deliberately
+**no Skill for `review`** — that stage is a human gate, not a prompt. See
+[Campaigns](./campaigns.md) for how the gate and its approvals work.
+:::
+
+Where to find them: the same **Skills** block at the bottom of **Sidebar →
+Teams → Agents** (`/agents#skills`) as every other Skill — same tabs, same
+search, same install and attach path — and on an Agent's own **Skills** tab.
+The prebuilt go-to-market Agent templates already name these slugs as their
+suggested Skills.
+
 ## Attaching Skills to Agents
 
 An Agent template declares which Skills it wants via a `skills.yml`
@@ -184,3 +246,5 @@ haven't landed in the catalog.
 - [Agents Catalog](./agents-catalog.md) — the starter-agent templates that
   ship the `skills.yml` manifests.
 - [Agents (Your AI Employees)](./agents.md) — the Agent product concept.
+- [Campaigns](./campaigns.md) — the go-to-market Work the sixteen built-in
+  Skills were written for, and the pipeline stages they map onto.

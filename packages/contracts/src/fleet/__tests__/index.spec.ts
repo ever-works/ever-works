@@ -159,6 +159,27 @@ const WORKSPACE_EXPORTS = [
 	'isReservedMountDir'
 ] as const;
 
+/** Run secrets: envFiles by reference + per-repository grants (slice Y, `fleet-run-secrets.types.js`). */
+const RUN_SECRETS_EXPORTS = [
+	'FLEET_RUN_ENV_FILE_MAX_COUNT',
+	'FLEET_RUN_ENV_FILE_MAX_CONTENT_BYTES',
+	'FLEET_RUN_ENV_FILES_MAX_TOTAL_BYTES',
+	'FLEET_RUN_ENV_FILE_REFS_MAX_COUNT',
+	'FLEET_RUN_ENV_FILE_PATH_PATTERN',
+	'FLEET_RUN_ENV_GRANT_MAX_COUNT',
+	'FLEET_RUN_ENV_GRANT_NAME_PATTERN',
+	'FLEET_RUN_ENV_UNGRANTABLE_PATTERN',
+	'FLEET_RUN_SECRETS_UNRESOLVED_REASON',
+	'FLEET_RUN_SECRETS_DECRYPT_FAILED_REASON',
+	'FLEET_RUN_SECRETS_DISABLED_REASON',
+	'FLEET_RUN_SECRETS_UNAVAILABLE_REASON',
+	'FleetRunEnvFileError',
+	'isValidFleetRunEnvFilePath',
+	'isGrantableFleetRunEnvName',
+	'normalizeFleetRunEnvFileRefs',
+	'normalizeFleetRunEnvGrants'
+] as const;
+
 /** Owner question from a fleet run (self-build slice Q, `fleet-jobs.types.js`). */
 const QUESTION_EXPORTS = [
 	'FLEET_AGENT_TASK_META_DIR',
@@ -186,6 +207,7 @@ const ALL_EXPORTS = [
 	...NODE_EXPORTS,
 	...RUNNER_STATUS_EXPORTS,
 	...WORKSPACE_EXPORTS,
+	...RUN_SECRETS_EXPORTS,
 	...QUESTION_EXPORTS
 ];
 
@@ -218,6 +240,11 @@ const FUNCTION_EXPORTS = [
 	'FleetTaskWorkspaceMountError',
 	'normalizeFleetTaskWorkspaceMounts',
 	'isReservedMountDir',
+	'FleetRunEnvFileError',
+	'isValidFleetRunEnvFilePath',
+	'isGrantableFleetRunEnvName',
+	'normalizeFleetRunEnvFileRefs',
+	'normalizeFleetRunEnvGrants',
 	'parseFleetAgentTaskQuestionMarkdown',
 	'normalizeFleetAgentTaskQuestion',
 	'normalizeFleetNodeWorkerState'
@@ -235,7 +262,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 121 runtime symbols', () => {
+	it('exposes exactly these 138 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -246,8 +273,10 @@ describe('fleet barrel', () => {
 		// → 121 with the credential lifecycle (EW-799): the three rotation-
 		// overlap bounds. Both groups live in `fleet-node.types.ts`, an
 		// existing module, so the witness table below needs no new row.
+		// → 138 with run secrets (EW-781): the twelve constants and five
+		// helpers of `fleet-run-secrets.types.ts`, pinned in their own spec.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(121);
+		expect(Object.keys(fleet)).toHaveLength(138);
 	});
 
 	it.each([
@@ -256,6 +285,7 @@ describe('fleet barrel', () => {
 		['fleet-jobs.types.js', 'FLEET_JOB_STATUSES'],
 		['fleet-node.types.js', 'FLEET_NODE_KINDS'],
 		['fleet-panic.types.js', 'FLEET_KILL_SWITCH_ID'],
+		['fleet-run-secrets.types.js', 'FLEET_RUN_ENV_FILE_MAX_COUNT'],
 		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
 		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {

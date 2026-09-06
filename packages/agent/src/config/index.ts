@@ -336,6 +336,26 @@ export const config = {
                 .map((name) => name.trim())
                 .filter((name) => name.length > 0);
         },
+        /**
+         * Run secrets (self-build slice Y) — the instance kill switch on
+         * delivering a repository's seed `.env` files to a fleet node.
+         *
+         * Default ON, because the feature is opt-in per repository already:
+         * a registry row with no env files delivers nothing, and turning
+         * this off is for an operator who wants the whole PATH shut, not
+         * for narrowing one repository.
+         *
+         * Turning it OFF fails a run that NEEDS env files closed, with
+         * `FLEET_RUN_SECRETS_DISABLED_REASON` — it never starts the run
+         * with a partial environment, because "the suite ran and every
+         * database test failed" is a far worse answer than "the run
+         * refused, here is the setting".
+         */
+        isRunEnvFilesEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_RUN_ENV_FILES || '').trim().toLowerCase();
+            if (raw === 'false' || raw === '0') return false;
+            return true;
+        },
 
         // ── Agent execution v2 — model CLIs on the node ─────────────
         //

@@ -1,5 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type {
+    FleetRunEnvFileRef,
     FleetTaskWorkspaceMountSpec,
     FleetTaskWorkspaceSpec,
     GateStatus,
@@ -7,7 +8,11 @@ import type {
     MergePolicySource,
     MergeRefusalCode,
 } from '@ever-works/contracts';
-import { normalizeFleetTaskWorkspaceMounts } from '@ever-works/contracts';
+import {
+    normalizeFleetRunEnvFileRefs,
+    normalizeFleetRunEnvGrants,
+    normalizeFleetTaskWorkspaceMounts,
+} from '@ever-works/contracts';
 import { TaskStatus, type Task, type TaskLinkedPullRequest } from '../entities/task.entity';
 import type { Work } from '../entities/work.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -30,6 +35,7 @@ import {
     resolveAttachedReposForAgent,
     toAdvisoryRepoSpecs,
     type AdvisoryAttachedRepoSpec,
+    type ResolvedAgentRepo,
 } from '../services/repo-registry.service';
 
 export interface ProvisionedTaskWorkspace {
@@ -313,7 +319,7 @@ export class TaskWorkspaceService {
         }
 
         const repositoryId = `${owner}/${repo}`;
-        const mounts = await this.resolveFleetMounts({
+        const { mounts, envFilesRef: mountEnvRefs } = await this.resolveFleetMounts({
             task,
             agentId: input.agentId,
             userId,
@@ -321,13 +327,165 @@ export class TaskWorkspaceService {
             primaryRepositoryId: repositoryId,
             branch,
         });
+        // Run secrets (slice Y): the PRIMARY repository of a Task is a Work
+        // repository, not a registry row, so it has no env files of its own.
+        // Its `.env` comes from a registry connection the operator added for
+        // the same clone URL — resolved explicitly here rather than skipped,
+        // because the one repository that matters most (the platform
+        // building itself) is exactly the primary.
+        const primaryRef = await this.resolvePrimaryEnvFilesRef(userId, repositoryId);
+        const envFilesRef = normalizeFleetRunEnvFileRefs([
+            ...(primaryRef ? [primaryRef] : []),
+            ...mountEnvRefs,
+        ]);
         return {
             repositoryId,
             repoUrl: tokenFreeCloneUrl(repository.cloneUrl),
             baseRef,
             branch,
             ...(mounts.length > 0 ? { mounts } : {}),
+            ...(envFilesRef.length > 0 ? { envFilesRef } : {}),
         };
+    }
+
+    /**
+     * Run secrets (slice Y) — the registry connection whose clone URL IS
+     * the Task's primary repository, if the operator registered one.
+     *
+     * Returns null when no row matches: a Task whose repository has no
+     * registry entry simply gets no env files, exactly as today. REFUSES
+     * when two enabled rows claim the same repository, naming both — the
+     * alternative is picking one by listing order, and "which `.env` landed
+     * in the checkout" is not a question that may be answered by luck.
+     *
+     * Never reads `envFiles`; only `envFilePaths`, which is why nothing
+     * here can put a decrypted value on the job.
+     */
+    private async resolvePrimaryEnvFilesRef(
+        userId: string,
+        primaryRepositoryId: string,
+    ): Promise<FleetRunEnvFileRef | null> {
+        // No registry wired at all (an in-process caller, a narrower module
+        // graph) is "no registry row for the primary", which is the same
+        // answer an empty registry gives and the behaviour every Task had
+        // before this slice. A registry that IS wired and then FAILS is a
+        // different thing and fails the plan below.
+        if (!this.repoConnections || typeof this.repoConnections.listByUser !== 'function') {
+            return null;
+        }
+        let rows: Awaited<ReturnType<RepoConnectionRepository['listByUser']>>;
+        try {
+            rows = await this.repoConnections.listByUser(userId);
+        } catch (error) {
+            // A registry that cannot be read must not silently mean "no env
+            // files": the run would start with a partial environment, which
+            // is the failure this whole feature exists to remove.
+            throw new Error(
+                `Task primary repository ${primaryRepositoryId} could not be matched against the repository registry: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        const wanted = primaryRepositoryId.toLowerCase();
+        const matches = rows.filter(
+            (row) =>
+                row.enabled &&
+                typeof row.url === 'string' &&
+                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
+        );
+        if (matches.length > 1) {
+            throw new Error(
+                `Repository registry has ${matches.length} enabled connections for the Task's primary repository ` +
+                    `${primaryRepositoryId} (${matches.map((row) => row.name).join(', ')}); ` +
+                    'disable or remove all but one so the run knows whose env files to use.',
+            );
+        }
+        const [connection] = matches;
+        if (!connection) return null;
+        const [resolved] = mapAttachmentEdgesToRepos([
+            { repoConnection: connection } as unknown as AgentRepoAttachment,
+        ]);
+        if (!resolved || resolved.envFilePaths.length === 0) return null;
+        return { repoConnectionId: resolved.repoConnectionId, paths: resolved.envFilePaths };
+    }
+
+    /**
+     * Run secrets (slice Y) — the union of the env-var NAMES every
+     * repository of this run granted.
+     *
+     * Unioned, and the docs say so plainly: a run is ONE process tree over
+     * one workspace, so a name granted by any repository of that workspace
+     * is readable by the model working in all of them. That is why a grant
+     * is per-repository (the operator binds it to something they own) but
+     * its effect is per-run.
+     *
+     * Deliberately lenient — a connection that no longer resolves is
+     * skipped rather than throwing — because `describeFleetWorkspace` has
+     * already refused a workspace it could not describe, and a grant that
+     * fails to resolve means LESS access, never more.
+     */
+    async resolveFleetRunEnvGrants(input: {
+        task: Task;
+        userId: string;
+        agentId?: string;
+    }): Promise<string[]> {
+        const sources: ResolvedAgentRepo[] = [];
+        if (input.agentId && this.agentRepoAttachments) {
+            sources.push(
+                ...(await resolveAttachedReposForAgent(
+                    this.agentRepoAttachments,
+                    input.agentId,
+                    input.userId,
+                ).catch(() => [])),
+            );
+        }
+        const extras = Array.isArray(input.task.extraRepos) ? input.task.extraRepos : [];
+        for (const extra of extras) {
+            if (!this.repoConnections) break;
+            const connection = await this.repoConnections
+                .findByIdAndUser(extra.repoConnectionId, input.userId)
+                .catch(() => null);
+            if (!connection) continue;
+            const [resolved] = mapAttachmentEdgesToRepos([
+                { repoConnection: connection } as unknown as AgentRepoAttachment,
+            ]);
+            if (resolved) sources.push(resolved);
+        }
+        if (input.task.workId && this.repoConnections && this.works) {
+            const work = await this.works.findById(input.task.workId).catch(() => null);
+            const owner = work?.getRepoOwner();
+            const repo = work?.getDataRepo();
+            if (owner && repo) {
+                const primary = await this.resolvePrimaryConnection(
+                    input.userId,
+                    `${owner}/${repo}`,
+                );
+                if (primary) sources.push(primary);
+            }
+        }
+        return normalizeFleetRunEnvGrants(sources.flatMap((source) => source.envGrants));
+    }
+
+    /** The enabled registry row for `primaryRepositoryId`, or null. Never throws. */
+    private async resolvePrimaryConnection(
+        userId: string,
+        primaryRepositoryId: string,
+    ): Promise<ResolvedAgentRepo | null> {
+        if (!this.repoConnections || typeof this.repoConnections.listByUser !== 'function')
+            return null;
+        const rows = await this.repoConnections.listByUser(userId).catch(() => []);
+        const wanted = primaryRepositoryId.toLowerCase();
+        const matches = rows.filter(
+            (row) =>
+                row.enabled &&
+                typeof row.url === 'string' &&
+                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
+        );
+        if (matches.length !== 1) return null;
+        const [resolved] = mapAttachmentEdgesToRepos([
+            { repoConnection: matches[0] } as unknown as AgentRepoAttachment,
+        ]);
+        return resolved ?? null;
     }
 
     /**
@@ -350,7 +508,12 @@ export class TaskWorkspaceService {
         workId: string;
         primaryRepositoryId: string;
         branch: string;
-    }): Promise<FleetTaskWorkspaceMountSpec[]> {
+    }): Promise<{ mounts: FleetTaskWorkspaceMountSpec[]; envFilesRef: FleetRunEnvFileRef[] }> {
+        // Run secrets (slice Y): mountDir → the registry row it came from, so
+        // the env-file PATHS can be attached to the final mount list after
+        // the Task-extra-vs-attachment precedence has been settled. PATHS
+        // only — `resolved.envFiles` (the decrypted contents) is never read.
+        const sourceByMountDir = new Map<string, ResolvedAgentRepo>();
         const extras = Array.isArray(input.task.extraRepos) ? input.task.extraRepos : [];
         const attached =
             input.agentId && this.agentRepoAttachments
@@ -360,7 +523,7 @@ export class TaskWorkspaceService {
                       input.userId,
                   )
                 : [];
-        if (attached.length === 0 && extras.length === 0) return [];
+        if (attached.length === 0 && extras.length === 0) return { mounts: [], envFilesRef: [] };
         if (!this.gitFacade) {
             throw new Error(
                 extras.length > 0
@@ -404,6 +567,7 @@ export class TaskWorkspaceService {
                 mountDir: repo.mountDir,
                 writable: true,
             });
+            sourceByMountDir.set(repo.mountDir.toLowerCase(), repo);
         }
         // The contracts normalizer is the same gate the node applies; failing
         // HERE names the attachment while the plan is still on the platform.
@@ -483,6 +647,7 @@ export class TaskWorkspaceService {
                 mountDir,
                 writable: extra.writable !== false,
             });
+            sourceByMountDir.set(mountDir.toLowerCase(), resolved);
         }
         const keptAttachments = mounts.filter(
             (candidate) =>
@@ -492,10 +657,21 @@ export class TaskWorkspaceService {
                         extra.mountDir.toLowerCase() === candidate.mountDir.toLowerCase(),
                 ),
         );
-        return normalizeFleetTaskWorkspaceMounts(
+        const normalized = normalizeFleetTaskWorkspaceMounts(
             [...keptAttachments, ...extraMounts],
             input.primaryRepositoryId,
         );
+        const envFilesRef: FleetRunEnvFileRef[] = [];
+        for (const mount of normalized) {
+            const source = sourceByMountDir.get(mount.mountDir.toLowerCase());
+            if (!source || source.envFilePaths.length === 0) continue;
+            envFilesRef.push({
+                repoConnectionId: source.repoConnectionId,
+                mountDir: mount.mountDir,
+                paths: source.envFilePaths,
+            });
+        }
+        return { mounts: normalized, envFilesRef };
     }
 
     /**
