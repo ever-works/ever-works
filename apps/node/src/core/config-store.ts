@@ -112,6 +112,16 @@ function clampInterval(value: unknown): number {
  * the desktop shell's `loadConfig` posture: a corrupt file must not wedge the
  * node, it must send the operator back through enrollment.
  */
+/**
+ * Rooted POSIX or Windows path. Written out rather than taken from
+ * `node:path` on purpose: this module is deliberately free of node
+ * builtins (it runs behind an injected filesystem seam), and
+ * `path.isAbsolute` would answer differently depending on which OS the
+ * process happens to be running on, for a config file that can be copied
+ * between them.
+ */
+const ABSOLUTE_PATH = /^(?:[/\\]|[A-Za-z]:[/\\])/;
+
 export function parseConfig(raw: string | null): NodeConfig | null {
 	if (!raw) {
 		return null;
@@ -178,6 +188,14 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 	// an out-of-range stored value is clamped rather than refused.
 	if (candidate.workspaceGc && typeof candidate.workspaceGc === 'object') {
 		config.workspaceGc = clampWorkspaceGcPolicy(candidate.workspaceGc);
+	}
+	// The workspace root the service runs against, so `doctor` and `gc`
+	// inspect the same tree (EW-803). Only ever an absolute path: a
+	// relative one would be resolved against whatever directory the
+	// operator happened to run the CLI from, which is the confusion this
+	// key exists to end.
+	if (typeof candidate.workspaceRoot === 'string' && ABSOLUTE_PATH.test(candidate.workspaceRoot.trim())) {
+		config.workspaceRoot = candidate.workspaceRoot.trim();
 	}
 	if (
 		candidate.unsafe &&

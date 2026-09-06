@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 import { loginViaUI } from './helpers/auth';
 
@@ -60,6 +60,34 @@ async function openDashboard(page: Page): Promise<void> {
     await page.goto('/en/works', { waitUntil: 'networkidle' });
 }
 
+/**
+ * A fresh, signed-out context with the sidebar pinned EXPANDED.
+ *
+ * Every assertion in this file about the pill's TEXT depends on it. The
+ * server layout defaults the sidebar to COLLAPSED when the
+ * `sidebar-collapsed` cookie is absent (`layout.tsx`:
+ * `collapsedCookie === undefined ? true : …`), and these tests deliberately
+ * start from an empty `storageState`, so no cookie is present and the
+ * sidebar renders as an icon rail. `RunnerStatusPill.tsx` gates the whole
+ * label block — including `runner-status-count` — on `!isCollapsed`, so the
+ * button is visible while the count element does not exist at all.
+ *
+ * That is exactly how these four tests failed on `stage`: `runner-status-pill`
+ * was visible and `getByTestId('runner-status-count')` reported "element(s)
+ * not found". They had never passed in CI, because e2e does not run on
+ * `pull_request` and never runs locally.
+ *
+ * `flow-a11y-key-flows-axe.spec.ts` pins the same cookie for the same reason.
+ * The origin mirrors `playwright.config.ts`'s own `baseURL` default.
+ */
+const ORIGIN = new URL(process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000').origin;
+
+async function freshExpandedContext(browser: Browser) {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    await context.addCookies([{ name: 'sidebar-collapsed', value: '0', url: ORIGIN }]);
+    return context;
+}
+
 test.describe('runner-status pill', () => {
     test('GET /api/fleet/runner-status: a fresh account has no runners and advertises the 30s cadence', async ({
         request,
@@ -89,7 +117,7 @@ test.describe('runner-status pill', () => {
         request,
     }) => {
         const u = await registerUserViaAPI(request);
-        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const context = await freshExpandedContext(browser);
         const page = await context.newPage();
         try {
             await loginViaUI(page, { email: u.email, password: u.password });
@@ -112,7 +140,7 @@ test.describe('runner-status pill', () => {
         const u = await registerUserViaAPI(request);
         const node = await enrollNode(request, u.access_token);
 
-        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const context = await freshExpandedContext(browser);
         const page = await context.newPage();
         try {
             await loginViaUI(page, { email: u.email, password: u.password });
@@ -145,7 +173,7 @@ test.describe('runner-status pill', () => {
         const u = await registerUserViaAPI(request);
         const node = await enrollNode(request, u.access_token);
 
-        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const context = await freshExpandedContext(browser);
         const page = await context.newPage();
         try {
             await loginViaUI(page, { email: u.email, password: u.password });
@@ -187,7 +215,7 @@ test.describe('runner-status pill', () => {
         });
         expect(beat.status()).toBe(401);
 
-        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const context = await freshExpandedContext(browser);
         const page = await context.newPage();
         try {
             await loginViaUI(page, { email: u.email, password: u.password });
@@ -222,7 +250,7 @@ test.describe('runner-status pill', () => {
             [first.nodeId, second.nodeId].sort(),
         );
 
-        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const context = await freshExpandedContext(browser);
         const page = await context.newPage();
         try {
             await loginViaUI(page, { email: u.email, password: u.password });

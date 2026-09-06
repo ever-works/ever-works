@@ -78,14 +78,19 @@ export class AgentApprovalsController {
     @Post('approve-all')
     @ApiOperation({
         summary:
-            'Bulk-approve my pending proposals in one call (optional ids subset; already-decided rows are skipped)',
+            'Bulk-approve my pending proposals in one call (optional ids subset; already-decided rows are skipped, merge approvals are excluded and stay pending)',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async approveAll(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: ApproveAllAgentApprovalsDto,
-    ): Promise<{ approved: number; skipped: number }> {
+    ): Promise<{ approved: number; skipped: number; excluded: number }> {
+        // `skipped` and `excluded` are deliberately separate counters:
+        // skipped means "somebody already decided this", excluded means
+        // "bulk approve refused to decide it and it is STILL PENDING"
+        // (merge approval, slice AE). A client that collapses them tells
+        // the user their merge was handled when it was not.
         return this.service.approveAll(auth.userId, body.ids);
     }
 

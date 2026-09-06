@@ -37,7 +37,10 @@ describe('FleetController', () => {
         deleteForUser: jest.Mock;
         enroll: jest.Mock;
         heartbeat: jest.Mock;
+        // EW-799 — the owner-scoped lookup the audit route settles
+        // ownership with, and the node-initiated rotation.
         getForUser: jest.Mock;
+        rotateCredentialByCredential: jest.Mock;
     };
     let jobs: {
         loadByNodeForUser: jest.Mock;
@@ -69,6 +72,11 @@ describe('FleetController', () => {
         describeForUser: jest.fn(async () => ceilingView),
         setFleetCeilingForUser: jest.fn(async () => ({ ...ceilingView, dailyCeilingCents: 5_000 })),
     };
+    /** EW-799 — the owner-scoped fleet_audit read, never the table-wide one. */
+    const auditStub = {
+        recentForOwnerNode: jest.fn(async () => []),
+        recent: jest.fn(async () => []),
+    };
 
     beforeEach(() => {
         service = {
@@ -88,6 +96,7 @@ describe('FleetController', () => {
             enroll: jest.fn(async () => null),
             heartbeat: jest.fn(async () => null),
             getForUser: jest.fn(async () => nodeView),
+            rotateCredentialByCredential: jest.fn(async () => null),
         };
         jobs = {
             loadByNodeForUser: jest.fn(async () => ({})),
@@ -97,6 +106,8 @@ describe('FleetController', () => {
         runs = { findByIds: jest.fn(async () => []) };
         ceilingStub.describeForUser.mockClear();
         ceilingStub.setFleetCeilingForUser.mockClear();
+        auditStub.recentForOwnerNode.mockClear();
+        auditStub.recent.mockClear();
         controller = new FleetController(
             service as never,
             jobs as never,
@@ -108,6 +119,8 @@ describe('FleetController', () => {
             { drainNodeForUser: jest.fn(async () => null) } as never,
             // EW-776 — the reconciled run outcome behind each history row.
             runs as never,
+            // EW-799 — the audit reader behind GET /nodes/:id/audit.
+            auditStub as never,
         );
     });
 
@@ -237,6 +250,27 @@ describe('FleetController', () => {
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(service.renameForUser).not.toHaveBeenCalled();
         expect(service.setDisabledForUser).not.toHaveBeenCalled();
+    });
+
+    describe('node audit trail (EW-799)', () => {
+        it('settles ownership through the registry BEFORE reading any rows', async () => {
+            await controller.nodeAudit(auth, nodeView.id, {});
+            expect(service.getForUser).toHaveBeenCalledWith('user-1', nodeView.id);
+            expect(auditStub.recentForOwnerNode).toHaveBeenCalledWith('user-1', nodeView.id, 50);
+            // Never the table-wide read — that one is platform-admin only.
+            expect(auditStub.recent).not.toHaveBeenCalled();
+        });
+
+        it('reads nothing when the node is not the caller’s (404 first)', async () => {
+            service.getForUser.mockRejectedValueOnce(new Error('Fleet node not found'));
+            await expect(controller.nodeAudit(auth, nodeView.id, {})).rejects.toThrow();
+            expect(auditStub.recentForOwnerNode).not.toHaveBeenCalled();
+        });
+
+        it('honours an explicit limit', async () => {
+            await controller.nodeAudit(auth, nodeView.id, { limit: 5 });
+            expect(auditStub.recentForOwnerNode).toHaveBeenCalledWith('user-1', nodeView.id, 5);
+        });
     });
 
     it('remove is owner-scoped', async () => {
@@ -381,8 +415,85 @@ describe('FleetController', () => {
                 modelIdentity: undefined,
                 workerState: undefined,
                 workerStateReason: undefined,
+                // Node housekeeping (EW-803).
+                minFreeDiskBytes: undefined,
+                workspaceCount: undefined,
+                workspaceBytes: undefined,
+                lastReclaimAt: undefined,
+                lastReclaimFreedBytes: undefined,
             });
+            // …and the KEY SET, because the assertion above does not check
+            // it (review AO-12). `toHaveBeenCalledWith` uses the same
+            // recursive equality as `toEqual`, which treats `{a: undefined}`
+            // and `{}` as equal — so every `x: undefined` line above would
+            // still pass with all five mappings deleted from the controller.
+            // A field added to the DTO and forgotten in the controller's map
+            // has to fail HERE, on a call that carries no values at all,
+            // rather than only in the sibling case below.
+            expect(Object.keys(service.enroll.mock.calls[0][1] as object).sort()).toEqual(
+                [
+                    'platform',
+                    'version',
+                    'capabilities',
+                    'cliVersion',
+                    'diskFreeBytes',
+                    'modelIdentity',
+                    'workerState',
+                    'workerStateReason',
+                    'minFreeDiskBytes',
+                    'workspaceCount',
+                    'workspaceBytes',
+                    'lastReclaimAt',
+                    'lastReclaimFreedBytes',
+                ].sort(),
+            );
             expect(result.secret).toBe('node-secret');
+        });
+
+        it('forwards the housekeeping report on BOTH enroll and heartbeat (EW-803)', async () => {
+            // Same trap as the worker state below: the mapping, not the DTO,
+            // is what decides whether a field ever reaches the service.
+            service.enroll.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'node-secret',
+                node: nodeView,
+            });
+            await controller.enroll({
+                token: 'x'.repeat(43),
+                minFreeDiskBytes: 2 * 1024 ** 3,
+                workspaceCount: 12,
+                workspaceBytes: 40 * 1024 ** 3,
+                lastReclaimAt: '2026-09-05T09:30:00.000Z',
+                lastReclaimFreedBytes: 3 * 1024 ** 3,
+            } as EnrollFleetNodeDto);
+            expect(service.enroll).toHaveBeenCalledWith(
+                'x'.repeat(43),
+                expect.objectContaining({
+                    minFreeDiskBytes: 2 * 1024 ** 3,
+                    workspaceCount: 12,
+                    workspaceBytes: 40 * 1024 ** 3,
+                    lastReclaimAt: '2026-09-05T09:30:00.000Z',
+                    lastReclaimFreedBytes: 3 * 1024 ** 3,
+                }),
+            );
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+                // The explicit null the node sends when the operator turned
+                // the floor off. It has to survive the mapping as `null`,
+                // not be normalized to `undefined` on the way through —
+                // `undefined` means "said nothing" and would leave a floor
+                // on screen that no longer exists.
+                minFreeDiskBytes: null,
+                workspaceCount: 0,
+            } as FleetHeartbeatDto);
+            expect(service.heartbeat).toHaveBeenCalledWith(
+                nodeView.id,
+                'x'.repeat(43),
+                expect.objectContaining({ minFreeDiskBytes: null, workspaceCount: 0 }),
+            );
         });
 
         it('forwards the worker state on BOTH enroll and heartbeat (EW-776)', async () => {
@@ -475,8 +586,50 @@ describe('FleetController', () => {
             ).resolves.toEqual({ ok: true, node: nodeView });
         });
 
+        it('rotate-credential maps every refusal to ONE undifferentiated 401', async () => {
+            // A distinct message per refusal would turn this route into a
+            // probe for which node ids exist and which are mid-rotation.
+            await expect(
+                controller.rotateCredential({
+                    nodeId: nodeView.id,
+                    secret: 'x'.repeat(43),
+                } as never),
+            ).rejects.toBeInstanceOf(UnauthorizedException);
+        });
+
+        it('rotate-credential returns the NEW secret once, plus when the old one dies', async () => {
+            const expiresAt = new Date('2026-09-05T10:15:00.000Z');
+            service.rotateCredentialByCredential.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'new-secret-value',
+                previousCredentialExpiresAt: expiresAt,
+                overlapSec: 900,
+                node: nodeView,
+            });
+
+            const result = await controller.rotateCredential({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+            } as never);
+
+            expect(result).toEqual({
+                ok: true,
+                nodeId: nodeView.id,
+                secret: 'new-secret-value',
+                previousCredentialExpiresAt: expiresAt.toISOString(),
+                overlapSec: 900,
+                node: nodeView,
+            });
+            // The node view is what the UI renders; a credential must
+            // never travel inside it.
+            expect(JSON.stringify(result.node)).not.toContain('new-secret-value');
+        });
+
         it('enroll and heartbeat are @Public (token/secret ARE the auth)', () => {
             expect(Reflect.getMetadata(IS_PUBLIC_KEY, FleetController.prototype.enroll)).toBe(true);
+            expect(
+                Reflect.getMetadata(IS_PUBLIC_KEY, FleetController.prototype.rotateCredential),
+            ).toBe(true);
             expect(Reflect.getMetadata(IS_PUBLIC_KEY, FleetController.prototype.heartbeat)).toBe(
                 true,
             );

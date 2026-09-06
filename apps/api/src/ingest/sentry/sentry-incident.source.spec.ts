@@ -83,7 +83,10 @@ describe('SentryIncidentSource', () => {
             expect(envelope).toMatchObject({
                 source: 'sentry',
                 kind: INCIDENT_EVENT_KIND,
-                sourceEventId: 'event_alert:4501:e1f2a3b4c5d6',
+                // Keyed on the issue and the 5-minute bucket its
+                // `datetime` falls in, NOT on the individual `event_id` —
+                // see the coalescing test below.
+                sourceEventId: 'event_alert:4501:2026-09-01T12:00:00.000Z',
                 occurredAt: '2026-09-01T12:00:00.000Z',
                 actor: { name: 'Sentry' },
                 subject: {
@@ -127,20 +130,53 @@ describe('SentryIncidentSource', () => {
             });
         });
 
-        it('keys the envelope on the issue id so every alert for one grouped issue is a revision of ONE incident', () => {
+        /**
+         * This used to assert the opposite — one envelope per alerting
+         * EVENT (`event_alert:<issue>:<event_id>`). That is what turned a
+         * flapping Sentry issue into thousands of `ingested_events` rows:
+         * the drain is a five-minute cron with a fifty-row batch, so two
+         * thousand alerts are hours of backlog IN FRONT of every other
+         * tenant's genuinely new work, and each row also costs an
+         * Activity row, a Memory write, a triage comment and a fire of
+         * every `{kind:'incident'}` trigger.
+         *
+         * A Sentry issue IS one fingerprint. Alerts inside one bucket are
+         * the same revision of it, so they collapse; a later alert still
+         * opens a new bucket and lands as a new revision.
+         */
+        it('collapses alerts for one issue inside a bucket, and takes a NEW revision after it', () => {
             const first = source.normalize({
                 resource: 'event_alert',
                 action: 'triggered',
                 body: eventAlertBody(),
             });
-            const second = source.normalize({
+            const sameBucket = source.normalize({
                 resource: 'event_alert',
                 action: 'triggered',
-                body: eventAlertBody({ event_id: 'ffffffffffff', release: 'ever-works@1.43.0' }),
+                body: eventAlertBody({
+                    event_id: 'ffffffffffff',
+                    datetime: '2026-09-01T12:04:59.000Z',
+                    release: 'ever-works@1.43.0',
+                }),
             });
-            expect(second?.subject?.externalId).toBe(first?.subject?.externalId);
-            expect(second?.sourceEventId).not.toBe(first?.sourceEventId);
-            expect(second?.payload.release).toBe('ever-works@1.43.0');
+            const laterBucket = source.normalize({
+                resource: 'event_alert',
+                action: 'triggered',
+                body: eventAlertBody({
+                    event_id: 'aaaaaaaaaaaa',
+                    datetime: '2026-09-01T12:05:00.000Z',
+                }),
+            });
+
+            expect(sameBucket?.subject?.externalId).toBe(first?.subject?.externalId);
+            // Different `event_id`, same issue, same bucket → the spine's
+            // (source, sourceEventId) dedupe writes exactly one row.
+            expect(sameBucket?.sourceEventId).toBe(first?.sourceEventId);
+            // The facts still travel: the winner of a bucket carries the
+            // latest release it saw.
+            expect(sameBucket?.payload.release).toBe('ever-works@1.43.0');
+            // A genuinely later alert is a new revision, not swallowed.
+            expect(laterBucket?.sourceEventId).not.toBe(first?.sourceEventId);
         });
 
         it('is deterministic for an exact redelivery', () => {
@@ -148,6 +184,56 @@ describe('SentryIncidentSource', () => {
             expect(source.normalize(input)?.sourceEventId).toBe(
                 source.normalize(input)?.sourceEventId,
             );
+        });
+
+        /**
+         * The documented replay control on this receiver is the spine's
+         * `(source, sourceEventId)` dedupe — Sentry's `Sentry-Hook-Timestamp`
+         * is not part of the signed material, so nothing else bounds a
+         * replay. That control only holds if the identity is a function
+         * of the DELIVERY, never of the clock: `isoOrNow()` stamped a
+         * fresh `now` whenever the vendor timestamp was absent, so a
+         * captured, still-signed delivery replayed N times minted N rows.
+         */
+        it('does not put the CLOCK in the dedupe identity when the vendor omits its timestamp', () => {
+            const noTimestamp = {
+                resource: 'event_alert',
+                action: 'triggered',
+                body: eventAlertBody({ datetime: undefined, timestamp: undefined }),
+            };
+            jest.useFakeTimers().setSystemTime(new Date('2026-09-01T12:00:00.000Z'));
+            const first = source.normalize(noTimestamp)?.sourceEventId;
+            // A replay a full minute later — under a `now()` fallback this
+            // is a brand new identity and a brand new row.
+            jest.setSystemTime(new Date('2026-09-01T12:01:00.000Z'));
+            const replay = source.normalize(noTimestamp)?.sourceEventId;
+            jest.useRealTimers();
+            expect(replay).toBe(first);
+        });
+    });
+
+    describe('issue resource replay', () => {
+        it('keeps an unstamped issue delivery on ONE dedupe identity across replays', () => {
+            const unstamped = {
+                resource: 'issue',
+                action: 'unresolved',
+                body: issueBody('unresolved', { lastSeen: undefined, firstSeen: undefined }),
+            };
+            jest.useFakeTimers().setSystemTime(new Date('2026-09-01T12:00:00.000Z'));
+            const first = source.normalize(unstamped)?.sourceEventId;
+            jest.setSystemTime(new Date('2026-09-01T12:01:00.000Z'));
+            const replay = source.normalize(unstamped)?.sourceEventId;
+            jest.useRealTimers();
+            expect(replay).toBe(first);
+        });
+
+        it('still keys a stamped transition on the vendor timestamp, exactly', () => {
+            const envelope = source.normalize({
+                resource: 'issue',
+                action: 'unresolved',
+                body: issueBody('unresolved'),
+            });
+            expect(envelope?.sourceEventId).toBe('issue:4501:unresolved:2026-09-01T12:00:00.000Z');
         });
 
         it('refuses an alert without an issue id', () => {

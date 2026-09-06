@@ -60,10 +60,24 @@ export interface HeartbeatCapableClient {
 /**
  * Self-description fields a heartbeat may drop and still be a valid beat.
  *
- * Today: the worker state (EW-776). See {@link HeartbeatLoop} for why
- * dropping them is ever the right move.
+ * The worker state (EW-776) and the housekeeping report (EW-803). See
+ * {@link HeartbeatLoop} for why dropping them is ever the right move.
+ *
+ * EVERY field added to the self-description after an API release belongs
+ * here. The API validates beats with `whitelist + forbidNonWhitelisted`,
+ * so a field an older platform does not know 400s the WHOLE request — a
+ * new field that is not in this list is a node that goes dark the moment
+ * it talks to a platform older than itself.
  */
-const OPTIONAL_DESCRIPTION_FIELDS = ['workerState', 'workerStateReason'] as const;
+const OPTIONAL_DESCRIPTION_FIELDS = [
+	'workerState',
+	'workerStateReason',
+	'minFreeDiskBytes',
+	'workspaceCount',
+	'workspaceBytes',
+	'lastReclaimAt',
+	'lastReclaimFreedBytes'
+] as const;
 
 export interface HeartbeatLoopOptions {
 	client: HeartbeatCapableClient;
@@ -195,8 +209,9 @@ export class HeartbeatLoop {
 	}
 
 	/**
-	 * Send one beat, tolerating a platform that predates the worker-state
-	 * fields (EW-776).
+	 * Send one beat, tolerating a platform that predates the optional
+	 * self-description fields (the worker state, EW-776; the housekeeping
+	 * report, EW-803).
 	 *
 	 * The API validates heartbeats with `whitelist + forbidNonWhitelisted`,
 	 * so a field an older build does not know is not ignored — it 400s the
@@ -236,7 +251,7 @@ export class HeartbeatLoop {
 			});
 			this.legacyDescription = true;
 			this.options.logger?.warn(
-				'Platform rejected the worker-state fields; it predates them. Reporting liveness only until this node restarts.'
+				'Platform rejected the optional self-description fields (worker state, housekeeping); it predates them. Reporting liveness only until this node restarts.'
 			);
 			return result;
 		}

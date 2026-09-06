@@ -18,13 +18,13 @@ Three new first-class concepts are added to the platform **in addition to** the 
 
 These three concepts are **core domain concepts**, not plugins. They **use** the existing plugin system (AI providers, Git providers, search providers, etc.) but are not themselves implemented as plugins. This is recorded as a design decision in [ADR-006](../decisions/006-agents-skills-tasks-as-core-not-plugins.md).
 
-The current platform already has a **platform-managed** "Work Agent" — `WorkAgentGoal` / `WorkAgentRun` / `WorkAgentRunLog` / `WorkAgentPreference` ([`packages/agent/src/entities/work-agent-goal.entity.ts`](../../../packages/agent/src/entities/work-agent-goal.entity.ts)) — which autonomously generates Ideas from a user goal and drives the Mission tick worker. That feature is **untouched** by this work. The new `Agent` entity introduced here is **user-defined**, named, persistent, and runs alongside the existing Work Agent without replacing it. See §11 for the exact distinction.
+The current platform already has a **platform-managed** "Work Agent" — `WorkAgentGoal` / `WorkAgentRun` / `WorkAgentRunLog` / `WorkAgentPreference` ([`packages/agent/src/entities/work-build-request.entity.ts`](../../../packages/agent/src/entities/work-build-request.entity.ts)) — which autonomously generates Ideas from a user goal and drives the Mission tick worker. That feature is **untouched** by this work. The new `Agent` entity introduced here is **user-defined**, named, persistent, and runs alongside the existing Work Agent without replacing it. See §11 for the exact distinction.
 
 ## 2. Cross-cutting goals
 
 | #      | Goal                                                                                                                                                                                                                                                                                                                |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **G1** | **Additive only**. Every existing surface — sidebar, Work/Mission/Idea detail pages, generators, plugins page, dashboard — keeps its current behavior. New tabs/pages/buttons are added; nothing is removed or renamed. (Project [NN #20](file:///C:/Coding/Workspace/AGENTS.md).)                                  |
+| **G1** | **Additive only**. Every existing surface — sidebar, Work/Mission/Idea detail pages, generators, plugins page, dashboard — keeps its current behavior. New tabs/pages/buttons are added; nothing is removed or renamed. (Project NN #20.)                                                                           |
 | **G2** | **Reuse plugins, don't replace them.** Agents pick an AI provider plugin the same way a Work generator does today — via `AiFacadeService` with `providerOverride` resolution. Agents pick a Git provider via `GitFacadeService` the same way.                                                                       |
 | **G3** | **Repo is the source of truth for definitions.** Agent definitions (`AGENTS.md`, `SOUL.md`, `HEARTBEAT.md`, `TOOLS.md`, `agent.yml`) and Skill definitions (`<skill>.md`) live in Git repos and are mirrored to DB for fast read. Same posture as Works' source-of-truth GitHub repos (Constitution Principle III). |
 | **G4** | **Modular**. New tab on Work page = its own folder under `apps/web/src/app/[locale]/(dashboard)/works/[id]/agents/`. Same for Mission/Idea. New API module lives at `apps/api/src/agents/`, with companion modules for `skills/` and `tasks/`.                                                                      |
@@ -304,7 +304,7 @@ The `details` JSON column carries event-specific payloads. Live activity feed (p
 
 ## 11. Relationship to the existing "Work Agent"
 
-The platform already has a `WorkAgentGoal`/`WorkAgentRun` system that **autonomously generates Ideas** from a user-provided Goal ([`packages/agent/src/entities/work-agent-goal.entity.ts`](../../../packages/agent/src/entities/work-agent-goal.entity.ts), `apps/api/src/work-agent/`). Mission ticks also use this engine to spawn child Ideas. Crucially:
+The platform already has a `WorkAgentGoal`/`WorkAgentRun` system that **autonomously generates Ideas** from a user-provided Goal ([`packages/agent/src/entities/work-build-request.entity.ts`](../../../packages/agent/src/entities/work-build-request.entity.ts), `apps/api/src/work-agent/`). Mission ticks also use this engine to spawn child Ideas. Crucially:
 
 | Aspect                     | Existing "Work Agent" (platform-managed)                     | New "Agent" (user-defined)                                                          |
 | -------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
@@ -435,4 +435,4 @@ The detailed open questions are consolidated in [`../QUESTIONS-agents-skills-tas
 - [`../QUESTIONS-agents-skills-tasks.md`](../QUESTIONS-agents-skills-tasks.md) — open questions.
 - [`../features/user-journeys-agents-skills-tasks.md`](../features/user-journeys-agents-skills-tasks.md) — five end-to-end user stories.
 - ADRs: [006](../decisions/006-agents-skills-tasks-as-core-not-plugins.md), [007](../decisions/007-skill-catalog-in-monorepo.md), [008](../decisions/008-tenant-control-repo-deferred-to-v2.md), [009](../decisions/009-tasks-vs-items-vs-kb-distinction.md).
-- Constitution: [`.specify/memory/constitution.md`](../../../.specify/memory/constitution.md).
+- Constitution: [`.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md).

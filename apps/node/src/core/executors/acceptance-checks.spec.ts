@@ -5,12 +5,16 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
+import { FLEET_JOB_MAX_RESULT_BYTES } from '@ever-works/contracts';
 import {
 	AcceptanceChecksPayloadError,
 	buildNodeCheckEnv,
+	CHECK_LOG_TAIL_BYTES,
+	fitNodeOutcomeToResultBudget,
 	normalizeChecks,
 	runAcceptanceChecksJob,
-	runNodeCommandStep
+	runNodeCommandStep,
+	tailUtf8Bytes
 } from './acceptance-checks';
 
 /**
@@ -297,5 +301,309 @@ describe('buildNodeCheckEnv — a check never inherits this machine', () => {
 
 	it('injects CI=1 so watch modes do not hang a check to its timeout', () => {
 		expect(buildNodeCheckEnv(undefined, parent).CI).toBe('1');
+	});
+
+	/**
+	 * Self-build slice Z (EW-796) — the MCP bridge did NOT weaken this.
+	 *
+	 * The bridge exists precisely BECAUSE `EVER_WORKS_` can never be
+	 * granted: a run credential could not be handed to the model through
+	 * the environment, so it is handed to a loopback proxy instead and the
+	 * model never sees it at all. These cases exist so that a future
+	 * "just add one exception" cannot land quietly — an env-based bridge
+	 * would have to delete a passing test, and the reviewer would see it.
+	 */
+	it('refuses the EVER_WORKS_ namespace even when a job explicitly grants it', () => {
+		const withPlatformVars: NodeJS.ProcessEnv = {
+			...parent,
+			EVER_WORKS_MCP_TOKEN: 'ew_run_0123456789abcdef',
+			EVER_WORKS_MCP_URL: 'https://mcp.ever.works/mcp',
+			EVER_WORKS_API_KEY: 'ew_live_should-never-appear'
+		};
+
+		// Ungranted: dropped, like every other platform-owned name.
+		const ungranted = buildNodeCheckEnv(undefined, withPlatformVars);
+		expect(ungranted.EVER_WORKS_MCP_TOKEN).toBeUndefined();
+		expect(ungranted.EVER_WORKS_MCP_URL).toBeUndefined();
+		expect(ungranted.EVER_WORKS_API_KEY).toBeUndefined();
+
+		// GRANTED explicitly: still dropped. The grant is not a bypass.
+		const granted = buildNodeCheckEnv(
+			['EVER_WORKS_MCP_TOKEN', 'EVER_WORKS_MCP_URL', 'EVER_WORKS_API_KEY'],
+			withPlatformVars
+		);
+		expect(granted.EVER_WORKS_MCP_TOKEN).toBeUndefined();
+		expect(granted.EVER_WORKS_MCP_URL).toBeUndefined();
+		expect(granted.EVER_WORKS_API_KEY).toBeUndefined();
+		// And nothing that looks like a run token survives anywhere in it.
+		expect(JSON.stringify(granted)).not.toContain('ew_run_');
+		expect(JSON.stringify(granted)).not.toContain('ew_live_');
+	});
+
+	it('still grants an ordinary name in the same call that refuses a platform one', () => {
+		// Proving the refusal is per-NAME and not "any call with a platform
+		// name in it grants nothing" — otherwise the test above would pass
+		// for the wrong reason.
+		const env = buildNodeCheckEnv(['EVER_WORKS_MCP_TOKEN', 'CUSTOM_BUILD_FLAG'], {
+			...parent,
+			EVER_WORKS_MCP_TOKEN: 'ew_run_0123456789abcdef'
+		});
+		expect(env.EVER_WORKS_MCP_TOKEN).toBeUndefined();
+		expect(env.CUSTOM_BUILD_FLAG).toBe('yes');
+	});
+});
+
+/**
+ * Per-repository env grants (run secrets, self-build slice Y, EW-781).
+ *
+ * `NODE_PLATFORM_OWNED_ENV_PATTERN` is a PREFIX regex, and the grant that
+ * opens it is an EXACT name. That asymmetry is the entire security of the
+ * feature: matched by prefix, one `DATABASE_URL` grant would also hand
+ * over `DATABASE_PASSWORD`. Every adjacent-name case below exists because
+ * getting this wrong is silent.
+ */
+describe('buildNodeCheckEnv — per-repository grants open the platform-owned refusal', () => {
+	const parent: NodeJS.ProcessEnv = {
+		PATH: '/usr/bin',
+		DATABASE_URL: 'postgres://user:pw@host/db',
+		DATABASE_URL_REPLICA: 'postgres://user:pw@replica/db',
+		DATABASE_HOST: 'db.internal',
+		DATABASE_PASSWORD: 'pw',
+		database_url_extra: 'lowercase-adjacent',
+		GH_TOKEN: 'gho_realtoken',
+		FLEET_NODE_SECRET: 'the-node-credential',
+		EVER_WORKS_API_KEY: 'platform-key',
+		PLUGIN_SECRET_ENCRYPTION_KEY: 'the-key-that-decrypts-every-tenant',
+		BETTER_AUTH_SECRET: 'session-signing',
+		PLATFORM_ADMIN_TOKEN: 'admin'
+	};
+
+	it('admits EXACTLY the granted name and nothing adjacent to it', () => {
+		const env = buildNodeCheckEnv(undefined, parent, ['DATABASE_URL']);
+		expect(env.DATABASE_URL).toBe('postgres://user:pw@host/db');
+		expect(env.DATABASE_URL_REPLICA).toBeUndefined();
+		expect(env.DATABASE_HOST).toBeUndefined();
+		expect(env.DATABASE_PASSWORD).toBeUndefined();
+		expect(env.database_url_extra).toBeUndefined();
+	});
+
+	it('admits a granted name even when the instance passthrough never mentions it', () => {
+		// A grant is a permission in its own right, not a filter over the
+		// instance-global list.
+		expect(buildNodeCheckEnv([], parent, ['GH_TOKEN']).GH_TOKEN).toBe('gho_realtoken');
+	});
+
+	it('with NO grants, behaves exactly as it did before this slice', () => {
+		const env = buildNodeCheckEnv(['DATABASE_URL', 'GH_TOKEN'], parent);
+		expect(env.DATABASE_URL).toBeUndefined();
+		expect(env.GH_TOKEN).toBeUndefined();
+		expect(buildNodeCheckEnv(['DATABASE_URL'], parent, []).DATABASE_URL).toBeUndefined();
+		expect(buildNodeCheckEnv(['DATABASE_URL'], parent, null).DATABASE_URL).toBeUndefined();
+	});
+
+	it.each([
+		'FLEET_NODE_SECRET',
+		'EVER_WORKS_API_KEY',
+		'PLUGIN_SECRET_ENCRYPTION_KEY',
+		'BETTER_AUTH_SECRET',
+		'PLATFORM_ADMIN_TOKEN'
+	])('never admits %s, however explicitly it is granted', (name) => {
+		// The un-grantable core. `FLEET_`/`EVER_WORKS_` is the credential
+		// that leases work on this machine; `PLUGIN_` decrypts every
+		// tenant's env files; the rest sign platform sessions. Opening any
+		// of them turns "read one secret" into "become the platform".
+		const env = buildNodeCheckEnv([name], parent, [name]);
+		expect(env[name]).toBeUndefined();
+	});
+
+	it('ignores a wildcard grant rather than expanding it', () => {
+		const env = buildNodeCheckEnv(undefined, parent, ['DATABASE_*', '*']);
+		expect(env.DATABASE_URL).toBeUndefined();
+		expect(env.DATABASE_PASSWORD).toBeUndefined();
+	});
+
+	it('matches case-insensitively, because Windows env names are', () => {
+		expect(buildNodeCheckEnv(undefined, parent, ['database_url']).DATABASE_URL).toBe('postgres://user:pw@host/db');
+	});
+
+	it('does not let a grant leak into the instance-global list for other repositories', () => {
+		// Two calls, one grant set each: the second must not see the first's.
+		buildNodeCheckEnv(undefined, parent, ['DATABASE_URL']);
+		expect(buildNodeCheckEnv(undefined, parent, ['GH_TOKEN']).DATABASE_URL).toBeUndefined();
+	});
+});
+
+describe('the CHECKOUT must not be able to choose the program (EW-807)', () => {
+	/**
+	 * THE control that makes an exact-match command allow-list mean
+	 * anything on Windows.
+	 *
+	 * `spawn(command, { shell: true, cwd })` on win32 is `cmd.exe /d /s /c`,
+	 * and cmd.exe resolves a bare program name from the CURRENT DIRECTORY
+	 * before it consults PATH. The current directory is the checkout, whose
+	 * contents are written by whoever can push to the repository and,
+	 * mid-run, by the model. So a committed three-line `git.cmd` turns the
+	 * character-for-character allow-listed string `git --version` into "run
+	 * the attacker's program" — no shell metacharacter, no mid-run edit of
+	 * the frozen set, no race.
+	 */
+	it('sets the cmd.exe switch that removes the implicit current directory', () => {
+		const env = buildNodeCheckEnv([], { PATH: '/usr/bin', SystemRoot: 'C:\\Windows' });
+		expect(env.NoDefaultCurrentDirectoryInExePath).toBe('1');
+	});
+
+	it('cannot be spelled away by the parent environment or by a grant', () => {
+		const env = buildNodeCheckEnv(['NoDefaultCurrentDirectoryInExePath'], {
+			PATH: '/usr/bin',
+			NoDefaultCurrentDirectoryInExePath: '0',
+			NODEFAULTCURRENTDIRECTORYINEXEPATH: '0'
+		});
+		const spellings = Object.keys(env).filter((key) => key.toUpperCase() === 'NODEFAULTCURRENTDIRECTORYINEXEPATH');
+		expect(spellings).toHaveLength(1);
+		expect(env[spellings[0]]).toBe('1');
+	});
+
+	it('strips the PATH entries that mean "here" — the POSIX half of the same hole', () => {
+		const separator = process.platform === 'win32' ? ';' : ':';
+		const env = buildNodeCheckEnv([], {
+			PATH: ['/usr/local/bin', '', '.', '/usr/bin', './', '"."'].join(separator)
+		});
+		expect(env.PATH?.split(separator)).toEqual(['/usr/local/bin', '/usr/bin']);
+	});
+
+	it('never leaves PATH as the empty string, which is itself "here"', () => {
+		const env = buildNodeCheckEnv([], { PATH: process.platform === 'win32' ? '.;;./' : '.::./' });
+		expect(env.PATH).not.toBe('');
+		if (process.platform !== 'win32') expect(env.PATH).toBe('/usr/local/bin:/usr/bin:/bin');
+	});
+
+	/**
+	 * The mechanism itself, through the REAL runner and a REAL cmd.exe.
+	 * Everything above asserts the env we build; this asserts that the env
+	 * we build actually stops the hijack.
+	 */
+	it('runs the real program, not one committed at the root of the checkout (win32)', async () => {
+		if (process.platform !== 'win32') {
+			expect(true).toBe(true);
+			return;
+		}
+		const root = mkdtempSync(join(tmpdir(), 'ew-hijack-'));
+		// A repository could have committed exactly this file.
+		writeFileSync(join(root, 'git.cmd'), '@echo off\r\necho HIJACKED-BY-REPO-FILE\r\n');
+		const result = await runNodeCommandStep({ id: 'probe', command: 'git --version' }, root, {
+			parentEnv: process.env
+		});
+		expect(result.status).toBe('green');
+		expect(result.logTail ?? '').not.toContain('HIJACKED-BY-REPO-FILE');
+		expect(result.logTail ?? '').toContain('git version');
+	});
+});
+
+describe('runAcceptanceChecksJob — a repository selector this kind cannot honour (EW-807)', () => {
+	/**
+	 * `mountDir` names WHICH repository of a multi-repo run a command runs
+	 * in. This job kind provisions ONE directory and holds no mount
+	 * descriptor, so it cannot resolve the name. Running it in
+	 * `workspacePath` anyway would grade the PRIMARY worktree and file the
+	 * verdict under the name of a repository nothing executed — the
+	 * wrong-repository green this slice exists to delete.
+	 */
+	it('refuses the job rather than running the check in the primary worktree', async () => {
+		await expect(
+			runAcceptanceChecksJob(
+				job({
+					workspacePath: ABSOLUTE,
+					checks: [{ id: 'template-tests', command: 'pnpm test', mountDir: 'template' }]
+				}),
+				{ directoryExists: () => true }
+			)
+		).rejects.toThrowError(/names repository 'template'/);
+	});
+
+	it('leaves a job with no selector exactly as it was', async () => {
+		const outcome = await runAcceptanceChecksJob(job({ workspacePath: ABSOLUTE, checks: [] }), {
+			directoryExists: () => true
+		});
+		expect(outcome).toEqual({ gateStatus: 'none', results: [] });
+	});
+});
+
+describe('log tails are bounded in BYTES, and the result fits the platform cap (EW-807)', () => {
+	function floodingSpawn(text: string) {
+		return ((): unknown => {
+			const handlers = new Map<string, (arg?: unknown) => void>();
+			const stdout = {
+				on: (event: string, handler: (chunk: Buffer) => void) => {
+					if (event === 'data') queueMicrotask(() => handler(Buffer.from(text, 'utf8')));
+				},
+				destroy: () => undefined
+			};
+			queueMicrotask(() => queueMicrotask(() => handlers.get('close')?.(0)));
+			return {
+				stdout,
+				stderr: { on: () => undefined, destroy: () => undefined },
+				on: (event: string, handler: (arg?: unknown) => void) => {
+					handlers.set(event, handler);
+				},
+				kill: () => undefined
+			};
+		}) as never;
+	}
+
+	it('keeps the tail inside its byte budget when the output is not ASCII', async () => {
+		// U+2500 is ONE UTF-16 code unit and THREE UTF-8 bytes — the glyph
+		// every package manager and test runner draws its trees with. Under
+		// a `String.prototype.slice` window the tail was 3x its stated
+		// budget, and the budget is what keeps the job result under the
+		// platform's hard 256 KiB cap.
+		const outcome = await runAcceptanceChecksJob(
+			job({ workspacePath: ABSOLUTE, checks: [{ id: 'noisy', command: 'noisy' }] }),
+			{ directoryExists: () => true, spawnFn: floodingSpawn('\u2500'.repeat(CHECK_LOG_TAIL_BYTES)) }
+		);
+		const tail = outcome.results[0].logTail ?? '';
+		expect(tail.length).toBeGreaterThan(0);
+		expect(Buffer.byteLength(tail, 'utf8')).toBeLessThanOrEqual(CHECK_LOG_TAIL_BYTES);
+	});
+
+	it('fits an oversize outcome inside the job result cap by shedding log text', () => {
+		const oversize = {
+			gateStatus: 'green',
+			results: Array.from({ length: 32 }, (_, index) => ({
+				id: `check-${index}`,
+				status: 'green',
+				exitCode: 0,
+				durationMs: 1,
+				logTail: 'x'.repeat(16 * 1024)
+			}))
+		};
+		expect(Buffer.byteLength(JSON.stringify(oversize), 'utf8')).toBeGreaterThan(FLEET_JOB_MAX_RESULT_BYTES);
+
+		const fitted = fitNodeOutcomeToResultBudget(oversize);
+		// The VERDICT survives — that is the whole point. An oversize result
+		// is rejected by `completeJob`, which the worker loop re-reports as
+		// a FAILED run, and a failure report stores no result at all: gate,
+		// pushed branch and owner question all discarded.
+		expect(Buffer.byteLength(JSON.stringify(fitted), 'utf8')).toBeLessThanOrEqual(FLEET_JOB_MAX_RESULT_BYTES);
+		expect(fitted.gateStatus).toBe('green');
+		expect(fitted.results).toHaveLength(32);
+		expect(fitted.results.every((result) => result.status === 'green')).toBe(true);
+	});
+
+	it('leaves an outcome that already fits completely untouched', () => {
+		const outcome = {
+			gateStatus: 'red',
+			results: [{ id: 'a', status: 'red', exitCode: 1, durationMs: 2 }]
+		};
+		expect(fitNodeOutcomeToResultBudget(outcome)).toBe(outcome);
+	});
+
+	it('counts a tail in bytes, not UTF-16 code units', () => {
+		expect(tailUtf8Bytes('\u2500'.repeat(10), 9)).toBe('\u2500'.repeat(3));
+		// A cut that lands mid-sequence walks FORWARD to the next codepoint
+		// rather than emitting U+FFFD, which is three bytes where the
+		// fragment was one and would push the tail back over its bound.
+		expect(tailUtf8Bytes('\u2500'.repeat(10), 8)).toBe('\u2500'.repeat(2));
+		expect(Buffer.byteLength(tailUtf8Bytes('\u2500'.repeat(10), 8), 'utf8')).toBeLessThanOrEqual(8);
+		expect(tailUtf8Bytes('abc', 10)).toBe('abc');
 	});
 });

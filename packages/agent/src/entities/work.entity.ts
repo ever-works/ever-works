@@ -68,6 +68,7 @@ import {
     type UserSelectableWorkKind,
     type WorkChecksPolicy,
     type WorkExternalRefs,
+    type WorkRepoDeclaredCommandPolicy,
     type WorkKind,
 } from '@ever-works/contracts';
 
@@ -465,6 +466,31 @@ export class Work {
      */
     @Column({ type: 'int', default: 2 })
     maxGateAttempts: number;
+
+    /**
+     * Whether this Work reads the commands its own repository declares in
+     * `.works/works.yml` (`spec.tasks.setup` / `spec.tasks.checks`), and
+     * which commands it will admit (EW-807).
+     *
+     * NULL — the value every existing row has and every new Work starts
+     * with — means `{ mode: 'off' }`: the file is not consulted for
+     * commands at all and runs are graded exactly as they were before this
+     * column existed.
+     *
+     * WHY IT IS A COLUMN AND NOT A FLAG. A declared command is a command
+     * one of the owner's enrolled machines will run, with their shell,
+     * their credential helper and (during a run) decrypted `.env` files on
+     * disk. The author of `.works/works.yml` is anyone who can land a
+     * commit or a PR branch in the repository — a far wider set than the
+     * Work's members — and during a run it is also the model, which has
+     * write access to the whole checkout. So the owner does not merely
+     * switch the feature on: they write down each command, verbatim, and
+     * the platform admits nothing else. Never read this column directly;
+     * pass it through `normalizeWorkRepoDeclaredCommandPolicy`, which
+     * fails closed on anything it does not recognise.
+     */
+    @Column('simple-json', { nullable: true })
+    repoDeclaredCommands?: WorkRepoDeclaredCommandPolicy | null;
 
     // ── Merge policy (Wave 3, founder decision D4) ───────────────────
 

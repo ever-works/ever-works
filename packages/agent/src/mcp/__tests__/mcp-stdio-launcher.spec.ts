@@ -26,6 +26,17 @@ describe('stdio connection pseudo-URL', () => {
         });
     });
 
+    /**
+     * The MCP schema does not constrain `mcpServers` keys, so `a/b` is a
+     * schema-valid server name. It cannot reach here — the reconciler refuses
+     * any server whose `toolNamespace` is null, well before the pointer is
+     * built — but the pointer's grammar depends on that, and a silent
+     * mis-parse would lose an agent's tools rather than announce itself.
+     */
+    it('refuses a server name containing "/" instead of building an ambiguous pointer', () => {
+        expect(() => stdioConnectionUrl('acme-tools', 'a/b')).toThrow('must not contain');
+    });
+
     it.each([
         'https://example.test/mcp',
         'stdio:',

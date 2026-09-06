@@ -1,5 +1,10 @@
 import { performance } from 'node:perf_hooks';
-import type { FleetJobKind, FleetJobView } from '@ever-works/contracts';
+import type {
+	FleetJobKind,
+	FleetJobView,
+	FleetRunEnvFileContent,
+	FleetRunEnvFileRequestRef
+} from '@ever-works/contracts';
 import {
 	clampLeaseTtlSec,
 	FLEET_JOB_DEFAULT_LEASE_TTL_SEC,
@@ -14,6 +19,7 @@ import {
 	admitByResourceLimits,
 	hasAdmissionCeilings,
 	hasDiskFloor,
+	judgeDiskFloor,
 	type AdmissionDecision,
 	type ResourceProbe,
 	type ResourceSample
@@ -217,6 +223,17 @@ export interface JobLeaseCapableClient {
 		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null },
 		leaseGeneration?: number
 	): Promise<boolean>;
+	/**
+	 * Run secrets (self-build slice Y). Optional so an embedder with an
+	 * older client still satisfies this interface; a run that NEEDS env
+	 * files and finds it absent fails naming the gap rather than starting
+	 * without them.
+	 */
+	fetchRunEnvFiles?(
+		jobId: string,
+		refs: readonly FleetRunEnvFileRequestRef[],
+		leaseGeneration?: number
+	): Promise<FleetRunEnvFileContent[]>;
 }
 
 /**
@@ -279,6 +296,22 @@ export interface JobLeaseHandle {
 	 * lapse so `reclaimExpired` re-offers the job inside its attempt budget.
 	 */
 	defer(reason: string): void;
+	/**
+	 * Fetch the decrypted seed `.env` files this run's repositories
+	 * declared (run secrets, self-build slice Y).
+	 *
+	 * On the LEASE handle rather than on a client the executor holds,
+	 * because it is exactly the same question the handle already answers
+	 * for a publish: "may this node still be trusted with this job right
+	 * now?". The platform proves it with the same four checks it uses for
+	 * complete (credential, recorded holder, active status, current lease
+	 * generation), so a claim that lapsed while the machine slept gets no
+	 * secrets — and gets them refused with `stale-lease`, not silently.
+	 *
+	 * Rejects rather than resolving empty on any failure: a run that starts
+	 * with part of its environment is worse than one that does not start.
+	 */
+	fetchRunEnvFiles(refs: readonly FleetRunEnvFileRequestRef[]): Promise<FleetRunEnvFileContent[]>;
 }
 
 /** The keep-alive as the LOOP sees it: the executor's half, plus control. */
@@ -905,12 +938,20 @@ export class WorkerLoop {
 		if (wantsDisk) {
 			// Measured on the nearest EXISTING ancestor of the root (a fresh
 			// node has not created it yet). A throwing / nonsense probe maps
-			// to null, and null admits: an unreadable volume is reported (the
-			// heartbeat carries no figure) rather than idling the node.
+			// to null, and null now REFUSES: the provisioner refuses the same
+			// unreadable reading, and a node that leases on it only defers the
+			// job later, burning its attempt budget (review AO-11).
 			sample.diskFreeBytes = await measureWorkspaceFreeBytes(this.diskProbe!, this.workspacePath!);
+		} else {
+			// Not sampled on this poll. Cleared explicitly so a host probe
+			// that happens to carry the field cannot make the floor speak.
+			delete sample.diskFreeBytes;
 		}
 		const decision = admitByResourceLimits(this.limits, sample);
-		this.noteDiskDecision(decision);
+		// Judged from the SAMPLE, not from `decision`: `admitByResourceLimits`
+		// reports only the first refusing dimension, so a disk refusal
+		// disappears from it the moment CPU or memory also trips.
+		this.noteDiskDecision(wantsDisk ? judgeDiskFloor(this.limits, sample) : null);
 		return decision;
 	}
 
@@ -918,18 +959,31 @@ export class WorkerLoop {
 	 * One warning when the floor starts refusing, one info line when it
 	 * clears — not a line per poll, which at the idle cadence would be a
 	 * log entry every five seconds for as long as the disk stays full.
+	 *
+	 * `refusal` is the DISK's own verdict (null = the volume is fine, or
+	 * the floor was not evaluated on this poll). It used to be the whole
+	 * admission decision, which meant a CPU refusal on the next poll
+	 * cleared the latch and logged "the volume is back above the disk floor
+	 * — leasing resumes" about a machine still sitting at 190 MB and still
+	 * leasing nothing (review AO-7). On a node with a CPU ceiling that
+	 * produced an alternating refuse/resume log — the exact signal an
+	 * operator is told to read to find out why the node went quiet.
 	 */
-	private noteDiskDecision(decision: AdmissionDecision): void {
-		if (!decision.admit && decision.dimension === 'disk') {
-			if (this.lastDiskRefusal !== decision.reason) {
-				this.lastDiskRefusal = decision.reason;
+	private noteDiskDecision(refusal: AdmissionDecision | null): void {
+		if (refusal) {
+			if (this.lastDiskRefusal !== refusal.reason) {
+				this.lastDiskRefusal = refusal.reason;
 				this.options.logger?.warn(
-					`Refusing to lease work: ${decision.reason}. Free space on the workspace volume (\`ever-works-node doctor\`, \`ever-works-node gc\`) or lower the floor with --min-free-disk.`
+					// Both remedies, because the refusal now has two causes:
+					// a volume that is genuinely full, and one whose free
+					// space cannot be read at all — where clearing space
+					// fixes nothing and only `--no-disk-floor` does.
+					`Refusing to lease work: ${refusal.reason}. Free space on the workspace volume (\`ever-works-node doctor\`, \`ever-works-node gc\`), lower the floor with --min-free-disk, or switch it off with --no-disk-floor.`
 				);
 			}
 			return;
 		}
-		if (this.lastDiskRefusal !== null && (decision.admit || decision.dimension !== 'disk')) {
+		if (this.lastDiskRefusal !== null) {
 			this.lastDiskRefusal = null;
 			this.options.logger?.info('Workspace volume is back above the disk floor — leasing resumes');
 		}
@@ -1376,6 +1430,18 @@ export class WorkerLoop {
 				// publish, and a later one would only describe the fallout.
 				defer: (reason: string) => {
 					if (deferral === null) deferral = reason;
+				},
+				// Run secrets: the generation is captured from THIS run, the
+				// same value the beats echo, so a fetch can never be made
+				// against a claim this handle does not represent.
+				fetchRunEnvFiles: async (refs: readonly FleetRunEnvFileRequestRef[]) => {
+					const fetchFn = this.options.client.fetchRunEnvFiles;
+					if (!fetchFn) {
+						throw new Error(
+							'This node cannot fetch run env files (the job client predates the run-secrets protocol)'
+						);
+					}
+					return fetchFn.call(this.options.client, jobId, refs, generation);
 				}
 			}
 		};

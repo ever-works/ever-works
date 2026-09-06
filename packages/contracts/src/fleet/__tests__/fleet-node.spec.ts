@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	FLEET_CREDENTIAL_MAX_LENGTH,
 	FLEET_CREDENTIAL_MIN_LENGTH,
+	FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
 	FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
 	FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
 	FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -11,12 +12,15 @@ import {
 	FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
 	FLEET_MAX_CAPABILITY_TAGS_CEILING,
 	FLEET_MAX_CLI_VERSION_LENGTH,
+	FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
 	FLEET_MAX_DAILY_COST_CEILING_CENTS,
 	FLEET_MAX_DISK_FREE_BYTES,
+	FLEET_MAX_WORKSPACE_COUNT,
 	FLEET_MAX_MODEL_IDENTITY_LENGTH,
 	FLEET_MAX_NODE_NAME_LENGTH,
 	FLEET_MAX_PLATFORM_LENGTH,
 	FLEET_MAX_VERSION_LENGTH,
+	FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
 	FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
 	FLEET_MIN_NODE_NAME_LENGTH,
 	FLEET_MIN_NODE_OFFLINE_AFTER_MS,
@@ -47,6 +51,7 @@ function BOUNDS_AND_TUNABLES(): Array<[string, number]> {
 		['FLEET_MAX_MODEL_IDENTITY_LENGTH', FLEET_MAX_MODEL_IDENTITY_LENGTH],
 		['FLEET_MAX_DAILY_COST_CEILING_CENTS', FLEET_MAX_DAILY_COST_CEILING_CENTS],
 		['FLEET_MAX_DISK_FREE_BYTES', FLEET_MAX_DISK_FREE_BYTES],
+		['FLEET_MAX_WORKSPACE_COUNT', FLEET_MAX_WORKSPACE_COUNT],
 		['FLEET_MIN_NODE_NAME_LENGTH', FLEET_MIN_NODE_NAME_LENGTH],
 		['FLEET_MAX_NODE_NAME_LENGTH', FLEET_MAX_NODE_NAME_LENGTH],
 		['FLEET_CREDENTIAL_MIN_LENGTH', FLEET_CREDENTIAL_MIN_LENGTH],
@@ -60,7 +65,10 @@ function BOUNDS_AND_TUNABLES(): Array<[string, number]> {
 		['FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS', FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS],
 		['FLEET_MIN_NODE_OFFLINE_AFTER_MS', FLEET_MIN_NODE_OFFLINE_AFTER_MS],
 		['FLEET_MAX_WORKER_STATE_REASON_LENGTH', FLEET_MAX_WORKER_STATE_REASON_LENGTH],
-		['FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS', FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS]
+		['FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS', FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS],
+		['FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS', FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS],
+		['FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS', FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS],
+		['FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS', FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS]
 	];
 }
 
@@ -332,6 +340,16 @@ describe('relational invariants a careless retune would break silently', () => {
 		expect(FLEET_MIN_NODE_OFFLINE_AFTER_MS).toBeLessThan(FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS);
 	});
 
+	it('orders the rotation-overlap floor, default and ceiling', () => {
+		// The overlap is the window in which BOTH credentials authenticate.
+		// Under the floor a node cannot finish one round-trip plus a disk
+		// write inside it, so the window would be a re-key with extra steps;
+		// over the ceiling the old credential stops being a handover and
+		// becomes a second permanent credential.
+		expect(FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS).toBeLessThan(FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS);
+		expect(FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS).toBeLessThan(FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS);
+	});
+
 	it('allows a wider CLI version than a daemon version', () => {
 		// An agent CLI commonly reports `1.2.3 (Claude Code)`, not a bare semver.
 		expect(FLEET_MAX_CLI_VERSION_LENGTH).toBeGreaterThan(FLEET_MAX_VERSION_LENGTH);
@@ -425,5 +443,25 @@ describe('FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS', () => {
 
 	it('defaults to 30 minutes', () => {
 		expect(FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS).toBe(30 * 60_000);
+	});
+});
+
+describe('FLEET_MAX_WORKSPACE_COUNT', () => {
+	it('is the "certainly nonsense" line, not a policy on how many workspaces a node may hold', () => {
+		// A real machine that has gone unreaped for months holds hundreds,
+		// maybe a few thousand, Task worktrees. The cap has to sit far above
+		// anything legitimate, because a count at or under it is STORED and
+		// shown verbatim — the platform must never quietly turn a broken
+		// probe's figure into a plausible one.
+		expect(FLEET_MAX_WORKSPACE_COUNT).toBe(100_000);
+		expect(FLEET_MAX_WORKSPACE_COUNT).toBeGreaterThan(10_000);
+	});
+
+	it('stays a safe integer, unlike the byte ceiling beside it', () => {
+		// `FLEET_MAX_DISK_FREE_BYTES` is deliberately past MAX_SAFE_INTEGER;
+		// a COUNT has no such excuse, and an unsafe one would make `<=`
+		// comparisons in the DTO silently approximate.
+		expect(Number.isSafeInteger(FLEET_MAX_WORKSPACE_COUNT)).toBe(true);
+		expect(FLEET_MAX_WORKSPACE_COUNT).toBeLessThan(FLEET_MAX_DISK_FREE_BYTES);
 	});
 });

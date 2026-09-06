@@ -298,6 +298,75 @@ describe('HeartbeatLoop', () => {
 			expect(entries.some((entry) => entry.message.includes('predates them'))).toBe(true);
 		});
 
+		it('drops the HOUSEKEEPING fields too, not just the worker state (EW-803)', async () => {
+			// Every field added to the self-description after an API release
+			// has to be in `OPTIONAL_DESCRIPTION_FIELDS`, or a node talking to
+			// an older platform 400s forever and sweeps to offline. This
+			// pins the housekeeping five, which are the newest additions —
+			// and it is the case that would have caught them being forgotten.
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: ['os:linux'],
+					// No worker state at all: the housekeeping fields alone
+					// must be enough to trigger the fallback, or a node whose
+					// worker probe happened to return nothing goes dark.
+					minFreeDiskBytes: 2 * 1024 ** 3,
+					workspaceCount: 12,
+					workspaceBytes: 40 * 1024 ** 3,
+					lastReclaimAt: '2026-09-05T09:30:00.000Z',
+					lastReclaimFreedBytes: 3 * 1024 ** 3
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			for (const field of [
+				'minFreeDiskBytes',
+				'workspaceCount',
+				'workspaceBytes',
+				'lastReclaimAt',
+				'lastReclaimFreedBytes'
+			]) {
+				expect(scripted.requests[0]).toHaveProperty(field);
+				expect(scripted.requests[1]).not.toHaveProperty(field);
+			}
+			expect(scripted.requests[1]).toMatchObject({ platform: 'linux/x64' });
+			expect(loop.getState().state).toBe('connected');
+			expect(loop.getState().consecutiveFailures).toBe(0);
+		});
+
+		it('treats an explicit NULL floor as a carried field, so it still triggers the fallback', async () => {
+			// `minFreeDiskBytes: null` is the one legitimate null on this
+			// payload ("the operator switched the floor off"). A truthiness
+			// test in `carriesOptionalFields` would miss it, and the beat
+			// would 400 in a loop with no retry.
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({ platform: 'linux/x64', minFreeDiskBytes: null }),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[1]).not.toHaveProperty('minFreeDiskBytes');
+			expect(loop.getState().state).toBe('connected');
+		});
+
 		it('latches, so it costs one extra request per process and not per beat', async () => {
 			const { loop, scripted } = workerBeat([rejected(), ok]);
 

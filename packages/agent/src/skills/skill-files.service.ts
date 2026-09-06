@@ -7,6 +7,7 @@ import {
     Optional,
 } from '@nestjs/common';
 import { SkillRepository } from '../database/repositories/skill.repository';
+import type { Skill } from '../entities/skill.entity';
 import { SkillFileRepository } from '../database/repositories/skill-file.repository';
 import { SkillFile, SKILL_FILE_KINDS, type SkillFileKind } from '../entities/skill-file.entity';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -93,7 +94,7 @@ export class SkillFilesService {
     }
 
     async add(userId: string, input: AddSkillFileInput): Promise<SkillFile> {
-        await this.assertOwnedSkill(userId, input.skillId);
+        const skill = await this.assertOwnedSkill(userId, input.skillId);
 
         const filename = input.filename?.trim();
         if (!filename || filename.length > 255 || /[/\\]|\.\.|[\0-\x1f]/.test(filename)) {
@@ -139,6 +140,22 @@ export class SkillFilesService {
             kind: input.kind ?? defaultKindForFilename(filename),
             sizeBytes: Math.floor(input.sizeBytes),
             mime: input.mime,
+            // Stamped from the PARENT Skill, not from the request scope.
+            //
+            // `ScopeStampingSubscriber` would otherwise fill these from
+            // whatever scope the request carried, and this path does not
+            // require the two to agree: `assertOwnedSkill` checks ownership
+            // only, so a personal-scope request may legitimately add a file to
+            // an Organization-scoped Skill. The row would then contradict its
+            // own parent, and nothing downstream could tell that from a
+            // genuinely personal file.
+            //
+            // The subscriber only fills a column that is `undefined`, so an
+            // explicit value wins. Reads are untouched — `SkillFileRepository`
+            // filters by `{skillId, userId}` and never by scope — which is why
+            // this fixes the stamp without narrowing anyone's access.
+            tenantId: skill.tenantId ?? null,
+            organizationId: skill.organizationId ?? null,
         });
         await this.logActivity(userId, input.skillId, filename, 'added');
         return created;
@@ -180,8 +197,17 @@ export class SkillFilesService {
         }
     }
 
-    private async assertOwnedSkill(userId: string, skillId: string): Promise<void> {
+    /**
+     * Returns the Skill rather than discarding it, so a caller that needs to
+     * stamp a child row from its parent's scope does not have to load it a
+     * second time. Ownership only — deliberately NOT scope-filtered, because
+     * `SkillRepository.findByIdAndUser` is how every Skill read works and
+     * narrowing it here would hide a user's own Skills from them depending on
+     * which tab they were standing in.
+     */
+    private async assertOwnedSkill(userId: string, skillId: string): Promise<Skill> {
         const skill = await this.skills.findByIdAndUser(skillId, userId);
         if (!skill) throw new NotFoundException(`Skill ${skillId} not found.`);
+        return skill;
     }
 }

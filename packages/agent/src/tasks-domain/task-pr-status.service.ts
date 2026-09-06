@@ -1,11 +1,15 @@
 import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import type { GitDiffResult, GitPullRequestStatus } from '@ever-works/plugin';
 import { DEFAULT_DIFF_MAX_BYTES, DEFAULT_DIFF_MAX_FILES, capChecks } from '@ever-works/plugin';
+import { normalizeCommitSha } from '@ever-works/contracts';
 import { Task, TaskStatus } from '../entities/task.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitFacadeService } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
+import { TaskMergeGateService } from './task-merge-gate.service';
+import { TaskCiAutoResumeService } from './task-ci-auto-resume.service';
+import { classifyCheckResult, computeCiFailureKey } from './task-ci-auto-resume';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -37,6 +41,13 @@ import { TaskTransitionService } from './task-transition.service';
  *     status write, so the approver + blocker gates keep holding. A Task
  *     whose approvals are still pending simply stays in review — the
  *     merge is recorded, the transition is not forced.
+ *  6. **This is also where the MERGE question gets re-asked** (merge
+ *     approval, self-build slice AE). A provider read is the only moment
+ *     the platform knows whether a pull request is green, so every
+ *     successful refresh hands the LIVE status to
+ *     `TaskMergeGateService`, which raises the human approval for a green
+ *     pull request and lands an approved one. Best-effort, per rule 4:
+ *     the gate can never fail a status refresh.
  */
 
 /** Minimum seconds between two provider reads for the same Task. */
@@ -96,6 +107,17 @@ export class TaskPrStatusService {
         private readonly works: WorkRepository,
         @Optional() private readonly gitFacade?: GitFacadeService,
         @Optional() private readonly transitions?: TaskTransitionService,
+        // Merge approval (self-build slice AE, EW-805) — the post-CI
+        // re-evaluation of the merge. Appended LAST + @Optional() per the
+        // positional-spec arity rule; absent, this service behaves exactly
+        // as it did before the slice (refresh the cache, land merged PRs).
+        @Optional() private readonly mergeGate?: TaskMergeGateService,
+        // CI feedback + autonomous fix loop (slice AC, EW-806). Appended
+        // LAST and @Optional(), the house positional convention: every
+        // existing call site and positional test construction keeps its
+        // meaning, and an install without the fix loop polls exactly as
+        // it did before.
+        @Optional() private readonly autoResume?: TaskCiAutoResumeService,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -242,6 +264,8 @@ export class TaskPrStatusService {
                 if (after.prState === 'merged' && before !== 'merged') {
                     summary.merged += 1;
                     if (await this.completeOnMerge(after)) summary.completed += 1;
+                } else {
+                    await this.offerRedGateToFixLoop(after);
                 }
             } catch (error) {
                 summary.failed += 1;
@@ -254,6 +278,80 @@ export class TaskPrStatusService {
         }
 
         return summary;
+    }
+
+    /**
+     * CI feedback + autonomous fix loop (slice AC, EW-806) — the SAFETY
+     * NET behind the webhook.
+     *
+     * The webhook is a one-shot: a red result refused for a TRANSIENT
+     * reason (`run-in-flight`, because the run that pushed the branch is
+     * still posting the PR link when CI reports; `awaiting-human`, until
+     * the owner answers) is refused forever, because nothing re-delivers
+     * it. Every envelope for that push has already been ingested, so a
+     * GitHub redelivery short-circuits as a duplicate, and when the run
+     * finally ends there is no further CI event to arrive. The Task's red
+     * build was then never retried — silently, with no Inbox notice.
+     *
+     * This sweep already runs every two minutes over exactly the right
+     * population (open pull requests whose verdict has gone stale, never
+     * a merged or closed one) and already has the provider's full check
+     * list in hand, so re-offering a still-red gate here costs one extra
+     * call on a Task that was going to be polled anyway.
+     *
+     * It cannot double-spend: the evaluator's claim key is
+     * `ci:<headSha>`, so a head the webhook already resumed for is
+     * `already-claimed` on every tick thereafter, forever.
+     */
+    private async offerRedGateToFixLoop(task: Task): Promise<void> {
+        if (!this.autoResume?.onCheckResult) return;
+        if (task.ciState !== 'failing' || !task.workId || !task.prNumber) return;
+        const failing = (Array.isArray(task.prChecks) ? task.prChecks : []).filter(
+            (check) =>
+                classifyCheckResult({
+                    status: check.status,
+                    conclusion: check.conclusion ?? null,
+                }) === 'failing',
+        );
+        if (failing.length === 0) return;
+        try {
+            const target = await this.resolveRepo(task, task.userId);
+            const headSha = (task.ciHeadSha ?? '').trim();
+            if (!headSha) return;
+            await this.autoResume.onCheckResult({
+                // Platform state throughout — this path has no webhook
+                // body to be tempted by.
+                userId: task.userId,
+                owner: target.owner,
+                repo: target.repo,
+                headSha,
+                headBranch: task.branchRef ?? null,
+                prNumbers: [task.prNumber],
+                // The poll reads the PULL REQUEST, so the head it reports
+                // IS the pull request's head by construction.
+                prHeads: [{ number: task.prNumber, headSha }],
+                observedAt: task.ciCheckedAt ?? null,
+                verdict: 'failing',
+                granularity: 'check_suite',
+                checkName: failing[0].name,
+                conclusion: failing[0].conclusion ?? 'failure',
+                url: failing[0].detailsUrl ?? task.prUrl ?? null,
+                outputTitle: null,
+                outputSummary: null,
+                failureKey: computeCiFailureKey({
+                    checkNames: failing.map((check) => check.name),
+                    output: null,
+                }),
+            });
+        } catch (error) {
+            // Never a sweep failure: the fix loop is an extra, and this
+            // Task's PR status has already been refreshed successfully.
+            this.logger.warn(
+                `CI fix-loop re-offer failed for task ${task.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     // ── Internals ─────────────────────────────────────────────────────
@@ -285,6 +383,30 @@ export class TaskPrStatusService {
             }
             const patch = this.toCachePatch(status, checkedAt);
             await this.tasks.updatePrStatusCache(task.id, patch);
+            // CI feedback + autonomous fix loop (slice AC, EW-806): the
+            // provider's answer includes the pull request's CURRENT head,
+            // which is the most authoritative statement of it anywhere —
+            // better than any single check delivery, and available even on
+            // an install whose webhook is not subscribed to check events at
+            // all. Written through the same monotonic CAS the webhook uses,
+            // so the two writers cannot clobber each other; a lost CAS just
+            // means the webhook got there first and the in-memory copy is
+            // left alone.
+            const providerHead = (status.headSha ?? '').trim();
+            if (providerHead && providerHead !== task.ciHeadSha) {
+                const landed = await this.tasks
+                    .recordCiHead({
+                        taskId: task.id,
+                        expectedHeadSha: task.ciHeadSha ?? null,
+                        headSha: providerHead,
+                        seenAt: checkedAt,
+                        failing: false,
+                    })
+                    .catch(() => false);
+                if (landed) {
+                    Object.assign(task, { ciHeadSha: providerHead, ciHeadSeenAt: checkedAt });
+                }
+            }
             // Keep the branch chip honest too — a landed PR is a merged branch.
             if (status.state === 'merged' && task.branchState !== 'merged') {
                 await this.tasks
@@ -292,7 +414,27 @@ export class TaskPrStatusService {
                     .catch(() => undefined);
                 Object.assign(task, { branchState: 'merged' });
             }
-            return Object.assign(task, patch);
+            Object.assign(task, patch);
+
+            // Merge approval (self-build slice AE) — THIS is the moment
+            // the merge question can finally be answered: the provider has
+            // just told us the pull request's state, head commit and CI
+            // verdict. Best-effort by contract (rule 4 above): the gate
+            // never fails a status refresh, and it is deliberately given
+            // the LIVE `status` rather than the Task's cache.
+            if (this.mergeGate) {
+                await this.mergeGate
+                    .onPullRequestStatusRefreshed(task, status)
+                    .catch((error: unknown) => {
+                        this.logger.warn(
+                            `Task ${task.id}: merge gate threw after a PR status refresh: ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                        );
+                        return undefined;
+                    });
+            }
+            return task;
         })().finally(() => {
             this.inFlight.delete(task.id);
         });
@@ -304,11 +446,17 @@ export class TaskPrStatusService {
     private toCachePatch(
         status: GitPullRequestStatus,
         checkedAt: Date,
-    ): Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks'> {
+    ): Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks' | 'prHeadSha'> {
         return {
             prState: status.state,
             ciState: status.ciState,
             ciCheckedAt: checkedAt,
+            // Merge approval (slice AE): the head the PROVIDER reports.
+            // `recordRemotePush` still refuses to persist the head a run
+            // pushed — the remote owns the branch head — and this is the
+            // same rule from the other side: the only head worth caching
+            // is the one the provider just named.
+            prHeadSha: normalizeCommitSha(status.headSha),
             prChecks: capChecks(status.checks).map((check) => ({
                 name: check.name,
                 status: check.status,

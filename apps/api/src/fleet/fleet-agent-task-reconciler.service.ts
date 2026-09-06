@@ -225,8 +225,8 @@ export class FleetAgentTaskReconcilerService {
         // the event arrives as an ordinary `node-report`.
         //
         // Falling through from there ran the whole success path:
-        // `finalizeRemotePush` OPENED A PULL REQUEST — and can auto-merge it
-        // — for a Task the user had explicitly cancelled, then posted a
+        // `finalizeRemotePush` OPENED A PULL REQUEST for a Task the user had
+        // explicitly cancelled, then posted a
         // "run finished" chat message contradicting the cancellation.
         //
         // The terminal write itself was always safe: `markCompleted` CASes
@@ -914,6 +914,16 @@ export function parseAgentTaskResult(
     const checks = Array.isArray(raw.checks)
         ? (raw.checks as TaskCheckResult[]).filter(isCheckResult)
         : null;
+    // Setup phase (EW-807). Parsed exactly like `checks` — same defensive
+    // filter, same untrusted-wire posture — and kept in its OWN key so
+    // nothing downstream can mistake a failed install for a failed test.
+    const setup = Array.isArray(raw.setup)
+        ? (raw.setup as TaskCheckResult[]).filter(isCheckResult)
+        : null;
+    const setupStatus =
+        raw.setupStatus === 'green' || raw.setupStatus === 'red' || raw.setupStatus === 'none'
+            ? raw.setupStatus
+            : null;
     const git =
         raw.git && typeof raw.git === 'object' ? (raw.git as FleetAgentTaskResult['git']) : null;
     const model =
@@ -927,9 +937,18 @@ export function parseAgentTaskResult(
     return {
         ...(raw as FleetAgentTaskResult),
         status,
+        // Self-build slice Z (EW-796): the MCP bridge verdict, narrowed at
+        // the boundary like every other block here. The raw spread would
+        // already carry it, but untyped — and this is a value a run report
+        // renders, so a malformed shape must become `null` rather than
+        // travel as an object nobody validated. It can never carry the
+        // token: the node has no path to put one there.
+        mcp: normalizeMcpResult(raw.mcp),
         taskId: typeof raw.taskId === 'string' ? raw.taskId : '',
         runId: typeof raw.runId === 'string' ? raw.runId : null,
         checks,
+        setup,
+        setupStatus,
         git: git && typeof git.branch === 'string' ? git : null,
         model,
         mountGit,
@@ -941,6 +960,33 @@ export function parseAgentTaskResult(
         // never leak an untyped (or smuggled-field) question into the
         // parked-run path.
         question: normalizeFleetAgentTaskQuestion(redactQuestionFields(raw.question)),
+    };
+}
+
+/**
+ * Self-build slice Z — coerce the node's MCP block to `{ enabled, toolCalls,
+ * unavailableReason }` or `null`.
+ *
+ * Deliberately total: any shape that is not recognisable is `null`, which
+ * reads exactly like a run that never had a bridge. The bridge is a
+ * reporting nicety and must never be able to fail a reconcile.
+ */
+function normalizeMcpResult(raw: unknown): FleetAgentTaskResult['mcp'] {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const input = raw as Record<string, unknown>;
+    if (typeof input.enabled !== 'boolean') return null;
+    const toolCalls =
+        typeof input.toolCalls === 'number' &&
+        Number.isFinite(input.toolCalls) &&
+        input.toolCalls >= 0
+            ? Math.floor(input.toolCalls)
+            : null;
+    return {
+        enabled: input.enabled,
+        toolCalls,
+        ...(typeof input.unavailableReason === 'string'
+            ? { unavailableReason: truncate(input.unavailableReason, 500) }
+            : {}),
     };
 }
 
@@ -1253,13 +1299,29 @@ function composeFailureMessage(
         '',
         reason,
     ];
+    const describe = (entry: TaskCheckResult): string =>
+        `- ${entry.id}: ${entry.status}${entry.exitCode !== null && entry.exitCode !== undefined ? ` (exit ${entry.exitCode})` : ''}`;
+    // Setup FIRST, and under its own heading (EW-807). When setup went red
+    // nothing after it ran, so there are no failing checks to list and the
+    // reader must not be left hunting for one: the workspace was never
+    // prepared, which is a different problem with a different fix.
+    const failingSetup = result?.setup?.filter((entry) => entry.status !== 'green') ?? [];
+    if (result?.setupStatus === 'red' && failingSetup.length > 0) {
+        lines.push(
+            '',
+            'Setup failed — the workspace was never prepared, so no acceptance check ran:',
+            ...failingSetup.map(describe),
+        );
+        const setupTail = failingSetup.find((entry) => entry.logTail)?.logTail;
+        if (setupTail) {
+            lines.push('', 'Setup output tail:', '```', truncate(setupTail, MAX_TAIL_CHARS), '```');
+        }
+    }
     const failing = result?.checks?.filter((check) => check.status !== 'green') ?? [];
     if (failing.length > 0) {
         lines.push('', 'Failing checks:');
         for (const check of failing) {
-            lines.push(
-                `- ${check.id}: ${check.status}${check.exitCode !== null && check.exitCode !== undefined ? ` (exit ${check.exitCode})` : ''}`,
-            );
+            lines.push(describe(check));
         }
     }
     const tail = result?.model?.outputTail ?? result?.model?.summary ?? null;

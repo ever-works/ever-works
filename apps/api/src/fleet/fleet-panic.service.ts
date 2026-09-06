@@ -13,6 +13,18 @@ import type {
 import { FLEET_CANCEL_IN_FLIGHT_MAX_IDS, FLEET_JOB_CANCEL_STATES } from '@ever-works/contracts';
 import { correlateAgentTaskJob } from './fleet-agent-task.correlation';
 
+/** How one per-node drain should be recorded (EW-799). */
+export interface DrainNodeOptions {
+    /** What produced the drain — `node-drain` (the route) or `drain-all`. */
+    via?: string;
+    /**
+     * True when the CALLER records the decision. Drain-all sets it: its
+     * aggregate row already names every node it touched, and N per-node
+     * rows beside it would bury the row an operator came to read.
+     */
+    suppressAudit?: boolean;
+}
+
 export interface CancelInFlightOptions {
     /** Also fail every job still `queued` for the owner. Default false. */
     includeQueued?: boolean;
@@ -68,10 +80,56 @@ export class FleetPanicService {
         userId: string,
         nodeId: string,
         drain: boolean,
+        options: DrainNodeOptions = {},
     ): Promise<FleetNodeDrainResult> {
-        const node = await this.fleet.setDisabledForUser(userId, nodeId, drain);
+        // Read the REAL prior status when this method is the one that
+        // will record the row. Inferring it from the request
+        // (`drained: !drain`) reads plausibly and is wrong exactly when
+        // an operator needs the trail: draining an already-disabled node
+        // would file a row claiming it had been running. Best-effort —
+        // an unreadable `before` degrades the delta, it must not cost the
+        // caller their drain. Skipped entirely under drain-all, which
+        // suppresses these rows anyway and must not pay N extra reads.
+        const before = options.suppressAudit ? null : await this.readStatus(userId, nodeId);
+        // `suppress: true`: a drain is ONE decision, and this method is
+        // the one that owns it. Letting `setDisabledForUser` audit as well
+        // would file a `node.disable` row beside every `node.drain` row —
+        // and, under drain-all, N pairs plus the aggregate.
+        const node = await this.fleet.setDisabledForUser(userId, nodeId, drain, {
+            suppress: true,
+        });
         const releasedJobs = drain ? await this.jobs.releaseClaimsForNode(userId, nodeId) : 0;
+        // Under drain-all the aggregate row is the record of the
+        // decision; per-node rows there would be noise, so the caller
+        // suppresses these too.
+        if (!options.suppressAudit) {
+            await this.audit.recordNodeAction({
+                action: 'node.drain',
+                actorUserId: userId,
+                ownerUserId: userId,
+                nodeId,
+                before: before ? { status: before, drained: before === 'disabled' } : null,
+                after: { status: node.status, drained: drain },
+                extra: { releasedJobs, via: options.via ?? 'node-drain' },
+            });
+        }
         return { node, releasedJobs };
+    }
+
+    /**
+     * The node's CURRENT status, or null when it cannot be read.
+     *
+     * Owner-scoped through the registry (a foreign id throws, exactly as
+     * the drain itself would) and never allowed to throw outward: it
+     * exists only to make one audit field truthful, and bookkeeping must
+     * never be the reason a drain does not happen.
+     */
+    private async readStatus(userId: string, nodeId: string): Promise<string | null> {
+        try {
+            return (await this.fleet.getForUser(userId, nodeId)).status;
+        } catch {
+            return null;
+        }
     }
 
     /**
@@ -95,7 +153,10 @@ export class FleetPanicService {
                 continue;
             }
             try {
-                const result = await this.drainNodeForUser(userId, node.id, true);
+                const result = await this.drainNodeForUser(userId, node.id, true, {
+                    via: 'drain-all',
+                    suppressAudit: true,
+                });
                 drainedIds.push(node.id);
                 releasedJobs += result.releasedJobs;
                 views.push(result.node);
@@ -223,7 +284,16 @@ export class FleetPanicService {
         };
     }
 
-    /** Audit after the action; a failure is logged and reported, never thrown. */
+    /**
+     * Audit after the action; a failure is logged and reported, never
+     * thrown.
+     *
+     * Left calling `record()` directly rather than the writer's own
+     * `tryRecord()` (EW-799 lifted this posture into `FleetAuditService`
+     * for the twenty new lifecycle call sites). The two are behaviourally
+     * identical; keeping this one as it is means the EW-778 panic paths
+     * and the spec that pins them are untouched by this slice.
+     */
     private async tryAudit(
         action: FleetAuditAction,
         userId: string,

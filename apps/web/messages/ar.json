@@ -623,6 +623,7 @@
                 "schedule_task": "جدولة مهمة",
                 "send_message": "إرسال رسالة",
                 "budget_override": "تجاوز الميزانية",
+                "merge_pull_request": "دمج طلب السحب",
                 "other": "إجراء"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "تم رفض الإجراء",
                 "bulkApproved": "تمت الموافقة على {count} إجراءات",
                 "bulkApprovedSkipped": "تمت الموافقة على {approved} إجراءات، و{skipped} تم البت فيها مسبقًا",
+                "bulkApprovedExcluded": "تمت الموافقة على {approved} إجراءات؛ {excluded} بحاجة إلى قرار فردي",
                 "error": "حدث خطأ ما. يُرجى المحاولة مرة أخرى."
             }
         },
@@ -1160,6 +1162,7 @@
                     "schedule_task": "جدولة مهمة",
                     "send_message": "إرسال رسالة",
                     "budget_override": "تجاوز الميزانية",
+                    "merge_pull_request": "دمج طلب السحب",
                     "other": "أخرى"
                 },
                 "save": "حفظ الضوابط",
@@ -3567,7 +3570,22 @@
                     "unknown": "Unknown"
                 },
                 "workerStateReason": "Reason: {reason}",
-                "workerStateSince": "Since {time}"
+                "workerStateSince": "Since {time}",
+                "housekeeping": {
+                    "title": "Disk & workspaces",
+                    "disk": {
+                        "ok": "Above floor",
+                        "below": "Below floor",
+                        "unknown": "Unknown"
+                    },
+                    "diskFigures": "{free} free, floor {floor}",
+                    "noFloor": "off",
+                    "unknownValue": "unknown",
+                    "workspaces": "{count} workspaces using {size}",
+                    "lastReclaim": "Last reclaimed {time}, freed {freed}",
+                    "neverReclaimed": "No reclaim reported yet — this node has never swept its workspaces.",
+                    "notReported": "Housekeeping not reported by this node."
+                }
             },
             "jobRuntime": {
                 "title": "Job Runtime",

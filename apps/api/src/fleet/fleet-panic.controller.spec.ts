@@ -62,7 +62,14 @@ function job(over: Partial<FleetJobView> = {}): FleetJobView {
  */
 describe('FleetPanicService', () => {
     let calls: string[];
-    let fleet: { listEnrolledForUser: jest.Mock; setDisabledForUser: jest.Mock };
+    let fleet: {
+        listEnrolledForUser: jest.Mock;
+        setDisabledForUser: jest.Mock;
+        // EW-799 — the owner-scoped read behind the `node.drain` row's
+        // `before`, so the trail states the status the node actually had
+        // rather than inferring it from what was requested.
+        getForUser: jest.Mock;
+    };
     let jobs: {
         releaseClaimsForNode: jest.Mock;
         activeForUser: jest.Mock;
@@ -70,7 +77,7 @@ describe('FleetPanicService', () => {
         cancel: jest.Mock;
     };
     let agentRuns: { cancel: jest.Mock };
-    let audit: { record: jest.Mock };
+    let audit: { record: jest.Mock; recordNodeAction: jest.Mock };
     let service: FleetPanicService;
 
     beforeEach(() => {
@@ -86,6 +93,7 @@ describe('FleetPanicService', () => {
                 calls.push(`disable:${id}`);
                 return node({ id, status: disabled ? 'disabled' : 'offline' });
             }),
+            getForUser: jest.fn(async (_user: string, id: string) => node({ id })),
         };
         jobs = {
             releaseClaimsForNode: jest.fn(async (_user: string, id: string) => {
@@ -122,7 +130,12 @@ describe('FleetPanicService', () => {
                 return { found: true, previousStatus: 'running', triggerRunId: null, workId: 'w' };
             }),
         };
-        audit = { record: jest.fn(async () => ({ id: 'audit-1' })) };
+        audit = {
+            record: jest.fn(async () => ({ id: 'audit-1' })),
+            // EW-799 — the lifecycle-row entry point; never throws by
+            // contract, so the stub returns a boolean, not a row.
+            recordNodeAction: jest.fn(async () => true),
+        };
         service = new FleetPanicService(
             fleet as never,
             jobs as never,
@@ -141,7 +154,15 @@ describe('FleetPanicService', () => {
         it('disables FIRST, then requeues the claims', async () => {
             const result = await service.drainNodeForUser('user-1', 'node-online', true);
             expect(calls).toEqual(['disable:node-online', 'release:node-online']);
-            expect(fleet.setDisabledForUser).toHaveBeenCalledWith('user-1', 'node-online', true);
+            expect(fleet.setDisabledForUser).toHaveBeenCalledWith(
+                'user-1',
+                'node-online',
+                true,
+                // EW-799: the drain suppresses the inner
+                // `node.disable` row — the drain IS the decision,
+                // and two rows for one act is not a better trail.
+                { suppress: true },
+            );
             expect(jobs.releaseClaimsForNode).toHaveBeenCalledWith('user-1', 'node-online');
             expect(result).toEqual({
                 node: expect.objectContaining({ status: 'disabled' }),
@@ -154,6 +175,52 @@ describe('FleetPanicService', () => {
             expect(jobs.releaseClaimsForNode).not.toHaveBeenCalled();
             expect(result.releasedJobs).toBe(0);
         });
+
+        it('writes ONE node.drain row with the actor, the node and the release count', async () => {
+            // EW-799: the per-node drain used to be the one panic action
+            // that left no trace at all, while drain-all — which calls it
+            // — was audited.
+            await service.drainNodeForUser('user-1', 'node-online', true);
+
+            expect(audit.recordNodeAction).toHaveBeenCalledTimes(1);
+            expect(audit.recordNodeAction).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'node.drain',
+                    actorUserId: 'user-1',
+                    ownerUserId: 'user-1',
+                    nodeId: 'node-online',
+                    // The status the node ACTUALLY had, read before the
+                    // disable — not inferred from what was requested.
+                    before: { status: 'online', drained: false },
+                    after: expect.objectContaining({ status: 'disabled', drained: true }),
+                    extra: expect.objectContaining({ releasedJobs: 1, via: 'node-drain' }),
+                }),
+            );
+        });
+
+        it('states the status the node ACTUALLY had, not the one the request implies', async () => {
+            // Draining an already-disabled node is the case the inferred
+            // `before` got wrong: it filed a row claiming the machine had
+            // been running.
+            fleet.getForUser.mockResolvedValueOnce(node({ id: 'node-online', status: 'disabled' }));
+
+            await service.drainNodeForUser('user-1', 'node-online', true);
+
+            expect(audit.recordNodeAction).toHaveBeenCalledWith(
+                expect.objectContaining({ before: { status: 'disabled', drained: true } }),
+            );
+        });
+
+        it('an unreadable prior status degrades the delta, it does not cost the drain', async () => {
+            fleet.getForUser.mockRejectedValueOnce(new Error('db down'));
+
+            const result = await service.drainNodeForUser('user-1', 'node-online', true);
+
+            expect(result.node.status).toBe('disabled');
+            expect(audit.recordNodeAction).toHaveBeenCalledWith(
+                expect.objectContaining({ before: null }),
+            );
+        });
     });
 
     describe('drainAllForUser', () => {
@@ -163,8 +230,24 @@ describe('FleetPanicService', () => {
             expect(fleet.listEnrolledForUser).toHaveBeenCalledWith('user-1');
             // Enrolling + disabled are skipped; the two online nodes drain.
             expect(fleet.setDisabledForUser).toHaveBeenCalledTimes(2);
-            expect(fleet.setDisabledForUser).toHaveBeenCalledWith('user-1', 'node-online', true);
-            expect(fleet.setDisabledForUser).toHaveBeenCalledWith('user-1', 'node-busy', true);
+            expect(fleet.setDisabledForUser).toHaveBeenCalledWith(
+                'user-1',
+                'node-online',
+                true,
+                // EW-799: the drain suppresses the inner
+                // `node.disable` row — the drain IS the decision,
+                // and two rows for one act is not a better trail.
+                { suppress: true },
+            );
+            expect(fleet.setDisabledForUser).toHaveBeenCalledWith(
+                'user-1',
+                'node-busy',
+                true,
+                // EW-799: the drain suppresses the inner
+                // `node.disable` row — the drain IS the decision,
+                // and two rows for one act is not a better trail.
+                { suppress: true },
+            );
             expect(fleet.setDisabledForUser).not.toHaveBeenCalledWith(
                 'user-1',
                 'node-enrolling',
@@ -190,6 +273,18 @@ describe('FleetPanicService', () => {
             expect(result.nodes).toHaveLength(4);
             expect(result.nodes.find((n) => n.id === 'node-online')?.status).toBe('disabled');
             expect(result.nodes.find((n) => n.id === 'node-enrolling')?.status).toBe('enrolling');
+        });
+
+        it('records the drain-all decision ONCE, not once per node', async () => {
+            // EW-799: per-node drains under drain-all are suppressed, so
+            // the aggregate row (written through `record`) stays the one
+            // record of the decision instead of being buried under N
+            // `node.drain` rows.
+            await service.drainAllForUser('user-1');
+            expect(audit.record).toHaveBeenCalledTimes(1);
+            expect(audit.recordNodeAction).not.toHaveBeenCalled();
+            // And it pays no per-node read for a `before` it will not file.
+            expect(fleet.getForUser).not.toHaveBeenCalled();
         });
 
         it('is scoped to the SESSION user — a different session drains a different owner', async () => {
@@ -336,6 +431,8 @@ describe('FleetPanicService', () => {
 describe('FleetPanicController', () => {
     let panic: { drainAllForUser: jest.Mock; cancelInFlightForUser: jest.Mock };
     let killSwitch: { publicState: jest.Mock; state: jest.Mock };
+    /** EW-799 — rotate-all is a whole-fleet owner verb, so it lives here. */
+    let rotator: { queueRotationForUser: jest.Mock };
     let controller: FleetPanicController;
 
     beforeEach(() => {
@@ -370,7 +467,20 @@ describe('FleetPanicController', () => {
             })),
             state: jest.fn(),
         };
-        controller = new FleetPanicController(panic as never, killSwitch as never);
+        rotator = {
+            // EW-799 — rotate-all QUEUES; it never mints a credential here.
+            queueRotationForUser: jest.fn(async () => ({
+                queuedNodes: 2,
+                skippedNodes: 1,
+                nodes: [],
+                auditFailed: false,
+            })),
+        };
+        controller = new FleetPanicController(
+            panic as never,
+            killSwitch as never,
+            rotator as never,
+        );
     });
 
     it('drain-all is scoped to the SESSION user', async () => {
@@ -396,6 +506,22 @@ describe('FleetPanicController', () => {
         expect(panic.cancelInFlightForUser).not.toHaveBeenCalled();
     });
 
+    it('rotate-all is scoped to the SESSION user', async () => {
+        await controller.rotateAll(auth);
+        expect(rotator.queueRotationForUser).toHaveBeenCalledWith('user-1');
+        await controller.rotateAll(otherAuth);
+        expect(rotator.queueRotationForUser).toHaveBeenLastCalledWith('user-2');
+    });
+
+    it('rotate-all reports what it QUEUED and returns no credential', async () => {
+        const result = await controller.rotateAll(auth);
+        expect(result).toMatchObject({ queuedNodes: 2, skippedNodes: 1, auditFailed: false });
+        // The point of queueing: only the machine can store a new secret,
+        // so this response must never carry one.
+        expect(JSON.stringify(result)).not.toContain('secret');
+        expect(JSON.stringify(result)).not.toContain('token');
+    });
+
     it('GET kill-switch answers the PUBLIC projection — the actor is never in it', async () => {
         const state = await controller.killSwitchState();
         expect(killSwitch.publicState).toHaveBeenCalledTimes(1);
@@ -408,7 +534,12 @@ describe('FleetPanicController', () => {
         const guards = Reflect.getMetadata('__guards__', FleetPanicController) ?? [];
         expect(guards).toContain(FleetEnabledGuard);
         expect(Reflect.getMetadata(IS_PUBLIC_KEY, FleetPanicController)).toBeFalsy();
-        for (const route of ['drainAll', 'cancelInFlight', 'killSwitchState'] as const) {
+        for (const route of [
+            'drainAll',
+            'cancelInFlight',
+            'rotateAll',
+            'killSwitchState',
+        ] as const) {
             expect(Reflect.getMetadata(IS_PUBLIC_KEY, controller[route])).toBeFalsy();
         }
     });

@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { isAbsolute, relative, resolve, sep } from 'path';
 import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/contracts';
-import { resolveExclusiveAgentCredentials } from '@ever-works/contracts';
+import { FLEET_JOB_MAX_RESULT_BYTES, resolveExclusiveAgentCredentials } from '@ever-works/contracts';
 
 /**
  * The `acceptance-checks` executor — the node's v1 job kind.
@@ -58,6 +58,32 @@ export const CHECK_LOG_TAIL_BYTES = 4096;
 /** Upper bound on how many checks one job may carry. */
 export const MAX_CHECKS_PER_JOB = 32;
 
+/**
+ * The budget one command runs under: how long it may take when it names
+ * no timeout, the hard ceiling it is clamped to, and how much of its
+ * output is kept.
+ *
+ * A parameter rather than three module constants because the SETUP phase
+ * (EW-807) needs a different budget from an acceptance check — an install
+ * is an order of magnitude slower and prints an order of magnitude more —
+ * and the alternative was a second command runner. A node that ran its
+ * phases through two subtly-different runners would be a node whose env
+ * scrub, termination proof and exit-code semantics depend on which phase
+ * the command landed in. One runner, an explicit budget.
+ */
+export interface NodeCommandLimits {
+	defaultTimeoutSec: number;
+	maxTimeoutSec: number;
+	logTailBytes: number;
+}
+
+/** What every command ran under before a budget could be named. */
+export const DEFAULT_NODE_COMMAND_LIMITS: NodeCommandLimits = {
+	defaultTimeoutSec: DEFAULT_CHECK_TIMEOUT_SEC,
+	maxTimeoutSec: MAX_CHECK_TIMEOUT_SEC,
+	logTailBytes: CHECK_LOG_TAIL_BYTES
+};
+
 /** Verdict of one check. Mirrors the platform's `TaskCheckResult.status`. */
 export type NodeCheckStatus = 'green' | 'red' | 'timeout' | 'error';
 
@@ -82,9 +108,32 @@ export interface WireCheck {
 	id: string;
 	command: string;
 	cwd?: string;
+	/**
+	 * WHICH repository this command runs in (EW-807): the `mountDir` of a
+	 * mount the run provisioned, or absent for the primary worktree.
+	 *
+	 * Carried here but NOT resolved here — `executeCheck` still takes a
+	 * root directory it is told to use. `agent-task` resolves the name
+	 * through {@link resolveCommandRoot} against the provisioned
+	 * descriptor before calling in, so this module never turns an
+	 * attacker-influenceable string into a path.
+	 */
+	mountDir?: string;
 	timeoutSec?: number;
 	required?: boolean;
 	envPassthrough?: string[];
+	/**
+	 * Per-repository env grants (self-build slice Y): env var NAMES an
+	 * operator explicitly bound to a repository of this run, which open the
+	 * platform-owned refusal for those EXACT names and nothing adjacent.
+	 *
+	 * Never read off the wire (EW-807). `normalizeChecks` and
+	 * `normalizeWireCommands` both drop it, so the ONLY thing that sets it
+	 * is `withRunEnvGrants`, from the run-level `execution.envGrants` — one
+	 * origin the operator can audit, and one that a repository-declared
+	 * command is deliberately excluded from.
+	 */
+	envGrants?: string[];
 }
 
 /** Injected so the whole executor is testable without spawning processes. */
@@ -141,6 +190,20 @@ export async function runAcceptanceChecksJob(
 	}
 
 	const checks = normalizeChecks(payload.checks);
+	// EW-807: this job kind provisions ONE directory and has no mount
+	// descriptor to resolve a repository name against, so a `mountDir` here
+	// cannot be honoured. REFUSE it. Running it in `workspacePath` anyway
+	// would grade the primary worktree and report the verdict under the
+	// name of a repository nothing executed — the wrong-repository green
+	// this slice exists to delete. `agent-task` is the kind that has
+	// mounts; see `resolveCommandRoot`.
+	const mountScoped = checks.find((check) => typeof check.mountDir === 'string' && check.mountDir.length > 0);
+	if (mountScoped) {
+		throw new AcceptanceChecksPayloadError(
+			`Check '${mountScoped.id}' names repository '${mountScoped.mountDir}', but an acceptance-checks job ` +
+				`provisions no mounted repositories — route a mount-scoped check through an agent-task job`
+		);
+	}
 	if (checks.length === 0) {
 		// No checks is not a pass and not a failure — it is nothing to run.
 		throwIfCommandAborted(signal);
@@ -158,7 +221,7 @@ export async function runAcceptanceChecksJob(
 		(check, index) => check.required !== false && results[index].status !== 'green'
 	);
 	throwIfCommandAborted(signal);
-	return { gateStatus: anyRequiredFailed ? 'red' : 'green', results };
+	return fitNodeOutcomeToResultBudget({ gateStatus: anyRequiredFailed ? 'red' : 'green', results });
 }
 
 /**
@@ -189,6 +252,11 @@ export function normalizeChecks(raw: unknown): WireCheck[] {
 		}
 		const out: WireCheck = { id, command };
 		if (typeof check.cwd === 'string' && check.cwd.trim()) out.cwd = check.cwd.trim();
+		// Copied through, not validated: `resolveCommandRoot` refuses a name
+		// that is not a mount THIS RUN provisioned, and that membership test
+		// is the gate that matters. Validating the shape twice, in two
+		// places, is how the two gates drift apart.
+		if (typeof check.mountDir === 'string' && check.mountDir.trim()) out.mountDir = check.mountDir.trim();
 		if (typeof check.timeoutSec === 'number') out.timeoutSec = check.timeoutSec;
 		if (typeof check.required === 'boolean') out.required = check.required;
 		if (Array.isArray(check.envPassthrough)) {
@@ -219,14 +287,15 @@ async function executeCheck(
 	check: WireCheck,
 	rootCwd: string,
 	io: AcceptanceChecksIo,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	limits: NodeCommandLimits = DEFAULT_NODE_COMMAND_LIMITS
 ): Promise<NodeCheckResult> {
 	const spawnFn = io.spawnFn ?? spawn;
 	const now = io.now ?? (() => Date.now());
 	const cwd = await resolveStepCwd(rootCwd, check.cwd);
 	const timeoutSec = Math.min(
-		typeof check.timeoutSec === 'number' && check.timeoutSec > 0 ? check.timeoutSec : DEFAULT_CHECK_TIMEOUT_SEC,
-		MAX_CHECK_TIMEOUT_SEC
+		typeof check.timeoutSec === 'number' && check.timeoutSec > 0 ? check.timeoutSec : limits.defaultTimeoutSec,
+		limits.maxTimeoutSec
 	);
 	const startedAt = now();
 
@@ -274,7 +343,7 @@ async function executeCheck(
 				shell: true,
 				detached: process.platform !== 'win32',
 				windowsHide: true,
-				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv)
+				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv, check.envGrants)
 			});
 		} catch (error) {
 			tail = error instanceof Error ? error.message : String(error);
@@ -319,8 +388,15 @@ async function executeCheck(
 			);
 		}, timeoutSec * 1000);
 
+		// BYTES, not UTF-16 code units (EW-807). `String.prototype.slice`
+		// counts code units, and `logTailBytes` is named, documented and
+		// BUDGETED in bytes against `FLEET_JOB_MAX_RESULT_BYTES`. Every
+		// character a package manager draws its progress with (`│ └ ─ ✔ ⠙`)
+		// is one code unit and three UTF-8 bytes, so a code-unit window is a
+		// 3x overrun on exactly the phase — the install — whose whole purpose
+		// is to run the loudest tools in the toolchain.
 		const append = (chunk: Buffer | string): void => {
-			tail = (tail + chunk.toString()).slice(-CHECK_LOG_TAIL_BYTES);
+			tail = tailUtf8Bytes(tail + chunk.toString(), limits.logTailBytes);
 		};
 		child.stdout?.on('data', append);
 		child.stderr?.on('data', append);
@@ -403,6 +479,116 @@ function sameFilesystemPath(left: string, right: string): boolean {
 }
 
 /**
+ * Last `maxBytes` UTF-8 bytes of `text`. Bytes, never code units.
+ *
+ * Cuts on a CODEPOINT boundary. A naive byte slice can land inside a
+ * multi-byte sequence, and the orphaned continuation bytes decode to
+ * U+FFFD — three bytes each, where the fragment was one or two. That
+ * makes the "bounded" tail longer than its bound, which is the exact
+ * arithmetic this function exists to get right.
+ */
+export function tailUtf8Bytes(text: string, maxBytes: number): string {
+	if (maxBytes <= 0) return '';
+	const buffer = Buffer.from(text, 'utf8');
+	if (buffer.length <= maxBytes) return text;
+	let start = buffer.length - maxBytes;
+	// 0b10xxxxxx is a continuation byte: walk forward off the partial
+	// codepoint, which can only ever shorten the result.
+	while (start < buffer.length && (buffer[start] & 0xc0) === 0x80) start += 1;
+	return buffer.subarray(start).toString('utf8');
+}
+
+/**
+ * Text fields a node outcome may shed, largest first, when the assembled
+ * result would not fit the platform's hard cap. Every one of them is a
+ * TAIL or an EXCERPT already — losing more of it loses detail, never a
+ * verdict.
+ */
+const SHRINKABLE_RESULT_TEXT_KEYS: readonly string[] = [
+	'logTail',
+	'summary',
+	'stdoutExcerpt',
+	'stderrExcerpt',
+	'failureReason'
+];
+
+/** Below this, a tail is noise; drop the key rather than keep shaving it. */
+const MIN_KEPT_TEXT_BYTES = 192;
+
+/**
+ * Fit an executor outcome inside the platform's result cap by shedding LOG
+ * TEXT, so a run that actually succeeded is never recorded as a failure
+ * (EW-807).
+ *
+ * ## The failure this removes
+ *
+ * `FleetJobService.completeJob` measures `JSON.stringify(result)` against
+ * `FLEET_JOB_MAX_RESULT_BYTES` and throws `BadRequestException` over it.
+ * The worker loop catches that, warns, returns `false` from `report`, and
+ * the `if (!accepted) throw` lands in its own catch — which re-reports the
+ * job as `{ success: false }`. `completeJob` discards the result on a
+ * failure report, so the ENTIRE outcome is thrown away: the gate verdict,
+ * the setup block, the owner question, and `git.branch`, which the
+ * reconciler needs to open the pull request. A run that installed, ran the
+ * model, passed every check and PUSHED A BRANCH is filed as failed with a
+ * message about leases, and its branch is orphaned.
+ *
+ * A per-command byte window alone cannot prevent that: the caps multiply
+ * (8 setup steps x 8 KiB + 16 steps x 4 KiB + 32 checks x 4 KiB is the
+ * cap exactly), and `redactCommandResult` can GROW a tail by replacing a
+ * short secret with the longer `[redacted]`. So the assembled result is
+ * measured the way the platform measures it and trimmed until it fits.
+ *
+ * Losing the last kilobyte of an install log is a bad outcome. Losing the
+ * verdict of a green run, its pushed branch and its owner question is a
+ * much worse one, and that is the trade this makes explicit.
+ *
+ * Round-trips through JSON deliberately: JSON is what the platform
+ * measures, so measuring anything else would be measuring the wrong thing.
+ */
+export function fitNodeOutcomeToResultBudget<T>(outcome: T, budgetBytes = FLEET_JOB_MAX_RESULT_BYTES): T {
+	const measured = (value: unknown): number => Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8');
+	if (measured(outcome) <= budgetBytes) return outcome;
+
+	const clone = JSON.parse(JSON.stringify(outcome)) as T;
+	const holders: Array<{ owner: Record<string, unknown>; key: string }> = [];
+	const walk = (node: unknown, depth: number): void => {
+		if (depth > 8 || node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const entry of node) walk(entry, depth + 1);
+			return;
+		}
+		const record = node as Record<string, unknown>;
+		for (const [key, value] of Object.entries(record)) {
+			if (typeof value === 'string' && SHRINKABLE_RESULT_TEXT_KEYS.includes(key)) {
+				holders.push({ owner: record, key });
+			} else {
+				walk(value, depth + 1);
+			}
+		}
+	};
+	walk(clone, 0);
+
+	// Bounded by construction: every pass either halves the largest text
+	// field or deletes it, so the loop runs out of text before it runs out
+	// of iterations.
+	for (let pass = 0; pass < 512; pass += 1) {
+		if (measured(clone) <= budgetBytes) return clone;
+		let largest: { owner: Record<string, unknown>; key: string; bytes: number } | null = null;
+		for (const holder of holders) {
+			const value = holder.owner[holder.key];
+			if (typeof value !== 'string' || value.length === 0) continue;
+			const bytes = Buffer.byteLength(value, 'utf8');
+			if (!largest || bytes > largest.bytes) largest = { ...holder, bytes };
+		}
+		if (!largest) break;
+		if (largest.bytes <= MIN_KEPT_TEXT_BYTES) delete largest.owner[largest.key];
+		else largest.owner[largest.key] = tailUtf8Bytes(String(largest.owner[largest.key]), largest.bytes >> 1);
+	}
+	return clone;
+}
+
+/**
  * THE command runner every node job kind goes through.
  *
  * Exported so a second kind (`agent-task`) executes its steps with the
@@ -415,9 +601,15 @@ export function runNodeCommandStep(
 	step: WireCheck,
 	rootCwd: string,
 	io: AcceptanceChecksIo = {},
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	/**
+	 * The phase's budget. Omitted = the acceptance-check budget every
+	 * command ran under before the setup phase existed, so no caller that
+	 * does not pass one changes behaviour.
+	 */
+	limits: NodeCommandLimits = DEFAULT_NODE_COMMAND_LIMITS
 ): Promise<NodeCheckResult> {
-	return executeCheck(step, rootCwd, io, signal);
+	return executeCheck(step, rootCwd, io, signal, limits);
 }
 
 /** Terminate the shell and every descendant without constructing a shell command. */
@@ -624,9 +816,87 @@ export const NODE_SECRETISH_ENV_KEY_PATTERN =
 export const NODE_PLATFORM_OWNED_ENV_PATTERN =
 	/^(DATABASE_|PLATFORM_|PLUGIN_|TRIGGER_|AUTH_|BETTER_AUTH_|EVER_WORKS_|FLEET_|SMTP_|RESEND_|MAILER_|STRIPE_|SENTRY_|POSTHOG_|JITSU_|TWENTY_CRM_|K8S_|STORAGE_|AWS_|REDIS_|S3_|MINIO_|GH_|GOOGLE_|FACEBOOK_|LINKEDIN_)/i;
 
+/**
+ * The subset of the above that stays refused even WITH an explicit
+ * per-repository grant (self-build slice Y).
+ *
+ * `FLEET_` and `EVER_WORKS_` are this node's own credential namespace: a
+ * grant there would let model-driven code read the secret that leases
+ * work on this machine and then lease, complete or cancel jobs as the
+ * node. `PLUGIN_` holds the key that decrypts every tenant's env files.
+ * `AUTH_` / `BETTER_AUTH_` / `PLATFORM_` sign platform sessions. None of
+ * them is ever what an operator means by "let my test suite reach the
+ * database", so refusing them costs nothing and closes the escalation
+ * from "read one secret" to "become the platform".
+ *
+ * Mirrors `FLEET_RUN_ENV_UNGRANTABLE_PATTERN` in `@ever-works/contracts`;
+ * kept as a local literal so the refusal survives even if the payload,
+ * the platform, or the contracts package is the thing that is wrong.
+ */
+export const NODE_UNGRANTABLE_ENV_PATTERN = /^(FLEET_|EVER_WORKS_|PLUGIN_|AUTH_|BETTER_AUTH_|PLATFORM_)/i;
+
 const NODE_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const MAX_ENV_PASSTHROUGH = 32;
 const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
+
+/**
+ * THE control that makes an exact-match command allow-list mean anything
+ * on Windows (EW-807).
+ *
+ * `spawn(command, { shell: true, cwd })` on win32 is `cmd.exe /d /s /c
+ * "<command>"`, and cmd.exe resolves a bare program name from the CURRENT
+ * DIRECTORY BEFORE it consults PATH. The current directory here is the
+ * checkout — a directory whose contents are written by whoever can push
+ * to the repository, and, mid-run, by the model. So a repository that
+ * commits a three-line `pnpm.cmd` at its root turns the allow-listed,
+ * character-for-character-matched string `pnpm install --frozen-lockfile`
+ * into "run the attacker's program", with no shell metacharacter, no
+ * mid-run edit of the frozen set, and no race. The command filter would
+ * be filtering the wrong noun: it bounds what is TYPED, and cmd.exe
+ * decides what is RUN.
+ *
+ * `NoDefaultCurrentDirectoryInExePath` is the documented cmd.exe switch
+ * that removes the implicit `.` from that search. It is set here, on the
+ * env every node command is spawned with, rather than at the spawn site,
+ * because it must also reach every DESCENDANT of the shell — the package
+ * manager that shells out to `node`, the test runner that shells out to
+ * `git` — and an inherited environment is the only thing that does.
+ *
+ * Set unconditionally on every platform: it is inert off win32, and a
+ * conditional would mean the guard is absent exactly where the fleet's
+ * machines actually are.
+ */
+export const NODE_NO_CWD_IN_EXE_PATH_ENV = 'NoDefaultCurrentDirectoryInExePath';
+
+/**
+ * The POSIX half of the same hole. An empty PATH entry (`/usr/bin::/bin`,
+ * or the trailing `;` that half the Windows boxes on earth have) means
+ * "the current directory", and a literal `.` says so outright. Both are
+ * inherited from the machine, not authored by anyone who thought about
+ * this subprocess, and both re-open the hijack above.
+ */
+function withoutCurrentDirectoryPathEntries(value: string): string {
+	const separator = process.platform === 'win32' ? ';' : ':';
+	return value
+		.split(separator)
+		.filter((entry) => {
+			const trimmed = entry
+				.trim()
+				.replace(/^"(.*)"$/, '$1')
+				.trim();
+			if (trimmed === '') return false;
+			return trimmed !== '.' && trimmed !== './' && trimmed !== '.\\';
+		})
+		.join(separator);
+}
+
+/** Remove every case-spelling of a name from a built env map. */
+function deleteEnvName(env: Record<string, string>, name: string): void {
+	const upper = name.toUpperCase();
+	for (const key of Object.keys(env)) {
+		if (key.toUpperCase() === upper) delete env[key];
+	}
+}
 
 /**
  * Build the environment for one check subprocess. Never returns the
@@ -635,7 +905,14 @@ const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
  */
 export function buildNodeCheckEnv(
 	passthrough?: readonly string[] | null,
-	parentEnv: NodeJS.ProcessEnv = process.env
+	parentEnv: NodeJS.ProcessEnv = process.env,
+	/**
+	 * Per-repository env grants (self-build slice Y). Env var NAMES an
+	 * operator bound to a repository of THIS run, which may pass the
+	 * platform-owned refusal below. Absent / empty = today's behaviour
+	 * exactly: every platform-owned name is refused.
+	 */
+	platformOwnedGrants?: readonly string[] | null
 ): Record<string, string> {
 	// Windows env names are case-insensitive (`Path` vs `PATH`), so index
 	// the parent once by upper-cased name and look everything up through it.
@@ -679,7 +956,25 @@ export function buildNodeCheckEnv(
 	// both would bill the Console org for an agent meant to run on a Claude
 	// plan — silently. Keep one per family, preferring the
 	// subscription-backed credential, and say so in the log.
-	const granted = normalizePassthrough(passthrough);
+	// The instance-global passthrough and the per-repository grants meet in
+	// exactly ONE place, and the grant set is an explicit argument with an
+	// empty default. If the grants ever leaked into the global list, every
+	// repository would inherit every repository's grants.
+	//
+	// A grant is a permission in its own right, not a filter on the
+	// passthrough: a name an operator bound to a repository is admitted
+	// whether or not the instance-global list also mentions it. The two
+	// lists are capped independently (32 each, matching the registry) and
+	// merged case-insensitively here, first spelling wins.
+	const grants = normalizeGrantedPlatformOwnedNames(platformOwnedGrants);
+	const granted: string[] = [];
+	const grantedSeen = new Set<string>();
+	for (const name of [...normalizePassthrough(passthrough, grants), ...grants]) {
+		const upper = name.toUpperCase();
+		if (grantedSeen.has(upper)) continue;
+		grantedSeen.add(upper);
+		granted.push(name);
+	}
 	const { names: exclusiveNames, notes } = resolveExclusiveAgentCredentials(granted, parentEnv);
 	for (const note of notes) {
 		// eslint-disable-next-line no-console
@@ -689,6 +984,24 @@ export function buildNodeCheckEnv(
 		const found = readParent(name);
 		if (found) env[found.key] = found.value;
 	}
+
+	// PROGRAM RESOLUTION (EW-807). Both of these run AFTER the allowlist,
+	// the prefix sweep and the grants, so nothing a passthrough or a grant
+	// names can re-open them — see {@link NODE_NO_CWD_IN_EXE_PATH_ENV}.
+	// The command string is exact-matched against an owner's allow-list;
+	// this is what makes that match a statement about the program that runs
+	// rather than only about the characters that were typed.
+	for (const key of Object.keys(env)) {
+		if (key.toUpperCase() !== 'PATH') continue;
+		const stripped = withoutCurrentDirectoryPathEntries(env[key]);
+		// A PATH that was ONLY current-directory entries becomes the empty
+		// string, which is itself "the current directory" to some resolvers.
+		// Drop the name so the POSIX floor below supplies a real one.
+		if (stripped) env[key] = stripped;
+		else delete env[key];
+	}
+	deleteEnvName(env, NODE_NO_CWD_IN_EXE_PATH_ENV);
+	env[NODE_NO_CWD_IN_EXE_PATH_ENV] = '1';
 
 	// `CI=1` is what a headless gate wants: it turns off watch modes and
 	// interactive prompts that would otherwise hang a check to its timeout.
@@ -706,8 +1019,60 @@ export function buildNodeCheckEnv(
 	return env;
 }
 
-/** Shape-valid, de-duplicated, capped, never platform-owned. */
-export function normalizePassthrough(names: readonly string[] | null | undefined): string[] {
+/**
+ * Shape-valid, de-duplicated, capped, and platform-owned ONLY where an
+ * operator granted that exact name.
+ *
+ * `platformOwnedGrants` is the keyhole in {@link NODE_PLATFORM_OWNED_ENV_PATTERN},
+ * and the whole security of the feature is in one word: EXACT. The
+ * refusal pattern is a PREFIX regex, so if a grant were matched by prefix
+ * a single `DATABASE_` grant would open `DATABASE_URL`,
+ * `DATABASE_PASSWORD` and everything else that starts that way. A grant
+ * therefore admits `DATABASE_URL` and NOT `DATABASE_URL_REPLICA`, not
+ * `DATABASE_HOST`, not anything adjacent. Case-insensitive because
+ * Windows env names are.
+ *
+ * The un-grantable core (`FLEET_`, `EVER_WORKS_`, `PLUGIN_`, `AUTH_`,
+ * `BETTER_AUTH_`, `PLATFORM_`) is stripped from the grant set before it
+ * reaches here — see {@link normalizeGrantedPlatformOwnedNames} — so no
+ * grant can ever hand a check the credential that leases work on this
+ * machine.
+ */
+export function normalizePassthrough(
+	names: readonly string[] | null | undefined,
+	platformOwnedGrants?: readonly string[] | null
+): string[] {
+	if (!Array.isArray(names)) return [];
+	const grantedUpper = new Set(
+		normalizeGrantedPlatformOwnedNames(platformOwnedGrants).map((name) => name.toUpperCase())
+	);
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const raw of names) {
+		if (typeof raw !== 'string') continue;
+		const name = raw.trim();
+		if (!NODE_ENV_NAME_PATTERN.test(name)) continue;
+		const upper = name.toUpperCase();
+		// EXACT-name grant, never a prefix and never a pattern.
+		if (NODE_PLATFORM_OWNED_ENV_PATTERN.test(name) && !grantedUpper.has(upper)) continue;
+		if (seen.has(upper)) continue;
+		seen.add(upper);
+		out.push(name);
+		if (out.length >= MAX_ENV_PASSTHROUGH) break;
+	}
+	return out;
+}
+
+/**
+ * The grant list as this node will actually honour it: shape-valid,
+ * wildcard-free, outside the un-grantable core, de-duplicated and capped.
+ *
+ * Re-derived here rather than trusted from the payload. The platform
+ * normalizes grants too, but this is the machine the values live on, and
+ * "the platform said so" is not a reason to hand a model-driven process a
+ * credential.
+ */
+export function normalizeGrantedPlatformOwnedNames(names: readonly string[] | null | undefined): string[] {
 	if (!Array.isArray(names)) return [];
 	const out: string[] = [];
 	const seen = new Set<string>();
@@ -715,7 +1080,8 @@ export function normalizePassthrough(names: readonly string[] | null | undefined
 		if (typeof raw !== 'string') continue;
 		const name = raw.trim();
 		if (!NODE_ENV_NAME_PATTERN.test(name)) continue;
-		if (NODE_PLATFORM_OWNED_ENV_PATTERN.test(name)) continue;
+		if (name.includes('*') || name.includes('?')) continue;
+		if (NODE_UNGRANTABLE_ENV_PATTERN.test(name)) continue;
 		const upper = name.toUpperCase();
 		if (seen.has(upper)) continue;
 		seen.add(upper);

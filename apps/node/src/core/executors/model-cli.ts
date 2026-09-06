@@ -58,6 +58,25 @@ export interface ModelCliScratchFiles {
 	resultPath: string;
 }
 
+/**
+ * Self-build slice Z (EW-796) — how the model CLI is pointed at the
+ * node's own loopback MCP proxy.
+ *
+ * `serverUrl` is ALWAYS a `http://127.0.0.1:<port>/mcp/<nonce>` URL
+ * produced by `startMcpLoopbackProxy` in this same process. It carries
+ * no credential: the token is injected by the proxy, from memory, on the
+ * way out. `configPath` is a file in the run's SCRATCH directory (never
+ * the worktree), deleted when the model step ends.
+ */
+export interface ModelCliMcpBridge {
+	/** Absolute path of the ephemeral MCP config file in scratch. */
+	configPath: string;
+	/** MCP server name — also the `mcp__<name>` tool-permission prefix. */
+	serverName: string;
+	/** Loopback URL the CLI connects to. */
+	serverUrl: string;
+}
+
 export class ModelCliCommandError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -111,6 +130,40 @@ export function quoteShellPath(path: string, platform: NodeJS.Platform = process
 	return `"${path}"`;
 }
 
+/**
+ * Slice Z — the MCP server name goes onto a command line twice (a
+ * `mcp__<name>` tool permission and a codex config KEY), so it is held to
+ * the same "opaque identifier" bar as the model id: letters, digits,
+ * underscore and hyphen only, nothing a shell or a TOML parser could
+ * read as structure.
+ */
+function assertMcpServerName(name: string): string {
+	if (typeof name !== 'string' || !MCP_SERVER_NAME_PATTERN.test(name)) {
+		throw new ModelCliCommandError('MCP server name is not an opaque identifier');
+	}
+	return name;
+}
+
+/**
+ * Slice Z — the URL the CLI is pointed at MUST be the loopback listener
+ * this very process started.
+ *
+ * Refused, not escaped, if it is anything else: this string is
+ * interpolated into a shell command AND it decides where a session with
+ * platform tools sends its calls. A value that is not
+ * `http://127.0.0.1:<port>/…` either did not come from the proxy or
+ * came from somewhere that should not be deciding it.
+ */
+function assertLoopbackUrl(url: string): string {
+	if (typeof url !== 'string' || !MCP_LOOPBACK_URL_PATTERN.test(url)) {
+		throw new ModelCliCommandError('MCP bridge URL is not a loopback URL this node produced');
+	}
+	return url;
+}
+
+const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const MCP_LOOPBACK_URL_PATTERN = /^http:\/\/127\.0\.0\.1:\d{1,5}\/mcp\/[a-f0-9]{8,64}$/;
+
 function assertModelId(model: string | undefined): string | null {
 	if (model === undefined) return null;
 	if (!FLEET_AGENT_EXECUTION_MODEL_PATTERN.test(model)) {
@@ -152,6 +205,12 @@ export function buildModelCliCommand(input: {
 	scratch: ModelCliScratchFiles;
 	/** Provisioned mounts of a multi-repo Task workspace, in spec order. */
 	mounts?: readonly FleetTaskWorkspaceMountDescriptor[];
+	/**
+	 * Slice Z — the loopback MCP bridge, when this run has one. Absent
+	 * (the default) produces byte-for-byte the command this step has
+	 * always built.
+	 */
+	mcp?: ModelCliMcpBridge;
 	platform?: NodeJS.Platform;
 }): string {
 	const platform = input.platform ?? process.platform;
@@ -216,6 +275,7 @@ export function buildModelCliCommand(input: {
 	// model every other Task's worktree and every cached repository on the
 	// machine.
 	const mounts = input.mounts ?? [];
+	const mcp = input.mcp;
 	const writableMounts = mounts.filter((mount) => mount.writable);
 	if (writableMounts.length > 0 && !fleetAgentExecutionProviderSupportsMountGrants(execution.provider)) {
 		throw new ModelCliCommandError(
@@ -236,6 +296,40 @@ export function buildModelCliCommand(input: {
 		if (execution.effort) args.push('--effort', execution.effort);
 		if (budget) args.push('--max-budget-usd', budget);
 		if (execution.skipPermissions === true) args.push('--dangerously-skip-permissions');
+		// ── Slice Z: the platform MCP bridge ────────────────────────────
+		//
+		// Three flags, and all three are load-bearing:
+		//
+		//   --mcp-config <file>   the ephemeral config in the run's scratch
+		//                         dir, pointing at 127.0.0.1. Variadic, so
+		//                         it must be followed by another flag —
+		//                         which it is, `--strict-mcp-config`.
+		//   --strict-mcp-config   use ONLY that file. Without it the CLI
+		//                         also loads the machine's own MCP servers,
+		//                         and a fleet run would inherit whatever the
+		//                         owner happens to have configured for
+		//                         themselves — servers the platform never
+		//                         vetted, in a session it is responsible for.
+		//   --allowedTools mcp__<server>
+		//                         in `-p` (non-interactive) mode an
+		//                         unapproved tool is a PROMPT, and a prompt
+		//                         with no terminal is a hang. Server-level
+		//                         rather than per-tool: the API's own route
+		//                         allowlist is what actually bounds the
+		//                         surface, and enumerating 100+ tool names
+		//                         here would drift the day one is added.
+		//
+		// Emitted before `--add-dir` so that flag stays last, exactly as
+		// the mount-grant block above requires.
+		if (mcp) {
+			args.push(
+				'--mcp-config',
+				quoteShellPath(mcp.configPath, platform),
+				'--strict-mcp-config',
+				'--allowedTools',
+				`mcp__${assertMcpServerName(mcp.serverName)}`
+			);
+		}
 		// `--add-dir <directories...>` is variadic — ONE flag, every granted
 		// directory after it. Emitted LAST so it can never swallow another
 		// option's value, and only when there is something to grant so a
@@ -253,6 +347,18 @@ export function buildModelCliCommand(input: {
 		// the effective permissions do not allow additional writable roots").
 		if (sandbox === 'workspace-write') {
 			for (const root of grantedRoots(writableMounts)) args.push('--add-dir', root);
+		}
+		// Slice Z: codex has no `--mcp-config`, but it takes arbitrary
+		// config overrides on the command line, and a streamable-HTTP MCP
+		// server is exactly one key: `mcp_servers.<name>.url`. The config
+		// FILE is still written (it is the record of what the run was
+		// given, and keeps both providers on one code path), but for codex
+		// the override on argv is what actually takes effect.
+		if (mcp) {
+			args.push(
+				'-c',
+				`mcp_servers.${assertMcpServerName(mcp.serverName)}.url=${assertLoopbackUrl(mcp.serverUrl)}`
+			);
 		}
 		if (model) args.push('-m', model);
 		if (execution.skipPermissions === true) args.push('--dangerously-bypass-approvals-and-sandbox');
@@ -315,14 +421,21 @@ export function assertMountGrantsInCommand(input: {
 export function buildModelCliStep(
 	execution: FleetAgentModelExecution,
 	command: string,
-	envPassthrough: readonly string[] | undefined
+	envPassthrough: readonly string[] | undefined,
+	/**
+	 * Per-repository env grants (self-build slice Y) — NAMES that open the
+	 * platform-owned refusal for this run. Carried onto the step so the ONE
+	 * command runner applies them the same way it applies `envPassthrough`.
+	 */
+	envGrants?: readonly string[]
 ): WireCheck {
 	return {
 		id: MODEL_CLI_STEP_ID,
 		command,
 		timeoutSec: execution.timeoutSec ?? FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC,
 		required: true,
-		...(envPassthrough && envPassthrough.length > 0 ? { envPassthrough: [...envPassthrough] } : {})
+		...(envPassthrough && envPassthrough.length > 0 ? { envPassthrough: [...envPassthrough] } : {}),
+		...(envGrants && envGrants.length > 0 ? { envGrants: [...envGrants] } : {})
 	};
 }
 
@@ -465,13 +578,85 @@ export function parseModelCliResult(
 	 * VALUES are read from this process and scrubbed out of everything the
 	 * node reports back — see {@link redactModelResult}.
 	 */
-	envPassthrough?: readonly string[]
+	envPassthrough?: readonly string[],
+	/**
+	 * Per-repository env grants (self-build slice Y). Scrubbed on exactly
+	 * the same footing as `envPassthrough`: a granted `DATABASE_URL` is a
+	 * credential the model could have echoed into its summary, and the
+	 * whole point of granting one is that it never leaves the machine.
+	 */
+	envGrants?: readonly string[],
+	/**
+	 * Where the values are read from. Defaults to this process, which is
+	 * what production uses; injectable so an embedder that supplies its own
+	 * `parentEnv` to the command runner scrubs the SAME values it granted,
+	 * rather than silently scrubbing nothing.
+	 */
+	parentEnv?: NodeJS.ProcessEnv,
+	/**
+	 * Values that are not in ANY environment — the run's delivered `.env`
+	 * file contents (self-build slice Y). The model can read those files,
+	 * and "print the contents of apps/api/.env" is exactly what a prompt
+	 * injection asks for, so they are scrubbed on the same footing as a
+	 * granted name's value.
+	 */
+	extraValues?: readonly string[]
 ): FleetAgentTaskModelResult {
-	return redactModelResult(parseModelCliOutcome(provider, rawOutput, step), collectProtectedValues(envPassthrough));
+	return redactModelResult(
+		parseModelCliOutcome(provider, rawOutput, step),
+		mergeProtectedValues(
+			collectProtectedValues([...(envPassthrough ?? []), ...(envGrants ?? [])], parentEnv),
+			extraValues
+		)
+	);
 }
 
 /** Placeholder left where a credential value was removed. */
 export const MODEL_CLI_REDACTED = '[redacted]';
+
+/**
+ * Scrub the values of `envNames` out of one command result's log tail.
+ *
+ * Run secrets (self-build slice Y): a granted `DATABASE_URL` is read by
+ * the acceptance checks and the platform-authored steps, not only by the
+ * model — and a failing `pnpm test` prints its connection string. The
+ * model result was already scrubbed; without this the SAME value would
+ * still reach the job result through a check's `logTail`.
+ *
+ * Values are read from this process at report time, exactly as
+ * `parseModelCliResult` does: the platform sends names, never values.
+ */
+export function redactCommandResult(
+	result: NodeCheckResult,
+	envNames?: readonly string[],
+	parentEnv?: NodeJS.ProcessEnv,
+	/**
+	 * Values that live in no environment: the run's delivered `.env` file
+	 * contents (self-build slice Y). A failing `pnpm test` prints the
+	 * connection string it read out of `apps/api/.env`, and that tail is
+	 * stored verbatim in `fleet_jobs.result` unless it is scrubbed here.
+	 */
+	extraValues?: readonly string[]
+): NodeCheckResult {
+	const values = mergeProtectedValues(collectProtectedValues(envNames, parentEnv), extraValues);
+	if (values.length === 0 || typeof result.logTail !== 'string') return result;
+	return { ...result, logTail: scrub(result.logTail, values) ?? result.logTail };
+}
+
+/**
+ * Union two protected-value lists, keeping the longest-first ordering
+ * {@link scrub} relies on so a value that contains another is replaced
+ * whole. Applies the same 8-character floor: a short value would redact
+ * ordinary prose out of every tail the node reports.
+ */
+function mergeProtectedValues(values: readonly string[], extra?: readonly string[]): string[] {
+	if (!extra?.length) return [...values];
+	const merged = new Set<string>(values);
+	for (const value of extra) {
+		if (typeof value === 'string' && value.trim().length >= 8) merged.add(value);
+	}
+	return [...merged].sort((a, b) => b.length - a.length);
+}
 
 /**
  * Credential values to scrub, longest first so a token that contains another
@@ -480,11 +665,23 @@ export const MODEL_CLI_REDACTED = '[redacted]';
  * Read from `process.env` at report time rather than carried on the payload:
  * the platform sends only NAMES, and the value never has to leave the node.
  */
-function collectProtectedValues(envPassthrough?: readonly string[]): string[] {
+function collectProtectedValues(
+	envPassthrough?: readonly string[],
+	parentEnv: NodeJS.ProcessEnv = process.env
+): string[] {
 	if (!envPassthrough?.length) return [];
 	const values = new Set<string>();
+	// Windows env names are case-insensitive, and the granted name may be
+	// spelled differently from the one the machine actually set.
+	const byUpperName = new Map<string, string>();
+	for (const key of Object.keys(parentEnv)) {
+		const upper = key.toUpperCase();
+		if (!byUpperName.has(upper)) byUpperName.set(upper, key);
+	}
 	for (const name of envPassthrough) {
-		const value = process.env[name];
+		if (typeof name !== 'string') continue;
+		const key = byUpperName.get(name.toUpperCase());
+		const value = key === undefined ? undefined : parentEnv[key];
 		// A short value would scrub ordinary prose. The node's own logger
 		// applies the same floor for the same reason.
 		if (typeof value === 'string' && value.trim().length >= 8) values.add(value);

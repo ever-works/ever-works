@@ -259,6 +259,56 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet (FLEET_* operator knobs)', () => {
+        describe('getEnrollmentTokenTtlMs', () => {
+            it('defaults to 15 minutes', () => {
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = String(3 * 60_000);
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(3 * 60_000);
+            });
+
+            it('floors a value that would make a token unredeemable', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = '0';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(30_000);
+            });
+
+            it('degrades a nonsense value to the default rather than NaN', () => {
+                // NaN here silently expires every token ever minted.
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = 'soon';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+        });
+
+        describe('getCredentialRotationOverlapMs (EW-799)', () => {
+            it('defaults to 15 minutes of dual-accept', () => {
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(2 * 60_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(2 * 60_000);
+            });
+
+            it('floors a window too short to finish a round-trip and a disk write', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = '1';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(30_000);
+            });
+
+            it('caps the window at 24h — past that it is a second permanent credential', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(30 * 86_400_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(86_400_000);
+            });
+
+            it('degrades a nonsense value to the default', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = 'a while';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+        });
+    });
+
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {
         describe('getApiUrl', () => {
             it('returns undefined when unset', () => {
@@ -291,6 +341,28 @@ describe('agent/config', () => {
                 (raw) => {
                     process.env.FLEET_NODE_LEASE_TTL_SECONDS = raw;
                     expect(config.fleetNode.getLeaseTtlSeconds()).toBeUndefined();
+                },
+            );
+        });
+
+        describe('isRunEnvFilesEnabled (run secrets, self-build slice Y)', () => {
+            it('defaults ON — the feature is already opt-in per repository', () => {
+                expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(true);
+            });
+
+            it.each(['false', 'FALSE', '0', ' false '])(
+                'is switched off by %s, so a run that needs env files fails closed',
+                (value) => {
+                    process.env.FLEET_NODE_RUN_ENV_FILES = value;
+                    expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(false);
+                },
+            );
+
+            it.each(['true', '1', '', 'yes'])(
+                'stays ON for %s — only an explicit off switches it off',
+                (value) => {
+                    process.env.FLEET_NODE_RUN_ENV_FILES = value;
+                    expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(true);
                 },
             );
         });
@@ -490,6 +562,59 @@ describe('agent/config', () => {
                 expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(true);
                 process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'yes';
                 expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(false);
+            });
+        });
+
+        /**
+         * Self-build slice Z (EW-796) — the operator switch for the fleet
+         * MCP bridge.
+         *
+         * Default OFF, and off in two independent ways. Handing a model on
+         * somebody's desktop a live platform credential is a deployment
+         * decision about the whole install, so a typo, an empty envsubst
+         * render or a missing server URL must all land on "no bridge"
+         * rather than on a half-configured one.
+         */
+        describe('isMcpBridgeEnabled / getMcpServerUrl (MCP bridge)', () => {
+            it('is OFF by default', () => {
+                expect(config.fleetNode.isMcpBridgeEnabled()).toBe(false);
+            });
+
+            it('turns on for the literal true/1 only', () => {
+                for (const value of ['true', 'TRUE', '1', ' true ']) {
+                    process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = value;
+                    expect(config.fleetNode.isMcpBridgeEnabled()).toBe(true);
+                }
+                // Anything else — including values a human would read as
+                // "on" — fails closed rather than guessing.
+                for (const value of ['yes', 'on', 'enabled', '2', 'false', '', '   ']) {
+                    process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = value;
+                    expect(config.fleetNode.isMcpBridgeEnabled()).toBe(false);
+                }
+            });
+
+            it('returns undefined for an unset server URL', () => {
+                expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+                process.env.FLEET_NODE_MCP_URL = '   ';
+                expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+            });
+
+            it('accepts an absolute http(s) URL and strips one trailing slash', () => {
+                process.env.FLEET_NODE_MCP_URL = 'https://mcp.ever.works/mcp';
+                expect(config.fleetNode.getMcpServerUrl()).toBe('https://mcp.ever.works/mcp');
+                process.env.FLEET_NODE_MCP_URL = ' http://localhost:3200/mcp/ ';
+                expect(config.fleetNode.getMcpServerUrl()).toBe('http://localhost:3200/mcp');
+            });
+
+            it('treats a non-URL as UNSET, which switches the bridge off', () => {
+                // Validated on the platform, where an operator reads logs,
+                // rather than on fifteen desktops — and the failure mode is
+                // "no bridge", never "a credential-bearing proxy aimed at a
+                // garbage host".
+                for (const value of ['not a url', '/mcp', 'ftp://host/mcp', 'file:///etc/passwd']) {
+                    process.env.FLEET_NODE_MCP_URL = value;
+                    expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+                }
             });
         });
     });

@@ -12,6 +12,7 @@ import { TaskWatcher } from '../entities/task-watcher.entity';
 import { TaskKbMention } from '../entities/task-kb-mention.entity';
 import { TaskTemplate } from '../entities/task-template.entity';
 import { TaskTemplateStep } from '../entities/task-template-step.entity';
+import { TaskCiAutoResumeAttempt } from '../entities/task-ci-auto-resume-attempt.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
@@ -21,6 +22,7 @@ import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
 import { TaskTemplateRepository } from '../database/repositories/task-template.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
@@ -49,11 +51,15 @@ import { TaskGraphFanoutService } from './task-graph-fanout.service';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
 import { TaskReviewRejectionService } from './task-review-rejection.service';
+import { TaskReviewApprovalService } from './task-review-approval.service';
+import { TaskMergeGateService } from './task-merge-gate.service';
 import { TaskGitLinkService } from './task-git-link.service';
 import { TaskWorkspaceService } from './task-workspace.service';
 import { TaskPrStatusService } from './task-pr-status.service';
+import { TaskCiAutoResumeService } from './task-ci-auto-resume.service';
 import { FacadesModule } from '../facades/facades.module';
 import { PolicyModule } from '../policy/policy.module';
+import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -84,6 +90,11 @@ import { DatabaseModule } from '../database/database.module';
             // `_entities-inventory.ts` (no autoLoadEntities in this repo).
             TaskTemplate,
             TaskTemplateStep,
+            // CI feedback + autonomous fix loop (slice AC, EW-806) — the
+            // durable attempt ledger that IS the retry budget. ALSO
+            // registered in `_entities-inventory.ts` (no autoLoadEntities
+            // in this repo) and in `_entity-names.ts`.
+            TaskCiAutoResumeAttempt,
             UserTaskCounter,
             WorkKnowledgeUpload,
             Work,
@@ -118,9 +129,14 @@ import { DatabaseModule } from '../database/database.module';
         // Wave 3 D4 — TaskWorkspaceService.finalizeRun records the scope
         // that governs this Work's merges in its PR-opened log line.
         PolicyModule,
+        // Merge approval (self-build slice AE, EW-805) — TaskMergeGate
+        // raises the human approval for a green pull request and verifies
+        // one before it asks for a merge.
+        MergeApprovalModule,
     ],
     providers: [
         TaskRepository,
+        TaskCiAutoResumeAttemptRepository,
         AgentRepoAttachmentRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
@@ -153,6 +169,15 @@ import { DatabaseModule } from '../database/database.module';
         // TaskReviewRejectionRepository, which AgentsModule (imported
         // above) owns and exports alongside AgentRunRepository.
         TaskReviewRejectionService,
+        // Merge approval (slice AE) — the approval twin of the rejection
+        // recorder above: a HUMAN provider review approval, stamped with
+        // the commit it was given for. Context for the person who makes
+        // the real (platform-side) merge decision; never an authorization.
+        TaskReviewApprovalService,
+        // Merge approval (slice AE) — the post-CI re-evaluation of the
+        // merge. Consumed by TaskPrStatusService right after every
+        // successful provider read.
+        TaskMergeGateService,
         // Git activity ingestion (audit item j) — read-only branch/PR →
         // Task resolver the GitHub receiver stamps onto push / commit /
         // merge events. Reads TaskRepository + WorkRepository, both
@@ -162,6 +187,15 @@ import { DatabaseModule } from '../database/database.module';
         // diff reads. Uses the git facade (FacadesModule, imported above)
         // and TaskTransitionService for the merged-PR -> done landing.
         TaskPrStatusService,
+        // CI feedback + autonomous fix loop (slice AC, EW-806) — the
+        // decision layer behind the GitHub check receiver. Reads the
+        // attempt ledger above, `AgentRunRepository` +
+        // `TaskReviewRejectionRepository` (AgentsModule, imported above)
+        // and `TaskGitLinkService`; resumes through the RUN_STEERING_PORT
+        // the api-side @Global() AgentsModule binds. Every one of those
+        // tokens is @Optional() at the injection site, so an install
+        // without them files nothing and resumes nothing.
+        TaskCiAutoResumeService,
         // Wave 3 M2 — acceptance-check runner (quality gates). Needs only
         // AgentRunRepository (exported by AgentsModule above) to persist
         // per-run gate results.
@@ -174,6 +208,7 @@ import { DatabaseModule } from '../database/database.module';
     ],
     exports: [
         TaskRepository,
+        TaskCiAutoResumeAttemptRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
         TaskApproverRepository,
@@ -198,8 +233,11 @@ import { DatabaseModule } from '../database/database.module';
         TaskRunDenormService,
         TaskWorkspaceService,
         TaskReviewRejectionService,
+        TaskReviewApprovalService,
+        TaskMergeGateService,
         TaskGitLinkService,
         TaskPrStatusService,
+        TaskCiAutoResumeService,
         TaskGateRunnerService,
         TaskGateJudgeService,
     ],

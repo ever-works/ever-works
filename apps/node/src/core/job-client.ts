@@ -1,12 +1,18 @@
 import type {
 	FleetJobCompleteResponse,
+	FleetJobEnvFilesResponse,
 	FleetJobHeartbeatResponse,
 	FleetJobLeaseResponse,
-	FleetJobView
+	FleetJobMcpCredentialResponse,
+	FleetJobMcpCredentialRevokeResponse,
+	FleetJobView,
+	FleetRunEnvFileContent,
+	FleetRunEnvFileRequestRef
 } from '@ever-works/contracts';
 import { FleetClientError, joinUrl, normalizeApiUrl, type FetchLike, type FetchRequestInit } from './fleet-client';
 import type { Logger } from './logger';
 import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH } from './types';
+import { extractRunEnvSecretValues } from './workspaces/run-env-files';
 
 /**
  * HTTP client for the three node-facing fleet-job endpoints:
@@ -14,6 +20,9 @@ import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH } from './types';
  *   POST /api/fleet/jobs/lease           → claim queued work
  *   POST /api/fleet/jobs/:id/heartbeat   → keep the claim alive
  *   POST /api/fleet/jobs/:id/complete    → report the verdict
+ *   POST /api/fleet/jobs/:id/env-files   → fetch the run's seed .env files
+ *   POST /api/fleet/jobs/:id/mcp-credential          → mint a run token
+ *   POST /api/fleet/jobs/:id/mcp-credential/revoke   → drop it early
  *
  * Same posture as {@link FleetClient}: all three are `@Public()` and
  * self-authenticating (the `(nodeId, secret)` pair in the body IS the
@@ -175,6 +184,114 @@ export class FleetJobClient {
 		return Boolean(payload?.ok);
 	}
 
+	/**
+	 * Fetch the decrypted seed `.env` files this run's repositories declared
+	 * (self-build slice Y, EW-781).
+	 *
+	 * Same channel, same credential, same four-check proof as heartbeat and
+	 * complete — deliberately not a second scheme. The REQUEST carries only
+	 * registry row ids and repository-relative paths; the RESPONSE is the
+	 * one place in this client where a secret value appears, and every
+	 * value is handed to `logger.protect` the moment it arrives, so a later
+	 * error message or debug line cannot echo it even by accident.
+	 *
+	 * Throws rather than returning null on every failure: a run must not
+	 * start with a partial environment, so "could not fetch" has to reach
+	 * the executor as a refusal, not as an empty list. `409` still means
+	 * `stale-lease` from the status alone.
+	 */
+	async fetchRunEnvFiles(
+		jobId: string,
+		refs: readonly FleetRunEnvFileRequestRef[],
+		leaseGeneration?: number
+	): Promise<FleetRunEnvFileContent[]> {
+		const body: Record<string, unknown> = {
+			nodeId: this.nodeId,
+			secret: this.secret,
+			refs: refs.map((ref) => ({ repoConnectionId: ref.repoConnectionId, paths: [...ref.paths] }))
+		};
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
+
+		const payload = (await this.post(
+			`api/fleet/jobs/${encodeURIComponent(jobId)}/env-files`,
+			'job-env-files',
+			body
+		)) as FleetJobEnvFilesResponse;
+		if (!payload || !Array.isArray(payload.files)) {
+			throw new FleetClientError('malformed', 'Run env-file response did not contain a file list');
+		}
+		const files: FleetRunEnvFileContent[] = [];
+		for (const file of payload.files) {
+			if (
+				!file ||
+				typeof file.repoConnectionId !== 'string' ||
+				typeof file.path !== 'string' ||
+				typeof file.content !== 'string'
+			) {
+				throw new FleetClientError('malformed', 'Run env-file response contained a malformed entry');
+			}
+			// Registered with the redactor BEFORE the value is used anywhere.
+			// The file as a WHOLE only ever matches a log line that reproduces
+			// it verbatim, which is not how a `.env` leaks — a failing command
+			// prints the one variable it read. So each VALUE inside it is
+			// registered as well.
+			this.logger?.protect(file.content);
+			for (const value of extractRunEnvSecretValues(file.content)) this.logger?.protect(value);
+			files.push({ repoConnectionId: file.repoConnectionId, path: file.path, content: file.content });
+		}
+		return files;
+	}
+
+	/**
+	 * Self-build slice Z (EW-796) — mint the run-scoped MCP credential for
+	 * a job this node holds.
+	 *
+	 * Authenticated with the node secret like every other call here; the
+	 * platform authorises on the LEASE, so this only succeeds while this
+	 * machine actually holds the claim. The returned token is registered
+	 * with the redacting logger before it leaves this method, so from that
+	 * instant it cannot appear in any node log line even by accident.
+	 *
+	 * The token is NOT stored on this client. It is returned to the caller
+	 * (the model step), lives in that closure, and is dropped when the
+	 * step ends.
+	 */
+	async mintMcpCredential(jobId: string): Promise<FleetJobMcpCredentialResponse> {
+		const payload = (await this.post(
+			`api/fleet/jobs/${encodeURIComponent(jobId)}/mcp-credential`,
+			'job-mcp-credential',
+			{ nodeId: this.nodeId, secret: this.secret }
+		)) as FleetJobMcpCredentialResponse;
+		if (
+			!payload ||
+			typeof payload.token !== 'string' ||
+			!payload.token ||
+			typeof payload.serverUrl !== 'string' ||
+			!payload.serverUrl
+		) {
+			throw new FleetClientError('malformed', 'MCP credential response did not contain a token');
+		}
+		this.logger?.protect(payload.token);
+		return payload;
+	}
+
+	/**
+	 * Revoke this job's run credentials early, right after the model step.
+	 *
+	 * Best-effort by contract: the platform revokes again when the job
+	 * settles and the token expires with the lease regardless, so a
+	 * failure here narrows a window rather than opening one. Returns the
+	 * number the platform actually deactivated.
+	 */
+	async revokeMcpCredential(jobId: string): Promise<number> {
+		const payload = (await this.post(
+			`api/fleet/jobs/${encodeURIComponent(jobId)}/mcp-credential/revoke`,
+			'job-mcp-credential-revoke',
+			{ nodeId: this.nodeId, secret: this.secret }
+		)) as FleetJobMcpCredentialRevokeResponse;
+		return typeof payload?.revoked === 'number' ? payload.revoked : 0;
+	}
+
 	private async post(
 		path: string,
 		operation: string,
@@ -257,6 +374,21 @@ export function errorForJobStatus(status: number, operation: string): FleetClien
 		return new FleetClientError(
 			'stale-lease',
 			'The platform holds a newer lease on this job (stale-lease); the claim this node is renewing or finalizing is void',
+			status
+		);
+	}
+	if (status === 422) {
+		// Run secrets (slice Y): reachable only by the authenticated holder
+		// of an active job, so it leaks nothing the 401 posture protects.
+		// The body carries a stable reason token which is logged
+		// platform-side against this job; this client still does not read
+		// it, because "never surface what the server wrote" is the rule
+		// that keeps every other message on this channel honest.
+		return new FleetClientError(
+			'unresolved',
+			'The platform could not resolve the env files this run asked for (unknown or disabled repository ' +
+				'connection, a path the repository no longer carries, a decryption failure, or env-file delivery ' +
+				'switched off on the instance). The precise reason is recorded platform-side against this job.',
 			status
 		);
 	}

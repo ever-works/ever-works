@@ -157,6 +157,43 @@ export const MAX_ENV_PASSTHROUGH = 32;
  */
 const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
 
+/**
+ * The switch that stops `cmd.exe` resolving a bare program name from the
+ * CURRENT DIRECTORY before it consults PATH (EW-807).
+ *
+ * A check is spawned with `shell: true` in the CHECKOUT, and a checkout is
+ * repository content. Without this, a `pnpm.cmd` committed at the
+ * repository root runs instead of pnpm for the check command `pnpm test` —
+ * the program is chosen by the repository, not by the person who authored
+ * the check. Mirrors `NODE_NO_CWD_IN_EXE_PATH_ENV` in the fleet node's
+ * `acceptance-checks.ts`; the two runtimes spawn the same user-authored
+ * commands in the same kind of directory and must not disagree about this.
+ *
+ * Set on every platform (inert off win32) and set LAST, so no allowlist
+ * entry or `envPassthrough` grant can spell it away.
+ */
+export const NO_CWD_IN_EXE_PATH_ENV = 'NoDefaultCurrentDirectoryInExePath';
+
+/**
+ * The POSIX half of the same hole: an empty PATH entry (and the trailing
+ * `;` that produces one on Windows) means "the current directory", and a
+ * literal `.` says so outright.
+ */
+function withoutCurrentDirectoryPathEntries(value: string): string {
+    const separator = process.platform === 'win32' ? ';' : ':';
+    return value
+        .split(separator)
+        .filter((entry) => {
+            const trimmed = entry
+                .trim()
+                .replace(/^"(.*)"$/, '$1')
+                .trim();
+            if (trimmed === '') return false;
+            return trimmed !== '.' && trimmed !== './' && trimmed !== '.\\';
+        })
+        .join(separator);
+}
+
 export interface BuildCheckEnvOptions {
     /**
      * Names the check explicitly opted into (`TaskAcceptanceCheck.envPassthrough`).
@@ -218,6 +255,24 @@ export function buildCheckEnv(options: BuildCheckEnvOptions = {}): Record<string
         const found = readParent(name);
         if (found) env[found.key] = found.value;
     }
+
+    // 2b. PROGRAM RESOLUTION. After the allowlist and after the grants, so
+    //     nothing either of them names can re-open it — see
+    //     {@link NO_CWD_IN_EXE_PATH_ENV}. The check command is authored by a
+    //     human; the directory it runs in is authored by the repository, and
+    //     without this the directory picks the program.
+    for (const key of Object.keys(env)) {
+        if (key.toUpperCase() !== 'PATH') continue;
+        const stripped = withoutCurrentDirectoryPathEntries(env[key]);
+        // Only-current-directory collapses to the empty string, which is
+        // itself "here" to some resolvers — drop it so the floor applies.
+        if (stripped) env[key] = stripped;
+        else delete env[key];
+    }
+    for (const key of Object.keys(env)) {
+        if (key.toUpperCase() === NO_CWD_IN_EXE_PATH_ENV.toUpperCase()) delete env[key];
+    }
+    env[NO_CWD_IN_EXE_PATH_ENV] = '1';
 
     // 3. Defaults for anything the parent did not supply, plus the PATH
     //    floor — a check whose commands cannot be resolved is useless.

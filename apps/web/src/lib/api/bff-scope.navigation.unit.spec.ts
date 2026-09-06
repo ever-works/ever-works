@@ -27,10 +27,16 @@ const base = { Authorization: 'Bearer fake-jwt' };
 
 describe('applyBffWorkspaceScopeFromNavigation', () => {
     beforeEach(() => {
+        // BOTH, because `trustedBrowserOrigin()` prefers
+        // NEXT_PUBLIC_WEB_URL. A test environment that sets it to another
+        // origin would otherwise make every matching-Referer case fail as
+        // cross-origin — the assertion would be measuring the environment.
         process.env.WEB_URL = 'http://web.example';
+        process.env.NEXT_PUBLIC_WEB_URL = 'http://web.example';
     });
     afterEach(() => {
         delete process.env.WEB_URL;
+        delete process.env.NEXT_PUBLIC_WEB_URL;
     });
 
     it('reads the Organization selector from ?scope= and forwards it as x-scope-slug', () => {
@@ -144,10 +150,16 @@ describe('applyBffWorkspaceScopeFromNavigation', () => {
 
 describe('applyBffWorkspaceScope (header variant) is unchanged', () => {
     beforeEach(() => {
+        // BOTH, because `trustedBrowserOrigin()` prefers
+        // NEXT_PUBLIC_WEB_URL. A test environment that sets it to another
+        // origin would otherwise make every matching-Referer case fail as
+        // cross-origin — the assertion would be measuring the environment.
         process.env.WEB_URL = 'http://web.example';
+        process.env.NEXT_PUBLIC_WEB_URL = 'http://web.example';
     });
     afterEach(() => {
         delete process.env.WEB_URL;
+        delete process.env.NEXT_PUBLIC_WEB_URL;
     });
 
     /**

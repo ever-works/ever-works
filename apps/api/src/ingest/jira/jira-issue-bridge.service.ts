@@ -5,6 +5,7 @@ import {
     EventIngestService,
     IngestInstallBindingRepository,
     type IngestResult,
+    type RecordIngestBindingData,
 } from '@ever-works/agent/ingest';
 import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/plugins';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
@@ -266,10 +267,24 @@ export class JiraIssueBridgeService {
             if (!bound) continue;
             const owner = candidates.find((c) => c.userId === bound.userId);
             if (owner) {
-                return {
-                    status: 'resolved',
-                    binding: { ...owner, matchedBy: 'binding', workspace },
-                };
+                // The binding names an owner; the SIGNATURE decides whether
+                // it is the owner of THIS delivery. `site:<host>` keys are
+                // written from an unverified body (see `recordBinding`), so
+                // a tenant can squat a Jira site they do not hold — and a
+                // squatted row would 401 the real owner's every delivery
+                // forever, with no path to evict it. If the bound install's
+                // secret does not verify this delivery, fall through to the
+                // site-host and signature steps below.
+                if (!lookup.verifySignature || lookup.verifySignature(owner.webhookSecret)) {
+                    return {
+                        status: 'resolved',
+                        binding: { ...owner, matchedBy: 'binding', workspace },
+                    };
+                }
+                this.logger.warn(
+                    `Jira delivery for ${key} does not verify against the bound install's secret; falling through to site/signature resolution`,
+                );
+                break;
             }
             // The bound install was removed or lost its webhook secret.
             // Attributing its events to ANOTHER user is exactly the defect
@@ -339,18 +354,43 @@ export class JiraIssueBridgeService {
      * Persist the site→user binding after a delivery has passed
      * signature verification. Best-effort: a failure here must never
      * break a webhook that has already been verified and handled.
+     *
+     * ## What the delivery actually proved
+     *
+     * `IngestInstallBindingRepository.record` RE-POINTS an existing row
+     * and requires proven OWNERSHIP of the workspace, not merely an
+     * authentic sender. Only `site-match` clears that bar here: the
+     * candidate's own install settings declare the site host, so platform
+     * state — not the body — corroborated the key.
+     *
+     * `single-install` and `signature` prove only that the sender knows
+     * THEIR OWN webhook secret, while `site:<host>` came out of the
+     * unverified body (`extractJiraSiteRef`). Any tenant with a
+     * `jira-connector` install can sign a body whose `issue.self` names
+     * somebody else's Atlassian site, so those paths go through
+     * `recordIfAbsent`: a key nobody holds may be claimed, a key somebody
+     * holds is never taken from them.
      */
     async recordBinding(binding: JiraEventsBinding): Promise<void> {
         const key = binding.workspace?.keys[0];
         if (binding.matchedBy === 'binding' || !key) return;
+        const write: RecordIngestBindingData = {
+            provider: JIRA_BINDING_PROVIDER,
+            externalWorkspaceId: key,
+            userId: binding.userId,
+            pluginId: JIRA_CONNECTOR_PLUGIN_ID,
+            externalWorkspaceName: binding.workspace?.label ?? null,
+        };
         try {
-            await this.installBindings.record({
-                provider: JIRA_BINDING_PROVIDER,
-                externalWorkspaceId: key,
-                userId: binding.userId,
-                pluginId: JIRA_CONNECTOR_PLUGIN_ID,
-                externalWorkspaceName: binding.workspace?.label ?? null,
-            });
+            const proven = binding.matchedBy === 'site-match';
+            const recorded = proven
+                ? await this.installBindings.record(write)
+                : await this.installBindings.recordIfAbsent(write);
+            if (!proven && recorded && recorded.userId !== binding.userId) {
+                this.logger.warn(
+                    `Jira site ${key} is already bound to another account; leaving the existing binding in place`,
+                );
+            }
         } catch (error) {
             this.logger.warn(
                 `Failed to record Jira site binding for ${key}: ${

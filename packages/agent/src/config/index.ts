@@ -18,6 +18,7 @@ import {
     type FleetAgentExecutionPermissionMode,
     type FleetAgentExecutionProvider,
     type FleetJobKind,
+    FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -25,7 +26,9 @@ import {
     FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
+    FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_MAX_DAILY_COST_CEILING_CENTS,
+    FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_MIN_NODE_OFFLINE_AFTER_MS,
 } from '@ever-works/contracts';
@@ -35,6 +38,15 @@ import {
     catalogCreditsMarginPercent,
     catalogPaygMaxMonthlyCapCredits,
 } from '../subscriptions/billing/stripe-catalog';
+// CI feedback + autonomous fix loop (slice AC, EW-806). Concrete file
+// import, not the tasks-domain barrel: `task-ci-auto-resume.ts` is a pure
+// leaf (its only import is `node:crypto`) and pulling the barrel here
+// would drag the Nest service graph into config resolution.
+import {
+    DEFAULT_CI_AUTO_RESUME_ATTEMPTS,
+    MAX_CI_AUTO_RESUME_ATTEMPTS,
+    clampAutoResumeAttempts,
+} from '../tasks-domain/task-ci-auto-resume';
 type AppType = 'cli' | 'api';
 
 /**
@@ -333,6 +345,76 @@ export const config = {
                 .map((name) => name.trim())
                 .filter((name) => name.length > 0);
         },
+        /**
+         * Run secrets (self-build slice Y) — the instance kill switch on
+         * delivering a repository's seed `.env` files to a fleet node.
+         *
+         * Default ON, because the feature is opt-in per repository already:
+         * a registry row with no env files delivers nothing, and turning
+         * this off is for an operator who wants the whole PATH shut, not
+         * for narrowing one repository.
+         *
+         * Turning it OFF fails a run that NEEDS env files closed, with
+         * `FLEET_RUN_SECRETS_DISABLED_REASON` — it never starts the run
+         * with a partial environment, because "the suite ran and every
+         * database test failed" is a far worse answer than "the run
+         * refused, here is the setting".
+         */
+        isRunEnvFilesEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_RUN_ENV_FILES || '').trim().toLowerCase();
+            if (raw === 'false' || raw === '0') return false;
+            return true;
+        },
+
+        // ── Self-build slice Z (EW-796) — the platform-MCP bridge ───
+        //
+        // OFF by default and off in two independent ways: this operator
+        // switch AND a configured server URL. Neither implies the other,
+        // and a run additionally needs its Agent's `canCallExternalTools`
+        // permission, so three separate facts have to line up before a
+        // node is ever asked to mint a credential.
+        //
+        // Why an operator switch at all: the bridge hands a model on
+        // someone's desktop a live (if short-lived and narrowly scoped)
+        // platform credential. That is a deployment-level decision about
+        // the whole install, not a per-tenant preference, and it must be
+        // possible to turn the whole thing off in one place during an
+        // incident without touching a single Agent.
+
+        /**
+         * Operator switch for the fleet MCP bridge. Default FALSE —
+         * only the literal `true` / `1` turns it on, so a typo or an
+         * empty value fails closed to today's behaviour (no platform
+         * tools in a fleet run).
+         */
+        isMcpBridgeEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_MCP_BRIDGE_ENABLED || '').trim().toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
+        /**
+         * Absolute URL of the platform MCP endpoint the node's loopback
+         * proxy forwards to (`apps/mcp` streamable-HTTP transport, whose
+         * endpoint is `/mcp` on `EVER_WORKS_MCP_PORT`).
+         *
+         * Validated here rather than at the node: a nonsense value must
+         * fail on the platform, where an operator reads logs, and not on
+         * fifteen desktops. Anything that is not an absolute http(s) URL
+         * is treated as unset — which switches the bridge off rather
+         * than pointing a credential-bearing proxy at a garbage host.
+         */
+        getMcpServerUrl(): string | undefined {
+            const raw = (process.env.FLEET_NODE_MCP_URL || '').trim();
+            if (!raw) return undefined;
+            let parsed: URL;
+            try {
+                parsed = new URL(raw);
+            } catch {
+                return undefined;
+            }
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+            // Strip a trailing slash so the node builds one canonical URL.
+            return raw.endsWith('/') && raw.length > 1 ? raw.slice(0, -1) : raw;
+        },
 
         // ── Agent execution v2 — model CLIs on the node ─────────────
         //
@@ -456,6 +538,27 @@ export const config = {
                 FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
                 FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
                 Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Credential lifecycle (EW-799) — how long BOTH credentials are
+         * accepted after a node rotates itself
+         * (`FLEET_CREDENTIAL_ROTATION_OVERLAP_MS`, default 15 minutes,
+         * floor 30s, ceiling 24h).
+         *
+         * The window exists so a machine can finish the job it is holding
+         * and persist its new secret before the old one dies. It closes on
+         * a clock, never on a callback: a node that never comes back still
+         * loses its old credential on time. Long enough to survive a
+         * restart; the 24h ceiling is where a handover window would stop
+         * being a handover and become a second permanent credential.
+         */
+        getCredentialRotationOverlapMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
             );
         },
         /**
@@ -1422,6 +1525,37 @@ export const config = {
         getTaskFanoutScanLimit() {
             const raw = parseInt(process.env.TASK_FANOUT_SCAN_LIMIT || '50', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 50;
+        },
+        /**
+         * CI feedback + autonomous fix loop (self-build slice AC, EW-806) —
+         * how many times ONE Task may be auto-resumed, over its whole life,
+         * because CI went red or a reviewer rejected its pull request.
+         *
+         * 💸 THIS KNOB SPENDS MONEY. Each attempt is a full
+         * `agent-task-execute` run on a fleet PC — the same order of model
+         * spend as the run that opened the pull request. The default of
+         * TWO therefore caps what this feature can add to any one Task at
+         * two extra runs, forever, not two per push and not two per day.
+         *
+         * `0` switches the loop OFF: check results are still ingested and
+         * the board still goes red, nothing is resumed. Values are clamped
+         * to 0..5; an unparseable value falls back to the default rather
+         * than silently disabling a shipped loop.
+         *
+         * The COUNTER is not here — it is rows in
+         * `task_ci_auto_resume_attempts`. This is only the ceiling.
+         */
+        getCiAutoResumeMaxAttempts() {
+            // `clampAutoResumeAttempts` rather than the local
+            // `clampedIntEnv`: the clamp that decides how much money this
+            // loop may spend has its own unit tests next to the constants
+            // it clamps against, and those tests are only worth anything
+            // if this is the function actually shipped. `parseInt` of an
+            // absent or unparseable value yields NaN, which the clamp maps
+            // to DEFAULT_CI_AUTO_RESUME_ATTEMPTS.
+            return clampAutoResumeAttempts(
+                parseInt(process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS ?? '', 10),
+            );
         },
         /**
          * H2 kill-switch for the plan-driven concurrency ceiling

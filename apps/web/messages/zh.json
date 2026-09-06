@@ -623,6 +623,7 @@
                 "schedule_task": "安排任务",
                 "send_message": "发送消息",
                 "budget_override": "预算覆盖",
+                "merge_pull_request": "合并拉取请求",
                 "other": "操作"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "操作已拒绝",
                 "bulkApproved": "已批准 {count} 项操作",
                 "bulkApprovedSkipped": "已批准 {approved} 项操作，{skipped} 项已有决定",
+                "bulkApprovedExcluded": "已批准 {approved} 项操作，{excluded} 项仍需逐一决定",
                 "error": "出现问题，请重试。"
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "计划任务",
                     "send_message": "发送消息",
                     "budget_override": "预算覆盖",
+                    "merge_pull_request": "合并拉取请求",
                     "other": "其他"
                 },
                 "save": "保存护栏",
@@ -3499,7 +3502,22 @@
                     "unknown": "Unknown"
                 },
                 "workerStateReason": "Reason: {reason}",
-                "workerStateSince": "Since {time}"
+                "workerStateSince": "Since {time}",
+                "housekeeping": {
+                    "title": "Disk & workspaces",
+                    "disk": {
+                        "ok": "Above floor",
+                        "below": "Below floor",
+                        "unknown": "Unknown"
+                    },
+                    "diskFigures": "{free} free, floor {floor}",
+                    "noFloor": "off",
+                    "unknownValue": "unknown",
+                    "workspaces": "{count} workspaces using {size}",
+                    "lastReclaim": "Last reclaimed {time}, freed {freed}",
+                    "neverReclaimed": "No reclaim reported yet — this node has never swept its workspaces.",
+                    "notReported": "Housekeeping not reported by this node."
+                }
             },
             "jobRuntime": {
                 "title": "Job Runtime",

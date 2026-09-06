@@ -40,7 +40,17 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
     >({});
     const [isApprovingAll, setIsApprovingAll] = useState(false);
 
-    const pendingIds = useMemo(() => proposals.map((p) => p.id), [proposals]);
+    // Merge approval (slice AE): a `merge_pull_request` proposal is
+    // deliberately NOT decidable in bulk — the server refuses to decide
+    // one here, and landing a pull request on a real branch has to be a
+    // per-pull-request act. It is excluded from the ids we SEND, so it
+    // also stays in the list below rather than being cleared as though it
+    // had been handled.
+    const bulkIds = useMemo(
+        () => proposals.filter((p) => p.actionType !== 'merge_pull_request').map((p) => p.id),
+        [proposals],
+    );
+    const excludedFromBulk = proposals.length - bulkIds.length;
 
     // Parent only mounts this block when the queue is non-empty, but keep
     // the guard so it disappears cleanly once the last row is decided.
@@ -90,15 +100,26 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
     };
 
     const handleApproveAll = async () => {
-        if (isApprovingAll || pendingIds.length === 0) return;
+        if (isApprovingAll || bulkIds.length === 0) return;
         setIsApprovingAll(true);
         try {
-            const { approved, skipped } = await approveAllProposalsAction(pendingIds);
+            const { approved, skipped } = await approveAllProposalsAction(bulkIds);
             // Approved rows AND skipped (concurrently-decided) rows are
-            // both no longer pending — clear every row we sent.
-            const sent = new Set(pendingIds);
+            // both no longer pending — clear every row we sent. Rows we
+            // deliberately did not send stay exactly where they are.
+            const sent = new Set(bulkIds);
             setProposals((prev) => prev.filter((p) => !sent.has(p.id)));
-            if (skipped > 0) {
+            if (excludedFromBulk > 0) {
+                // Said separately from `skipped`: these are still pending
+                // and still need a decision, which is the opposite of
+                // "already decided".
+                toast.success(
+                    t('toast.bulkApprovedExcluded', {
+                        approved,
+                        excluded: excludedFromBulk,
+                    }),
+                );
+            } else if (skipped > 0) {
                 toast.success(t('toast.bulkApprovedSkipped', { approved, skipped }));
             } else {
                 toast.success(t('toast.bulkApproved', { count: approved }));
@@ -133,7 +154,7 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
                         size="sm"
                         variant="secondary"
                         onClick={handleApproveAll}
-                        disabled={isApprovingAll}
+                        disabled={isApprovingAll || bulkIds.length === 0}
                         data-testid="approval-approve-all"
                         className="gap-1.5"
                     >

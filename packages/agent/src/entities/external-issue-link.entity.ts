@@ -39,6 +39,11 @@ import { PortableDateColumn } from './_types';
  * by the ingest drain when a matching issue event comes through. They
  * are observability, not state — the link is valid with both NULL.
  *
+ * `regressionCount` is the one piece of STATE on the row: it counts the
+ * times a closed Task for this issue was superseded by a new one after
+ * the vendor said the issue came back (added by
+ * `1789600000000-AddExternalIssueLinkRegressionCount`).
+ *
  * Scope columns are raw uuid references (no @ManyToOne) per the EW-654
  * cycle-avoidance rule; FKs live in the migration
  * (`1784730000000-CreateExternalIssueLinks`).
@@ -92,6 +97,24 @@ export class ExternalIssueLink {
     /** `ingested_events.id` of the most recent event seen for this issue. */
     @Column({ type: 'uuid', nullable: true })
     lastIngestedEventId?: string | null;
+
+    /**
+     * How many times this external issue has RE-OPENED work: the number
+     * of times a vendor regression signal (a reopened GitHub issue, a
+     * Sentry `unresolved`, a Dependabot `reintroduced`, a Jira
+     * transition back out of a done status) arrived while the linked
+     * Task was already closed, and the triage filer therefore filed a
+     * fresh Task and re-pointed this row at it.
+     *
+     * `0` on every first link and on every ordinary refresh — dedup is
+     * unchanged for them: one Task per `(userId, source,
+     * externalIssueId)`, later revisions are comments. This counter is
+     * the audit trail for the ONE case where dedup deliberately yields,
+     * so "why are there three Tasks for this issue?" has an answer that
+     * does not require reading the drain's logs.
+     */
+    @Column({ type: 'int', default: 0 })
+    regressionCount: number;
 
     /** When that most recent event occurred at the source. */
     // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`

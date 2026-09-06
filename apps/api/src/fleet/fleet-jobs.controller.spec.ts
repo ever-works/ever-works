@@ -1,9 +1,14 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+    ConflictException,
+    UnauthorizedException,
+    UnprocessableEntityException,
+} from '@nestjs/common';
 import type { FleetJobView } from '@ever-works/contracts';
 import { FLEET_JOB_STALE_LEASE_REASON } from '@ever-works/contracts';
 import { FleetJobsController } from './fleet-jobs.controller';
+import { FleetRunSecretsError, FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetJobStaleLeaseError } from '@ever-works/agent/fleet';
-import type { FleetJobService } from '@ever-works/agent/fleet';
+import type { FleetJobService, FleetRunCredentialService } from '@ever-works/agent/fleet';
 
 /**
  * The node work channel.
@@ -22,6 +27,8 @@ import type { FleetJobService } from '@ever-works/agent/fleet';
 const NODE_ID = '11111111-1111-4111-8111-111111111111';
 const JOB_ID = '22222222-2222-4222-8222-222222222222';
 const SECRET = 'a'.repeat(43);
+/** A repository registry row id (run secrets, slice Y). */
+const ROW_ID = '33333333-3333-4333-8333-333333333333';
 /** The claim identity every heartbeat/complete body must carry (suspend-safe leases). */
 const GENERATION = 3;
 // Frozen: `jobView()` is called on both sides of several assertions, and a
@@ -46,8 +53,22 @@ function jobView(overrides: Partial<FleetJobView> = {}): FleetJobView {
     };
 }
 
-function makeController(service: Partial<FleetJobService>): FleetJobsController {
-    return new FleetJobsController(service as FleetJobService);
+// Slice Y (EW-781) owns the SECOND argument and slice Z (EW-782) the third.
+// Both slices independently appended a controller dependency, so a call that
+// passes a credential stub positionally in slot 2 type-checks as a run-secrets
+// stub and the feature silently does nothing — the failure this repo has now
+// hit four times. Pass `undefined` for a slot you do not care about rather
+// than shifting the one you do.
+function makeController(
+    service: Partial<FleetJobService>,
+    runSecrets: Partial<FleetRunSecretsService> = { resolve: jest.fn(async () => null) },
+    runCredentials: Partial<FleetRunCredentialService> = {},
+): FleetJobsController {
+    return new FleetJobsController(
+        service as FleetJobService,
+        runSecrets as FleetRunSecretsService,
+        runCredentials as FleetRunCredentialService,
+    );
 }
 
 describe('FleetJobsController', () => {
@@ -253,11 +274,207 @@ describe('FleetJobsController', () => {
                     success: true,
                     leaseGeneration: GENERATION,
                 }),
+            // Run secrets (slice Y) is the FOURTH route on this channel and
+            // must not become the one that says something different.
+            () =>
+                controller.envFiles(JOB_ID, {
+                    nodeId: NODE_ID,
+                    secret: SECRET,
+                    leaseGeneration: GENERATION,
+                    refs: [{ repoConnectionId: ROW_ID, paths: ['.env'] }],
+                }),
         ]) {
             await call().catch((error: Error) => messages.push(error.message));
         }
 
-        expect(messages).toHaveLength(3);
+        expect(messages).toHaveLength(4);
         expect(new Set(messages).size).toBe(1);
+    });
+
+    /**
+     * Run secrets (self-build slice Y, EW-781) — the only route on this
+     * channel that returns a decrypted secret. It keeps the channel's two
+     * existing answers (one 401, one 409 stale-lease) and adds exactly one
+     * of its own: a 422 carrying a STABLE reason token, which is reachable
+     * only by the authenticated holder of an active job.
+     */
+    describe('POST /api/fleet/jobs/:id/env-files', () => {
+        const body = {
+            nodeId: NODE_ID,
+            secret: SECRET,
+            leaseGeneration: GENERATION,
+            refs: [{ repoConnectionId: ROW_ID, paths: ['apps/api/.env'] }],
+        };
+
+        it('returns the resolved files and forwards the claim as the node sent it', async () => {
+            const resolve = jest.fn(async () => ({
+                files: [{ repoConnectionId: ROW_ID, path: 'apps/api/.env', content: 'A=1' }],
+            }));
+            const controller = makeController({}, { resolve });
+            await expect(controller.envFiles(JOB_ID, body)).resolves.toEqual({
+                files: [{ repoConnectionId: ROW_ID, path: 'apps/api/.env', content: 'A=1' }],
+            });
+            expect(resolve).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                jobId: JOB_ID,
+                leaseGeneration: GENERATION,
+                refs: body.refs,
+            });
+        });
+
+        it('collapses a refused claim to the SAME 401 as every other route', async () => {
+            const controller = makeController({}, { resolve: jest.fn(async () => null) });
+            await expect(controller.envFiles(JOB_ID, body)).rejects.toBeInstanceOf(
+                UnauthorizedException,
+            );
+        });
+
+        it('answers 422 with the stable reason token, and nothing else', async () => {
+            const controller = makeController(
+                {},
+                {
+                    resolve: jest.fn(async () => {
+                        throw new FleetRunSecretsError('run-secrets-unresolved');
+                    }),
+                },
+            );
+            const error = await controller.envFiles(JOB_ID, body).catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(UnprocessableEntityException);
+            expect((error as UnprocessableEntityException).getStatus()).toBe(422);
+            expect((error as UnprocessableEntityException).getResponse()).toMatchObject({
+                reason: 'run-secrets-unresolved',
+            });
+        });
+
+        it('lets a stale lease surface as the channel-wide 409, not as a 422', async () => {
+            const controller = makeController(
+                {},
+                {
+                    resolve: jest.fn(async () => {
+                        throw new FleetJobStaleLeaseError();
+                    }),
+                },
+            );
+            const error = await controller.envFiles(JOB_ID, body).catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).getResponse()).toMatchObject({
+                reason: FLEET_JOB_STALE_LEASE_REASON,
+            });
+        });
+    });
+});
+
+/**
+ * Self-build slice Z (EW-796) — the run-credential routes on the node
+ * channel.
+ *
+ * Same edge contract as every other route here: the service decides, and
+ * every refusal it returns becomes ONE undifferentiated 401. That matters
+ * more on these routes than anywhere else, because the caller is asking
+ * "may I have a credential for job X" — and a differentiated answer would
+ * turn a valid node secret into a probe for which jobs exist, which are
+ * active, and which have the bridge enabled.
+ */
+describe('FleetJobsController — MCP run credentials', () => {
+    const body = { nodeId: NODE_ID, secret: SECRET };
+
+    describe('POST /api/fleet/jobs/:id/mcp-credential', () => {
+        it('returns the minted credential for the node holding the lease', async () => {
+            const credential = {
+                token: 'ew_run_0123456789abcdef',
+                expiresAt: '2026-07-26T00:05:00.000Z',
+                serverUrl: 'https://mcp.ever.works/mcp',
+            };
+            const mint = jest.fn(async () => credential);
+            const controller = makeController({}, undefined, { mint });
+
+            await expect(controller.mintMcpCredential(JOB_ID, body)).resolves.toEqual(credential);
+            expect(mint).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                jobId: JOB_ID,
+            });
+        });
+
+        it('scopes the mint to the id in the PATH, never to one in the body', async () => {
+            const mint = jest.fn(async () => null);
+            const controller = makeController({}, undefined, { mint });
+
+            await expect(
+                controller.mintMcpCredential(JOB_ID, {
+                    ...body,
+                    // A body field the DTO does not declare cannot reach the
+                    // service; this pins that the path param is the source.
+                    jobId: 'someone-elses-job',
+                } as never),
+            ).rejects.toThrow(UnauthorizedException);
+            expect(mint).toHaveBeenCalledWith(expect.objectContaining({ jobId: JOB_ID }));
+        });
+
+        it('collapses EVERY refusal to one undifferentiated 401', async () => {
+            // The service returns `null` for a foreign node, a missing job, a
+            // settled job, a cancel-pending job, a bridge-disabled payload and
+            // an operator switch that is off. The controller must not be able
+            // to tell them apart, so there is exactly one message.
+            const controller = makeController({}, undefined, { mint: jest.fn(async () => null) });
+
+            await expect(controller.mintMcpCredential(JOB_ID, body)).rejects.toThrow(
+                new UnauthorizedException('Invalid node credential'),
+            );
+        });
+
+        it('uses the SAME 401 message the lease and complete routes use', async () => {
+            const mintController = makeController({}, undefined, {
+                mint: jest.fn(async () => null),
+            });
+            const leaseController = makeController({ lease: jest.fn(async () => null) });
+
+            const mintError = await mintController
+                .mintMcpCredential(JOB_ID, body)
+                .catch((error: Error) => error);
+            const leaseError = await leaseController.lease(body).catch((error: Error) => error);
+
+            expect((mintError as Error).message).toBe((leaseError as Error).message);
+        });
+    });
+
+    describe('POST /api/fleet/jobs/:id/mcp-credential/revoke', () => {
+        it('reports how many credentials were dropped', async () => {
+            const revokeForNode = jest.fn(async () => 2);
+            const controller = makeController({}, undefined, { revokeForNode });
+
+            await expect(controller.revokeMcpCredential(JOB_ID, body)).resolves.toEqual({
+                ok: true,
+                revoked: 2,
+            });
+            expect(revokeForNode).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                jobId: JOB_ID,
+            });
+        });
+
+        it('answers ok with 0 — not a 401 — when there was nothing to revoke', async () => {
+            // The distinction that must survive: `null` (refused) vs `0` (a
+            // valid node whose job had no live credential). Collapsing those
+            // would make an ordinary double-revoke look like an auth failure.
+            const controller = makeController({}, undefined, {
+                revokeForNode: jest.fn(async () => 0),
+            });
+            await expect(controller.revokeMcpCredential(JOB_ID, body)).resolves.toEqual({
+                ok: true,
+                revoked: 0,
+            });
+        });
+
+        it('collapses a refused revoke to the same 401', async () => {
+            const controller = makeController({}, undefined, {
+                revokeForNode: jest.fn(async () => null),
+            });
+            await expect(controller.revokeMcpCredential(JOB_ID, body)).rejects.toThrow(
+                new UnauthorizedException('Invalid node credential'),
+            );
+        });
     });
 });

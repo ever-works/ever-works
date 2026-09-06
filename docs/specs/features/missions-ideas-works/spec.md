@@ -12,7 +12,7 @@
 
 > Scope of this document: **product behavior** — concepts, UX, UI, flows, states, naming, AI Chat surface, dashboard surface. Implementation details are referenced where they constrain product behavior. The detailed phased execution plan lives in the sibling [PLAN doc](plan.md).
 >
-> **Hard rule:** This entire feature is an **extension**. Nothing currently shipping is being removed, rewritten, or significantly changed. The existing Work Agent settings page, the existing `work_proposals` pipeline, the existing `work_budgets` infra, the existing templates page, the existing `/works/new` page, and all existing creation entry points all stay; we add new surfaces and entities on top, and reuse the existing primitives as the plumbing underneath. Anywhere this spec proposes a change to existing UI, the change is **additive** (new section, new filter, new switch) or a **rename** of copy only — never a deletion of code paths. This rule is enforced project-wide by [Workspace AGENTS.md NN #20](file:///C:/Coding/Workspace/AGENTS.md) ("Feature/UX requests are ADDITIVE by default") — added 2026-05-24 in response to operator feedback during v3 iteration.
+> **Hard rule:** This entire feature is an **extension**. Nothing currently shipping is being removed, rewritten, or significantly changed. The existing Work Agent settings page, the existing `work_proposals` pipeline, the existing `work_budgets` infra, the existing templates page, the existing `/works/new` page, and all existing creation entry points all stay; we add new surfaces and entities on top, and reuse the existing primitives as the plumbing underneath. Anywhere this spec proposes a change to existing UI, the change is **additive** (new section, new filter, new switch) or a **rename** of copy only — never a deletion of code paths. This rule is enforced project-wide by Workspace AGENTS.md NN #20 ("Feature/UX requests are ADDITIVE by default") — added 2026-05-24 in response to operator feedback during v3 iteration.
 
 > **What changed v5 → v6 (this turn):**
 > Six deferred items pulled INTO v1 (operator-confirmed). All additive, none replace existing surfaces.
@@ -39,7 +39,7 @@
 >
 > **What changed v2 → v3:**
 >
-> 1. New §4.0 documents the global **`+ New`** entry page (sidebar button renamed from `+ New Work` to `+ New`). This is the **one main path** for creating anything — Mission, Idea, or Work — via a large prompt + chips, with AI Chat hidden until the user submits. (v4: this page lives at `/new`, NOT `/works/new`.) "One main path" does NOT mean "only path": every existing creation entry point stays, per [NN #20](file:///C:/Coding/Workspace/AGENTS.md).
+> 1. New §4.0 documents the global **`+ New`** entry page (sidebar button renamed from `+ New Work` to `+ New`). This is the **one main path** for creating anything — Mission, Idea, or Work — via a large prompt + chips, with AI Chat hidden until the user submits. (v4: this page lives at `/new`, NOT `/works/new`.) "One main path" does NOT mean "only path": every existing creation entry point stays, per NN #20.
 > 2. The `+ New Mission` button on `/missions` page is **preserved** (small, top-right) as one of the additional paths. The large prompt + Type switch on `/missions` page that v2 §4.1 proposed is dropped — it was a v2 _spec-draft_ addition that the operator retired before it shipped, redirecting that surface to the new `+ New` page. The page-level Cards list itself is unchanged from v2.
 > 3. The `+ Add` button on `/ideas` page **stays** (inline, fast path for atomic Ideas). The page is unchanged from v2.
 > 4. The existing 3 Work-creation blocks on `/works/new` (Create with AI / Create Manually / Import Existing) are **preserved with no changes**. The new `/new` page reuses the same component to render parallel blocks below the prompt input (v4: with "Work" suffix labels on the `/new` rendering only).
@@ -321,7 +321,7 @@ Action on an Idea whose `status='ACCEPTED'` (Done). Visible only when the **Show
 
 - Endpoint: `POST /me/work-proposals/:id/rebuild`. New endpoint (Phase 1).
 - Behavior: creates a fresh `WorkAgentGoal` against the same Idea description, producing a NEW Work — independent of the Idea's existing `acceptedWorkId` (which stays pointing at the original Work).
-- The Idea's status transitions: ACCEPTED → BUILDING → ACCEPTED (with `acceptedWorkId` re-pointed at the new Work). The original Work is NOT deleted (per [NN #20](file:///C:/Coding/Workspace/AGENTS.md)) — the user can keep, delete, or repurpose it independently.
+- The Idea's status transitions: ACCEPTED → BUILDING → ACCEPTED (with `acceptedWorkId` re-pointed at the new Work). The original Work is NOT deleted (per NN #20) — the user can keep, delete, or repurpose it independently.
 - Optional: the rebuild endpoint accepts a `keepOriginalLink: true` flag that, when set, creates a new `WorkProposal` row (a clone of the Idea, status=PENDING) for the rebuild target rather than re-pointing the original Idea. v1 defaults to re-point; v2 may flip the default.
 
 ### 3.8 AI Chat control (mandatory)
@@ -417,7 +417,7 @@ User types in the prompt + (optionally) picks a chip + clicks arrow:
 
 #### 4.0.6 Other entry points are PRESERVED (additional paths)
 
-Per [NN #20](file:///C:/Coding/Workspace/AGENTS.md), the `+ New` page is the one _main_ path, not the _only_ path. Every existing or new-in-this-spec entry point continues to work:
+Per NN #20, the `+ New` page is the one _main_ path, not the _only_ path. Every existing or new-in-this-spec entry point continues to work:
 
 - **`+ New Mission`** button (small, top-right of `/missions` page) — see §4.1.
 - **`+ Add`** button on `/ideas` page and Dashboard Ideas block (inline modal) — see §3.4.

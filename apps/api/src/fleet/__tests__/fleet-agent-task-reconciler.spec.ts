@@ -617,6 +617,50 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
     });
 
+    // Acceptance checks that mean something (EW-807). A failed install is
+    // not a failed test, and the message a human reads must say so — the
+    // fix for one is nothing like the fix for the other.
+    it('reports a failed SETUP as setup, with no failing checks to hunt for', async () => {
+        const failed: FleetAgentTaskResult = {
+            ...successResult,
+            status: 'failed',
+            // The gate did not fail. It never ran.
+            gateStatus: 'none',
+            checks: null,
+            setup: [
+                {
+                    id: 'repo/setup-1',
+                    status: 'red',
+                    exitCode: 1,
+                    durationMs: 90_000,
+                    logTail: 'ERR_PNPM_OUTDATED_LOCKFILE',
+                },
+            ],
+            setupStatus: 'red',
+            model: null,
+            failureReason:
+                "SETUP FAILED: 'repo/setup-1' exited 1. The workspace was never prepared, so the model, " +
+                'the steps and the acceptance checks did not run — this is not a failing test.',
+        };
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job({ status: 'failed' }),
+                USER,
+                'node-report',
+                NODE,
+                failed as unknown as Record<string, unknown>,
+            ),
+        );
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('Setup failed — the workspace was never prepared');
+        expect(body).toContain('- repo/setup-1: red (exit 1)');
+        expect(body).toContain('ERR_PNPM_OUTDATED_LOCKFILE');
+        expect(body).not.toContain('Failing checks:');
+        expect(runs.markFailed).toHaveBeenCalledWith(RUN, expect.stringContaining('SETUP FAILED'));
+        // And the gate is never recorded as red for it.
+        expect(runs.updateGateResults).not.toHaveBeenCalled();
+    });
+
     it('uses the job error when the node reported no structured result', async () => {
         await build().onCompleted(
             new FleetJobCompletedEvent(
@@ -1672,6 +1716,74 @@ describe('parseAgentTaskResult', () => {
         });
     });
 
+    /**
+     * Self-build slice Z (EW-796) — the MCP bridge verdict.
+     *
+     * It is a reporting value that a run report renders, so it is narrowed
+     * at this boundary like every other block: a shape nobody validated
+     * must not travel onward, and a malformed one must read exactly like a
+     * run that never had a bridge rather than failing the reconcile
+     * half-way through.
+     */
+    it('normalises the MCP bridge block (slice Z)', () => {
+        // Absent → null, indistinguishable from a run without the bridge.
+        expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.mcp).toBeNull();
+
+        // The two real shapes the node reports.
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: 7 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: 7 });
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: false, toolCalls: null, unavailableReason: 'EADDRINUSE' },
+            })!.mcp,
+        ).toEqual({ enabled: false, toolCalls: null, unavailableReason: 'EADDRINUSE' });
+
+        // Garbage of every shape → null rather than a throw.
+        for (const mcp of [null, 'yes', 42, [], {}, { enabled: 'true' }, { toolCalls: 3 }]) {
+            expect(
+                parseAgentTaskResult({ status: 'succeeded', taskId: TASK, mcp })!.mcp,
+            ).toBeNull();
+        }
+
+        // A nonsense count is dropped, not carried.
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: -1 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: null });
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: 2.7 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: 2 });
+
+        // Smuggled keys are dropped — including anything token-shaped a
+        // node could never legitimately have put there.
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            mcp: {
+                enabled: true,
+                toolCalls: 1,
+                token: 'ew_run_secret',
+                serverUrl: 'https://x/mcp',
+            },
+        })!.mcp!;
+        expect(Object.keys(parsed).sort()).toEqual(['enabled', 'toolCalls']);
+        expect(JSON.stringify(parsed)).not.toContain('ew_run_');
+    });
+
     it('normalises the owner question (slice Q): absent or garbage → null, oversize text sliced, unknown keys dropped', () => {
         expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.question).toBeNull();
         expect(
@@ -1707,6 +1819,34 @@ describe('parseAgentTaskResult', () => {
         })!.question!;
         expect(parsed.text).toBe('Use [redacted secret]?');
         expect(parsed.context).toBe('token [redacted secret] again');
+    });
+
+    it('keeps well-formed setup verdicts, drops malformed ones, and coerces setupStatus (EW-807)', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            setup: [
+                { id: 'install', status: 'red', exitCode: 1, durationMs: 10 },
+                { status: 'red', exitCode: 1, durationMs: 10 },
+                'pnpm install',
+                null,
+            ],
+            setupStatus: 'red',
+        })!;
+        expect(parsed.setup).toEqual([
+            { id: 'install', status: 'red', exitCode: 1, durationMs: 10 },
+        ]);
+        expect(parsed.setupStatus).toBe('red');
+        // A non-array, or a status word the contract does not define, is
+        // null rather than a value anything downstream could branch on.
+        const garbage = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            setup: 'pnpm install',
+            setupStatus: 'exploded',
+        })!;
+        expect(garbage.setup).toBeNull();
+        expect(garbage.setupStatus).toBeNull();
     });
 
     it('rejects anything without a status', () => {

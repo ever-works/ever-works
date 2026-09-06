@@ -234,6 +234,50 @@ export interface FleetNodeSelfDescription {
 	 * sanitizes and caps it at {@link FLEET_MAX_WORKER_STATE_REASON_LENGTH}.
 	 */
 	workerStateReason?: string;
+	/**
+	 * Node housekeeping (EW-803) — the disk FLOOR this machine enforces on
+	 * itself, in bytes. `null` means the operator switched the floor off.
+	 *
+	 * Reported for VISIBILITY only, and that distinction is the whole
+	 * reason it is allowed to exist. The limit is still evaluated entirely
+	 * on the node; the platform neither sets it, nor consults it when
+	 * routing, nor may assume a node respects it — a lent machine stays
+	 * bounded from its own side. What the figure closes is an operator
+	 * question that {@link FleetNodeSelfDescription.diskFreeBytes} alone
+	 * cannot answer: "1.2 GB free" says nothing about whether that is
+	 * above or below the line at which this node stops taking work.
+	 *
+	 * Additive like {@link FleetNodeSelfDescription.cliVersion}, with ONE
+	 * difference: an explicit `null` is not the same as absent. Absent
+	 * means "this daemon said nothing" and leaves the stored value alone;
+	 * `null` means "there is no floor on this machine" and does overwrite,
+	 * because a floor that was switched off is a fact an operator needs.
+	 */
+	minFreeDiskBytes?: number | null;
+	/**
+	 * How many workspaces (Task worktrees) the node was holding when its
+	 * reclaim sweep last finished. Capped at {@link FLEET_MAX_WORKSPACE_COUNT}.
+	 *
+	 * The number that answers "is this machine accumulating?" — bytes
+	 * alone cannot tell one enormous checkout from four hundred small
+	 * ones, and only the second means the reaper is falling behind.
+	 */
+	workspaceCount?: number;
+	/** Bytes those retained workspaces occupy, as last measured by the sweep. */
+	workspaceBytes?: number;
+	/**
+	 * ISO-8601 instant at which the node's last reclaim sweep COMPLETED.
+	 *
+	 * The NODE's own clock, and therefore the one field here the platform
+	 * cannot corroborate — a machine with a stepped clock reports a wrong
+	 * instant and the server has no way to know. Stored anyway, because
+	 * "the reaper last ran three weeks ago" is exactly the fact that
+	 * explains a full disk; refused outright when it does not parse or
+	 * lands implausibly far in the future.
+	 */
+	lastReclaimAt?: string;
+	/** Bytes that sweep reclaimed. Zero is a real answer: it ran and found nothing to take. */
+	lastReclaimFreedBytes?: number;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -306,6 +350,30 @@ export interface FleetNodeView {
 	 * hundreds of beats that follow rather than resetting every 30s.
 	 */
 	workerStateChangedAt?: string | null;
+	/**
+	 * ISO instant at which the owner QUEUED a credential rotation for this
+	 * node (`POST /api/fleet/rotate-all`), or null when none is pending.
+	 *
+	 * A flag, not an instruction the platform can carry out: only the
+	 * machine can rotate its own credential, so this is what its next
+	 * heartbeat reads to decide to call `POST /api/fleet/rotate-credential`.
+	 * Cleared by the rotation that satisfies it.
+	 */
+	rotationRequestedAt?: string | null;
+
+	/**
+	 * Node housekeeping (EW-803), as last reported. Every one of these is
+	 * null for a node that has never reported it — an older daemon, a
+	 * visibility-only node with no worker, or a worker whose first reclaim
+	 * sweep has not run yet. Null renders as "unknown", never as zero:
+	 * "0 workspaces" and "we have never been told" are different facts,
+	 * and only the first would be reassuring.
+	 */
+	minFreeDiskBytes?: number | null;
+	workspaceCount?: number | null;
+	workspaceBytes?: number | null;
+	lastReclaimAt?: string | null;
+	lastReclaimFreedBytes?: number | null;
 }
 
 /**
@@ -359,6 +427,18 @@ export interface FleetHeartbeatRequest extends FleetNodeSelfDescription {
 export interface FleetHeartbeatResponse {
 	ok: true;
 	node: FleetNodeView;
+	/**
+	 * True when the owner has QUEUED a credential rotation for this node
+	 * (`POST /api/fleet/rotate-all`). The daemon answers by calling
+	 * `POST /api/fleet/rotate-credential` with the credential it is
+	 * holding; until it does, nothing changes and the node keeps working.
+	 *
+	 * Optional and additive on purpose: a daemon built before this field
+	 * existed ignores it and simply never self-rotates — its owner can
+	 * still re-key it the old way. Nothing breaks, which is the only way
+	 * to ship a protocol field to machines nobody can redeploy at once.
+	 */
+	rotationRequested?: boolean;
 }
 
 // ─── Protocol bounds (fixed) ────────────────────────────────────────────────
@@ -411,6 +491,18 @@ export const FLEET_MAX_DAILY_COST_CEILING_CENTS = 100_000 * 100;
  * make the runner widget render a machine with an exabyte free.
  */
 export const FLEET_MAX_DISK_FREE_BYTES = 2 ** 60;
+
+/**
+ * Ceiling on a node's reported workspace COUNT (EW-803).
+ *
+ * 100,000 Task worktrees is not a machine that needs a bigger reaper — a
+ * single checkout of the monorepo is tens of megabytes, so a hundred
+ * thousand of them cannot fit on any volume a node runs on. Like
+ * {@link FLEET_MAX_DISK_FREE_BYTES} this is the "certainly nonsense"
+ * line, not a policy: a count outside `[0, this]` is dropped rather than
+ * clamped, because a clamped figure is one an operator would believe.
+ */
+export const FLEET_MAX_WORKSPACE_COUNT = 100_000;
 
 /** Node display-name bounds, enforced by the DTO and re-checked in the service. */
 export const FLEET_MIN_NODE_NAME_LENGTH = 1;
@@ -467,6 +559,67 @@ export const FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING = 128;
 
 /** Floor for the enrollment-token TTL — a zero-TTL token cannot be redeemed. */
 export const FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS = 30_000;
+
+/**
+ * Default DUAL-ACCEPT window for a node-initiated credential rotation
+ * (15 minutes, `FLEET_CREDENTIAL_ROTATION_OVERLAP_MS`).
+ *
+ * For this long after a node rotates itself, BOTH the new credential and
+ * the one it replaced authenticate. That overlap is what makes rotation
+ * survivable on a real machine: the daemon can finish the job it is
+ * holding, write the new secret to disk, restart, and only then stop
+ * needing the old one. A zero-overlap re-key (the operator-side
+ * `POST /api/fleet/nodes/:id/rotate`) kills the old secret instantly and
+ * therefore requires a human at the keyboard — which is exactly why
+ * credentials never rotated.
+ *
+ * The window closes on a CLOCK, not on a callback: the old credential
+ * stops being accepted when `previousCredentialExpiresAt` passes, whether
+ * or not the node ever confirms it stored the new one.
+ */
+export const FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS = 15 * 60_000;
+
+/**
+ * Floor for the rotation overlap. Below this a node could not finish a
+ * single HTTP round-trip plus a disk write inside the window, so the
+ * "bounded overlap" would be a re-key with extra steps.
+ */
+export const FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS = 30_000;
+
+/**
+ * Ceiling on the rotation overlap: 24 hours. Not a recommendation — it is
+ * the point past which "the old credential still works" stops being a
+ * handover window and becomes a second, permanent credential, which is
+ * the property rotation exists to remove.
+ */
+export const FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS = 24 * 60 * 60_000;
+
+/** Request body for the PUBLIC `POST /api/fleet/rotate-credential`. */
+export interface FleetNodeRotateCredentialRequest extends FleetNodeSelfDescription {
+	nodeId: string;
+	/** The node's CURRENT secret. A previous-window secret is refused. */
+	secret: string;
+}
+
+/**
+ * Response body for `POST /api/fleet/rotate-credential`.
+ *
+ * `secret` is the NEW credential and is returned exactly once — only its
+ * sha256 is stored, the same contract enroll has always had. The node
+ * must persist it before {@link FleetNodeRotateCredentialResponse.previousCredentialExpiresAt},
+ * after which the credential it presented here stops working.
+ */
+export interface FleetNodeRotateCredentialResponse {
+	ok: true;
+	nodeId: string;
+	/** The new node secret, returned exactly once. */
+	secret: string;
+	/** ISO instant the OLD credential stops being accepted. */
+	previousCredentialExpiresAt: string | null;
+	/** Seconds the old credential remains valid, for a node that cannot parse dates. */
+	overlapSec: number;
+	node: FleetNodeView;
+}
 
 /**
  * Floor for the offline sweep window. Below the node's own minimum

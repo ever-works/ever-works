@@ -4,6 +4,7 @@ import { UsageModule } from '../usage/usage.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { PolicyModule } from '../policy/policy.module';
 import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
+import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -89,7 +90,19 @@ const FACADES = [
     // importing it here cannot cycle. It binds AGENT_PLUGIN_SKILL_SOURCE,
     // which SkillsFacadeService consumes @Optional() to merge Agent Plugins
     // package skills into the catalog as an additive last source.
-    imports: [DatabaseModule, UsageModule, BudgetsModule, PolicyModule, AgentPluginsModule],
+    imports: [
+        DatabaseModule,
+        UsageModule,
+        BudgetsModule,
+        PolicyModule,
+        AgentPluginsModule,
+        // Merge approval (self-build slice AE, EW-805) — binds
+        // MERGE_APPROVAL_VERIFIER, which GitFacadeService consumes before
+        // it lets any merge reach a provider. Imported here (not folded
+        // into PolicyModule) so PolicyModule stays the entity-only leaf
+        // every policy consumer can depend on.
+        MergeApprovalModule,
+    ],
     providers: FACADES,
     exports: FACADES,
 })

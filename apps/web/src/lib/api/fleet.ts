@@ -34,6 +34,7 @@ import type {
     FleetExecutionMode,
     FleetExecutionPreferenceView,
     FleetExecutionScopeType,
+    FleetRotateAllResult,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
 
@@ -59,6 +60,7 @@ export type {
     FleetExecutionMode,
     FleetExecutionPreferenceView,
     FleetExecutionScopeType,
+    FleetRotateAllResult,
     FleetRunnerNodeView,
     FleetRunnerStatusView,
     // Fleet health signals (EW-776) — the worker-state vocabulary and the
@@ -300,6 +302,41 @@ export const fleetAPI = {
     killSwitchAudit: async (limit?: number) => {
         const query = typeof limit === 'number' && limit > 0 ? `?limit=${Math.trunc(limit)}` : '';
         return serverFetch<FleetAuditView[]>(`${BASE}/kill-switch/audit${query}`);
+    },
+
+    /**
+     * Credential lifecycle (EW-799).
+     *
+     * `nodeAudit` is the OWNER-scoped trail for one machine — distinct
+     * from `killSwitchAudit`, which reads the whole table and is a
+     * platform-admin route. The node id reaches here from a Server Action
+     * argument, i.e. from the browser, so it is encoded as ONE path
+     * segment for the same reason the affinity helpers do it: a crafted
+     * value carrying `/` or `..` must not be dot-segment-normalised by
+     * `fetch` onto a different `/api/*` route under the caller's bearer.
+     */
+    nodeAudit: async (nodeId: string, limit?: number) => {
+        const query = typeof limit === 'number' && limit > 0 ? `?limit=${Math.trunc(limit)}` : '';
+        return serverFetch<FleetAuditView[]>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/audit${query}`,
+        );
+    },
+
+    /**
+     * QUEUE a credential rotation across the fleet. Nothing is rotated by
+     * this call and no credential comes back: each machine re-keys itself
+     * on its next heartbeat, keeping both credentials valid for a bounded
+     * overlap so it never goes dark. There is deliberately no web helper
+     * for `POST /api/fleet/rotate-credential` — that route is the NODE's,
+     * authenticated by the node secret, and a browser never holds one.
+     */
+    rotateAll: async () => {
+        return serverMutation<FleetRotateAllResult>({
+            endpoint: `${BASE}/rotate-all`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
     },
 
     /**

@@ -306,12 +306,107 @@ export class TaskRepository {
      */
     async updatePrStatusCache(
         taskId: string,
-        patch: Partial<Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks'>>,
+        patch: Partial<
+            Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks' | 'prHeadSha'>
+        >,
     ): Promise<void> {
         await this.repository
             .createQueryBuilder()
             .update(Task)
             .set(patch)
+            .where('id = :taskId', { taskId })
+            .execute();
+    }
+
+    /**
+     * Merge approval (self-build slice AE) — record that a HUMAN approved
+     * this Task's pull request on the git provider, for one specific
+     * commit.
+     *
+     * Same query-builder posture as `updatePrStatusCache` and for the same
+     * reason: this is provider telemetry arriving on a webhook, and it
+     * must not bump `updatedAt` and reshuffle the board.
+     *
+     * `prNumber` is part of the predicate, not just the id: a webhook is
+     * resolved to a Task by `(workId, prNumber)`, which is a newest-first
+     * lookup rather than a unique one, so the write re-asserts that the
+     * row it landed on still carries the pull request the review was for.
+     */
+    async recordPullRequestReviewApproval(
+        taskId: string,
+        prNumber: number,
+        patch: { headSha: string; approvedAt: Date; approvedBy: string | null },
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({
+                prReviewApprovedSha: patch.headSha,
+                prReviewApprovedAt: patch.approvedAt,
+                prReviewApprovedBy: patch.approvedBy,
+            })
+            .where('id = :taskId', { taskId })
+            .andWhere('prNumber = :prNumber', { prNumber })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Merge approval (self-build slice AE) — RETRACT a provider-side human
+     * review approval, because its author withdrew or reversed it.
+     *
+     * Guarded on the recorded approver: a dismissal by Alice clears
+     * Alice's attestation, and a `changes_requested` from Bob does not
+     * unmake the fact that Alice read the diff. Same query-builder posture
+     * as the writer — webhook telemetry must not bump `updatedAt`.
+     *
+     * Returns true when a Task row was cleared.
+     */
+    async clearPullRequestReviewApproval(
+        taskId: string,
+        prNumber: number,
+        approvedBy: string,
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({
+                prReviewApprovedSha: null,
+                prReviewApprovedAt: null,
+                prReviewApprovedBy: null,
+            })
+            .where('id = :taskId', { taskId })
+            .andWhere('prNumber = :prNumber', { prNumber })
+            .andWhere('LOWER(prReviewApprovedBy) = :approvedBy', {
+                approvedBy: approvedBy.toLowerCase(),
+            })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Merge approval (self-build slice AE) — remember the last merge
+     * REFUSAL so it is told to the human once instead of every two
+     * minutes.
+     *
+     * The merge attempt now lives on the PR-status sweep, so a stable
+     * refusal (a protected base branch, a required review) repeats for as
+     * long as the pull request stays open. `TaskWorkspaceService`
+     * compares (head commit, refusal code) against what is stored here
+     * before it posts a chat message and writes an activity row.
+     *
+     * Query-builder update for the same reason as `updatePrStatusCache`:
+     * this is bookkeeping about a background sweep and must not bump
+     * `updatedAt` and reshuffle the updatedAt-ordered board.
+     */
+    async recordMergeRefusal(
+        taskId: string,
+        patch: { sha: string | null; code: string | null },
+    ): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ mergeRefusedSha: patch.sha, mergeRefusedCode: patch.code })
             .where('id = :taskId', { taskId })
             .execute();
     }
@@ -574,5 +669,71 @@ export class TaskRepository {
                 nextOccurrenceAt: LessThanOrEqual(olderThan),
             },
         });
+    }
+
+    /**
+     * CI feedback loop (slice AC, EW-806) — record the head commit the
+     * provider is reporting checks against, and the red verdict that came
+     * with it.
+     *
+     * MONOTONIC by construction: the head pair is only written when the
+     * row still carries the head this caller read (or none at all), so two
+     * deliveries racing on one push cannot leave the newer commit
+     * overwritten by the older one. Returns whether this caller's head
+     * write landed.
+     *
+     * Query-builder update for the same reason `updatePrStatusCache` uses
+     * one: it must NOT bump `updatedAt`, or a busy CI would reshuffle the
+     * updatedAt-ordered board on every job.
+     *
+     * `ciState` is only ever written RED here. A single green check is not
+     * a green gate — only the poll, which sees every check at once, may
+     * write `passing` (see `deriveCiState`: red beats everything, never
+     * green early).
+     */
+    async recordCiHead(input: {
+        taskId: string;
+        expectedHeadSha: string | null;
+        headSha: string;
+        seenAt: Date;
+        failing?: boolean;
+    }): Promise<boolean> {
+        const patch: Partial<Task> = { ciHeadSha: input.headSha, ciHeadSeenAt: input.seenAt };
+        if (input.failing) {
+            patch.ciState = 'failing';
+            patch.ciCheckedAt = input.seenAt;
+        }
+        const qb = this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set(patch)
+            .where('id = :taskId', { taskId: input.taskId });
+        if (input.expectedHeadSha === null) {
+            qb.andWhere('ciHeadSha IS NULL');
+        } else {
+            qb.andWhere('ciHeadSha = :expected', { expected: input.expectedHeadSha });
+        }
+        const result = await qb.execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * CI feedback loop (slice AC) — claim the right to file the ONE
+     * "automatic retries stopped" Inbox notice for this Task.
+     *
+     * Compare-and-set from NULL in a single statement, so exactly one of N
+     * concurrent deliveries that all discover a spent budget files the
+     * notice and the rest are told they lost. Same shape as
+     * `FleetNodeRepository.casTripDailyCeiling`.
+     */
+    async casMarkCiAutoResumeNoticed(taskId: string, at: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ ciAutoResumeNoticedAt: at })
+            .where('id = :taskId', { taskId })
+            .andWhere('ciAutoResumeNoticedAt IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
     }
 }

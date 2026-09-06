@@ -346,7 +346,23 @@ export class FleetCostCeilingService {
         verdict: FleetCostCeilingVerdict,
     ): Promise<void> {
         try {
-            await this.fleet.setDisabledForUser(userId, nodeId, true);
+            // `actorUserId: null` — the SYSTEM drained this node, not its
+            // owner. The method is owner-scoped and takes the owner's id,
+            // so without this the audit row would accuse the owner of a
+            // drain they did not perform (and were probably asleep for).
+            await this.fleet.setDisabledForUser(userId, nodeId, true, {
+                actorUserId: null,
+                via: 'cost-ceiling',
+                details: {
+                    day: verdict.day,
+                    nodeCeilingCents: verdict.node.ceilingCents,
+                    nodeSpendCents: verdict.node.spendCents,
+                    nodeOutcome: verdict.node.outcome,
+                    fleetCeilingCents: verdict.fleet.ceilingCents,
+                    fleetSpendCents: verdict.fleet.spendCents,
+                    fleetOutcome: verdict.fleet.outcome,
+                },
+            });
             await this.jobService.releaseClaimsForNode(userId, nodeId);
             if (!verdict.drainedNodeIds.includes(nodeId)) verdict.drainedNodeIds.push(nodeId);
         } catch (error) {

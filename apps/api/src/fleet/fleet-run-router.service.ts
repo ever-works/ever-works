@@ -387,7 +387,23 @@ export class FleetRunRouterService {
             jobPayload.execution = plan.execution;
             jobPayload.workspace = plan.workspace;
             jobPayload.acceptanceChecks = plan.acceptanceChecks;
+            // EW-807: THE freeze. Both phases are embedded in the immutable
+            // enqueued payload here, and the node never reads them from
+            // anywhere else — which is what makes "a model editing
+            // `.works/works.yml` mid-run cannot widen what runs" a property
+            // of the system rather than a promise.
+            if (plan.setup && plan.setup.length > 0) {
+                jobPayload.setup = plan.setup;
+            }
             jobPayload.git = plan.git;
+            // Self-build slice Z (EW-796) — only when the planner actually
+            // enabled the bridge. The node reads THIS field to decide
+            // whether to mint a credential, and `FleetRunCredentialService`
+            // re-reads it at mint time, so a job whose plan never asked for
+            // tools can never be talked into having them.
+            if (plan.mcp) {
+                jobPayload.mcp = plan.mcp;
+            }
         }
         // A model-CLI job may only be leased by a node that advertises the
         // CLI it needs: the tag is backed by a resolved executable on the

@@ -311,6 +311,64 @@ describe('createNodeRuntime', () => {
 		});
 	});
 
+	it('points every client at the pinned control plane, and warns when the pin is not the enrolled origin', async () => {
+		// EW-779. A broken `develop` must not be able to orphan the fleet: an
+		// operator sets EVER_WORKS_NODE_API_URL, restarts, and both the
+		// heartbeat and the job channel move together — they are resolved ONCE
+		// so they can never end up on different platforms.
+		const { io: deps, entries } = io(async () => ({
+			ok: true,
+			status: 200,
+			text: async () => JSON.stringify({ ok: true, node: nodeFromApi })
+		}));
+		const config: NodeConfig = {
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z'
+		};
+
+		const runtime = createNodeRuntime(config, deps, {
+			workerEnabled: true,
+			env: { EVER_WORKS_NODE_API_URL: 'https://apistage.ever.works/' }
+		});
+
+		expect(runtime.client.baseUrl).toBe('https://apistage.ever.works');
+		const logged = entries.map((entry) => entry.message).join('\n');
+		expect(logged).toContain('Control plane: https://apistage.ever.works');
+		// The pin does not match the origin the secret was minted against, so
+		// every call will 401 — said out loud rather than left to a retry loop.
+		expect(logged).toContain('401');
+		// And the pin is never written back: unsetting the variable must be
+		// enough to undo it.
+		expect(config.apiUrl).toBe('https://api.ever.works');
+		await runtime.worker?.stop();
+	});
+
+	it('falls back to the enrolled origin when nothing is pinned', async () => {
+		const { io: deps, entries } = io(async () => ({
+			ok: true,
+			status: 200,
+			text: async () => JSON.stringify({ ok: true, node: nodeFromApi })
+		}));
+		const config: NodeConfig = {
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z'
+		};
+
+		const runtime = createNodeRuntime(config, deps, { env: {} });
+		expect(runtime.client.baseUrl).toBe('https://api.ever.works');
+		expect(entries.map((entry) => entry.message).join('\n')).toContain('from the enrolled config');
+	});
+
 	it('wires a client and a loop against the stored config, protecting the secret', async () => {
 		const {
 			io: deps,
