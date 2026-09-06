@@ -1603,6 +1603,30 @@ export class TaskWorkspaceService {
          * and never trusts this value.
          */
         headSha?: string | null;
+        /**
+         * The branch this pull request actually merges INTO.
+         *
+         * Release promotion lane (self-build slice AI, EW-808). Every
+         * other caller's pull request targets the Work's
+         * `taskIsolationBaseBranch`, which is why that used to be assumed
+         * here unconditionally — and a promotion is the first pull request
+         * on this platform for which it is WRONG. It matters twice: the
+         * protected-branch rule is evaluated against this value, and it is
+         * the branch named in the string the approving human reads. A
+         * `stage -> main` promotion reported as `develop` would be
+         * approved as one thing and merged as another, and the
+         * `protected-branch` refusal would never fire.
+         *
+         * Omitted (the ordinary Task case) it falls back to the Work's
+         * base branch exactly as before.
+         */
+        baseRef?: string | null;
+        /**
+         * RAISE the approval requirement for this merge, whatever the
+         * resolved policy says. Never lowers it — see
+         * {@link AgentMergeActor.requireHumanApproval}.
+         */
+        requireHumanApproval?: boolean;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task } = input;
         if (!this.gitFacade || !this.mergePolicy) return undefined;
@@ -1619,7 +1643,9 @@ export class TaskWorkspaceService {
             workId: work.id,
         };
         const baseRef =
-            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || 'main';
+            (input.baseRef && input.baseRef.trim()) ||
+            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
+            'main';
 
         return this.attemptAgentMerge({
             task,
@@ -1633,6 +1659,7 @@ export class TaskWorkspaceService {
             baseRef,
             gateStatus: input.gateStatus ?? null,
             headSha: input.headSha ?? task.prHeadSha ?? null,
+            requireHumanApproval: input.requireHumanApproval === true,
         });
     }
 
@@ -1685,6 +1712,8 @@ export class TaskWorkspaceService {
         gateStatus: GateStatus | null;
         /** Head commit the refusal record is keyed by. Never an input to the decision. */
         headSha?: string | null;
+        /** Raises the approval requirement; can never clear it (slice AI). */
+        requireHumanApproval?: boolean;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task, work, userId, agentId, owner, repo, prNumber, baseRef } = args;
         if (!this.mergePolicy || !this.gitFacade) return undefined;
@@ -1749,6 +1778,12 @@ export class TaskWorkspaceService {
                     // approval would not be a gate.
                     taskId: task.id,
                     targetBranch: baseRef,
+                    // Release promotion lane (slice AI): a caller-side
+                    // RAISE only. The facade ORs it with the resolved
+                    // policy, so this can never clear an approval
+                    // requirement — only insist on one the policy did not
+                    // ask for.
+                    requireHumanApproval: args.requireHumanApproval === true,
                 },
             );
 

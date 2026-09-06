@@ -219,6 +219,14 @@ describe('TaskMergeGateService', () => {
             // than on every two-minute sweep. Never an input to the
             // decision — the facade re-reads and pins the head itself.
             headSha: HEAD,
+            // Release promotion lane (slice AI): both are the ORDINARY
+            // Task answers, asserted rather than omitted so the promotion
+            // narrowing can never leak into an ordinary merge. `null` base
+            // means "use the Work's `taskIsolationBaseBranch`", exactly as
+            // before; `false` leaves the resolved policy's approval
+            // requirement untouched.
+            baseRef: null,
+            requireHumanApproval: false,
         });
         expect(outcome).toEqual({
             action: 'merge-attempted',

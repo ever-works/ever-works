@@ -190,3 +190,6 @@ export * from './agent-plugin-package.entity';
 export * from './agent-plugin-package-allowlist.entity';
 export * from './repo-connection.entity';
 export * from './agent-repo-attachment.entity';
+// Release promotion lane (self-build slice AI, EW-808) — one row per
+// attempt to move a Work one rung along develop -> stage -> main.
+export * from './release-promotion.entity';

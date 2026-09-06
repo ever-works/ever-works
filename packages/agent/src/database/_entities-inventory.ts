@@ -160,6 +160,7 @@ import { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
 import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-allowlist.entity';
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
+import { ReleasePromotion } from '../entities/release-promotion.entity';
 
 import {
     PluginEntity,
@@ -402,4 +403,9 @@ export const ENTITIES = [
     AgentPluginPackageAllowlist,
     RepoConnection,
     AgentRepoAttachment,
+    // Release promotion lane (self-build slice AI, EW-808) — one row per
+    // attempt to move a Work one rung along develop -> stage -> main. The
+    // UNIQUE (workId, rung, laneKey) index on it is what stops two merges
+    // to develop opening two competing promotion pull requests.
+    ReleasePromotion,
 ];

@@ -33,6 +33,8 @@ import type {
     GitDiffOptions,
     GitDiffResult,
     GitPullRequestStatus,
+    // Release promotion lane (self-build slice AI, EW-808).
+    GitWorkflowRun,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -226,8 +228,32 @@ export interface AgentMergeActor {
      * looks it up through the provider. If it still cannot be determined
      * and the policy protects any branch, the merge is REFUSED rather than
      * performed blind.
+     *
+     * MUST be the branch this pull request actually merges into. Passing
+     * a Work-level default here (the caller's usual base) makes the
+     * protected-branch rule evaluate a branch that is not being merged
+     * into — see the release promotion lane, whose pull requests are the
+     * first on this platform whose base is not `taskIsolationBaseBranch`.
      */
     targetBranch?: string | null;
+    /**
+     * Release promotion lane (self-build slice AI, EW-808) — a caller-side
+     * RAISE of the approval requirement.
+     *
+     * One direction only, enforced at the read: `true` forces the approval
+     * gate on even where the resolved policy sets `requireHumanApproval:
+     * false`; `false` / omitted changes nothing. A caller can therefore
+     * never lower the bar, only insist on a higher one.
+     *
+     * It exists because "an operator turned approvals off for this scope"
+     * must not extend to a release promotion. A promotion moves a whole
+     * batch onto `stage` or into production off a build lane measured at
+     * 215-243 minutes, and this slice's whole premise is that a human
+     * reads the gate verdict and decides. `TaskMergeGateService` sets it
+     * for promotions, and it is asserted HERE too so the property does not
+     * depend on one caller remembering.
+     */
+    requireHumanApproval?: boolean;
 }
 
 export type { GitProviderInfo };
@@ -926,7 +952,13 @@ export class GitFacadeService implements IGitFacade {
         if (typeof this.mergePolicy.resolve === 'function') {
             try {
                 const resolved = await this.mergePolicy.resolve(scope);
-                requiresApproval = resolved.policy.requireHumanApproval;
+                // OR, never assignment: `agentActor.requireHumanApproval`
+                // can only RAISE the bar (release promotion lane, slice
+                // AI). A caller that could clear it would be able to
+                // answer the question the gate exists to ask.
+                requiresApproval =
+                    resolved.policy.requireHumanApproval ||
+                    agentActor.requireHumanApproval === true;
                 policySource = resolved.source;
             } catch (error) {
                 this.logger.warn(
@@ -1246,6 +1278,46 @@ export class GitFacadeService implements IGitFacade {
             throw new GitOperationNotSupportedError('getPullRequestDiff', plugin.id);
         }
         return impl.call(plugin, owner, repo, prNumber, diffOptions, token);
+    }
+
+    // ── Release promotion lane (self-build slice AI, EW-808) ──────────
+
+    /**
+     * The verdict of ONE named workflow file for ONE commit.
+     *
+     * Separate from `getPullRequestStatus` on purpose. That read rolls up
+     * every check on the head commit and treats `skipped` / `cancelled` /
+     * `neutral` / `stale` as non-blocking, which is right for the board's
+     * dot and wrong for a release gate — `promotion-gate.yml` SKIPS its
+     * e2e job by design on any head that is not `stage`, and a skipped job
+     * renders green. It also cannot answer "did the gate run at all?",
+     * because the `checks[]` it returns is a capped sample.
+     *
+     * Three outcomes, all distinct and all meaningful to the caller:
+     *   - a run          → the caller maps its status/conclusion to a verdict;
+     *   - `null`         → the workflow has no run for this commit;
+     *   - a THROW        → the lookup is broken (no capability, no scope,
+     *                      provider down). Never collapsed into `null`.
+     *
+     * The promotion lane refuses on all three except an explicit success,
+     * but it tells the operator a different story for each.
+     */
+    async getWorkflowRunForCommit(
+        owner: string,
+        repo: string,
+        workflowPath: string,
+        headSha: string,
+        options: GitFacadeOptions,
+    ): Promise<GitWorkflowRun | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        // The lazy-plugin proxy over-reports optional methods, so the
+        // method is materialised off the resolved plugin before it is
+        // called (same rule as the PR-insights reads above).
+        const impl = plugin.getWorkflowRunForCommit;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getWorkflowRunForCommit', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, workflowPath, headSha, token);
     }
 
     /** Same, for a pushed branch that has not opened a PR yet. */

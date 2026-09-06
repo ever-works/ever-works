@@ -77,6 +77,17 @@ export {
     TaskCiAutoResumeAttemptRepository,
     type ClaimAutoResumeAttemptInput,
 } from '../database/repositories/task-ci-auto-resume-attempt.repository';
+// Release promotion lane (self-build slice AI, EW-808) — develop -> stage
+// -> main. Opens a promotion pull request and reports the gate; merging it
+// stays on the slice-AE human-approval path.
+export * from './release-promotion.service';
+export * from './release-promotion.module';
+export { ReleasePromotion } from '../entities/release-promotion.entity';
+export {
+    ReleasePromotionRepository,
+    type ClaimPromotionLaneInput,
+    type PromotionLaneClaim,
+} from '../database/repositories/release-promotion.repository';
 // Git activity ingestion (audit item j) — branch/PR → Task resolver.
 export * from './task-git-link.service';
 export {
