@@ -60,6 +60,12 @@ describe('TaskPrStatusService — promotion lane seam', () => {
             findDuePrStatusSync: jest.fn().mockResolvedValue([]),
             updatePrStatusCache: jest.fn().mockResolvedValue(undefined),
             updateById: jest.fn().mockResolvedValue(undefined),
+            // Slice AC (EW-806) merged while this branch was in review and made
+            // the refresh path record the provider's head. Without this stub the
+            // call throws, the surrounding catch swallows it, and BOTH the
+            // promotion watcher and the merge gate below are skipped — which is
+            // how this suite went red on a rebase without either hook changing.
+            recordCiHead: jest.fn().mockResolvedValue(false),
         };
         const works = {
             findById: jest.fn().mockResolvedValue({
@@ -93,6 +99,12 @@ describe('TaskPrStatusService — promotion lane seam', () => {
             git as never,
             transitions as never,
             mergeGate as never,
+            // Slice AC (EW-806) merged while this branch was in review and its
+            // auto-resume evaluator took the slot before this one. Passing
+            // `undefined` keeps the promotion watcher in the argument the
+            // constructor actually declares for it — shifting it would make this
+            // suite construct an auto-resume service and silently test nothing.
+            undefined,
             promotionLane as never,
         );
         return { service, tasks, git, mergeGate, promotionLane, calls };
