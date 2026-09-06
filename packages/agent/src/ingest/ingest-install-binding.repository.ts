@@ -98,4 +98,65 @@ export class IngestInstallBindingRepository {
             return null;
         }
     }
+
+    /**
+     * Insert the binding for one external workspace ONLY when nothing
+     * holds it yet, and return whoever holds it afterwards (never null
+     * unless the insert failed for a non-race reason).
+     *
+     * The difference from {@link record} is deliberate and
+     * security-relevant. `record` RE-POINTS an existing row, which is
+     * correct after a signature-verified delivery has proven ownership.
+     * An authenticated FIRST-CLAIM surface (Sentry installations) has no
+     * such proof — the claimant only knows an id — so a second claimant
+     * must lose to the first instead of overwriting it. `record`'s
+     * check-then-write cannot express that: two concurrent claims both
+     * see no row, and the second one's update silently steals the first
+     * one's binding. Here the existence check and the insert are the
+     * only two outcomes, so the loser of the race gets the winner's row
+     * back and the caller answers 409 by comparing `userId`.
+     */
+    async recordIfAbsent(data: RecordIngestBindingData): Promise<IngestInstallBinding | null> {
+        if (!data.externalWorkspaceId) return null;
+        const existing = await this.findByWorkspace(data.provider, data.externalWorkspaceId);
+        if (existing) return existing;
+        try {
+            return await this.repository.save(
+                this.repository.create({
+                    provider: data.provider,
+                    externalWorkspaceId: data.externalWorkspaceId,
+                    externalEnterpriseId: data.externalEnterpriseId ?? null,
+                    userId: data.userId,
+                    pluginId: data.pluginId,
+                    externalWorkspaceName: data.externalWorkspaceName ?? null,
+                }),
+            );
+        } catch (error) {
+            // Concurrent first claim — the UNIQUE index picked a winner;
+            // hand it back so the caller can tell "mine" from "theirs".
+            const winner = await this.findByWorkspace(data.provider, data.externalWorkspaceId);
+            if (winner) return winner;
+            this.logger.warn(
+                `Failed to claim ${data.provider} install binding for "${data.externalWorkspaceId}": ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * Remove the binding for one external workspace. True when a row
+     * went. Used when the external side tells us the installation is
+     * gone (Sentry `installation.deleted`) or when the owner unbinds it
+     * from the settings surface — the caller is responsible for having
+     * verified either the delivery signature or the owner.
+     */
+    async remove(provider: IngestInstallProvider, externalWorkspaceId: string): Promise<boolean> {
+        if (!externalWorkspaceId) return false;
+        const existing = await this.findByWorkspace(provider, externalWorkspaceId);
+        if (!existing) return false;
+        await this.repository.remove(existing);
+        return true;
+    }
 }

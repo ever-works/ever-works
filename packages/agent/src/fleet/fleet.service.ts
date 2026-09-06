@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import {
     BadRequestException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
@@ -15,13 +16,23 @@ import {
     FLEET_ENROLLABLE_NODE_KINDS,
     FLEET_MAX_CLI_VERSION_LENGTH,
     FLEET_MAX_DISK_FREE_BYTES,
+    FLEET_MAX_MODEL_IDENTITY_LENGTH,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
+    FLEET_MAX_WORKER_STATE_REASON_LENGTH,
+    FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
+    normalizeFleetNodeWorkerState,
 } from '@ever-works/contracts';
-import type { FleetNodeView, FleetNodeLoadView } from '@ever-works/contracts';
+import type {
+    FleetAuditAction,
+    FleetNodeView,
+    FleetNodeLoadView,
+    FleetNodeWorkerState,
+} from '@ever-works/contracts';
 import { config } from '../config';
+import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import {
     FleetNode,
     FleetNodeKind,
@@ -30,13 +41,17 @@ import {
 } from '../entities/fleet-node.entity';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { redactSecrets } from '../utils/secret-scan';
 import { FleetNodeRepository } from './fleet-node.repository';
+import { FleetAuditService } from './fleet-audit.service';
+import { normalizeDailyCeilingCents } from './fleet-cost-ceiling.shared';
 import {
     CREDENTIAL_MAX_LENGTH,
     CREDENTIAL_MIN_LENGTH,
     constantTimeEquals,
+    matchNodeCredential,
     sha256Hex,
-    UUID_RE,
+    verifyNodeSecret,
 } from './fleet-node-credential';
 
 /**
@@ -136,12 +151,93 @@ export interface EnrollInput {
     cliVersion?: string;
     /** Free bytes on the node's workspace volume. Same optional contract. */
     diskFreeBytes?: number;
+    /**
+     * Which account / seat the agent CLI is logged in as (fleet cost
+     * accounting, EW-777) — a display label, never a credential. Same
+     * optional contract as {@link cliVersion}.
+     */
+    modelIdentity?: string;
+    /**
+     * Fleet health signals (EW-776) — what the node's WORKER reports
+     * doing. An untrusted STRING, not the union: the wire has to admit a
+     * value a newer daemon invented (rejecting it would fail the beat and
+     * take a live node offline), and it is normalized here before it is
+     * stored. Same additive contract as {@link cliVersion}.
+     */
+    workerState?: string;
+    /** Why — quarantine message, throttle reason. Sanitized and capped. */
+    workerStateReason?: string;
+    /**
+     * Node housekeeping (EW-803) — the free-space floor the node enforces
+     * on ITSELF, in bytes.
+     *
+     * The one field on this input where `undefined` and `null` mean
+     * different things. `undefined` is the usual "said nothing, leave the
+     * stored value alone"; an explicit `null` means "this machine has no
+     * floor" and DOES clear the column, because an operator switching the
+     * floor off is a change they need to see reflected rather than a
+     * silence that preserves a stale number.
+     */
+    minFreeDiskBytes?: number | null;
+    /** Workspaces retained by the node's last reclaim sweep. Same additive contract as {@link cliVersion}. */
+    workspaceCount?: number;
+    /** Bytes those workspaces occupy. */
+    workspaceBytes?: number;
+    /** ISO-8601 instant of that sweep, on the NODE's clock. Parsed and refused here if implausible. */
+    lastReclaimAt?: string;
+    /** Bytes that sweep freed. */
+    lastReclaimFreedBytes?: number;
 }
 
 export interface EnrollResult {
     nodeId: string;
     /** Heartbeat secret, returned exactly once — only its sha256 is stored. */
     secret: string;
+    node: FleetNodeView;
+}
+
+/**
+ * Who is behind a lifecycle write, and whether THIS method should be the
+ * one that records it (EW-799).
+ *
+ * Two problems it solves, both of which produce a factually wrong log if
+ * it is skipped:
+ *
+ *   1. `setDisabledForUser` has three callers — the PATCH route, the
+ *      per-node drain (and drain-all through it) and the cost-ceiling
+ *      trip. Auditing unconditionally inside it writes N per-node rows
+ *      PLUS the aggregate `drain-all` row on one panic. `suppress` is how
+ *      an outer caller says "I own this decision and will record the
+ *      richer row myself".
+ *   2. The cost-ceiling drain calls the same owner-scoped method with the
+ *      OWNER's id, but the actor is the SYSTEM. `actorUserId: null` is how
+ *      the row says so, instead of accusing the owner of a drain they did
+ *      not perform.
+ */
+export interface FleetNodeAuditContext {
+    /** Who acted. `null` = the system; omitted = the owner in scope. */
+    actorUserId?: string | null;
+    /** What produced the write (`drain-all`, `cost-ceiling`, `node`). */
+    via?: string;
+    /** Extra facts worth recording. Scrubbed by the audit writer. */
+    details?: Record<string, unknown>;
+    /** True when the caller records the richer row itself. */
+    suppress?: boolean;
+}
+
+/**
+ * Result of a NODE-INITIATED credential rotation. The secret is returned
+ * exactly once and, like every other Fleet credential, only its sha256 is
+ * ever stored.
+ */
+export interface RotateNodeCredentialResult {
+    nodeId: string;
+    /** The NEW node secret. Returned once; never logged, never audited. */
+    secret: string;
+    /** When the credential the node presented stops being accepted. */
+    previousCredentialExpiresAt: Date;
+    /** The same instant as a duration, for a daemon that cannot parse dates. */
+    overlapSec: number;
     node: FleetNodeView;
 }
 
@@ -183,6 +279,16 @@ export class FleetService {
         private readonly repository: FleetNodeRepository,
         @Optional() private readonly pluginRegistry?: PluginRegistryService,
         @Optional() private readonly pluginSettings?: PluginSettingsService,
+        // Fleet health signals (EW-776). Appended LAST and @Optional() per
+        // the positional-construction rule the specs rely on; the token is
+        // bound by the api-side @Global() InboxModule, so unit tests and
+        // the worker's RPC context simply file no notices.
+        @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
+        // APPENDED and @Optional() on purpose: several existing
+        // constructions pass only the repository. A dependency inserted
+        // anywhere but last, or made required, would break them — and an
+        // audit trail is not worth making the registry unbootable for.
+        @Optional() private readonly audit?: FleetAuditService,
     ) {}
 
     /** Issue a one-time enrollment token for a new node (owner-scoped). */
@@ -214,10 +320,22 @@ export class FleetService {
             capabilities: [],
         });
 
+        const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
+        // Act first, then audit. The token has already been minted and
+        // handed back; a failed audit row must not un-mint it.
+        await this.tryAuditNode({
+            action: 'node.create',
+            ownerUserId: userId,
+            nodeId: node.id,
+            before: null,
+            after: { status: node.status, name: node.name, kind: node.kind },
+            // The TTL, never the token and never its hash.
+            extra: { ttlMs },
+        });
         return {
             node: this.toView(node),
             token,
-            expiresInSec: Math.floor(config.fleet.getEnrollmentTokenTtlMs() / 1000),
+            expiresInSec: Math.floor(ttlMs / 1000),
         };
     }
 
@@ -262,6 +380,7 @@ export class FleetService {
 
         const secret = randomBytes(32).toString('base64url');
         const now = new Date();
+        const enrolledWorkerState = normalizeFleetNodeWorkerState(input.workerState);
         const patch = {
             enrollmentTokenHash: sha256Hex(secret),
             status: 'online' as FleetNodeStatus,
@@ -275,6 +394,35 @@ export class FleetService {
             // "leave alone"; see the comment there.
             cliVersion: sanitizeText(input.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH),
             diskFreeBytes: sanitizeByteCount(input.diskFreeBytes),
+            modelIdentity: sanitizeModelIdentity(input.modelIdentity),
+            // Health signals (EW-776): normalized, never stored verbatim.
+            // Stamped (possibly null) for the same reason the rest of the
+            // telemetry is — the row is new, there is nothing to preserve.
+            workerState: enrolledWorkerState,
+            // Dropped with the state it explains when that state is one we
+            // could not recognise — same rule the heartbeat path applies.
+            // Captioning an "unknown" badge with text whose meaning we
+            // cannot vouch for is worse than saying nothing.
+            workerStateReason:
+                enrolledWorkerState === null ? null : sanitizeWorkerStateReason(input),
+            workerStateChangedAt: now,
+            // Credential lifecycle (EW-799) — belt. Today the only path
+            // back to `enrolling` is the operator re-key, which already
+            // clears these; stamping them here makes "a node that has
+            // just enrolled accepts exactly one credential" true by
+            // construction rather than by an argument about which call
+            // sites exist. A stale window surviving an enroll would be a
+            // credential from a previous life still authenticating.
+            previousCredentialHash: null,
+            previousCredentialExpiresAt: null,
+            // Node housekeeping (EW-803). Set (possibly to null) for the
+            // same reason as the telemetry above: the row is brand new, so
+            // there is no earlier reading that "leave alone" could protect.
+            minFreeDiskBytes: sanitizeByteCount(input.minFreeDiskBytes),
+            workspaceCount: sanitizeCount(input.workspaceCount, FLEET_MAX_WORKSPACE_COUNT),
+            workspaceBytes: sanitizeByteCount(input.workspaceBytes),
+            lastReclaimAt: sanitizeReportedInstant(input.lastReclaimAt, now),
+            lastReclaimFreedBytes: sanitizeByteCount(input.lastReclaimFreedBytes),
         };
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
@@ -283,6 +431,22 @@ export class FleetService {
             return null;
         }
 
+        // Actor is NULL: the machine enrolled itself, presenting a token
+        // the owner minted. Attributing it to the owner would make the log
+        // claim a person was at that keyboard.
+        await this.tryAuditNode({
+            action: 'node.enroll',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status },
+            after: {
+                status: patch.status,
+                platform: patch.platform,
+                version: patch.version,
+                capabilities: patch.capabilities,
+            },
+        });
         return {
             nodeId: node.id,
             secret,
@@ -302,29 +466,29 @@ export class FleetService {
      * moment its owner most needs to see it. The beat therefore stamps
      * `lastHeartbeatAt` but PRESERVES the sticky status, so a heartbeat
      * can never silently un-pause or re-enable a node.
+     *
+     * A beat is NOT audited, deliberately: one row per node per 30s is not
+     * a trail, it is a firehose that buries the rows an operator came to
+     * read. What it does carry is `rotationRequested` — the flag a queued
+     * `rotate-all` sets, which is how a machine learns to re-key itself.
      */
     async heartbeat(
         nodeId: unknown,
         secret: unknown,
         refresh: EnrollInput = {},
-    ): Promise<{ node: FleetNodeView } | null> {
-        if (typeof nodeId !== 'string' || !UUID_RE.test(nodeId)) {
-            return null;
-        }
-        if (
-            typeof secret !== 'string' ||
-            secret.length < CREDENTIAL_MIN_LENGTH ||
-            secret.length > CREDENTIAL_MAX_LENGTH
-        ) {
-            return null;
-        }
+    ): Promise<{ node: FleetNodeView; rotationRequested: boolean } | null> {
+        const verified = verifyNodeSecret(nodeId, secret);
+        if (!verified) return null;
 
-        const node = await this.repository.findById(nodeId);
+        const node = await this.repository.findById(verified.nodeId);
         if (!node) return null;
         // An enrolling node has no secret yet (the hash column still
         // holds the token hash), so it can never authenticate here.
         if (node.status === 'enrolling') return null;
-        if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) {
+        // Dual-accept (EW-799): a node inside its rotation window may beat
+        // with EITHER credential. Without this, a node that rotated
+        // mid-beat would go dark until it restarted.
+        if (matchNodeCredential(verified, node) === null) {
             return null;
         }
 
@@ -355,9 +519,292 @@ export class FleetService {
         if (cliVersion) patch.cliVersion = cliVersion;
         const diskFreeBytes = sanitizeByteCount(refresh.diskFreeBytes);
         if (diskFreeBytes !== null) patch.diskFreeBytes = diskFreeBytes;
-
+        // Same additive contract (EW-777): a beat that says nothing about
+        // the seat leaves the last reported seat in place.
+        const modelIdentity = sanitizeModelIdentity(refresh.modelIdentity);
+        if (modelIdentity) patch.modelIdentity = modelIdentity;
+        // Health signals (EW-776). `undefined` means the daemon said
+        // nothing about its worker — the same "leave alone" contract as
+        // the telemetry above — and is distinct from a REPORTED value this
+        // build does not recognise, which is stored as null / "unknown".
+        const workerState = this.applyWorkerState(node, refresh, patch);
+        this.applyHousekeeping(refresh, patch);
+        // Re-arm the offline notice markers on EVERY accepted beat, not
+        // only on beats that happened to report a worker state. The beat
+        // itself is the proof the machine is reachable, and the daemons
+        // that report nothing are exactly the ones this must not forget:
+        // a build older than the field, a visibility-only node with its
+        // worker disabled, and — created by this very slice — a daemon
+        // that latched into liveness-only reporting after an older API
+        // 400'd the fields. Folding this into `applyWorkerState` left
+        // `offlineLongNoticedAt` set forever on all three, so their
+        // SECOND outage would never have been announced.
+        this.rearmOfflineNotices(node, patch);
         await this.repository.update(node.id, patch);
-        return { node: this.toView({ ...node, ...patch }) };
+        // Best-effort and AFTER the write, so a notice never claims a
+        // transition the database refused. The dedup markers ride in the
+        // same patch, which is what makes each notice fire once: if the
+        // Inbox call then fails we log it rather than re-arming, exactly
+        // as the daily-ceiling notice does.
+        await this.announceWorkerTransition(node, patch, workerState);
+        return {
+            node: this.toView({ ...node, ...patch }),
+            rotationRequested: Boolean(node.rotationRequestedAt),
+        };
+    }
+
+    /**
+     * Fold a heartbeat's housekeeping report into the update patch
+     * (EW-803).
+     *
+     * Every field follows the additive contract the telemetry above
+     * follows — absent leaves the stored value alone — with ONE deliberate
+     * exception, `minFreeDiskBytes`, where an explicit `null` clears the
+     * column. That asymmetry exists because "the operator switched the
+     * floor off" is a real state with no other way to say it, and a stale
+     * "2.0 GiB floor" shown next to a node that no longer has one would be
+     * worse than showing nothing.
+     *
+     * A figure the sanitizers refuse is dropped, not written as null: a
+     * broken probe must not wipe the last good reading an operator is
+     * looking at. The one exception is the pairing rule at the bottom —
+     * see there.
+     */
+    private applyHousekeeping(refresh: EnrollInput, patch: Partial<FleetNode>): void {
+        if (refresh.minFreeDiskBytes === null) {
+            patch.minFreeDiskBytes = null;
+        } else if (refresh.minFreeDiskBytes !== undefined) {
+            const floor = sanitizeByteCount(refresh.minFreeDiskBytes);
+            if (floor !== null) patch.minFreeDiskBytes = floor;
+        }
+        const workspaceCount = sanitizeCount(refresh.workspaceCount, FLEET_MAX_WORKSPACE_COUNT);
+        if (workspaceCount !== null) patch.workspaceCount = workspaceCount;
+        const workspaceBytes = sanitizeByteCount(refresh.workspaceBytes);
+        if (workspaceBytes !== null) patch.workspaceBytes = workspaceBytes;
+        // The instant and the bytes it describes move TOGETHER. "4.1 GB
+        // freed" is reassuring or alarming entirely depending on when, so a
+        // freed-bytes figure is never written against the previous sweep's
+        // timestamp: if the instant is refused, the bytes are dropped with
+        // it, and if the instant is accepted the bytes are written even
+        // when the node reported none (a sweep that freed nothing is a
+        // real, and reassuring, outcome).
+        const lastReclaimAt = sanitizeReportedInstant(refresh.lastReclaimAt, new Date());
+        if (lastReclaimAt !== null) {
+            patch.lastReclaimAt = lastReclaimAt;
+            patch.lastReclaimFreedBytes = sanitizeByteCount(refresh.lastReclaimFreedBytes);
+        }
+    }
+
+    /**
+     * Fold a heartbeat's reported worker state into the update patch.
+     *
+     * Returns the NORMALIZED state (`null` = reported but unknown), or
+     * `undefined` when the beat said nothing at all — the caller uses that
+     * to tell "an old daemon" apart from "a daemon reporting something we
+     * do not understand", which are different facts and must not collapse.
+     *
+     * `workerStateChangedAt` moves only on an actual transition: a
+     * quarantine that started at 03:14 must still say 03:14 after the
+     * three hundred beats that follow it, and re-stamping it every 30
+     * seconds would silently destroy the only durable evidence of when the
+     * machine stopped working.
+     */
+    private applyWorkerState(
+        node: FleetNode,
+        refresh: EnrollInput,
+        patch: Partial<FleetNode>,
+    ): FleetNodeWorkerState | null | undefined {
+        // `null` counts as "said nothing", not as "report unknown": the
+        // DTO's `@IsOptional()` already treats null as absent, so a client
+        // that serializes missing fields as null must not end up clearing a
+        // good reading that an older client would have preserved.
+        if (refresh.workerState === undefined || refresh.workerState === null) return undefined;
+        const state = normalizeFleetNodeWorkerState(refresh.workerState);
+        // A reason for a state we could not understand is not something to
+        // show an operator: it would caption an "unknown" badge with text
+        // whose meaning we cannot vouch for.
+        const reason = state === null ? null : sanitizeWorkerStateReason(refresh);
+        const previous = node.workerState ?? null;
+        if (state !== previous) {
+            patch.workerState = state;
+            patch.workerStateChangedAt = new Date();
+        }
+        if ((node.workerStateReason ?? null) !== reason) {
+            patch.workerStateReason = reason;
+        }
+        if (!this.inbox) return state;
+        // Quarantine dedup marker, written in the same patch as the state
+        // it describes. Set on the FIRST beat that reports the quarantine;
+        // cleared by the first beat that reports anything else, so a
+        // second quarantine hours later is news again.
+        if (state === 'quarantined') {
+            if (!node.quarantineNoticedAt) patch.quarantineNoticedAt = new Date();
+        } else if (node.quarantineNoticedAt) {
+            patch.quarantineNoticedAt = null;
+        }
+        return state;
+    }
+
+    /**
+     * Clear the offline notice markers, so the NEXT outage is announced.
+     *
+     * Called for every accepted heartbeat — whatever the beat said, or
+     * did not say, about its worker. A marker means "the owner has
+     * already been told about the outage that is currently running"; an
+     * accepted beat ends that outage by definition.
+     *
+     * Only bookkeeping the Inbox needs, so it stays inert when no
+     * producer is bound: a deployment that binds one later must not
+     * inherit markers written while nothing was ever notified.
+     */
+    private rearmOfflineNotices(node: FleetNode, patch: Partial<FleetNode>): void {
+        if (!this.inbox) return;
+        if (node.offlineNoticedAt) patch.offlineNoticedAt = null;
+        if (node.offlineLongNoticedAt) patch.offlineLongNoticedAt = null;
+    }
+
+    /**
+     * File the online → quarantined notice, once per quarantine.
+     *
+     * Only this transition is announced from the heartbeat: it is the one
+     * the platform can see NOW and could never see before (the beat
+     * arrives, the node looks perfectly online, and it is refusing every
+     * job). Going offline is announced by the sweep, because a node that
+     * has gone offline is by definition not sending beats.
+     */
+    private async announceWorkerTransition(
+        node: FleetNode,
+        patch: Partial<FleetNode>,
+        state: FleetNodeWorkerState | null | undefined,
+    ): Promise<void> {
+        if (!this.inbox || state !== 'quarantined' || node.quarantineNoticedAt) return;
+        // The reason as it was just STORED: the patch carries it when this
+        // beat changed it, and the row's own value when it did not.
+        const reason =
+            patch.workerStateReason !== undefined
+                ? patch.workerStateReason
+                : (node.workerStateReason ?? null);
+        await this.fileNodeNotice(node, {
+            title: `Fleet node quarantined: ${node.name}`,
+            body: [
+                `${node.name} (${node.kind}) has quarantined itself and is refusing new work.`,
+                'A quarantine is a fail-closed stop the machine imposed on itself and it survives a restart — it can only be cleared at that keyboard.',
+                `Reason: ${reason ?? 'not reported by the node'}`,
+                `Last seen: ${describeLastSeen(node)}`,
+            ].join('\n'),
+        });
+    }
+
+    /**
+     * Announce the offline transitions the SWEEP decides, then let the
+     * bulk sweep run as it always has.
+     *
+     * Two notices, each claimed by a CAS so it fires exactly once per
+     * outage: the flip to `offline`, and — a configurable window later,
+     * default 30 minutes — "this machine is still gone". The second one
+     * exists because the runbook recommends `local-wait`, under which
+     * there is no cloud fallback and therefore no other signal at all
+     * that somebody's PC went dark.
+     *
+     * Whole thing is best-effort: an Inbox or notice-bookkeeping failure
+     * must never take down the node list, which is the page an operator
+     * opens precisely when something is wrong.
+     */
+    private async announceOfflineTransitions(userId: string, cutoff: Date): Promise<void> {
+        if (!this.inbox) return;
+        try {
+            for (const row of await this.repository.findStaleOnline(userId, cutoff)) {
+                // The CAS is the dedup AND the flip: a node that beat back
+                // between the read and here is not flipped and not announced.
+                if (!(await this.repository.markOfflineIfStale(row.id, cutoff))) continue;
+                await this.fileNodeNotice(row, {
+                    title: `Fleet node offline: ${row.name}`,
+                    body: [
+                        `${row.name} (${row.kind}) stopped reporting and has been marked offline.`,
+                        'Work routed to this machine will queue until it comes back.',
+                        `Last seen: ${describeLastSeen(row)}`,
+                    ].join('\n'),
+                });
+            }
+
+            const longAfterMs = config.fleet.getNodeOfflineNoticeAfterMs();
+            const longCutoff = new Date(Date.now() - longAfterMs);
+            for (const row of await this.repository.findOfflineUnnoticed(userId, longCutoff)) {
+                if (!(await this.repository.markLongOfflineNoticed(row.id))) continue;
+                await this.fileNodeNotice(row, {
+                    title: `Fleet node still offline: ${row.name}`,
+                    body: [
+                        `${row.name} (${row.kind}) has now been offline for over ${formatDurationMs(longAfterMs)}.`,
+                        'Nothing will run on it until it is back; if this fleet routes with local-wait there is no cloud fallback covering for it.',
+                        `Last seen: ${describeLastSeen(row)}`,
+                    ].join('\n'),
+                });
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Fleet health notices skipped for user ${userId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /** File one node-scoped notice. Never throws — the inbox mirrors, it does not gate. */
+    private async fileNodeNotice(
+        node: FleetNode,
+        message: { title: string; body: string },
+    ): Promise<void> {
+        if (!this.inbox) return;
+        try {
+            await this.inbox.notice(node.userId, {
+                title: message.title,
+                body: message.body,
+                organizationId: node.organizationId ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Fleet health notice "${message.title}" was not filed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Fleet cost accounting (EW-777) — set (or clear, with null) one node's
+     * DAILY model-spend ceiling, owner-scoped. Validated the way the
+     * fleet-wide one is: a positive whole number of cents up to the
+     * contract cap, refused rather than clamped. Clearing it hands the node
+     * back to the deployment default (`FLEET_NODE_DAILY_COST_CEILING_USD`).
+     *
+     * Changing the ceiling RE-ARMS the one-notice marker
+     * (`dailyCostTrippedOn`). The marker exists so that the tenth
+     * completion crossing the same ceiling on the same day says nothing
+     * new — but an owner who raised the ceiling after a trip has made a
+     * new decision, and the NEXT crossing (of the new ceiling) is news
+     * again. Left set, that crossing would drain the node in silence.
+     */
+    async setDailyCostCeilingForUser(
+        userId: string,
+        nodeId: string,
+        dailyCostCeilingCents: unknown,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
+        const ceiling = normalizeDailyCeilingCents(dailyCostCeilingCents);
+        const node = await this.getOwnedNode(userId, nodeId);
+        const patch: Partial<FleetNode> = {
+            dailyCostCeilingCents: ceiling,
+            dailyCostTrippedOn: null,
+        };
+        await this.repository.update(node.id, patch);
+        await this.auditLifecycle('node.cost-ceiling', userId, node, ctx, {
+            before: {
+                dailyCostCeilingCents: node.dailyCostCeilingCents ?? null,
+                dailyCostTrippedOn: node.dailyCostTrippedOn ?? null,
+            },
+            after: { dailyCostCeilingCents: ceiling, dailyCostTrippedOn: null },
+        });
+        return this.toView({ ...node, ...patch } as FleetNode);
     }
 
     /**
@@ -386,10 +833,13 @@ export class FleetService {
      * router route work to a machine that will never poll for it.
      */
     async listEnrolledForUser(userId: string): Promise<FleetNodeView[]> {
-        await this.repository.sweepOffline(
-            userId,
-            new Date(Date.now() - config.fleet.getNodeOfflineAfterMs()),
-        );
+        const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
+        // Health signals (EW-776): name each node that is about to flip
+        // BEFORE the bulk sweep flips them all silently. The sweep below is
+        // unchanged and still runs — it is the catch-all for anything the
+        // per-row pass missed (or skipped, when no Inbox is bound).
+        await this.announceOfflineTransitions(userId, cutoff);
+        await this.repository.sweepOffline(userId, cutoff);
         const rows = await this.repository.findByUser(userId);
         return rows.map((row) => this.toView(row));
     }
@@ -418,12 +868,19 @@ export class FleetService {
     async listOutstandingTokensForUser(userId: string): Promise<FleetEnrollmentTokenView[]> {
         const rows = await this.repository.findByUser(userId);
         const now = Date.now();
+        const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
         return rows
             .filter((row) => row.status === 'enrolling')
             .map((row) => {
                 const issuedAtMs = credentialIssuedAtMs(row);
                 const hasIssuedAt = Number.isFinite(issuedAtMs);
-                const expiresAtMs = issuedAtMs + FLEET_ENROLLMENT_TOKEN_TTL_MS;
+                // The LIVE TTL, not the exported default: this list is the
+                // expiry an operator is SHOWN, and `enroll` validates
+                // against `config.fleet.getEnrollmentTokenTtlMs()`. Reading
+                // the constant here made the two disagree the moment
+                // `FLEET_ENROLLMENT_TOKEN_TTL_MS` was set — a token listed
+                // as live that enroll refuses, or the reverse.
+                const expiresAtMs = issuedAtMs + ttlMs;
                 return {
                     nodeId: row.id,
                     name: row.name,
@@ -453,7 +910,11 @@ export class FleetService {
      * Revoking a never-enrolled row deletes it, because the row exists
      * only to carry the token: there is no machine behind it yet.
      */
-    async revokeEnrollmentTokenForUser(userId: string, nodeId: string): Promise<void> {
+    async revokeEnrollmentTokenForUser(
+        userId: string,
+        nodeId: string,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
         if (node.status !== 'enrolling') {
             throw new BadRequestException(
@@ -461,6 +922,13 @@ export class FleetService {
             );
         }
         await this.repository.delete(node.id);
+        // The row is gone, so the audit row is the only surviving record
+        // that this machine was ever half-registered. `nodeId` carries no
+        // FK precisely so this outlives the deletion.
+        await this.auditLifecycle('node.token-revoke', userId, node, ctx, {
+            before: { status: node.status, name: node.name, kind: node.kind },
+            after: null,
+        });
     }
 
     /**
@@ -472,10 +940,17 @@ export class FleetService {
      * well as a re-key: the machine stops being able to report or lease
      * until it re-enrolls with the new token. Returned exactly once,
      * like every other Fleet credential.
+     *
+     * This is the OPERATOR's re-key, and it requires a human at the
+     * machine. {@link rotateCredentialByCredential} is the routine one —
+     * the node re-keys itself with a bounded overlap and never goes dark.
+     * Reach for this one when the credential is believed COMPROMISED,
+     * because zero overlap is exactly what you want then.
      */
     async rotateCredentialForUser(
         userId: string,
         nodeId: string,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<CreateEnrollmentTokenResult> {
         const node = await this.getOwnedNode(userId, nodeId);
         const token = randomBytes(32).toString('base64url');
@@ -483,12 +958,185 @@ export class FleetService {
             enrollmentTokenHash: sha256Hex(token),
             credentialIssuedAt: new Date(),
             status: 'enrolling',
+            // A hard re-key ends any dual-accept window that was open:
+            // the point of this path is that the old credential dies NOW.
+            previousCredentialHash: null,
+            previousCredentialExpiresAt: null,
+            rotationRequestedAt: null,
+            rotationRequestedByUserId: null,
         };
         await this.repository.update(node.id, patch);
+        const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
+        await this.auditLifecycle('node.rotate', userId, node, ctx, {
+            before: { status: node.status },
+            after: { status: patch.status },
+            // Timestamps and durations only — never the token or its hash.
+            extra: { ttlMs, overlapMs: 0 },
+        });
         return {
             node: this.toView({ ...node, ...patch } as FleetNode),
             token,
-            expiresInSec: Math.floor(FLEET_ENROLLMENT_TOKEN_TTL_MS / 1000),
+            // The LIVE TTL. Reading the exported DEFAULT here made this
+            // route report 900s no matter what the operator configured,
+            // while the mint route reported the real number.
+            expiresInSec: Math.floor(ttlMs / 1000),
+        };
+    }
+
+    /**
+     * NODE-INITIATED credential rotation with a bounded DUAL-ACCEPT
+     * window (EW-799) — the rotation that can actually happen.
+     *
+     * The machine presents the credential it is ALREADY using and gets a
+     * new one back. Its status is untouched (unlike the operator re-key),
+     * and the credential it presented keeps working until
+     * `previousCredentialExpiresAt` — long enough to finish the job it is
+     * holding, write the new secret to disk and restart.
+     *
+     * Fail closed, four ways, each of which is a real attack or a real
+     * race rather than a hypothetical:
+     *   - the presented credential must be the CURRENT one. Accepting the
+     *     previous one would let a captured old secret renew itself
+     *     forever, which is the opposite of rotating;
+     *   - a node still `enrolling` is refused: its hash column holds a
+     *     token, not a secret;
+     *   - a second rotation while a window is already open is refused, so
+     *     a node cannot chain windows into a permanent overlap;
+     *   - the write is a CAS on the presented hash, so two simultaneous
+     *     rotations cannot both "succeed" and leave the machine holding a
+     *     secret the row no longer knows.
+     *
+     * A `paused` or `disabled` node MAY rotate — same reasoning as
+     * `heartbeat` accepting one: a drained machine must stay observable
+     * and must not be locked out of re-keying itself.
+     *
+     * Returns null on every refusal, so the edge answers one
+     * undifferentiated 401.
+     */
+    async rotateCredentialByCredential(
+        nodeId: unknown,
+        secret: unknown,
+    ): Promise<RotateNodeCredentialResult | null> {
+        const verified = verifyNodeSecret(nodeId, secret);
+        if (!verified) return null;
+
+        const node = await this.repository.findById(verified.nodeId);
+        if (!node) return null;
+        if (node.status === 'enrolling') return null;
+        // 'current' SPECIFICALLY — a rotate presented with the previous
+        // credential is a replay.
+        if (matchNodeCredential(verified, node) !== 'current') return null;
+
+        const now = Date.now();
+        const openUntil = toEpochMsOrNaN(node.previousCredentialExpiresAt);
+        // A window still open means a rotation is already in flight.
+        if (openUntil > now) return null;
+
+        const overlapMs = config.fleet.getCredentialRotationOverlapMs();
+        const previousCredentialExpiresAt = new Date(now + overlapMs);
+        const newSecret = randomBytes(32).toString('base64url');
+        // Non-null by construction: a row with no credential hash cannot
+        // have matched 'current' above (`constantTimeEquals` refuses a
+        // null stored hash), so this is the value the node just proved it
+        // holds — and it is what the CAS predicate below keys on.
+        const currentHash = node.enrollmentTokenHash as string;
+        const rotated = await this.repository.casRotateCredential(node.id, currentHash, {
+            enrollmentTokenHash: sha256Hex(newSecret),
+            previousCredentialHash: currentHash,
+            previousCredentialExpiresAt,
+            credentialIssuedAt: new Date(now),
+            rotationRequestedAt: null,
+            rotationRequestedByUserId: null,
+        });
+        // Zero rows affected = a raced rotation. Same null as a bad
+        // credential: the loser must not learn that it lost.
+        if (!rotated) return null;
+
+        await this.tryAuditNode({
+            action: 'node.rotate-self',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status, rotationRequested: Boolean(node.rotationRequestedAt) },
+            after: { status: node.status, rotationRequested: false },
+            extra: {
+                via: 'node',
+                overlapMs,
+                // `overlapExpiresAt`, NOT `previousCredentialExpiresAt`:
+                // the writer's redaction belt drops the value of any key
+                // whose NAME contains "credential", so the column name
+                // would have stored `[redacted]` here and silently thrown
+                // away the one fact this row exists to record — when the
+                // old credential dies. The belt is right to be blunt; the
+                // key is what has to move.
+                overlapExpiresAt: previousCredentialExpiresAt.toISOString(),
+                queuedByUserId: node.rotationRequestedByUserId ?? null,
+            },
+        });
+
+        return {
+            nodeId: node.id,
+            secret: newSecret,
+            previousCredentialExpiresAt,
+            overlapSec: Math.floor(overlapMs / 1000),
+            node: this.toView({
+                ...node,
+                credentialIssuedAt: new Date(now),
+                previousCredentialExpiresAt,
+                rotationRequestedAt: null,
+                rotationRequestedByUserId: null,
+            } as FleetNode),
+        };
+    }
+
+    /**
+     * QUEUE a credential rotation on every node this owner has enrolled.
+     *
+     * Nothing is rotated here and no credential is minted: each machine
+     * rotates ITSELF on its next beat. That indirection is the whole
+     * feature — only the node can store the new secret, so a rotate-all
+     * that tried to do the rotating would just be six re-keys nobody is
+     * standing next to.
+     *
+     * Nodes still `enrolling` are skipped: they have no secret to rotate,
+     * only an unconsumed token, and the remedy for one of those is revoke.
+     */
+    async queueRotationForUser(userId: string): Promise<{
+        queuedNodes: number;
+        skippedNodes: number;
+        nodes: FleetNodeView[];
+        auditFailed: boolean;
+    }> {
+        const before = await this.repository.findByUser(userId);
+        const eligible = before.filter((node) => node.status !== 'enrolling');
+        const queuedNodes = await this.repository.markRotationRequestedForUser(
+            userId,
+            userId,
+            new Date(),
+        );
+        const skippedNodes = before.length - eligible.length;
+        this.logger.warn(
+            `rotate-all by ${userId}: queued ${queuedNodes} node(s), skipped ${skippedNodes}`,
+        );
+        // ONE row for the decision, mirroring `drain-all` — not N rows for
+        // a marking no machine has acted on yet.
+        const audited = await this.tryAuditNode({
+            action: 'rotate-all',
+            actorUserId: userId,
+            ownerUserId: userId,
+            nodeId: null,
+            extra: {
+                queuedNodes,
+                skippedNodes,
+                nodeIds: eligible.map((node) => node.id),
+            },
+        });
+        const after = await this.repository.findByUser(userId);
+        return {
+            queuedNodes,
+            skippedNodes,
+            nodes: after.map((node) => this.toView(node)),
+            auditFailed: !audited,
         };
     }
 
@@ -506,6 +1154,7 @@ export class FleetService {
         nodeId: string,
         capabilities: unknown,
         pinned = true,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<FleetNodeView> {
         if (!Array.isArray(capabilities)) {
             throw new BadRequestException('Capabilities must be an array of tags');
@@ -516,11 +1165,23 @@ export class FleetService {
             capabilitiesPinned: pinned,
         };
         await this.repository.update(node.id, patch);
+        await this.auditLifecycle('node.capabilities', userId, node, ctx, {
+            before: {
+                capabilities: node.capabilities ?? [],
+                capabilitiesPinned: Boolean(node.capabilitiesPinned),
+            },
+            after: { capabilities: patch.capabilities, capabilitiesPinned: pinned },
+        });
         return this.toView({ ...node, ...patch } as FleetNode);
     }
 
     /** Rename an enrolled node (owner-scoped, no existence leak). */
-    async renameForUser(userId: string, nodeId: string, name: string): Promise<FleetNodeView> {
+    async renameForUser(
+        userId: string,
+        nodeId: string,
+        name: string,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
         const trimmed = typeof name === 'string' ? name.trim() : '';
         if (
             trimmed.length < FLEET_MIN_NODE_NAME_LENGTH ||
@@ -532,6 +1193,10 @@ export class FleetService {
         }
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.update(node.id, { name: trimmed });
+        await this.auditLifecycle('node.rename', userId, node, ctx, {
+            before: { name: node.name },
+            after: { name: trimmed },
+        });
         return this.toView({ ...node, name: trimmed });
     }
 
@@ -551,10 +1216,19 @@ export class FleetService {
         userId: string,
         nodeId: string,
         disabled: boolean,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<FleetNodeView> {
         const node = await this.getOwnedNode(userId, nodeId);
         const status: FleetNodeStatus = disabled ? 'disabled' : 'offline';
         await this.repository.update(node.id, { status });
+        // Three callers (PATCH, per-node drain / drain-all, the
+        // cost-ceiling trip) — `ctx` is what keeps the log from claiming
+        // the owner drained a node the system drained, and what stops a
+        // drain-all writing N rows plus its own aggregate one.
+        await this.auditLifecycle('node.disable', userId, node, ctx, {
+            before: { status: node.status },
+            after: { status },
+        });
         return this.toView({ ...node, status });
     }
 
@@ -573,15 +1247,22 @@ export class FleetService {
         userId: string,
         nodeId: string,
         paused: boolean,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<FleetNodeView> {
         const node = await this.getOwnedNode(userId, nodeId);
         // Never let "resume" silently undo a disable: a disabled node
-        // has to be re-enabled explicitly.
+        // has to be re-enabled explicitly. Nothing was written, so
+        // nothing is audited — an audit row for a no-op would be a claim
+        // the fleet changed when it did not.
         if (!paused && node.status === 'disabled') {
             return this.toView(node);
         }
         const status: FleetNodeStatus = paused ? 'paused' : 'offline';
         await this.repository.update(node.id, { status });
+        await this.auditLifecycle('node.pause', userId, node, ctx, {
+            before: { status: node.status },
+            after: { status },
+        });
         return this.toView({ ...node, status });
     }
 
@@ -610,6 +1291,16 @@ export class FleetService {
         }
         const status: FleetNodeStatus = paused ? 'paused' : 'offline';
         await this.repository.update(node.id, { status });
+        // Actor NULL: the machine did this, not its owner.
+        await this.tryAuditNode({
+            action: 'node.pause',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status },
+            after: { status },
+            extra: { via: 'node' },
+        });
         return { node: this.toView({ ...node, status }) };
     }
 
@@ -627,13 +1318,33 @@ export class FleetService {
         const node = await this.authenticateNodeByCredential(nodeId, secret);
         if (!node) return false;
         await this.repository.delete(node.id);
+        // The registration is gone; this row is the only record that the
+        // machine ever existed, and `fleet_audit.nodeId` carries no FK so
+        // it survives the deletion.
+        await this.tryAuditNode({
+            action: 'node.unenroll',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status, name: node.name, kind: node.kind },
+            after: null,
+            extra: { via: 'node' },
+        });
         return true;
     }
 
     /** Delete a node registration (owner-scoped, no existence leak). */
-    async deleteForUser(userId: string, nodeId: string): Promise<void> {
+    async deleteForUser(
+        userId: string,
+        nodeId: string,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.delete(node.id);
+        await this.auditLifecycle('node.delete', userId, node, ctx, {
+            before: { status: node.status, name: node.name, kind: node.kind },
+            after: null,
+        });
     }
 
     /**
@@ -645,19 +1356,99 @@ export class FleetService {
         nodeId: unknown,
         secret: unknown,
     ): Promise<FleetNode | null> {
-        if (typeof nodeId !== 'string' || !UUID_RE.test(nodeId)) return null;
-        if (
-            typeof secret !== 'string' ||
-            secret.length < CREDENTIAL_MIN_LENGTH ||
-            secret.length > CREDENTIAL_MAX_LENGTH
-        ) {
-            return null;
-        }
-        const node = await this.repository.findById(nodeId);
+        const verified = verifyNodeSecret(nodeId, secret);
+        if (!verified) return null;
+        const node = await this.repository.findById(verified.nodeId);
         if (!node) return null;
         if (node.status === 'enrolling') return null;
-        if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) return null;
+        // Dual-accept (EW-799) — the same window heartbeat and the lease
+        // channel honour. One matcher, four call sites: three of four
+        // updated would give a node that beats but cannot pause itself.
+        if (matchNodeCredential(verified, node) === null) return null;
         return node;
+    }
+
+    /**
+     * Audit one OWNER-SCOPED lifecycle write, honouring `ctx`.
+     *
+     * Act first, then audit: this runs AFTER the repository write in
+     * every caller, and a failure is logged (inside the writer) and
+     * swallowed. `ctx.suppress` is the outer caller saying it will record
+     * the richer row itself; `ctx.actorUserId` overrides the owner as
+     * actor (null = the system).
+     */
+    private async auditLifecycle(
+        action: FleetAuditAction,
+        ownerUserId: string,
+        node: FleetNode,
+        ctx: FleetNodeAuditContext,
+        payload: {
+            before?: Record<string, unknown> | null;
+            after?: Record<string, unknown> | null;
+            extra?: Record<string, unknown>;
+        },
+    ): Promise<boolean> {
+        if (ctx.suppress) return true;
+        const extra = { ...(payload.extra ?? {}), ...(ctx.details ?? {}) } as Record<
+            string,
+            unknown
+        >;
+        if (ctx.via) extra.via = ctx.via;
+        return this.tryAuditNode({
+            action,
+            actorUserId: ctx.actorUserId === undefined ? ownerUserId : ctx.actorUserId,
+            ownerUserId,
+            nodeId: node.id,
+            before: payload.before,
+            after: payload.after,
+            extra: Object.keys(extra).length > 0 ? extra : null,
+        });
+    }
+
+    /**
+     * Write one lifecycle row, if an audit writer is bound at all.
+     *
+     * The dependency is `@Optional()`, so a `FleetService` constructed
+     * without one (several specs, and any context without the audit
+     * repository) simply records nothing rather than throwing. That is
+     * the same trade the whole surface makes: bookkeeping never breaks
+     * the action.
+     */
+    private async tryAuditNode(input: {
+        action: FleetAuditAction;
+        actorUserId?: string | null;
+        ownerUserId: string;
+        nodeId: string | null;
+        before?: Record<string, unknown> | null;
+        after?: Record<string, unknown> | null;
+        extra?: Record<string, unknown> | null;
+    }): Promise<boolean> {
+        if (!this.audit) return false;
+        try {
+            return await this.audit.recordNodeAction({
+                action: input.action,
+                actorUserId:
+                    input.actorUserId === undefined ? input.ownerUserId : input.actorUserId,
+                ownerUserId: input.ownerUserId,
+                nodeId: input.nodeId,
+                before: input.before,
+                after: input.after,
+                extra: input.extra,
+            });
+        } catch (error) {
+            // `recordNodeAction` does not throw by contract; this guard is
+            // the belt. The action has ALREADY landed by the time we get
+            // here, so letting an exception out would answer 500 to a
+            // caller whose rename/drain/rotation actually succeeded —
+            // which is precisely the "bookkeeping undid the action"
+            // failure the whole posture exists to prevent.
+            this.logger.error(
+                `fleet audit row for ${input.action} on node ${input.nodeId ?? '-'} could not be written: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return false;
+        }
     }
 
     private async getOwnedNode(userId: string, nodeId: string): Promise<FleetNode> {
@@ -765,8 +1556,38 @@ export class FleetService {
             // a wire view — is what stops `"12345" > 0` style bugs from
             // reaching the UI on one driver and not the other.
             diskFreeBytes: toOptionalNumber(node.diskFreeBytes),
+            // Fleet cost accounting (EW-777).
+            modelIdentity: node.modelIdentity ?? null,
+            dailyCostCeilingCents: toOptionalNumber(node.dailyCostCeilingCents),
+            dailyCostTrippedOn: node.dailyCostTrippedOn ?? null,
+            // Fleet health signals (EW-776). Null is "unknown", never
+            // "idle" — see `normalizeFleetNodeWorkerState`.
+            workerState: node.workerState ?? null,
+            workerStateReason: node.workerStateReason ?? null,
+            workerStateChangedAt: node.workerStateChangedAt
+                ? toIso(node.workerStateChangedAt)
+                : null,
+            // Credential lifecycle (EW-799). The two hash columns and the
+            // window expiry stay OUT of the view: a wire shape that can
+            // carry a credential artefact eventually does.
+            rotationRequestedAt: node.rotationRequestedAt ? toIso(node.rotationRequestedAt) : null,
+            // Node housekeeping (EW-803). Three of these are `bigint`
+            // columns and go through the same driver normalization as
+            // `diskFreeBytes` — this method is the one place that happens.
+            minFreeDiskBytes: toOptionalNumber(node.minFreeDiskBytes),
+            workspaceCount: toOptionalNumber(node.workspaceCount),
+            workspaceBytes: toOptionalNumber(node.workspaceBytes),
+            lastReclaimAt: node.lastReclaimAt ? toIso(node.lastReclaimAt) : null,
+            lastReclaimFreedBytes: toOptionalNumber(node.lastReclaimFreedBytes),
         };
     }
+}
+
+/** `Date | string` → epoch ms, `NaN` when it is not a usable date. */
+function toEpochMsOrNaN(value: Date | string | null | undefined): number {
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === 'string') return new Date(value).getTime();
+    return NaN;
 }
 
 /**
@@ -811,11 +1632,117 @@ function sanitizeByteCount(value: unknown): number | null {
     return Math.floor(value);
 }
 
+/**
+ * Accept a node-reported COUNT, or refuse it.
+ *
+ * Same doctrine as {@link sanitizeByteCount}, and the same reason: a
+ * clamped count is one an operator would believe. A machine reporting
+ * 4 billion workspaces has a broken probe, and "unknown" is the honest
+ * rendering of that — not `FLEET_MAX_WORKSPACE_COUNT`.
+ */
+function sanitizeCount(value: unknown, max: number): number | null {
+    if (typeof value !== 'number' || !Number.isInteger(value)) return null;
+    if (value < 0 || value > max) return null;
+    return value;
+}
+
+/**
+ * Accept an instant a NODE reported, or refuse it.
+ *
+ * Unlike every other timestamp on `fleet_nodes`, this one is not
+ * server-stamped — the platform learns a reclaim sweep happened only
+ * because a beat said so, and cannot derive the time itself. So it is
+ * treated as untrusted input:
+ *
+ *  - anything that is not a parseable date is refused, which is also why
+ *    the DTO admits it as a plain string: rejecting it at the pipe would
+ *    fail the whole beat and sweep a live node offline over a cosmetic
+ *    field;
+ *  - anything more than {@link REPORTED_INSTANT_FUTURE_SKEW_MS} ahead of
+ *    the server is refused. A little skew is ordinary on an unattended
+ *    PC; hours of it means the clock is wrong, and "last reclaimed in
+ *    four hours" is worse than no answer at all.
+ *
+ * A far-PAST instant is accepted deliberately. "Last reclaimed in March"
+ * is not implausible, it is the exact finding this field exists to
+ * surface.
+ */
+function sanitizeReportedInstant(value: unknown, now: Date): Date | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = new Date(trimmed);
+    const ms = parsed.getTime();
+    if (Number.isNaN(ms)) return null;
+    if (ms > now.getTime() + REPORTED_INSTANT_FUTURE_SKEW_MS) return null;
+    return parsed;
+}
+
+/**
+ * How far ahead of the server a node-reported instant may sit before it
+ * is refused: five minutes, comfortably more than the clock drift of an
+ * unattended machine and comfortably less than a timezone mistake.
+ */
+const REPORTED_INSTANT_FUTURE_SKEW_MS = 5 * 60_000;
+
 function sanitizeText(value: unknown, maxLength: number): string | null {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
     if (!trimmed) return null;
     return trimmed.slice(0, maxLength);
+}
+
+/**
+ * Fleet cost accounting (EW-777) — the billing identity a node reports.
+ *
+ * The daemon builds the label from whitelisted fields of the CLI's own
+ * status output, so a credential can only arrive here from a tampered or
+ * misbuilt daemon — and this field is stored, listed, frozen into every
+ * run's usage metadata and quoted in Inbox notices, so it is scrubbed for
+ * known token shapes anyway. Defence in depth: the wire is untrusted.
+ */
+function sanitizeModelIdentity(value: unknown): string | null {
+    const text = sanitizeText(value, FLEET_MAX_MODEL_IDENTITY_LENGTH);
+    if (!text) return null;
+    // The placeholder can be longer than the token it replaces — re-cap.
+    return redactSecrets(text).cleaned.slice(0, FLEET_MAX_MODEL_IDENTITY_LENGTH);
+}
+
+/**
+ * Fleet health signals (EW-776) — the free text a node offers to explain
+ * its worker state.
+ *
+ * Scrubbed the same way `modelIdentity` is, and for the same reason: this
+ * string is composed on an untrusted machine out of error messages and
+ * command output, it is stored, listed AND quoted into Inbox notices, and
+ * a quarantine reason is exactly the kind of message that carries a
+ * command line with a token in it. Capped after redaction because a
+ * placeholder can be longer than what it replaced.
+ */
+function sanitizeWorkerStateReason(source: { workerStateReason?: unknown }): string | null {
+    const text = sanitizeText(source.workerStateReason, FLEET_MAX_WORKER_STATE_REASON_LENGTH);
+    if (!text) return null;
+    return redactSecrets(text).cleaned.slice(0, FLEET_MAX_WORKER_STATE_REASON_LENGTH);
+}
+
+/** Last-seen line for a health notice; a node that never beat says so. */
+function describeLastSeen(node: FleetNode): string {
+    if (!node.lastHeartbeatAt) return 'never (this machine has not reported since enrolling)';
+    try {
+        return toIso(node.lastHeartbeatAt);
+    } catch {
+        return 'unknown';
+    }
+}
+
+/** `45s` / `30 minutes` / `2 hours` — for notice prose, not for parsing. */
+function formatDurationMs(ms: number): string {
+    if (!Number.isFinite(ms) || ms <= 0) return '0 minutes';
+    const minutes = Math.round(ms / 60_000);
+    if (minutes < 1) return `${Math.round(ms / 1000)} seconds`;
+    if (minutes < 120) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+    const hours = Math.round(minutes / 60);
+    return `${hours} hour${hours === 1 ? '' : 's'}`;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
     ManyToOne,
     PrimaryGeneratedColumn,
 } from 'typeorm';
+import type { TaskExtraRepo } from '@ever-works/contracts';
 import { TaskTemplate } from './task-template.entity';
 
 /**
@@ -56,6 +57,33 @@ export class TaskTemplateStep {
     /** Starter-agent-template hint (e.g. `starter-planner`). */
     @Column({ type: 'varchar', length: 80, nullable: true })
     agentTemplateSlug?: string | null;
+
+    /**
+     * Multi-repo decomposition (self-build slice AH): the Work this STEP
+     * files its sub-task against, overriding the `workId` the
+     * instantiation input stamps on the parent and on every other step.
+     * NULL = inherit the parent's Work, which is what every template
+     * written before this column did.
+     *
+     * No @ManyToOne, for the same reason `agentId` above has none: the
+     * Work may be deleted independently of the template. Unlike a stale
+     * `agentId` (which silently skips an assignment) a stale `workId` is
+     * REFUSED at instantiation — see
+     * `TaskTemplatesService.assertStepScopesReachable`.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    workId?: string | null;
+
+    /**
+     * Multi-repo decomposition (self-build slice AH): repositories this
+     * step's sub-task mounts in addition to its Work's, by
+     * repository-registry connection — the per-step half of
+     * `tasks.extraRepos`. Validated by THE Task validator
+     * (`normalizeTaskExtraRepos`) at write AND instantiate time. NULL =
+     * none.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    extraRepos?: TaskExtraRepo[] | null;
 
     @Column({ type: 'boolean', default: false })
     requiresApproval: boolean;

@@ -22,20 +22,33 @@ import { serverFetch, serverMutation } from './server-api';
  */
 import type {
     FleetAgentNodeAffinityView,
+    FleetCostCeilingView,
+    FleetAuditView,
+    FleetCancelInFlightResult,
+    FleetDrainAllResult,
+    FleetKillSwitchChangeResult,
+    FleetKillSwitchState,
     FleetNodeDetailView,
     FleetNodeDrainResult,
     FleetEnrollmentTokenView,
     FleetExecutionMode,
     FleetExecutionPreferenceView,
     FleetExecutionScopeType,
+    FleetRotateAllResult,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
 
 export type {
     FleetAgentNodeAffinityView,
+    FleetCostCeilingView,
+    FleetAuditView,
+    FleetCancelInFlightResult,
+    FleetDrainAllResult,
     FleetJobKind,
     FleetJobStatus,
     FleetJobView,
+    FleetKillSwitchChangeResult,
+    FleetKillSwitchState,
     FleetNodeKind,
     FleetNodeStatus,
     FleetNodeView,
@@ -47,9 +60,22 @@ export type {
     FleetExecutionMode,
     FleetExecutionPreferenceView,
     FleetExecutionScopeType,
+    FleetRotateAllResult,
     FleetRunnerNodeView,
     FleetRunnerStatusView,
+    // Fleet health signals (EW-776) — the worker-state vocabulary and the
+    // richer node-drawer history row.
+    FleetNodeWorkerState,
+    FleetNodeJobHistoryEntry,
+    FleetJobHistorySummary,
+    FleetJobReconciledOutcome,
 } from '@ever-works/contracts';
+
+/** Body of `POST /api/fleet/cancel-in-flight`. */
+export interface CancelFleetInFlightPayload {
+    /** Also fail queued jobs nothing has started. Default false. */
+    includeQueued?: boolean;
+}
 
 export interface CreateFleetEnrollmentTokenPayload {
     name: string;
@@ -81,6 +107,12 @@ export interface UpdateFleetNodePayload {
     capabilities?: string[];
     /** `false` hands tag ownership back to the node's heartbeats. */
     capabilitiesPinned?: boolean;
+    /**
+     * Fleet cost accounting (EW-777) — this node's daily (UTC) model-spend
+     * ceiling in cents; `null` clears it back to the deployment default.
+     * Crossing it drains the node until it is re-enabled.
+     */
+    dailyCostCeilingCents?: number | null;
 }
 
 export interface SetFleetExecutionPreferencePayload {
@@ -196,6 +228,112 @@ export const fleetAPI = {
         return serverMutation<FleetNodeDrainResult>({
             endpoint: `${BASE}/nodes/${nodeId}/drain`,
             data: { drain },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Fleet cost accounting (EW-777) — the account's fleet-wide daily
+     * model-spend ceiling, with the deployment default it falls back to
+     * and today's spend across every node.
+     */
+    getCostCeiling: async () => {
+        return serverFetch<FleetCostCeilingView>(`${BASE}/cost-ceiling`);
+    },
+
+    /** `null` clears the owner's ceiling back to the deployment default. */
+    setCostCeiling: async (dailyCeilingCents: number | null) => {
+        return serverMutation<FleetCostCeilingView>({
+            endpoint: `${BASE}/cost-ceiling`,
+            data: { dailyCeilingCents },
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Panic controls (EW-778). Draining and cancelling are two routes on
+     * purpose — stopping new work is not killing running work — and the
+     * stop flag is READ here by any session while SET/CLEAR are platform-
+     * admin routes (the API answers 403 for everyone else).
+     */
+    drainAll: async () => {
+        return serverMutation<FleetDrainAllResult>({
+            endpoint: `${BASE}/drain-all`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    cancelInFlight: async (payload: CancelFleetInFlightPayload = {}) => {
+        return serverMutation<FleetCancelInFlightResult>({
+            endpoint: `${BASE}/cancel-in-flight`,
+            data: { includeQueued: payload.includeQueued === true },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Polled by the fleet page banner; a read, so no cache invalidation. */
+    killSwitchState: async () => {
+        return serverFetch<FleetKillSwitchState>(`${BASE}/kill-switch`);
+    },
+
+    stopKillSwitch: async (reason?: string | null) => {
+        return serverMutation<FleetKillSwitchChangeResult>({
+            endpoint: `${BASE}/kill-switch/stop`,
+            data: reason ? { reason } : {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    clearKillSwitch: async () => {
+        return serverMutation<FleetKillSwitchChangeResult>({
+            endpoint: `${BASE}/kill-switch/clear`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    killSwitchAudit: async (limit?: number) => {
+        const query = typeof limit === 'number' && limit > 0 ? `?limit=${Math.trunc(limit)}` : '';
+        return serverFetch<FleetAuditView[]>(`${BASE}/kill-switch/audit${query}`);
+    },
+
+    /**
+     * Credential lifecycle (EW-799).
+     *
+     * `nodeAudit` is the OWNER-scoped trail for one machine — distinct
+     * from `killSwitchAudit`, which reads the whole table and is a
+     * platform-admin route. The node id reaches here from a Server Action
+     * argument, i.e. from the browser, so it is encoded as ONE path
+     * segment for the same reason the affinity helpers do it: a crafted
+     * value carrying `/` or `..` must not be dot-segment-normalised by
+     * `fetch` onto a different `/api/*` route under the caller's bearer.
+     */
+    nodeAudit: async (nodeId: string, limit?: number) => {
+        const query = typeof limit === 'number' && limit > 0 ? `?limit=${Math.trunc(limit)}` : '';
+        return serverFetch<FleetAuditView[]>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/audit${query}`,
+        );
+    },
+
+    /**
+     * QUEUE a credential rotation across the fleet. Nothing is rotated by
+     * this call and no credential comes back: each machine re-keys itself
+     * on its next heartbeat, keeping both credentials valid for a bounded
+     * overlap so it never goes dark. There is deliberately no web helper
+     * for `POST /api/fleet/rotate-credential` — that route is the NODE's,
+     * authenticated by the node secret, and a browser never holds one.
+     */
+    rotateAll: async () => {
+        return serverMutation<FleetRotateAllResult>({
+            endpoint: `${BASE}/rotate-all`,
+            data: {},
             method: 'POST',
             wrapInData: false,
         });

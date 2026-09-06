@@ -2,6 +2,7 @@ import type { Logger } from './logger';
 import type { SecretStore } from './secret-store';
 import {
 	clampResourceLimits,
+	clampWorkspaceGcPolicy,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	isFleetEnrollableNodeKind,
 	MAX_HEARTBEAT_INTERVAL_MS,
@@ -111,6 +112,16 @@ function clampInterval(value: unknown): number {
  * the desktop shell's `loadConfig` posture: a corrupt file must not wedge the
  * node, it must send the operator back through enrollment.
  */
+/**
+ * Rooted POSIX or Windows path. Written out rather than taken from
+ * `node:path` on purpose: this module is deliberately free of node
+ * builtins (it runs behind an injected filesystem seam), and
+ * `path.isAbsolute` would answer differently depending on which OS the
+ * process happens to be running on, for a config file that can be copied
+ * between them.
+ */
+const ABSOLUTE_PATH = /^(?:[/\\]|[A-Za-z]:[/\\])/;
+
 export function parseConfig(raw: string | null): NodeConfig | null {
 	if (!raw) {
 		return null;
@@ -171,6 +182,20 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 	}
 	if (typeof candidate.name === 'string' && candidate.name) {
 		config.name = candidate.name;
+	}
+	// Present only once an operator set it: a config that never carried the
+	// key keeps round-tripping without it (the default policy applies), and
+	// an out-of-range stored value is clamped rather than refused.
+	if (candidate.workspaceGc && typeof candidate.workspaceGc === 'object') {
+		config.workspaceGc = clampWorkspaceGcPolicy(candidate.workspaceGc);
+	}
+	// The workspace root the service runs against, so `doctor` and `gc`
+	// inspect the same tree (EW-803). Only ever an absolute path: a
+	// relative one would be resolved against whatever directory the
+	// operator happened to run the CLI from, which is the confusion this
+	// key exists to end.
+	if (typeof candidate.workspaceRoot === 'string' && ABSOLUTE_PATH.test(candidate.workspaceRoot.trim())) {
+		config.workspaceRoot = candidate.workspaceRoot.trim();
 	}
 	if (
 		candidate.unsafe &&

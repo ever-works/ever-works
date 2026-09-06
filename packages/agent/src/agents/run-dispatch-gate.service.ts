@@ -9,12 +9,18 @@ import {
     type AgentTaskExecuteDispatcher,
 } from '../tasks-domain/task-dispatcher';
 import { RUN_CREDITS_PRECHECK, type RunCreditsPrecheck } from './run-credits-precheck';
+import {
+    KILL_SWITCH_ACTIVE_ERROR_NAME,
+    RUN_KILL_SWITCH,
+    type RunKillSwitch,
+} from './run-kill-switch';
 import { RUN_PLAN_LIMITS, type RunPlanLimits } from './run-plan-limits';
 import {
     composeRunAdmission,
     DEFAULT_RUN_ADMISSION_CHAIN,
     QUEUED_REASON_CONCURRENCY,
     QUEUED_REASON_INSUFFICIENT_CREDITS,
+    QUEUED_REASON_KILL_SWITCH,
     type RunAdmissionMiddleware,
 } from './run-admission-chain';
 
@@ -40,6 +46,17 @@ export { QUEUED_REASON_CONCURRENCY };
  */
 export { QUEUED_REASON_INSUFFICIENT_CREDITS };
 
+/**
+ * Panic controls (EW-778) — stamped when the GLOBAL STOP FLAG parks a
+ * run. Drained by {@link RunDispatchGateService.promoteParked} once the
+ * flag is cleared (the api-side clear route calls it), and exempt from
+ * the stuck-run sweeper for as long as the flag is set.
+ */
+export { QUEUED_REASON_KILL_SWITCH };
+
+/** Upper bound on one `promoteParked` pass, so a clear cannot stampede. */
+export const PROMOTE_PARKED_MAX_PROMOTIONS = 200;
+
 export interface RunDispatchAdmitInput {
     userId: string;
     workId?: string | null;
@@ -48,7 +65,10 @@ export interface RunDispatchAdmitInput {
 
 export interface RunDispatchAdmitResult {
     admitted: boolean;
-    /** Set only when `admitted === false`; today always `concurrency-limit`. */
+    /**
+     * Set only when `admitted === false`: `concurrency-limit`,
+     * `insufficient-credits`, or `kill-switch` (EW-778).
+     */
     queuedReason?: string;
 }
 
@@ -56,6 +76,16 @@ export interface RunDispatchDrainResult {
     dispatched: boolean;
     runId?: string;
     reason?: 'no-candidate' | 'over-limit' | 'claim-lost' | 'no-dispatcher' | 'dispatch-failed';
+}
+
+/** Outcome of one {@link RunDispatchGateService.promoteParked} pass. */
+export interface RunDispatchPromoteResult {
+    /** Runs handed to a runtime. */
+    promoted: number;
+    /** Distinct Works that had at least one parked run. */
+    works: number;
+    /** True when the promotion budget ran out with candidates left. */
+    budgetExhausted: boolean;
 }
 
 /**
@@ -193,6 +223,14 @@ export class RunDispatchGateService {
         @Optional()
         @Inject(RUN_PLAN_LIMITS)
         private readonly planLimits?: RunPlanLimits,
+        // Panic controls (EW-778) — the GLOBAL STOP FLAG. Bound (to
+        // FleetKillSwitchService) by the api-side @Global() AgentsModule;
+        // absent in unit tests and fleet-less installs, where the
+        // kill-switch middleware simply passes every run through. Same
+        // @Optional() + appended-LAST posture as every seam above.
+        @Optional()
+        @Inject(RUN_KILL_SWITCH)
+        private readonly killSwitch?: RunKillSwitch,
     ) {}
 
     /** Env default today; per-Work override column when it lands. */
@@ -265,23 +303,37 @@ export class RunDispatchGateService {
             isPlanConcurrencyEnabled: () => config.agents.isPlanConcurrencyEnforcementEnabled(),
             ...(this.creditsPrecheck ? { creditsPrecheck: this.creditsPrecheck } : {}),
             ...(this.planLimits ? { planLimits: this.planLimits } : {}),
+            ...(this.killSwitch ? { killSwitch: this.killSwitch } : {}),
         });
     }
 
     /**
-     * Promote the oldest concurrency-parked run for a Work, if capacity
-     * allows. One promotion per call on purpose: every terminal
-     * transition frees at most one slot, and the next terminal (or the
-     * sweeper net) drains the next row. Best-effort by contract — every
-     * failure is logged and reported in the result, never thrown, so a
-     * drain hiccup can never fail the terminal transition that hosts it.
+     * Promote the oldest parked run for a Work, if capacity allows. One
+     * promotion per call on purpose: every terminal transition frees at
+     * most one slot, and the next terminal (or the sweeper net) drains
+     * the next row. Best-effort by contract — every failure is logged
+     * and reported in the result, never thrown, so a drain hiccup can
+     * never fail the terminal transition that hosts it.
+     *
+     * `queuedReason` selects WHICH parked rows are candidates. The
+     * default — and what every terminal-transition caller passes — is
+     * `concurrency-limit`. {@link promoteParked} passes `kill-switch`
+     * (EW-778) after the global stop flag is cleared, so a clear resumes
+     * parked work through this SAME claim / enqueue / stamp / rollback
+     * path rather than a second drain implementation.
+     *
+     * A `kill-switch`-parked run the chain now refuses for a DIFFERENT
+     * reason (the Work is saturated, credits ran out) is RELABELLED to
+     * that reason, so the ordinary terminal-transition drain (or the
+     * credits top-up) picks it up later. Without that it would stay
+     * parked with a reason nothing drains once the flag is off.
      */
-    async drainForWork(workId: string): Promise<RunDispatchDrainResult> {
+    async drainForWork(
+        workId: string,
+        queuedReason: string = QUEUED_REASON_CONCURRENCY,
+    ): Promise<RunDispatchDrainResult> {
         try {
-            const candidate = await this.runs.findOldestQueuedForConcurrency(
-                workId,
-                QUEUED_REASON_CONCURRENCY,
-            );
+            const candidate = await this.runs.findOldestQueuedForConcurrency(workId, queuedReason);
             if (!candidate) return { dispatched: false, reason: 'no-candidate' };
             if (!candidate.taskId) {
                 // Every parking path is Task-keyed (task fan-out, board
@@ -304,7 +356,30 @@ export class RunDispatchGateService {
                 workId,
                 organizationId: candidate.organizationId ?? null,
             });
-            if (!admission.admitted) return { dispatched: false, reason: 'over-limit' };
+            if (!admission.admitted) {
+                if (
+                    queuedReason === QUEUED_REASON_KILL_SWITCH &&
+                    admission.queuedReason &&
+                    admission.queuedReason !== QUEUED_REASON_KILL_SWITCH &&
+                    typeof this.runs.relabelQueuedReason === 'function'
+                ) {
+                    // The flag is off but something else now parks this
+                    // run. Hand it to the reason that will actually drain
+                    // it (CAS — a raced promotion is a harmless no-op).
+                    try {
+                        await this.runs.relabelQueuedReason(
+                            candidate.id,
+                            QUEUED_REASON_KILL_SWITCH,
+                            admission.queuedReason,
+                        );
+                    } catch (relabelErr) {
+                        this.logger.warn(
+                            `Dispatch gate: failed to relabel parked run ${candidate.id}: ${relabelErr}`,
+                        );
+                    }
+                }
+                return { dispatched: false, reason: 'over-limit' };
+            }
 
             if (viaChat ? !this.chatDispatcher : !this.dispatcher) {
                 // Nothing to dispatch through — leave the row parked (it
@@ -312,10 +387,7 @@ export class RunDispatchGateService {
                 return { dispatched: false, reason: 'no-dispatcher' };
             }
 
-            const claimed = await this.runs.claimQueuedForDispatch(
-                candidate.id,
-                QUEUED_REASON_CONCURRENCY,
-            );
+            const claimed = await this.runs.claimQueuedForDispatch(candidate.id, queuedReason);
             if (!claimed) return { dispatched: false, reason: 'claim-lost' };
 
             try {
@@ -363,6 +435,34 @@ export class RunDispatchGateService {
                 return { dispatched: true, runId: candidate.id };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
+                if (
+                    err instanceof Error &&
+                    err.name === KILL_SWITCH_ACTIVE_ERROR_NAME &&
+                    typeof this.runs.restoreQueuedReason === 'function'
+                ) {
+                    // Panic controls (EW-778) — the dispatcher (the fleet-
+                    // aware wrapper, or the router under it) read the
+                    // global stop flag AFTER admission passed: an operator
+                    // re-threw the switch in the window between the two
+                    // reads. A stop PARKS work, it never fails it — put the
+                    // run back exactly where the flag left it (CAS: only a
+                    // still-queued, still-unlabelled row is touched) so the
+                    // next clear resumes it.
+                    this.logger.warn(
+                        `Dispatch gate: drain of ${candidate.id} refused by the global stop flag — re-parking: ${message}`,
+                    );
+                    try {
+                        await this.runs.restoreQueuedReason(
+                            candidate.id,
+                            QUEUED_REASON_KILL_SWITCH,
+                        );
+                    } catch (restoreErr) {
+                        this.logger.warn(
+                            `Dispatch gate: failed to re-park run ${candidate.id} after the stop flag refused it: ${restoreErr}`,
+                        );
+                    }
+                    return { dispatched: false, reason: 'over-limit' };
+                }
                 const notConfigured =
                     err instanceof Error && err.name === 'JobRuntimeNotConfiguredError';
                 const reason = notConfigured
@@ -387,5 +487,54 @@ export class RunDispatchGateService {
             this.logger.warn(`Dispatch gate: drainForWork(${workId}) failed: ${err}`);
             return { dispatched: false, reason: 'dispatch-failed' };
         }
+    }
+
+    /**
+     * Panic controls (EW-778) — promote runs parked with `queuedReason`
+     * across EVERY Work that has one, oldest first per Work, until a
+     * Work has no more candidates (or refuses one) or the promotion
+     * budget is spent. Called by the api-side clear route after the
+     * global stop flag is lifted; best-effort and bounded by contract,
+     * never throws.
+     *
+     * Reuses {@link drainForWork} for every promotion, so the claim CAS,
+     * the chat-vs-task dispatch split and the dispatch-failed rollback
+     * are stated exactly once. Work-less parked runs (heartbeat runs
+     * carry `workId: null`) cannot be promoted by the Work-keyed drain
+     * and wait for their schedule's next tick — a documented limitation.
+     */
+    async promoteParked(
+        queuedReason: string,
+        maxPromotions: number = PROMOTE_PARKED_MAX_PROMOTIONS,
+    ): Promise<RunDispatchPromoteResult> {
+        const budget = Math.max(0, Math.trunc(maxPromotions));
+        const result: RunDispatchPromoteResult = { promoted: 0, works: 0, budgetExhausted: false };
+        if (budget === 0 || typeof this.runs.findQueuedWorkIdsByReason !== 'function') {
+            return result;
+        }
+        try {
+            const workIds = await this.runs.findQueuedWorkIdsByReason(queuedReason, budget);
+            result.works = workIds.length;
+            for (const workId of workIds) {
+                // Per-Work loop: `drainForWork` promotes ONE run, so keep
+                // asking until the Work runs dry or refuses, each answer
+                // consuming budget only when a run actually went out.
+                for (;;) {
+                    if (result.promoted >= budget) {
+                        result.budgetExhausted = true;
+                        return result;
+                    }
+                    const drained = await this.drainForWork(workId, queuedReason);
+                    if (!drained.dispatched) break;
+                    result.promoted += 1;
+                }
+            }
+            this.logger.log(
+                `Dispatch gate: promoted ${result.promoted} run(s) parked as '${queuedReason}' across ${result.works} Work(s).`,
+            );
+        } catch (err) {
+            this.logger.warn(`Dispatch gate: promoteParked('${queuedReason}') failed: ${err}`);
+        }
+        return result;
     }
 }

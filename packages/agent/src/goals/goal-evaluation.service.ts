@@ -1,11 +1,13 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import {
     Goal,
     GoalOutcome,
     GoalStatus,
+    type GoalComparator,
     type GoalConstraint,
+    type GoalMetricSource,
     type GoalResolvedScore,
 } from '../entities/goal.entity';
 import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
@@ -22,11 +24,20 @@ import {
     resolveSourceFor,
     type CriterionObservation,
 } from './goal-criteria';
+import { summarizeDoD } from './goal-dod';
+import { isDeliveryGoal } from './goal-kind';
 import {
     MIN_CHECK_FREQUENCY_MINUTES,
     type GoalEvaluationEntry,
     type GoalEvaluationSummary,
 } from './types';
+
+/** A metric Goal whose four metric fields are all present — the only shape this service will read. */
+type MetricGoal = Goal & {
+    metricSource: GoalMetricSource;
+    comparator: GoalComparator;
+    targetValue: number;
+};
 
 /**
  * Goals & Metrics — PR-8 evaluation engine (spec FR-12..FR-14).
@@ -125,10 +136,15 @@ export class GoalEvaluationService {
     }
 
     /**
-     * Evaluate one Goal now: read the metric through the facade
-     * (budget-guarded + metered per PR-7), append an (immutable)
-     * sample, refresh currentValue/baseline, and apply the
-     * auto-outcome rules:
+     * Evaluate one Goal now.
+     *
+     * **Delivery Goal** (self-build slice AG): no provider is read and no
+     * sample is written — the Goal completes on its approved Definition of
+     * Done alone. See {@link evaluateDelivery}.
+     *
+     * **Metric Goal**: read the metric through the facade (budget-guarded
+     * + metered per PR-7), append an (immutable) sample, refresh
+     * currentValue/baseline, and apply the auto-outcome rules:
      *
      *   - comparator satisfied            → COMPLETED + ACHIEVED
      *   - deadline passed AND unsatisfied → COMPLETED + MISSED
@@ -139,9 +155,17 @@ export class GoalEvaluationService {
      * deliberately leaves the schedule untouched.
      *
      * Throws the facade's typed errors on provider failure — no
-     * sample and no Goal mutation happens in that case.
+     * sample and no Goal mutation happens in that case. Also throws,
+     * fail-closed, on a metric row that lacks any of its metric fields:
+     * that row is corrupt, and guessing a target would be worse than
+     * reporting it (`evaluateDue` counts it `failed` and moves on).
      */
     async evaluateOne(goal: Goal): Promise<GoalEvaluationEntry> {
+        if (isDeliveryGoal(goal)) {
+            return this.evaluateDelivery(goal);
+        }
+        this.assertMetricGoalShape(goal);
+
         const source = goal.metricSource;
         const sample = await this.metricsFacade.getMetricValue(
             source.pluginId,
@@ -222,7 +246,65 @@ export class GoalEvaluationService {
         };
     }
 
+    /**
+     * Delivery-kind evaluation: the approved DoD IS the completion rule.
+     *
+     * No `MetricsFacadeService` call, no `goal_metric_samples` row, no
+     * comparator — a delivery Goal has none of those, and reading a
+     * provider for it would be reading nothing. `summarizeDoD` already
+     * excludes proposed (unapproved) criteria, so a planning run cannot
+     * complete a Goal by proposing that it is done. The deadline rule is
+     * the same as for a metric Goal, which is why `activate` schedules
+     * delivery Goals too: a missed deadline must surface without a plugin.
+     *
+     * Idempotent with the orchestrator's `applyTerminal`, which writes the
+     * same terminal state when the loop observes the complete DoD first.
+     * Invariant I-4 holds: only the Goal row is written.
+     */
+    private async evaluateDelivery(goal: Goal): Promise<GoalEvaluationEntry> {
+        const now = new Date();
+        const dod = summarizeDoD(goal.dodCriteria);
+        let outcome: GoalEvaluationEntry['outcome'] = 'evaluated';
+
+        if (dod.complete) {
+            goal.status = GoalStatus.COMPLETED;
+            goal.outcome = GoalOutcome.ACHIEVED;
+            goal.nextCheckAt = null;
+            outcome = 'achieved';
+        } else if (goal.deadline && goal.deadline.getTime() <= now.getTime()) {
+            goal.status = GoalStatus.COMPLETED;
+            goal.outcome = GoalOutcome.MISSED;
+            goal.nextCheckAt = null;
+            outcome = 'missed';
+        }
+
+        await this.goals.save(goal);
+        return { goalId: goal.id, outcome };
+    }
+
     // ─── internals ──────────────────────────────────────────────────
+
+    /**
+     * Fail closed on a metric row that lacks its metric fields. The
+     * columns are nullable only so the delivery kind can share the table;
+     * for a metric Goal a NULL there is corruption, never a valid state.
+     */
+    private assertMetricGoalShape(goal: Goal): asserts goal is MetricGoal {
+        const source = goal.metricSource;
+        const missing: string[] = [];
+        if (typeof source !== 'object' || source === null || Array.isArray(source)) {
+            missing.push('metricSource');
+        }
+        if (goal.comparator !== 'gte' && goal.comparator !== 'lte') missing.push('comparator');
+        if (typeof goal.targetValue !== 'number' || !Number.isFinite(goal.targetValue)) {
+            missing.push('targetValue');
+        }
+        if (missing.length > 0) {
+            throw new BadRequestException(
+                `Metric Goal ${goal.id} cannot be evaluated: missing ${missing.join(', ')}.`,
+            );
+        }
+    }
 
     /**
      * Atomic claim: advance `nextCheckAt` by the (re-clamped)
@@ -256,7 +338,7 @@ export class GoalEvaluationService {
         return true;
     }
 
-    private isSatisfied(goal: Goal, value: number): boolean {
+    private isSatisfied(goal: MetricGoal, value: number): boolean {
         return goal.comparator === 'gte' ? value >= goal.targetValue : value <= goal.targetValue;
     }
 
@@ -289,6 +371,12 @@ export class GoalEvaluationService {
         const observations: CriterionObservation[] = [];
         for (const criterion of goal.criteria) {
             const { source, window } = resolveSourceFor(goal, criterion);
+            if (!source) {
+                // Neither the criterion nor the Goal names a metric: unknown,
+                // not failed — the same containment as a provider outage.
+                observations.push({ criterion, value: null, error: 'no metric source' });
+                continue;
+            }
             try {
                 const sample = await this.metricsFacade.getMetricValue(
                     source.pluginId,
@@ -316,6 +404,13 @@ export class GoalEvaluationService {
             // platform does not claim to have checked what it cannot read.
             if (!isMeasurableConstraint(constraint)) continue;
             const { source, window } = resolveSourceFor(goal, constraint);
+            if (!source) {
+                // No metric to read → UNKNOWN, never violated (see below).
+                this.logger.warn(
+                    `Goal ${goal.id} constraint '${constraint.id}' has no metric source (treated as not violated)`,
+                );
+                continue;
+            }
             try {
                 const sample = await this.metricsFacade.getMetricValue(
                     source.pluginId,

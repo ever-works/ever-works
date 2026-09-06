@@ -11,6 +11,8 @@ import { In, IsNull, Repository } from 'typeorm';
 import {
     GOAL_EXECUTION_TARGETS,
     Goal,
+    GoalOutcome,
+    GoalStatus,
     type GoalDoDCriterion,
     type GoalExecutionTarget,
     type GoalLoopStatus,
@@ -37,10 +39,12 @@ import {
 } from '../database/ownership-scope';
 import {
     dodProgressSignature,
+    hasDefinitionOfDone,
     normalizeDoDCriteria,
     summarizeDoD,
     validateDoDCriteria,
 } from './goal-dod';
+import { isDeliveryGoal } from './goal-kind';
 import {
     decideGoalLoop,
     formatUsd,
@@ -66,6 +70,14 @@ export const GOAL_ITERATION_LABEL = 'goal-iteration';
 export const MAX_SPEND_CAP_CENTS = 100_000_000; // $1,000,000
 export const MAX_WALL_CLOCK_LIMIT_HOURS = 24 * 365;
 export const MAX_STUCK_THRESHOLD_ITERATIONS = 1000;
+/**
+ * Concurrent iterations (slice AH) — upper bound on
+ * `goals.maxConcurrentIterations`. Deliberately small: this multiplies
+ * how much work ONE Goal starts at once, and every iteration still has
+ * to pass the run admission chain, so a large number here would only
+ * manufacture parked runs.
+ */
+export const MAX_CONCURRENT_ITERATIONS = 10;
 export const MAX_SESSION_BUDGET_MINUTES = 24 * 60;
 export const MAX_GRACE_PERIOD_MINUTES = 24 * 60;
 export const MAX_MODEL_HINT_CHARS = 120;
@@ -75,6 +87,12 @@ export const MAX_NUDGE_CHARS = 2000;
 
 /** How many iteration Tasks one rollup will ever consider. */
 const MAX_GOAL_TASKS = 500;
+
+/**
+ * Cold-start pool bound: how many in-scope agents a fresh unpinned Goal
+ * round-robins over. Mirrors the default page `findByUserIdScoped` uses.
+ */
+const MAX_SCOPE_CANDIDATES = 50;
 
 const ACTIVE_RUN_STATUSES = ['queued', 'running'];
 
@@ -187,6 +205,14 @@ export class GoalOrchestratorService {
                 MAX_STUCK_THRESHOLD_ITERATIONS,
             );
         }
+        if (input.maxConcurrentIterations !== undefined) {
+            goal.maxConcurrentIterations = this.assertBoundedInt(
+                input.maxConcurrentIterations,
+                'maxConcurrentIterations',
+                1,
+                MAX_CONCURRENT_ITERATIONS,
+            );
+        }
         if (input.sessionBudgetMinutes !== undefined) {
             goal.sessionBudgetMinutes = this.assertBoundedInt(
                 input.sessionBudgetMinutes,
@@ -232,7 +258,13 @@ export class GoalOrchestratorService {
 
     // ─── Definition of Done ─────────────────────────────────────────
 
-    /** Replace the whole checklist (operator-authored, already approved). */
+    /**
+     * Replace the whole checklist (operator-authored, already approved).
+     *
+     * A DELIVERY Goal's checklist is its entire completion rule, so it can
+     * never be cleared or reduced to nothing approved — a delivery Goal
+     * with no finish line would be unfinishable, not "open-ended".
+     */
     async setDodCriteria(
         userId: string,
         goalId: string,
@@ -240,6 +272,14 @@ export class GoalOrchestratorService {
     ): Promise<GoalDto> {
         const goal = await this.findOrThrow(userId, goalId);
         this.assertDod(criteria);
+        if (
+            isDeliveryGoal(goal) &&
+            (criteria === null || !hasDefinitionOfDone({ dodCriteria: criteria }))
+        ) {
+            throw new BadRequestException(
+                'A delivery Goal must keep at least one approved Definition-of-Done criterion.',
+            );
+        }
         const beforeSignature = dodProgressSignature(goal.dodCriteria);
         goal.dodCriteria = criteria === null ? null : normalizeDoDCriteria(criteria);
         this.markProgressIfChanged(goal, beforeSignature);
@@ -408,6 +448,13 @@ export class GoalOrchestratorService {
         const goal = await this.findOrThrow(userId, goalId);
         if (goal.archivedAt) {
             throw new BadRequestException('Archived Goals cannot run an execution loop.');
+        }
+        if (isDeliveryGoal(goal) && !hasDefinitionOfDone(goal)) {
+            // Defensive: create + setDodCriteria already guarantee this, but a
+            // loop with no finish line would run until a budget stops it.
+            throw new BadRequestException(
+                'A delivery Goal needs at least one approved Definition-of-Done criterion before its loop can start.',
+            );
         }
         const resuming = goal.loopStatus === 'paused' || goal.loopStatus === 'stuck';
         goal.loopStatus = 'running';
@@ -738,7 +785,8 @@ export class GoalOrchestratorService {
             await this.goals.save(goal);
         }
 
-        const activeRun = await this.findActiveRun(goal.id);
+        const activeRuns = await this.findActiveRuns(goal.id);
+        const activeRun = activeRuns[0] ?? null;
         const candidates = await this.resolveCandidates(goal);
         const decision = decideGoalLoop({
             loopStatus: opts.force ? 'running' : (goal.loopStatus ?? null),
@@ -752,6 +800,20 @@ export class GoalOrchestratorService {
             loopStartedAt: goal.loopStartedAt ?? null,
             gracePeriodMinutes: goal.gracePeriodMinutes ?? null,
             hasRunInFlight: activeRun !== null,
+            // Concurrent iterations (slice AH). Both derive from the SAME
+            // active-run list, so at the default ceiling of 1 the count
+            // and the boolean can never disagree.
+            runsInFlight: activeRuns.length,
+            // 🛑 Re-clamp on READ, not only on write. `assertBoundedInt`
+            // caps the column at MAX_CONCURRENT_ITERATIONS when someone
+            // sets it, but `decideGoalLoop` is a pure function with no
+            // ceiling of its own: a row carrying a larger value (a direct
+            // DB write, a restored backup, a future raise of the write
+            // cap) would otherwise make ONE tick create that many Tasks.
+            maxConcurrentIterations:
+                typeof goal.maxConcurrentIterations === 'number'
+                    ? Math.min(goal.maxConcurrentIterations, MAX_CONCURRENT_ITERATIONS)
+                    : null,
             candidates,
             now: new Date(),
         });
@@ -780,13 +842,34 @@ export class GoalOrchestratorService {
         }
     }
 
-    /** Create the iteration Task, dispatch it, and log both halves. */
+    /**
+     * Create the iteration Task(s), dispatch them, and log both halves.
+     *
+     * Concurrent iterations (slice AH): the decision carries one SLOT per
+     * iteration it wants started (`agentIds` / `iterations`), already
+     * bounded by the Goal's ceiling minus what is in flight. A Goal that
+     * never raised `maxConcurrentIterations` always has exactly one slot,
+     * and this method then does precisely what it did before — same
+     * order, same events, same dedup key.
+     *
+     * Every slot goes through `dispatchAgentRun` with the SAME
+     * iteration-keyed dedup key as before, so overlapping cron ticks
+     * still cannot fire one iteration twice.
+     */
     private async applyDispatch(
         goal: Goal,
         decision: GoalLoopDecision,
     ): Promise<GoalAdvanceResult> {
-        const agentId = decision.agentId as string;
-        const iteration = decision.nextIteration ?? (goal.iteration ?? 0) + 1;
+        const agentIds =
+            decision.agentIds && decision.agentIds.length > 0
+                ? decision.agentIds
+                : [decision.agentId as string];
+        const iterations =
+            decision.iterations && decision.iterations.length > 0
+                ? decision.iterations
+                : [decision.nextIteration ?? (goal.iteration ?? 0) + 1];
+        const agentId = agentIds[0];
+        const iteration = iterations[0];
 
         if (!this.tasksService || !this.transitions) {
             // Loud degradation: report the refusal rather than counting a
@@ -808,83 +891,151 @@ export class GoalOrchestratorService {
         }
 
         // The routing decision is logged BEFORE the dispatch, so a
-        // dispatch that then fails still leaves the reasoning behind.
+        // dispatch that then fails still leaves the reasoning behind. ONE
+        // route line per decision: its reasoning already names every slot.
         await this.recordEvent(goal, {
             kind: 'route',
             message: decision.reasoning,
             agentId,
             iteration,
-            metadata: { reasonCode: decision.reasonCode },
-        });
-
-        const task = await this.tasksService.create(
-            goal.userId,
-            {
-                title: `[Goal] ${goal.title} — iteration ${iteration}`,
-                description: this.buildIterationBrief(goal, iteration),
-                status: TaskStatus.TODO,
-                priority: TaskPriority.P2,
-                labels: [GOAL_ITERATION_LABEL],
-                goalId: goal.id,
-                agentId,
-                createdByType: 'user',
-                createdById: goal.userId,
+            metadata: {
+                reasonCode: decision.reasonCode,
+                ...(iterations.length > 1 ? { iterations, agentIds } : {}),
             },
-            ownershipScopeOf(goal),
-        );
-
-        const dispatch = await this.transitions.dispatchAgentRun(task, agentId, {
-            // Keyed on the iteration, so a double tick of the cron cannot
-            // fire the same iteration twice.
-            dedupKey: `goal:${goal.id}:${iteration}`,
         });
 
-        goal.iteration = iteration;
-        goal.activeAgentId = agentId;
+        const slots: Array<{
+            iteration: number;
+            agentId: string;
+            task: Awaited<ReturnType<TasksService['create']>>;
+            dispatch: Awaited<ReturnType<TaskTransitionService['dispatchAgentRun']>>;
+        }> = [];
+        for (let index = 0; index < iterations.length; index++) {
+            const slotIteration = iterations[index];
+            const slotAgentId = agentIds[index] ?? agentIds[agentIds.length - 1];
+            try {
+                const task = await this.tasksService.create(
+                    goal.userId,
+                    {
+                        title: `[Goal] ${goal.title} — iteration ${slotIteration}`,
+                        description: this.buildIterationBrief(goal, slotIteration),
+                        status: TaskStatus.TODO,
+                        priority: TaskPriority.P2,
+                        labels: [GOAL_ITERATION_LABEL],
+                        goalId: goal.id,
+                        agentId: slotAgentId,
+                        createdByType: 'user',
+                        createdById: goal.userId,
+                    },
+                    ownershipScopeOf(goal),
+                );
+
+                const dispatch = await this.transitions.dispatchAgentRun(task, slotAgentId, {
+                    // Keyed on the iteration, so a double tick of the cron cannot
+                    // fire the same iteration twice.
+                    dedupKey: `goal:${goal.id}:${slotIteration}`,
+                });
+                slots.push({ iteration: slotIteration, agentId: slotAgentId, task, dispatch });
+            } catch (err) {
+                // 🛑 A failure PART WAY through a multi-slot dispatch must
+                // not discard the slots that already landed. `goal.iteration`
+                // is what the next tick derives its iteration numbers from,
+                // so throwing here would leave iteration N dispatched while
+                // the counter still said N-1 — and the next tick would create
+                // a SECOND Task numbered N. Keep the slots that succeeded,
+                // let the counter advance to cover them, and let the next
+                // tick fill the slot that failed.
+                //
+                // The FIRST slot is different: nothing landed, so the caller
+                // sees exactly the failure it saw before concurrent
+                // iterations existed (serial Goals are byte-for-byte
+                // unchanged).
+                if (slots.length === 0) throw err;
+                this.logger.warn(
+                    `Goal ${goal.id}: iteration ${slotIteration} could not be dispatched ` +
+                        `(${slots.length} of ${iterations.length} slot(s) started): ${
+                            err instanceof Error ? err.message : String(err)
+                        }`,
+                );
+                break;
+            }
+        }
+
+        const last = slots[slots.length - 1];
+        goal.iteration = last.iteration;
+        goal.activeAgentId = last.agentId;
         const saved = await this.goals.save(goal);
 
-        await this.recordEvent(saved, {
-            kind: 'dispatch',
-            message:
-                `Dispatched iteration ${iteration} — session task ${task.slug} created for agent ` +
-                `${agentId}${dispatch.dispatched ? '' : ' (queued — the runtime has not started it yet)'}.`,
-            agentId,
-            taskId: task.id,
-            iteration,
-            metadata: {
-                runId: dispatch.runId,
-                dispatched: dispatch.dispatched,
-                parked: dispatch.parked,
-                executionTarget: saved.executionTarget ?? null,
-                ...(dispatch.error ? { error: dispatch.error } : {}),
-            },
-        });
-        await this.recordActivity(
-            saved,
-            ActivityActionType.GOAL_ITERATION_DISPATCHED,
-            'iteration',
-            {
-                iteration,
-                agentId,
-                taskId: task.id,
-                runId: dispatch.runId,
-                reasonCode: decision.reasonCode,
-            },
-        );
+        for (const slot of slots) {
+            await this.recordEvent(saved, {
+                kind: 'dispatch',
+                message:
+                    `Dispatched iteration ${slot.iteration} — session task ${slot.task.slug} created for agent ` +
+                    `${slot.agentId}${slot.dispatch.dispatched ? '' : ' (queued — the runtime has not started it yet)'}.`,
+                agentId: slot.agentId,
+                taskId: slot.task.id,
+                iteration: slot.iteration,
+                metadata: {
+                    runId: slot.dispatch.runId,
+                    dispatched: slot.dispatch.dispatched,
+                    parked: slot.dispatch.parked,
+                    executionTarget: saved.executionTarget ?? null,
+                    ...(slot.dispatch.error ? { error: slot.dispatch.error } : {}),
+                },
+            });
+            await this.recordActivity(
+                saved,
+                ActivityActionType.GOAL_ITERATION_DISPATCHED,
+                'iteration',
+                {
+                    iteration: slot.iteration,
+                    agentId: slot.agentId,
+                    taskId: slot.task.id,
+                    runId: slot.dispatch.runId,
+                    reasonCode: decision.reasonCode,
+                },
+            );
+        }
 
+        const first = slots[0];
         return {
             goalId: saved.id,
             action: 'dispatch',
             reasonCode: decision.reasonCode,
             reasoning: decision.reasoning,
-            agentId,
-            taskId: task.id,
-            runId: dispatch.runId,
-            iteration,
+            // Scalars stay the FIRST slot so every pre-AH reader — the
+            // advanceDue counters, the API response, the specs — sees
+            // exactly what it saw before.
+            agentId: first.agentId,
+            taskId: first.task.id,
+            runId: first.dispatch.runId,
+            iteration: first.iteration,
+            ...(slots.length > 1
+                ? {
+                      agentIds: slots.map((slot) => slot.agentId),
+                      taskIds: slots.map((slot) => slot.task.id),
+                      runIds: slots.map((slot) => slot.dispatch.runId),
+                      iterations: slots.map((slot) => slot.iteration),
+                  }
+                : {}),
         };
     }
 
-    /** Apply a terminal decision (done / paused / stuck) + log it. */
+    /**
+     * Apply a terminal decision (done / paused / stuck) + log it.
+     *
+     * For a DELIVERY Goal, `done` also completes the Goal itself
+     * (COMPLETED + ACHIEVED, schedule cleared): the approved DoD is its
+     * only completion rule, so whichever path observes it first — this
+     * loop or the evaluation tick — records the same terminal state, and
+     * both writes are idempotent on an already-completed row. A row that
+     * is ALREADY COMPLETED is left alone: a human outcome override
+     * (`abandoned`, FR-13) or a deadline `missed` recorded by the evaluation
+     * tick is never overwritten by the loop finishing late — the same way a
+     * metric Goal stops being evaluated once it is COMPLETED. A metric
+     * Goal's `status`/`outcome` stay untouched here: its loop finishing is
+     * not the same fact as its metric being reached.
+     */
     private async applyTerminal(
         goal: Goal,
         decision: GoalLoopDecision,
@@ -892,6 +1043,11 @@ export class GoalOrchestratorService {
     ): Promise<GoalAdvanceResult> {
         goal.loopStatus = loopStatus;
         goal.activeAgentId = null;
+        if (loopStatus === 'done' && isDeliveryGoal(goal) && goal.status !== GoalStatus.COMPLETED) {
+            goal.status = GoalStatus.COMPLETED;
+            goal.outcome = GoalOutcome.ACHIEVED;
+            goal.nextCheckAt = null;
+        }
         const saved = await this.goals.save(goal);
 
         const kind: GoalEventKind = loopStatus === 'done' ? 'complete' : 'limit';
@@ -966,8 +1122,21 @@ export class GoalOrchestratorService {
     }
 
     private async findActiveRun(goalId: string): Promise<AgentRun | null> {
+        return (await this.findActiveRuns(goalId))[0] ?? null;
+    }
+
+    /**
+     * EVERY in-flight run of this Goal's iterations, not just the first.
+     *
+     * Concurrent iterations (slice AH) need the COUNT — "3 of 4 slots
+     * used" — and `findActiveRun` now reads the head of this list, so the
+     * boolean the decision function sees and the number it sees can never
+     * come from two different reads. No extra query: `loadGoalWork`
+     * already fetched the runs.
+     */
+    private async findActiveRuns(goalId: string): Promise<AgentRun[]> {
         const { runs } = await this.loadGoalWork(goalId);
-        return runs.find((run) => ACTIVE_RUN_STATUSES.includes(run.status)) ?? null;
+        return runs.filter((run) => ACTIVE_RUN_STATUSES.includes(run.status));
     }
 
     /**
@@ -1037,6 +1206,20 @@ export class GoalOrchestratorService {
      * data alone. An agent that has been deleted (or belongs to someone
      * else) is dropped: routing must never offer what dispatch would
      * reject.
+     *
+     * **Cold start** (self-build slice AG, finding R1): a fresh unpinned
+     * Goal has no history, and until now that meant an EMPTY pool and
+     * `stuck / no-candidate-agent` on iteration 1 — the loop could only
+     * ever start after an operator pinned an agent. So when there is no
+     * pin and no history the pool falls back to the eligible agents of the
+     * Goal's own scope, through `AgentRepository.findByUserIdScoped` with
+     * `ownershipRelationScopeOf(goal)` — the same Organization / tenant
+     * rule `findByIdAndUser` applies to the pin and the dispatch path
+     * re-validates. An agent outside the Goal's scope is therefore never
+     * offered; an empty scope still yields `[]` and the honest `stuck`.
+     * The fallback is deliberately NOT taken when a pin exists but failed
+     * its scope check: an unhonoured explicit pin is the operator's to
+     * fix, not something to route around silently.
      */
     private async resolveCandidates(goal: Goal): Promise<GoalRoutingCandidate[]> {
         if (goal.assignedAgentId) {
@@ -1077,7 +1260,48 @@ export class GoalOrchestratorService {
                 source: 'history',
             });
         }
-        return [...out.values()];
+        if (out.size > 0 || goal.assignedAgentId || !this.agents) {
+            return [...out.values()];
+        }
+        return this.resolveScopeCandidates(goal);
+    }
+
+    /**
+     * The cold-start pool: every agent the Goal's owner may run inside the
+     * Goal's scope, oldest first.
+     *
+     * Ordered by `createdAt` then `id` IN MEMORY because the repository
+     * orders by `updatedAt DESC` — under which the iteration-keyed
+     * round-robin would pick a different agent every time any agent was
+     * edited, and the log line "round-robins over N agents" would stop
+     * being reproducible from the persisted counter. No status filter,
+     * matching `TasksService.listRunCandidates`: agents are created DRAFT
+     * and the whole point of this pool is that a freshly created agent
+     * can be picked. Archived agents are excluded by the repository.
+     */
+    private async resolveScopeCandidates(goal: Goal): Promise<GoalRoutingCandidate[]> {
+        if (!this.agents) return [];
+        // A repository failure PROPAGATES: `advanceDue` counts a throwing
+        // Goal as `failed` and retries it next tick, whereas swallowing it
+        // into `[]` would mark the loop `stuck` — a terminal state a human
+        // has to resume — over what was an infrastructure hiccup.
+        const { rows } = await this.agents.findByUserIdScoped(
+            goal.userId,
+            { limit: MAX_SCOPE_CANDIDATES },
+            ownershipRelationScopeOf(goal),
+        );
+        return [...rows]
+            .sort((a, b) => {
+                const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                if (aTime !== bTime) return aTime - bTime;
+                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+            })
+            .map((agent) => ({
+                agentId: agent.id,
+                name: agent.name ?? agent.slug ?? null,
+                source: 'scope' as const,
+            }));
     }
 
     /**
@@ -1096,6 +1320,12 @@ export class GoalOrchestratorService {
             `Iteration ${iteration} of the Goal "${goal.title}".`,
             '',
             goal.description ? `${goal.description}\n` : '',
+            ...(isDeliveryGoal(goal)
+                ? [
+                      'Delivery Goal — there is no metric; the checklist below is the whole definition of done.',
+                      '',
+                  ]
+                : []),
             `Definition of Done — ${summary.done} done, ${summary.waived} waived, ${summary.open} open:`,
             open.length > 0 ? open.join('\n') : '- (no open criteria recorded)',
             '',
@@ -1195,6 +1425,7 @@ export class GoalOrchestratorService {
             spendCapCents: goal.spendCapCents ?? null,
             wallClockLimitHours: goal.wallClockLimitHours ?? null,
             stuckThresholdIterations: goal.stuckThresholdIterations ?? null,
+            maxConcurrentIterations: goal.maxConcurrentIterations ?? null,
             sessionBudgetMinutes: goal.sessionBudgetMinutes ?? null,
             gracePeriodMinutes: goal.gracePeriodMinutes ?? null,
             executionTarget: goal.executionTarget ?? null,

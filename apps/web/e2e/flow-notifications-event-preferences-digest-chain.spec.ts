@@ -584,7 +584,7 @@ test.describe('Real-event notification chain — Task assignment -> inbox -> lif
         expect((await listNotifications(request, token)).length).toBe(1);
     });
 
-    test('cross-user delivery — assigning user B lands the row in B inbox with actor=A; the actor A inbox stays empty for that task', async ({
+    test('cross-user isolation — a personal-scope Task refuses a stranger as assignee (400, one shared no-oracle message), so nothing is delivered to either inbox', async ({
         request,
     }) => {
         const alice = await registerUserViaAPI(request);
@@ -593,29 +593,32 @@ test.describe('Real-event notification chain — Task assignment -> inbox -> lif
         const task = await createTaskViaAPI(request, alice.access_token, {
             title: 'Delegate to Bob',
         });
-        await assignUser(request, alice.access_token, task.id, bob.user.id);
 
-        // Bob receives it; the actor stamp is Alice.
-        const bobRows = await waitFor(
-            request,
-            bob.access_token,
-            (r) => r.some((n) => (n.metadata as { taskId?: string } | null)?.taskId === task.id),
-            'Bob receives the assignment',
+        // Since the Task-scope hardening a user actor is reachable only as the
+        // Task owner (personal scope) or through an Organization roster row
+        // (org scope). Bob is neither. Every mismatch shares one message so a
+        // known user id is not a scope oracle. The delivery half of this
+        // journey (assignee inside an Organization) has no API fixture: the
+        // org-invite token is email-only by design and never returned.
+        const refused = await request.post(`${API_BASE}/api/tasks/${task.id}/assignees`, {
+            headers: authedHeaders(alice.access_token),
+            data: { assigneeType: 'user', assigneeId: bob.user.id },
+        });
+        const refusedBody = await refused.text();
+        expect(refused.status(), `addAssignee body=${refusedBody}`).toBe(400);
+        expect(JSON.parse(refusedBody).message).toBe(
+            'Task actor is not reachable in this Task scope.',
         );
-        const bobNotif = bobRows.find(
-            (n) => (n.metadata as { taskId?: string } | null)?.taskId === task.id,
-        )!;
-        expect(bobNotif.userId).toBe(bob.user.id);
-        expect((bobNotif.metadata as { actorUserId?: string }).actorUserId).toBe(alice.user.id);
-        expect(bobNotif.message).toContain(alice.user.id.slice(0, 8));
-        expect(await unreadCount(request, bob.access_token)).toBe(1);
 
-        // Alice (the actor / creator, not a watcher) gets nothing for this task.
-        const aliceRows = await listNotifications(request, alice.access_token);
-        expect(
-            aliceRows.some((n) => (n.metadata as { taskId?: string } | null)?.taskId === task.id),
-        ).toBe(false);
-        expect(await unreadCount(request, alice.access_token)).toBe(0);
+        // The refusal happened before any event: neither inbox has a row for
+        // this Task and both unread counts stay at zero.
+        for (const who of [bob, alice]) {
+            const rows = await listNotifications(request, who.access_token);
+            expect(
+                rows.some((n) => (n.metadata as { taskId?: string } | null)?.taskId === task.id),
+            ).toBe(false);
+            expect(await unreadCount(request, who.access_token)).toBe(0);
+        }
     });
 
     test('cross-user isolation — user B cannot read or dismiss user A notification (404 each), and unread counts stay per-user', async ({

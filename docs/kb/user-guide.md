@@ -19,7 +19,10 @@ organization, and how to find it again.
 For a higher-level introduction, see
 [Knowledge Base & Memory (Features)](../features/knowledge-base.md). For
 machine-driven access (Claude / GPT / Gemini sessions, scripts, CI),
-see the [MCP & CLI Reference](./mcp-cli-reference.md).
+see the [MCP & CLI Reference](./mcp-cli-reference.md). The KB described
+here is **per Work**; the organization-wide layer above it — every
+Work's KB in one searchable list, plus files, agent memory, meetings
+and a review queue — is [Memory](../features/memory.md).
 
 ## Where the KB lives
 
@@ -74,18 +77,22 @@ runs the same pipeline regardless of where the file came from:
    (default `local-fs`; switchable to `aws-s3`, `minio`, or
    `github-storage` — see
    [Storage plugins](../architecture/plugins.md#storage-plugins-in-detail)).
-2. **Sniff the MIME type** from the file's magic bytes (the
-   client-supplied MIME is never trusted).
+2. **Resolve the MIME type** for the upload — the multipart
+   `Content-Type`, normalized (parameters stripped, lower-cased).
+   That resolved type is stored on the upload row next to the
+   original filename, and it is what the extractor routes on.
 3. **Normalize media** when the file isn't text:
     - Video → MP4 + extracted MP3 audio track.
     - Audio → MP3.
-    - PDF / DOCX / XLSX → text via the configured content-extractor
-      plugin.
+    - PDF / DOCX / XLSX / XLSM / PPTX / CSV / TSV / HTML → Markdown,
+      extracted in process from the uploaded bytes. See
+      [What the extractor understands](#what-the-extractor-understands).
 4. **Transcribe audio** (MP3 from a video, or a directly-uploaded
    podcast / call recording) via the AI provider that advertises the
-   `transcribe` capability — OpenAI Whisper today, Groq's Whisper-large
-   in operator-pin mode. The transcript becomes a `transcripts`-class
-   KB document.
+   `transcribe` capability — the OpenAI plugin today (Whisper);
+   `KB_TRANSCRIPTION_PROVIDER_ID` lets an operator pin any other
+   plugin that advertises `transcribe`. The transcript becomes a
+   `transcripts`-class KB document.
 5. **Extract** the text from the original and classify it. You can
    choose the target class on upload (`--class brand`, `targetClass=brand`)
    or let the AI suggest one.
@@ -97,6 +104,62 @@ Agents only ever read the extract, never the binary original. That
 means a 200-page PDF turns into a chunked, citable Markdown document
 that fits in a prompt window. The original stays in storage for human
 review.
+
+### What the extractor understands
+
+Uploads are extracted **in process**, from the bytes the multipart
+parse already holds — the platform never re-fetches its own upload
+over HTTP, so extraction still works when the storage backend isn't
+publicly reachable. The route is picked from the resolved MIME type:
+
+| You upload              | Extracted by              | What lands in the KB                                               |
+| ----------------------- | ------------------------- | ------------------------------------------------------------------ |
+| Markdown / plain text   | UTF-8 passthrough         | The body verbatim                                                  |
+| HTML / XHTML            | Turndown                  | Markdown with ATX headings and fenced code blocks                  |
+| PDF                     | `pdf-parse` text layer    | The page text as a Markdown body                                   |
+| Word `.docx`            | `mammoth` → Turndown      | Markdown                                                           |
+| Excel `.xlsx` / `.xlsm` | `exceljs`                 | One `##` heading + Markdown table per sheet, capped at 10,000 rows |
+| PowerPoint `.pptx`      | `jszip` + slide XML       | One `## Slide N` section per slide, capped at 1,000 slides         |
+| CSV / TSV               | `papaparse`               | A single Markdown table                                            |
+| Audio / video           | the `transcribe` provider | A `transcripts`-class document (see below)                         |
+| Anything else           | —                         | Nothing: the original is stored and the upload is marked `skipped` |
+
+Three things worth knowing:
+
+- **Bodies are capped at 1 MiB.** A longer body is truncated with an
+  HTML comment marker (`<!-- truncated: ... exceeded 1 MiB -->`). The
+  plain-text / Markdown passthrough route emits
+  `<!-- truncated: original exceeded 1 MiB -->`; every converted route
+  (PDF, DOCX, XLSX, PPTX, CSV / TSV, HTML) emits
+  `<!-- truncated: extracted body exceeded 1 MiB -->`. Either way the
+  original stays whole in storage and stays downloadable.
+- **Legacy binary Office formats are not routed.** `.doc`, `.xls` and
+  `.ppt` are deliberately excluded — the OOXML libraries either error
+  out or silently produce garbage on them. Convert to `.docx` /
+  `.xlsx` / `.pptx` and re-upload.
+- **Failed extractions can be retried.** A row whose status is
+  `failed` grows a **Retry extraction** link in the Originals pane
+  (`POST /api/works/:id/kb/uploads/:uploadId/retry-extraction`). A
+  `skipped` row has no route to retry with, so convert the file first.
+
+#### Office documents and scanned PDFs behind a URL
+
+The table above covers files you upload. Source material referenced by
+**URL** — the pages and documents a Work generates from, or a
+community PR submits — goes through the content-extractor plugin chain
+instead (default `local-content-extractor`), and two optional plugins
+widen what that chain can read:
+
+| Plugin                | Handles                   | Enabled by default | What it adds                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------- | ------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pdf-extractor`       | `.pdf`                    | No                 | Text-layer extraction first. When text density falls below **Text Density Threshold** (default 100 characters per page) it falls back to **Mistral OCR** — set **Mistral API Key** (`PLUGIN_PDF_EXTRACTOR_API_KEY`) and, optionally, **OCR Model** (default `mistral-ocr-latest`). With no key, or if the OCR call fails, you get whatever thin text layer the scan had. |
+| `officecli-extractor` | `.docx`, `.xlsx`, `.pptx` | No                 | Office extraction via the OfficeCLI tool. **Render Mode** is `text` (default) or `markdown`; **Max Download Size** defaults to 25 MB (`OFFICECLI_EXTRACTOR_MAX_BYTES`). Downloads run behind the SSRF guard and that byte cap, so an attacker-supplied source URL can't reach internal hosts or exhaust memory.                                                          |
+
+Both ship built in and both are **off by default**; neither is needed
+for the upload path above. To switch one on, open **Plugins**
+(`/plugins`), find it, and **Enable** — and tick **Also enable for all
+works**, because enabling at the account level does not otherwise
+cascade into your Works.
 
 ### Transcription pipeline (audio / video)
 
@@ -168,10 +231,29 @@ already gathered.
 **organization scope** and inherited by every Work in that
 organization. The pattern:
 
-1. An org admin creates the doc at `/orgs/:id/kb` (UI mirrors the
-   per-Work workbench).
-2. Every Work in the org sees that doc in its KB list with an
-   "Inherited" badge. Agents pull it on every relevant run.
+1. An org admin creates the doc. There is **no `/orgs/:id/kb`
+   screen** — the two shipped paths are:
+    - **Upload it into org-wide Memory.** Open **Memory** (`/memory`),
+      drop the file on the **Originals** panel, and the resulting
+      document is organization-scoped. (The Memory header's **New**
+      document action is deliberately hidden until a dedicated
+      org-authoring flow exists.)
+    - **Call the API.** `POST /api/organizations/:orgId/kb/documents`
+      takes the same body as a per-Work document. The write goes
+      through the organization ownership/admin gate — the route's
+      `@OrgAdmin()` guard plus the shared membership service's
+      `ensureAdmin` seam, which today resolves to the same
+      tenant-ownership check the read routes use; a distinct
+      org-admin role is a later tightening. The route accepts only
+      the three inheritable classes; `GET` on the same path lists what
+      the org already has. The `ever works kb` CLI commands are
+      Work-scoped only — there is no org-scope CLI verb today.
+2. Every Work in the org gets that doc in an **Inherited from
+   organization** section of its KB tree, each row labelled
+   _Inherited (read-only)_. Opening one shows an "Inherited from
+   organization" banner and the document is read-only in that Work,
+   with an **Override locally** action beside it. Agents pull it on
+   every relevant run.
 3. A Work can **override** the inherited doc by creating a doc with
    the same path at the Work scope. The Work-scoped version wins for
    that Work; the org-scoped version still applies everywhere else.
@@ -182,6 +264,28 @@ This is how a single, lawyer-approved disclaimer or a single house
 style guide spans dozens of Works without copy-paste drift. See
 [Tenants & Organizations](../advanced/multi-tenancy.md) for the
 broader scoping model.
+
+Two clarifications about the org scope:
+
+- **Only `legal`, `style` and `seo` overlay into Works.** An upload
+  into org-wide Memory may land in any class — a research PDF or a
+  meeting transcript belongs in Memory too — but a document outside
+  the inheritable set is inert with respect to Works: it is searchable
+  in Memory and never overlaid. Brand identity deliberately stays
+  per-Work.
+- **The Work decides which org it inherits from, not the caller.**
+  `GET /api/works/:id/kb/inheritable` returns the merged org-level +
+  Work-override set for one Work, and
+  `GET /api/works/:id/kb/inheritable/*idOrPath` returns the body of a
+  single inherited document (by UUID or by path, e.g.
+  `legal/privacy.md`). Both resolve the organization from the Work's
+  own `organizationId`; an `orgId` that doesn't match is rejected, so
+  no caller can read another tenant's org documents through a Work
+  they can see.
+
+To browse everything at once — every Work's KB plus the
+organization-level documents, with facets, a review queue and a
+consolidation pass — see [Memory (Org-Wide)](../features/memory.md).
 
 ## Search
 
@@ -218,6 +322,7 @@ for plugins to extend it:
 ## See also
 
 - [Knowledge Base & Memory (Features)](../features/knowledge-base.md) — high-level pitch
+- [Memory (Org-Wide)](../features/memory.md) — the `/memory` page: org-level documents, files, review queue, consolidation
 - [KB MCP & CLI Reference](./mcp-cli-reference.md) — machine access
 - [Plugin System (End-to-End)](../architecture/plugins.md) — how storage / transcribe / extractor plugins back the KB
 - [Activity Log](../api/activity-log.md) — KB events surface here

@@ -257,6 +257,105 @@ describe('heartbeat', () => {
 		expect(body).not.toHaveProperty('diskFreeBytes');
 	});
 
+	it('carries the model identity onto the wire, and omits it when the probe had no answer', async () => {
+		// Fleet cost accounting (EW-777): `selfDescription` is an explicit
+		// whitelist, so a field it does not name is computed, logged and
+		// never sent — the exact way `cliVersion` was once lost.
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			modelIdentity: 'claude-code: ops@example.com (Acme, max)'
+		});
+		expect(JSON.parse(calls[0].init.body).modelIdentity).toBe('claude-code: ops@example.com (Acme, max)');
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET });
+		expect(JSON.parse(calls[1].init.body)).not.toHaveProperty('modelIdentity');
+	});
+
+	it('carries the worker state and reason, and omits both when absent', async () => {
+		// Fleet health signals (EW-776), same whitelist trap as above: a
+		// worker state the loop computes and the client never sends is a
+		// quarantined machine that still reads healthy in Fleet — the
+		// precise defect this slice exists to close.
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			workerState: 'quarantined',
+			workerStateReason: 'process tree for job 42 could not be proven terminated'
+		});
+		const body = JSON.parse(calls[0].init.body);
+		expect(body.workerState).toBe('quarantined');
+		expect(body.workerStateReason).toBe('process tree for job 42 could not be proven terminated');
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET });
+		expect(JSON.parse(calls[1].init.body)).not.toHaveProperty('workerState');
+		expect(JSON.parse(calls[1].init.body)).not.toHaveProperty('workerStateReason');
+	});
+
+	it('carries the housekeeping report, and omits every field the caller left out', async () => {
+		// Node housekeeping (EW-803), same whitelist trap as above — and the
+		// one this slice actually had to fix: a floor and a reclaim summary
+		// the node computes, logs and never sends is exactly the invisible
+		// housekeeping the slice exists to end.
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			minFreeDiskBytes: 2 * 1024 ** 3,
+			workspaceCount: 12,
+			workspaceBytes: 40 * 1024 ** 3,
+			lastReclaimAt: '2026-09-05T09:30:00.000Z',
+			lastReclaimFreedBytes: 3 * 1024 ** 3
+		});
+		const body = JSON.parse(calls[0].init.body);
+		expect(body.minFreeDiskBytes).toBe(2 * 1024 ** 3);
+		expect(body.workspaceCount).toBe(12);
+		expect(body.workspaceBytes).toBe(40 * 1024 ** 3);
+		expect(body.lastReclaimAt).toBe('2026-09-05T09:30:00.000Z');
+		expect(body.lastReclaimFreedBytes).toBe(3 * 1024 ** 3);
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET });
+		const bare = JSON.parse(calls[1].init.body);
+		for (const field of [
+			'minFreeDiskBytes',
+			'workspaceCount',
+			'workspaceBytes',
+			'lastReclaimAt',
+			'lastReclaimFreedBytes'
+		]) {
+			expect(bare).not.toHaveProperty(field);
+		}
+	});
+
+	it('sends an explicit null floor rather than dropping it as falsy', async () => {
+		// The one field in the whole projection that may travel as null.
+		// A truthiness test here would silently turn "the operator switched
+		// the floor off" into "this daemon said nothing", and the server
+		// would keep showing a floor that no longer exists.
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET, minFreeDiskBytes: null });
+
+		const body = JSON.parse(calls[0].init.body);
+		expect(body).toHaveProperty('minFreeDiskBytes');
+		expect(body.minFreeDiskBytes).toBeNull();
+	});
+
+	it('sends a state without a reason when there is nothing to explain', async () => {
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET, workerState: 'idle' });
+
+		const body = JSON.parse(calls[0].init.body);
+		expect(body.workerState).toBe('idle');
+		expect(body).not.toHaveProperty('workerStateReason');
+	});
+
 	it('reports a revoked/disabled node as unauthorized with an actionable message', async () => {
 		const { fetchFn } = fakeFetch(() => ({ status: 401 }));
 		const error = await client(fetchFn)

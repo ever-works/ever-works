@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CommandRunner } from './capabilities';
 import { describeSelf } from './capabilities';
-import { AGENT_CLI_CANDIDATES, detectAgentCliVersion, detectDiskFreeBytes, parseCliVersion } from './telemetry-probe';
+import {
+	AGENT_CLI_CANDIDATES,
+	cacheProbe,
+	detectAgentCliVersion,
+	detectDiskFreeBytes,
+	detectModelIdentity,
+	MODEL_IDENTITY_CACHE_TTL_MS,
+	parseClaudeAuthStatus,
+	parseCliVersion,
+	parseCodexLoginStatus
+} from './telemetry-probe';
 
 /**
  * Node telemetry probes.
@@ -149,6 +159,170 @@ describe('detectDiskFreeBytes', () => {
 	});
 });
 
+describe('parseClaudeAuthStatus (fleet cost accounting, EW-777)', () => {
+	it('builds the label from the whitelisted fields only', () => {
+		const status = JSON.stringify({
+			loggedIn: true,
+			authMethod: 'claude.ai',
+			apiProvider: 'firstParty',
+			email: 'ops@example.com',
+			orgId: 'org_123',
+			orgName: 'Acme',
+			subscriptionType: 'max',
+			accessToken: 'sk-ant-oat-should-never-appear'
+		});
+		const label = parseClaudeAuthStatus(status);
+		expect(label).toBe('claude-code: ops@example.com (Acme, max)');
+		expect(label).not.toContain('sk-ant');
+		expect(label).not.toContain('org_123');
+	});
+
+	it('says "not logged in" rather than nothing, so a logged-out seat is visible', () => {
+		expect(parseClaudeAuthStatus(JSON.stringify({ loggedIn: false }))).toBe('claude-code: not logged in');
+	});
+
+	it('falls back to the auth method when the email is absent', () => {
+		expect(parseClaudeAuthStatus(JSON.stringify({ loggedIn: true, authMethod: 'console' }))).toBe(
+			'claude-code: console login'
+		);
+		expect(parseClaudeAuthStatus(JSON.stringify({ loggedIn: true }))).toBe('claude-code: logged in');
+	});
+
+	it('flattens control characters out of the label', () => {
+		expect(parseClaudeAuthStatus(JSON.stringify({ loggedIn: true, email: 'a@b.c\n\tx' }))).toBe(
+			'claude-code: a@b.c x'
+		);
+	});
+
+	it('returns null for anything that is not a JSON object', () => {
+		expect(parseClaudeAuthStatus('not json')).toBeNull();
+		expect(parseClaudeAuthStatus('[]')).toBeNull();
+		expect(parseClaudeAuthStatus('')).toBeNull();
+	});
+});
+
+describe('parseCodexLoginStatus (fleet cost accounting, EW-777)', () => {
+	it('maps the CLI prose onto the three seat kinds', () => {
+		expect(parseCodexLoginStatus('Logged in using ChatGPT')).toBe('codex: chatgpt');
+		expect(parseCodexLoginStatus('Logged in using an API key')).toBe('codex: api-key');
+		expect(parseCodexLoginStatus('Not logged in')).toBe('codex: not logged in');
+		expect(parseCodexLoginStatus('Logged in')).toBe('codex: logged in');
+	});
+
+	it('returns null for silence or unrelated output', () => {
+		expect(parseCodexLoginStatus('')).toBeNull();
+		expect(parseCodexLoginStatus('usage: codex login [status]')).toBeNull();
+	});
+});
+
+describe('detectModelIdentity (fleet cost accounting, EW-777)', () => {
+	const claudeJson = JSON.stringify({ loggedIn: true, email: 'ops@example.com', subscriptionType: 'max' });
+
+	it('asks the resolved claude-code binary first and reports its seat', async () => {
+		const runner = runnerFor({
+			'/opt/claude': { code: 0, stdout: claudeJson },
+			codex: { code: 0, stdout: 'Logged in using ChatGPT' }
+		});
+
+		await expect(detectModelIdentity(runner, { 'claude-code': '/opt/claude' })).resolves.toBe(
+			'claude-code: ops@example.com (max)'
+		);
+		const calls = (runner.run as ReturnType<typeof vi.fn>).mock.calls;
+		expect(calls[0]).toEqual(['/opt/claude', ['auth', 'status', '--json']]);
+		// Claude answered — codex was never spawned.
+		expect(calls).toHaveLength(1);
+	});
+
+	it('keeps the claude seat when the CLI also prints a warning on stderr', async () => {
+		// A JSON document plus stderr noise is not a JSON document; the
+		// probe must read stdout on its own before giving up on the seat.
+		const runner = runnerFor({
+			claude: { code: 0, stdout: claudeJson, stderr: 'warning: a newer version of claude is available' },
+			codex: { code: 0, stdout: 'Logged in using ChatGPT' }
+		});
+
+		await expect(detectModelIdentity(runner)).resolves.toBe('claude-code: ops@example.com (max)');
+		expect((runner.run as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+	});
+
+	it('falls through to codex when claude-code is absent, using the resolved codex path', async () => {
+		const runner = runnerFor({ '/opt/codex': { code: 0, stdout: 'Logged in using ChatGPT' } });
+
+		await expect(detectModelIdentity(runner, { codex: '/opt/codex' })).resolves.toBe('codex: chatgpt');
+	});
+
+	it('still reports a logged-OUT codex, whose status command exits non-zero', async () => {
+		const runner = runnerFor({ codex: { code: 1, stdout: '', stderr: 'Not logged in' } });
+
+		await expect(detectModelIdentity(runner)).resolves.toBe('codex: not logged in');
+	});
+
+	it('probes the bare command names when no path was resolved', async () => {
+		const runner = runnerFor({});
+		await detectModelIdentity(runner);
+
+		const probed = (runner.run as ReturnType<typeof vi.fn>).mock.calls.map((call) => call[0]);
+		expect(probed).toEqual(['claude', 'codex']);
+	});
+
+	it('returns null (not a throw) when nothing answers or the runner throws', async () => {
+		await expect(detectModelIdentity(runnerFor({}))).resolves.toBeNull();
+		const throwing: CommandRunner = {
+			run: vi.fn(async () => {
+				throw new Error('spawn EACCES');
+			})
+		};
+		await expect(detectModelIdentity(throwing)).resolves.toBeNull();
+	});
+
+	it('caps the label at the contract length', async () => {
+		const runner = runnerFor({
+			claude: { code: 0, stdout: JSON.stringify({ loggedIn: true, email: `${'x'.repeat(400)}@example.com` }) }
+		});
+		const label = await detectModelIdentity(runner);
+		expect((label ?? '').length).toBeLessThanOrEqual(200);
+	});
+});
+
+describe('cacheProbe', () => {
+	it('reuses one reading for the TTL, then re-probes', async () => {
+		let clock = 0;
+		const probe = vi.fn(async () => `reading-${probe.mock.calls.length}`);
+		const cached = cacheProbe(probe, MODEL_IDENTITY_CACHE_TTL_MS, () => clock);
+
+		await expect(cached()).resolves.toBe('reading-1');
+		clock += MODEL_IDENTITY_CACHE_TTL_MS - 1;
+		await expect(cached()).resolves.toBe('reading-1');
+		expect(probe).toHaveBeenCalledTimes(1);
+
+		clock += 1;
+		await expect(cached()).resolves.toBe('reading-2');
+		expect(probe).toHaveBeenCalledTimes(2);
+	});
+
+	it('caches a null reading too — a machine with no CLI must not spawn per beat', async () => {
+		const probe = vi.fn(async () => null);
+		const cached = cacheProbe(probe, 1000, () => 0);
+
+		await cached();
+		await cached();
+		expect(probe).toHaveBeenCalledTimes(1);
+	});
+
+	it('shares one in-flight probe between concurrent callers', async () => {
+		let release: (value: string) => void = () => undefined;
+		const probe = vi.fn(() => new Promise<string>((resolve) => (release = resolve)));
+		const cached = cacheProbe(probe, 1000, () => 0);
+
+		const first = cached();
+		const second = cached();
+		release('one');
+		await expect(first).resolves.toBe('one');
+		await expect(second).resolves.toBe('one');
+		expect(probe).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe('describeSelf telemetry integration', () => {
 	const environment = {
 		platform: 'linux',
@@ -177,11 +351,25 @@ describe('describeSelf telemetry integration', () => {
 	it('includes telemetry when the probes answer', async () => {
 		const description = await describeSelf(runnerFor({}), environment, '1.0.0', null, {
 			cliVersion: () => 'claude 1.4.2',
-			diskFreeBytes: () => 900_000_000
+			diskFreeBytes: () => 900_000_000,
+			modelIdentity: () => 'claude-code: ops@example.com (max)'
 		});
 
 		expect(description.cliVersion).toBe('claude 1.4.2');
 		expect(description.diskFreeBytes).toBe(900_000_000);
+		expect(description.modelIdentity).toBe('claude-code: ops@example.com (max)');
+	});
+
+	it('OMITS the model identity when the probe answers null or blank', async () => {
+		// Same rule as the other two fields: absent means "leave the stored
+		// reading alone" server-side, so a transient probe miss must not
+		// blank the identity the operator is reading spend against.
+		for (const answer of [null, '']) {
+			const description = await describeSelf(runnerFor({}), environment, '1.0.0', null, {
+				modelIdentity: () => answer
+			});
+			expect(description).not.toHaveProperty('modelIdentity');
+		}
 	});
 
 	it('describes the node unchanged when no telemetry is supplied at all', async () => {

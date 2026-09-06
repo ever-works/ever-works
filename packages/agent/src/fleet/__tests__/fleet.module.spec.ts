@@ -22,11 +22,20 @@ jest.mock('../../entities/fleet-job.entity', () => ({
 jest.mock('../../entities/fleet-execution-preference.entity', () => ({
     FleetExecutionPreference: class FleetExecutionPreference {},
 }));
+jest.mock('../../entities/fleet-cost-policy.entity', () => ({
+    FleetCostPolicy: class FleetCostPolicy {},
+}));
 jest.mock('../../entities/agent.entity', () => ({
     Agent: class Agent {},
 }));
 jest.mock('../../entities/fleet-agent-node-affinity.entity', () => ({
     FleetAgentNodeAffinity: class FleetAgentNodeAffinity {},
+}));
+jest.mock('../../entities/fleet-kill-switch.entity', () => ({
+    FleetKillSwitch: class FleetKillSwitch {},
+}));
+jest.mock('../../entities/fleet-audit.entity', () => ({
+    FleetAudit: class FleetAudit {},
 }));
 jest.mock('../../plugins/services/plugin-registry.service', () => ({
     PluginRegistryService: class PluginRegistryService {},
@@ -58,6 +67,21 @@ jest.mock('../fleet-execution-preference.service', () => ({
 jest.mock('../fleet-agent-node-affinity.service', () => ({
     FleetAgentNodeAffinityService: class FleetAgentNodeAffinityService {},
 }));
+jest.mock('../fleet-cost-policy.repository', () => ({
+    FleetCostPolicyRepository: class FleetCostPolicyRepository {},
+}));
+jest.mock('../fleet-cost-ceiling.service', () => ({
+    FleetCostCeilingService: class FleetCostCeilingService {},
+}));
+jest.mock('../fleet-kill-switch.repository', () => ({
+    FleetKillSwitchRepository: class FleetKillSwitchRepository {},
+}));
+jest.mock('../fleet-kill-switch.service', () => ({
+    FleetKillSwitchService: class FleetKillSwitchService {},
+}));
+jest.mock('../fleet-audit.service', () => ({
+    FleetAuditService: class FleetAuditService {},
+}));
 
 import 'reflect-metadata';
 import { FleetModule } from '../fleet.module';
@@ -69,34 +93,89 @@ import { FleetExecutionPreferenceRepository } from '../fleet-execution-preferenc
 import { FleetExecutionPreferenceService } from '../fleet-execution-preference.service';
 import { FleetAgentNodeAffinityRepository } from '../fleet-agent-node-affinity.repository';
 import { FleetAgentNodeAffinityService } from '../fleet-agent-node-affinity.service';
+import { FleetCostPolicyRepository } from '../fleet-cost-policy.repository';
+import { FleetCostCeilingService } from '../fleet-cost-ceiling.service';
+import { FleetKillSwitchRepository } from '../fleet-kill-switch.repository';
+import { FleetKillSwitchService } from '../fleet-kill-switch.service';
+import { FleetAuditService } from '../fleet-audit.service';
+import { FleetRunCredentialService } from '../fleet-run-credential.service';
+import { ApiKeyRepository } from '../../database/repositories/api-key.repository';
 
 describe('FleetModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, FleetModule) ?? [];
 
-    it('provides the registry, the job-runtime halves and the routing preference', () => {
+    // Fleet cost accounting (EW-777) appended the cost-policy repository and
+    // the daily-ceiling service to both lists; panic controls (EW-778) then
+    // appended the kill-switch repository, the audit service and the
+    // kill-switch service; the MCP bridge (self-build slice Z / EW-796)
+    // appended `ApiKeyRepository` (run credentials are `api_keys` rows, so
+    // the module carries its own `forFeature([ApiKey])` and the repository
+    // that reads it) and `FleetRunCredentialService`. The pin below grew
+    // with all three so the shape stays exact — a provider added without
+    // updating it fails here.
+    it('provides the registry, the job-runtime halves, the routing preference, the cost ceilings and the panic controls', () => {
         expect(meta('providers')).toEqual([
             FleetNodeRepository,
             FleetJobRepository,
             FleetExecutionPreferenceRepository,
             FleetAgentNodeAffinityRepository,
+            FleetCostPolicyRepository,
+            FleetKillSwitchRepository,
             FleetService,
             FleetJobService,
             FleetExecutionPreferenceService,
             FleetAgentNodeAffinityService,
+            FleetCostCeilingService,
+            FleetAuditService,
+            FleetKillSwitchService,
+            ApiKeyRepository,
+            FleetRunCredentialService,
         ]);
     });
 
-    it('exports all six for the API surface + chat-tool assembly', () => {
+    it('exports every provider for the API surface + chat-tool assembly', () => {
         expect(meta('exports')).toEqual([
             FleetNodeRepository,
             FleetJobRepository,
             FleetExecutionPreferenceRepository,
             FleetAgentNodeAffinityRepository,
+            FleetCostPolicyRepository,
+            FleetKillSwitchRepository,
             FleetService,
             FleetJobService,
             FleetExecutionPreferenceService,
             FleetAgentNodeAffinityService,
+            FleetCostCeilingService,
+            FleetAuditService,
+            FleetKillSwitchService,
+            FleetRunCredentialService,
         ]);
+    });
+
+    /**
+     * Self-build slice Z (EW-796) — the api-side `FleetJobsController`
+     * injects this to mint on the node channel and
+     * `FleetMcpCredentialListener` injects it to revoke when a job settles.
+     * Both resolve through this module's exports; an unexported service
+     * would fail Nest's DI at boot rather than degrade, but the pin makes
+     * the reason legible.
+     *
+     * `ApiKeyRepository` is deliberately NOT exported: the api side gets it
+     * from `DatabaseModule`, and exporting a second binding of the same
+     * class from here would make which one wins depend on import order.
+     */
+    it('exports the run-credential service so the API can mint and revoke', () => {
+        expect(meta('exports')).toContain(FleetRunCredentialService);
+        expect(meta('exports')).not.toContain(ApiKeyRepository);
+    });
+
+    // EW-778 — the api-side AgentsModule binds RUN_KILL_SWITCH to this
+    // service with `useExisting`, which only resolves when the fleet
+    // module EXPORTS it. An unexported service would leave the gate's
+    // @Optional() injection undefined and the stop flag silently dark.
+    it('exports the kill switch so the gate port binding can resolve it', () => {
+        expect(meta('exports')).toContain(FleetKillSwitchService);
+        expect(meta('exports')).toContain(FleetAuditService);
     });
 
     it('imports only the entity feature (plugins resolve via the global module)', () => {
@@ -118,6 +197,12 @@ describe('fleet barrel', () => {
         expect(barrel.FleetExecutionPreferenceRepository).toBe(FleetExecutionPreferenceRepository);
         expect(barrel.FleetAgentNodeAffinityService).toBe(FleetAgentNodeAffinityService);
         expect(barrel.FleetAgentNodeAffinityRepository).toBe(FleetAgentNodeAffinityRepository);
+        expect(barrel.FleetCostPolicyRepository).toBe(FleetCostPolicyRepository);
+        expect(barrel.FleetCostCeilingService).toBe(FleetCostCeilingService);
+        expect(barrel.FleetKillSwitchService).toBe(FleetKillSwitchService);
+        expect(barrel.FleetKillSwitchRepository).toBe(FleetKillSwitchRepository);
+        expect(barrel.FleetAuditService).toBe(FleetAuditService);
+        expect(barrel.FleetRunCredentialService).toBe(FleetRunCredentialService);
         expect(typeof barrel.buildFleetTools).toBe('function');
     });
 

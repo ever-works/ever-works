@@ -18,7 +18,7 @@ sidebar_position: 71
 
 ## Overview
 
-The Composio plugin executes [Composio](https://composio.dev/) tools during work generation, giving Ever Works access to 500+ third-party app integrations (Gmail, Slack, GitHub, Notion, Linear, Salesforce, HubSpot, Stripe, Shopify, Airtable, …) without writing per-app connector code.
+The Composio plugin executes [Composio](https://composio.dev/) tools during work generation, giving Ever Works access to 500+ third-party app integrations (Gmail, Slack, GitHub, Notion, Linear, Salesforce, HubSpot, Stripe, Airtable, …) without writing per-app connector code.
 
 Composio brokers OAuth on your behalf: each user connects an app once through Composio's hosted flow, and the platform reuses that connection on subsequent tool calls. Unlike a single platform-wide API key, Composio scopes credentials to a `user_id` so every user can connect their own accounts safely.
 

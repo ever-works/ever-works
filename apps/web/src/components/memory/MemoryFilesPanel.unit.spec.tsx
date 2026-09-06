@@ -7,6 +7,12 @@ vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
 }));
 
+// The panel derives the download href from `usePathname()`; keep it in step
+// with the `window.history` path the scoped-fetch assertions already use.
+vi.mock('next/navigation', () => ({
+    usePathname: () => window.location.pathname,
+}));
+
 vi.mock('@/components/ui/button', () => ({
     Button: ({ children, asChild }: { children: ReactNode; asChild?: boolean }) =>
         asChild ? <>{children}</> : <button type="button">{children}</button>,
@@ -294,21 +300,34 @@ describe('MemoryFilesPanel BFF transport', () => {
     });
 
     /**
-     * KNOWN GAP (EW-786), pinned deliberately. A document navigation
-     * carries no custom header, so the Download control stays a plain
-     * `<a href>` and `app/api/memory/files/[id]/download/route.ts` stays
-     * unscoped. Org-scoped Memory originals — which the now-scoped list
-     * above is what makes visible here — 404 on download. If this
-     * assertion ever fails because someone put the scope in the href,
-     * that is the design decision this fix deliberately did not make.
+     * The download control is a document navigation, so it cannot use
+     * `browserApiFetch`; the tab's workspace rides on the href as `?scope=`
+     * instead and `[id]/download/route.ts` reads it back. This closes the
+     * EW-786 gap the previous version of this test pinned: org-scoped Memory
+     * originals were listed by the scoped table and then 404'd on download.
      */
-    it('leaves the download control a bare anchor with no scope carrier', async () => {
+    it('puts the tab’s workspace selector on the download anchor', async () => {
         window.history.replaceState({}, '', '/org/ever/memory');
         installScopedFetch();
         render(<MemoryFilesPanel />);
 
         const anchor = await screen.findByTestId('memory-files-download-up-1');
         expect(anchor.tagName).toBe('A');
-        expect(anchor).toHaveAttribute('href', '/api/memory/files/up-1/download?source=upload');
+        expect(anchor).toHaveAttribute(
+            'href',
+            '/api/memory/files/up-1/download?source=upload&scope=org%3Aever',
+        );
+    });
+
+    it('carries the personal selector on a personal-scope page', async () => {
+        window.history.replaceState({}, '', '/memory');
+        installScopedFetch();
+        render(<MemoryFilesPanel />);
+
+        const anchor = await screen.findByTestId('memory-files-download-up-1');
+        expect(anchor).toHaveAttribute(
+            'href',
+            '/api/memory/files/up-1/download?source=upload&scope=personal',
+        );
     });
 });

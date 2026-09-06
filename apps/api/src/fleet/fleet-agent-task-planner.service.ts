@@ -12,6 +12,8 @@ import { SkillsService } from '@ever-works/agent/skills';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import {
     resolveAcceptanceChecks,
+    resolveChecksPolicy,
+    resolveSetupSteps,
     TaskRepository,
     TaskStatus,
     TaskWorkspaceService,
@@ -19,6 +21,8 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import {
     FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
+    FLEET_RUN_MCP_SERVER_NAME,
+    FLEET_RUN_MCP_TOOL_FAMILIES,
     FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES,
     FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
     FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
@@ -34,10 +38,16 @@ import {
     type FleetAgentExecutionPermissionMode,
     type FleetAgentExecutionProvider,
     type FleetAgentModelExecution,
+    type FleetAgentTaskMcpBridge,
     type FleetTaskWorkspaceSpec,
     type TaskAcceptanceCheck,
 } from '@ever-works/contracts';
-import type { FleetAgentTaskPlan, FleetAgentTaskPlanner } from './fleet-agent-task.dispatcher';
+import { agentTaskRequiredCapabilities } from './fleet-agent-task-capabilities';
+import type {
+    FleetAgentTaskPlan,
+    FleetAgentTaskPlanner,
+    FleetAgentTaskRequirements,
+} from './fleet-agent-task.dispatcher';
 
 /** Plugin id whose per-tenant settings overlay the instance defaults. */
 export const FLEET_NODE_RUNTIME_PLUGIN_ID = 'job-runtime-node';
@@ -235,6 +245,25 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         return settings;
     }
 
+    /**
+     * Self-build slice S — the capability tags the job WILL be stamped
+     * with, from settings alone (no Task / workspace reads), so the
+     * router can count only the nodes that could lease it. Mirrors what
+     * {@link plan} + `enqueueAgentTask` produce through the ONE shared
+     * `agentTaskRequiredCapabilities`: the provider tag in `model-cli`
+     * mode, the operator's config tags otherwise.
+     */
+    async requirements(
+        payload: AgentTaskExecuteDispatchPayload,
+    ): Promise<FleetAgentTaskRequirements> {
+        const settings = await this.resolveSettings(payload.userId);
+        return {
+            requiredCapabilities: agentTaskRequiredCapabilities(
+                settings.mode === 'model-cli' ? settings.provider : null,
+            ),
+        };
+    }
+
     async plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null> {
         const settings = await this.resolveSettings(payload.userId);
         if (settings.mode !== 'model-cli') {
@@ -300,15 +329,87 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         }
 
         const work = task.workId ? await this.works.findById(task.workId) : null;
-        const acceptanceChecks = safeResolveChecks(task, work);
+        // Owner-authored, from the Work's defaults and the Task's own list.
+        // `safeResolveChecks` swallows a read failure to `[]` deliberately:
+        // an unreadable Work grades nothing, and that was true before this
+        // slice. It is NOT the posture for the repository-declared set
+        // below, which refuses instead — see `readFleetRepoDeclaredCommands`.
+        // `checksPolicy: 'off'` is documented as "checks never run", and it
+        // is the switch an owner reaches for when something in their
+        // repository misbehaves. The cloud path honours it; until EW-807
+        // the fleet path did not consult it at all, so an owner who turned
+        // their gate off kept executing check commands on their own PCs —
+        // and, once `repoDeclaredCommands` is on, kept executing commands
+        // written by anyone who can land a commit. A control that reads as
+        // the off switch and is inert on the only path where these commands
+        // run at all fails OPEN, so it is honoured here.
+        //
+        // What `off` stops, precisely: the acceptance checks, and READING
+        // `.works/works.yml` for commands at all — so no repository-authored
+        // command of either phase is planned. What it does NOT stop: the
+        // owner's OWN setup steps. Those are the dependency install that
+        // makes the model's work possible rather than a judgement on it, an
+        // owner authored them, and killing them would turn "stop grading me"
+        // into "break every run".
+        const checksPolicy = resolveChecksPolicy(work);
+        const checksOff = checksPolicy === 'off';
+        const ownerChecks = checksOff ? [] : safeResolveChecks(task, work);
+        const ownerSetup = safeResolveSetup(task, work);
+
+        // Repository-declared commands (EW-807). Read here and nowhere else:
+        // this is the one point where the Task, the Work and the RESOLVED
+        // workspace (mounts included) are all in hand, a throw still lands
+        // loudly on the run row, and the result is about to be sealed into
+        // an immutable job payload. Anything earlier has no mounts;
+        // anything later has no loud failure path — and anything on the
+        // NODE could be re-read after the model had edited the file.
+        //
+        // Deliberately NOT wrapped in a try/catch. A repository that
+        // declares commands this Work does not admit, or a config that
+        // cannot be read, fails the plan; the alternative is a run that
+        // reports green having verified less than the repository asked for.
+        const repoDeclared = checksOff
+            ? { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] }
+            : await this.taskWorkspace.readFleetRepoDeclaredCommands({
+                  task,
+                  userId: payload.userId,
+                  workspace,
+              });
+
+        // Owner-authored entries come FIRST in both phases, and repository
+        // ids carry a `repo/` prefix that owner ids cannot spell, so a
+        // repository can never replace or suppress a command the owner
+        // wrote — it can only add to it.
+        const acceptanceChecks = [...ownerChecks, ...repoDeclared.checks];
+        const setup = [...ownerSetup, ...repoDeclared.setup];
         const ownerMessages = await this.resolveOwnerMessages(payload);
+        // Self-build slice Z (EW-796) — resolved BEFORE the instructions
+        // because the instructions have to tell the model whether it has
+        // platform tools. The two must never disagree: a prompt that
+        // promises Tasks/Inbox tools to a run with no bridge produces a
+        // model that hunts for them and gives up, and a bridge nobody
+        // told the model about is a credential minted for nothing.
+        const mcp = resolveMcpBridge(agent, settings);
         const instructions = await this.composeInstructions({
             agent,
             task,
             workspace,
             acceptanceChecks,
+            setup,
             ownerMessages,
             settings,
+            mcp,
+        });
+
+        // Run secrets (self-build slice Y): the union of the env var NAMES
+        // every repository of this run granted. NAMES only — the values are
+        // read from the node's own environment and scrubbed back out of
+        // everything the node reports. Read fresh on every plan, which is
+        // what makes a revoked grant stop applying from the next run on.
+        const envGrants = await this.taskWorkspace.resolveFleetRunEnvGrants({
+            task,
+            userId: payload.userId,
+            agentId: payload.agentId,
         });
 
         const execution: FleetAgentModelExecution = {
@@ -317,6 +418,7 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             permissionMode: settings.permissionMode,
             timeoutSec: settings.timeoutSec,
             envPassthrough: config.fleetNode.getAgentTaskEnvPassthrough(),
+            ...(envGrants.length > 0 ? { envGrants } : {}),
         };
         if (settings.model) execution.model = settings.model;
         if (settings.effort) execution.effort = settings.effort;
@@ -328,11 +430,16 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             execution,
             workspace,
             acceptanceChecks,
+            ...(setup.length > 0 ? { setup } : {}),
             git: {
                 commit: canCommit,
                 push: canCommit,
                 commitMessage: `feat(task): ${task.slug ?? task.id} agent run output`,
             },
+            // Conditional key: a run without the bridge produces the exact
+            // payload it always produced, so nothing about a normal fleet
+            // job changes shape because this slice exists.
+            ...(mcp ? { mcp } : {}),
         };
     }
 
@@ -397,10 +504,14 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         task: Task;
         workspace: FleetTaskWorkspaceSpec;
         acceptanceChecks: TaskAcceptanceCheck[];
+        /** The dispatch-frozen SETUP phase (EW-807), described so the model knows it ran. */
+        setup: TaskAcceptanceCheck[];
         ownerMessages: string[];
         settings: FleetAgentExecutionSettings;
+        /** Slice Z — present only when the run actually gets platform tools. */
+        mcp?: FleetAgentTaskMcpBridge | null;
     }): Promise<string> {
-        const { agent, task, workspace, acceptanceChecks, ownerMessages, settings } = input;
+        const { agent, task, workspace, acceptanceChecks, setup, ownerMessages, settings } = input;
         // `plan` maps to `--permission-mode plan` / Codex `--sandbox
         // read-only` on the node: the CLI cannot write the question file,
         // so telling it to would only produce a summary that never
@@ -437,18 +548,32 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 .join('\n\n');
         }
 
-        const checksSection =
-            acceptanceChecks.length === 0
-                ? 'No acceptance checks are declared for this Task.'
+        // EW-807: a check can now name WHICH repository it runs in, and the
+        // install that makes any of them meaningful runs before the model.
+        // Both have to be described, or the model is told the gate runs in
+        // "the repository root" when half of it runs somewhere else — and
+        // is left guessing whether dependencies are present.
+        const describeCommand = (check: TaskAcceptanceCheck): string =>
+            `- ${neutralizeControlTokens(check.name || check.id)}: \`${neutralizeControlTokens(check.command)}\`` +
+            (check.mountDir ? ` (in \`.mounts/${neutralizeControlTokens(check.mountDir)}\`)` : '') +
+            (check.cwd ? ` (in ${neutralizeControlTokens(check.cwd)})` : '') +
+            (check.required === false ? ' — informational' : '');
+
+        const checksSection = [
+            ...(setup.length > 0
+                ? [
+                      'The node already ran this setup before starting you, so the workspace is installed:',
+                      ...setup.map(describeCommand),
+                      '',
+                  ]
+                : []),
+            ...(acceptanceChecks.length === 0
+                ? ['No acceptance checks are declared for this Task.']
                 : [
-                      'After you finish, the node runs these commands in the repository root; every required one must exit 0:',
-                      ...acceptanceChecks.map(
-                          (check) =>
-                              `- ${neutralizeControlTokens(check.name || check.id)}: \`${neutralizeControlTokens(check.command)}\`${
-                                  check.cwd ? ` (in ${neutralizeControlTokens(check.cwd)})` : ''
-                              }${check.required === false ? ' — informational' : ''}`,
-                      ),
-                  ].join('\n');
+                      'After you finish, the node runs these commands in the repository they name (the primary worktree unless a mount is given); every required one must exit 0:',
+                      ...acceptanceChecks.map(describeCommand),
+                  ]),
+        ].join('\n');
 
         const outputContract = [
             `Your final message is recorded as the run summary. State what you changed, which files${
@@ -461,7 +586,10 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
 
         const fleetSections = [
             '# WORKSPACE (fleet node)',
-            describeWorkspaceSection(workspace, { canAskOwner }),
+            describeWorkspaceSection(workspace, {
+                canAskOwner,
+                ...(input.mcp ? { mcp: input.mcp } : {}),
+            }),
             '# ACCEPTANCE CHECKS',
             checksSection,
             '# OUTPUT CONTRACT',
@@ -567,6 +695,23 @@ function safeResolveChecks(
     }
 }
 
+/**
+ * Same posture for the owner-authored SETUP phase (EW-807): a Work whose
+ * column cannot be read installs nothing, which is what every Work did
+ * before the phase existed. A repository-declared setup step is a
+ * different matter and refuses — see `readFleetRepoDeclaredCommands`.
+ */
+function safeResolveSetup(
+    task: Task,
+    work: Parameters<typeof resolveSetupSteps>[1],
+): TaskAcceptanceCheck[] {
+    try {
+        return resolveSetupSteps(task, work);
+    } catch {
+        return [];
+    }
+}
+
 function byteLength(value: string): number {
     return Buffer.byteLength(value, 'utf8');
 }
@@ -655,6 +800,50 @@ function describeQuestionProtocol(): string {
 }
 
 /**
+ * Self-build slice Z (EW-796) — decide whether THIS run gets platform
+ * tools, and describe the bridge if it does.
+ *
+ * THREE independent switches, all of which must say yes:
+ *
+ *   1. `FLEET_NODE_MCP_BRIDGE_ENABLED` — the operator's install-wide
+ *      switch, default OFF. Handing a model on someone's desktop a live
+ *      platform credential is a deployment decision, not a preference.
+ *   2. `FLEET_NODE_MCP_URL` — a configured, valid MCP endpoint. Without
+ *      one there is nothing for the node's proxy to forward to, and
+ *      minting a credential would be minting it for nowhere.
+ *   3. `agent.permissions.canCallExternalTools` — the per-Agent opt-in.
+ *
+ * Why #3 reuses the EXISTING permission rather than adding a flag: it is
+ * already the exact gate the CLOUD path applies to MCP tools
+ * (`packages/agent/src/mcp/mcp-tool-source.ts`) and to every other
+ * outbound tool call. An Agent the owner has not trusted with tools in
+ * the cloud must not silently gain them because its run landed on a
+ * fleet node — that asymmetry would be a surprise, and a new ninth flag
+ * would have left the two paths free to drift.
+ *
+ * `plan` permission mode is excluded on top of all three: the CLI runs
+ * read-only there, and a read-only session that can nevertheless POST to
+ * the platform through MCP tools is not a plan-mode run in any sense the
+ * owner would recognise.
+ */
+export function resolveMcpBridge(
+    agent: Pick<Agent, 'permissions'>,
+    settings: FleetAgentExecutionSettings,
+): FleetAgentTaskMcpBridge | null {
+    if (settings.permissionMode === 'plan') return null;
+    if (agent.permissions?.canCallExternalTools !== true) return null;
+    if (!config.fleetNode.isMcpBridgeEnabled()) return null;
+    const serverUrl = config.fleetNode.getMcpServerUrl();
+    if (!serverUrl) return null;
+    return {
+        enabled: true,
+        serverUrl,
+        serverName: FLEET_RUN_MCP_SERVER_NAME,
+        toolFamilies: [...FLEET_RUN_MCP_TOOL_FAMILIES],
+    };
+}
+
+/**
  * The `# WORKSPACE` section of the fleet instructions.
  *
  * Multi-repo Task workspaces (self-build slice C): when the spec carries
@@ -667,10 +856,17 @@ function describeQuestionProtocol(): string {
  * blocked model at the question file instead of at its final message;
  * without it (plan mode, or any caller that does not opt in) the closing
  * line is today's, verbatim.
+ *
+ * Self-build slice Z (EW-796): with `mcp` the closing line stops saying
+ * the session has no platform tools — because it now has them — and
+ * names the families, the scope they act in, and the one thing the model
+ * must not do with them (approve its own work). Without `mcp` the line
+ * is today's, verbatim, which is what every run that has not opted into
+ * the bridge still gets.
  */
 export function describeWorkspaceSection(
     workspace: FleetTaskWorkspaceSpec,
-    options: { canAskOwner?: boolean } = {},
+    options: { canAskOwner?: boolean; mcp?: FleetAgentTaskMcpBridge } = {},
 ): string {
     const mounts = workspace.mounts ?? [];
     const lines = [
@@ -693,10 +889,20 @@ export function describeWorkspaceSection(
             'Edit the primary repository here and the mounted repositories in place when the Task needs it. Do NOT commit, push, switch branches, or touch any other repository: when you finish, the node commits and pushes each repository that changed, and the platform opens one pull request per repository and links them.',
         );
     }
+    const bridge = options.mcp;
+    if (bridge?.enabled) {
+        const families = (bridge.toolFamilies ?? []).join(', ');
+        lines.push(
+            `You DO have Ever Works platform tools in this session, through the MCP server \`${bridge.serverName}\`${
+                families ? ` (${families})` : ''
+            }. They act as the Task owner, in this run's own scope, and only for as long as this run holds its claim — read context with them, record progress with them, and NEVER use them to approve, review or transition your own work past a human gate.`,
+        );
+    }
+    const noTools = bridge?.enabled ? '' : 'You have no platform tools in this session. ';
     lines.push(
         options.canAskOwner
-            ? `You have no platform tools in this session. If the Task cannot be completed as written, do not guess — ask the owner through \`${FLEET_AGENT_TASK_QUESTION_FILE}\` (see OUTPUT CONTRACT) and stop, leaving the working tree in a consistent state.`
-            : 'You have no platform tools in this session. If the Task cannot be completed as written, do not guess — leave the working tree unchanged and explain exactly what is missing in your final message.',
+            ? `${noTools}If the Task cannot be completed as written, do not guess — ask the owner through \`${FLEET_AGENT_TASK_QUESTION_FILE}\` (see OUTPUT CONTRACT) and stop, leaving the working tree in a consistent state.`
+            : `${noTools}If the Task cannot be completed as written, do not guess — leave the working tree unchanged and explain exactly what is missing in your final message.`,
     );
     return lines.join('\n');
 }

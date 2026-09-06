@@ -81,19 +81,47 @@ export interface BffProxyOptions {
     readonly reason?: string;
     /**
      * Response for a request with no auth cookie. Defaults to
-     * `401 { error: 'Unauthorized' }`. Some routes deliberately soften this (the
-     * org-templates catalogue answers `[]` so its modal skips a step rather than
-     * erroring), which is why it is overridable.
+     * `401 { error: 'Unauthorized' }`.
+     *
+     * Routes differ here and the difference is on the wire, so it is
+     * overridable: the org-templates catalogue answers `[]`/200 so its modal
+     * skips a step rather than erroring, and the Memory routes answer a
+     * PLAIN-TEXT `Unauthorized` rather than JSON.
+     *
+     * Typed as `Response`, not `NextResponse`, so a plain `new Response(...)`
+     * can be preserved verbatim. Narrowing it would force those routes to
+     * change their wire format merely to adopt the wrapper — a silent
+     * behaviour change smuggled in by a refactor, which is exactly what this
+     * wrapper exists to prevent.
      */
-    readonly onUnauthorized?: () => NextResponse;
+    readonly onUnauthorized?: () => Response;
 }
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-export function bffProxy<Ctx = unknown>(
+/**
+ * The returned signature depends on whether the route has params, and it has to.
+ *
+ * Next 16 validates route exports structurally. A DYNAMIC route's second
+ * argument must be exactly its context type — `RouteContext | undefined` is
+ * rejected with "Expected RouteContext, got RouteContext | undefined", so an
+ * optional parameter fails `next build`. A STATIC route has no context, and
+ * every route spec in this repo calls the handler directly as `await GET(req)`,
+ * so a required second parameter fails `tsc` with TS2554 at those call sites.
+ *
+ * Neither a required nor an optional parameter satisfies both. Keying the
+ * signature off `Ctx` does: omit the type argument for a static route and get a
+ * one-parameter handler; pass it for a dynamic route and get the exact
+ * two-parameter shape Next expects.
+ */
+type BffRouteHandler<Ctx> = [Ctx] extends [never]
+    ? (request: NextRequest) => Promise<Response>
+    : (request: NextRequest, context: Ctx) => Promise<Response>;
+
+export function bffProxy<Ctx = never>(
     handler: (scoped: ScopedBffRequest, context: Ctx) => Promise<Response> | Response,
     options: BffProxyOptions = {},
-): (request: NextRequest, context: Ctx) => Promise<Response> {
+): BffRouteHandler<Ctx> {
     const { scope = 'workspace', reason, onUnauthorized = unauthorized } = options;
 
     if (scope === 'none' && !reason?.trim()) {
@@ -104,13 +132,16 @@ export function bffProxy<Ctx = unknown>(
         );
     }
 
-    return async (request: NextRequest, context: Ctx): Promise<Response> => {
+    // Built with an optional parameter internally and cast to the public
+    // signature above: at runtime Next always passes a context, and a static
+    // route simply ignores it.
+    const route = async (request: NextRequest, context?: Ctx): Promise<Response> => {
         const token = await getAuthAccessCookie();
         if (!token) return onUnauthorized();
 
         const base: HeadersInit = { Authorization: `Bearer ${token}` };
         if (scope === 'none') {
-            return handler({ request, headers: new Headers(base), token }, context);
+            return handler({ request, headers: new Headers(base), token }, context as Ctx);
         }
 
         let headers: Headers;
@@ -120,6 +151,8 @@ export function bffProxy<Ctx = unknown>(
             return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
         }
 
-        return handler({ request, headers, token }, context);
+        return handler({ request, headers, token }, context as Ctx);
     };
+
+    return route as BffRouteHandler<Ctx>;
 }

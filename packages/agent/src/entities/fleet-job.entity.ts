@@ -31,6 +31,11 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
  *      maxAttempts`, otherwise `failed`. Reclaim runs inline on every
  *      lease poll AND on the `fleet-job-lease-sweeper` cron, so a fleet
  *      that stops polling still converges.
+ *   6. Every claim (step 2, including a re-lease after step 5) increments
+ *      `leaseGeneration`; heartbeat and complete carry it and are refused
+ *      (`409 stale-lease`) when it is not the current one, so a node that
+ *      slept through its lease can never overwrite the current holder —
+ *      not even when that holder is the same node on a later claim.
  *
  * Auth: every node-facing transition authenticates with the SAME node
  * secret minted at enrollment (constant-time compare against the
@@ -49,6 +54,11 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
 @Index('idx_fleet_jobs_node_status', ['nodeId', 'status'])
 @Index('idx_fleet_jobs_target_status', ['targetNodeId', 'status'])
 @Index('idx_fleet_jobs_lease_expiry', ['status', 'leaseExpiresAt'])
+@Index('idx_fleet_jobs_queued_at', ['status', 'queuedAt'])
+// Fleet cost accounting (EW-777): the per-node daily spend sum is
+// `WHERE nodeId = ? AND completedAt >= dayStart`. Migration
+// `1788300000000-AddFleetCostAccounting` adds the index with the column.
+@Index('idx_fleet_jobs_node_completed', ['nodeId', 'completedAt'])
 export class FleetJob {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -105,6 +115,21 @@ export class FleetJob {
     maxAttempts: number;
 
     /**
+     * Monotonic identity of the CLAIM (suspend-safe leases, self-build
+     * finding R7). 0 until the first lease; every successful claim —
+     * including a re-lease after a lapse — writes `previous + 1`, and the
+     * node is handed the new value with the lease. `extendLease` and
+     * `complete` pin it in their WHERE clause next to `nodeId`, which is
+     * what closes the hole `nodeId` alone cannot: the same machine
+     * re-leasing the job it slept through, whose old in-flight run would
+     * otherwise renew and finalize the NEW claim. No index — the row is
+     * always addressed by primary key and this is an equality predicate
+     * on that one row.
+     */
+    @Column({ type: 'int', default: 0 })
+    leaseGeneration: number;
+
+    /**
      * Stable identity across retries (`JobEnqueueOptions.idempotencyKey`).
      * UNIQUE so a re-enqueue of the same logical job reuses the row
      * instead of doubling the work onto the fleet.
@@ -121,6 +146,20 @@ export class FleetJob {
     error?: string | null;
 
     /**
+     * Fleet cost accounting (EW-777) — the model spend this job's run
+     * reported, in cents, stamped by the API-side reconciler when the
+     * node's result carried a CLI cost. NULL = no model ran, or the CLI
+     * printed no price (Codex reports tokens only). Denormalised HERE, next
+     * to `nodeId` and `completedAt`, because the per-node and fleet-wide
+     * DAILY ceilings are one portable
+     * `SUM(costCents) WHERE nodeId|userId = ? AND completedAt >= dayStart`
+     * — and `plugin_usage_events`, which carries the same cents for the
+     * Costs dashboard, has no node id to sum by.
+     */
+    @Column({ type: 'int', nullable: true })
+    costCents?: number | null;
+
+    /**
      * Why a `queued` row has not started yet — today only
      * `waiting-for-runner`, stamped by the fleet run router when the job
      * was accepted with no runner able to take it.
@@ -135,6 +174,21 @@ export class FleetJob {
      */
     @Column({ type: 'varchar', length: 64, nullable: true })
     queuedReason?: string | null;
+
+    /**
+     * When the row last ENTERED `queued` (self-build slice S / EW-775).
+     * Set at enqueue, reset by reclaim and by a drain releasing the
+     * claim, NOT reset by a heartbeat promotion (clearing
+     * `queuedReason` does not make the job younger). The queue SLA
+     * (`FleetJobService.expireQueued`) is measured from it. Nullable so
+     * a row written by an older replica during rollout has an UNKNOWN
+     * age, and an unknown age is never destructively failed.
+     *
+     * Migration: `1788200000000-AddFleetJobQueuedAt` (backfills
+     * `createdAt` onto rows that were `queued` at upgrade time).
+     */
+    @PortableDateColumn({ nullable: true })
+    queuedAt?: Date | null;
 
     /**
      * Operator cancel request on an ACTIVE job (agent execution v2 /

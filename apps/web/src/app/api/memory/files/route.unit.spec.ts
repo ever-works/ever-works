@@ -214,17 +214,16 @@ describe('/api/memory/files workspace scope', () => {
     });
 
     /**
-     * KNOWN GAP, pinned so a later change is a deliberate one.
-     *
-     * `MemoryFilesController.download` IS org-aware, but the URL is reached
-     * by browser document requests — the `<a href>` in `MemoryFilesPanel`,
-     * the same anchor in `MemoryFilePreview`, and the KB binary viewers'
-     * `<img>`/`<video>` sources — none of which can carry a custom header.
-     * Scoping it would 400 every download instead of 404-ing the org-scoped
-     * originals only, so it stays unscoped until a human picks a carrier.
+     * Download is reached by document requests — the `<a href>` in
+     * `MemoryFilesPanel`, the same anchor in `MemoryFilePreview`, the KB
+     * binary viewers' `<img>`/`<video>` sources — which cannot carry a
+     * header, so it takes the selector from the `?scope=` carrier instead.
+     * The full contract lives in `[id]/download/route.unit.spec.ts`; pinned
+     * here from the family's point of view: a link with no carrier still
+     * serves (personal), and the carrier never reaches the API's query.
      */
-    describe('unscoped — download cannot carry a header', () => {
-        it('GET /files/:id/download serves without a selector and sends no scope', async () => {
+    describe('download — the query carrier', () => {
+        it('GET /files/:id/download serves a link with no selector in personal scope', async () => {
             const response = await downloadFile(
                 request('/api/memory/files/kb-9/download?source=kb-upload'),
                 params('kb-9'),
@@ -233,22 +232,18 @@ describe('/api/memory/files workspace scope', () => {
             expect(response.status).toBe(200);
             const [url] = fetchMock.mock.calls[0] as [string];
             expect(url).toBe('http://api.example/memory/files/kb-9/download?source=kb-upload');
-            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBeNull();
+            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBe('@personal');
         });
 
-        it('GET /files/:id/download ignores a selector rather than acting on it', async () => {
+        it('GET /files/:id/download reads ?scope= and strips it from the upstream query', async () => {
             await downloadFile(
-                request('/api/memory/files/kb-9/download?source=kb-upload', {
-                    selector: 'org:ever',
-                }),
+                request('/api/memory/files/kb-9/download?source=kb-upload&scope=org:ever'),
                 params('kb-9'),
             );
 
-            // A selector reaches this route only from the preview's text
-            // fetch, never from the anchor or the binary viewers. Honouring
-            // it here would make downloads succeed or 404 depending on which
-            // control the user clicked.
-            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBeNull();
+            const [url] = fetchMock.mock.calls[0] as [string];
+            expect(url).toBe('http://api.example/memory/files/kb-9/download?source=kb-upload');
+            expect(forwarded(fetchMock).get(API_SCOPE_HEADER)).toBe('ever');
         });
     });
 });

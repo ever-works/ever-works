@@ -1,13 +1,22 @@
 import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import * as yaml from 'yaml';
 import type {
+    FleetRunEnvFileRef,
     FleetTaskWorkspaceMountSpec,
     FleetTaskWorkspaceSpec,
     GateStatus,
     MergeMethod,
     MergePolicySource,
     MergeRefusalCode,
+    TaskAcceptanceCheck,
 } from '@ever-works/contracts';
-import { normalizeFleetTaskWorkspaceMounts } from '@ever-works/contracts';
+import {
+    normalizeCommitSha,
+    normalizeFleetRunEnvFileRefs,
+    normalizeFleetRunEnvGrants,
+    normalizeFleetTaskWorkspaceMounts,
+    normalizeWorkRepoDeclaredCommandPolicy,
+} from '@ever-works/contracts';
 import { TaskStatus, type Task, type TaskLinkedPullRequest } from '../entities/task.entity';
 import type { Work } from '../entities/work.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -30,7 +39,16 @@ import {
     resolveAttachedReposForAgent,
     toAdvisoryRepoSpecs,
     type AdvisoryAttachedRepoSpec,
+    type ResolvedAgentRepo,
 } from '../services/repo-registry.service';
+import {
+    admitRepoDeclaredCommands,
+    parseRepoDeclaredCommands,
+    RepoDeclaredCommandsError,
+} from './repo-declared-commands';
+
+/** The ONE path a Work's config lives at; mirrors `WORKS_CONFIG_FILEPATHS`. */
+const WORKS_CONFIG_FILEPATH = '.works/works.yml';
 
 export interface ProvisionedTaskWorkspace {
     /** Filesystem path of the checkout — the run's working directory. */
@@ -63,6 +81,23 @@ export interface TaskAgentMergeOutcome {
     policySource?: MergePolicySource;
     /** Merge commit SHA when the provider reported one. */
     sha?: string;
+    /**
+     * Merge approval (self-build slice AE): nothing was attempted because
+     * the effective policy requires a human approval, and that decision
+     * cannot exist yet — the pull request was opened seconds ago and CI
+     * has not run. The merge is re-evaluated after CI reports, by
+     * `TaskMergeGateService`. Distinct from `attempted: false` alone,
+     * which means the policy does not allow agent merges at all.
+     */
+    awaitingApproval?: boolean;
+    /**
+     * Merge approval (self-build slice AE): nothing was attempted because
+     * provider CI has not reported yet. Set on EVERY deferral from
+     * pull-request-open time, including for an operator whose policy asks
+     * for no human approval — they opted out of a person, not out of CI,
+     * and a pull request opened one second ago has no checks to be green.
+     */
+    awaitingCi?: boolean;
 }
 
 export interface TaskWorkspaceFinalizeOutcome {
@@ -313,7 +348,7 @@ export class TaskWorkspaceService {
         }
 
         const repositoryId = `${owner}/${repo}`;
-        const mounts = await this.resolveFleetMounts({
+        const { mounts, envFilesRef: mountEnvRefs } = await this.resolveFleetMounts({
             task,
             agentId: input.agentId,
             userId,
@@ -321,13 +356,294 @@ export class TaskWorkspaceService {
             primaryRepositoryId: repositoryId,
             branch,
         });
+        // Run secrets (slice Y): the PRIMARY repository of a Task is a Work
+        // repository, not a registry row, so it has no env files of its own.
+        // Its `.env` comes from a registry connection the operator added for
+        // the same clone URL — resolved explicitly here rather than skipped,
+        // because the one repository that matters most (the platform
+        // building itself) is exactly the primary.
+        const primaryRef = await this.resolvePrimaryEnvFilesRef(userId, repositoryId);
+        const envFilesRef = normalizeFleetRunEnvFileRefs([
+            ...(primaryRef ? [primaryRef] : []),
+            ...mountEnvRefs,
+        ]);
         return {
             repositoryId,
             repoUrl: tokenFreeCloneUrl(repository.cloneUrl),
             baseRef,
             branch,
             ...(mounts.length > 0 ? { mounts } : {}),
+            ...(envFilesRef.length > 0 ? { envFilesRef } : {}),
         };
+    }
+
+    /**
+     * Run secrets (slice Y) — the registry connection whose clone URL IS
+     * the Task's primary repository, if the operator registered one.
+     *
+     * Returns null when no row matches: a Task whose repository has no
+     * registry entry simply gets no env files, exactly as today. REFUSES
+     * when two enabled rows claim the same repository, naming both — the
+     * alternative is picking one by listing order, and "which `.env` landed
+     * in the checkout" is not a question that may be answered by luck.
+     *
+     * Never reads `envFiles`; only `envFilePaths`, which is why nothing
+     * here can put a decrypted value on the job.
+     */
+    private async resolvePrimaryEnvFilesRef(
+        userId: string,
+        primaryRepositoryId: string,
+    ): Promise<FleetRunEnvFileRef | null> {
+        // No registry wired at all (an in-process caller, a narrower module
+        // graph) is "no registry row for the primary", which is the same
+        // answer an empty registry gives and the behaviour every Task had
+        // before this slice. A registry that IS wired and then FAILS is a
+        // different thing and fails the plan below.
+        if (!this.repoConnections || typeof this.repoConnections.listByUser !== 'function') {
+            return null;
+        }
+        let rows: Awaited<ReturnType<RepoConnectionRepository['listByUser']>>;
+        try {
+            rows = await this.repoConnections.listByUser(userId);
+        } catch (error) {
+            // A registry that cannot be read must not silently mean "no env
+            // files": the run would start with a partial environment, which
+            // is the failure this whole feature exists to remove.
+            throw new Error(
+                `Task primary repository ${primaryRepositoryId} could not be matched against the repository registry: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        const wanted = primaryRepositoryId.toLowerCase();
+        const matches = rows.filter(
+            (row) =>
+                row.enabled &&
+                typeof row.url === 'string' &&
+                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
+        );
+        if (matches.length > 1) {
+            throw new Error(
+                `Repository registry has ${matches.length} enabled connections for the Task's primary repository ` +
+                    `${primaryRepositoryId} (${matches.map((row) => row.name).join(', ')}); ` +
+                    'disable or remove all but one so the run knows whose env files to use.',
+            );
+        }
+        const [connection] = matches;
+        if (!connection) return null;
+        const [resolved] = mapAttachmentEdgesToRepos([
+            { repoConnection: connection } as unknown as AgentRepoAttachment,
+        ]);
+        if (!resolved || resolved.envFilePaths.length === 0) return null;
+        return { repoConnectionId: resolved.repoConnectionId, paths: resolved.envFilePaths };
+    }
+
+    /**
+     * Run secrets (slice Y) — the union of the env-var NAMES every
+     * repository of this run granted.
+     *
+     * Unioned, and the docs say so plainly: a run is ONE process tree over
+     * one workspace, so a name granted by any repository of that workspace
+     * is readable by the model working in all of them. That is why a grant
+     * is per-repository (the operator binds it to something they own) but
+     * its effect is per-run.
+     *
+     * Deliberately lenient — a connection that no longer resolves is
+     * skipped rather than throwing — because `describeFleetWorkspace` has
+     * already refused a workspace it could not describe, and a grant that
+     * fails to resolve means LESS access, never more.
+     */
+    async resolveFleetRunEnvGrants(input: {
+        task: Task;
+        userId: string;
+        agentId?: string;
+    }): Promise<string[]> {
+        const sources: ResolvedAgentRepo[] = [];
+        if (input.agentId && this.agentRepoAttachments) {
+            sources.push(
+                ...(await resolveAttachedReposForAgent(
+                    this.agentRepoAttachments,
+                    input.agentId,
+                    input.userId,
+                ).catch(() => [])),
+            );
+        }
+        const extras = Array.isArray(input.task.extraRepos) ? input.task.extraRepos : [];
+        for (const extra of extras) {
+            if (!this.repoConnections) break;
+            const connection = await this.repoConnections
+                .findByIdAndUser(extra.repoConnectionId, input.userId)
+                .catch(() => null);
+            if (!connection) continue;
+            const [resolved] = mapAttachmentEdgesToRepos([
+                { repoConnection: connection } as unknown as AgentRepoAttachment,
+            ]);
+            if (resolved) sources.push(resolved);
+        }
+        if (input.task.workId && this.repoConnections && this.works) {
+            const work = await this.works.findById(input.task.workId).catch(() => null);
+            const owner = work?.getRepoOwner();
+            const repo = work?.getDataRepo();
+            if (owner && repo) {
+                const primary = await this.resolvePrimaryConnection(
+                    input.userId,
+                    `${owner}/${repo}`,
+                );
+                if (primary) sources.push(primary);
+            }
+        }
+        return normalizeFleetRunEnvGrants(sources.flatMap((source) => source.envGrants));
+    }
+
+    /**
+     * Read the commands this Task's PRIMARY repository declares in
+     * `.works/works.yml` (EW-807), or refuse.
+     *
+     * ## Where and when
+     *
+     * At PLAN time, on the platform, over the Git provider API, at the
+     * workspace's BASE REF — the branch the Task worktree is cut from.
+     * Deliberately not on the node and deliberately not from the checkout:
+     *
+     *  - the node never parses this file, so it needs no YAML parser and
+     *    has no repository content on an execution path of its own;
+     *  - the result is folded into the frozen check set and sealed into the
+     *    immutable job payload before the job is even enqueued, so a MODEL
+     *    THAT REWRITES THE FILE MID-RUN changes nothing about the run it is
+     *    in. That is what makes "the frozen set" a real guarantee here
+     *    rather than a name.
+     *
+     * The base ref, not the default branch: a run is judged by the config
+     * of the branch it started from. And not the TASK branch, which is the
+     * branch the model is about to write to.
+     *
+     * ## Refusal posture
+     *
+     * The opposite of `WorksConfigService`, which is advisory by design and
+     * must never take a Work offline over a schema quibble. Here every
+     * failure throws: a malformed `spec.tasks`, a provider error, a
+     * command the owner's allow-list does not admit, a `mount:` naming a
+     * repository the Task does not mount. Reporting a green run that
+     * verified less than the repository asked for is the defect; a run
+     * that fails on its own row naming the line to fix is not.
+     *
+     * Returns EMPTY without a round trip when the Work's policy is `off`,
+     * which is every Work until its owner opts in. A missing file, or a
+     * file with no `spec.tasks`, is also empty — a repository that declares
+     * nothing declares nothing.
+     *
+     * KNOWN LIMIT: the git facade returns `null` both for "no such file"
+     * and for a provider plugin with no file-read capability, so a Work on
+     * such a provider silently gets no declarations. Every provider that
+     * can host a Work implements `getFileContent` (the whole works.yml
+     * import path depends on it), so this is a theoretical gap rather than
+     * a live one — but it is a gap, and it is why the FEATURE is opt-in
+     * per Work rather than inferred from the file's presence.
+     */
+    async readFleetRepoDeclaredCommands(input: {
+        task: Task;
+        userId: string;
+        workspace: FleetTaskWorkspaceSpec;
+    }): Promise<{ setup: TaskAcceptanceCheck[]; checks: TaskAcceptanceCheck[] }> {
+        const empty = { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] };
+        if (!input.task.workId) return empty;
+        const work = await this.works.findById(input.task.workId);
+        if (!work) return empty;
+
+        const policy = normalizeWorkRepoDeclaredCommandPolicy(work.repoDeclaredCommands);
+        // `off` is the whole point of the opt-in: the file is not read at
+        // all, so a repository cannot make a Work do work by writing to it.
+        if (policy.mode !== 'allowlist') return empty;
+
+        if (!this.gitFacade) {
+            throw new RepoDeclaredCommandsError(
+                `Work ${work.id} reads repository-declared commands, but no git facade is available in this runtime to read .works/works.yml`,
+            );
+        }
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        if (!owner || !repo) {
+            // NOT an empty set. Control only reaches here for a Work that
+            // OPTED IN — the policy gate and the git-facade gate are both
+            // already behind us — so returning `{ setup: [], checks: [] }`
+            // would grade the run by the owner's checks alone and report it
+            // green having verified less than the repository asked for. That
+            // is the same silent fallback every other branch on this read
+            // path throws over (a provider error, invalid YAML, a denied
+            // command); a Work whose repository coordinates do not resolve
+            // is a configuration failure, and it belongs on the run row.
+            throw new RepoDeclaredCommandsError(
+                `Work ${work.id} reads repository-declared commands, but its repository coordinates do not ` +
+                    `resolve (owner='${owner ?? ''}', repo='${repo ?? ''}') — ${WORKS_CONFIG_FILEPATH} cannot be ` +
+                    `read. Reconnect the Work's repository, or turn repository-declared commands off.`,
+            );
+        }
+
+        let file: { content: string; encoding: string } | null;
+        try {
+            file = await this.gitFacade.getFileContent(
+                owner,
+                repo,
+                WORKS_CONFIG_FILEPATH,
+                { userId: input.userId, providerId: work.gitProvider, workId: work.id },
+                input.workspace.baseRef,
+            );
+        } catch (error) {
+            // NOT swallowed. "We could not read the file that says how to
+            // verify this change, so we verified it with nothing" is the
+            // silent fallback this slice exists to remove.
+            throw new RepoDeclaredCommandsError(
+                `Could not read ${WORKS_CONFIG_FILEPATH} from ${owner}/${repo}@${input.workspace.baseRef}, and this ` +
+                    `Work reads repository-declared commands: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+        if (!file?.content) return empty;
+
+        let parsed: unknown;
+        try {
+            parsed = yaml.parse(file.content);
+        } catch (error) {
+            throw new RepoDeclaredCommandsError(
+                `${WORKS_CONFIG_FILEPATH} in ${owner}/${repo}@${input.workspace.baseRef} is not valid YAML: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new RepoDeclaredCommandsError(
+                `${WORKS_CONFIG_FILEPATH} in ${owner}/${repo} must contain a YAML mapping at the root`,
+            );
+        }
+
+        const declared = parseRepoDeclaredCommands((parsed as Record<string, unknown>).spec);
+        return admitRepoDeclaredCommands({
+            declared,
+            policy,
+            mountDirs: (input.workspace.mounts ?? []).map((mount) => mount.mountDir),
+            repositoryId: `${owner}/${repo}`,
+        });
+    }
+
+    /** The enabled registry row for `primaryRepositoryId`, or null. Never throws. */
+    private async resolvePrimaryConnection(
+        userId: string,
+        primaryRepositoryId: string,
+    ): Promise<ResolvedAgentRepo | null> {
+        if (!this.repoConnections || typeof this.repoConnections.listByUser !== 'function')
+            return null;
+        const rows = await this.repoConnections.listByUser(userId).catch(() => []);
+        const wanted = primaryRepositoryId.toLowerCase();
+        const matches = rows.filter(
+            (row) =>
+                row.enabled &&
+                typeof row.url === 'string' &&
+                repositoryIdFromCloneUrl(row.url)?.toLowerCase() === wanted,
+        );
+        if (matches.length !== 1) return null;
+        const [resolved] = mapAttachmentEdgesToRepos([
+            { repoConnection: matches[0] } as unknown as AgentRepoAttachment,
+        ]);
+        return resolved ?? null;
     }
 
     /**
@@ -350,7 +666,12 @@ export class TaskWorkspaceService {
         workId: string;
         primaryRepositoryId: string;
         branch: string;
-    }): Promise<FleetTaskWorkspaceMountSpec[]> {
+    }): Promise<{ mounts: FleetTaskWorkspaceMountSpec[]; envFilesRef: FleetRunEnvFileRef[] }> {
+        // Run secrets (slice Y): mountDir → the registry row it came from, so
+        // the env-file PATHS can be attached to the final mount list after
+        // the Task-extra-vs-attachment precedence has been settled. PATHS
+        // only — `resolved.envFiles` (the decrypted contents) is never read.
+        const sourceByMountDir = new Map<string, ResolvedAgentRepo>();
         const extras = Array.isArray(input.task.extraRepos) ? input.task.extraRepos : [];
         const attached =
             input.agentId && this.agentRepoAttachments
@@ -360,7 +681,7 @@ export class TaskWorkspaceService {
                       input.userId,
                   )
                 : [];
-        if (attached.length === 0 && extras.length === 0) return [];
+        if (attached.length === 0 && extras.length === 0) return { mounts: [], envFilesRef: [] };
         if (!this.gitFacade) {
             throw new Error(
                 extras.length > 0
@@ -404,6 +725,7 @@ export class TaskWorkspaceService {
                 mountDir: repo.mountDir,
                 writable: true,
             });
+            sourceByMountDir.set(repo.mountDir.toLowerCase(), repo);
         }
         // The contracts normalizer is the same gate the node applies; failing
         // HERE names the attachment while the plan is still on the platform.
@@ -483,6 +805,7 @@ export class TaskWorkspaceService {
                 mountDir,
                 writable: extra.writable !== false,
             });
+            sourceByMountDir.set(mountDir.toLowerCase(), resolved);
         }
         const keptAttachments = mounts.filter(
             (candidate) =>
@@ -492,10 +815,21 @@ export class TaskWorkspaceService {
                         extra.mountDir.toLowerCase() === candidate.mountDir.toLowerCase(),
                 ),
         );
-        return normalizeFleetTaskWorkspaceMounts(
+        const normalized = normalizeFleetTaskWorkspaceMounts(
             [...keptAttachments, ...extraMounts],
             input.primaryRepositoryId,
         );
+        const envFilesRef: FleetRunEnvFileRef[] = [];
+        for (const mount of normalized) {
+            const source = sourceByMountDir.get(mount.mountDir.toLowerCase());
+            if (!source || source.envFilePaths.length === 0) continue;
+            envFilesRef.push({
+                repoConnectionId: source.repoConnectionId,
+                mountDir: mount.mountDir,
+                paths: source.envFilePaths,
+            });
+        }
+        return { mounts: normalized, envFilesRef };
     }
 
     /**
@@ -1140,22 +1474,16 @@ export class TaskWorkspaceService {
                 `${await this.describeMergePolicy(args.agentId, work.id)}.`,
         );
 
-        // Merge-policy matrix (Wave 3, D4) — the agent-merge path. The PR
-        // exists and the gate has already spoken; ask the policy whether
-        // THIS agent may land it. Everything below is best-effort by
-        // contract: an open pull request is the promise this method made,
-        // and no merge outcome may retroactively fail it.
-        const merge = await this.attemptAgentMerge({
+        // Merge approval (slice AE) — the PR exists and the gate has
+        // already spoken, but nothing is merged from here any more. This
+        // only reports WHY the merge is being left to the post-CI gate.
+        // Best-effort by contract: an open pull request is the promise
+        // this method made, and no merge outcome may retroactively fail it.
+        const merge = await this.evaluateMergeAtPullRequestOpen({
             task,
             work,
-            userId,
             agentId: args.agentId,
-            owner,
-            repo,
-            gitOptions,
             prNumber: pr.number,
-            baseRef,
-            gateStatus: args.gateStatus,
         });
 
         return {
@@ -1164,6 +1492,148 @@ export class TaskWorkspaceService {
             prUrl: pr.url,
             ...(merge ? { merge } : {}),
         };
+    }
+
+    /**
+     * Merge approval (self-build slice AE, EW-805) — what happens at
+     * PULL-REQUEST OPEN time, which is now almost always "nothing yet".
+     *
+     * The bug this replaces: `attemptAgentMerge` was called from here,
+     * six lines after `createPullRequest`, and it passed
+     * `humanApproved: false` as a literal. Under the shipped default
+     * (`requireHumanApproval: true`) that produced a guaranteed refusal
+     * on every single agent pull request, recorded as a chat message and
+     * a `task_merge_refused` activity row — the platform telling the user
+     * it would not do a thing it was never going to be able to do. And
+     * the timing was wrong regardless: no CI has run one second after a
+     * branch is pushed, so "is this mergeable?" cannot be answered here
+     * even in principle.
+     *
+     * So NOTHING is merged here, under any policy. The merge question is
+     * asked exactly once, by `TaskMergeGateService`, after the PR-status
+     * sweep has read provider CI:
+     *
+     *  - **Approval required** (the shipped default): the gate raises the
+     *    Inbox approval for a GREEN pull request and merges once a human
+     *    has decided.
+     *  - **Approval NOT required** (an operator who opted out): the gate
+     *    merges on green, with no human in the loop. That operator opted
+     *    out of a PERSON, not out of CI — and an early attempt here could
+     *    only ever be judged against zero check runs, because the branch
+     *    was pushed seconds ago. An intermediate revision of this slice
+     *    did attempt the merge here for that policy; it merged pull
+     *    requests before a single check had started, and disagreed with
+     *    the gate about what "no approval required" means.
+     *
+     * All this method still does is decide whether there is anything to
+     * wait FOR, so the outcome it reports is honest. A policy read that
+     * fails, or one that forbids agent merges, says so and stops.
+     */
+    private async evaluateMergeAtPullRequestOpen(args: {
+        task: Task;
+        work: { id: string; organizationId?: string | null; tenantId?: string | null };
+        agentId: string;
+        prNumber: number;
+    }): Promise<TaskAgentMergeOutcome | undefined> {
+        if (!this.mergePolicy || !this.gitFacade) return undefined;
+
+        let resolved;
+        try {
+            resolved = await this.mergePolicy.resolve({
+                agentId: args.agentId,
+                workId: args.work.id,
+                organizationId: args.work.organizationId ?? null,
+                tenantId: args.work.tenantId ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${args.task.id} merge-policy read failed before the merge attempt (no merge attempted): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return { attempted: false, merged: false };
+        }
+
+        if (!resolved.policy.allowAgentMerge) {
+            // The conservative default. Nothing attempted, nothing said.
+            return { attempted: false, merged: false, policySource: resolved.source };
+        }
+
+        // Silent by design in both directions: the human has not been
+        // asked yet, and the thing that will ask them (the post-CI gate)
+        // files an Inbox item. A refusal message here would be noise about
+        // a decision nobody has been given the chance to make.
+        this.logger.log(
+            `Task ${args.task.id} PR #${args.prNumber}: merge deferred until provider CI reports` +
+                `${resolved.policy.requireHumanApproval ? ' and a human approves' : ''} ` +
+                `(policy source: ${resolved.source}).`,
+        );
+        return {
+            attempted: false,
+            merged: false,
+            ...(resolved.policy.requireHumanApproval ? { awaitingApproval: true } : {}),
+            awaitingCi: true,
+            policySource: resolved.source,
+        };
+    }
+
+    /**
+     * Merge approval (self-build slice AE) — the POST-CI entry point.
+     *
+     * `TaskMergeGateService` calls this once provider CI has reported
+     * green for a Task's pull request and (when the policy requires it) a
+     * human approval is on record. It resolves the repository coordinates
+     * the same way finalize does and hands off to the one merge path, so
+     * a merge triggered by CI and a merge triggered at finalize are
+     * indistinguishable downstream — same policy, same approval gate,
+     * same head pin, same recording.
+     *
+     * Returns `undefined` when the Task is not in a mergeable shape (no
+     * Work, no pull request, no facade); that is an ordinary outcome for
+     * a sweep, not an error.
+     */
+    async attemptMergeForOpenPullRequest(input: {
+        task: Task;
+        agentId: string;
+        gateStatus?: GateStatus | null;
+        /**
+         * The head commit the caller just read LIVE from the provider.
+         * Used only to key the "have we already told the human about this
+         * refusal?" record — the facade re-reads and pins the head itself,
+         * and never trusts this value.
+         */
+        headSha?: string | null;
+    }): Promise<TaskAgentMergeOutcome | undefined> {
+        const { task } = input;
+        if (!this.gitFacade || !this.mergePolicy) return undefined;
+        if (!task.workId || !task.prNumber) return undefined;
+
+        const work = await this.works.findById(task.workId);
+        if (!work) return undefined;
+
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        const gitOptions = {
+            userId: task.userId,
+            providerId: work.gitProvider,
+            workId: work.id,
+        };
+        const baseRef =
+            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || 'main';
+
+        return this.attemptAgentMerge({
+            task,
+            work,
+            userId: task.userId,
+            agentId: input.agentId,
+            owner,
+            repo,
+            gitOptions,
+            prNumber: task.prNumber,
+            baseRef,
+            gateStatus: input.gateStatus ?? null,
+            headSha: input.headSha ?? task.prHeadSha ?? null,
+        });
     }
 
     /**
@@ -1183,11 +1653,24 @@ export class TaskWorkspaceService {
      *    `AgentMergeActor`, and the facade routes it through
      *    `MergePolicyService.canAgentMerge`. Gate status, protected
      *    branches, allowed methods and human approval are evaluated THERE.
-     *    No rule is duplicated here.
-     * 3. **Refusals are recorded, never swallowed.** A refusal posts a task
-     *    chat message naming the stable code, the human reason and the
-     *    governing scope, and writes a `task_merge_refused` activity row.
-     *    A user can always answer "why did the agent not merge this?"
+     *    No rule is duplicated here. Merge approval (slice AE): the actor
+     *    says WHICH merge this is (`taskId` + the PR number); it does not
+     *    and cannot claim that a human approved it. The facade reads the
+     *    live head from the provider, verifies the recorded approval
+     *    against that head, and pins the merge to it.
+     *
+     *    ONE caller reaches this method:
+     *    {@link attemptMergeForOpenPullRequest}, the post-CI gate. Nothing
+     *    merges at pull-request-open time under any policy — see
+     *    {@link evaluateMergeAtPullRequestOpen}.
+     * 3. **Refusals are recorded ONCE, never swallowed.** A refusal posts a
+     *    task chat message naming the stable code, the human reason and
+     *    the governing scope, and writes a `task_merge_refused` activity
+     *    row — the first time it is seen for a given (head commit, code).
+     *    The attempt itself is on a two-minute sweep, so a stable refusal
+     *    like a protected base branch would otherwise report itself ~720
+     *    times a day; the same refusal at a NEW head, or a different
+     *    refusal at the same head, is news and is reported again.
      */
     private async attemptAgentMerge(args: {
         task: Task;
@@ -1200,6 +1683,8 @@ export class TaskWorkspaceService {
         prNumber: number;
         baseRef: string;
         gateStatus: GateStatus | null;
+        /** Head commit the refusal record is keyed by. Never an input to the decision. */
+        headSha?: string | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task, work, userId, agentId, owner, repo, prNumber, baseRef } = args;
         if (!this.mergePolicy || !this.gitFacade) return undefined;
@@ -1249,11 +1734,20 @@ export class TaskWorkspaceService {
                     organizationId: work.organizationId ?? null,
                     tenantId: work.tenantId ?? null,
                     gateStatus: args.gateStatus,
-                    // No human-approval record exists for an agent-opened PR
-                    // at finalize time. A policy that requires one therefore
-                    // refuses here BY DESIGN — the approval lives with the
-                    // human who gives it, not with the agent asking.
-                    humanApproved: false,
+                    // Merge approval (self-build slice AE, EW-805): this
+                    // used to be `humanApproved: false`, a literal, with a
+                    // comment explaining that a policy requiring approval
+                    // therefore refused here BY DESIGN — "the approval
+                    // lives with the human who gives it, not with the
+                    // agent asking". That was honest and it was a dead
+                    // end: no surface existed for the human to give one.
+                    //
+                    // The claim is gone entirely. The actor now says WHICH
+                    // merge this is (`taskId` + `prNumber`), and the
+                    // facade looks the approval up itself against the live
+                    // head commit. An asker that could assert its own
+                    // approval would not be a gate.
+                    taskId: task.id,
                     targetBranch: baseRef,
                 },
             );
@@ -1334,8 +1828,24 @@ export class TaskWorkspaceService {
 
     /**
      * The "recorded, not swallowed" half: one task chat message a human can
-     * read plus one activity row a feed can render, for every merge that
-     * was attempted and did not land.
+     * read plus one activity row a feed can render, for a merge that was
+     * attempted and did not land.
+     *
+     * ONE, not one per attempt (merge approval, slice AE). The attempt sits
+     * on the two-minute PR-status sweep now, and a refusal that is a
+     * property of the repository rather than of the moment — a protected
+     * base branch, a required CODEOWNERS review, a merge method the policy
+     * forbids — is still true two minutes later and every two minutes
+     * after that. Reporting it each time buries the Task's chat under
+     * hundreds of identical messages a day and writes as many activity
+     * rows, which is how a correct refusal becomes an outage.
+     *
+     * The dedup key is (head commit, refusal code), read from and written
+     * to the Task row so it holds across the API process and the cron
+     * worker. A new commit is a new situation and is reported again; so is
+     * a DIFFERENT refusal at the same commit. The ATTEMPT is never
+     * suppressed — a provider fault is indistinguishable from a policy
+     * refusal here, and retrying is how a transient one clears.
      */
     private async recordMergeFailure(
         args: {
@@ -1344,6 +1854,7 @@ export class TaskWorkspaceService {
             agentId: string;
             prNumber: number;
             baseRef: string;
+            headSha?: string | null;
         },
         outcome: TaskAgentMergeOutcome,
     ): Promise<TaskAgentMergeOutcome> {
@@ -1357,6 +1868,32 @@ export class TaskWorkspaceService {
                     outcome.policySource ?? 'default'
                 }).`,
         );
+
+        const refusalSha = normalizeCommitSha(args.headSha) ?? null;
+        const refusalCode = outcome.refusalCode ?? 'not-merged';
+        const alreadyTold =
+            (task.mergeRefusedSha ?? null) === refusalSha &&
+            (task.mergeRefusedCode ?? null) === refusalCode;
+        if (alreadyTold) {
+            this.logger.debug(
+                `Task ${task.id}: PR #${prNumber} refusal '${refusalCode}' at ` +
+                    `${refusalSha ?? 'unknown head'} was already reported — not repeating it.`,
+            );
+            return outcome;
+        }
+        // Written BEFORE the message so a crash between the two repeats at
+        // most one message rather than looping forever on the next sweep.
+        try {
+            await this.tasks.recordMergeRefusal(task.id, { sha: refusalSha, code: refusalCode });
+            Object.assign(task, { mergeRefusedSha: refusalSha, mergeRefusedCode: refusalCode });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: could not record the merge refusal marker (the message is still posted): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+
         await this.postSystemMessage(
             { task, userId, agentId },
             [

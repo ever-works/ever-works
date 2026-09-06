@@ -5,6 +5,7 @@ import {
     AGENT_CHAT_REPLY_DISPATCHER,
 } from '@ever-works/agent/tasks-domain';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { UsageModule } from '@ever-works/agent/usage';
 // Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
 // AgentRepository so the TasksController + TaskChatController can
 // inject it for mention-lookup population. Without this import the
@@ -62,6 +63,7 @@ import {
 // store; `FleetRunRouterService` decides per run whether the resolved
 // runtime is the owner's Fleet and, when it is, writes the lease-able
 // row an enrolled node polls for.
+import { FleetKillSwitchService } from '@ever-works/agent/fleet';
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetRunRouterService } from '../fleet/fleet-run-router.service';
 import { createFleetAwareAgentTaskExecuteDispatcher } from '../fleet/fleet-agent-task.dispatcher';
@@ -96,6 +98,10 @@ import { TaskChatController } from './task-chat.controller';
     imports: [
         TasksDomainModule,
         DatabaseModule,
+        // Fleet cost accounting (EW-777): `PluginUsageService`, so the
+        // fleet reconciler below can record a fleet run's model spend as
+        // the same `plugin_usage_events` row the cloud facades write.
+        UsageModule,
         AgentsModule,
         // Supplies SkillsService to FleetAgentTaskPlannerService — see the
         // import comment above; without it the fleet prompt carries no
@@ -134,17 +140,23 @@ import { TaskChatController } from './task-chat.controller';
                 scopeResolver: FleetTaskScopeResolverService,
                 notifications: NotificationService,
                 planner: FleetAgentTaskPlannerService,
+                // Panic controls (EW-778) — the global stop flag, checked
+                // before routing so a stop can never become a cloud
+                // fallback. Resolves through FleetApiModule's re-export of
+                // the agent-side FleetModule.
+                killSwitch: FleetKillSwitchService,
             ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
-                    { scopeResolver, notifications, planner },
+                    { scopeResolver, notifications, planner, killSwitch },
                 ),
             inject: [
                 FleetRunRouterService,
                 FleetTaskScopeResolverService,
                 NotificationService,
                 FleetAgentTaskPlannerService,
+                FleetKillSwitchService,
             ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },

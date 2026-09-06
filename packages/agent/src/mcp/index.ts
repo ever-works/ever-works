@@ -18,4 +18,5 @@ export {
 export * from './mcp-client.service';
 export * from './mcp-connections.service';
 export * from './mcp-tool-source';
+export * from './mcp-stdio-launcher';
 export * from './mcp-sdk';

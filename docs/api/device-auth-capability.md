@@ -179,6 +179,25 @@ Each of these plugins ships its own settings schema for the resulting
 token storage; the device-auth flow only handles the _acquisition_ of
 the token, not its long-term storage shape.
 
+**Shipped status (verified 2026-09-05).** The table above describes the
+plugins this capability was designed for, but only `codex` declares
+`device-auth` in its `everworks.plugin.capabilities` array today
+(`packages/plugins/codex/package.json`) and implements
+`startDeviceAuth` / `getDeviceAuthStatus`
+(`packages/plugins/codex/src/device-auth.ts`). Because
+`getDeviceAuthProvider` gates on the _declared_ capability rather
+than on method presence, calling `/api/device-auth/:pluginId/start`
+for `claude-code`, `claude-managed-agent`, `gemini` or `opencode`
+returns `400 Plugin "<id>" does not support device auth`, and the
+plugin settings page renders the device-auth card only for plugins
+whose `capabilities` include `device-auth`. Those four authenticate
+with token or API-key settings instead: `claude-code` with an OAuth
+token from `claude setup-token` or an Anthropic API key,
+`claude-managed-agent` and `gemini` with an API key, and `opencode`
+with the configured AI provider's credentials. Treat the remaining
+rows as intended scope, not as shipped behaviour, until each plugin's
+manifest declares the capability.
+
 ## Error Handling
 
 Errors propagate unwrapped from the underlying `PluginOperationsService`.

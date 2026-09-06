@@ -3,6 +3,7 @@ import {
     AuthProvider,
     BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS,
     config,
+    DEFAULT_TRUSTED_REVIEW_BOTS,
 } from './constants';
 
 describe('config/constants', () => {
@@ -31,7 +32,8 @@ describe('config/constants', () => {
                 key === 'HTTP_DEBUG' ||
                 key === 'MAILER_PROVIDER' ||
                 key === 'WORK_STALE_TIMEOUT_HOURS' ||
-                key === 'EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS'
+                key === 'EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS' ||
+                key === 'GITHUB_TRUSTED_REVIEW_BOTS'
             ) {
                 delete process.env[key];
             }
@@ -685,6 +687,71 @@ describe('config/constants', () => {
             process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS =
                 'inngest,trigger,inngest,trigger';
             expect(config.tenantJobRuntime.getAllowedProviders()).toEqual(['inngest', 'trigger']);
+        });
+    });
+
+    describe('config.githubReviewBots (trusted review bots, R16)', () => {
+        it('trusts the four verified reviewer bots by default — and NOT github-actions', () => {
+            // Logins read off this repository's PR history with `gh api`.
+            // Copilot is two identities (review author vs inline author).
+            expect([...DEFAULT_TRUSTED_REVIEW_BOTS]).toEqual([
+                'coderabbitai[bot]',
+                'copilot-pull-request-reviewer[bot]',
+                'copilot',
+                'chatgpt-codex-connector[bot]',
+                'greptile-apps[bot]',
+            ]);
+            expect(config.githubReviewBots.trustedLogins()).toEqual([
+                ...DEFAULT_TRUSTED_REVIEW_BOTS,
+            ]);
+            expect(config.githubReviewBots.trustedLogins()).not.toContain('github-actions[bot]');
+        });
+
+        it('falls back to the defaults on a blank value', () => {
+            process.env.GITHUB_TRUSTED_REVIEW_BOTS = '   \t ';
+            expect(config.githubReviewBots.trustedLogins()).toEqual([
+                ...DEFAULT_TRUSTED_REVIEW_BOTS,
+            ]);
+        });
+
+        it('parses an operator list: trimmed, @-stripped, lower-cased, de-duplicated, order kept', () => {
+            process.env.GITHUB_TRUSTED_REVIEW_BOTS =
+                ' @Greptile-Apps[bot], coderabbitai[bot] ,GREPTILE-APPS[bot],, my-reviewer[bot]';
+            expect(config.githubReviewBots.trustedLogins()).toEqual([
+                'greptile-apps[bot]',
+                'coderabbitai[bot]',
+                'my-reviewer[bot]',
+            ]);
+        });
+
+        it('`none` is the explicit opt-out; a list of only separators is not', () => {
+            process.env.GITHUB_TRUSTED_REVIEW_BOTS = 'NONE';
+            expect(config.githubReviewBots.trustedLogins()).toEqual([]);
+            process.env.GITHUB_TRUSTED_REVIEW_BOTS = ' , ,';
+            expect(config.githubReviewBots.trustedLogins()).toEqual([
+                ...DEFAULT_TRUSTED_REVIEW_BOTS,
+            ]);
+        });
+
+        it('derives the self identity from GITHUB_APP_SLUG (default ever-works[bot])', () => {
+            expect(config.githubReviewBots.selfLogins()).toEqual(['ever-works[bot]']);
+            process.env.GITHUB_APP_SLUG = 'Acme-Reviewer';
+            expect(config.githubReviewBots.selfLogins()).toEqual(['acme-reviewer[bot]']);
+        });
+
+        it('names the same self identity when GITHUB_APP_SLUG is pasted with an @ or a [bot] suffix', () => {
+            // A doubled `[bot][bot]` would leave the real login outside the
+            // self set — and an allow-list entry could then let it in.
+            process.env.GITHUB_APP_SLUG = 'ever-works[bot]';
+            expect(config.githubReviewBots.selfLogins()).toEqual(['ever-works[bot]']);
+            process.env.GITHUB_APP_SLUG = ' @Ever-Works[BOT] ';
+            expect(config.githubReviewBots.selfLogins()).toEqual(['ever-works[bot]']);
+        });
+
+        it('never ships the self identity inside the default trusted list', () => {
+            for (const self of config.githubReviewBots.selfLogins()) {
+                expect(config.githubReviewBots.trustedLogins()).not.toContain(self);
+            }
         });
     });
 

@@ -134,9 +134,11 @@ export {
 export {
     AgentPluginStdioServerService,
     type RunningStdioServer,
+    type RunningStdioClient,
     type StdioLaunchRequest,
     type StdioTransportFactory,
 } from './stdio-server.service';
+export { AgentPluginStdioLauncherService } from './stdio-launcher.service';
 
 export {
     AgentPluginExportService,

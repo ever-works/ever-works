@@ -213,7 +213,7 @@ _Then_ it renders as a wikilink — same WikiLinkExtension reused from `KbEditor
 ### 4.1 Performance
 
 - **NFR-1** `GET /tasks?limit=50` p95 < 200 ms with 1000 tasks per user.
-- **NFR-2** Kanban view with 500 tasks renders within 500 ms (matches existing Works Kanban `KANBAN_LIMIT=500` per [`WorksKanbanView.tsx`](../../../apps/web/src/components/works/WorksKanbanView.tsx)).
+- **NFR-2** Kanban view with 500 tasks renders within 500 ms (matches existing Works Kanban `KANBAN_LIMIT=500` per [`WorksKanbanView.tsx`](../../../../apps/web/src/components/works/WorksKanbanView.tsx)).
 - **NFR-3** Task chat poll interval 5000 ms (same as activity feed); exponential backoff on failure.
 
 ### 4.2 Reliability
@@ -299,7 +299,7 @@ Default-off (configurable):
 - Priority changes
 - Status transitions between `backlog/todo/in_progress`
 
-Implementation: reuse the existing `Notification` entity ([`packages/agent/src/entities/notification.entity.ts`](../../../packages/agent/src/entities/notification.entity.ts)) with new `NotificationCategory.TASK` enum value (or `NotificationCategory.SYSTEM` if we don't want to extend the enum yet). Deduplication key `task-${taskId}-${eventType}-${day}` keeps notification floods in check.
+Implementation: reuse the existing `Notification` entity ([`packages/agent/src/entities/notification.entity.ts`](../../../../packages/agent/src/entities/notification.entity.ts)) with new `NotificationCategory.TASK` enum value (or `NotificationCategory.SYSTEM` if we don't want to extend the enum yet). Deduplication key `task-${taskId}-${eventType}-${day}` keeps notification floods in check.
 
 See [QUESTIONS F8](../../QUESTIONS-agents-skills-tasks.md#f8--email--push-notifications-which-events).
 
@@ -465,6 +465,6 @@ Only explicit `@<user-slug>` or `@<agent-slug>` mentions trigger dispatches/noti
 - Reuse map: [`../../architecture/implementation-reuse-map.md`](../../architecture/implementation-reuse-map.md)
 - Architecture: [`../../architecture/agents-skills-tasks.md`](../../architecture/agents-skills-tasks.md)
 - Agents: [`../agents/spec.md`](../agents/spec.md)
-- Existing Kanban: [`apps/web/src/components/works/WorksKanbanView.tsx`](../../../apps/web/src/components/works/WorksKanbanView.tsx)
-- KB editor reused for descriptions/chat: [`apps/web/src/components/works/detail/kb/KbEditor.tsx`](../../../apps/web/src/components/works/detail/kb/KbEditor.tsx)
-- Constitution: [`../../../.specify/memory/constitution.md`](../../../.specify/memory/constitution.md)
+- Existing Kanban: [`apps/web/src/components/works/WorksKanbanView.tsx`](../../../../apps/web/src/components/works/WorksKanbanView.tsx)
+- KB editor reused for descriptions/chat: [`apps/web/src/components/works/detail/kb/KbEditor.tsx`](../../../../apps/web/src/components/works/detail/kb/KbEditor.tsx)
+- Constitution: [`../../../.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)

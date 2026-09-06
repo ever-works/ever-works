@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository, type FindOptionsWhere } from 'typeorm';
+import { DEFAULT_GOAL_KIND, GOAL_KINDS, isGoalKind, type GoalKind } from '@ever-works/contracts';
 import {
     Goal,
     GoalStatus,
     type GoalComparator,
+    type GoalDoDCriterion,
     type GoalMetricSource,
     type GoalOutcome,
     type GoalWindow,
@@ -14,6 +16,8 @@ import { MissionGoal } from '../entities/mission-goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { GoalEvaluationService } from './goal-evaluation.service';
 import { validateGoalJudgment } from './goal-criteria';
+import { hasDefinitionOfDone, normalizeDoDCriteria, validateDoDCriteria } from './goal-dod';
+import { isDeliveryGoal, metricOnlyFieldsPresent, validateGoalKindInput } from './goal-kind';
 import {
     ownershipStamp,
     ownershipWhere,
@@ -149,14 +153,35 @@ export class GoalsService {
         return rows.map(toGoalMetricSampleDto);
     }
 
+    /**
+     * Create a Goal of either kind (self-build slice AG, EW-795).
+     *
+     * The kind decides the shape, and the check is FAIL-CLOSED both ways:
+     * a metric Goal (the default — every caller that never heard of kinds)
+     * still needs all four metric fields and is validated by exactly the
+     * per-field assertions it always was; a delivery Goal must carry none
+     * of them and at least one approved Definition-of-Done criterion; an
+     * unknown kind is refused. `validateGoalKindInput` then re-checks the
+     * chosen shape as one rule shared with the specs.
+     */
     async create(userId: string, input: CreateGoalInput, scope?: OwnershipScope): Promise<GoalDto> {
-        const metricSource = this.validateMetricSource(input.metricSource, {
-            requireProvider: false,
-        });
-        this.assertComparator(input.comparator);
-        this.assertWindow(input.window);
-        this.assertFiniteNumber(input.targetValue, 'targetValue');
-        this.assertJudgment({ criteria: input.criteria, constraints: input.constraints });
+        const goalKind = this.resolveWriteKind(input.goalKind);
+
+        let metricSource: GoalMetricSource | null = null;
+        if (goalKind === 'metric') {
+            // The legacy per-field assertions run FIRST and unchanged — their
+            // exact messages are pinned by the e2e validation matrix.
+            metricSource = this.validateMetricSource(input.metricSource, {
+                requireProvider: false,
+            });
+            this.assertComparator(input.comparator);
+            this.assertWindow(input.window);
+            this.assertFiniteNumber(input.targetValue, 'targetValue');
+            this.assertUnit(input.unit);
+            this.assertJudgment({ criteria: input.criteria, constraints: input.constraints });
+        }
+        this.assertGoalKindShape({ ...input, goalKind });
+        const dodCriteria = this.normalizeDodInput(input.dodCriteria);
 
         const saved = await this.goals.save(
             this.goals.create({
@@ -164,21 +189,40 @@ export class GoalsService {
                 ...ownershipStamp(scope),
                 title: input.title.trim().slice(0, 200),
                 description: input.description?.trim() || null,
-                metricSource,
-                comparator: input.comparator,
-                targetValue: input.targetValue,
-                unit: input.unit.trim().slice(0, 32),
-                window: input.window,
-                baselineValue: input.baselineValue ?? null,
+                goalKind,
+                ...(goalKind === 'metric'
+                    ? {
+                          metricSource,
+                          comparator: input.comparator,
+                          targetValue: input.targetValue,
+                          unit: (input.unit as string).trim().slice(0, 32),
+                          window: input.window as GoalWindow,
+                          baselineValue: input.baselineValue ?? null,
+                          // Judgment layer G1 - additive. Omitted stays NULL,
+                          // which IS the single-metric Goal this service
+                          // already created.
+                          criteria: input.criteria ?? null,
+                          constraints: input.constraints ?? null,
+                      }
+                    : {
+                          // A delivery Goal carries no metric at all. `window`
+                          // stays NOT NULL at the column level and is never
+                          // read for this kind.
+                          metricSource: null,
+                          comparator: null,
+                          targetValue: null,
+                          unit: null,
+                          window: 'total' as GoalWindow,
+                          baselineValue: null,
+                          criteria: null,
+                          constraints: null,
+                      }),
                 deadline: input.deadline ?? null,
                 checkFrequencyMinutes: this.clampFrequency(input.checkFrequencyMinutes),
                 nextCheckAt: null,
                 status: GoalStatus.DRAFT,
                 outcome: null,
-                // Judgment layer G1 - additive. Omitted stays NULL, which
-                // IS the single-metric Goal this service already created.
-                criteria: input.criteria ?? null,
-                constraints: input.constraints ?? null,
+                dodCriteria,
             }),
         );
         return toGoalDto(saved);
@@ -199,6 +243,18 @@ export class GoalsService {
         scope?: OwnershipScope,
     ): Promise<GoalDto> {
         const existing = await this.findOrThrow(userId, goalId, scope);
+
+        if (isDeliveryGoal(existing)) {
+            // The kind is immutable and a delivery Goal has no metric: any
+            // attempt to give it one (even `null`, which is a "clear" write
+            // on a metric Goal) is a client error, not a no-op.
+            const offending = metricOnlyFieldsPresent(input, { treatNullAsPresent: true });
+            if (offending.length > 0) {
+                throw new BadRequestException(
+                    `Delivery Goals carry no metric target; ${offending.join(', ')} cannot be set.`,
+                );
+            }
+        }
 
         if (input.title !== undefined) existing.title = input.title.trim().slice(0, 200);
         if (input.description !== undefined) {
@@ -284,12 +340,17 @@ export class GoalsService {
     // ─── lifecycle ──────────────────────────────────────────────────
 
     /**
-     * DRAFT | PAUSED | COMPLETED → ACTIVE. Requires an evaluable
-     * `metricSource` (explicit pluginId + metricId — spec FR-3:
-     * multiple providers may be enabled, so a Goal always names its
-     * provider). Re-activating a COMPLETED Goal clears its outcome.
-     * `nextCheckAt` is set to "now" so the next dispatcher tick
-     * evaluates immediately.
+     * DRAFT | PAUSED | COMPLETED → ACTIVE.
+     *
+     * A metric Goal requires an evaluable `metricSource` (explicit
+     * pluginId + metricId — spec FR-3: multiple providers may be enabled,
+     * so a Goal always names its provider). A delivery Goal requires at
+     * least one APPROVED Definition-of-Done criterion — without one it has
+     * no finish line to evaluate against. Re-activating a COMPLETED Goal
+     * clears its outcome. `nextCheckAt` is set to "now" for BOTH kinds so
+     * the next dispatcher tick evaluates immediately: for a delivery Goal
+     * that tick reads no provider, it only re-checks the DoD and the
+     * deadline (so deadline → MISSED still works without a plugin).
      */
     async activate(userId: string, goalId: string, scope?: OwnershipScope): Promise<GoalDto> {
         const existing = await this.findOrThrow(userId, goalId, scope);
@@ -298,7 +359,15 @@ export class GoalsService {
                 `Goal cannot be activated from status "${existing.status}". Allowed: ${ACTIVATABLE_STATUSES.join(', ')}.`,
             );
         }
-        this.validateMetricSource(existing.metricSource, { requireProvider: true });
+        if (isDeliveryGoal(existing)) {
+            if (!hasDefinitionOfDone(existing)) {
+                throw new BadRequestException(
+                    'Delivery Goals need at least one approved Definition-of-Done criterion before activation.',
+                );
+            }
+        } else {
+            this.validateMetricSource(existing.metricSource, { requireProvider: true });
+        }
         existing.status = GoalStatus.ACTIVE;
         existing.outcome = null;
         existing.nextCheckAt = new Date();
@@ -323,7 +392,8 @@ export class GoalsService {
      * `nextCheckAt` schedule but NOT the budget guard — the metric
      * read goes through the same `MetricsFacadeService.getMetricValue`
      * path as a scheduled evaluation. Only ACTIVE Goals can be
-     * evaluated (activation is what validates the metric source).
+     * evaluated (activation is what validates the metric source). For a
+     * delivery Goal the tick reads no provider; it re-checks the DoD.
      */
     async evaluateNow(
         userId: string,
@@ -519,7 +589,6 @@ export class GoalsService {
         return row;
     }
 
-    /** Spec FR-12 — clamp to ≥ 15 minutes; default 60. */
     /**
      * Judgment layer G1 - reject an invalid criteria/constraint payload
      * with EVERY problem at once. The helper returns a list rather than
@@ -533,6 +602,54 @@ export class GoalsService {
         }
     }
 
+    /**
+     * WRITE-path kind resolution: omitted means `metric` (every caller
+     * that predates kinds), anything not in the vocabulary is refused. No
+     * coercion here — that is `normalizeGoalKind`'s job on READ paths only.
+     */
+    private resolveWriteKind(value: GoalKind | undefined): GoalKind {
+        const kind = value === undefined || value === null ? DEFAULT_GOAL_KIND : value;
+        if (!isGoalKind(kind)) {
+            throw new BadRequestException(
+                `Invalid goalKind "${String(kind)}". Allowed: ${GOAL_KINDS.join(', ')}.`,
+            );
+        }
+        return kind;
+    }
+
+    /** The per-kind shape rule (`goal-kind.ts`), reported all at once. */
+    private assertGoalKindShape(input: Parameters<typeof validateGoalKindInput>[0]): void {
+        const errors = validateGoalKindInput(input);
+        if (errors.length > 0) {
+            throw new BadRequestException(errors.map((e) => `${e.field}: ${e.message}`).join('; '));
+        }
+    }
+
+    /**
+     * Validate + canonicalise a submitted Definition of Done for the
+     * create path. Absent → NULL (no checklist, which is the metric Goal
+     * this service always created). The delivery-kind requirement of at
+     * least one approved entry is enforced by `assertGoalKindShape`.
+     */
+    private normalizeDodInput(
+        criteria: GoalDoDCriterion[] | null | undefined,
+    ): GoalDoDCriterion[] | null {
+        if (criteria === undefined || criteria === null) return null;
+        const errors = validateDoDCriteria(criteria);
+        if (errors.length > 0) {
+            throw new BadRequestException(errors.map((e) => `${e.field}: ${e.message}`).join('; '));
+        }
+        return criteria.length === 0 ? null : normalizeDoDCriteria(criteria);
+    }
+
+    private assertUnit(value: unknown): void {
+        if (typeof value !== 'string' || value.trim().length === 0) {
+            throw new BadRequestException('unit must be a non-empty string.');
+        }
+    }
+
+    /** Spec FR-12 — clamp to ≥ 15 minutes; default 60. */
+
     private clampFrequency(minutes: number | undefined): number {
         if (minutes === undefined || minutes === null) return DEFAULT_CHECK_FREQUENCY_MINUTES;
         if (!Number.isInteger(minutes)) {
@@ -542,10 +659,11 @@ export class GoalsService {
     }
 
     /**
-     * Validate + normalize the metric source. `requireProvider`
-     * hardens the activation path: a DRAFT goal may be sketched with
-     * placeholder ids, but activation (and any edit while ACTIVE)
-     * demands a concrete pluginId + metricId.
+     * Validate + normalize the metric source — METRIC Goals only; a
+     * delivery Goal never reaches this (its `metricSource` is NULL by
+     * rule). `requireProvider` hardens the activation path: a DRAFT goal
+     * may be sketched with placeholder ids, but activation (and any edit
+     * while ACTIVE) demands a concrete pluginId + metricId.
      */
     private validateMetricSource(
         value: unknown,

@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { FleetJobView } from '@ever-works/contracts';
+import type { FleetJobView, FleetNodeJobHistoryEntry } from '@ever-works/contracts';
 import {
     FLEET_JOB_FILTERS,
     filterFleetJobs,
     fleetJobDurationMs,
+    fleetJobOutcomeKey,
+    fleetJobOutcomeText,
+    fleetNodeDiskBadgeClass,
+    fleetNodeDiskState,
+    fleetWorkerStateBadgeClass,
+    fleetWorkerStateKey,
     formatFleetJobDuration,
+    hasFleetNodeHousekeeping,
 } from './fleet-node-drawer.shared';
 
 function job(over: Partial<FleetJobView> = {}): FleetJobView {
@@ -54,6 +61,36 @@ describe('filterFleetJobs', () => {
 
     it('"failed" keeps only failed jobs', () => {
         expect(filterFleetJobs(jobs, 'failed').map((entry) => entry.id)).toEqual(['failed']);
+    });
+
+    /**
+     * The chip has to agree with the badge sitting next to it (EW-776).
+     * Judging the filter on `job.status` while the badge is judged on the
+     * reconciled run outcome would put a row rendering a red "Failed" in
+     * All and hide it under Failed — the original defect, one layer up.
+     */
+    it('"failed" is judged on the RECONCILED outcome, not the job status', () => {
+        const rows = [
+            {
+                ...job({ id: 'done-but-run-failed', status: 'done' }),
+                reconciled: { runId: 'r1', status: 'failed' as const, summary: null, error: null },
+            },
+            {
+                ...job({ id: 'failed-but-run-completed', status: 'failed' }),
+                reconciled: {
+                    runId: 'r2',
+                    status: 'completed' as const,
+                    summary: null,
+                    error: null,
+                },
+            },
+            { ...job({ id: 'failed-no-run', status: 'failed' }), reconciled: null },
+        ];
+
+        expect(filterFleetJobs(rows, 'failed').map((entry) => entry.id)).toEqual([
+            'done-but-run-failed',
+            'failed-no-run',
+        ]);
     });
 
     /**
@@ -110,5 +147,208 @@ describe('formatFleetJobDuration', () => {
         expect(formatFleetJobDuration(undefined)).toBeNull();
         expect(formatFleetJobDuration(-1)).toBeNull();
         expect(formatFleetJobDuration(Number.NaN)).toBeNull();
+    });
+});
+
+/**
+ * Fleet health signals (EW-776) — the drawer's new derivations.
+ *
+ * Two of these encode the defect directly: a node reads `online` while
+ * its worker is quarantined, and a job reads `done` while the run it
+ * carried failed. Both used to render as "fine".
+ */
+
+function historyJob(over: Partial<FleetNodeJobHistoryEntry> = {}): FleetNodeJobHistoryEntry {
+    return { ...job(), error: null, summary: null, reconciled: null, ...over };
+}
+
+const reconciled = (
+    over: Partial<NonNullable<FleetNodeJobHistoryEntry['reconciled']>> = {},
+): NonNullable<FleetNodeJobHistoryEntry['reconciled']> => ({
+    runId: 'run-1',
+    status: 'completed',
+    summary: null,
+    error: null,
+    ...over,
+});
+
+describe('fleetWorkerStateKey', () => {
+    it.each([['idle'], ['working'], ['paused'], ['quarantined'], ['throttled']] as const)(
+        'passes %s through',
+        (workerState) => {
+            expect(fleetWorkerStateKey({ workerState })).toBe(workerState);
+        },
+    );
+
+    it('reports unknown — never idle — for a node that has never said', () => {
+        // A fabricated readiness for a machine we know nothing about is
+        // the exact lie this feature exists to end.
+        expect(fleetWorkerStateKey({ workerState: null })).toBe('unknown');
+        expect(fleetWorkerStateKey({})).toBe('unknown');
+    });
+
+    it('reports unknown for a value this build does not recognise', () => {
+        expect(fleetWorkerStateKey({ workerState: 'hibernating' as never })).toBe('unknown');
+    });
+});
+
+describe('fleetWorkerStateBadgeClass', () => {
+    it('makes a quarantine stand out and leaves idle neutral', () => {
+        expect(fleetWorkerStateBadgeClass('quarantined')).toContain('danger');
+        expect(fleetWorkerStateBadgeClass('throttled')).toContain('warning');
+        expect(fleetWorkerStateBadgeClass('paused')).toContain('warning');
+        expect(fleetWorkerStateBadgeClass('working')).toContain('info');
+        // An idle machine is not an event.
+        expect(fleetWorkerStateBadgeClass('idle')).not.toContain('danger');
+        expect(fleetWorkerStateBadgeClass('unknown')).not.toContain('danger');
+    });
+});
+
+describe('fleetJobOutcomeKey', () => {
+    it('reports a FAILED run behind a job the node called done', () => {
+        expect(
+            fleetJobOutcomeKey(
+                historyJob({ status: 'done', reconciled: reconciled({ status: 'failed' }) }),
+            ),
+        ).toBe('failed');
+    });
+
+    it('keeps saying running while the reconciler has not settled the run', () => {
+        // "Completed" here would repeat the original mistake with fresher
+        // data: the JOB finished, the WORK has not.
+        expect(
+            fleetJobOutcomeKey(
+                historyJob({ status: 'done', reconciled: reconciled({ status: 'running' }) }),
+            ),
+        ).toBe('running');
+    });
+
+    it('surfaces a cancelled run', () => {
+        expect(
+            fleetJobOutcomeKey(historyJob({ reconciled: reconciled({ status: 'cancelled' }) })),
+        ).toBe('cancelled');
+    });
+
+    it.each([
+        ['done', 'completed'],
+        ['failed', 'failed'],
+        ['running', 'running'],
+        ['leased', 'running'],
+        ['queued', 'queued'],
+    ] as const)('falls back to the job status %s → %s when no run is known', (status, expected) => {
+        expect(fleetJobOutcomeKey(historyJob({ status, reconciled: null }))).toBe(expected);
+    });
+});
+
+describe('fleetJobOutcomeText', () => {
+    it('leads with the RUN error — the reconciled reason is the one that matters', () => {
+        const text = fleetJobOutcomeText(
+            historyJob({
+                error: 'job said: exit 1',
+                reconciled: reconciled({ status: 'failed', error: 'model refused the plan' }),
+            }),
+        );
+        expect(text).toBe('model refused the plan');
+    });
+
+    it("falls back to the job's own error", () => {
+        expect(fleetJobOutcomeText(historyJob({ error: 'pnpm install exploded' }))).toBe(
+            'pnpm install exploded',
+        );
+    });
+
+    it('shows the run summary only when nothing went wrong', () => {
+        expect(
+            fleetJobOutcomeText(
+                historyJob({ reconciled: reconciled({ summary: 'Added a guard' }) }),
+            ),
+        ).toBe('Added a guard');
+    });
+
+    it('returns null when there is nothing to say', () => {
+        expect(fleetJobOutcomeText(historyJob())).toBeNull();
+        expect(fleetJobOutcomeText(historyJob({ error: '   ' }))).toBeNull();
+    });
+
+    it('truncates so a pasted stack trace cannot take over the drawer', () => {
+        const text = fleetJobOutcomeText(historyJob({ error: 'x'.repeat(400) }), 240);
+        expect(text).toHaveLength(241);
+        expect(text?.endsWith('…')).toBe(true);
+    });
+});
+
+/**
+ * Node housekeeping (EW-803) — the derivations behind the drawer's disk
+ * and workspace block.
+ *
+ * The property that matters is that UNKNOWN never renders as a verdict.
+ * A node we have not heard from about its floor must not read "above
+ * floor" (a reassurance nobody earned) and must not read "below floor"
+ * (an alarm nobody raised).
+ */
+describe('fleetNodeDiskState', () => {
+    const GIB = 1024 ** 3;
+
+    it('reads a node under its own floor as below', () => {
+        // The state this whole slice exists to surface: online, idle, and
+        // refusing every job because the volume filled up.
+        expect(
+            fleetNodeDiskState({ diskFreeBytes: 200 * 1024 ** 2, minFreeDiskBytes: 2 * GIB }),
+        ).toBe('below');
+    });
+
+    it('reads a node with room as ok, including exactly at the floor', () => {
+        expect(fleetNodeDiskState({ diskFreeBytes: 9 * GIB, minFreeDiskBytes: 2 * GIB })).toBe(
+            'ok',
+        );
+        // The node admits at `free >= floor`, so the boundary must agree
+        // with the gate rather than being off by one machine's worth of
+        // confusion.
+        expect(fleetNodeDiskState({ diskFreeBytes: 2 * GIB, minFreeDiskBytes: 2 * GIB })).toBe(
+            'ok',
+        );
+    });
+
+    it.each([
+        ['no reading at all', { diskFreeBytes: null, minFreeDiskBytes: 2 * GIB }],
+        ['no floor reported', { diskFreeBytes: 9 * GIB, minFreeDiskBytes: undefined }],
+        ['the floor switched off', { diskFreeBytes: 9 * GIB, minFreeDiskBytes: null }],
+        ['an older daemon reporting neither', {}],
+        ['a non-finite reading', { diskFreeBytes: Number.NaN, minFreeDiskBytes: 2 * GIB }],
+    ])('reads %s as unknown rather than as a verdict', (_label, node) => {
+        expect(fleetNodeDiskState(node)).toBe('unknown');
+    });
+
+    it('colours only the below state, since neither ok nor unknown is an event', () => {
+        expect(fleetNodeDiskBadgeClass('below')).toContain('danger');
+        expect(fleetNodeDiskBadgeClass('ok')).not.toContain('danger');
+        expect(fleetNodeDiskBadgeClass('unknown')).not.toContain('danger');
+    });
+});
+
+describe('hasFleetNodeHousekeeping', () => {
+    it('is true once the node has reported any housekeeping figure', () => {
+        expect(hasFleetNodeHousekeeping({ minFreeDiskBytes: 2 * 1024 ** 3 })).toBe(true);
+        expect(hasFleetNodeHousekeeping({ workspaceCount: 0 })).toBe(true);
+        expect(hasFleetNodeHousekeeping({ workspaceBytes: 0 })).toBe(true);
+        expect(hasFleetNodeHousekeeping({ lastReclaimAt: '2026-09-05T09:30:00.000Z' })).toBe(true);
+    });
+
+    it('does NOT count a null floor, which every stored row carries', () => {
+        // `toView` emits null for an unset column, so treating null as
+        // evidence would make every node ever enrolled claim to have
+        // reported — and the "not reported yet" line would never show.
+        expect(
+            hasFleetNodeHousekeeping({
+                minFreeDiskBytes: null,
+                workspaceCount: null,
+                workspaceBytes: null,
+                lastReclaimAt: null,
+            }),
+        ).toBe(false);
+    });
+
+    it('is false for a node that has reported nothing at all', () => {
+        expect(hasFleetNodeHousekeeping({})).toBe(false);
     });
 });

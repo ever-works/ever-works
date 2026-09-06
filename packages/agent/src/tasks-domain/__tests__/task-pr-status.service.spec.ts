@@ -6,6 +6,8 @@ import type { TaskRepository } from '../../database/repositories/task.repository
 import type { WorkRepository } from '../../database/repositories/work.repository';
 import type { GitFacadeService } from '../../facades/git.facade';
 import type { TaskTransitionService } from '../task-transition.service';
+import type { TaskMergeGateService } from '../task-merge-gate.service';
+import type { TaskCiAutoResumeService } from '../task-ci-auto-resume.service';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5/M6/M7) — the sync + read
@@ -33,7 +35,9 @@ describe('TaskPrStatusService', () => {
         findDuePrStatusSync: jest.Mock;
         updatePrStatusCache: jest.Mock;
         updateById: jest.Mock;
+        recordCiHead: jest.Mock;
     };
+    let autoResume: { onCheckResult: jest.Mock };
     let works: { findById: jest.Mock };
     let git: {
         getPullRequestStatus: jest.Mock;
@@ -41,6 +45,7 @@ describe('TaskPrStatusService', () => {
         getCompareDiff: jest.Mock;
     };
     let transitions: { transition: jest.Mock };
+    let mergeGate: { onPullRequestStatusRefreshed: jest.Mock };
     let service: TaskPrStatusService;
 
     const makeTask = (overrides: Partial<Task> = {}): Task =>
@@ -66,7 +71,7 @@ describe('TaskPrStatusService', () => {
         state: 'open' as const,
         merged: false,
         mergeable: true,
-        headSha: 'abc',
+        headSha: 'abc1234',
         reviewDecision: null,
         ciState: 'passing' as const,
         checks: [{ name: 'build', status: 'completed' as const, conclusion: 'success' as const }],
@@ -79,6 +84,10 @@ describe('TaskPrStatusService', () => {
             findDuePrStatusSync: jest.fn().mockResolvedValue([]),
             updatePrStatusCache: jest.fn().mockResolvedValue(undefined),
             updateById: jest.fn().mockResolvedValue(undefined),
+            // CI feedback + autonomous fix loop (slice AC, EW-806): the
+            // poll is the second writer of the head pair, through the same
+            // monotonic compare-and-set the webhook uses.
+            recordCiHead: jest.fn().mockResolvedValue(true),
         };
         works = {
             findById: jest.fn().mockResolvedValue({
@@ -109,11 +118,20 @@ describe('TaskPrStatusService', () => {
             }),
         };
         transitions = { transition: jest.fn().mockResolvedValue(undefined) };
+        // Merge approval (self-build slice AE, EW-805) — the post-CI gate.
+        mergeGate = {
+            onPullRequestStatusRefreshed: jest
+                .fn()
+                .mockResolvedValue({ action: 'skipped', reason: 'no-agent' }),
+        };
+        autoResume = { onCheckResult: jest.fn().mockResolvedValue({ reason: 'already-claimed' }) };
         service = new TaskPrStatusService(
             tasks as unknown as TaskRepository,
             works as unknown as WorkRepository,
             git as unknown as GitFacadeService,
             transitions as unknown as TaskTransitionService,
+            mergeGate as unknown as TaskMergeGateService,
+            autoResume as unknown as TaskCiAutoResumeService,
         );
     });
 
@@ -386,6 +404,115 @@ describe('TaskPrStatusService', () => {
         expect(summary).toMatchObject({ scanned: 2, refreshed: 1, failed: 1 });
     });
 
+    /**
+     * CI feedback + autonomous fix loop (slice AC, EW-806) — the SAFETY
+     * NET behind the webhook.
+     *
+     * The webhook is a one-shot. A red result refused for a TRANSIENT
+     * reason — `run-in-flight`, because the run that pushed the branch is
+     * still posting the PR link when CI reports — was refused FOREVER:
+     * every envelope for that push is already ingested, so a GitHub
+     * redelivery short-circuits as a duplicate, and when the run finally
+     * ends there is no further CI event to arrive. Nothing re-evaluated a
+     * refusal, so the Task's red build was never retried, silently, with
+     * no Inbox notice. This sweep already runs every two minutes over
+     * exactly the right population and already holds the provider's check
+     * list, so it re-offers a still-red gate.
+     */
+    describe('re-offering a still-red gate to the fix loop', () => {
+        const redStatus = {
+            ...openStatus,
+            ciState: 'failing' as const,
+            headSha: 'deadbeef',
+            checks: [
+                { name: 'build', status: 'completed' as const, conclusion: 'success' as const },
+                {
+                    name: 'lint-and-test',
+                    status: 'completed' as const,
+                    conclusion: 'failure' as const,
+                },
+            ],
+        };
+
+        it('offers the red gate with the pull request’s own head, from platform state only', async () => {
+            git.getPullRequestStatus.mockResolvedValue(redStatus);
+            tasks.findDuePrStatusSync.mockResolvedValue([makeTask({ ciHeadSha: 'old' })]);
+
+            await service.syncDuePrStatuses();
+
+            expect(autoResume.onCheckResult).toHaveBeenCalledTimes(1);
+            const offered = autoResume.onCheckResult.mock.calls[0][0];
+            expect(offered).toMatchObject({
+                userId: USER,
+                owner: 'acme',
+                repo: 'widgets',
+                headSha: 'deadbeef',
+                verdict: 'failing',
+                checkName: 'lint-and-test',
+                conclusion: 'failure',
+                prNumbers: [41],
+                // The poll reads the PULL REQUEST, so its head IS the pull
+                // request's head by construction — the staleness rule can
+                // never mistake this for a superseded commit.
+                prHeads: [{ number: 41, headSha: 'deadbeef' }],
+            });
+            expect(offered.failureKey).toEqual(expect.any(String));
+            // …and the fresh head was written through the monotonic CAS.
+            expect(tasks.recordCiHead).toHaveBeenCalledWith(
+                expect.objectContaining({ expectedHeadSha: 'old', headSha: 'deadbeef' }),
+            );
+        });
+
+        it('offers nothing for a green or pending gate', async () => {
+            for (const ciState of ['passing', 'pending', 'unknown'] as const) {
+                autoResume.onCheckResult.mockClear();
+                git.getPullRequestStatus.mockResolvedValue({ ...redStatus, ciState });
+                tasks.findDuePrStatusSync.mockResolvedValue([makeTask()]);
+                await service.syncDuePrStatuses();
+                expect(autoResume.onCheckResult).not.toHaveBeenCalled();
+            }
+        });
+
+        it('offers nothing for a MERGED pull request — that landing is its own path', async () => {
+            git.getPullRequestStatus.mockResolvedValue({
+                ...redStatus,
+                state: 'merged' as const,
+                merged: true,
+            });
+            tasks.findDuePrStatusSync.mockResolvedValue([makeTask({ prState: 'open' })]);
+
+            await service.syncDuePrStatuses();
+
+            expect(autoResume.onCheckResult).not.toHaveBeenCalled();
+        });
+
+        it('never lets the fix loop sink the sweep', async () => {
+            git.getPullRequestStatus.mockResolvedValue(redStatus);
+            autoResume.onCheckResult.mockRejectedValue(new Error('evaluator exploded'));
+            tasks.findDuePrStatusSync.mockResolvedValue([makeTask()]);
+
+            await expect(service.syncDuePrStatuses()).resolves.toMatchObject({
+                scanned: 1,
+                refreshed: 1,
+                failed: 0,
+            });
+        });
+
+        it('does nothing at all when the fix loop is not bound in this runtime', async () => {
+            const withoutLoop = new TaskPrStatusService(
+                tasks as unknown as TaskRepository,
+                works as unknown as WorkRepository,
+                git as unknown as GitFacadeService,
+                transitions as unknown as TaskTransitionService,
+            );
+            git.getPullRequestStatus.mockResolvedValue(redStatus);
+            tasks.findDuePrStatusSync.mockResolvedValue([makeTask()]);
+
+            await expect(withoutLoop.syncDuePrStatuses()).resolves.toMatchObject({ refreshed: 1 });
+            expect(autoResume.onCheckResult).not.toHaveBeenCalled();
+        });
+    });
+
     it('does nothing at all when no git facade is bound in this runtime', async () => {
         const bare = new TaskPrStatusService(
             tasks as unknown as TaskRepository,
@@ -396,5 +523,94 @@ describe('TaskPrStatusService', () => {
             refreshed: 0,
         });
         expect(tasks.findDuePrStatusSync).not.toHaveBeenCalled();
+    });
+
+    // ── Merge approval (self-build slice AE, EW-805) ─────────────────
+    //
+    // A provider read is the ONLY moment the platform knows whether a
+    // pull request is green, which is why the merge question is re-asked
+    // from here and not from the finalize path that opened the PR.
+
+    describe('post-CI merge gate', () => {
+        it('persists the head commit the provider reported', async () => {
+            tasks.findByIdAndUser.mockResolvedValue(makeTask({ ciCheckedAt: null }));
+            await service.getForTask(USER, 'task-1');
+            expect(tasks.updatePrStatusCache).toHaveBeenCalledWith(
+                'task-1',
+                expect.objectContaining({ prHeadSha: 'abc1234' }),
+            );
+        });
+
+        it('normalises the head SHA and stores null for a value that is not one', async () => {
+            git.getPullRequestStatus.mockResolvedValue({ ...openStatus, headSha: 'main' });
+            tasks.findByIdAndUser.mockResolvedValue(makeTask({ ciCheckedAt: null }));
+            await service.getForTask(USER, 'task-1');
+            expect(tasks.updatePrStatusCache).toHaveBeenCalledWith(
+                'task-1',
+                expect.objectContaining({ prHeadSha: null }),
+            );
+        });
+
+        it('hands the LIVE provider status to the gate, not the Task cache', async () => {
+            const task = makeTask({ ciCheckedAt: null, ciState: 'pending' });
+            tasks.findByIdAndUser.mockResolvedValue(task);
+
+            await service.getForTask(USER, 'task-1');
+
+            expect(mergeGate.onPullRequestStatusRefreshed).toHaveBeenCalledTimes(1);
+            const [seenTask, seenStatus] = mergeGate.onPullRequestStatusRefreshed.mock.calls[0];
+            expect(seenTask.id).toBe('task-1');
+            // `openStatus` is green; the Task row said `pending` on the way
+            // in. Passing the cached value would gate merges on a verdict
+            // that is up to two minutes old.
+            expect(seenStatus.ciState).toBe('passing');
+            expect(seenStatus.headSha).toBe('abc1234');
+        });
+
+        it('runs the gate on the cron sweep too, once per refreshed Task', async () => {
+            tasks.findDuePrStatusSync.mockResolvedValue([
+                makeTask({ id: 'task-1', ciCheckedAt: null }),
+                makeTask({ id: 'task-2', ciCheckedAt: null }),
+            ]);
+            await service.syncDuePrStatuses();
+            expect(mergeGate.onPullRequestStatusRefreshed).toHaveBeenCalledTimes(2);
+        });
+
+        it('does NOT run the gate when the pull request is gone from the provider', async () => {
+            git.getPullRequestStatus.mockResolvedValue(null);
+            tasks.findByIdAndUser.mockResolvedValue(makeTask({ ciCheckedAt: null }));
+            await service.getForTask(USER, 'task-1');
+            expect(mergeGate.onPullRequestStatusRefreshed).not.toHaveBeenCalled();
+        });
+
+        it('does NOT run the gate when the cache is served inside the floor', async () => {
+            tasks.findByIdAndUser.mockResolvedValue(
+                makeTask({ ciCheckedAt: new Date(Date.now() - 5_000) }),
+            );
+            await service.getForTask(USER, 'task-1');
+            expect(mergeGate.onPullRequestStatusRefreshed).not.toHaveBeenCalled();
+        });
+
+        it('a gate that throws never fails the status refresh', async () => {
+            mergeGate.onPullRequestStatusRefreshed.mockRejectedValue(new Error('boom'));
+            tasks.findByIdAndUser.mockResolvedValue(makeTask({ ciCheckedAt: null }));
+            const view = await service.getForTask(USER, 'task-1');
+            // The refresh still happened and still answered.
+            expect(view.ciState).toBe('passing');
+            expect(tasks.updatePrStatusCache).toHaveBeenCalled();
+        });
+
+        it('is entirely absent in a runtime with no gate bound', async () => {
+            const bare = new TaskPrStatusService(
+                tasks as unknown as TaskRepository,
+                works as unknown as WorkRepository,
+                git as unknown as GitFacadeService,
+                transitions as unknown as TaskTransitionService,
+            );
+            tasks.findByIdAndUser.mockResolvedValue(makeTask({ ciCheckedAt: null }));
+            await expect(bare.getForTask(USER, 'task-1')).resolves.toMatchObject({
+                ciState: 'passing',
+            });
+        });
     });
 });

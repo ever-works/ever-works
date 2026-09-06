@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
+import { withUploadServeScope } from '@/lib/api/upload-serve-url';
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import {
@@ -120,6 +122,9 @@ export function AttachmentPreview({
 
     // Lock the page behind the overlay and hand focus to the dialog so Escape
     // and the arrow keys work without the user clicking first.
+    // The download anchor is a navigation, so the tab's workspace rides on the
+    // href. A local blob preview needs no scope and is left untouched.
+    const workspace = useWorkspaceScope();
     useEffect(() => {
         restoreFocusRef.current = document.activeElement;
         const previousOverflow = document.body.style.overflow;
@@ -134,7 +139,7 @@ export function AttachmentPreview({
 
     if (typeof document === 'undefined' || !current) return null;
 
-    const downloadHref = current.previewUrl ?? current.url;
+    const downloadHref = current.previewUrl ?? withUploadServeScope(current.url, workspace);
 
     return createPortal(
         <div

@@ -121,7 +121,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				type: 'string',
 				title: 'Webhook secret',
 				description:
-					'Shared secret used to verify GitHub webhook deliveries sent to the platform ingest receiver (POST /api/ingest/github/events). Set the same value on the GitHub webhook configuration; deliveries with a missing or mismatched X-Hub-Signature-256 are rejected. Leave blank to keep the receiver disabled for your account.',
+					'Shared secret used to verify GitHub webhook deliveries sent to the platform ingest receiver (POST /api/ingest/github/events). Set the same value on the GitHub webhook configuration; deliveries with a missing or mismatched X-Hub-Signature-256 are rejected. Subscribe the webhook to pull requests, issue comments, pull request review comments, pushes, issues, and — for the CI auto-fix loop — check runs, check suites and workflow runs. Leave blank to keep the receiver disabled for your account.',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-widget': 'password'

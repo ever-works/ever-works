@@ -261,4 +261,146 @@ describe('describeSelf', () => {
 		const long = await describeSelf(runnerWith([]), environment(), 'v'.repeat(80));
 		expect(long.version).toHaveLength(32);
 	});
+
+	/**
+	 * Fleet health signals (EW-776) — the worker state joins the
+	 * description through the same optional-probe seam as the telemetry,
+	 * and inherits its whole contract: a probe that returns null or throws
+	 * is an ABSENT field, never a failed beat and never a `null` on the
+	 * wire (the server reads absent as "leave the stored value alone", so
+	 * a momentary probe failure must not wipe a quarantine an operator is
+	 * reading right now).
+	 */
+	describe('worker health', () => {
+		it('carries the worker state and its reason', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => ({ workerState: 'quarantined', workerStateReason: 'process tree unproven' })
+			});
+
+			expect(description.workerState).toBe('quarantined');
+			expect(description.workerStateReason).toBe('process tree unproven');
+		});
+
+		it('omits the reason when the state carries none', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => ({ workerState: 'idle' })
+			});
+
+			expect(description.workerState).toBe('idle');
+			expect('workerStateReason' in description).toBe(false);
+		});
+
+		it('omits BOTH fields when there is no worker at all', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => null
+			});
+
+			expect('workerState' in description).toBe(false);
+			expect('workerStateReason' in description).toBe(false);
+		});
+
+		it('omits them when the probe throws, rather than failing the beat', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => {
+					throw new Error('worker loop is mid-restart');
+				}
+			});
+
+			expect('workerState' in description).toBe(false);
+			// Everything else still lands — one broken probe never costs the
+			// node its whole description.
+			expect(description.platform).toBe('linux/x64');
+		});
+
+		it('omits them when no probe is supplied at all', async () => {
+			// Every existing caller, and every older build of this app.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0');
+
+			expect('workerState' in description).toBe(false);
+		});
+	});
+
+	/**
+	 * Node housekeeping (EW-803) — the disk floor this machine enforces on
+	 * itself and what its reaper last reclaimed, joined through the same
+	 * optional-probe seam and inheriting the same contract, with one
+	 * documented exception: `minFreeDiskBytes` may legitimately travel as
+	 * `null`, because "the operator switched the floor off" has no other
+	 * way to be said.
+	 */
+	describe('housekeeping', () => {
+		it('carries the floor and the last sweep', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({
+					minFreeDiskBytes: 2 * 1024 ** 3,
+					workspaceCount: 12,
+					workspaceBytes: 40 * 1024 ** 3,
+					lastReclaimAt: '2026-09-05T09:30:00.000Z',
+					lastReclaimFreedBytes: 3 * 1024 ** 3
+				})
+			});
+
+			expect(description.minFreeDiskBytes).toBe(2 * 1024 ** 3);
+			expect(description.workspaceCount).toBe(12);
+			expect(description.workspaceBytes).toBe(40 * 1024 ** 3);
+			expect(description.lastReclaimAt).toBe('2026-09-05T09:30:00.000Z');
+			expect(description.lastReclaimFreedBytes).toBe(3 * 1024 ** 3);
+		});
+
+		it('forwards an explicit null floor, which is the one null this payload may carry', async () => {
+			// Absent means "leave the stored value alone" server-side, so an
+			// operator who turned the floor off needs the null to reach the
+			// platform or Fleet keeps showing a floor that no longer exists.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({ minFreeDiskBytes: null })
+			});
+
+			expect(description.minFreeDiskBytes).toBeNull();
+			expect('minFreeDiskBytes' in description).toBe(true);
+		});
+
+		it('omits reclaim fields the report does not carry', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({ minFreeDiskBytes: 2 * 1024 ** 3 })
+			});
+
+			expect('workspaceCount' in description).toBe(false);
+			expect('lastReclaimAt' in description).toBe(false);
+			expect('lastReclaimFreedBytes' in description).toBe(false);
+		});
+
+		it('never sends freed bytes without the instant they belong to', async () => {
+			// A figure whose meaning depends entirely on "when" must not
+			// reach the platform with the "when" missing.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({ lastReclaimFreedBytes: 4 * 1024 ** 3 })
+			});
+
+			expect('lastReclaimFreedBytes' in description).toBe(false);
+		});
+
+		it('omits everything when the probe returns null or throws, rather than failing the beat', async () => {
+			const none = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => null
+			});
+			expect('minFreeDiskBytes' in none).toBe(false);
+
+			const thrown = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => {
+					throw new Error('reaper is mid-cycle');
+				}
+			});
+			expect('minFreeDiskBytes' in thrown).toBe(false);
+			// One broken probe never costs the node its whole description.
+			expect(thrown.platform).toBe('linux/x64');
+		});
+
+		it('omits everything when no probe is supplied at all', async () => {
+			// A visibility-only node, and every older build of this app.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0');
+
+			expect('minFreeDiskBytes' in description).toBe(false);
+			expect('workspaceBytes' in description).toBe(false);
+		});
+	});
 });

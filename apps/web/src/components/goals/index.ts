@@ -6,7 +6,19 @@ export { GoalCard } from './GoalCard';
 export { GoalForm } from './GoalForm';
 export { GoalDetailClient } from './GoalDetailClient';
 export { Sparkline } from './Sparkline';
-export { OutcomeBadge, COMPARATOR_GLYPH, formatMetricValue, formatDateTime } from './goal-ui';
+export {
+    OutcomeBadge,
+    GoalKindBadge,
+    COMPARATOR_GLYPH,
+    formatMetricValue,
+    formatDateTime,
+} from './goal-ui';
+export {
+    buildCreateGoalPayload,
+    parseDodLines,
+    validateGoalFormFields,
+    type GoalFormFields,
+} from './goal-form-payload';
 // Autonomy layer — Definition of Done, limits, orchestrator log, sessions.
 export { GoalDodPanel } from './GoalDodPanel';
 export { GoalLimitsDialog, type GoalAgentOption } from './GoalLimitsDialog';

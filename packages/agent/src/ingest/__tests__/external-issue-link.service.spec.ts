@@ -120,6 +120,56 @@ describe('ExternalIssueLinkService', () => {
             expect(links.upsert).not.toHaveBeenCalled();
         });
 
+        /**
+         * The triage intake files a Task and binds the issue in ONE step,
+         * stamping the ingested event id it acted on so a drain retry of
+         * that same row can recognise itself. The fields only travel when
+         * the caller sets them — an ordinary `link()` from the API leaves
+         * the breadcrumbs to the drain.
+         */
+        it('passes freshness breadcrumbs through when a server-side filer stamps them', async () => {
+            const lastSeenAt = new Date('2026-09-01T09:00:00.000Z');
+            await build().link({
+                userId: 'user-1',
+                taskId: 'task-1',
+                source: 'github',
+                externalIssueId: 'octo/site#42',
+                lastIngestedEventId: 'row-7',
+                lastSeenAt,
+            });
+            expect(links.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({ lastIngestedEventId: 'row-7', lastSeenAt }),
+            );
+        });
+
+        it('leaves the freshness breadcrumbs untouched when the caller does not set them', async () => {
+            await build().link({
+                userId: 'user-1',
+                taskId: 'task-1',
+                source: 'github',
+                externalIssueId: 'octo/site#42',
+            });
+            const written = links.upsert.mock.calls[0][0];
+            expect(written).not.toHaveProperty('lastIngestedEventId');
+            expect(written).not.toHaveProperty('lastSeenAt');
+            // The regression counter is state, not a breadcrumb: an
+            // ordinary link must never reset somebody's history to 0.
+            expect(written).not.toHaveProperty('regressionCount');
+        });
+
+        it('carries the re-opening count when a regression re-points the link', async () => {
+            await build().link({
+                userId: 'user-1',
+                taskId: 'task-1',
+                source: 'github',
+                externalIssueId: 'octo/site#42',
+                regressionCount: 3,
+            });
+            expect(links.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({ regressionCount: 3 }),
+            );
+        });
+
         it('normalizes absent optional labels to null so an upsert clears stale values', async () => {
             await build().link({
                 userId: 'user-1',
@@ -150,6 +200,13 @@ describe('ExternalIssueLinkService', () => {
                 'linear-connector',
                 'issue-42',
             );
+        });
+
+        it('find returns the whole owner-scoped row (the triage filer reads taskId + lastIngestedEventId)', async () => {
+            const row = { id: 'link-1', taskId: 'task-1', lastIngestedEventId: 'row-7' };
+            links.findByExternal.mockResolvedValue(row);
+            await expect(build().find('user-1', 'github', 'octo/site#42')).resolves.toBe(row);
+            expect(links.findByExternal).toHaveBeenCalledWith('user-1', 'github', 'octo/site#42');
         });
 
         it('resolves to null when the issue is not linked', async () => {

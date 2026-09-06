@@ -33,8 +33,14 @@ import {
     type GoalOutcome,
     type GoalSession,
 } from '@/lib/api/goals';
-import { COMPARATOR_GLYPH, OutcomeBadge, formatDateTime, formatMetricValue } from './goal-ui';
-import { DodRollup, LoopStatusBadge, formatCents } from './goal-loop-ui';
+import {
+    COMPARATOR_GLYPH,
+    GoalKindBadge,
+    OutcomeBadge,
+    formatDateTime,
+    formatMetricValue,
+} from './goal-ui';
+import { DodProgressBar, DodRollup, LoopStatusBadge, formatCents } from './goal-loop-ui';
 import { Sparkline } from './Sparkline';
 import { GoalDodPanel } from './GoalDodPanel';
 import { GoalLimitsDialog, type GoalAgentOption } from './GoalLimitsDialog';
@@ -61,9 +67,11 @@ export interface GoalDetailClientProps {
     events: GoalEvent[];
     sessions: GoalSession[];
     /**
-     * Agents the routing pin may choose between. Server-fetched, because
-     * without a pin a Goal created in the UI has an empty candidate pool and
-     * the loop can only ever answer `no-candidate-agent`.
+     * Agents the routing pin may choose between. Server-fetched so the
+     * Adjust-limits dialog can offer a pin; without one the router
+     * round-robins over the agents that have worked this Goal and, for a
+     * brand-new Goal, over the eligible agents in its scope (self-build
+     * slice AG), so an empty pool now means the scope really has no agent.
      */
     agents?: GoalAgentOption[];
 }
@@ -149,7 +157,11 @@ export function GoalDetailClient({
 
     const canActivate = goal.status !== 'active';
     const canPause = goal.status === 'active';
+    // Kept for both kinds: on a delivery Goal "evaluate now" re-checks the
+    // Definition of Done and the deadline without any plugin call.
     const canEvaluate = goal.status === 'active';
+    const isDelivery = goal.goalKind === 'delivery';
+    const unit = goal.unit ?? undefined;
     const loopRunning = goal.loopStatus === 'running';
     const loopStartable = !loopRunning && goal.loopStatus !== 'cancelled' && !goal.archivedAt;
 
@@ -265,6 +277,7 @@ export function GoalDetailClient({
                             </h1>
                             <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                 <StatusPill status={goal.status} />
+                                <GoalKindBadge kind={goal.goalKind} />
                                 {goal.outcome ? <OutcomeBadge outcome={goal.outcome} /> : null}
                                 {goal.loopStatus ? (
                                     <LoopStatusBadge status={goal.loopStatus} />
@@ -523,45 +536,65 @@ export function GoalDetailClient({
                             </h2>
                         </div>
 
-                        <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-                            <div>
-                                <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                    {t('progress.current')}
-                                </p>
-                                <p className="text-2xl font-semibold text-text dark:text-text-dark tabular-nums">
-                                    {formatMetricValue(goal.currentValue, goal.unit)}
-                                </p>
-                            </div>
-                            <span
-                                className="text-2xl font-semibold text-info pb-0.5"
-                                title={t(`comparator.${goal.comparator}`)}
-                            >
-                                {COMPARATOR_GLYPH[goal.comparator]}
-                            </span>
-                            <div>
-                                <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                    {t('progress.target')}
-                                </p>
-                                <p className="text-2xl font-semibold text-text-secondary dark:text-text-secondary-dark tabular-nums">
-                                    {formatMetricValue(goal.targetValue, goal.unit)}
+                        {isDelivery ? (
+                            /* Delivery Goal: nothing is measured — the approved
+                               Definition of Done is the whole progress story. */
+                            <div className="space-y-3" data-testid="goal-delivery-progress">
+                                <DodRollup summary={goal.dodSummary} className="text-sm" />
+                                <DodProgressBar summary={goal.dodSummary} />
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('progress.deliveryHint')}
                                 </p>
                             </div>
-                        </div>
+                        ) : (
+                            <>
+                                <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                            {t('progress.current')}
+                                        </p>
+                                        <p className="text-2xl font-semibold text-text dark:text-text-dark tabular-nums">
+                                            {formatMetricValue(goal.currentValue, unit)}
+                                        </p>
+                                    </div>
+                                    <span
+                                        className="text-2xl font-semibold text-info pb-0.5"
+                                        title={
+                                            goal.comparator
+                                                ? t(`comparator.${goal.comparator}`)
+                                                : undefined
+                                        }
+                                    >
+                                        {goal.comparator ? COMPARATOR_GLYPH[goal.comparator] : '—'}
+                                    </span>
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                            {t('progress.target')}
+                                        </p>
+                                        <p className="text-2xl font-semibold text-text-secondary dark:text-text-secondary-dark tabular-nums">
+                                            {formatMetricValue(goal.targetValue, unit)}
+                                        </p>
+                                    </div>
+                                </div>
 
-                        <div className="mt-4">
-                            {sparkValues.length > 0 ? (
-                                <Sparkline values={sparkValues} target={goal.targetValue} />
-                            ) : (
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark py-6 text-center">
-                                    {t('progress.noSamples')}
-                                </p>
-                            )}
-                            {sparkValues.length > 0 ? (
-                                <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark">
-                                    {t('progress.sampleCount', { count: sparkValues.length })}
-                                </p>
-                            ) : null}
-                        </div>
+                                <div className="mt-4">
+                                    {sparkValues.length > 0 ? (
+                                        <Sparkline values={sparkValues} target={goal.targetValue} />
+                                    ) : (
+                                        <p className="text-xs text-text-muted dark:text-text-muted-dark py-6 text-center">
+                                            {t('progress.noSamples')}
+                                        </p>
+                                    )}
+                                    {sparkValues.length > 0 ? (
+                                        <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark">
+                                            {t('progress.sampleCount', {
+                                                count: sparkValues.length,
+                                            })}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            </>
+                        )}
                     </section>
 
                     <div className="grid gap-5 @3xl/main:grid-cols-2">
@@ -570,18 +603,27 @@ export function GoalDetailClient({
                                 {t('sections.details')}
                             </h2>
                             <div className="divide-y divide-border/50 dark:divide-border-dark/50">
-                                <DetailRow label={t('details.plugin')}>
-                                    {goal.metricSource.pluginId}
+                                <DetailRow label={t('details.kind')}>
+                                    <GoalKindBadge kind={goal.goalKind} />
                                 </DetailRow>
-                                <DetailRow label={t('details.metric')}>
-                                    {goal.metricSource.metricId}
-                                </DetailRow>
-                                <DetailRow label={t('details.window')}>
-                                    {t(`window.${goal.window}`)}
-                                </DetailRow>
-                                <DetailRow label={t('details.baseline')}>
-                                    {formatMetricValue(goal.baselineValue, goal.unit)}
-                                </DetailRow>
+                                {/* Provider / metric / window / baseline only mean
+                                    something on a metric Goal. */}
+                                {!isDelivery ? (
+                                    <>
+                                        <DetailRow label={t('details.plugin')}>
+                                            {goal.metricSource?.pluginId ?? '—'}
+                                        </DetailRow>
+                                        <DetailRow label={t('details.metric')}>
+                                            {goal.metricSource?.metricId ?? '—'}
+                                        </DetailRow>
+                                        <DetailRow label={t('details.window')}>
+                                            {t(`window.${goal.window}`)}
+                                        </DetailRow>
+                                        <DetailRow label={t('details.baseline')}>
+                                            {formatMetricValue(goal.baselineValue, unit)}
+                                        </DetailRow>
+                                    </>
+                                ) : null}
                                 <DetailRow label={t('details.checkFrequency')}>
                                     {t('details.minutes', { count: goal.checkFrequencyMinutes })}
                                 </DetailRow>

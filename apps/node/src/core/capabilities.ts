@@ -2,6 +2,8 @@ import { FLEET_BROWSER_CAPABILITY, FLEET_GPU_CAPABILITY } from '@ever-works/cont
 import type { BrowserProbeIo } from './browser-probe';
 import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
+import type { NodeHousekeepingReport } from './housekeeping-report';
+import type { WorkerHealth } from './worker-health';
 import {
 	MAX_CAPABILITY_TAG_LENGTH,
 	MAX_CAPABILITY_TAGS,
@@ -286,6 +288,35 @@ export interface SelfDescriptionTelemetry {
 	cliVersion?: () => Promise<string | null> | string | null;
 	/** Free-disk probe for the node's workspace volume. */
 	diskFreeBytes?: () => Promise<number | null> | number | null;
+	/**
+	 * Which account / seat the agent CLI is logged in as (fleet cost
+	 * accounting, EW-777), e.g. `detectModelIdentity(runner, paths)`. A
+	 * display label, never a credential.
+	 */
+	modelIdentity?: () => Promise<string | null> | string | null;
+	/**
+	 * What the worker loop is doing (fleet health signals, EW-776), via
+	 * `describeWorkerHealth(worker.getState())`.
+	 *
+	 * A probe like the others — absent on a visibility-only node that has
+	 * no worker at all, and a null return is an ABSENT field rather than a
+	 * reported "unknown". That matters: the server treats an absent field
+	 * as "leave the stored value alone", so a probe that momentarily fails
+	 * does not wipe the quarantine an operator is currently reading.
+	 */
+	workerHealth?: () => Promise<WorkerHealth | null> | WorkerHealth | null;
+	/**
+	 * What this machine is doing about its own disk (node housekeeping,
+	 * EW-803), via `NodeHousekeepingReporter.describe()` — the floor it
+	 * enforces on itself, and what its last reclaim sweep retained and
+	 * freed.
+	 *
+	 * A probe like the others: absent on a visibility-only node, which
+	 * has neither a floor nor a reaper. Every field inside the report is
+	 * itself optional, so a worker whose first sweep has not run yet
+	 * reports the floor alone.
+	 */
+	housekeeping?: () => Promise<NodeHousekeepingReport | null> | NodeHousekeepingReport | null;
 }
 
 /**
@@ -322,6 +353,53 @@ export async function describeSelf(
 	const diskFreeBytes = await resolveTelemetry(telemetry.diskFreeBytes);
 	if (typeof diskFreeBytes === 'number' && Number.isFinite(diskFreeBytes) && diskFreeBytes >= 0) {
 		description.diskFreeBytes = diskFreeBytes;
+	}
+	const modelIdentity = await resolveTelemetry(telemetry.modelIdentity);
+	if (typeof modelIdentity === 'string' && modelIdentity) {
+		description.modelIdentity = modelIdentity;
+	}
+	// Fleet health signals (EW-776). Both halves land together or neither
+	// does: a reason without a state has nothing to caption, and a state
+	// the probe could not produce must stay ABSENT so the server keeps the
+	// last one it was told.
+	const workerHealth = await resolveTelemetry(telemetry.workerHealth);
+	if (workerHealth && typeof workerHealth.workerState === 'string') {
+		description.workerState = workerHealth.workerState;
+		if (workerHealth.workerStateReason) {
+			description.workerStateReason = workerHealth.workerStateReason;
+		}
+	}
+	// Node housekeeping (EW-803). Copied field by field rather than
+	// spread, for the reason the API controller's mapping carries the same
+	// warning: this is a WIRE payload, and a spread would forward whatever
+	// a future reporter happens to put on the object — straight into a
+	// server whose validation pipe runs `forbidNonWhitelisted` and answers
+	// an unexpected field with a 400. A 400 here is a failed beat, and a
+	// node that cannot beat is swept offline.
+	//
+	// `minFreeDiskBytes` is the one field that IS forwarded as `null`: the
+	// server reads absent as "leave alone", so an operator who switched
+	// the floor off needs an explicit null to say so.
+	const housekeeping = await resolveTelemetry(telemetry.housekeeping);
+	if (housekeeping) {
+		if (housekeeping.minFreeDiskBytes === null || typeof housekeeping.minFreeDiskBytes === 'number') {
+			description.minFreeDiskBytes = housekeeping.minFreeDiskBytes;
+		}
+		if (typeof housekeeping.workspaceCount === 'number') {
+			description.workspaceCount = housekeeping.workspaceCount;
+		}
+		if (typeof housekeeping.workspaceBytes === 'number') {
+			description.workspaceBytes = housekeeping.workspaceBytes;
+		}
+		if (typeof housekeeping.lastReclaimAt === 'string' && housekeeping.lastReclaimAt) {
+			description.lastReclaimAt = housekeeping.lastReclaimAt;
+			if (typeof housekeeping.lastReclaimFreedBytes === 'number') {
+				// Only ever alongside the instant it belongs to. A freed-bytes
+				// figure with no time attached is unreadable: "4.1 GB freed"
+				// is reassuring or alarming entirely depending on when.
+				description.lastReclaimFreedBytes = housekeeping.lastReclaimFreedBytes;
+			}
+		}
 	}
 	return description;
 }

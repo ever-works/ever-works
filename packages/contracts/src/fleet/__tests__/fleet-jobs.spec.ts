@@ -4,32 +4,44 @@ import { INBOX_MAX_BODY_CHARS, INBOX_MAX_TITLE_CHARS } from '../../inbox/inbox.t
 import {
 	clampLeaseTtlSec,
 	clampMaxAttempts,
+	clampQueuedMaxAgeSec,
+	FLEET_AGENT_TASK_MAX_SETUP_STEPS,
 	FLEET_AGENT_TASK_MAX_STEPS,
 	FLEET_AGENT_TASK_META_DIR,
 	FLEET_AGENT_TASK_QUESTION_FILE,
 	FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES,
 	FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES,
 	FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
+	FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC,
+	FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES,
+	FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC,
 	FLEET_BROWSER_CAPABILITY,
 	FLEET_GPU_CAPABILITY,
 	FLEET_JOB_ACTIVE_STATUSES,
 	FLEET_JOB_DEFAULT_LEASE_TTL_SEC,
 	FLEET_JOB_DEFAULT_MAX_ATTEMPTS,
+	FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC,
 	FLEET_JOB_KINDS,
+	FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON,
 	FLEET_JOB_MAX_ATTEMPTS_CEILING,
 	FLEET_JOB_MAX_ERROR_LENGTH,
 	FLEET_JOB_MAX_LEASE_BATCH,
 	FLEET_JOB_MAX_LEASE_TTL_SEC,
 	FLEET_JOB_MAX_PAYLOAD_BYTES,
+	FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC,
 	FLEET_JOB_MAX_REQUIRED_CAPABILITIES,
 	FLEET_JOB_MAX_RESULT_BYTES,
 	FLEET_JOB_MIN_LEASE_TTL_SEC,
+	FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC,
+	FLEET_JOB_QUEUE_EXPIRED_REASON,
+	FLEET_JOB_STALE_LEASE_REASON,
 	FLEET_JOB_STATUSES,
 	FLEET_JOB_TERMINAL_STATUSES,
 	isFleetJobActive,
 	isFleetJobKind,
 	isFleetJobTerminal,
 	isNodeBusy,
+	isQueueExpiredError,
 	nodeSatisfiesCapabilities,
 	normalizeFleetAgentTaskQuestion,
 	parseFleetAgentTaskQuestionMarkdown,
@@ -257,6 +269,26 @@ describe('capability tag constants', () => {
 	});
 });
 
+describe('suspend-safe lease reasons', () => {
+	// Both tokens are keyed on by code, not read by people: the node aborts
+	// on the 409 `reason`, and the run's error carries the suspend reason
+	// verbatim. The literal IS the contract.
+	it('pins the stale-lease reason the 409 body carries', () => {
+		expect(FLEET_JOB_STALE_LEASE_REASON).toBe('stale-lease');
+	});
+
+	it('pins the reason a node reports for a lease that lapsed during a suspend', () => {
+		expect(FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON).toBe('lease-lapsed-while-suspended');
+	});
+
+	it('keeps the two reasons distinct short machine tokens', () => {
+		expect(FLEET_JOB_STALE_LEASE_REASON).not.toBe(FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON);
+		for (const token of [FLEET_JOB_STALE_LEASE_REASON, FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON]) {
+			expect(token).toMatch(/^[a-z][a-z-]{1,63}$/);
+		}
+	});
+});
+
 describe('numeric limits', () => {
 	const LIMITS: Array<[string, number, number]> = [
 		['FLEET_JOB_DEFAULT_LEASE_TTL_SEC', FLEET_JOB_DEFAULT_LEASE_TTL_SEC, 300],
@@ -275,7 +307,17 @@ describe('numeric limits', () => {
 		// context cap keeps title + context inside the Inbox body cap.
 		['FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES', FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES, 65536],
 		['FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS', FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS, 300],
-		['FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES', FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES, 6144]
+		['FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES', FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES, 6144],
+		// Setup phase (EW-807). These four bound how long an install may hold
+		// a node's only worker and how much of its output rides back in the
+		// job result, so they are pinned against literals here for the same
+		// reason as every other cap on this table: the only test that can
+		// catch "someone raised the ceiling" is one that does not derive its
+		// expectation from the ceiling.
+		['FLEET_AGENT_TASK_MAX_SETUP_STEPS', FLEET_AGENT_TASK_MAX_SETUP_STEPS, 8],
+		['FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC', FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC, 1800],
+		['FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC', FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC, 5400],
+		['FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES', FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES, 8192]
 	];
 
 	it.each(LIMITS)('pins %s', (_name, actual, expected) => {
@@ -291,6 +333,28 @@ describe('numeric limits', () => {
 
 	it('expresses the payload cap as 256 KiB', () => {
 		expect(FLEET_JOB_MAX_PAYLOAD_BYTES).toBe(256 * 1024);
+	});
+
+	// Structural, not a restatement of the literals above: these say what
+	// the setup numbers have to be TRUE OF, so raising one of them without
+	// raising its neighbours reds here even if someone edits the literal.
+	it('bounds the whole setup phase inside the job result cap, with room for the checks', () => {
+		// 8 steps x an 8 KiB tail is what a maximal install phase alone can
+		// push into one job result. It has to leave most of the 256 KiB for
+		// the model excerpt, the steps and the acceptance-check tails — the
+		// alternative is a settlement the platform rejects, which the worker
+		// loop then re-reports as a FAILED run and stores with no result at
+		// all: verdict, pushed branch and owner question discarded.
+		const setupBudget = FLEET_AGENT_TASK_MAX_SETUP_STEPS * FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES;
+		expect(setupBudget).toBeLessThanOrEqual(FLEET_JOB_MAX_RESULT_BYTES / 4);
+	});
+
+	it('orders the setup timeout bounds default < max, and keeps the max finite', () => {
+		expect(FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC).toBeLessThan(FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC);
+		// An install that hangs must not hold a node's only worker past the
+		// span an operator would notice. Two hours is the outer edge of
+		// "a cold install on a slow machine"; anything beyond it is a hang.
+		expect(FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC).toBeLessThanOrEqual(2 * 60 * 60);
 	});
 
 	it('keeps the payload and result caps symmetric', () => {
@@ -844,5 +908,81 @@ describe('normalizeFleetAgentTaskQuestion (self-build slice Q)', () => {
 			mountDir: 'template'
 		});
 		expect(normalizeFleetAgentTaskQuestion(once)).toEqual(once);
+	});
+});
+
+describe('clampQueuedMaxAgeSec (queue SLA, self-build slice S)', () => {
+	it('defaults per kind: a day for agent-task, two hours for the checks', () => {
+		expect(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC).toEqual({
+			'agent-task': 86_400,
+			'acceptance-checks': 7_200,
+			'browser-check': 7_200
+		});
+		for (const kind of FLEET_JOB_KINDS) {
+			expect(clampQueuedMaxAgeSec(kind)).toBe(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind]);
+			expect(clampQueuedMaxAgeSec(kind, undefined)).toBe(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind]);
+		}
+	});
+
+	it('covers every kind — a new kind without a default would be a compile error, not a silent "forever"', () => {
+		expect(Object.keys(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC).sort()).toEqual([...FLEET_JOB_KINDS].sort());
+		expect(Object.isFrozen(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC)).toBe(true);
+	});
+
+	it('orders the bounds min < every default <= max', () => {
+		expect(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC).toBe(60);
+		expect(FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC).toBe(7 * 86_400);
+		for (const value of Object.values(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC)) {
+			expect(value).toBeGreaterThan(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC);
+			expect(value).toBeLessThanOrEqual(FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC);
+		}
+	});
+
+	it.each([
+		['null', null],
+		['a numeric string', '3600'],
+		['NaN', Number.NaN],
+		['Infinity', Number.POSITIVE_INFINITY],
+		['zero', 0],
+		['a negative number', -5],
+		['an object', { seconds: 60 }]
+	] as Array<[string, unknown]>)(
+		'falls back to the kind default for %s (fail closed — never "disabled")',
+		(_label, value) => {
+			expect(clampQueuedMaxAgeSec('agent-task', value)).toBe(86_400);
+			expect(clampQueuedMaxAgeSec('browser-check', value)).toBe(7_200);
+		}
+	);
+
+	it('clamps into [min, max] and rounds', () => {
+		expect(clampQueuedMaxAgeSec('agent-task', 1)).toBe(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC);
+		expect(clampQueuedMaxAgeSec('agent-task', 59.4)).toBe(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC);
+		expect(clampQueuedMaxAgeSec('agent-task', 90.6)).toBe(91);
+		expect(clampQueuedMaxAgeSec('agent-task', 10 ** 9)).toBe(FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC);
+		expect(clampQueuedMaxAgeSec('acceptance-checks', 3_600)).toBe(3_600);
+	});
+
+	it('uses the SHORTEST default for an unknown kind (fail closed)', () => {
+		expect(clampQueuedMaxAgeSec('teleport' as unknown as FleetJobKind)).toBe(7_200);
+	});
+});
+
+describe('FLEET_JOB_QUEUE_EXPIRED_REASON / isQueueExpiredError', () => {
+	it('is a short machine token, never free text', () => {
+		expect(FLEET_JOB_QUEUE_EXPIRED_REASON).toBe('queued-max-age-exceeded');
+		expect(FLEET_JOB_QUEUE_EXPIRED_REASON).toMatch(/^[a-z-]+$/);
+		expect(FLEET_JOB_QUEUE_EXPIRED_REASON.length).toBeLessThanOrEqual(64);
+	});
+
+	it('matches the stored prefix form and nothing else', () => {
+		expect(isQueueExpiredError(FLEET_JOB_QUEUE_EXPIRED_REASON)).toBe(true);
+		expect(
+			isQueueExpiredError(`${FLEET_JOB_QUEUE_EXPIRED_REASON}: no eligible runner took the job within 24h`)
+		).toBe(true);
+		expect(isQueueExpiredError('Lease expired 3 time(s) without a result')).toBe(false);
+		expect(isQueueExpiredError(` ${FLEET_JOB_QUEUE_EXPIRED_REASON}`)).toBe(false);
+		expect(isQueueExpiredError('')).toBe(false);
+		expect(isQueueExpiredError(null)).toBe(false);
+		expect(isQueueExpiredError(undefined)).toBe(false);
 	});
 });

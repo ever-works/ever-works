@@ -31,6 +31,7 @@ import type {
     CreateFleetEnrollmentTokenResponse,
     FleetEnrollmentTokenView,
     FleetExecutionPreferenceView,
+    FleetKillSwitchState,
     FleetNodeDetailView,
     FleetNodeKind,
     FleetNodeView,
@@ -46,9 +47,12 @@ import {
     updateFleetNodeAction,
 } from '@/app/actions/settings/fleet';
 import { formatBytes } from '@/components/dashboard/runner-status.shared';
+import { FleetCostCeiling } from './FleetCostCeiling';
 import { FleetEnrollHandoff } from './FleetEnrollHandoff';
 import { FleetExecutionPreferences } from './FleetExecutionPreferences';
+import { FleetKillSwitchBanner } from './FleetKillSwitchBanner';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
+import { FleetPanicControls } from './FleetPanicControls';
 import { FleetTokensSection } from './FleetTokensSection';
 
 interface FleetSettingsProps {
@@ -64,6 +68,9 @@ interface FleetSettingsProps {
     /** Execution routing preferences (account-wide + narrower overrides). */
     initialPreferences: FleetExecutionPreferenceView[];
     preferencesError: string | null;
+    /** Panic controls (EW-778) — the stop flag's first paint; polled afterwards. */
+    initialKillSwitch?: FleetKillSwitchState | null;
+    killSwitchError?: string | null;
 }
 
 const ENROLLABLE_KINDS: Exclude<FleetNodeKind, 'k8s'>[] = ['desktop-node', 'node'];
@@ -109,6 +116,8 @@ export function FleetSettings({
     nodeDownloadUrl,
     initialPreferences,
     preferencesError,
+    initialKillSwitch = null,
+    killSwitchError = null,
 }: FleetSettingsProps) {
     const t = useTranslations('dashboard.settings.fleet');
     const [nodes, setNodes] = useState<FleetNodeView[]>(initialNodes);
@@ -322,6 +331,29 @@ export function FleetSettings({
         });
     };
 
+    /** Fleet cost accounting (EW-777): the per-node daily ceiling, in cents; null clears it. */
+    const handleSaveCostCeiling = (dailyCostCeilingCents: number | null) => {
+        const target = drawerNode;
+        if (!target) return;
+        startTransition(async () => {
+            const result = await updateFleetNodeAction(target.id, { dailyCostCeilingCents });
+            if (result.success) {
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === target.id ? result.data : entry)),
+                );
+                setDrawerNode(result.data);
+                setDrawerDetail((prev) => (prev ? { ...prev, node: result.data } : prev));
+                toast.success(
+                    dailyCostCeilingCents === null
+                        ? t('costCeiling.nodeCleared')
+                        : t('costCeiling.nodeSaved'),
+                );
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
     const handleDrain = (drain: boolean) => {
         const target = drawerNode;
         if (!target) return;
@@ -377,6 +409,9 @@ export function FleetSettings({
                 </Button>
             </div>
 
+            {/* Panic controls (EW-778) — visible the moment an operator stops the platform. */}
+            <FleetKillSwitchBanner initial={initialKillSwitch} initialError={killSwitchError} />
+
             {loadError && (
                 <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                     <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
@@ -416,6 +451,9 @@ export function FleetSettings({
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('table.cliVersion')}
+                                </th>
+                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                    {t('table.billingIdentity')}
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('table.diskFree')}
@@ -475,6 +513,18 @@ export function FleetSettings({
                                         data-testid={`fleet-node-cli-${node.id}`}
                                     >
                                         {node.cliVersion ?? t('table.cliNotInstalled')}
+                                    </td>
+                                    {/* Fleet cost accounting (EW-777): which
+                                        seat this machine's spend is billed
+                                        to — observed and shown here; which
+                                        seat it SHOULD be is the founder's
+                                        call, not the table's. */}
+                                    <td
+                                        className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
+                                        data-testid={`fleet-node-identity-${node.id}`}
+                                        title={node.modelIdentity ?? undefined}
+                                    >
+                                        {node.modelIdentity ?? t('table.identityUnknown')}
                                     </td>
                                     <td
                                         className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
@@ -592,10 +642,22 @@ export function FleetSettings({
                 </div>
             )}
 
+            {/* Panic controls (EW-778) — drain everything; cancel running work as a separate step. */}
+            <FleetPanicControls
+                nodes={nodes}
+                onNodesDrained={(drained) =>
+                    setNodes((prev) =>
+                        prev.map((entry) => drained.find((node) => node.id === entry.id) ?? entry),
+                    )
+                }
+            />
+
             <FleetExecutionPreferences
                 initialPreferences={initialPreferences}
                 error={preferencesError}
             />
+
+            <FleetCostCeiling />
 
             <FleetTokensSection
                 tokens={tokens}
@@ -782,6 +844,7 @@ export function FleetSettings({
                     setDrawerError(null);
                 }}
                 onSaveCapabilities={handleSaveCapabilities}
+                onSaveCostCeiling={handleSaveCostCeiling}
                 onRotate={handleRotate}
                 onDrain={handleDrain}
             />

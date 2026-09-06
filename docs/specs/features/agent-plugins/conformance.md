@@ -47,13 +47,13 @@ rows below say exactly where the subprocess half stops.
 
 ## MCP (AP-11 … AP-15)
 
-| ID    | Requirement                                                                               | Status        | Evidence                                                                                                                                                                                                                           |
-| ----- | ----------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AP-11 | MCP config only from `mcp.json`, closed schema                                            | Met (library) | `PERMITTED_MCP_FIELDS`, `parseMcpConfig`                                                                                                                                                                                           |
-| AP-12 | `mcp.json` `$schema` version must match `plugin.json`'s                                   | Met (library) | `versions.ts`. Note the trap recorded in ADR-018: this is a string **equality** check, not a compatibility-set check, so a 1.0.0 manifest beside a 1.1.0 `mcp.json` disables MCP even though both releases load                    |
-| AP-13 | Server entries form a closed union on `type`                                              | Met (library) | `validateMcpConfig`; `McpServerConfig` union                                                                                                                                                                                       |
-| AP-14 | All three transports supported                                                            | **Partial**   | `streamable-http` and `sse` reach the client. `stdio` is now parsed, gated, planned and launchable (`stdio-server.service.ts`), but nothing in the agent run path calls it yet, so a stdio server contributes no tools to an agent |
-| AP-15 | Package `headers`/`env` are visible and non-secret; no cross-origin credential forwarding | Met           | `guarded-fetch.ts` — redirects are followed manually, each hop re-checked, and **every** caller header dropped on an origin change; `guarded-fetch.spec.ts` covers port-only and scheme-downgrade hops                             |
+| ID    | Requirement                                                                               | Status        | Evidence                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----- | ----------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AP-11 | MCP config only from `mcp.json`, closed schema                                            | Met (library) | `PERMITTED_MCP_FIELDS`, `parseMcpConfig`                                                                                                                                                                                                                                                                                                                                                                    |
+| AP-12 | `mcp.json` `$schema` version must match `plugin.json`'s                                   | Met (library) | `versions.ts`. Note the trap recorded in ADR-018: this is a string **equality** check, not a compatibility-set check, so a 1.0.0 manifest beside a 1.1.0 `mcp.json` disables MCP even though both releases load                                                                                                                                                                                             |
+| AP-13 | Server entries form a closed union on `type`                                              | Met (library) | `validateMcpConfig`; `McpServerConfig` union                                                                                                                                                                                                                                                                                                                                                                |
+| AP-14 | All three transports supported                                                            | **Met**       | `streamable-http` and `sse` dial per call; `stdio` is launched per RUN by `McpToolSource` through `MCP_STDIO_LAUNCHER` (`mcp-stdio-launcher.ts` → `AgentPluginStdioLauncherService`) and released on every exit path of the run by `AgentRunService.runToolLoop`'s `finally`. `mcp-sdk-stdio.spec.ts` drives a real child process; `mcp-tool-source-stdio.spec.ts` pins launch-once-per-run and the release |
+| AP-15 | Package `headers`/`env` are visible and non-secret; no cross-origin credential forwarding | Met           | `guarded-fetch.ts` — redirects are followed manually, each hop re-checked, and **every** caller header dropped on an origin change; `guarded-fetch.spec.ts` covers port-only and scheme-downgrade hops                                                                                                                                                                                                      |
 
 ## Subprocess (AP-16 … AP-19)
 
@@ -82,22 +82,30 @@ rows below say exactly where the subprocess half stops.
 
 ## Summary
 
-|                     | Count     |
-| ------------------- | --------- |
-| Met / Met (library) | 22        |
-| Partial             | 1 (AP-14) |
-| Not yet             | 0         |
+|                     | Count |
+| ------------------- | ----- |
+| Met / Met (library) | 23    |
+| Partial             | 0     |
+| Not yet             | 0     |
 
-One row remains short of Met. **AP-14** is partial because the stdio launcher
-exists, is gated and is tested, but nothing in the agent run path calls it yet —
-a stdio server can be planned, gated and spawned, and still contributes no tools
-to an agent.
+Every row is Met. **AP-14** was the last Partial, and closing it needed more
+than the wiring the previous revision of this page called it.
 
-Whoever closes that gap must wire `AgentPluginStdioServerService.launch` **and**
-`shutdownAll` in the same change. `shutdownAll` has no caller today either, so
-wiring only the spawn leaks one subprocess per run for the lifetime of the pod —
-invisible until the pod is OOM-killed. The generation counter makes the pair safe
-to interleave; it does not make either safe to omit.
+`AgentMcpToolSource` had a single `buildTools(agent)` call and no teardown, and
+there was no run lifecycle anywhere in `agents/` or `mcp/` to borrow — so
+launching from `buildTools` would have spawned a subprocess nothing could stop,
+one per run for the lifetime of the pod. The contract now carries
+`releaseRun(runId)`, `AgentRunService` calls it from a `finally` that wraps tool
+resolution as well as the loop (the throw-before-the-loop path is the one an
+inner `finally` cannot see), and `McpToolSource` registers each launched server
+against its run. `shutdownAll` remains the module-destroy backstop it always was.
+
+Two stderr-drain orderings were corrected while closing this, both found by a
+spec that drives a REAL child process with a 200 KB flood rather than a token
+payload: the drain must be attached BEFORE the transport starts, because the SDK
+creates the stderr `PassThrough` in the transport's constructor precisely so a
+caller can. Draining after `Client.connect()` deadlocks outright — the child
+blocks mid-write, never reads `initialize`, and connect never resolves.
 
 That is not required for the claim as stated: v1.0.0 lets a client support a
 subset of component types provided it is honest about which, and the claim names

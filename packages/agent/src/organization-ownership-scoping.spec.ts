@@ -122,6 +122,7 @@ function goal(overrides: Partial<Goal>): Goal {
         spentCents: 0,
         wallClockLimitHours: null,
         stuckThresholdIterations: null,
+        maxConcurrentIterations: null,
         sessionBudgetMinutes: null,
         gracePeriodMinutes: null,
         executionTarget: null,

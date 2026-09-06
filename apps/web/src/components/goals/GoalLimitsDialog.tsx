@@ -88,6 +88,11 @@ export function GoalLimitsDialog({
     const [stuckThreshold, setStuckThreshold] = useState(
         goal.stuckThresholdIterations === null ? '' : String(goal.stuckThresholdIterations),
     );
+    const [maxConcurrentIterations, setMaxConcurrentIterations] = useState(
+        goal.maxConcurrentIterations === null || goal.maxConcurrentIterations === undefined
+            ? ''
+            : String(goal.maxConcurrentIterations),
+    );
     const [sessionBudget, setSessionBudget] = useState(
         goal.sessionBudgetMinutes === null ? '' : String(goal.sessionBudgetMinutes),
     );
@@ -117,6 +122,7 @@ export function GoalLimitsDialog({
             spendCapCents,
             wallClockLimitHours: toNullableInt(wallClock),
             stuckThresholdIterations: toNullableInt(stuckThreshold),
+            maxConcurrentIterations: toNullableInt(maxConcurrentIterations),
             sessionBudgetMinutes: toNullableInt(sessionBudget),
             gracePeriodMinutes: toNullableInt(grace),
             executionTarget:
@@ -195,6 +201,18 @@ export function GoalLimitsDialog({
                         min={1}
                         value={stuckThreshold}
                         onChange={(e) => setStuckThreshold(e.target.value)}
+                    />
+                    {/* Concurrent iterations (slice AH). Empty = one at a
+                        time, which is what every Goal did before and what
+                        `toNullableInt` sends as `null`. */}
+                    <Input
+                        label={t('fields.maxConcurrentIterations')}
+                        helperText={t('fields.maxConcurrentIterationsHelp')}
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={maxConcurrentIterations}
+                        onChange={(e) => setMaxConcurrentIterations(e.target.value)}
                     />
                     <Input
                         label={t('fields.sessionBudget')}

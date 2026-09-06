@@ -632,11 +632,12 @@ export async function unscheduleTaskAction(id: string): Promise<Task> {
     return task;
 }
 
-// FU-5 — attachment server actions. The actual upload (multipart →
-// /api/uploads) happens client-side via the proxy route at
-// `apps/web/src/app/api/uploads/route.ts`; once the client has the
-// returned uploadId, it calls `attachUploadAction` to wire it into the
-// Task via the existing `POST /api/tasks/:id/attachments` endpoint.
+// FU-5 — attachment server actions. The actual upload happens client-side
+// through the Work KB proxy (`TaskAttachmentsSection` hands an `uploader`
+// that posts to `/api/works/:workId/kb/uploads`), NOT through
+// `app/api/uploads/route.ts`; once the client has the returned uploadId,
+// it calls `attachUploadAction` to wire it into the Task via the existing
+// `POST /api/tasks/:id/attachments` endpoint.
 
 export async function attachUploadAction(
     taskId: string,

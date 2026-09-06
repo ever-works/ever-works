@@ -18,7 +18,9 @@ import {
     X,
 } from 'lucide-react';
 import { browserApiFetch } from '@/lib/api/browser-api';
+import { memoryFileDownloadUrl } from '@/lib/api/memory-files-url';
 import { cn } from '@/lib/utils/cn';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
 import { UploadDropZone } from '@/components/kb/workbench/UploadDropZone';
 import { MemoryFilePreview } from './MemoryFilePreview';
 import type {
@@ -52,8 +54,9 @@ import type {
  * so a later scoping change cannot half-land: the `refresh()` pair fires
  * tree and list together, and only one of the two is scope-sensitive.
  *
- * The one thing `browserApiFetch` cannot reach is the Download anchor —
- * see the comment on it below, and on `[id]/download/route.ts`.
+ * The Download anchor is a document navigation, so it carries the
+ * selector as `?scope=` (`memoryFileDownloadUrl`) instead of a header —
+ * see `[id]/download/route.ts` for the carrier contract.
  */
 
 type ScopeFilter = 'all' | 'global' | 'agents';
@@ -73,6 +76,8 @@ function formatDate(iso: string): string {
 
 export function MemoryFilesPanel() {
     const t = useTranslations('dashboard.memoryPage.files');
+    // Download is a navigation, so the tab's workspace rides on the href.
+    const workspace = useWorkspaceScope();
 
     const [folders, setFolders] = useState<MemoryFolderNode[]>([]);
     const [files, setFiles] = useState<MemoryFileRow[]>([]);
@@ -780,22 +785,8 @@ export function MemoryFilesPanel() {
                                                         </option>
                                                     ))}
                                                 </select>
-                                                {/*
-                                                 * EW-786 known gap: a document
-                                                 * navigation carries no custom
-                                                 * header, so this anchor cannot
-                                                 * use `browserApiFetch` and the
-                                                 * download route stays unscoped.
-                                                 * Org-scoped Memory originals —
-                                                 * now VISIBLE in this table
-                                                 * because the list above is
-                                                 * scoped — 404 here. Do not
-                                                 * smuggle the scope into the
-                                                 * href; see
-                                                 * `app/api/memory/files/[id]/download/route.ts`.
-                                                 */}
                                                 <a
-                                                    href={`/api/memory/files/${encodeURIComponent(row.id)}/download?source=${row.source}`}
+                                                    href={memoryFileDownloadUrl(row, workspace)}
                                                     data-testid={`memory-files-download-${row.id}`}
                                                     title={t('download')}
                                                     className="p-1 rounded text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"

@@ -1,6 +1,8 @@
 import { INBOX_MAX_TITLE_CHARS } from '../inbox/inbox.types.js';
 import type { TaskAcceptanceCheck, TaskCheckResult } from '../tasks/task-gates.types.js';
+import { normalizeFleetRunEnvGrants } from './fleet-run-secrets.types.js';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
+import type { FleetAgentTaskMcpBridge, FleetAgentTaskMcpResult } from './fleet-run-credential.types.js';
 
 /**
  * Fleet job lease protocol — the wire shapes an enrolled node and the
@@ -168,6 +170,66 @@ export function clampMaxAttempts(value: unknown): number {
 }
 
 /**
+ * Queue SLA (self-build slice S / EW-775) — the longest a `queued` job
+ * may wait for an eligible runner before the platform FAILS it.
+ *
+ * Nothing used to bound a queued row's age: the reclaim sweep only scans
+ * ACTIVE statuses, so a job pinned to a node that never came back, or
+ * requiring a tag no node advertises, sat `queued` forever with its
+ * AgentRun waiting on a verdict that was never coming. The SLA is the
+ * backstop behind eligibility-aware routing: routing stops the common
+ * case from being enqueued at all, and the SLA settles whatever slips
+ * past it (a runner that went offline between the decision and the
+ * lease, a `local-wait` job whose machine never returns).
+ *
+ * Per kind, because the honest wait differs: an `agent-task` under
+ * `local-wait` is deliberately held for one machine and a day is a
+ * plausible wait for a closed laptop; a check that has not run in two
+ * hours is stale evidence. Deliberately NOT disableable — the floor and
+ * ceiling below clamp any operator value, and "unset" means the kind's
+ * default, never "wait forever". A tenant that genuinely wants longer
+ * raises `FLEET_NODE_QUEUE_MAX_AGE_SECONDS[_<KIND>]` up to the ceiling.
+ */
+export const FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC: Readonly<Record<FleetJobKind, number>> = Object.freeze({
+	'agent-task': 24 * 60 * 60,
+	'acceptance-checks': 2 * 60 * 60,
+	'browser-check': 2 * 60 * 60
+});
+
+/** Floor/ceiling clamps applied to any operator-supplied queued max age. */
+export const FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC = 60;
+export const FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC = 7 * 24 * 60 * 60;
+
+/**
+ * Clamp an operator-supplied queued max age for `kind` into the supported
+ * range. Unset / NaN / non-positive is the kind's default (fail closed:
+ * a typo in the deploy manifest must not turn into an unbounded wait);
+ * an unknown kind gets the SHORTEST default, for the same reason.
+ */
+export function clampQueuedMaxAgeSec(kind: FleetJobKind, value?: unknown): number {
+	const fallback =
+		FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind] ?? Math.min(...Object.values(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC));
+	if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+		return fallback;
+	}
+	return Math.min(Math.max(Math.round(value), FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC), FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC);
+}
+
+/**
+ * Stable machine-readable token a queue-SLA failure is recorded under.
+ * It is the PREFIX of `fleet_jobs.error` (and, through the reconciler, of
+ * `agent_runs.failureReason`), followed by a human sentence — the same
+ * discipline the stuck-run sweeper's prefix follows, so a UI can switch
+ * on it and a log search can find every occurrence.
+ */
+export const FLEET_JOB_QUEUE_EXPIRED_REASON = 'queued-max-age-exceeded';
+
+/** True when a job / run error was written by the queue SLA. */
+export function isQueueExpiredError(error: string | null | undefined): boolean {
+	return typeof error === 'string' && error.startsWith(FLEET_JOB_QUEUE_EXPIRED_REASON);
+}
+
+/**
  * Capability-tag filter: a node may only lease a job whose every
  * required tag is present in the node's own advertised capability set.
  *
@@ -207,6 +269,16 @@ export interface FleetJobView {
 	startedAt: string | null;
 	completedAt: string | null;
 	/**
+	 * ISO timestamp the row last ENTERED `queued`: set at enqueue, reset
+	 * when a lapsed or drained claim returns to the pool, untouched by a
+	 * heartbeat promotion. The queue SLA (`FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC`)
+	 * is measured from it. Null on rows written before the column existed
+	 * — an unknown age is never destructively failed.
+	 *
+	 * Optional on the wire so an older API build still satisfies this type.
+	 */
+	queuedAt?: string | null;
+	/**
 	 * Why a `queued` job has not started — today only
 	 * `waiting-for-runner` (see `QUEUED_REASON_WAITING_FOR_RUNNER`),
 	 * stamped at enqueue when no runner could take the job and cleared
@@ -223,6 +295,45 @@ export interface FleetJobView {
 	 * reports; the row then settles `failed`. Null / absent otherwise.
 	 */
 	cancelRequestedAt?: string | null;
+	/**
+	 * Identity of the CLAIM this view was minted under (suspend-safe
+	 * leases, self-build finding R7). Every successful lease — including a
+	 * re-lease after the previous claim lapsed — increments it, and the
+	 * node echoes it on every call that mutates the job (heartbeat,
+	 * complete). A call carrying any other value is refused with
+	 * `409 { reason: "stale-lease" }`, so a machine that slept through
+	 * its lease can never overwrite the state of whoever holds the job
+	 * now — even when that is the same machine on a later claim.
+	 *
+	 * Optional on the wire so an older API build that does not send it
+	 * still satisfies this type on a newer client; a node that receives
+	 * no generation simply omits it, and an API that requires one then
+	 * refuses that node — the safe direction.
+	 */
+	leaseGeneration?: number;
+}
+
+/**
+ * Machine-readable reason carried by the `409` a node receives when the
+ * generation it echoes is no longer the job's current one. Stable: the
+ * node keys its abort on this token (and on the status), never on the
+ * message text.
+ */
+export const FLEET_JOB_STALE_LEASE_REASON = 'stale-lease';
+
+/**
+ * Stable failure reason a node reports when it detects, on resume from a
+ * suspend, that its lease deadline passed while the machine slept. The
+ * job is aborted locally (model process killed, nothing pushed) and this
+ * token is what the report and the run's error carry.
+ */
+export const FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON = 'lease-lapsed-while-suspended';
+
+/** Body of the `409` returned for a stale lease generation. */
+export interface FleetJobStaleLeaseResponse {
+	statusCode: 409;
+	reason: typeof FLEET_JOB_STALE_LEASE_REASON;
+	message: string;
 }
 
 /** Owner-safe view of one active-Organization Agent-to-node binding. */
@@ -258,6 +369,47 @@ export interface FleetAcceptanceChecksPayload {
 export const FLEET_AGENT_TASK_MAX_STEPS = 16;
 
 /**
+ * Setup phase (acceptance checks that mean something, EW-807).
+ *
+ * A node-provisioned Task worktree is a fresh `git worktree`: it has the
+ * repository's files and NOTHING else. No `node_modules`, no `.venv`, no
+ * build cache. Every acceptance check a Work could declare therefore
+ * failed on its first line — and the run reported a red gate, which reads
+ * as "the model's change broke the tests" when it actually means "nobody
+ * installed the dependencies".
+ *
+ * The setup phase is the install, and it is a separate phase rather than
+ * one more step because it needs to be budgeted, capped and REPORTED
+ * differently:
+ *
+ *   - an install is an order of magnitude slower than a test run, so the
+ *     per-check ceiling (30 min) is the wrong shape for it;
+ *   - an install prints tens of thousands of lines, so a 4 KiB tail is
+ *     usually all resolver noise and none of the error;
+ *   - and a failed install is NOT a failed test. It is reported as
+ *     `setupStatus`, never as a check, and never as a red gate.
+ */
+export const FLEET_AGENT_TASK_MAX_SETUP_STEPS = 8;
+
+/** Budget applied to a setup step that declares no `timeoutSec`. */
+export const FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC = 1800;
+
+/**
+ * Hard ceiling on one setup step. Higher than a check's (1800s) because a
+ * cold `pnpm install` on a fresh machine legitimately takes tens of
+ * minutes; still finite, because an install that hangs must not hold a
+ * node's only worker until the lease lapses.
+ */
+export const FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC = 5400;
+
+/**
+ * Last-N-bytes window kept from a setup step. Larger than a check's 4 KiB:
+ * package managers print a long success epilogue after the error that
+ * actually mattered, and a 4 KiB tail routinely contained none of it.
+ */
+export const FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES = 8192;
+
+/**
  * One command the node runs for an `agent-task` job. Deliberately the
  * same shape as a `TaskAcceptanceCheck` so the node executes both kinds
  * through ONE command runner (same env scrub, same timeout policy, same
@@ -270,12 +422,46 @@ export interface FleetAgentTaskStep {
 	command: string;
 	/** Directory relative to the job's `workspacePath`. */
 	cwd?: string;
+	/**
+	 * WHICH repository of a multi-repo run this command executes in
+	 * (EW-807): the `mountDir` of a mount the run actually provisioned, or
+	 * absent for the primary worktree.
+	 *
+	 * A NAME, never a path. The node looks it up in the provisioned
+	 * workspace descriptor and refuses a name that is not there — it never
+	 * joins the value onto a directory, because `.mounts/<dir>` is a
+	 * junction and a mount's real worktree is a COUSIN of the primary
+	 * under the fleet root, not a descendant of it.
+	 */
+	mountDir?: string;
 	/** Wall-clock budget; the node clamps it to its own ceiling. */
 	timeoutSec?: number;
 	/** `false` means a nonzero exit does not fail the job. Default true. */
 	required?: boolean;
 	/** Extra env names this step may see; never platform-owned ones. */
 	envPassthrough?: string[];
+	/**
+	 * Per-repository env grants (self-build slice Y). Env var NAMES an
+	 * operator explicitly bound to a repository of this run, which the node
+	 * admits THROUGH the platform-owned refusal — exact names only, never a
+	 * prefix, never a family, and never one of the un-grantable core
+	 * namespaces (`FLEET_`, `EVER_WORKS_`, `PLUGIN_`, `AUTH_`,
+	 * `BETTER_AUTH_`, `PLATFORM_`).
+	 *
+	 * Names, not values: the VALUE is read from the node's own environment
+	 * and scrubbed out of everything the node reports back, exactly as
+	 * `envPassthrough` values already are.
+	 *
+	 * NOT HONOURED PER COMMAND (EW-807). The node reads a run's grants from
+	 * `FleetAgentModelExecution.envGrants` ONLY and stamps that one list
+	 * onto every step, setup step and acceptance check. A per-entry list on
+	 * the wire is ignored, because `acceptanceChecks` never read one and a
+	 * setup step that honoured a grant a check refuses would be the more
+	 * privileged of the two phases — the one that runs first, before the
+	 * model, at the largest ceiling. Nothing on the platform populates this
+	 * field; it is kept so an older payload still validates.
+	 */
+	envGrants?: string[];
 }
 
 /**
@@ -316,6 +502,20 @@ export interface FleetAgentTaskPayload {
 	/** Ordered commands the node executes for this run. */
 	steps?: FleetAgentTaskStep[];
 	/**
+	 * Dispatch-frozen SETUP phase (EW-807): dependency installs and
+	 * environment preparation, run BEFORE the model and before everything
+	 * else, in the workspace the run provisioned.
+	 *
+	 * Same wire shape as a step so the node executes it through the one
+	 * command runner, but a different BUDGET (`FLEET_AGENT_TASK_SETUP_*`)
+	 * and a different report: results land in `FleetAgentTaskResult.setup`
+	 * with their own `setupStatus`, never in `checks`, and a red setup is
+	 * never a red gate. When a required setup step fails the node stops —
+	 * no model call, no steps, no checks — because every verdict after a
+	 * failed install describes the install, not the change.
+	 */
+	setup?: FleetAgentTaskStep[] | null;
+	/**
 	 * Model-CLI execution (agent execution v2). When present the node runs
 	 * a local agent CLI (Claude Code / Codex) in the provisioned workspace
 	 * with `instructions` on stdin, BEFORE any `steps`. `null` is the
@@ -334,6 +534,17 @@ export interface FleetAgentTaskPayload {
 	 * (the platform opens the pull request from the pushed branch).
 	 */
 	git?: FleetAgentTaskGitPolicy | null;
+	/**
+	 * Self-build slice Z (EW-796) — the platform-MCP bridge for this run.
+	 *
+	 * Absent or `enabled: false` (the default, and every job enqueued
+	 * before this slice) means the node behaves exactly as it always has:
+	 * no credential is minted, no loopback proxy is started, and the model
+	 * CLI's command line is byte-for-byte the one it had. Only when this
+	 * says `enabled` does the node ask the platform for a run-scoped
+	 * token and point the CLI at its own loopback listener.
+	 */
+	mcp?: FleetAgentTaskMcpBridge | null;
 }
 
 // ─── Agent execution v2 — model CLIs on the node ─────────────────────
@@ -480,6 +691,12 @@ export interface FleetAgentModelExecution {
 	 * (its credential), same semantics as `FleetAgentTaskStep.envPassthrough`.
 	 */
 	envPassthrough?: string[];
+	/**
+	 * Per-repository env grants, same semantics as
+	 * `FleetAgentTaskStep.envGrants` — NAMES the run's repositories were
+	 * granted, which the node admits through the platform-owned refusal.
+	 */
+	envGrants?: string[];
 }
 
 /** What the node does with the working tree after the model ran. */
@@ -587,6 +804,16 @@ export function normalizeFleetAgentModelExecution(raw: unknown): FleetAgentModel
 		}
 		out.envPassthrough = input.envPassthrough.filter((name): name is string => typeof name === 'string');
 	}
+	if (input.envGrants !== undefined && input.envGrants !== null) {
+		if (!Array.isArray(input.envGrants)) {
+			throw new FleetAgentExecutionError('Fleet agent execution envGrants must be an array of names');
+		}
+		// Normalized, not filtered: a grant naming the un-grantable core, a
+		// wildcard or a malformed name is DROPPED here as well as on the
+		// node, so nothing downstream has to re-decide what a grant may say.
+		const grants = normalizeFleetRunEnvGrants(input.envGrants);
+		if (grants.length > 0) out.envGrants = grants;
+	}
 	return out;
 }
 
@@ -612,14 +839,96 @@ export interface FleetAgentTaskModelResult {
 	durationMs: number;
 	/** The CLI's final message (Claude Code `result`), when it produced one. */
 	summary: string | null;
-	/** Spend the CLI reported for this run, when it did. */
+	/**
+	 * Spend the CLI reported for this run, when it did.
+	 *
+	 * Fleet cost accounting (EW-777): this is the CLI's OWN estimate —
+	 * Claude Code prints `total_cost_usd` at API list price even when the
+	 * seat is a flat-rate subscription; Codex prints tokens but no price,
+	 * so a Codex run reports `null` here rather than an invented figure.
+	 * The platform records it as the run's cost (`plugin_usage_events` +
+	 * `agent_runs.costCents`) and evaluates daily ceilings against it; it
+	 * never debits platform credits for it (the seat is the owner's).
+	 */
 	costUsd?: number | null;
 	/** Model round-trips the CLI reported, when it did. */
 	turns?: number | null;
 	/** CLI session id, for a later resume. */
 	sessionId?: string | null;
+	/**
+	 * The model the CLI billed the bulk of this run to (e.g.
+	 * `claude-opus-4-1-20250805`), when the CLI reported one. Feeds the
+	 * per-model Costs panel next to the cloud runs' `modelId`.
+	 */
+	modelId?: string | null;
+	/** Prompt tokens the CLI reported (uncached input), when it did. */
+	inputTokens?: number | null;
+	/** Completion tokens the CLI reported, when it did. */
+	outputTokens?: number | null;
+	/**
+	 * Prompt tokens served from the provider's cache, when reported. For
+	 * Claude Code this is a bucket of its own (`input_tokens` excludes
+	 * cache traffic); for Codex it is the cached SHARE of `inputTokens`
+	 * (`cached_input_tokens` ⊆ `input_tokens`), so `totalTokens` never
+	 * counts it twice.
+	 */
+	cacheReadTokens?: number | null;
+	/** Prompt tokens written to the provider's cache, when reported. */
+	cacheCreationTokens?: number | null;
+	/**
+	 * Every token the run consumed, input + output + cache traffic. The
+	 * number `agent_runs.totalTokens` accumulates for a cloud run, so a
+	 * fleet run reads the same way in the run list.
+	 */
+	totalTokens?: number | null;
 	/** Last bytes of combined stdout/stderr, for the run report. */
 	outputTail?: string;
+}
+
+/**
+ * Fleet cost accounting (EW-777) — the ONE conversion from the CLI's
+ * dollar figure to the platform's cents.
+ *
+ * Shared by the node (which never converts — it forwards the CLI's
+ * number), the API reconciler (which records the usage row) and every
+ * spec, so nobody rounds differently. Half-cents round to the nearest
+ * cent (`Math.round`), matching how `PluginUsageService.record` already
+ * rounds the cloud facades' figures. Anything that is not a finite,
+ * non-negative number is `null` — "unknown", never "free": a ceiling
+ * evaluated against a null cost fails closed rather than permitting.
+ *
+ * The product is snapped to a micro-cent before rounding because the
+ * CLI's figure is a printed DECIMAL that JSON hands us as a binary
+ * double: `1.005 * 100` is `100.49999999999999` in IEEE-754 and a bare
+ * `Math.round` would bill 100 cents for a run the CLI priced at $1.005.
+ * Snapping first lets the decimal the CLI printed decide the cent.
+ */
+export function fleetModelCostUsdToCents(costUsd: unknown): number | null {
+	if (typeof costUsd !== 'number' || !Number.isFinite(costUsd) || costUsd < 0) return null;
+	return Math.round(Number((costUsd * 100).toFixed(6)));
+}
+
+/**
+ * `pluginId` prefix of the `plugin_usage_events` row a FLEET run leaves
+ * behind (`fleet-node:claude-code`, `fleet-node:codex`).
+ *
+ * A fleet run's model spend is billed to the CLI seat the node is logged
+ * in as, never to a platform-supplied provider key, so the row is tagged
+ * with a plugin id no real plugin can claim: the settlement recognises
+ * the prefix as bring-your-own (stamped on the run for visibility and
+ * ceilings, exempt from the credits debit), and the Costs dashboard
+ * groups it apart from the cloud providers.
+ */
+export const FLEET_BYO_MODEL_PLUGIN_ID_PREFIX = 'fleet-node:';
+
+/** The usage-row `pluginId` for one execution provider. */
+export function fleetModelPluginId(provider: FleetAgentExecutionProvider): string {
+	return `${FLEET_BYO_MODEL_PLUGIN_ID_PREFIX}${provider}`;
+}
+
+/** True for a usage row a fleet run wrote (see {@link FLEET_BYO_MODEL_PLUGIN_ID_PREFIX}). */
+export function isFleetModelPluginId(pluginId: unknown): boolean {
+	return typeof pluginId === 'string' && pluginId.startsWith(FLEET_BYO_MODEL_PLUGIN_ID_PREFIX);
 }
 
 /** What the node did with the working tree after the model ran. */
@@ -864,6 +1173,25 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	workspace: FleetTaskWorkspaceDescriptor | null;
 	/** Verdicts of the legacy command steps, in declared order. */
 	steps: TaskCheckResult[];
+	/**
+	 * Verdicts of the SETUP phase (EW-807), in declared order. Present only
+	 * when the job carried a `setup` block.
+	 *
+	 * Deliberately its OWN key rather than entries in `steps` or `checks`:
+	 * "the install failed" and "a test failed" are different facts about a
+	 * run, and the whole point of the phase is that a reader (and the
+	 * reconciler, and the pull request) can tell them apart without
+	 * pattern-matching a command string.
+	 */
+	setup?: TaskCheckResult[] | null;
+	/**
+	 * Roll-up over `setup`: `green` when every required setup step passed,
+	 * `red` when one did not, `none` when the job carried no setup phase.
+	 *
+	 * A `red` here means the model, the steps and the checks did NOT run,
+	 * and `gateStatus` is `none` — the gate did not fail, it never ran.
+	 */
+	setupStatus?: 'green' | 'red' | 'none' | null;
 	/** Present when the job carried an `execution` block. */
 	model?: FleetAgentTaskModelResult | null;
 	/** Verdicts of the acceptance checks, when the job carried any. */
@@ -886,6 +1214,14 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	 * non-zero model exit and that verdict is still true.
 	 */
 	question?: FleetAgentTaskQuestion | null;
+	/**
+	 * Self-build slice Z: what the MCP bridge did, when the payload asked
+	 * for one. Reports whether it actually ran and how many `tools/call`
+	 * requests the loopback proxy forwarded. NEVER the token — the whole
+	 * point of the design is that the credential has no path into the
+	 * result, which is stored on the job row and rendered in run reports.
+	 */
+	mcp?: FleetAgentTaskMcpResult | null;
 	/** Why `status` is `failed`, in one sentence, for the run report. */
 	failureReason?: string | null;
 }
@@ -959,6 +1295,12 @@ export interface FleetJobHeartbeatRequest {
 	secret: string;
 	/** Requested lease extension; clamped server-side. */
 	leaseTtlSec?: number;
+	/**
+	 * The `leaseGeneration` returned with the lease. Required: a beat whose
+	 * generation is not the job's current one is refused with
+	 * `409 { reason: "stale-lease" }` and the node must abort the run.
+	 */
+	leaseGeneration: number;
 }
 
 /** Response body for `POST /api/fleet/jobs/:id/heartbeat`. */
@@ -977,6 +1319,12 @@ export interface FleetJobCompleteRequest {
 	result?: Record<string, unknown> | null;
 	/** Failure detail. Capped server-side. */
 	error?: string | null;
+	/**
+	 * The `leaseGeneration` returned with the lease. Required: a report
+	 * whose generation is not the job's current one is refused with
+	 * `409 { reason: "stale-lease" }` and never touches the row.
+	 */
+	leaseGeneration: number;
 }
 
 /** Response body for `POST /api/fleet/jobs/:id/complete`. */

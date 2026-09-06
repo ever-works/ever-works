@@ -124,6 +124,15 @@ interface LinkRow {
 
 const GOAL_DTO_KEYS = [
     'id',
+    // A Goal's KIND (EW-795, "delivery Goal kind + Goal cold start").
+    // `toGoalDto` writes it unconditionally via `normalizeGoalKind`, so the
+    // key is always present even for a Goal created before the column
+    // existed — which is why it belongs in this exact-shape list rather
+    // than being tolerated as optional.
+    'goalKind',
+    // Goal loop-control knob (EW-796 self-build orchestration). Like
+    // `goalKind`, `toGoalDto` emits it unconditionally.
+    'maxConcurrentIterations',
     // Ownership scope: the DTO deliberately surfaces the tenant/Organization
     // pair a Goal is stamped with (e49936d8 "fix(api): expose and enforce
     // organization ownership"), so a client can tell a personal Goal from an

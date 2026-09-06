@@ -174,6 +174,35 @@ export class PluginUsageRepository {
     }
 
     /**
+     * Fleet cost accounting (EW-777) — the per-Agent budget precheck's
+     * input: one user's spend attributed to ONE Agent inside a period,
+     * whatever executed it. A cloud run's facade rows and a fleet run's
+     * `fleet-node:*` row are the same column, so the precheck sees both
+     * without a second accounting. Uses
+     * `idx_plugin_usage_events_user_agent_occurred`.
+     */
+    async getTotalSpendCentsForAgent(
+        userId: string,
+        agentId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        currency?: string,
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.costCents), 0)', 'total')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.agentId = :agentId', { agentId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+        if (currency) {
+            qb.andWhere('e.currency = :currency', { currency });
+        }
+        const row = await qb.getRawOne<{ total: string }>();
+        return Number(row?.total ?? 0);
+    }
+
+    /**
      * Tasks feature — Phase 15.7. Per-Task spend rollup. Caller
      * filters by `since` (defaults to "all-time") + optional
      * `currency`. Returns the total cost in cents for usage events

@@ -31,7 +31,16 @@ import { PortableDateColumn } from './_types';
  * `EncryptedJsonColumn` envelope as notification channel secrets). Values
  * are NEVER echoed by the API — responses carry header names only.
  */
-export type McpConnectionTransport = 'streamable-http' | 'sse';
+/**
+ * `stdio` rows are minted only by `PackageMcpReconcilerService` for a server
+ * an installed Agent Plugin package declares; their `url` is the opaque
+ * `stdio:<package>/<server>` pointer (see `mcp/mcp-stdio-launcher.ts`), never
+ * an address. The manual-create API deliberately does NOT accept it — its DTO
+ * validates against its own narrower `MCP_CONNECTION_TRANSPORTS`, so a
+ * user-pasted stdio connection cannot exist, and a row that runs local code
+ * can only come from a package the deployment installed.
+ */
+export type McpConnectionTransport = 'streamable-http' | 'sse' | 'stdio';
 export type McpConnectionSource = 'manual' | 'package';
 
 export const MCP_CONNECTION_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/;

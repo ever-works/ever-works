@@ -7,6 +7,7 @@ import {
 import { computeNextTemplateOccurrence, cloneRecurringTaskAsInstance } from './recurrence';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskTransitionService } from './task-transition.service';
+import { TaskGraphFanoutService, type TaskFanoutSummary } from './task-graph-fanout.service';
 import { TaskStatus, type Task } from '../entities/task.entity';
 
 export interface RecurrenceDispatchEntry {
@@ -52,7 +53,7 @@ export interface ScheduleDispatchSummary {
 /**
  * Tasks feature — Phase 17.6 + schedule-modes upgrade.
  *
- * Cron-fed dispatcher with two due-scans:
+ * Cron-fed dispatcher with three scans per tick:
  *
  *  1. `dispatchDue` — recurring Task templates whose
  *     `nextOccurrenceAt <= now` (RRULE or cron cadence). CAS-claims each
@@ -65,6 +66,13 @@ export interface ScheduleDispatchSummary {
  *  2. `dispatchDueScheduled` — one-shot Tasks whose `scheduledAt <= now`
  *     and are unclaimed. CAS-claims via `scheduleClaimedAt`, then
  *     dispatches the Task itself (no clone).
+ *
+ *  3. `dispatchUnblockedTodo` — the task-graph fan-out (slice AH):
+ *     TODO Tasks with zero OPEN blockers, started through the ordinary
+ *     gated path, bounded per owner and OFF by default. It lives behind
+ *     this class rather than beside it because this service is already
+ *     in the worker RPC map, so a new METHOD needs no plumbing while a
+ *     new service would need edits in five files.
  *
  * Both paths resolve the run agent as: agent assignees (fan-out, one run
  * per agent) → the Task's own `agentId`. When nothing resolves, the
@@ -93,6 +101,10 @@ export class TaskRecurrenceDispatcherService {
         // instances exactly as before (inert), never crash.
         @Optional() private readonly assignees?: TaskAssigneeRepository,
         @Optional() private readonly transitions?: TaskTransitionService,
+        // Task-graph fan-out (slice AH). Appended LAST + Optional for the
+        // same positional-construction reason as the two above; unbound,
+        // `dispatchUnblockedTodo` reports a tick that started nothing.
+        @Optional() private readonly fanout?: TaskGraphFanoutService,
     ) {}
 
     async dispatchDue(limit = 50, now: Date = new Date()): Promise<RecurrenceDispatchSummary> {
@@ -281,6 +293,34 @@ export class TaskRecurrenceDispatcherService {
         }
 
         return summary;
+    }
+
+    /**
+     * Task-graph fan-out (slice AH) — the third scan of the tick.
+     *
+     * A thin delegation on purpose: `TaskGraphFanoutService` owns every
+     * rule (the blocker predicate, the per-owner bound, the stop flag and
+     * the admission probe), and this method only makes it reachable from
+     * the cron through the RPC surface this class already has.
+     *
+     * Unbound service ⇒ a summary that plainly says nothing ran, never a
+     * silent zero that reads like "there was nothing to do".
+     */
+    async dispatchUnblockedTodo(limit?: number): Promise<TaskFanoutSummary> {
+        if (!this.fanout) {
+            return {
+                limit: limit ?? 0,
+                candidateCount: 0,
+                started: 0,
+                skipped: 0,
+                failed: 0,
+                halted: false,
+                disabled: true,
+                maxStartsPerOwner: 0,
+                entries: [],
+            };
+        }
+        return this.fanout.dispatchUnblocked(limit);
     }
 
     // ── internals ─────────────────────────────────────────────────

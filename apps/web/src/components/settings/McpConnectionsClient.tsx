@@ -10,7 +10,7 @@ import {
     testMcpConnectionAction,
     updateMcpConnectionAction,
 } from '@/app/actions/mcp-connections';
-import type { McpConnection, McpConnectionTransport } from '@/lib/api/mcp-connections';
+import type { McpConnection, McpManualTransport } from '@/lib/api/mcp-connections';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -41,7 +41,7 @@ export function McpConnectionsClient({ initial }: Props) {
 
     const [name, setName] = useState('');
     const [url, setUrl] = useState('');
-    const [transport, setTransport] = useState<McpConnectionTransport>('streamable-http');
+    const [transport, setTransport] = useState<McpManualTransport>('streamable-http');
     const [headerName, setHeaderName] = useState('');
     const [headerValue, setHeaderValue] = useState('');
 
@@ -165,9 +165,7 @@ export function McpConnectionsClient({ initial }: Props) {
                             </label>
                             <select
                                 value={transport}
-                                onChange={(e) =>
-                                    setTransport(e.target.value as McpConnectionTransport)
-                                }
+                                onChange={(e) => setTransport(e.target.value as McpManualTransport)}
                                 className="w-full h-10 rounded-lg border border-border dark:border-border-dark bg-transparent px-3 text-sm text-text dark:text-text-dark"
                             >
                                 <option value="streamable-http">{t('form.streamableHttp')}</option>

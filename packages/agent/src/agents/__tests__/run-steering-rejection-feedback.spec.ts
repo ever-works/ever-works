@@ -207,4 +207,54 @@ describe('composeRejectionFeedbackMessage', () => {
             'Please rebase on develop & re-run CI.',
         );
     });
+
+    it('labels an automated finding with its reviewer kind and severity (R16)', () => {
+        const message = composeRejectionFeedbackMessage([
+            {
+                source: 'pull-request',
+                feedback: 'apps/api/x.ts:144 — drop without a guard',
+                reviewerLabel: 'coderabbitai[bot]',
+                prNumber: 9,
+                reviewerKind: 'bot',
+                severity: 'major',
+            },
+            {
+                source: 'pull-request',
+                feedback: 'plain prose',
+                reviewerLabel: 'Copilot',
+                prNumber: 9,
+                reviewerKind: 'bot',
+                severity: null,
+            },
+        ]);
+        expect(message).toContain(
+            'Rejection from coderabbitai[bot] (pull request #9, automated review, severity: major):',
+        );
+        expect(message).toContain('Rejection from Copilot (pull request #9, automated review):');
+        expect(message).toContain('critical or major');
+        // Conservative default: a bot finding with no marker is not a nit.
+        expect(message).toContain('no stated severity (treat it as major)');
+        expect(message).toContain('  apps/api/x.ts:144 — drop without a guard');
+    });
+
+    it('renders a human rejection byte-identically to before R16', () => {
+        const before = composeRejectionFeedbackMessage([
+            { source: 'pull-request', feedback: 'no tests', reviewerLabel: 'octocat', prNumber: 7 },
+        ]);
+        const after = composeRejectionFeedbackMessage([
+            {
+                source: 'pull-request',
+                feedback: 'no tests',
+                reviewerLabel: 'octocat',
+                prNumber: 7,
+                reviewerKind: 'human',
+                severity: null,
+            },
+        ]);
+        expect(after).toBe(before);
+        expect(after).toBe(
+            'Your previous work on this task was REJECTED by a reviewer. Address the feedback below before doing anything else, then finish.\n\nRejection from octocat (pull request #7):\n  no tests',
+        );
+        expect(after).not.toContain('automated');
+    });
 });

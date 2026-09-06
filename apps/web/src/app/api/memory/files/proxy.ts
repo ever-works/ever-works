@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import {
+    applyBffWorkspaceScope,
+    applyBffWorkspaceScopeFromNavigation,
+    upstreamSearchWithoutScope,
+} from '@/lib/api/bff-scope';
 
 /**
  * Shared same-origin proxy for the /api/memory/files BFF routes.
@@ -24,6 +28,12 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  * instead of a personal-scoped answer. A `scoped: true` route can
  * therefore only be reached through `browserApiFetch`.
  *
+ * `scoped: 'navigation'` is for the one route reached by document
+ * requests (`<a href download>`, `<img src>`): it reads the selector from
+ * `?scope=` (then the header), runs PERSONAL when neither is present —
+ * every link predating the carrier — and strips the carrier from the
+ * upstream query. See `applyBffWorkspaceScopeFromNavigation`.
+ *
  * The current table, checked against `MemoryFilesController`:
  *
  * | route                              | handler       | org-aware | scoped |
@@ -35,19 +45,19 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  * | `POST /files/upload`                | `upload`      | no        | no     |
  * | `POST /files/folders`               | `createFolder`| no        | no     |
  * | `PATCH|DELETE /files/folders/:id`   | `update|delete` | no      | no     |
- * | `GET  /files/:id/download`          | `download`    | yes       | NO — see that route |
+ * | `GET  /files/:id/download`          | `download`    | yes       | navigation |
  *
  * The four `no`-org handlers key off `auth.userId` (and, for folders,
  * `MemoryFoldersService` ownership) and never touch
  * `ScopeContextService`, so scoping them would buy nothing and would
- * newly 400 a request that works today. Download is the exception that
- * needs its own paragraph — it is org-aware but unreachable by
- * `browserApiFetch`; the reasoning lives in `[id]/download/route.ts`.
+ * newly 400 a request that works today. Download is org-aware but
+ * unreachable by `browserApiFetch`, so it carries the selector on the
+ * URL instead; the contract lives in `[id]/download/route.ts`.
  */
 export async function proxyMemoryFiles(
     request: NextRequest,
     upstreamPath: string,
-    init: { method: string; body?: BodyInit | null; scoped: boolean },
+    init: { method: string; body?: BodyInit | null; scoped: boolean | 'navigation' },
 ): Promise<Response> {
     const token = await getAuthAccessCookie();
 
@@ -64,13 +74,22 @@ export async function proxyMemoryFiles(
     let headers = baseHeaders;
     if (init.scoped) {
         try {
-            headers = applyBffWorkspaceScope(request, baseHeaders);
+            headers =
+                init.scoped === 'navigation'
+                    ? applyBffWorkspaceScopeFromNavigation(request, baseHeaders)
+                    : applyBffWorkspaceScope(request, baseHeaders);
         } catch {
             return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
         }
     }
 
-    const upstream = await fetch(`${API_URL}${upstreamPath}${request.nextUrl.search}`, {
+    // The carrier is consumed here; the API's DTOs do not know `scope`.
+    const search =
+        init.scoped === 'navigation'
+            ? upstreamSearchWithoutScope(request.nextUrl.searchParams)
+            : request.nextUrl.search;
+
+    const upstream = await fetch(`${API_URL}${upstreamPath}${search}`, {
         method: init.method,
         headers,
         ...(init.body !== undefined ? { body: init.body, duplex: 'half' } : {}),

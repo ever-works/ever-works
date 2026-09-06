@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	DEFAULT_FLEET_EXECUTION_MODE,
 	decideFleetRouting,
+	FLEET_FALLBACK_REASONS,
 	isFleetExecutionMode,
 	isLocalExecutionMode,
 	QUEUED_REASON_WAITING_FOR_RUNNER,
@@ -164,5 +165,96 @@ describe('summarizeRunnerStatus', () => {
 	it('reports busy only when EVERY online runner is holding work', () => {
 		expect(summarizeRunnerStatus({ total: 2, online: 2, busy: 2 })).toBe('busy');
 		expect(summarizeRunnerStatus({ total: 2, online: 2, busy: 1 })).toBe('online');
+	});
+});
+
+describe('decideFleetRouting — eligibility (self-build slice S / EW-775)', () => {
+	const PINNED = '22222222-2222-4222-8222-222222222222';
+	/** The R5 snapshot: the eligible set is the pinned node, it is down, five siblings idle. */
+	const PINNED_OFFLINE: FleetRunnerAvailability = {
+		total: 1,
+		online: 0,
+		free: 0,
+		fleetTotal: 6,
+		pinnedNodeId: PINNED
+	};
+
+	it('REGRESSION: a pin to an offline node with five idle siblings is a fallback, not a placement', () => {
+		// The counts are over the ELIGIBLE set, so `free` is 0 however many
+		// siblings are idle — and the reason names the pinned runner, with
+		// the precise 1-of-6 the notice stores.
+		expect(decideFleetRouting('local-fallback', PINNED_OFFLINE)).toEqual({
+			target: 'cloud',
+			mode: 'local-fallback',
+			fallbackReason: 'pinned-runner-offline',
+			runnerCount: 1,
+			fleetRunnerCount: 6,
+			pinnedNodeId: PINNED
+		});
+	});
+
+	it('the same pin under local-wait waits, visibly', () => {
+		expect(decideFleetRouting('local-wait', PINNED_OFFLINE)).toEqual({
+			target: 'fleet-waiting',
+			mode: 'local-wait',
+			queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER
+		});
+	});
+
+	it('names no-eligible-runners when the fleet has runners but none could take the job', () => {
+		// A pinned node that was unenrolled, or a tag no machine advertises:
+		// "enrol a runner" would be the wrong advice for an owner with three.
+		expect(decideFleetRouting('local-fallback', { total: 0, online: 0, free: 0, fleetTotal: 3 })).toEqual({
+			target: 'cloud',
+			mode: 'local-fallback',
+			fallbackReason: 'no-eligible-runners',
+			runnerCount: 0,
+			fleetRunnerCount: 3
+		});
+	});
+
+	it('keeps no-runners when the whole fleet is empty', () => {
+		expect(decideFleetRouting('local-fallback', { total: 0, online: 0, free: 0, fleetTotal: 0 })).toEqual({
+			target: 'cloud',
+			mode: 'local-fallback',
+			fallbackReason: 'no-runners',
+			runnerCount: 0,
+			fleetRunnerCount: 0
+		});
+	});
+
+	it('a pinned runner that is online but busy is runners-busy, with the pin attached', () => {
+		expect(
+			decideFleetRouting('local-fallback', { total: 1, online: 1, free: 0, fleetTotal: 2, pinnedNodeId: PINNED })
+		).toEqual({
+			target: 'cloud',
+			mode: 'local-fallback',
+			fallbackReason: 'runners-busy',
+			runnerCount: 1,
+			fleetRunnerCount: 2,
+			pinnedNodeId: PINNED
+		});
+	});
+
+	it('a pinned runner that is online and idle is placed exactly as before', () => {
+		expect(
+			decideFleetRouting('local-fallback', { total: 1, online: 1, free: 1, fleetTotal: 6, pinnedNodeId: PINNED })
+		).toEqual({ target: 'fleet', mode: 'local-fallback' });
+	});
+
+	it('an unpinned eligible set that is all offline is still runners-offline', () => {
+		expect(
+			decideFleetRouting('local-fallback', { total: 2, online: 0, free: 0, fleetTotal: 4, pinnedNodeId: null })
+		).toMatchObject({ fallbackReason: 'runners-offline', runnerCount: 2, fleetRunnerCount: 4 });
+	});
+
+	it('lists the five fallback reasons, eligibility-aware ones last', () => {
+		expect(FLEET_FALLBACK_REASONS).toEqual([
+			'no-runners',
+			'runners-offline',
+			'runners-busy',
+			'no-eligible-runners',
+			'pinned-runner-offline'
+		]);
 	});
 });

@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
 
 type RouteContext = { params: Promise<{ docId: string }> };
 
@@ -18,45 +17,38 @@ type RouteContext = { params: Promise<{ docId: string }> };
  * Organization off the request scope and refuses with 422 when there is
  * none, so every Accept click from an Organization tab failed — the
  * write path has no empty-payload fallback the way the queue read does.
- * Translating the browser's `x-ever-workspace` selector into
- * `x-scope-slug` here is what makes the button work at all, and it must
- * land in the same change as the panel's `browserApiFetch` transport:
- * scoped route + raw `fetch()` caller is a guaranteed 400.
+ *
+ * {@link bffProxy} now performs that conversion. The unauthenticated
+ * response is overridden to keep this route's PLAIN-TEXT `Unauthorized`
+ * rather than the wrapper's JSON default — same bytes as before.
  */
-export async function POST(request: NextRequest, { params }: RouteContext) {
-    const { docId } = await params;
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return new Response('Unauthorized', { status: 401 });
-    }
+export const POST = bffProxy<RouteContext>(
+    async ({ headers }, { params }) => {
+        const { docId } = await params;
+        headers.set('Accept', 'application/json');
 
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`,
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
-
-    const upstream = await fetch(`${API_URL}/memory/review/${encodeURIComponent(docId)}/accept`, {
-        method: 'POST',
-        headers,
-        cache: 'no-store',
-    });
-
-    if (!upstream.ok) {
-        const text = await upstream.text().catch(() => '');
-        return new Response(text, {
-            status: upstream.status,
-            headers: {
-                'Content-Type': upstream.headers.get('content-type') ?? 'application/json',
-                'Cache-Control': 'no-store',
+        const upstream = await fetch(
+            `${API_URL}/memory/review/${encodeURIComponent(docId)}/accept`,
+            {
+                method: 'POST',
+                headers,
+                cache: 'no-store',
             },
-        });
-    }
+        );
 
-    const body = await upstream.json().catch(() => null);
-    return NextResponse.json(body ?? {}, { status: 200 });
-}
+        if (!upstream.ok) {
+            const text = await upstream.text().catch(() => '');
+            return new Response(text, {
+                status: upstream.status,
+                headers: {
+                    'Content-Type': upstream.headers.get('content-type') ?? 'application/json',
+                    'Cache-Control': 'no-store',
+                },
+            });
+        }
+
+        const body = await upstream.json().catch(() => null);
+        return NextResponse.json(body ?? {}, { status: 200 });
+    },
+    { onUnauthorized: () => new Response('Unauthorized', { status: 401 }) },
+);

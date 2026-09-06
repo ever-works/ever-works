@@ -55,7 +55,7 @@ For architecture, testing patterns, deployment, and detailed conventions, **do n
 
 For human-facing documentation and deeper architecture notes, see:
 
-- **Project docs**: https://github.com/ever-works/ever-works-docs/tree/develop/website/docs
+- **Project docs**: https://docs.ever.works (source: `apps/docs/` + `docs/`)
 - **Repository**: https://github.com/ever-works/ever-works
 - **Website**: https://ever.works
 

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Download, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
+import { memoryFileDownloadUrl } from '@/lib/api/memory-files-url';
 import { pickKbViewer } from '@/components/works/detail/kb/viewers/pick-viewer';
 import { KbPdfViewer } from '@/components/works/detail/kb/viewers/KbPdfViewer';
 import { KbDocxViewer } from '@/components/works/detail/kb/viewers/KbDocxViewer';
@@ -28,16 +30,14 @@ import type { MemoryFileRow } from '@/lib/api/memory-files-types';
  * has only bytes, so this component fetches small text payloads itself
  * and renders them; anything else falls back to a download card.
  *
- * **Transport (EW-786).** The text preview below stays on a raw
- * `fetch()` — the exception to the rest of Memory, which moved to
- * `browserApiFetch`. `url` is the download route, and that route is
- * deliberately left UNSCOPED because the binary viewers put the very
- * same `url` on an `<img>`/`<video>`/object element and the overlay's
- * own Download control is an `<a href>`; neither can carry a header, and
- * a scoped route 400s without one. Sending the selector from here alone
- * would imply a contract the route does not honour. The consequence is
- * that previewing an org-scoped Memory original 404s — see
- * `app/api/memory/files/[id]/download/route.ts` for the full analysis.
+ * **Transport.** `url` is the download route with the tab's workspace
+ * carried as `?scope=` (`memoryFileDownloadUrl`), because the binary
+ * viewers put the very same `url` on an `<img>`/`<video>`/`<iframe>`
+ * and the overlay's own Download control is an `<a href>` — none can
+ * carry a header. The text preview below therefore stays on a raw
+ * `fetch()` too: the scope is already on the URL, and sending it a
+ * second time as a header would give the route two carriers to
+ * reconcile. See `app/api/memory/files/[id]/download/route.ts`.
  */
 
 /** Text payloads above this are not fetched for inline display. */
@@ -62,7 +62,8 @@ export interface MemoryFilePreviewProps {
 
 export function MemoryFilePreview({ row, onClose }: MemoryFilePreviewProps) {
     const t = useTranslations('dashboard.memoryPage.files');
-    const url = `/api/memory/files/${encodeURIComponent(row.id)}/download?source=${row.source}`;
+    const scope = useWorkspaceScope();
+    const url = memoryFileDownloadUrl(row, scope);
     const kind = pickKbViewer(row.mime);
     const sizeBytes = row.size ?? 0;
 

@@ -1,11 +1,13 @@
 import {
     CanActivate,
     ExecutionContext,
+    ForbiddenException,
     Injectable,
     Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
+import type { FleetRunCredentialBinding } from '../auth/types/auth.types';
 import { ScopeContextService } from './scope-context.service';
 
 /**
@@ -60,6 +62,16 @@ import { ScopeContextService } from './scope-context.service';
  * on PR #1074.) Positioned before `ScopeOwnershipGuard` so the
  * hydrated value + seeded scope are both visible to it.
  *
+ * **Fleet-run credentials (self-build slice Z, EW-796).** When
+ * `AuthSessionGuard` authenticated the request with an `ew_run_…`
+ * token it leaves `request.fleetRunCredential` behind, carrying the
+ * Organization the platform bound the token to at mint time. That
+ * pin OUTRANKS everything below: a resolved slug pointing at a
+ * different Organization is a 403 rather than a silent widening, and
+ * a token with no slug at all is seeded into its bound Organization
+ * instead of falling back to personal scope. The token's scope wins,
+ * and any `X-Scope-Slug` must equal it.
+ *
  * **Performance:** one extra indexed-PK `findById` per authenticated
  * request. Acceptable; can be cached or folded into the auth token in
  * a later optimization.
@@ -82,6 +94,7 @@ export class SessionScopeGuard implements CanActivate {
 
         const req = context.switchToHttp().getRequest<{
             user?: { userId?: string; tenantId?: string | null };
+            fleetRunCredential?: FleetRunCredentialBinding;
         }>();
         const user = req.user;
         if (!user?.userId) {
@@ -113,6 +126,43 @@ export class SessionScopeGuard implements CanActivate {
         // a fresh-login navigation default, not request authorization. This is
         // what keeps simultaneous Ever and Yo tabs isolated.
         const scope = this.scopeContext.getScope();
+
+        // Self-build slice Z (EW-796) — a fleet-run MCP credential carries
+        // its OWN Organization, decided when the platform minted it from
+        // the job's row. That pin is the authorization, not a preference:
+        //
+        //   - a slug that resolved a DIFFERENT Organization is refused
+        //     outright, so the token's scope can never be widened or
+        //     side-stepped by a header the caller controls;
+        //   - otherwise the bound Organization is seeded in place, so the
+        //     tools act exactly where the run was dispatched even when the
+        //     MCP server sends no `x-scope-slug` at all.
+        //
+        // `null` here means the run belongs to the owner's personal scope;
+        // the seed below then behaves like any other unprefixed request.
+        const runCredential = req.fleetRunCredential;
+        if (runCredential) {
+            if (
+                scope.organizationId !== null &&
+                scope.organizationId !== runCredential.organizationId
+            ) {
+                throw new ForbiddenException('Scope does not match the run credential');
+            }
+            if (runCredential.organizationId !== null) {
+                if (tenantId === null) {
+                    // An Organization-pinned token whose owner has no Tenant
+                    // cannot be authorized against anything. Fail closed.
+                    throw new ForbiddenException('Scope does not match the run credential');
+                }
+                await this.requireActiveOrganization(tenantId, runCredential.organizationId);
+                this.scopeContext.setScope({
+                    tenantId,
+                    organizationId: runCredential.organizationId,
+                });
+                return true;
+            }
+        }
+
         if (
             scope.organizationId !== null &&
             scope.tenantId !== null &&

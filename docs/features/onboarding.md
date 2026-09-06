@@ -170,8 +170,8 @@ Where your Work repositories live. Four options:
 | ------------------ | ---------------------------------------------- |
 | **Ever Works Git** | The default — a managed Ever Works GitHub org. |
 | **Your GitHub**    | Your own GitHub account or organization.       |
-| **Your GitLab**    | Bring your own GitLab.                         |
-| **Your Git**       | A self-hosted Git server.                      |
+| **Your GitLab**    | Coming soon — bring your own GitLab.           |
+| **Your Git**       | Coming soon — use a self-hosted Git server.    |
 
 **Your GitHub** adds the **Configure storage** step, where you sign in with
 GitHub so the platform can create repositories for you.

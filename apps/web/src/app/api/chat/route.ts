@@ -5,6 +5,7 @@ import { runAgent } from '@/lib/ai/agent';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
 import { saveConversationMessages, type MessageUsage } from '@/lib/ai/persistence';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 export const maxDuration = 60;
 
@@ -152,22 +153,44 @@ export async function POST(request: Request) {
     // best-effort — a failure here must never cost the user their message,
     // so nothing about the chat response depends on the outcome.
     if (attachmentIds && attachmentIds.length > 0) {
-        after(async () => {
-            try {
-                await fetch(`${API_URL}/memory/uploads/from-attachments`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ attachmentIds }),
-                    cache: 'no-store',
-                });
-            } catch {
-                // Deliberately silent: Memory ingest is an enhancement of
-                // the chat turn, not part of it.
-            }
-        });
+        // Scope has to be resolved HERE, not inside `after()`. The callback
+        // runs after the response, where Next's `headers()` is no longer
+        // available — which is why this call hand-built its headers and so
+        // forwarded no selector at all. `OrgMemoryController.ingestFromAttachments`
+        // requires an active Organization and answers 422 without one, so
+        // every attachment a member added inside an Org was silently dropped:
+        // the catch below swallowed it and the chat turn looked fine.
+        //
+        // Still strictly best-effort. A caller with no selector (or a stale
+        // one) must not cost the user their message, so a failure to build
+        // scoped headers skips the ingest rather than throwing — same
+        // contract the empty catch already gave this call.
+        let ingestHeaders: Headers | null = null;
+        try {
+            ingestHeaders = applyBffWorkspaceScope(request, {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            });
+        } catch {
+            ingestHeaders = null;
+        }
+
+        if (ingestHeaders) {
+            const headersForIngest = ingestHeaders;
+            after(async () => {
+                try {
+                    await fetch(`${API_URL}/memory/uploads/from-attachments`, {
+                        method: 'POST',
+                        headers: headersForIngest,
+                        body: JSON.stringify({ attachmentIds }),
+                        cache: 'no-store',
+                    });
+                } catch {
+                    // Deliberately silent: Memory ingest is an enhancement of
+                    // the chat turn, not part of it.
+                }
+            });
+        }
     }
 
     if (!providerOverride) {

@@ -232,6 +232,83 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet.getNodeOfflineNoticeAfterMs (health signals, EW-776)', () => {
+        it('defaults to 30 minutes', () => {
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(30 * 60_000);
+        });
+
+        it('honours an operator override', () => {
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(2 * 3600_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(2 * 3600_000);
+        });
+
+        it('is floored at the offline sweep window it escalates', () => {
+            // A "still offline after N" notice that could fire before the
+            // node is even considered offline would be two notices for one
+            // event — so the floor is the sweep window, not a constant.
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = '1000';
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(
+                config.fleet.getNodeOfflineAfterMs(),
+            );
+        });
+
+        it('tracks a RAISED offline window, so the pair can never invert', () => {
+            process.env.FLEET_NODE_OFFLINE_AFTER_MS = String(45 * 60_000);
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(10 * 60_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(45 * 60_000);
+        });
+    });
+
+    describe('config.fleet (FLEET_* operator knobs)', () => {
+        describe('getEnrollmentTokenTtlMs', () => {
+            it('defaults to 15 minutes', () => {
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = String(3 * 60_000);
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(3 * 60_000);
+            });
+
+            it('floors a value that would make a token unredeemable', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = '0';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(30_000);
+            });
+
+            it('degrades a nonsense value to the default rather than NaN', () => {
+                // NaN here silently expires every token ever minted.
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = 'soon';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+        });
+
+        describe('getCredentialRotationOverlapMs (EW-799)', () => {
+            it('defaults to 15 minutes of dual-accept', () => {
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(2 * 60_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(2 * 60_000);
+            });
+
+            it('floors a window too short to finish a round-trip and a disk write', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = '1';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(30_000);
+            });
+
+            it('caps the window at 24h — past that it is a second permanent credential', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(30 * 86_400_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(86_400_000);
+            });
+
+            it('degrades a nonsense value to the default', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = 'a while';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+        });
+    });
+
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {
         describe('getApiUrl', () => {
             it('returns undefined when unset', () => {
@@ -264,6 +341,71 @@ describe('agent/config', () => {
                 (raw) => {
                     process.env.FLEET_NODE_LEASE_TTL_SECONDS = raw;
                     expect(config.fleetNode.getLeaseTtlSeconds()).toBeUndefined();
+                },
+            );
+        });
+
+        describe('isRunEnvFilesEnabled (run secrets, self-build slice Y)', () => {
+            it('defaults ON — the feature is already opt-in per repository', () => {
+                expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(true);
+            });
+
+            it.each(['false', 'FALSE', '0', ' false '])(
+                'is switched off by %s, so a run that needs env files fails closed',
+                (value) => {
+                    process.env.FLEET_NODE_RUN_ENV_FILES = value;
+                    expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(false);
+                },
+            );
+
+            it.each(['true', '1', '', 'yes'])(
+                'stays ON for %s — only an explicit off switches it off',
+                (value) => {
+                    process.env.FLEET_NODE_RUN_ENV_FILES = value;
+                    expect(config.fleetNode.isRunEnvFilesEnabled()).toBe(true);
+                },
+            );
+        });
+
+        describe('getQueuedMaxAgeSeconds (queue SLA, self-build slice S)', () => {
+            const KINDS = ['agent-task', 'acceptance-checks', 'browser-check'] as const;
+
+            it('defaults per kind — a day for agent-task, two hours for the checks — never "forever"', () => {
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(24 * 3600);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('acceptance-checks')).toBe(2 * 3600);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(2 * 3600);
+            });
+
+            it('applies FLEET_NODE_QUEUE_MAX_AGE_SECONDS to every kind', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '3600';
+                for (const kind of KINDS) {
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds(kind)).toBe(3600);
+                }
+            });
+
+            it('lets the per-kind variable win over the all-kinds one', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '3600';
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_AGENT_TASK = '7200';
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_ACCEPTANCE_CHECKS = '900';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(7200);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('acceptance-checks')).toBe(900);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(3600);
+            });
+
+            it('clamps into [60s, 7d] rather than honouring an absurd value', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '5';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(60);
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '999999999';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(7 * 86400);
+            });
+
+            it.each(['0', '-5', 'soon', ''])(
+                "falls back to the kind default for nonsense value '%s' (fail closed)",
+                (raw) => {
+                    process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = raw;
+                    process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_BROWSER_CHECK = raw;
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(24 * 3600);
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(2 * 3600);
                 },
             );
         });
@@ -420,6 +562,59 @@ describe('agent/config', () => {
                 expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(true);
                 process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'yes';
                 expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(false);
+            });
+        });
+
+        /**
+         * Self-build slice Z (EW-796) — the operator switch for the fleet
+         * MCP bridge.
+         *
+         * Default OFF, and off in two independent ways. Handing a model on
+         * somebody's desktop a live platform credential is a deployment
+         * decision about the whole install, so a typo, an empty envsubst
+         * render or a missing server URL must all land on "no bridge"
+         * rather than on a half-configured one.
+         */
+        describe('isMcpBridgeEnabled / getMcpServerUrl (MCP bridge)', () => {
+            it('is OFF by default', () => {
+                expect(config.fleetNode.isMcpBridgeEnabled()).toBe(false);
+            });
+
+            it('turns on for the literal true/1 only', () => {
+                for (const value of ['true', 'TRUE', '1', ' true ']) {
+                    process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = value;
+                    expect(config.fleetNode.isMcpBridgeEnabled()).toBe(true);
+                }
+                // Anything else — including values a human would read as
+                // "on" — fails closed rather than guessing.
+                for (const value of ['yes', 'on', 'enabled', '2', 'false', '', '   ']) {
+                    process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = value;
+                    expect(config.fleetNode.isMcpBridgeEnabled()).toBe(false);
+                }
+            });
+
+            it('returns undefined for an unset server URL', () => {
+                expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+                process.env.FLEET_NODE_MCP_URL = '   ';
+                expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+            });
+
+            it('accepts an absolute http(s) URL and strips one trailing slash', () => {
+                process.env.FLEET_NODE_MCP_URL = 'https://mcp.ever.works/mcp';
+                expect(config.fleetNode.getMcpServerUrl()).toBe('https://mcp.ever.works/mcp');
+                process.env.FLEET_NODE_MCP_URL = ' http://localhost:3200/mcp/ ';
+                expect(config.fleetNode.getMcpServerUrl()).toBe('http://localhost:3200/mcp');
+            });
+
+            it('treats a non-URL as UNSET, which switches the bridge off', () => {
+                // Validated on the platform, where an operator reads logs,
+                // rather than on fifteen desktops — and the failure mode is
+                // "no bridge", never "a credential-bearing proxy aimed at a
+                // garbage host".
+                for (const value of ['not a url', '/mcp', 'ftp://host/mcp', 'file:///etc/passwd']) {
+                    process.env.FLEET_NODE_MCP_URL = value;
+                    expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+                }
             });
         });
     });
@@ -1113,6 +1308,59 @@ describe('agent/config', () => {
                 process.env.AGENT_PLUGINS_DIR = '';
                 expect(config.agentPlugins.getPackageDirs()).toBe('/app/agent-plugins');
             });
+        });
+    });
+
+    /**
+     * Task-graph fan-out (self-build slice AH). These two knobs govern
+     * the ONE driver on the platform that starts work nobody clicked, and
+     * the zero on the first one reads the OPPOSITE way round from the
+     * concurrency valves next to it — which is exactly the kind of thing
+     * an operator gets backwards, so it is pinned here.
+     */
+    describe('agents — task-graph fan-out', () => {
+        describe('getTaskFanoutMaxStartsPerOwner', () => {
+            it('defaults to 0, which means the driver is OFF', () => {
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+            });
+
+            it('returns an explicitly configured bound', () => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = '3';
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(3);
+            });
+
+            it.each(['', '  ', 'lots'])('falls back to OFF for %j', (value) => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = value;
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+            });
+
+            it('reads 0 as "no starts", NOT as "no ceiling" like the concurrency valves', () => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = '0';
+                process.env.AGENT_MAX_CONCURRENT_RUNS_PER_WORK = '0';
+                // Same literal, opposite meanings — the driver stops, the
+                // valve stops bounding.
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+                expect(config.agents.getMaxConcurrentRunsPerWork()).toBe(0);
+            });
+        });
+
+        describe('getTaskFanoutScanLimit', () => {
+            it('defaults to 50', () => {
+                expect(config.agents.getTaskFanoutScanLimit()).toBe(50);
+            });
+
+            it('returns an explicitly configured limit', () => {
+                process.env.TASK_FANOUT_SCAN_LIMIT = '120';
+                expect(config.agents.getTaskFanoutScanLimit()).toBe(120);
+            });
+
+            it.each(['0', '-5', 'many', ''])(
+                'refuses %j and keeps the default — a scan of nothing is a broken tick, not a valve',
+                (value) => {
+                    process.env.TASK_FANOUT_SCAN_LIMIT = value;
+                    expect(config.agents.getTaskFanoutScanLimit()).toBe(50);
+                },
+            );
         });
     });
 });

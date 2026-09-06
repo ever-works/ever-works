@@ -258,10 +258,246 @@ describe('decideGoalLoop — routing', () => {
     });
 });
 
+describe('decideGoalLoop — cold start (scope fallback, self-build slice AG)', () => {
+    const scoped = [
+        candidate({ agentId: 'a', name: 'Alpha', source: 'scope' }),
+        candidate({ agentId: 'b', name: 'Beta', source: 'scope' }),
+    ];
+
+    it('dispatches to an in-scope agent and says so in the reasoning', () => {
+        const decision = decideGoalLoop(input({ iteration: 0, candidates: scoped }));
+        expect(decision.action).toBe('dispatch');
+        expect(decision.reasonCode).toBe('routed-scope-fallback');
+        expect(decision.nextIteration).toBe(1);
+        // nextIteration = 1, 1 % 2 = 1 → Beta.
+        expect(decision.agentId).toBe('b');
+        expect(decision.reasoning).toContain('Beta');
+        expect(decision.reasoning).toContain('no agent has worked it yet');
+        expect(decision.reasoning).toContain("2 eligible agent(s) in the Goal's scope");
+    });
+
+    it('round-robins over the scope pool by the persisted iteration counter alone', () => {
+        expect(decideGoalLoop(input({ iteration: 1, candidates: scoped })).agentId).toBe('a');
+        expect(decideGoalLoop(input({ iteration: 2, candidates: scoped })).agentId).toBe('b');
+        expect(decideGoalLoop(input({ iteration: 3, candidates: scoped })).agentId).toBe('a');
+    });
+
+    it('keeps the history reasoning untouched when the pool came from history', () => {
+        const decision = decideGoalLoop(
+            input({ candidates: [candidate({ agentId: 'h', name: 'Hist', source: 'history' })] }),
+        );
+        expect(decision.reasonCode).toBe('routed-round-robin');
+        expect(decision.reasoning).not.toContain('scope');
+    });
+
+    it('a pin still beats scope candidates', () => {
+        const decision = decideGoalLoop(
+            input({
+                candidates: [...scoped, candidate({ agentId: 'pin', source: 'assigned' })],
+            }),
+        );
+        expect(decision.agentId).toBe('pin');
+        expect(decision.reasonCode).toBe('routed-assigned-agent');
+    });
+
+    it('an empty pool is still an honest stuck, and points the operator at the Goal scope', () => {
+        const decision = decideGoalLoop(input({ candidates: [] }));
+        expect(decision.action).toBe('stuck');
+        expect(decision.reasonCode).toBe('no-candidate-agent');
+        expect(decision.reasoning).toContain("in this Goal's scope");
+    });
+
+    it('limits still beat routing: a spend cap pauses before any scope candidate is used', () => {
+        const decision = decideGoalLoop(
+            input({ candidates: scoped, spendCapCents: 100, spentCents: 500 }),
+        );
+        expect(decision.action).toBe('pause');
+        expect(decision.agentId).toBeUndefined();
+    });
+});
+
+describe('decideGoalLoop — Definition of Done approval (kind-agnostic)', () => {
+    it('does not complete on proposed-only criteria — the loop keeps dispatching', () => {
+        const decision = decideGoalLoop(
+            input({
+                dod: summarizeDoD([{ id: 'a', text: 'x', status: 'done', proposed: true }]),
+            }),
+        );
+        expect(decision.action).toBe('dispatch');
+    });
+
+    it('completes once every APPROVED criterion is closed, even with proposals pending', () => {
+        const decision = decideGoalLoop(
+            input({
+                dod: summarizeDoD([
+                    { id: 'a', text: 'x', status: 'done' },
+                    { id: 'p', text: 'y', status: 'open', proposed: true },
+                ]),
+            }),
+        );
+        expect(decision.action).toBe('complete');
+        expect(decision.reasonCode).toBe('dod-complete');
+    });
+});
+
 describe('formatUsd', () => {
     it('renders cents as dollars', () => {
         expect(formatUsd(0)).toBe('$0.00');
         expect(formatUsd(1234)).toBe('$12.34');
         expect(formatUsd(100_000)).toBe('$1000.00');
+    });
+});
+
+/**
+ * Concurrent iterations (self-build slice AH).
+ *
+ * The whole table ABOVE is the N=1 identity proof: it passes untouched,
+ * with no `maxConcurrentIterations` anywhere in it. These cases cover
+ * what changes only when a Goal opts in.
+ */
+describe('decideGoalLoop — concurrent iterations', () => {
+    it('is byte-identical at N=1, however the ceiling is spelled', () => {
+        const baseline = decideGoalLoop(input({ iteration: 4 }));
+        for (const maxConcurrentIterations of [undefined, null, 0, 1, -3, Number.NaN]) {
+            expect(decideGoalLoop(input({ iteration: 4, maxConcurrentIterations }))).toEqual(
+                baseline,
+            );
+        }
+        expect(baseline).toMatchObject({
+            action: 'dispatch',
+            agentIds: ['agent-1'],
+            iterations: [5],
+            nextIteration: 5,
+        });
+    });
+
+    it('still waits at N=1 with a run in flight, with the same reasoning string', () => {
+        const decision = decideGoalLoop(
+            input({ iteration: 7, hasRunInFlight: true, maxConcurrentIterations: 1 }),
+        );
+        expect(decision).toMatchObject({ action: 'wait', reasonCode: 'run-in-flight' });
+        expect(decision.reasoning).toBe('Iteration 7 is still running — router waiting.');
+    });
+
+    it('dispatches the free slots only — N minus what is in flight', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 10,
+                hasRunInFlight: true,
+                runsInFlight: 3,
+                maxConcurrentIterations: 4,
+                candidates: [candidate({ agentId: 'a1' }), candidate({ agentId: 'a2' })],
+            }),
+        );
+        expect(decision.action).toBe('dispatch');
+        expect(decision.iterations).toEqual([11]);
+        expect(decision.agentIds).toHaveLength(1);
+    });
+
+    it('dispatches consecutive iterations across the free slots', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 10,
+                runsInFlight: 0,
+                maxConcurrentIterations: 3,
+                candidates: [candidate({ agentId: 'a1' }), candidate({ agentId: 'a2' })],
+            }),
+        );
+        expect(decision.action).toBe('dispatch');
+        expect(decision.reasonCode).toBe('routed-round-robin');
+        expect(decision.iterations).toEqual([11, 12, 13]);
+        // Round-robin keyed on the iteration about to run, so the sequence
+        // is reproducible from the persisted counter alone.
+        expect(decision.agentIds).toEqual(['a2', 'a1', 'a2']);
+        // Scalars stay the first slot for every pre-AH reader.
+        expect(decision.agentId).toBe('a2');
+        expect(decision.nextIteration).toBe(11);
+        expect(decision.reasoning).toContain('11, 12 and 13');
+    });
+
+    it('gives every free slot to a pinned agent', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 2,
+                maxConcurrentIterations: 3,
+                candidates: [
+                    candidate({ agentId: 'pinned', source: 'assigned' }),
+                    candidate({ agentId: 'other' }),
+                ],
+            }),
+        );
+        expect(decision.reasonCode).toBe('routed-assigned-agent');
+        expect(decision.agentIds).toEqual(['pinned', 'pinned', 'pinned']);
+        expect(decision.iterations).toEqual([3, 4, 5]);
+        expect(decision.reasoning).toContain('3, 4 and 5');
+    });
+
+    it('waits once the ceiling is saturated, naming the count', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 9,
+                hasRunInFlight: true,
+                runsInFlight: 4,
+                maxConcurrentIterations: 4,
+            }),
+        );
+        expect(decision).toMatchObject({ action: 'wait', reasonCode: 'run-in-flight' });
+        expect(decision.reasoning).toBe(
+            '4 of 4 concurrent iterations are still running — router waiting for a slot.',
+        );
+    });
+
+    it('never lets a raised ceiling outrank a budget, a clock or the DoD', () => {
+        const wide = { maxConcurrentIterations: 5, runsInFlight: 0 } as const;
+        expect(
+            decideGoalLoop(input({ ...wide, spendCapCents: 500, spentCents: 500 })).reasonCode,
+        ).toBe('spend-cap-exceeded');
+        expect(
+            decideGoalLoop(
+                input({
+                    ...wide,
+                    wallClockLimitHours: 1,
+                    loopStartedAt: new Date(NOW.getTime() - 7_200_000),
+                }),
+            ).reasonCode,
+        ).toBe('wall-clock-exceeded');
+        expect(
+            decideGoalLoop(
+                input({
+                    ...wide,
+                    iteration: 9,
+                    lastProgressIteration: 1,
+                    stuckThresholdIterations: 3,
+                }),
+            ).reasonCode,
+        ).toBe('no-progress');
+        expect(decideGoalLoop(input({ ...wide, candidates: [] })).reasonCode).toBe(
+            'no-candidate-agent',
+        );
+    });
+
+    it('leaves the grace-period branch reading the BOOLEAN, not the count', () => {
+        // Grace exists so a session mid-write can land; it is about there
+        // being work in flight at all, not about how many slots are used.
+        const decision = decideGoalLoop(
+            input({
+                wallClockLimitHours: 1,
+                loopStartedAt: new Date(NOW.getTime() - 3_660_000),
+                gracePeriodMinutes: 30,
+                hasRunInFlight: true,
+                runsInFlight: 1,
+                maxConcurrentIterations: 4,
+            }),
+        );
+        expect(decision).toMatchObject({ action: 'wait', reasonCode: 'grace-period' });
+    });
+
+    it('falls back to the boolean when the caller counted nothing', () => {
+        expect(
+            decideGoalLoop(input({ hasRunInFlight: true, maxConcurrentIterations: 2 })).action,
+        ).toBe('dispatch');
+        expect(
+            decideGoalLoop(input({ hasRunInFlight: true, maxConcurrentIterations: 1 })).action,
+        ).toBe('wait');
     });
 });

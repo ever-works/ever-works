@@ -68,6 +68,19 @@ const REVIEW_DECISION_MAP: Record<string, GitReviewDecision> = {
 /** Pages of check-runs/statuses to read before giving up (rate budget). */
 const CHECKS_PER_PAGE = 100;
 
+/**
+ * Merge approval (slice AE) — how many pages of check-runs / commit
+ * statuses we will read for ONE commit before admitting we cannot see
+ * them all.
+ *
+ * `ciState` is an authorization input now, so "we read the first page and
+ * called it green" is not an answer. 5 × 100 covers every realistic PR
+ * (this monorepo's own matrix is dozens, not hundreds); past that the
+ * read reports `checksComplete: false` and the merge gate refuses rather
+ * than rolling up a sample.
+ */
+const CHECKS_MAX_PAGES = 5;
+
 /** GitHub file payload → the contract's provider-neutral diff row. */
 function toDiffFile(file: {
 	filename: string;
@@ -631,13 +644,21 @@ export class GitHubApiService {
 	): Promise<MergeResult> {
 		const octokit = this.createOctokit(token, baseUrl);
 
+		// `sha` is GitHub's own optimistic-concurrency guard: the merge is
+		// refused (409 `Head branch was modified`) when the pull request's
+		// head is no longer this commit. The agent merge path pins it to
+		// the head it just verified as green and approved, so a push that
+		// lands in the gap between the check and this call cannot be
+		// merged in place of what was reviewed. Omitted when the caller
+		// does not supply one, which is the pre-existing behaviour.
 		const { data } = await octokit.rest.pulls.merge({
 			owner,
 			repo,
 			pull_number: prNumber,
 			commit_title: options?.commitTitle,
 			commit_message: options?.commitMessage,
-			merge_method: options?.mergeMethod || 'merge'
+			merge_method: options?.mergeMethod || 'merge',
+			...(options?.expectedHeadSha ? { sha: options.expectedHeadSha } : {})
 		});
 
 		return {
@@ -745,7 +766,18 @@ export class GitHubApiService {
 		}
 
 		const headSha: string | null = pr.head?.sha ?? null;
-		const checks = headSha ? await this.readChecks(octokit, owner, repo, headSha) : [];
+		// Merge approval (slice AE): roll up FIRST, cap SECOND. `capped` is
+		// the display sample the pill renders; `checks` is the whole set
+		// the verdict is computed over. Deriving `ciState` from `capped`
+		// (which is what this did until the AE review) reports a red pull
+		// request green the moment the failing leg sorts past index 20 —
+		// and this repository's own CI runs far more than twenty legs,
+		// with external commit statuses appended LAST so they were always
+		// the ones dropped.
+		const read = headSha
+			? await this.readChecks(octokit, owner, repo, headSha)
+			: { checks: [] as GitPullRequestCheck[], complete: true };
+		const checks = read.checks;
 		const capped = capChecks(checks);
 
 		const merged = pr.merged === true || pr.merged_at != null;
@@ -769,8 +801,9 @@ export class GitHubApiService {
 			mergeable: typeof pr.mergeable === 'boolean' ? pr.mergeable : null,
 			headSha,
 			reviewDecision,
-			ciState: deriveCiState(capped),
+			ciState: deriveCiState(checks),
 			checks: capped,
+			checksComplete: read.complete,
 			url: pr.html_url,
 			title: pr.title
 		};
@@ -778,50 +811,91 @@ export class GitHubApiService {
 
 	/**
 	 * Read check-runs AND commit-statuses for one commit and normalise
-	 * both onto the contract vocabulary. Best-effort per source: a token
-	 * missing one scope still gets the other half.
+	 * both onto the contract vocabulary.
+	 *
+	 * Best-effort per source: a token missing one scope still gets the
+	 * other half. But "best-effort" is now REPORTED rather than silently
+	 * absorbed — `complete` is false whenever a source could not be read
+	 * at all, or whenever the commit carries more checks than the page
+	 * budget will fetch. `getPullRequestStatus` passes that straight
+	 * through as `checksComplete`, and the merge gate refuses to treat an
+	 * incomplete roll-up as green (merge approval, slice AE). The board's
+	 * dot is unaffected — a mostly-right pill still beats no pill.
 	 */
 	private async readChecks(
 		octokit: Octokit,
 		owner: string,
 		repo: string,
 		ref: string
-	): Promise<GitPullRequestCheck[]> {
+	): Promise<{ checks: GitPullRequestCheck[]; complete: boolean }> {
 		const out: GitPullRequestCheck[] = [];
+		let complete = true;
 
 		try {
-			const { data } = await octokit.rest.checks.listForRef({
-				owner,
-				repo,
-				ref,
-				per_page: CHECKS_PER_PAGE
-			});
-			for (const run of data.check_runs ?? []) {
-				const check: GitPullRequestCheck = {
-					name: run.name,
-					status: CHECK_STATUS_MAP[run.status] ?? 'unknown',
-					conclusion: run.conclusion ? (CHECK_CONCLUSION_MAP[run.conclusion] ?? null) : null,
-					...(run.details_url ? { detailsUrl: run.details_url } : {})
-				};
-				out.push(check);
+			let page = 1;
+			let seen = 0;
+			for (;;) {
+				const { data } = await octokit.rest.checks.listForRef({
+					owner,
+					repo,
+					ref,
+					per_page: CHECKS_PER_PAGE,
+					page
+				});
+				const runs = data.check_runs ?? [];
+				for (const run of runs) {
+					const check: GitPullRequestCheck = {
+						name: run.name,
+						status: CHECK_STATUS_MAP[run.status] ?? 'unknown',
+						conclusion: run.conclusion ? (CHECK_CONCLUSION_MAP[run.conclusion] ?? null) : null,
+						...(run.details_url ? { detailsUrl: run.details_url } : {})
+					};
+					out.push(check);
+				}
+				seen += runs.length;
+				// `total_count` is GitHub's own count for the ref, so this
+				// is the only honest way to know whether a page-1 read saw
+				// everything. A response without it is taken at face value.
+				const total = typeof data.total_count === 'number' ? data.total_count : seen;
+				if (seen >= total || runs.length === 0) break;
+				if (page >= CHECKS_MAX_PAGES) {
+					complete = false;
+					break;
+				}
+				page += 1;
 			}
 		} catch {
 			// `checks:read` not granted, or a provider without the Checks
-			// API. Fall through to commit statuses.
+			// API. Fall through to commit statuses — but say so: a verdict
+			// rolled up without the Checks API cannot claim to have seen
+			// every Actions run on the commit.
+			complete = false;
 		}
 
 		try {
-			const { data } = await octokit.rest.repos.listCommitStatusesForRef({
-				owner,
-				repo,
-				ref,
-				per_page: CHECKS_PER_PAGE
-			});
 			// Statuses are append-only per context — keep the newest per
 			// context so a fixed re-run doesn't leave a stale red behind.
-			const newestByContext = new Map<string, (typeof data)[number]>();
-			for (const status of data) {
-				if (!newestByContext.has(status.context)) newestByContext.set(status.context, status);
+			// GitHub returns them newest-first, so the FIRST row wins.
+			const newestByContext = new Map<string, { context: string; state: string; target_url?: string | null }>();
+			let page = 1;
+			for (;;) {
+				const { data } = await octokit.rest.repos.listCommitStatusesForRef({
+					owner,
+					repo,
+					ref,
+					per_page: CHECKS_PER_PAGE,
+					page
+				});
+				for (const status of data) {
+					if (!newestByContext.has(status.context)) newestByContext.set(status.context, status);
+				}
+				// No total_count on this endpoint: a short page is the end.
+				if (data.length < CHECKS_PER_PAGE) break;
+				if (page >= CHECKS_MAX_PAGES) {
+					complete = false;
+					break;
+				}
+				page += 1;
 			}
 			for (const status of newestByContext.values()) {
 				const settled = status.state !== 'pending';
@@ -833,10 +907,12 @@ export class GitHubApiService {
 				});
 			}
 		} catch {
-			// Same posture — an unreadable source contributes nothing.
+			// Same posture — an unreadable source contributes nothing, and
+			// is reported as a gap rather than as "there was nothing here".
+			complete = false;
 		}
 
-		return out;
+		return { checks: out, complete };
 	}
 
 	/**

@@ -1,4 +1,5 @@
 import {
+    clampQueuedMaxAgeSec,
     DEFAULT_FLEET_AGENT_EXECUTION_MODE,
     DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE,
     DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER,
@@ -16,12 +17,18 @@ import {
     type FleetAgentExecutionMode,
     type FleetAgentExecutionPermissionMode,
     type FleetAgentExecutionProvider,
+    type FleetJobKind,
+    FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
+    FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
+    FLEET_MAX_DAILY_COST_CEILING_CENTS,
+    FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_MIN_NODE_OFFLINE_AFTER_MS,
 } from '@ever-works/contracts';
@@ -31,7 +38,31 @@ import {
     catalogCreditsMarginPercent,
     catalogPaygMaxMonthlyCapCredits,
 } from '../subscriptions/billing/stripe-catalog';
+// CI feedback + autonomous fix loop (slice AC, EW-806). Concrete file
+// import, not the tasks-domain barrel: `task-ci-auto-resume.ts` is a pure
+// leaf (its only import is `node:crypto`) and pulling the barrel here
+// would drag the Nest service graph into config resolution.
+import {
+    DEFAULT_CI_AUTO_RESUME_ATTEMPTS,
+    MAX_CI_AUTO_RESUME_ATTEMPTS,
+    clampAutoResumeAttempts,
+} from '../tasks-domain/task-ci-auto-resume';
 type AppType = 'cli' | 'api';
+
+/**
+ * Fleet cost accounting (EW-777) — parse a dollar env var into whole
+ * cents, or null when unset. Unlike the clamped knobs, a nonsense value
+ * (non-numeric, zero, negative, above the contract cap) is `null` = "no
+ * ceiling", NOT a clamped one: a ceiling nobody typed correctly must not
+ * silently become a ceiling nobody chose. The service logs which value is
+ * in force, and the settings page shows it.
+ */
+function usdEnvToCents(raw: string | undefined): number | null {
+    const usd = parseFloat(raw || '');
+    if (!Number.isFinite(usd) || usd <= 0) return null;
+    const cents = Math.round(usd * 100);
+    return cents >= 1 && cents <= FLEET_MAX_DAILY_COST_CEILING_CENTS ? cents : null;
+}
 
 /**
  * Parse an integer env var into a clamped range, falling back to
@@ -181,8 +212,10 @@ export const config = {
      *
      * Nothing in this group turns the fleet runtime ON by itself — that
      * is still `EVER_WORKS_JOB_RUNTIME=node` (or a tenant overlay row).
-     * `FLEET_NODE_RUNTIME_ENABLED=false` is the kill switch that wins
-     * over both.
+     * `FLEET_NODE_RUNTIME_ENABLED=false` is a ROUTING SELECTOR that wins
+     * over both — work falls back to the cloud. It is NOT a panic control;
+     * the control that stops work is the DB-backed global stop flag
+     * (`FleetKillSwitchService`, EW-778).
      */
     fleetNode: {
         /**
@@ -203,6 +236,31 @@ export const config = {
         getLeaseTtlSeconds(): number | undefined {
             const raw = parseInt(process.env.FLEET_NODE_LEASE_TTL_SECONDS || '', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+        },
+        /**
+         * Queue SLA (self-build slice S / EW-775): the longest a `queued`
+         * job of `kind` may wait for an eligible runner before
+         * `FleetJobService.expireQueued` fails it.
+         *
+         * `FLEET_NODE_QUEUE_MAX_AGE_SECONDS` sets every kind; the per-kind
+         * `FLEET_NODE_QUEUE_MAX_AGE_SECONDS_AGENT_TASK` /
+         * `_ACCEPTANCE_CHECKS` / `_BROWSER_CHECK` overrides it. Always
+         * passed through `clampQueuedMaxAgeSec`: unset or nonsense is the
+         * kind's default, out-of-range is clamped, and there is no value
+         * that means "wait forever" — a deploy-manifest typo must fail
+         * closed to the documented bound, not to an unbounded queue.
+         */
+        getQueuedMaxAgeSeconds(kind: FleetJobKind): number {
+            const suffix = kind.toUpperCase().replace(/-/g, '_');
+            const perKind = parseInt(
+                process.env[`FLEET_NODE_QUEUE_MAX_AGE_SECONDS_${suffix}`] || '',
+                10,
+            );
+            if (Number.isFinite(perKind) && perKind > 0) {
+                return clampQueuedMaxAgeSec(kind, perKind);
+            }
+            const all = parseInt(process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS || '', 10);
+            return clampQueuedMaxAgeSec(kind, Number.isFinite(all) && all > 0 ? all : undefined);
         },
         /**
          * Capability tags a node must advertise to be eligible for this
@@ -286,6 +344,76 @@ export const config = {
                 .split(',')
                 .map((name) => name.trim())
                 .filter((name) => name.length > 0);
+        },
+        /**
+         * Run secrets (self-build slice Y) — the instance kill switch on
+         * delivering a repository's seed `.env` files to a fleet node.
+         *
+         * Default ON, because the feature is opt-in per repository already:
+         * a registry row with no env files delivers nothing, and turning
+         * this off is for an operator who wants the whole PATH shut, not
+         * for narrowing one repository.
+         *
+         * Turning it OFF fails a run that NEEDS env files closed, with
+         * `FLEET_RUN_SECRETS_DISABLED_REASON` — it never starts the run
+         * with a partial environment, because "the suite ran and every
+         * database test failed" is a far worse answer than "the run
+         * refused, here is the setting".
+         */
+        isRunEnvFilesEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_RUN_ENV_FILES || '').trim().toLowerCase();
+            if (raw === 'false' || raw === '0') return false;
+            return true;
+        },
+
+        // ── Self-build slice Z (EW-796) — the platform-MCP bridge ───
+        //
+        // OFF by default and off in two independent ways: this operator
+        // switch AND a configured server URL. Neither implies the other,
+        // and a run additionally needs its Agent's `canCallExternalTools`
+        // permission, so three separate facts have to line up before a
+        // node is ever asked to mint a credential.
+        //
+        // Why an operator switch at all: the bridge hands a model on
+        // someone's desktop a live (if short-lived and narrowly scoped)
+        // platform credential. That is a deployment-level decision about
+        // the whole install, not a per-tenant preference, and it must be
+        // possible to turn the whole thing off in one place during an
+        // incident without touching a single Agent.
+
+        /**
+         * Operator switch for the fleet MCP bridge. Default FALSE —
+         * only the literal `true` / `1` turns it on, so a typo or an
+         * empty value fails closed to today's behaviour (no platform
+         * tools in a fleet run).
+         */
+        isMcpBridgeEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_MCP_BRIDGE_ENABLED || '').trim().toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
+        /**
+         * Absolute URL of the platform MCP endpoint the node's loopback
+         * proxy forwards to (`apps/mcp` streamable-HTTP transport, whose
+         * endpoint is `/mcp` on `EVER_WORKS_MCP_PORT`).
+         *
+         * Validated here rather than at the node: a nonsense value must
+         * fail on the platform, where an operator reads logs, and not on
+         * fifteen desktops. Anything that is not an absolute http(s) URL
+         * is treated as unset — which switches the bridge off rather
+         * than pointing a credential-bearing proxy at a garbage host.
+         */
+        getMcpServerUrl(): string | undefined {
+            const raw = (process.env.FLEET_NODE_MCP_URL || '').trim();
+            if (!raw) return undefined;
+            let parsed: URL;
+            try {
+                parsed = new URL(raw);
+            } catch {
+                return undefined;
+            }
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+            // Strip a trailing slash so the node builds one canonical URL.
+            return raw.endsWith('/') && raw.length > 1 ? raw.slice(0, -1) : raw;
         },
 
         // ── Agent execution v2 — model CLIs on the node ─────────────
@@ -413,6 +541,27 @@ export const config = {
             );
         },
         /**
+         * Credential lifecycle (EW-799) — how long BOTH credentials are
+         * accepted after a node rotates itself
+         * (`FLEET_CREDENTIAL_ROTATION_OVERLAP_MS`, default 15 minutes,
+         * floor 30s, ceiling 24h).
+         *
+         * The window exists so a machine can finish the job it is holding
+         * and persist its new secret before the old one dies. It closes on
+         * a clock, never on a callback: a node that never comes back still
+         * loses its old credential on time. Long enough to survive a
+         * restart; the 24h ceiling is where a handover window would stop
+         * being a handover and become a second permanent credential.
+         */
+        getCredentialRotationOverlapMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
+            );
+        },
+        /**
          * Silence after which an `online` node is swept to `offline` by
          * the next owner-scoped list read. Default 5 minutes.
          *
@@ -425,6 +574,25 @@ export const config = {
                 process.env.FLEET_NODE_OFFLINE_AFTER_MS,
                 FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
                 FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Fleet health signals (EW-776) — how long an already-offline node
+         * stays gone before its owner gets a SECOND, louder Inbox notice.
+         * Default 30 minutes (`FLEET_NODE_OFFLINE_NOTICE_AFTER_MS`).
+         *
+         * Floored at {@link getNodeOfflineAfterMs}, not at a constant: a
+         * window shorter than the sweep window would fire the escalation
+         * before the node is even considered offline, i.e. two notices for
+         * one event. The floor is read live so lowering it below a raised
+         * `FLEET_NODE_OFFLINE_AFTER_MS` still cannot invert the pair.
+         */
+        getNodeOfflineNoticeAfterMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS,
+                FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
+                this.getNodeOfflineAfterMs(),
                 Number.MAX_SAFE_INTEGER,
             );
         },
@@ -445,6 +613,27 @@ export const config = {
                 1,
                 FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
             );
+        },
+        /**
+         * Fleet cost accounting (EW-777) — deployment-default DAILY (UTC
+         * day) model-spend ceiling for ONE node, in cents, or null for no
+         * ceiling. `FLEET_NODE_DAILY_COST_CEILING_USD`; a node's own
+         * `dailyCostCeilingCents` column overrides it. Unset (the default)
+         * means no ceiling and zero behaviour change — enabling one is an
+         * explicit decision, and crossing it DRAINS the node until its
+         * owner re-enables it.
+         */
+        getDefaultNodeDailyCostCeilingCents(): number | null {
+            return usdEnvToCents(process.env.FLEET_NODE_DAILY_COST_CEILING_USD);
+        },
+        /**
+         * Deployment-default FLEET-WIDE daily ceiling (every node of one
+         * owner, summed), in cents, or null. `FLEET_DAILY_COST_CEILING_USD`;
+         * the owner's `fleet_cost_policies` row overrides it. Same
+         * unset-means-none rule as the per-node default.
+         */
+        getDefaultFleetDailyCostCeilingCents(): number | null {
+            return usdEnvToCents(process.env.FLEET_DAILY_COST_CEILING_USD);
         },
     },
 
@@ -1305,6 +1494,68 @@ export const config = {
         getMaxConcurrentRunsPerOrg() {
             const raw = parseInt(process.env.AGENT_MAX_CONCURRENT_RUNS_PER_ORG || '25', 10);
             return Number.isFinite(raw) ? raw : 25;
+        },
+        /**
+         * Task-graph fan-out (self-build slice AH) — how many TODO Tasks
+         * `TaskGraphFanoutService` may START for ONE owner in a single
+         * tick.
+         *
+         * 🛑 READ THE ZERO THE OTHER WAY ROUND. For the concurrency valves
+         * above, `<= 0` means "no ceiling". Here `<= 0` means the driver
+         * is OFF and starts nothing — which is the DEFAULT, because this
+         * is the one knob on the platform that begins work nobody clicked.
+         * An operator opts in by setting a positive number.
+         *
+         * The bound is per OWNER per tick, not a concurrency limit: the
+         * real ceilings (the Work / org valves, the plan entitlement, the
+         * credits precheck, the global stop flag) still decide whether any
+         * given start is admitted, and a Task refused by them stays `todo`
+         * and is a candidate again next tick.
+         */
+        getTaskFanoutMaxStartsPerOwner() {
+            const raw = parseInt(process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER || '0', 10);
+            return Number.isFinite(raw) ? raw : 0;
+        },
+        /**
+         * How many TODO Tasks one fan-out tick SCANS (before blocker,
+         * agent and admission filtering). Bounds the tick's cost — the
+         * blocker check is one query per blocker row — not how much work
+         * starts; `getTaskFanoutMaxStartsPerOwner` does that.
+         */
+        getTaskFanoutScanLimit() {
+            const raw = parseInt(process.env.TASK_FANOUT_SCAN_LIMIT || '50', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 50;
+        },
+        /**
+         * CI feedback + autonomous fix loop (self-build slice AC, EW-806) —
+         * how many times ONE Task may be auto-resumed, over its whole life,
+         * because CI went red or a reviewer rejected its pull request.
+         *
+         * 💸 THIS KNOB SPENDS MONEY. Each attempt is a full
+         * `agent-task-execute` run on a fleet PC — the same order of model
+         * spend as the run that opened the pull request. The default of
+         * TWO therefore caps what this feature can add to any one Task at
+         * two extra runs, forever, not two per push and not two per day.
+         *
+         * `0` switches the loop OFF: check results are still ingested and
+         * the board still goes red, nothing is resumed. Values are clamped
+         * to 0..5; an unparseable value falls back to the default rather
+         * than silently disabling a shipped loop.
+         *
+         * The COUNTER is not here — it is rows in
+         * `task_ci_auto_resume_attempts`. This is only the ceiling.
+         */
+        getCiAutoResumeMaxAttempts() {
+            // `clampAutoResumeAttempts` rather than the local
+            // `clampedIntEnv`: the clamp that decides how much money this
+            // loop may spend has its own unit tests next to the constants
+            // it clamps against, and those tests are only worth anything
+            // if this is the function actually shipped. `parseInt` of an
+            // absent or unparseable value yields NaN, which the clamp maps
+            // to DEFAULT_CI_AUTO_RESUME_ATTEMPTS.
+            return clampAutoResumeAttempts(
+                parseInt(process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS ?? '', 10),
+            );
         },
         /**
          * H2 kill-switch for the plan-driven concurrency ceiling

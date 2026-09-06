@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isFleetModelPluginId } from '@ever-works/contracts';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import {
     PluginUsageRepository,
@@ -277,16 +278,28 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
      * founder decision. `admin`/`env`/`default` sources are
      * platform-supplied and bill normally. Per-plugin failures bill that
      * plugin (never exempt on doubt); no settings service ⇒ no exemption.
+     *
+     * Fleet cost accounting (EW-777): a `fleet-node:*` row is a FLEET
+     * run's model spend, billed to the CLI seat the owner's own machine is
+     * logged in as — bring-your-own by construction, exempt under the same
+     * founder rule as BYOK (P2/P3). It needs no settings service: the
+     * plugin id itself is the provenance. The spend is still stamped on
+     * `agent_runs.costCents` above (visibility, Goal caps, ceilings); it
+     * is simply never debited from platform credits.
      */
     private async resolveExemptPlugins(
         spend: RunPluginSpend[],
         userId: string,
         workId?: string,
     ): Promise<string[]> {
-        if (!this.pluginSettingsService) return [];
         const exempt: string[] = [];
         for (const row of spend) {
             if (row.costCents <= 0) continue;
+            if (isFleetModelPluginId(row.pluginId)) {
+                exempt.push(row.pluginId);
+                continue;
+            }
+            if (!this.pluginSettingsService) continue;
             try {
                 const resolved = await this.pluginSettingsService.getResolvedSettings(
                     row.pluginId,

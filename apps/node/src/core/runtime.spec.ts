@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CapabilityEnvironment, CommandRunner } from './capabilities';
 import type { FetchLike } from './fleet-client';
 import { createLogger, type LogEntry } from './logger';
-import { clampHeartbeatInterval, createNodeRuntime, enrollNode, installShutdownHandlers } from './runtime';
+import {
+	buildSelfDescriptionTelemetry,
+	clampHeartbeatInterval,
+	createNodeRuntime,
+	enrollNode,
+	installShutdownHandlers
+} from './runtime';
 import { PUBLISH_FENCE_MARGIN_MS } from './worker-loop';
 import {
 	clampResourceLimits,
@@ -58,6 +64,38 @@ describe('clampHeartbeatInterval', () => {
 		expect(clampHeartbeatInterval(1)).toBe(MIN_HEARTBEAT_INTERVAL_MS);
 		expect(clampHeartbeatInterval(99_999_999)).toBe(MAX_HEARTBEAT_INTERVAL_MS);
 		expect(clampHeartbeatInterval(30_000)).toBe(30_000);
+	});
+});
+
+describe('buildSelfDescriptionTelemetry — model identity (fleet cost accounting, EW-777)', () => {
+	it('asks the SAME claude-code binary the agent-task step spawns which seat it is logged in as', async () => {
+		const run = vi.fn(async (command: string, args: string[]) => {
+			if (command === '/opt/claude' && args[0] === 'auth') {
+				return { code: 0, stdout: JSON.stringify({ loggedIn: true, email: 'ops@example.com' }), stderr: '' };
+			}
+			return { code: 127, stdout: '', stderr: '' };
+		});
+		const telemetry = buildSelfDescriptionTelemetry({
+			...io(async () => ({ ok: true, status: 200, text: async () => '{}' })).io,
+			runner: { run },
+			environment: { ...environment, modelCli: { 'claude-code': '/opt/claude' } }
+		});
+
+		await expect(telemetry.modelIdentity?.()).resolves.toBe('claude-code: ops@example.com');
+		expect(run).toHaveBeenCalledWith('/opt/claude', ['auth', 'status', '--json']);
+	});
+
+	it('does not spawn the CLI on every beat — the reading is cached', async () => {
+		const run = vi.fn(async () => ({ code: 0, stdout: JSON.stringify({ loggedIn: true }), stderr: '' }));
+		const telemetry = buildSelfDescriptionTelemetry({
+			...io(async () => ({ ok: true, status: 200, text: async () => '{}' })).io,
+			runner: { run }
+		});
+
+		await telemetry.modelIdentity?.();
+		await telemetry.modelIdentity?.();
+		await telemetry.modelIdentity?.();
+		expect(run).toHaveBeenCalledTimes(1);
 	});
 });
 
@@ -175,6 +213,160 @@ describe('createNodeRuntime', () => {
 		expect(runtime.worker?.getState()).toMatchObject({ state: 'unsafe', lastError: 'unverified process tree' });
 		expect(requests).toEqual([]);
 		await runtime.worker?.stop();
+	});
+
+	/**
+	 * Fleet health signals (EW-776) — end to end on the node side.
+	 *
+	 * The wiring is the risky part, not the mapping: `describe` is closed
+	 * over the telemetry object at line ~345, BEFORE the worker loop is
+	 * constructed. A naive "pass the worker into describeSelf" would have
+	 * required reordering that construction, and the heartbeat would have
+	 * silently reported nothing. So these drive the REAL beat body.
+	 */
+	describe('worker state on the heartbeat', () => {
+		const beatBodies = (bodies: Record<string, unknown>[]): FetchLike => {
+			return async (url, init) => {
+				if (url.endsWith('/api/fleet/heartbeat')) {
+					bodies.push(JSON.parse(init.body) as Record<string, unknown>);
+					return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: nodeFromApi }) };
+				}
+				return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+			};
+		};
+
+		const baseConfig = (over: Partial<NodeConfig> = {}): NodeConfig => ({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z',
+			...over
+		});
+
+		it('reports a restored quarantine, with the reason that was persisted', async () => {
+			// The whole defect, in one test: a machine whose durable safety
+			// marker survived a restart used to beat as a healthy, idle
+			// `online` node while refusing every job.
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(
+				baseConfig({
+					unsafe: { since: '2026-08-22T23:00:00.000Z', reason: 'unverified process tree' }
+				}),
+				deps,
+				{ workerEnabled: true }
+			);
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0].workerState).toBe('quarantined');
+			expect(bodies[0].workerStateReason).toBe('unverified process tree');
+		});
+
+		it('reports a node started drained as paused', async () => {
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(baseConfig(), deps, {
+				workerEnabled: true,
+				startPaused: true
+			});
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0].workerState).toBe('paused');
+		});
+
+		it('reports idle for a worker that is simply up', async () => {
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(baseConfig(), deps, { workerEnabled: true });
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0].workerState).toBe('idle');
+			expect(bodies[0]).not.toHaveProperty('workerStateReason');
+		});
+
+		it('reports NOTHING on a visibility-only node with no worker', async () => {
+			// Absent, not `idle`: there is no worker, so there is no
+			// capacity, and the platform shows "unknown" rather than a
+			// fabricated readiness.
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(baseConfig(), deps);
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0]).not.toHaveProperty('workerState');
+			expect(bodies[0]).not.toHaveProperty('workerStateReason');
+			// The rest of the description is unaffected.
+			expect(bodies[0].platform).toBe('linux/x64');
+		});
+	});
+
+	it('points every client at the pinned control plane, and warns when the pin is not the enrolled origin', async () => {
+		// EW-779. A broken `develop` must not be able to orphan the fleet: an
+		// operator sets EVER_WORKS_NODE_API_URL, restarts, and both the
+		// heartbeat and the job channel move together — they are resolved ONCE
+		// so they can never end up on different platforms.
+		const { io: deps, entries } = io(async () => ({
+			ok: true,
+			status: 200,
+			text: async () => JSON.stringify({ ok: true, node: nodeFromApi })
+		}));
+		const config: NodeConfig = {
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z'
+		};
+
+		const runtime = createNodeRuntime(config, deps, {
+			workerEnabled: true,
+			env: { EVER_WORKS_NODE_API_URL: 'https://apistage.ever.works/' }
+		});
+
+		expect(runtime.client.baseUrl).toBe('https://apistage.ever.works');
+		const logged = entries.map((entry) => entry.message).join('\n');
+		expect(logged).toContain('Control plane: https://apistage.ever.works');
+		// The pin does not match the origin the secret was minted against, so
+		// every call will 401 — said out loud rather than left to a retry loop.
+		expect(logged).toContain('401');
+		// And the pin is never written back: unsetting the variable must be
+		// enough to undo it.
+		expect(config.apiUrl).toBe('https://api.ever.works');
+		await runtime.worker?.stop();
+	});
+
+	it('falls back to the enrolled origin when nothing is pinned', async () => {
+		const { io: deps, entries } = io(async () => ({
+			ok: true,
+			status: 200,
+			text: async () => JSON.stringify({ ok: true, node: nodeFromApi })
+		}));
+		const config: NodeConfig = {
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z'
+		};
+
+		const runtime = createNodeRuntime(config, deps, { env: {} });
+		expect(runtime.client.baseUrl).toBe('https://api.ever.works');
+		expect(entries.map((entry) => entry.message).join('\n')).toContain('from the enrolled config');
 	});
 
 	it('wires a client and a loop against the stored config, protecting the secret', async () => {

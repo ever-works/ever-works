@@ -8,6 +8,11 @@ vi.mock('next-intl', () => ({
 
 // Same shim the sibling viewer specs use: the real Button imports the
 // locale-aware `Link`, which drags the Next router into jsdom.
+// The overlay derives the download URL from `usePathname()`: stand in an Org.
+vi.mock('next/navigation', () => ({
+    usePathname: () => '/org/ever/memory',
+}));
+
 vi.mock('@/components/ui/button', () => ({
     Button: ({
         children,
@@ -87,7 +92,7 @@ describe('MemoryFilePreview', () => {
 
         expect(screen.getByTestId('memory-files-preview-download')).toHaveAttribute(
             'href',
-            '/api/memory/files/kb-9/download?source=kb-upload',
+            '/api/memory/files/kb-9/download?source=kb-upload&scope=org%3Aever',
         );
     });
 
@@ -111,7 +116,7 @@ describe('MemoryFilePreview', () => {
             ),
         );
         expect(fetchMock).toHaveBeenCalledWith(
-            '/api/memory/files/f-1/download?source=upload',
+            '/api/memory/files/f-1/download?source=upload&scope=org%3Aever',
             expect.objectContaining({ cache: 'no-store' }),
         );
     });

@@ -59,7 +59,10 @@ import {
     type EverWorksGitRepoRef,
 } from '@src/ever-works-providers';
 import { config } from '@src/config';
-import { isRepositoryWorkKind } from '@ever-works/contracts';
+import {
+    isRepositoryWorkKind,
+    normalizeWorkRepoDeclaredCommandPolicy,
+} from '@ever-works/contracts';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
@@ -983,6 +986,22 @@ export class WorkLifecycleService {
             }
             if (updateDto.maxGateAttempts !== undefined) {
                 updateData.maxGateAttempts = updateDto.maxGateAttempts;
+            }
+
+            // Repository-declared commands (EW-807). Normalized on the way
+            // IN as well as on the way out: the column is `simple-json`, so
+            // this is the last place the value is a validated DTO rather
+            // than arbitrary stored JSON, and normalizing here means the
+            // allow-list an owner reads back is the one the matcher will
+            // actually compare against (whitespace collapsed, duplicates
+            // gone, `off` carrying no live list). `null` clears the
+            // override back to "this Work does not read its repository's
+            // commands", which is where every Work starts.
+            if (updateDto.repoDeclaredCommands !== undefined) {
+                updateData.repoDeclaredCommands =
+                    updateDto.repoDeclaredCommands === null
+                        ? null
+                        : normalizeWorkRepoDeclaredCommandPolicy(updateDto.repoDeclaredCommands);
             }
 
             // Merge-policy matrix (Wave 3, D4). A PARTIAL object is normal —

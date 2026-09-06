@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
+import { isQueueExpiredError } from '@ever-works/contracts';
 import type { FleetAgentTaskResult, FleetJobView } from '@ever-works/contracts';
 import {
     FleetAgentTaskReconcilerService,
@@ -93,6 +94,10 @@ describe('FleetAgentTaskReconcilerService', () => {
     let dispatchGate: { drainForWork: jest.Mock };
     let inbox: { notice: jest.Mock; questionRaised: jest.Mock } | undefined;
     let nodes: { findById: jest.Mock };
+    // Fleet cost accounting (EW-777) — the three trailing optional deps.
+    let pluginUsage: { record: jest.Mock } | undefined;
+    let jobsRepo: { stampCostCents: jest.Mock } | undefined;
+    let costCeiling: { evaluateAfterCompletion: jest.Mock } | undefined;
 
     const build = () =>
         new FleetAgentTaskReconcilerService(
@@ -105,6 +110,9 @@ describe('FleetAgentTaskReconcilerService', () => {
             dispatchGate as never,
             inbox as never,
             nodes as never,
+            pluginUsage as never,
+            jobsRepo as never,
+            costCeiling as never,
         );
 
     beforeEach(() => {
@@ -119,6 +127,8 @@ describe('FleetAgentTaskReconcilerService', () => {
             setAwaitingInput: jest.fn().mockResolvedValue(undefined),
             updateGateResults: jest.fn().mockResolvedValue(undefined),
             updateTelemetry: jest.fn().mockResolvedValue(undefined),
+            addTokens: jest.fn().mockResolvedValue(undefined),
+            stampCostCents: jest.fn().mockResolvedValue(undefined),
         };
         tasks = {
             findById: jest.fn().mockResolvedValue({
@@ -158,8 +168,269 @@ describe('FleetAgentTaskReconcilerService', () => {
             questionRaised: jest.fn().mockResolvedValue(undefined),
         };
         nodes = {
-            findById: jest.fn().mockResolvedValue({ id: NODE, userId: USER, name: 'everdesk2' }),
+            findById: jest.fn().mockResolvedValue({
+                id: NODE,
+                userId: USER,
+                name: 'everdesk2',
+                modelIdentity: 'claude-code: ops@example.com (Acme, max)',
+            }),
         };
+        pluginUsage = { record: jest.fn().mockResolvedValue({ id: 'usage-1' }) };
+        jobsRepo = { stampCostCents: jest.fn().mockResolvedValue(undefined) };
+        costCeiling = {
+            evaluateAfterCompletion: jest
+                .fn()
+                .mockResolvedValue({ drainedNodeIds: [], noticesFiled: 0 }),
+        };
+    });
+
+    describe('fleet cost accounting (EW-777)', () => {
+        const billed: FleetAgentTaskResult = {
+            ...successResult,
+            model: {
+                ...successResult.model!,
+                costUsd: 0.42,
+                turns: 4,
+                modelId: 'claude-opus-4-1-20250805',
+                inputTokens: 120,
+                outputTokens: 3400,
+                cacheReadTokens: 90_000,
+                cacheCreationTokens: 2500,
+                totalTokens: 96_020,
+            },
+        };
+
+        const completed = (result: FleetAgentTaskResult, status: FleetJobView['status'] = 'done') =>
+            build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job({ status }),
+                    USER,
+                    'node-report',
+                    NODE,
+                    result as unknown as Record<string, unknown>,
+                ),
+            );
+
+        it('writes what the cloud path writes — the usage row, the tokens, the job cost — BEFORE the terminal write, in exact cents', async () => {
+            await completed(billed);
+
+            expect(pluginUsage!.record).toHaveBeenCalledTimes(1);
+            expect(pluginUsage!.record).toHaveBeenCalledWith({
+                workId: 'work-1',
+                userId: USER,
+                pluginId: 'fleet-node:claude-code',
+                capability: 'ai',
+                units: 4,
+                costCents: 42,
+                modelId: 'claude-opus-4-1-20250805',
+                requestId: 'job-1',
+                metadata: expect.objectContaining({
+                    source: 'fleet-node',
+                    provider: 'claude-code',
+                    nodeId: NODE,
+                    fleetJobId: 'job-1',
+                    // The seat the spend is billed to, frozen per run so
+                    // attribution survives a later re-login on the node.
+                    billedTo: 'claude-code: ops@example.com (Acme, max)',
+                    costUsd: 0.42,
+                    turns: 4,
+                    inputTokens: 120,
+                    outputTokens: 3400,
+                    cacheReadTokens: 90_000,
+                    cacheCreationTokens: 2500,
+                    totalTokens: 96_020,
+                }),
+                agentId: AGENT,
+                taskId: TASK,
+                runId: RUN,
+            });
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 96_020);
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 42);
+            // The row must exist when `markCompleted`'s CAS settles it.
+            expect(pluginUsage!.record.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.markCompleted.mock.invocationCallOrder[0],
+            );
+            // And the ceiling reads the job AFTER its cost is stamped.
+            expect(jobsRepo!.stampCostCents.mock.invocationCallOrder[0]).toBeLessThan(
+                costCeiling!.evaluateAfterCompletion.mock.invocationCallOrder[0],
+            );
+            expect(costCeiling!.evaluateAfterCompletion).toHaveBeenCalledWith({
+                userId: USER,
+                nodeId: NODE,
+                jobId: 'job-1',
+                costCents: 42,
+                runId: RUN,
+                taskId: TASK,
+                agentId: AGENT,
+                workId: 'work-1',
+                organizationId: null,
+            });
+            // `stampCostCents` on the RUN is the settlement's job, not ours.
+            expect(runs.stampCostCents).not.toHaveBeenCalled();
+            // The chat sentence is byte-identical to before.
+            expect(taskChat.post.mock.calls[0][1].body).toContain('$0.42');
+        });
+
+        it('rounds the dollar figure to the nearest cent and defaults the units to one turn', async () => {
+            await completed({
+                ...billed,
+                model: { ...billed.model!, costUsd: 0.125, turns: null },
+            });
+
+            expect(pluginUsage!.record).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 13, units: 1 }),
+            );
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 13);
+        });
+
+        it('records on the FAILURE path too, before markFailed', async () => {
+            await completed(
+                {
+                    ...billed,
+                    status: 'failed',
+                    failureReason: 'a required acceptance check did not pass',
+                },
+                'failed',
+            );
+
+            expect(pluginUsage!.record).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 42 }),
+            );
+            expect(pluginUsage!.record.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.markFailed.mock.invocationCallOrder[0],
+            );
+            expect(runs.markCompleted).not.toHaveBeenCalled();
+        });
+
+        it('records on the QUESTION path, before the parking CAS', async () => {
+            await completed({
+                ...billed,
+                question: {
+                    text: 'Which database should this target?',
+                    context: null,
+                    truncated: false,
+                    mountDir: null,
+                },
+            });
+
+            expect(pluginUsage!.record).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 42 }),
+            );
+            expect(pluginUsage!.record.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.tryMarkCompleted.mock.invocationCallOrder[0],
+            );
+            expect(runs.markFailed).not.toHaveBeenCalled();
+        });
+
+        it('a Codex run (tokens, no price) adds its tokens, writes NO usage row, stamps NO cost, and hands the ceiling a null cost', async () => {
+            await completed({
+                ...billed,
+                model: {
+                    provider: 'codex',
+                    status: 'succeeded',
+                    exitCode: 0,
+                    durationMs: 5000,
+                    summary: 'done',
+                    inputTokens: 120,
+                    outputTokens: 80,
+                    totalTokens: 200,
+                },
+            });
+
+            // Absent, not 0: a zero-cost row would settle `costCents = 0`,
+            // and the run list would read a Codex run as free.
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(jobsRepo!.stampCostCents).not.toHaveBeenCalled();
+            expect(runs.stampCostCents).not.toHaveBeenCalled();
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 200);
+            expect(costCeiling!.evaluateAfterCompletion).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: null }),
+            );
+            expect(runs.markCompleted).toHaveBeenCalled();
+        });
+
+        it('hands the ceiling a ZERO cost when no model ran at all (legacy command job)', async () => {
+            await completed({ ...billed, model: null });
+
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(runs.addTokens).not.toHaveBeenCalled();
+            expect(costCeiling!.evaluateAfterCompletion).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 0 }),
+            );
+        });
+
+        it('records nothing — and evaluates no ceiling — on a replayed completion whose run is already terminal', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'completed',
+            });
+
+            await completed(billed);
+
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(runs.addTokens).not.toHaveBeenCalled();
+            expect(jobsRepo!.stampCostCents).not.toHaveBeenCalled();
+            expect(costCeiling!.evaluateAfterCompletion).not.toHaveBeenCalled();
+        });
+
+        it('stamps the run directly when there is no Work to attribute the usage row to (its workId is NOT NULL)', async () => {
+            tasks.findById.mockResolvedValue({
+                id: TASK,
+                workId: null,
+                title: 'Fix the thing',
+                organizationId: null,
+            });
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: null,
+            });
+
+            await completed(billed);
+
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(runs.stampCostCents).toHaveBeenCalledWith(RUN, 42);
+            // The job cost and the tokens still land — the ceilings and
+            // the run list do not depend on a Work.
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 42);
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 96_020);
+        });
+
+        it('stamps the run directly when no usage service is bound, so the spend is never silently lost', async () => {
+            pluginUsage = undefined;
+
+            await completed(billed);
+
+            expect(runs.stampCostCents).toHaveBeenCalledWith(RUN, 42);
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 42);
+        });
+
+        it('still settles the run when the usage write, the stamp or the ceiling throws — every write is best-effort', async () => {
+            pluginUsage!.record.mockRejectedValue(new Error('usage table unavailable'));
+            jobsRepo!.stampCostCents.mockRejectedValue(new Error('fleet_jobs unavailable'));
+            costCeiling!.evaluateAfterCompletion.mockRejectedValue(new Error('ceiling exploded'));
+
+            await completed(billed);
+
+            expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'completed');
+        });
+
+        it('works without the three optional deps at all (older wiring): the run still settles', async () => {
+            pluginUsage = undefined;
+            jobsRepo = undefined;
+            costCeiling = undefined;
+
+            await completed(billed);
+
+            expect(runs.stampCostCents).toHaveBeenCalledWith(RUN, 42);
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 96_020);
+            expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
+        });
     });
 
     it('correlates only agent-task jobs that carry run and task ids', () => {
@@ -346,6 +617,50 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
     });
 
+    // Acceptance checks that mean something (EW-807). A failed install is
+    // not a failed test, and the message a human reads must say so — the
+    // fix for one is nothing like the fix for the other.
+    it('reports a failed SETUP as setup, with no failing checks to hunt for', async () => {
+        const failed: FleetAgentTaskResult = {
+            ...successResult,
+            status: 'failed',
+            // The gate did not fail. It never ran.
+            gateStatus: 'none',
+            checks: null,
+            setup: [
+                {
+                    id: 'repo/setup-1',
+                    status: 'red',
+                    exitCode: 1,
+                    durationMs: 90_000,
+                    logTail: 'ERR_PNPM_OUTDATED_LOCKFILE',
+                },
+            ],
+            setupStatus: 'red',
+            model: null,
+            failureReason:
+                "SETUP FAILED: 'repo/setup-1' exited 1. The workspace was never prepared, so the model, " +
+                'the steps and the acceptance checks did not run — this is not a failing test.',
+        };
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job({ status: 'failed' }),
+                USER,
+                'node-report',
+                NODE,
+                failed as unknown as Record<string, unknown>,
+            ),
+        );
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('Setup failed — the workspace was never prepared');
+        expect(body).toContain('- repo/setup-1: red (exit 1)');
+        expect(body).toContain('ERR_PNPM_OUTDATED_LOCKFILE');
+        expect(body).not.toContain('Failing checks:');
+        expect(runs.markFailed).toHaveBeenCalledWith(RUN, expect.stringContaining('SETUP FAILED'));
+        // And the gate is never recorded as red for it.
+        expect(runs.updateGateResults).not.toHaveBeenCalled();
+    });
+
     it('uses the job error when the node reported no structured result', async () => {
         await build().onCompleted(
             new FleetJobCompletedEvent(
@@ -384,6 +699,106 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(runs.markFailed).not.toHaveBeenCalled();
         expect(runs.markCompleted).not.toHaveBeenCalled();
         expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+    });
+
+    describe('queue SLA — a job no node ever took (self-build slice S)', () => {
+        const PINNED = '22222222-2222-4222-8222-222222222222';
+        const expiredError = `queued-max-age-exceeded: no eligible runner took the job within 24h (pinned to node ${PINNED}) [requires claude-code]`;
+        const expiredJob = (): FleetJobView =>
+            job({
+                status: 'failed',
+                nodeId: null,
+                targetNodeId: PINNED,
+                requiredCapabilities: ['claude-code'],
+                queuedAt: '2026-09-01T00:00:00.000Z',
+                completedAt: '2026-09-02T00:00:00.000Z',
+            });
+
+        it('fails the run with the stable token and files exactly ONE "never started" Inbox notice', async () => {
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    expiredJob(),
+                    USER,
+                    'queue-expired',
+                    null,
+                    null,
+                    expiredError,
+                ),
+            );
+
+            // The machine token lands in `failureReason`, switchable later.
+            expect(runs.markFailed).toHaveBeenCalledWith(RUN, expiredError);
+            expect(isQueueExpiredError(runs.markFailed.mock.calls[0][1])).toBe(true);
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+
+            expect(inbox!.notice).toHaveBeenCalledTimes(1);
+            const [userId, notice] = inbox!.notice.mock.calls[0];
+            expect(userId).toBe(USER);
+            expect(notice.title).toMatch(/^Fleet run never started: /);
+            // The owner reads a sentence with the facts they need to fix it.
+            expect(notice.body).toContain('within 24h');
+            expect(notice.body).toContain(`pinned to node ${PINNED}`);
+            expect(notice.body).toContain('claude-code');
+            expect(notice.body).toContain('Wake the runner');
+            expect(notice).toMatchObject({ taskId: TASK, agentRunId: RUN, workId: 'work-1' });
+
+            // Nothing ran, so nothing to push or finalize.
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(runs.markCompleted).not.toHaveBeenCalled();
+            expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
+        });
+
+        it('says "never started" in the Task chat rather than "failed"', async () => {
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    expiredJob(),
+                    USER,
+                    'queue-expired',
+                    null,
+                    null,
+                    expiredError,
+                ),
+            );
+
+            expect(taskChat.post).toHaveBeenCalledTimes(1);
+            expect(JSON.stringify(taskChat.post.mock.calls[0])).toContain(
+                'Fleet run never started',
+            );
+        });
+
+        it('keeps the stable token even when the event carries no error text', async () => {
+            await build().onCompleted(
+                new FleetJobCompletedEvent(expiredJob(), USER, 'queue-expired'),
+            );
+
+            expect(isQueueExpiredError(runs.markFailed.mock.calls[0][1])).toBe(true);
+            expect(inbox!.notice).toHaveBeenCalledTimes(1);
+        });
+
+        it('only mirrors the board when the run was already cancelled', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'cancelled',
+            });
+
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    expiredJob(),
+                    USER,
+                    'queue-expired',
+                    null,
+                    null,
+                    expiredError,
+                ),
+            );
+
+            expect(runs.markFailed).not.toHaveBeenCalled();
+            expect(inbox!.notice).not.toHaveBeenCalled();
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+        });
     });
 
     // Cancellation reaches a node as a REFUSED HEARTBEAT, and
@@ -1301,6 +1716,74 @@ describe('parseAgentTaskResult', () => {
         });
     });
 
+    /**
+     * Self-build slice Z (EW-796) — the MCP bridge verdict.
+     *
+     * It is a reporting value that a run report renders, so it is narrowed
+     * at this boundary like every other block: a shape nobody validated
+     * must not travel onward, and a malformed one must read exactly like a
+     * run that never had a bridge rather than failing the reconcile
+     * half-way through.
+     */
+    it('normalises the MCP bridge block (slice Z)', () => {
+        // Absent → null, indistinguishable from a run without the bridge.
+        expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.mcp).toBeNull();
+
+        // The two real shapes the node reports.
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: 7 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: 7 });
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: false, toolCalls: null, unavailableReason: 'EADDRINUSE' },
+            })!.mcp,
+        ).toEqual({ enabled: false, toolCalls: null, unavailableReason: 'EADDRINUSE' });
+
+        // Garbage of every shape → null rather than a throw.
+        for (const mcp of [null, 'yes', 42, [], {}, { enabled: 'true' }, { toolCalls: 3 }]) {
+            expect(
+                parseAgentTaskResult({ status: 'succeeded', taskId: TASK, mcp })!.mcp,
+            ).toBeNull();
+        }
+
+        // A nonsense count is dropped, not carried.
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: -1 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: null });
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: 2.7 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: 2 });
+
+        // Smuggled keys are dropped — including anything token-shaped a
+        // node could never legitimately have put there.
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            mcp: {
+                enabled: true,
+                toolCalls: 1,
+                token: 'ew_run_secret',
+                serverUrl: 'https://x/mcp',
+            },
+        })!.mcp!;
+        expect(Object.keys(parsed).sort()).toEqual(['enabled', 'toolCalls']);
+        expect(JSON.stringify(parsed)).not.toContain('ew_run_');
+    });
+
     it('normalises the owner question (slice Q): absent or garbage → null, oversize text sliced, unknown keys dropped', () => {
         expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.question).toBeNull();
         expect(
@@ -1336,6 +1819,34 @@ describe('parseAgentTaskResult', () => {
         })!.question!;
         expect(parsed.text).toBe('Use [redacted secret]?');
         expect(parsed.context).toBe('token [redacted secret] again');
+    });
+
+    it('keeps well-formed setup verdicts, drops malformed ones, and coerces setupStatus (EW-807)', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            setup: [
+                { id: 'install', status: 'red', exitCode: 1, durationMs: 10 },
+                { status: 'red', exitCode: 1, durationMs: 10 },
+                'pnpm install',
+                null,
+            ],
+            setupStatus: 'red',
+        })!;
+        expect(parsed.setup).toEqual([
+            { id: 'install', status: 'red', exitCode: 1, durationMs: 10 },
+        ]);
+        expect(parsed.setupStatus).toBe('red');
+        // A non-array, or a status word the contract does not define, is
+        // null rather than a value anything downstream could branch on.
+        const garbage = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            setup: 'pnpm install',
+            setupStatus: 'exploded',
+        })!;
+        expect(garbage.setup).toBeNull();
+        expect(garbage.setupStatus).toBeNull();
     });
 
     it('rejects anything without a status', () => {

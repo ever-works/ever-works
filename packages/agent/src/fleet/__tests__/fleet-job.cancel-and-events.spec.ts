@@ -49,10 +49,12 @@ function makeJob(over: Partial<FleetJob> = {}): FleetJob {
         leaseExpiresAt: null,
         attempts: 0,
         maxAttempts: 3,
+        leaseGeneration: 0,
         idempotencyKey: null,
         result: null,
         error: null,
         queuedReason: null,
+        queuedAt: new Date('2026-09-02T10:00:00Z'),
         cancelRequestedAt: null,
         startedAt: null,
         completedAt: null,
@@ -101,6 +103,8 @@ describe('FleetJobService — cancel + lifecycle events', () => {
                 return true;
             }),
             findExpiredLeases: jest.fn(async () => []),
+            // Queue SLA scan on the lease path (slice S): nothing stale here.
+            findQueuedOlderThan: jest.fn(async () => []),
             reclaim: jest.fn(async () => true),
             failExhausted: jest.fn(
                 async (_id: string, _observed: unknown, error: string, completedAt: Date) => {
@@ -142,6 +146,9 @@ describe('FleetJobService — cancel + lifecycle events', () => {
         expect(event.job.status).toBe('leased');
         expect(event.nodeId).toBe(NODE);
         expect(event.userId).toBe(USER);
+        // The claim identity rides on the event as it rides on the wire.
+        expect(view.leaseGeneration).toBe(1);
+        expect(event.job.leaseGeneration).toBe(1);
     });
 
     it('emits fleet.job.completed with the node report on complete', async () => {
@@ -153,6 +160,7 @@ describe('FleetJobService — cancel + lifecycle events', () => {
             jobId: JOB,
             success: true,
             result: { status: 'succeeded', taskId: 'task-1' },
+            leaseGeneration: job.leaseGeneration,
         });
         expect(done?.status).toBe('done');
         expect(emitter.emit).toHaveBeenCalledTimes(1);
@@ -163,6 +171,7 @@ describe('FleetJobService — cancel + lifecycle events', () => {
         expect(event.nodeId).toBe(NODE);
         expect(event.succeeded).toBe(true);
         expect(event.result).toEqual({ status: 'succeeded', taskId: 'task-1' });
+        expect(event.job.leaseGeneration).toBe(1);
     });
 
     it('emits fleet.job.completed (lease-exhausted) when the reclaim sweep fails a job', async () => {
@@ -254,7 +263,7 @@ describe('FleetJobService — cancel + lifecycle events', () => {
             // No completion yet — the node has not reported.
             expect(emitter.emit).not.toHaveBeenCalled();
 
-            const beat = await service.heartbeatJob(NODE, secret, JOB, 300);
+            const beat = await service.heartbeatJob(NODE, secret, JOB, 300, job.leaseGeneration);
             expect(beat).toBeNull();
             expect(jobs.extendLease).not.toHaveBeenCalled();
 
@@ -265,6 +274,7 @@ describe('FleetJobService — cancel + lifecycle events', () => {
                 jobId: JOB,
                 success: false,
                 error: 'Fleet job lease was lost',
+                leaseGeneration: job.leaseGeneration,
             });
             expect(reported?.status).toBe('failed');
             expect(emitter.emit.mock.calls[0][1].source).toBe('node-report');

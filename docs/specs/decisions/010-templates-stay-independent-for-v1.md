@@ -107,5 +107,5 @@ The DB-level union into a single `WorkshopTemplate` table is still rejected. The
 
 - ADR-007: Skill catalog in-monorepo (parallel decision for one of the catalogs).
 - [`features/UX-DESIGN-agents-skills-tasks.md` §4.1`](../features/UX-DESIGN-agents-skills-tasks.md).
-- Mission Templates: [`packages/agent/src/missions/mission-template.config.ts`](../../packages/agent/src/missions/mission-template.config.ts).
-- Existing `/templates` page: [`apps/web/src/components/templates/TemplatesCatalog.tsx`](../../apps/web/src/components/templates/TemplatesCatalog.tsx).
+- Mission Templates: [`packages/agent/src/missions/mission-template.config.ts`](../../../packages/agent/src/missions/mission-template.config.ts).
+- Existing `/templates` page: [`apps/web/src/components/templates/TemplatesCatalog.tsx`](../../../apps/web/src/components/templates/TemplatesCatalog.tsx).

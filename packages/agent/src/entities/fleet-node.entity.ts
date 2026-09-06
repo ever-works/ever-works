@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-import type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
+import type { FleetNodeKind, FleetNodeStatus, FleetNodeWorkerState } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -26,6 +26,14 @@ import { PortableDateColumn } from './_types';
  *      `enrolling` with a freshly minted one-time token: the old
  *      heartbeat secret stops working the instant the hash is replaced,
  *      and the operator re-enrolls the machine with the new token.
+ *   6. `rotateCredentialByCredential` (EW-799) is the SELF-service
+ *      rotation the machine performs with the credential it already
+ *      holds. It leaves the status alone and opens a bounded DUAL-ACCEPT
+ *      window: the replaced hash moves to `previousCredentialHash` and
+ *      both credentials authenticate until `previousCredentialExpiresAt`,
+ *      after which the old one is refused. That window is why rotation
+ *      can actually happen on six machines spread across desks — step 5
+ *      requires a human at the keyboard, so in practice it never runs.
  *
  * Cluster boundary: rows only ever describe user-enrolled machines.
  * Nodes of user-configured clusters (`clusterSource:
@@ -51,7 +59,7 @@ import { PortableDateColumn } from './_types';
  *
  * `k8s` is list-time only — never persisted as a row.
  */
-export type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
+export type { FleetNodeKind, FleetNodeStatus, FleetNodeWorkerState } from '@ever-works/contracts';
 /**
  * Statuses in which the platform will NOT lease new work onto a node.
  *
@@ -125,6 +133,57 @@ export class FleetNode {
     @PortableDateColumn({ nullable: true })
     credentialIssuedAt?: Date | null;
 
+    /**
+     * Credential lifecycle (EW-799) — sha256 hex of the credential this
+     * node held BEFORE its last self-rotation, or NULL.
+     *
+     * Deliberately a SEPARATE, NON-UNIQUE column rather than a second
+     * value in {@link enrollmentTokenHash}, for two independent reasons:
+     *
+     *   1. `idx_fleet_nodes_credential` is UNIQUE on `enrollmentTokenHash`;
+     *      two live hashes cannot share it.
+     *   2. `enroll` resolves a row BY hash
+     *      (`FleetNodeRepository.findByCredentialHash`). Anything reachable
+     *      from that lookup is, by construction, a redeemable enrollment
+     *      token — so a still-valid previous credential found there would
+     *      turn a rotation window into a replayable enrollment. This column
+     *      is therefore written and read ONLY by node id, never queried by
+     *      value, and `matchNodeCredential` is its one reader.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    previousCredentialHash?: string | null;
+
+    /**
+     * When the credential in {@link previousCredentialHash} stops being
+     * accepted — the end of the DUAL-ACCEPT window.
+     *
+     * The window closes on this CLOCK and on nothing else. No callback,
+     * no confirmation from the node, no sweeper: a rotation whose node
+     * never comes back still ends, on time, because every verification
+     * site compares against this instant. NULL (or an unparseable value)
+     * counts as EXPIRED, never as "no expiry" — the same fail-closed rule
+     * `credentialIssuedAtMs` applies to token age.
+     */
+    @PortableDateColumn({ nullable: true })
+    previousCredentialExpiresAt?: Date | null;
+
+    /**
+     * When the OWNER queued a rotation for this node
+     * (`POST /api/fleet/rotate-all`), or NULL.
+     *
+     * A request, not an act: the platform cannot rotate a credential the
+     * machine has to store, so this is a flag the node reads off its own
+     * heartbeat response and answers by calling
+     * `POST /api/fleet/rotate-credential`. Cleared by the rotation that
+     * satisfies it.
+     */
+    @PortableDateColumn({ nullable: true })
+    rotationRequestedAt?: Date | null;
+
+    /** Who queued that rotation. Raw uuid (EW-654); FK lives in the migration. */
+    @Column({ type: 'uuid', nullable: true })
+    rotationRequestedByUserId?: string | null;
+
     /** Capability tags ('terminal', 'workspace', 'docker', ...). */
     @Column({ type: 'simple-json' })
     capabilities: string[];
@@ -173,6 +232,173 @@ export class FleetNode {
      */
     @Column({ type: 'bigint', nullable: true })
     diskFreeBytes?: string | number | null;
+
+    /**
+     * Fleet cost accounting (EW-777) — which account / seat the agent CLI
+     * on this machine is logged in as, as last reported by the node
+     * (`claude-code: user@example.com (Acme, max)`, `codex: chatgpt`). A
+     * display label the node builds from whitelisted fields; never a
+     * credential. Makes the spend a run reports ATTRIBUTABLE to the
+     * subscription that paid for it — it does not decide which
+     * subscription that should be (dedicated seat per PC vs the owner's
+     * own login is the founder's call; see
+     * `docs/internal/feat-fleet-cost-accounting-notes.md`).
+     *
+     * Same additive telemetry contract as {@link cliVersion}: absent on a
+     * heartbeat means "leave alone", so an older daemon never blanks it.
+     * Migration: `1788300000000-AddFleetCostAccounting`.
+     */
+    @Column({ type: 'varchar', length: 200, nullable: true })
+    modelIdentity?: string | null;
+
+    /**
+     * Per-node DAILY (UTC day) model-spend ceiling in cents. NULL = inherit
+     * the deployment default (`FLEET_NODE_DAILY_COST_CEILING_USD`), itself
+     * unset by default, i.e. no ceiling. `FleetCostCeilingService`
+     * evaluates it on every fleet job completion against
+     * `SUM(fleet_jobs.costCents)` for the day; crossing it DRAINS the node
+     * (`disabled` + claims requeued) — the same stop the drain endpoint
+     * applies, chosen over `paused` because a node can lift its own pause
+     * but not an owner-level disable.
+     */
+    @Column({ type: 'int', nullable: true })
+    dailyCostCeilingCents?: number | null;
+
+    /**
+     * The UTC day (`YYYY-MM-DD`) this node was last drained by its daily
+     * ceiling. The ONE-NOTICE idempotency key: the trip is a CAS on this
+     * column (`FleetNodeRepository.casTripDailyCeiling`), so however many
+     * completions cross the ceiling on one day, exactly one of them files
+     * the Inbox notice. Draining itself is repeated on every crossing —
+     * a ceiling is a stop, not a rate limit. Cleared whenever the owner
+     * changes the ceiling (`FleetService.setDailyCostCeilingForUser`): the
+     * next crossing of a NEW ceiling is news again.
+     */
+    @Column({ type: 'varchar', length: 10, nullable: true })
+    dailyCostTrippedOn?: string | null;
+
+    /**
+     * Fleet health signals (EW-776) — what the node's WORKER last
+     * reported doing: `idle | working | paused | quarantined | throttled`.
+     *
+     * NULL means the node has never reported one (a daemon predating the
+     * field, a visibility-only node with its worker disabled, or a value
+     * this build did not recognise). Rendered as "unknown", never as
+     * `idle`: the whole reason this column exists is that `status:
+     * 'online'` was being read as "healthy" by a machine that had
+     * self-quarantined and was refusing every job.
+     *
+     * Never stored verbatim from the wire — `FleetService` runs every
+     * incoming value through `normalizeFleetNodeWorkerState` first.
+     * Same additive contract as {@link cliVersion}: a beat that omits the
+     * field leaves the stored value alone.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    workerState?: FleetNodeWorkerState | null;
+
+    /**
+     * Why the worker is in that state — the quarantine's own message, the
+     * resource ceiling that throttled the lease — sanitized and capped at
+     * `FLEET_MAX_WORKER_STATE_REASON_LENGTH`. NULL when the state carries
+     * no reason worth reading.
+     */
+    @Column({ type: 'varchar', length: 500, nullable: true })
+    workerStateReason?: string | null;
+
+    /**
+     * When {@link workerState} last CHANGED. Stamped only on a transition,
+     * not on every beat: "quarantined since 03:14" is the fact an operator
+     * needs, and re-stamping it twice a minute would erase it.
+     */
+    @PortableDateColumn({ nullable: true })
+    workerStateChangedAt?: Date | null;
+
+    /**
+     * Dedup marker: set when the online → offline notice for the CURRENT
+     * outage was filed, cleared by the beat that brings the node back.
+     *
+     * The marker lives on the row rather than in the Inbox because
+     * `InboxService.notice` files unconditionally — it has no dedup of its
+     * own — so "exactly one notice per transition" has to be a CAS
+     * somewhere, and the node row is the only thing both the sweep and the
+     * heartbeat already touch. Written by
+     * `FleetNodeRepository.markOfflineIfStale`, which is a conditional
+     * UPDATE on `status = 'online'`: two API replicas sweeping the same
+     * owner at once produce one notice, not two.
+     */
+    @PortableDateColumn({ nullable: true })
+    offlineNoticedAt?: Date | null;
+
+    /**
+     * Dedup marker for the SECOND, louder notice: this machine has now
+     * been gone longer than `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` (default
+     * 30 minutes). One per outage — the sweep runs on every list read, and
+     * without this the owner would get a notice every 30 seconds for as
+     * long as the PC stayed off. Cleared by the beat that brings it back,
+     * so the NEXT outage notifies again.
+     */
+    @PortableDateColumn({ nullable: true })
+    offlineLongNoticedAt?: Date | null;
+
+    /**
+     * Dedup marker for the online → quarantined notice, set on the FIRST
+     * beat that reports the quarantine and cleared by the first beat that
+     * reports anything else. That re-arm is what makes a second
+     * quarantine, hours later, news again.
+     */
+    @PortableDateColumn({ nullable: true })
+    quarantineNoticedAt?: Date | null;
+
+    /**
+     * Node housekeeping (EW-803) — the free-space FLOOR the node enforces
+     * on itself, in bytes, as last reported. NULL means either "never
+     * reported" or "the operator switched the floor off"; the two are
+     * indistinguishable here on purpose, because both answer the
+     * operator's question the same way: there is no floor to compare
+     * {@link diskFreeBytes} against.
+     *
+     * Stored for DISPLAY. Nothing on the platform routes on it, and no
+     * path exists to push a value back down — the limit stays enforced on
+     * the machine, which is the invariant the node's `types.ts` states.
+     *
+     * `bigint` for the same reason as {@link diskFreeBytes}, and with the
+     * same warning: a STRING on Postgres, a number on sqlite, normalized
+     * only in `FleetService.toView`.
+     * Migration: `1789500000000-AddFleetNodeHousekeeping`.
+     */
+    @Column({ type: 'bigint', nullable: true })
+    minFreeDiskBytes?: string | number | null;
+
+    /**
+     * Task worktrees the node was holding when its last reclaim sweep
+     * finished. NULL = never reported, which is NOT the same as 0 and must
+     * never be rendered as it: "no workspaces" is reassuring, "we have
+     * never been told" is not.
+     */
+    @Column({ type: 'int', nullable: true })
+    workspaceCount?: number | null;
+
+    /** Bytes those retained workspaces occupy. `bigint`; see {@link diskFreeBytes}. */
+    @Column({ type: 'bigint', nullable: true })
+    workspaceBytes?: string | number | null;
+
+    /**
+     * When the node's last reclaim sweep completed, on the NODE's clock.
+     *
+     * The only node-supplied instant on this row — everything else
+     * temporal here is server-stamped — because the platform cannot
+     * derive it: it learns a sweep happened only when a beat says so. A
+     * machine with a stepped clock therefore reports a wrong instant and
+     * we cannot tell. Kept anyway: "last reclaimed three weeks ago" is
+     * the fact that explains a full disk, and `FleetService` refuses a
+     * value that does not parse or lands implausibly in the future.
+     */
+    @PortableDateColumn({ nullable: true })
+    lastReclaimAt?: Date | null;
+
+    /** Bytes that sweep freed. 0 is a real answer — it ran and found nothing to take. */
+    @Column({ type: 'bigint', nullable: true })
+    lastReclaimFreedBytes?: string | number | null;
 
     @CreateDateColumn()
     createdAt: Date;

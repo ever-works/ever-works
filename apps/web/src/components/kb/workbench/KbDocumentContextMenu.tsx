@@ -254,6 +254,7 @@ export function KbDocumentContextMenu({
         setError(null);
         const newPath = makeDuplicatePath(document.path);
         try {
+            // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
             const res = await fetch(
                 `/api/works/${encodeURIComponent(workId)}/kb/documents/${encodeURIComponent(
                     document.id,

@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import type { McpStdioServer } from '@ever-works/agent-plugins';
 import { config } from '../config';
 import { AgentPluginPackageDataDirService } from './package-data-dir.service';
 import { buildLaunchPlan, LaunchRefused, type LaunchPlan } from './stdio-launcher';
+import { createStdioSdkClient } from '../mcp/mcp-sdk';
+import type { McpSdkClient } from '../mcp/mcp-sdk';
 
 /**
  * Spawns a package-declared stdio MCP server (T30, second half).
@@ -47,8 +49,13 @@ export interface RunningStdioServer {
     close(): Promise<void>;
 }
 
+/** A launched server plus the client that owns it (AP-14). */
+export interface RunningStdioClient extends RunningStdioServer {
+    readonly client: McpSdkClient;
+}
+
 @Injectable()
-export class AgentPluginStdioServerService {
+export class AgentPluginStdioServerService implements OnModuleDestroy {
     private readonly logger = new Logger(AgentPluginStdioServerService.name);
     private factory: StdioTransportFactory | null = null;
 
@@ -170,6 +177,26 @@ export class AgentPluginStdioServerService {
      * cannot strand the others — a half-completed teardown leaks processes,
      * which is worse than a noisy log line.
      */
+    /**
+     * The backstop this service's own docstring has promised since it was
+     * written, and which nothing actually called until now.
+     *
+     * `McpToolSource.releaseRun` stops the servers it launched on every exit
+     * path of a run, and that is the normal case. This covers the ones it
+     * cannot reach: a pod told to drain mid-run, a runtime whose tool service
+     * predates `releaseMcpRun`, or any future caller of `launch()` that holds
+     * a handle of its own. Without it the `running` set is a write-only
+     * accumulator and the guarantee is imaginary.
+     */
+    async onModuleDestroy(): Promise<void> {
+        const { stopped, failed } = await this.shutdownAll();
+        if (stopped > 0 || failed > 0) {
+            this.logger.log(
+                `Shutdown: stopped ${stopped} stdio server(s), ${failed} failed to stop.`,
+            );
+        }
+    }
+
     async shutdownAll(): Promise<{ stopped: number; failed: number }> {
         // Bumped BEFORE the snapshot, so a launch that completes during
         // teardown sees a different generation and closes itself rather than
@@ -189,6 +216,91 @@ export class AgentPluginStdioServerService {
         // matches it, so the service is reusable without a window in which a
         // late transport can slip through.
         return { stopped: results.length - failed, failed };
+    }
+
+    /**
+     * Launch a server AND connect a client to it (AP-14).
+     *
+     * The sibling of `launch()` for the tool path: same policy gate, same
+     * data directory, same launch plan and the same shutdown-generation
+     * race guard — the difference is who starts the transport. `launch()`
+     * starts it standalone; here the SDK client does, because it must
+     * (`createStdioSdkClient` documents why). Both register into the same
+     * `running` set, which `onModuleDestroy` drains — so a subprocess whose
+     * handle nobody closes is still stopped when the module goes down.
+     */
+    async launchClient(request: StdioLaunchRequest): Promise<RunningStdioClient> {
+        const generation = this.shutdownGeneration;
+
+        if (!config.agentPlugins.isStdioEnabled()) {
+            throw new LaunchRefused(
+                'Stdio servers are disabled by policy on this deployment ' +
+                    '(AGENT_PLUGINS_STDIO).',
+                'disabled-by-policy',
+            );
+        }
+
+        const pluginData = await this.dataDirs.ensure({
+            userId: request.userId,
+            packageName: request.packageName,
+        });
+        const plan = await buildLaunchPlan(request.server, {
+            packageRoot: request.packageRoot,
+            pluginData,
+        });
+
+        const launched = await this.connect({
+            command: plan.command,
+            args: [...plan.args],
+            env: { ...plan.env },
+            cwd: plan.cwd,
+        });
+
+        if (this.shutdownGeneration !== generation) {
+            await launched.close().catch(() => undefined);
+            throw new LaunchRefused(
+                'Shutdown began while this server was starting; it was stopped again.',
+                'shutting-down',
+            );
+        }
+
+        const handle = { close: () => launched.close() };
+        this.running.add(handle);
+        this.logger.log(
+            `Launched stdio server (client) for package "${request.packageName}" ` +
+                `(${plan.resolvesThroughPath ? 'PATH' : 'package-local'}: ${plan.command})`,
+        );
+
+        return {
+            plan,
+            client: launched.client,
+            close: async () => {
+                this.running.delete(handle);
+                await launched.close().catch((err: unknown) => {
+                    this.logger.warn(
+                        `Failed to close stdio server for "${request.packageName}": ${
+                            err instanceof Error ? err.message : String(err)
+                        }`,
+                    );
+                });
+            },
+        };
+    }
+
+    /**
+     * Seam for the spec: the real path spawns a child process, so the tests
+     * that are about the GATE and the LIFECYCLE substitute this rather than
+     * shelling out. `createStdioSdkClient` itself is exercised against a real
+     * child in its own spec — the lesson from the two hangs this epic already
+     * shipped is that a seam every test stubs is a seam nothing runs.
+     */
+    protected connect(params: {
+        command: string;
+        args: string[];
+        env: Record<string, string>;
+        cwd: string;
+    }): Promise<{ client: McpSdkClient; close(): Promise<void> }> {
+        return createStdioSdkClient(params);
     }
 
     private async getFactory(): Promise<StdioTransportFactory> {
@@ -212,7 +324,6 @@ export async function createStdioTransportFactory(): Promise<StdioTransportFacto
     return {
         async create(params) {
             const transport = new StdioClientTransport(params);
-            await transport.start();
 
             // MANDATORY, not hygiene. `stderr: 'pipe'` keeps a package's output
             // out of the platform's log stream — the whole reason it is not
@@ -237,6 +348,17 @@ export async function createStdioTransportFactory(): Promise<StdioTransportFacto
             // listener puts the readable into flowing mode — the same drain
             // without an `as` cast over the SDK's own typing.
             transport.stderr?.on('data', () => undefined);
+
+            // AFTER the drain, not before. The SDK builds the stderr
+            // PassThrough in the transport's CONSTRUCTOR and exposes it
+            // immediately, "allowing callers to attach listeners before the
+            // start method is invoked". Starting first leaves a window in
+            // which a server that logs on startup blocks mid-write before
+            // anything is reading — the identical stall, just harder to hit.
+            // Found while writing the AP-14 client path, where the window is
+            // not small: draining after `Client.connect()` deadlocks outright,
+            // because the child must read `initialize` to let connect resolve.
+            await transport.start();
 
             return transport as unknown as { close(): Promise<void> };
         },

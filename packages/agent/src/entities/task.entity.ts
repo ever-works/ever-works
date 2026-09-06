@@ -247,6 +247,111 @@ export class Task {
         detailsUrl?: string;
     }> | null;
 
+    // ── Merge approval (self-build slice AE, EW-805) ─────────────────
+    // The pull request's head commit and the provider-side human review
+    // of it. Written by `TaskPrStatusService` (head) and the GitHub
+    // review bridge (review), both alongside the columns above.
+    //
+    // `prHeadSha` closes a documented gap: `recordRemotePush` deliberately
+    // does NOT persist the head a run pushed ("the remote owns the branch
+    // head"), and that is still right — this column holds the head the
+    // PROVIDER reported, which is the only head anybody should reason
+    // about. It is a cache for display and for deciding whether an
+    // approval is worth raising; the merge gate always re-reads live.
+
+    /** Head commit of the pull request as last observed from the provider. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    prHeadSha?: string | null;
+
+    /**
+     * Head commit a HUMAN reviewer approved on the git provider. Never
+     * written for a bot review of any kind — not the platform's own app,
+     * not an allow-listed reviewer bot: the whole point is that a person
+     * looked. Compare against `prHeadSha` to know whether the approval
+     * still covers the current head.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    prReviewApprovedSha?: string | null;
+
+    /** When that provider-side approval arrived. */
+    @PortableDateColumn({ nullable: true })
+    prReviewApprovedAt?: Date | null;
+
+    /**
+     * Provider login of the approving reviewer. UNTRUSTED display string —
+     * a provider login is not a platform identity and is never an
+     * entitlement input. The authorising decision is the platform-side
+     * approval on `agent_action_proposals`.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    prReviewApprovedBy?: string | null;
+
+    // The last merge REFUSAL the agent-merge path recorded, so it is
+    // recorded ONCE rather than once every two minutes.
+    //
+    // The merge attempt now lives on the PR-status sweep, which runs on a
+    // two-minute cron for as long as the pull request stays open. A
+    // stable refusal — a protected base branch, a required CODEOWNERS
+    // review, a merge method the policy forbids — therefore repeats
+    // forever, and `recordMergeFailure` posts a task-chat message and an
+    // activity row for each one: ~720 of each per Task per day. These two
+    // columns are the memory that turns that into one message per
+    // (commit, reason). A new head commit, or a different reason, is
+    // genuinely new news and is reported again.
+    //
+    // Deliberately NOT a suppression of the ATTEMPT: a provider fault is
+    // indistinguishable from a policy refusal at this level, and retrying
+    // is how a transient one clears itself.
+
+    /** Head commit the last recorded merge refusal was about. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    mergeRefusedSha?: string | null;
+
+    /** Stable refusal code of that refusal (or `not-merged` when untyped). */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    mergeRefusedCode?: string | null;
+    // ── CI feedback + autonomous fix loop (slice AC, EW-806) ─────────
+    // Written from the git provider's OWN `check_run` / `check_suite` /
+    // `workflow_run` deliveries, not from the every-2-minutes poll that
+    // fills the three columns above. They sit here for the same reason
+    // those do: the pull request belongs to the Task's branch, which
+    // outlives any single run.
+
+    /**
+     * Head commit the last CI result was reported against, straight from
+     * the provider delivery.
+     *
+     * This is the column that makes "is this check result for the head we
+     * still care about?" answerable at all — `baseSha` is where the branch
+     * was cut FROM, and the per-entry `headSha` inside
+     * `linkedPullRequests` only covers non-primary repositories. Without
+     * it the fix loop could not tell a fresh red from CI catching up on a
+     * revision that has already been force-pushed away.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    ciHeadSha?: string | null;
+
+    /**
+     * When `ciHeadSha` was observed. Written as a PAIR with it, and used
+     * only to order two different head commits — a delivery reporting a
+     * commit older than this one is stale and never resumes anything.
+     */
+    @PortableDateColumn({ nullable: true })
+    ciHeadSeenAt?: Date | null;
+
+    /**
+     * One-shot marker for the "automatic retries stopped" Inbox notice.
+     *
+     * Compare-and-set from NULL exactly once per Task
+     * (`TaskRepository.casMarkCiAutoResumeNoticed`), the same shape
+     * `fleet_nodes.dailyCostTrippedOn` uses: a single pull request emits
+     * dozens of check deliveries and every one of them re-discovers a
+     * spent budget, so without this marker the owner would get one Inbox
+     * row per delivery instead of one per Task.
+     */
+    @PortableDateColumn({ nullable: true })
+    ciAutoResumeNoticedAt?: Date | null;
+
     // ── Latest-run denorm (kanban run cockpit, Wave 2) ───────────────
     // Maintained by `TaskRunDenormService` on queued creation, claim and
     // terminal transition of task-kind AgentRuns. Denormalized so the

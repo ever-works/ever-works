@@ -1023,6 +1023,14 @@ export class DigestService {
         if (input.goals.length > 0) {
             lines.push('', '## Goal progress', '');
             for (const goal of input.goals.slice(0, MAX_ITEMS_PER_SECTION)) {
+                if (goal.goalKind === 'delivery') {
+                    // A delivery Goal has no metric; its progress IS the
+                    // Definition-of-Done rollup.
+                    lines.push(
+                        `- ${this.cap(goal.title)}: ${goal.dodSummary.closed} / ${goal.dodSummary.total} criteria done`,
+                    );
+                    continue;
+                }
                 const current = goal.currentValue ?? '—';
                 lines.push(
                     `- ${this.cap(goal.title)}: ${current} / ${goal.targetValue} ${goal.unit}`,

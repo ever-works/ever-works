@@ -403,6 +403,55 @@ describe('RunCostSettlementService', () => {
     });
 
     describe('settleRun — BYOK/BYOS exemption (founder decision P2/P3)', () => {
+        it('fleet-node rows (EW-777) stamp costCents and debit nothing — with or without a settings service', async () => {
+            // A fleet run's model spend is billed to the CLI seat on the
+            // owner's own machine; the plugin id is the provenance, so no
+            // settings lookup is needed and the "no settings service ⇒
+            // bill in full" posture must NOT apply to it.
+            for (const settings of [undefined, null] as const) {
+                const { service, agentRuns, ledger } = makeService({
+                    usage: {
+                        getRunCostByPlugin: jest
+                            .fn()
+                            .mockResolvedValue([
+                                { pluginId: 'fleet-node:claude-code', costCents: 42 },
+                            ]),
+                    },
+                    ...(settings === null ? { settings: null } : {}),
+                });
+
+                const result = await service.settleRun('run-1');
+
+                expect(result.status).toBe('settled');
+                expect(result.totalCostCents).toBe(42);
+                expect(result.billableCostCents).toBe(0);
+                expect(result.exemptPluginIds).toEqual(['fleet-node:claude-code']);
+                // Stamped for the Goal cap, the top-runs panel and the ceilings...
+                expect(agentRuns.update).toHaveBeenCalledWith('run-1', { costCents: 42 });
+                // ...and never debited.
+                expect(ledger.consumeForRun).not.toHaveBeenCalled();
+            }
+        });
+
+        it('a fleet-node row next to a platform-keyed row exempts only the fleet row', async () => {
+            const { service, ledger } = makeService({
+                usage: {
+                    getRunCostByPlugin: jest.fn().mockResolvedValue([
+                        { pluginId: 'fleet-node:codex', costCents: 30 },
+                        { pluginId: 'platform-provider', costCents: 12 },
+                    ]),
+                },
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(result.exemptPluginIds).toEqual(['fleet-node:codex']);
+            expect(result.billableCostCents).toBe(12);
+            expect(ledger.consumeForRun).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 12 }),
+            );
+        });
+
         it('excludes plugins whose apiKey resolved from USER settings; stamp keeps the full total', async () => {
             const { service, agentRuns, ledger } = makeService({
                 usage: {

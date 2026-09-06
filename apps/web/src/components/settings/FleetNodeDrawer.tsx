@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, KeyRound, Pin, PinOff, Plus, X } from 'lucide-react';
 import { QUEUED_REASON_WAITING_FOR_RUNNER } from '@ever-works/contracts';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,11 +15,20 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import type { FleetJobView, FleetNodeDetailView, FleetNodeView } from '@/lib/api/fleet';
+import { formatBytes } from '@/components/dashboard/runner-status.shared';
+import { centsToUsdInput, formatCeilingCents, usdInputToCents } from './fleet-cost-ceiling.shared';
 import {
     FLEET_JOB_FILTERS,
     filterFleetJobs,
     fleetJobDurationMs,
+    fleetJobOutcomeKey,
+    fleetJobOutcomeText,
+    fleetNodeDiskBadgeClass,
+    fleetNodeDiskState,
+    fleetWorkerStateBadgeClass,
+    fleetWorkerStateKey,
     formatFleetJobDuration,
+    hasFleetNodeHousekeeping,
     type FleetJobFilter,
 } from './fleet-node-drawer.shared';
 
@@ -30,6 +40,11 @@ interface FleetNodeDrawerProps {
     isPending: boolean;
     onClose: () => void;
     onSaveCapabilities: (capabilities: string[], pinned: boolean) => void;
+    /**
+     * Fleet cost accounting (EW-777): this node's daily model-spend
+     * ceiling, in cents; null clears it back to the deployment default.
+     */
+    onSaveCostCeiling: (dailyCostCeilingCents: number | null) => void;
     onRotate: () => void;
     onDrain: (drain: boolean) => void;
 }
@@ -89,6 +104,7 @@ export function FleetNodeDrawer({
     isPending,
     onClose,
     onSaveCapabilities,
+    onSaveCostCeiling,
     onRotate,
     onDrain,
 }: FleetNodeDrawerProps) {
@@ -97,6 +113,9 @@ export function FleetNodeDrawer({
     const [pinned, setPinned] = useState(false);
     const [draft, setDraft] = useState('');
     const [jobFilter, setJobFilter] = useState<FleetJobFilter>('all');
+    // Fleet cost accounting (EW-777): the per-node daily ceiling, edited
+    // in dollars and sent as whole cents.
+    const [ceilingDraft, setCeilingDraft] = useState('');
 
     // Re-seed the editor whenever a different node (or fresher data for
     // the same node) arrives, so the form never shows another machine's
@@ -121,7 +140,25 @@ export function FleetNodeDrawer({
         setJobFilter('all');
     }, [nodeId]);
 
+    // Re-seed the ceiling editor from the server's value, keyed the same
+    // way as the tags so a save (or another node) never shows a stale draft.
+    const serverCeiling = detail?.node.dailyCostCeilingCents ?? node?.dailyCostCeilingCents ?? null;
+    const ceilingSeedKey = `${nodeId}|${serverCeiling ?? ''}`;
+    useEffect(() => {
+        setCeilingDraft(centsToUsdInput(serverCeiling));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ceilingSeedKey]);
+
     if (!node) return null;
+
+    const saveCeiling = () => {
+        const cents = usdInputToCents(ceilingDraft);
+        if (cents === undefined) {
+            toast.error(t('costCeiling.invalid'));
+            return;
+        }
+        onSaveCostCeiling(cents);
+    };
 
     const recentJobs = detail?.recentJobs ?? [];
     const visibleJobs = filterFleetJobs(recentJobs, jobFilter);
@@ -133,6 +170,14 @@ export function FleetNodeDrawer({
         reason === QUEUED_REASON_WAITING_FOR_RUNNER
             ? t('jobs.queuedReasons.waitingForRunner')
             : reason;
+
+    // Fleet health signals (EW-776). `unknown` for a node that has never
+    // reported — never `idle`, which would claim a readiness nobody has
+    // told us about.
+    const workerStateKey = fleetWorkerStateKey(node);
+    // Node housekeeping (EW-803).
+    const diskState = fleetNodeDiskState(node);
+    const hasHousekeeping = hasFleetNodeHousekeeping(node);
 
     const addTag = () => {
         const tag = draft.trim().slice(0, MAX_TAG_LENGTH);
@@ -199,7 +244,203 @@ export function FleetNodeDrawer({
                                 {formatMoment(node.lastHeartbeatAt)}
                             </dd>
                         </div>
+                        {/* Fleet health signals (EW-776): what the MACHINE
+                            says about itself, next to what the platform
+                            infers from heartbeats. `online` + `quarantined`
+                            is the pair that used to be invisible. */}
+                        <div className="col-span-2">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('table.worker')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark"
+                                data-testid="fleet-node-drawer-worker"
+                            >
+                                <span
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${fleetWorkerStateBadgeClass(workerStateKey)}`}
+                                    data-testid="fleet-node-drawer-worker-state"
+                                >
+                                    {t(`workerStates.${workerStateKey}` as never)}
+                                </span>
+                                {node.workerStateReason ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark break-words"
+                                        data-testid="fleet-node-drawer-worker-reason"
+                                    >
+                                        {t('workerStateReason', {
+                                            reason: node.workerStateReason,
+                                        })}
+                                    </span>
+                                ) : null}
+                                {node.workerStateChangedAt ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-worker-since"
+                                    >
+                                        {t('workerStateSince', {
+                                            time: formatMoment(node.workerStateChangedAt),
+                                        })}
+                                    </span>
+                                ) : null}
+                            </dd>
+                        </div>
+                        {/* Node housekeeping (EW-803): the disk floor this
+                            machine enforces on ITSELF, read against the free
+                            space it reports, plus what its reaper last
+                            reclaimed. `online` + `below the floor` is the
+                            pair that used to be invisible — a node that
+                            looks healthy and quietly leases nothing. */}
+                        <div className="col-span-2 sm:col-span-4">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('housekeeping.title')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark"
+                                data-testid="fleet-node-drawer-housekeeping"
+                            >
+                                <span
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${fleetNodeDiskBadgeClass(diskState)}`}
+                                    data-testid="fleet-node-drawer-disk-state"
+                                >
+                                    {t(`housekeeping.disk.${diskState}` as never)}
+                                </span>{' '}
+                                <span data-testid="fleet-node-drawer-disk-figures">
+                                    {t('housekeeping.diskFigures', {
+                                        free:
+                                            formatBytes(node.diskFreeBytes) ??
+                                            t('housekeeping.unknownValue'),
+                                        floor:
+                                            typeof node.minFreeDiskBytes === 'number'
+                                                ? (formatBytes(node.minFreeDiskBytes) ??
+                                                  t('housekeeping.unknownValue'))
+                                                : t('housekeeping.noFloor'),
+                                    })}
+                                </span>
+                                {hasHousekeeping ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-workspaces"
+                                    >
+                                        {t('housekeeping.workspaces', {
+                                            count:
+                                                typeof node.workspaceCount === 'number'
+                                                    ? node.workspaceCount
+                                                    : t('housekeeping.unknownValue'),
+                                            size:
+                                                formatBytes(node.workspaceBytes) ??
+                                                t('housekeeping.unknownValue'),
+                                        })}
+                                    </span>
+                                ) : (
+                                    // Said ONCE. Four dashes would read as
+                                    // four separate faults rather than one
+                                    // daemon that predates the fields.
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-housekeeping-unreported"
+                                    >
+                                        {t('housekeeping.notReported')}
+                                    </span>
+                                )}
+                                {node.lastReclaimAt ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-last-reclaim"
+                                    >
+                                        {t('housekeeping.lastReclaim', {
+                                            time: formatMoment(node.lastReclaimAt),
+                                            freed:
+                                                formatBytes(node.lastReclaimFreedBytes) ??
+                                                t('housekeeping.unknownValue'),
+                                        })}
+                                    </span>
+                                ) : hasHousekeeping ? (
+                                    // The finding this field exists for: a
+                                    // machine reporting workspaces but no
+                                    // sweep is one whose reaper has never run.
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-never-reclaimed"
+                                    >
+                                        {t('housekeeping.neverReclaimed')}
+                                    </span>
+                                ) : null}
+                            </dd>
+                        </div>
+                        {/* Fleet cost accounting (EW-777): the seat this
+                            machine's spend is billed to, and its ceiling. */}
+                        <div className="col-span-2">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('table.billingIdentity')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark break-all"
+                                data-testid="fleet-node-drawer-identity"
+                            >
+                                {node.modelIdentity ?? t('table.identityUnknown')}
+                            </dd>
+                        </div>
+                        <div className="col-span-2">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('costCeiling.nodeTitle')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark"
+                                data-testid="fleet-node-drawer-ceiling"
+                            >
+                                {formatCeilingCents(node.dailyCostCeilingCents) ??
+                                    t('costCeiling.nodeInherit')}
+                                {node.dailyCostTrippedOn ? (
+                                    <span className="block text-xs text-warning">
+                                        {t('costCeiling.nodeTripped', {
+                                            day: node.dailyCostTrippedOn,
+                                        })}
+                                    </span>
+                                ) : null}
+                            </dd>
+                        </div>
                     </dl>
+
+                    {/* Per-node daily cost ceiling — editable */}
+                    <section className="space-y-2" data-testid="fleet-node-cost-ceiling">
+                        <h4 className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('costCeiling.nodeTitle')}
+                        </h4>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('costCeiling.nodeHint')}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                inputMode="decimal"
+                                value={ceilingDraft}
+                                onChange={(event) => setCeilingDraft(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        saveCeiling();
+                                    }
+                                }}
+                                placeholder={t('costCeiling.inputPlaceholder')}
+                                aria-label={t('costCeiling.nodeTitle')}
+                                data-testid="fleet-node-cost-ceiling-input"
+                            />
+                            <Button
+                                onClick={saveCeiling}
+                                loading={isPending}
+                                data-testid="fleet-node-cost-ceiling-save"
+                            >
+                                {t('costCeiling.save')}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => onSaveCostCeiling(null)}
+                                disabled={isPending || node.dailyCostCeilingCents == null}
+                                data-testid="fleet-node-cost-ceiling-clear"
+                            >
+                                {t('costCeiling.clear')}
+                            </Button>
+                        </div>
+                    </section>
 
                     {/* Capability tags — admin-editable */}
                     <section className="space-y-2" data-testid="fleet-capability-editor">
@@ -377,7 +618,12 @@ export function FleetNodeDrawer({
                         ) : (
                             <ul className="space-y-1.5">
                                 {visibleJobs.map((job) => {
-                                    const failed = job.status === 'failed';
+                                    const outcome = fleetJobOutcomeKey(job);
+                                    // Red on the RECONCILED verdict, not on
+                                    // the job status: a job the node called
+                                    // done whose run failed is a failure.
+                                    const failed = outcome === 'failed';
+                                    const outcomeText = fleetJobOutcomeText(job);
                                     const durationMs = fleetJobDurationMs(job, now);
                                     const duration = formatFleetJobDuration(durationMs);
                                     return (
@@ -401,6 +647,25 @@ export function FleetNodeDrawer({
                                                         data-testid={`fleet-node-job-status-${job.id}`}
                                                     >
                                                         {t(`jobs.statuses.${job.status}` as never)}
+                                                    </span>
+                                                    {/* What actually happened to the WORK
+                                                        (EW-776) — the reconciled run
+                                                        outcome, which can disagree with the
+                                                        job status above and is the answer
+                                                        the operator came for. */}
+                                                    <span
+                                                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${jobStatusBadgeClass(
+                                                            outcome === 'completed'
+                                                                ? 'done'
+                                                                : outcome === 'failed'
+                                                                  ? 'failed'
+                                                                  : outcome === 'running'
+                                                                    ? 'running'
+                                                                    : 'queued',
+                                                        )}`}
+                                                        data-testid={`fleet-node-job-outcome-${job.id}`}
+                                                    >
+                                                        {t(`jobs.outcomes.${outcome}` as never)}
                                                     </span>
                                                     {job.targetNodeId === node.id && (
                                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] bg-primary/10 text-primary">
@@ -481,6 +746,52 @@ export function FleetNodeDrawer({
                                                     {t('jobs.queuedReason', {
                                                         reason: queuedReasonLabel(job.queuedReason),
                                                     })}
+                                                </p>
+                                            ) : null}
+                                            {/* The one sentence that explains the row:
+                                                the run's error, else the job's, else the
+                                                run's summary. Never the payload. */}
+                                            {outcomeText ? (
+                                                <p
+                                                    className={`mt-1 text-xs break-words ${
+                                                        failed
+                                                            ? 'text-danger'
+                                                            : 'text-text-muted dark:text-text-muted-dark'
+                                                    }`}
+                                                    data-testid={`fleet-node-job-outcome-text-${job.id}`}
+                                                >
+                                                    {t('jobs.outcomeText', { text: outcomeText })}
+                                                </p>
+                                            ) : null}
+                                            {/* IDs only. `job.payload` is executor input
+                                                composed from user content and is never
+                                                rendered here — the API sends it as null. */}
+                                            {job.summary?.taskId || job.summary?.runId ? (
+                                                <p
+                                                    className="mt-1 flex flex-wrap gap-x-3 text-[11px] font-mono text-text-muted dark:text-text-muted-dark"
+                                                    data-testid={`fleet-node-job-summary-${job.id}`}
+                                                >
+                                                    {job.summary?.taskId ? (
+                                                        <span>
+                                                            {t('jobs.summaryTask', {
+                                                                id: job.summary.taskId,
+                                                            })}
+                                                        </span>
+                                                    ) : null}
+                                                    {job.summary?.runId ? (
+                                                        <span>
+                                                            {t('jobs.summaryRun', {
+                                                                id: job.summary.runId,
+                                                            })}
+                                                        </span>
+                                                    ) : null}
+                                                    {job.summary?.agentId ? (
+                                                        <span>
+                                                            {t('jobs.summaryAgent', {
+                                                                id: job.summary.agentId,
+                                                            })}
+                                                        </span>
+                                                    ) : null}
                                                 </p>
                                             ) : null}
                                         </li>

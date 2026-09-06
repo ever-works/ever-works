@@ -400,6 +400,165 @@ describe('buildModelCliCommand — writable mount grants', () => {
  * `--add-dir`. The property lives in argv, so it is checked in argv,
  * against the exact string the node is about to hand the shell.
  */
+describe('buildModelCliCommand — MCP bridge (self-build slice Z)', () => {
+	const bridge = {
+		configPath: '/tmp/job/mcp.json',
+		serverName: 'ever-works',
+		serverUrl: 'http://127.0.0.1:54321/mcp/aaaabbbbccccdddd0000111122223333'
+	};
+
+	it('adds NO flag at all when the run has no bridge — byte-identical to today', () => {
+		const withoutBridge = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			platform: POSIX
+		});
+		expect(withoutBridge).not.toContain('--mcp-config');
+		expect(withoutBridge).not.toContain('--allowedTools');
+		expect(withoutBridge).toBe(
+			'"/usr/local/bin/claude" -p --output-format json --permission-mode acceptEdits < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+	});
+
+	it('claude-code gets the config, strict mode and a server-level tool allowance', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mcp: bridge,
+			platform: POSIX
+		});
+		expect(command).toContain('--mcp-config "/tmp/job/mcp.json"');
+		// Without `--strict-mcp-config` the run would also load the OWNER'S
+		// own MCP servers — servers the platform never vetted, in a session
+		// it is responsible for.
+		expect(command).toContain('--strict-mcp-config');
+		// Without an allowance, `-p` mode PROMPTS for every MCP tool, and a
+		// prompt with no terminal is a hung run.
+		expect(command).toContain('--allowedTools mcp__ever-works');
+	});
+
+	it('keeps --add-dir last so the variadic mount grant still swallows nothing', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [WRITABLE_MOUNT, READ_ONLY_MOUNT],
+			mcp: bridge,
+			platform: POSIX
+		});
+		const mcpIndex = command.indexOf('--mcp-config');
+		const addDirIndex = command.indexOf('--add-dir');
+		expect(mcpIndex).toBeGreaterThan(-1);
+		expect(addDirIndex).toBeGreaterThan(mcpIndex);
+		// Everything after `--add-dir` is directories, so the last token
+		// before the redirection must still be a mount path.
+		expect(command).toContain(
+			'--add-dir "/fleet/repositories/tpl-pool/worktrees/fleet-tpl" "/fleet/repositories/docs-pool/worktrees/fleet-docs" <'
+		);
+	});
+
+	it('the variadic --mcp-config is always followed by another flag, never by a path', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mcp: bridge,
+			platform: POSIX
+		});
+		expect(command).toContain('--mcp-config "/tmp/job/mcp.json" --strict-mcp-config');
+	});
+
+	it('codex gets the streamable-HTTP server as a config override on argv', () => {
+		const command = buildModelCliCommand({
+			execution: execution({ provider: 'codex' }),
+			executable: '/usr/local/bin/codex',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mcp: bridge,
+			platform: POSIX
+		});
+		expect(command).toContain(
+			'-c mcp_servers.ever-works.url=http://127.0.0.1:54321/mcp/aaaabbbbccccdddd0000111122223333'
+		);
+		// codex has no --mcp-config; the file is still written as the record
+		// of what the run was given, but it is not on the command line.
+		expect(command).not.toContain('--mcp-config');
+		// The prompt still arrives on stdin, and `-` stays last.
+		expect(command.trimEnd().split(' < ')[0]?.endsWith('-')).toBe(true);
+	});
+
+	it('the token is nowhere on the command line — it never leaves node memory', () => {
+		for (const provider of ['claude-code', 'codex'] as const) {
+			const command = buildModelCliCommand({
+				execution: execution({ provider }),
+				executable: '/usr/local/bin/cli',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				mcp: bridge,
+				platform: POSIX
+			});
+			expect(command).not.toContain('ew_run_');
+			expect(command.toLowerCase()).not.toContain('authorization');
+			expect(command.toLowerCase()).not.toContain('x-ever-works-jwt');
+		}
+	});
+
+	it('refuses a server name that is not an opaque identifier', () => {
+		for (const serverName of ['ever works', 'a;b', 'x$y', '', 'a'.repeat(65)]) {
+			expect(() =>
+				buildModelCliCommand({
+					execution: execution(),
+					executable: '/usr/local/bin/claude',
+					workspacePath: '/work/ws',
+					scratch: scratchPosix,
+					mcp: { ...bridge, serverName },
+					platform: POSIX
+				})
+			).toThrowError(ModelCliCommandError);
+		}
+	});
+
+	it('refuses a bridge URL that is not the loopback listener this node started', () => {
+		for (const serverUrl of [
+			'https://mcp.example.com/mcp',
+			'http://10.0.0.9:54321/mcp/aaaabbbbccccdddd0000111122223333',
+			'http://127.0.0.1:54321/other',
+			'http://127.0.0.1:54321/mcp/../etc',
+			''
+		]) {
+			expect(() =>
+				buildModelCliCommand({
+					execution: execution({ provider: 'codex' }),
+					executable: '/usr/local/bin/codex',
+					workspacePath: '/work/ws',
+					scratch: scratchPosix,
+					mcp: { ...bridge, serverUrl },
+					platform: POSIX
+				})
+			).toThrowError(ModelCliCommandError);
+		}
+	});
+
+	it('refuses a config path the shell could interpret rather than escaping it', () => {
+		expect(() =>
+			buildModelCliCommand({
+				execution: execution(),
+				executable: '/usr/local/bin/claude',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				mcp: { ...bridge, configPath: '/tmp/job/mcp.json; rm -rf /' },
+				platform: POSIX
+			})
+		).toThrowError(ModelCliCommandError);
+	});
+});
+
 describe('assertMountGrantsInCommand', () => {
 	const granted = (...mounts: FleetTaskWorkspaceMountDescriptor[]): string =>
 		buildModelCliCommand({
@@ -600,6 +759,78 @@ describe('parseModelCliResult — claude-code', () => {
 		expect(parseModelCliResult('claude-code', stream, step()).sessionId).toBe('sess-1');
 	});
 
+	describe('cost accounting (EW-777) — tokens and the billed model', () => {
+		const billed = {
+			...envelope,
+			usage: {
+				input_tokens: 120,
+				output_tokens: 3400,
+				cache_read_input_tokens: 90_000,
+				cache_creation_input_tokens: 2500
+			},
+			modelUsage: {
+				'claude-haiku-4-5-20251001': { inputTokens: 20, outputTokens: 400, costUSD: 0.01 },
+				'claude-opus-4-1-20250805': { inputTokens: 100, outputTokens: 3000, costUSD: 0.41 }
+			}
+		};
+
+		it('carries every token bucket, their total and the model the money went to', () => {
+			const out = parseModelCliResult('claude-code', JSON.stringify(billed), step());
+			expect(out).toMatchObject({
+				costUsd: 0.42,
+				turns: 7,
+				modelId: 'claude-opus-4-1-20250805',
+				inputTokens: 120,
+				outputTokens: 3400,
+				cacheReadTokens: 90_000,
+				cacheCreationTokens: 2500,
+				totalTokens: 120 + 3400 + 90_000 + 2500
+			});
+		});
+
+		it('leaves the token fields ABSENT (not 0) when the CLI reported no usage', () => {
+			// Absent means "unknown" downstream; 0 would read as a free run.
+			const out = parseModelCliResult('claude-code', JSON.stringify(envelope), step());
+			expect(out).not.toHaveProperty('inputTokens');
+			expect(out).not.toHaveProperty('totalTokens');
+			expect(out).not.toHaveProperty('modelId');
+		});
+
+		it('ranks the billed model by cost, then by output tokens when no cost is printed', () => {
+			const byTokens = {
+				...envelope,
+				modelUsage: {
+					small: { outputTokens: 10 },
+					big: { outputTokens: 900 }
+				}
+			};
+			expect(parseModelCliResult('claude-code', JSON.stringify(byTokens), step()).modelId).toBe('big');
+		});
+
+		it('refuses negative, non-numeric and non-finite token counts rather than summing garbage', () => {
+			const broken = {
+				...envelope,
+				usage: { input_tokens: -5, output_tokens: '12', cache_read_input_tokens: 40.9 }
+			};
+			const out = parseModelCliResult('claude-code', JSON.stringify(broken), step());
+			expect(out).not.toHaveProperty('inputTokens');
+			expect(out).not.toHaveProperty('outputTokens');
+			expect(out.cacheReadTokens).toBe(40);
+			expect(out.totalTokens).toBe(40);
+		});
+
+		it('reads the usage off the last `result` line of a stream-json run', () => {
+			const stream = [
+				JSON.stringify({ type: 'system', subtype: 'init' }),
+				JSON.stringify({ type: 'assistant', message: {} }),
+				JSON.stringify(billed)
+			].join('\n');
+			const out = parseModelCliResult('claude-code', stream, step());
+			expect(out.totalTokens).toBe(96_020);
+			expect(out.modelId).toBe('claude-opus-4-1-20250805');
+		});
+	});
+
 	it('keeps an output tail when nothing parses', () => {
 		const out = parseModelCliResult(
 			'claude-code',
@@ -643,7 +874,50 @@ describe('parseModelCliResult — codex', () => {
 			exitCode: 0,
 			durationMs: 1234,
 			summary: 'All green, pushed.',
-			sessionId: 'thr-9'
+			sessionId: 'thr-9',
+			// The one `turn.completed` in the stream reported one input token.
+			inputTokens: 1,
+			totalTokens: 1
+		});
+	});
+
+	describe('cost accounting (EW-777)', () => {
+		it('sums the token usage across every turn and reports NO cost — Codex prints none', () => {
+			const events = [
+				JSON.stringify({ type: 'thread.started', thread_id: 'thr-9' }),
+				JSON.stringify({
+					type: 'turn.completed',
+					usage: { input_tokens: 100, cached_input_tokens: 4000, output_tokens: 50 }
+				}),
+				JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'done' } }),
+				JSON.stringify({
+					type: 'turn.completed',
+					usage: { input_tokens: 20, cached_input_tokens: 1000, output_tokens: 30 }
+				})
+			].join('\n');
+			const out = parseModelCliResult('codex', events, step());
+			expect(out).toMatchObject({
+				inputTokens: 120,
+				cacheReadTokens: 5000,
+				outputTokens: 80,
+				// `cached_input_tokens` is the cached SHARE of `input_tokens`
+				// (OpenAI usage semantics), not a bucket on top of it: the
+				// total is input + output, never input + cache + output.
+				totalTokens: 200
+			});
+			// Absent, not 0: "unknown" fails a ceiling closed; "free" would not.
+			expect(out).not.toHaveProperty('costUsd');
+			expect(out).not.toHaveProperty('modelId');
+		});
+
+		it('leaves the token fields absent when no turn reported usage', () => {
+			const events = [
+				JSON.stringify({ type: 'thread.started', thread_id: 'thr-9' }),
+				JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'done' } })
+			].join('\n');
+			const out = parseModelCliResult('codex', events, step());
+			expect(out).not.toHaveProperty('inputTokens');
+			expect(out).not.toHaveProperty('totalTokens');
 		});
 	});
 });

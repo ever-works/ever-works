@@ -29,7 +29,7 @@ You can start a Store directly when you know exactly what you want, or let a [Mi
 A Store is a **Work of type "Store"** — you choose how it's built:
 
 - **Many storefront templates** — pick from a catalog of eCommerce [templates](./website-templates.md), or bring your own **Custom** template.
-- **The backend you choose** — a self-hostable **open-source commerce backend** deployed for you, **Shopify**, or your own — connected through deployment plugins, so you're never locked to one commerce stack.
+- **The backend you choose** — a self-hostable **open-source commerce backend** deployed for you, a **hosted commerce platform**, or one you already run — connected through deployment plugins, so you're never locked to one commerce stack. None of those commerce deployment plugins ships yet; the two `deployment` plugins in `packages/plugins/` today are Kubernetes and Vercel.
 - **Grow it over time** — start small and let the Store expand its catalog, content, and experiments as it runs, the same way any [Work](./creating-a-work.md) keeps improving.
 
 ## What the Store builder is planned to do

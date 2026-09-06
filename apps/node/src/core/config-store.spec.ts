@@ -219,3 +219,50 @@ describe('redactConfig', () => {
 		expect(redactConfig(config({ secret: '' })).hasSecret).toBe(false);
 	});
 });
+
+describe('disk floor and workspace reaper policy persistence (self-build §6)', () => {
+	const path = '/home/x/.config/ever-works-node/node-config.json';
+
+	it('round-trips minFreeDiskBytes and workspaceGc exactly', async () => {
+		const { fs } = memoryFs();
+		const stored = config({
+			limits: clampResourceLimits({ minFreeDiskBytes: 4 * 1024 ** 3 }),
+			workspaceGc: { maxAgeDays: 7, maxCount: 20 }
+		});
+
+		await saveConfig(fs, path, stored, { platform: 'linux' });
+		expect(await loadConfig(fs, path)).toEqual(stored);
+	});
+
+	it('round-trips an explicit null floor (switched off) distinctly from an absent one', async () => {
+		const { fs } = memoryFs();
+		const stored = config({ limits: clampResourceLimits({ minFreeDiskBytes: null }) });
+
+		await saveConfig(fs, path, stored, { platform: 'linux' });
+		const reloaded = await loadConfig(fs, path);
+		expect(reloaded?.limits?.minFreeDiskBytes).toBeNull();
+		expect('minFreeDiskBytes' in (reloaded?.limits ?? {})).toBe(true);
+	});
+
+	it('reads a config from before either key existed with neither key — the defaults apply without being written', () => {
+		const legacy = config();
+		const parsed = parseConfig(JSON.stringify(legacy));
+		expect('minFreeDiskBytes' in (parsed?.limits ?? {})).toBe(false);
+		expect(parsed?.workspaceGc).toBeUndefined();
+		// And it survives a save unchanged — the existing round-trip contract.
+		expect(parsed).toEqual(legacy);
+	});
+
+	it('clamps an out-of-range stored policy instead of refusing the whole config', () => {
+		const parsed = parseConfig(JSON.stringify({ ...config(), workspaceGc: { maxAgeDays: 0, maxCount: 999_999 } }));
+		expect(parsed?.workspaceGc).toEqual({ maxAgeDays: 1, maxCount: 10_000 });
+		const nonsense = parseConfig(JSON.stringify({ ...config(), workspaceGc: { maxAgeDays: 'soon' } }));
+		expect(nonsense?.workspaceGc).toEqual({ maxAgeDays: 14, maxCount: null });
+	});
+
+	it('redacts the policy alongside the limits', () => {
+		const view = redactConfig(config({ workspaceGc: { maxAgeDays: 3, maxCount: null } }));
+		expect(view.workspaceGc).toEqual({ maxAgeDays: 3, maxCount: null });
+		expect(redactConfig(config()).workspaceGc).toBeUndefined();
+	});
+});

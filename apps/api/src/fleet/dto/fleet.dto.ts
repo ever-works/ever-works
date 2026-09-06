@@ -20,11 +20,16 @@ import {
     FLEET_EXECUTION_MODES,
     FLEET_EXECUTION_SCOPE_TYPES,
     FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_DAILY_COST_CEILING_CENTS,
     FLEET_MAX_DISK_FREE_BYTES,
+    FLEET_MAX_MODEL_IDENTITY_LENGTH,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
+    FLEET_MAX_WORKER_STATE_REASON_LENGTH,
+    FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
+    FLEET_NODE_WORKER_STATES,
 } from '@ever-works/contracts';
 import type {
     FleetEnrollableNodeKind,
@@ -47,6 +52,19 @@ import {
  * constraints in `./fleet-capability.validators`.
  */
 const ENROLLABLE_KINDS: readonly FleetEnrollableNodeKind[] = FLEET_ENROLLABLE_NODE_KINDS;
+
+/**
+ * Edge cap on a node-reported ISO-8601 instant (`lastReclaimAt`).
+ *
+ * Local rather than a shared contract constant on purpose: it is not a
+ * protocol bound both tiers must agree on, it is this edge refusing an
+ * oversized body before `FleetService` — the actual source of truth —
+ * parses the string. The longest legitimate form
+ * (`2026-09-05T14:03:07.123456789+05:30`) is 35 characters; 64 leaves
+ * room for every variant without leaving a heartbeat field usable as
+ * unbounded storage.
+ */
+const FLEET_MAX_INSTANT_LENGTH = 64;
 
 /**
  * Request body for `POST /api/fleet/nodes/enrollment-token` — issue a
@@ -121,6 +139,49 @@ export class UpdateFleetNodeDto {
     @IsOptional()
     @IsBoolean()
     capabilitiesPinned?: boolean;
+
+    /**
+     * Fleet cost accounting (EW-777) — this node's DAILY (UTC) model-spend
+     * ceiling in cents. `null` clears it back to the deployment default;
+     * absent leaves it alone. Crossing it drains the node until its owner
+     * re-enables it. Re-validated in `FleetService`, the source of truth.
+     */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        minimum: 1,
+        maximum: FLEET_MAX_DAILY_COST_CEILING_CENTS,
+        description:
+            'Daily (UTC day) model-spend ceiling for this node, in cents; null clears it (inherit the deployment default). Crossing it drains the node until you re-enable it.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(FLEET_MAX_DAILY_COST_CEILING_CENTS)
+    dailyCostCeilingCents?: number | null;
+}
+
+/**
+ * Request body for `PUT /api/fleet/cost-ceiling` — the owner's FLEET-WIDE
+ * daily model-spend ceiling (fleet cost accounting, EW-777).
+ *
+ * `null` is a value here, not an omission: it clears the owner's ceiling
+ * back to the deployment default, so it is validated with `ValidateIf`
+ * rather than skipped by `IsOptional`.
+ */
+export class SetFleetCostCeilingDto {
+    @ApiProperty({
+        nullable: true,
+        minimum: 1,
+        maximum: FLEET_MAX_DAILY_COST_CEILING_CENTS,
+        description:
+            'Daily (UTC day) model-spend ceiling across every node of this account, in cents; null clears it (inherit the deployment default). Crossing it drains every node until you re-enable them.',
+    })
+    @ValidateIf((dto: SetFleetCostCeilingDto) => dto.dailyCeilingCents !== null)
+    @IsInt()
+    @Min(1)
+    @Max(FLEET_MAX_DAILY_COST_CEILING_CENTS)
+    dailyCeilingCents: number | null;
 }
 
 /**
@@ -202,6 +263,151 @@ export class FleetNodeSelfDescriptionDto {
     @Min(0)
     @Max(FLEET_MAX_DISK_FREE_BYTES)
     diskFreeBytes?: number;
+
+    /**
+     * Fleet cost accounting (EW-777) — which account / seat the agent CLI
+     * is logged in as, as a display label (`claude-code: user@example.com
+     * (Acme, max)`). Never a credential. Same optional, leave-alone-when-
+     * absent contract as `cliVersion`.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_MODEL_IDENTITY_LENGTH,
+        description:
+            'Which account/seat the agent CLI on the node is logged in as (display label, never a credential).',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_MAX_MODEL_IDENTITY_LENGTH)
+    modelIdentity?: string;
+
+    /**
+     * Fleet health signals (EW-776) — what the node's WORKER is doing.
+     *
+     * Bounded as a plain `@IsString()` and NOT `@IsIn(FLEET_NODE_WORKER_STATES)`,
+     * deliberately. The global pipe runs `whitelist + forbidNonWhitelisted`,
+     * so a value this build rejects does not merely get dropped — it fails
+     * the whole request, and a failed heartbeat is a node that goes
+     * offline. A daemon newer than the API it is talking to must be able
+     * to report a state we have never heard of and still stay alive; the
+     * service normalizes it to "unknown" rather than trusting it. The
+     * `enum` on the Swagger property documents the vocabulary without
+     * enforcing it.
+     */
+    @ApiProperty({
+        required: false,
+        enum: FLEET_NODE_WORKER_STATES,
+        maxLength: 32,
+        description:
+            "What the node's worker is doing (idle | working | paused | quarantined | throttled). Any other value is recorded as unknown rather than rejected, so a newer node never loses its heartbeat to an older API.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    workerState?: string;
+
+    /**
+     * Why the worker is in that state — the quarantine message, the
+     * resource ceiling. Sanitized and re-capped in `FleetService`, which
+     * is the source of truth; this bound just refuses an oversized body
+     * at the edge.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_WORKER_STATE_REASON_LENGTH,
+        description:
+            'Why the worker is in that state (quarantine reason, resource ceiling). Never a credential — the server redacts and caps it anyway.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_MAX_WORKER_STATE_REASON_LENGTH)
+    workerStateReason?: string;
+
+    /**
+     * Node housekeeping (EW-803) — the disk floor the node enforces on
+     * itself. Reported for visibility; the platform never sets it and
+     * never routes on it.
+     *
+     * `@IsOptional()` skips validation for `null` as well as `undefined`,
+     * which is what makes "the operator switched the floor off" (an
+     * explicit null) expressible without the pipe rejecting the beat.
+     * The service tells the two apart: absent leaves the stored value
+     * alone, null clears it.
+     */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        minimum: 0,
+        maximum: FLEET_MAX_DISK_FREE_BYTES,
+        description:
+            'Free-space floor the node refuses to lease or provision below, in bytes. Null means the operator switched the floor off. Enforced on the node; reported here for visibility only.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_DISK_FREE_BYTES)
+    minFreeDiskBytes?: number | null;
+
+    /** Workspaces the node retained after its last reclaim sweep. */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_WORKSPACE_COUNT,
+        description: 'Task worktrees the node was holding when its last reclaim sweep finished.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_WORKSPACE_COUNT)
+    workspaceCount?: number;
+
+    /** Bytes those retained workspaces occupy. */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_DISK_FREE_BYTES,
+        description: 'Bytes the node’s retained workspaces occupy.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_DISK_FREE_BYTES)
+    workspaceBytes?: number;
+
+    /**
+     * When the node's last reclaim sweep completed, on the NODE's clock.
+     *
+     * Bounded as a plain `@IsString()` and NOT `@IsISO8601()`, for
+     * exactly the reason `workerState` is not an `@IsIn`: the global pipe
+     * runs `whitelist + forbidNonWhitelisted`, so a value this build
+     * rejects fails the whole request — and a failed heartbeat is a node
+     * swept offline. A malformed instant must cost the operator that one
+     * figure, never the machine's liveness. `FleetService` parses it and
+     * refuses anything it cannot trust.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_INSTANT_LENGTH,
+        description:
+            'ISO-8601 instant at which the node’s last reclaim sweep completed (the node’s own clock). An unparseable value is recorded as unknown rather than rejected, so a node never loses its heartbeat to a bad timestamp.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_MAX_INSTANT_LENGTH)
+    lastReclaimAt?: string;
+
+    /** Bytes that sweep reclaimed. Zero is a real answer. */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_DISK_FREE_BYTES,
+        description: 'Bytes the node’s last reclaim sweep freed.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_DISK_FREE_BYTES)
+    lastReclaimFreedBytes?: number;
 }
 
 /**
@@ -278,6 +484,17 @@ export class FleetNodePauseDto extends FleetNodeCredentialDto {
  * credential worthless from that moment on.
  */
 export class FleetUnenrollDto extends FleetNodeCredentialDto {}
+
+/**
+ * Request body for the PUBLIC `POST /api/fleet/rotate-credential` — a
+ * node re-keying ITSELF with the credential it is already using
+ * (EW-799).
+ *
+ * No extra field: the credential pair IS the request. `secret` must be
+ * the node's CURRENT secret — a previous-window one is a replay and is
+ * refused with the same undifferentiated 401 as a wrong one.
+ */
+export class RotateFleetNodeCredentialDto extends FleetNodeCredentialDto {}
 
 /**
  * Request body for `PUT /api/fleet/execution-preference` — set (or

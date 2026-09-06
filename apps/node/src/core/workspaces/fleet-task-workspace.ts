@@ -4,7 +4,9 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
 import {
 	FLEET_AGENT_TASK_META_DIR,
+	normalizeFleetRunEnvFileRefs,
 	normalizeFleetTaskWorkspaceMounts,
+	type FleetRunEnvFileRef,
 	type FleetTaskWorkspaceDescriptor,
 	type FleetTaskWorkspaceMountDescriptor,
 	type FleetTaskWorkspaceMountSpec,
@@ -12,6 +14,11 @@ import {
 } from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation, LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
 import type { IWorkspacePlugin, WorkspaceHandle, WorkspacePublishFence } from '@ever-works/plugin';
+import { formatBytes } from '../resource-limits';
+import type { DiskProbeIo } from '../telemetry-probe';
+import { effectiveMinFreeDiskBytes } from '../types';
+import { measureWorkspaceFreeBytes } from './disk-headroom';
+import { removeRunEnvFiles, sweepStaleRunEnvFiles, writeRunEnvFiles, type RunEnvFileWrite } from './run-env-files';
 
 export type FleetTaskWorkspaceErrorCode =
 	| 'invalid-root'
@@ -19,7 +26,19 @@ export type FleetTaskWorkspaceErrorCode =
 	| 'cancelled'
 	| 'provision-failed'
 	| 'path-collision'
-	| 'git-failed';
+	| 'git-failed'
+	/**
+	 * The workspace volume is below the node's disk floor, OR its free
+	 * space could not be measured at all; nothing was written either way.
+	 * The floor fails closed at provision time — see `assertDiskHeadroom`
+	 * for why this gate is stricter than the one at the lease.
+	 */
+	| 'disk-low'
+	/**
+	 * The worktree is being reclaimed by the workspace reaper right now;
+	 * nothing was written. Transient — a retry lands on a fresh checkout.
+	 */
+	| 'workspace-busy';
 
 /** Stable, non-secret failure surface suitable for Fleet job diagnostics. */
 export class FleetTaskWorkspaceError extends Error {
@@ -143,12 +162,312 @@ const FLEET_TASK_WORKSPACE_EXCLUDE_PROBES: readonly string[] = [
  */
 export const FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE = '.ever-works-mount-write-probe';
 
+// ---------------------------------------------------------------------------
+// Lease + usage files (self-build program note §6, R8)
+//
+// Both live in the worktree's PRIVATE gitdir (`<pool>/worktrees/<id>/`),
+// beside the provider's binding stamp: never committable, never visible in
+// the working tree, and gone with the worktree when Git removes it. They
+// are the on-disk evidence the workspace reaper reads:
+//
+//   - the LEASE says "a process is in this worktree right now" (pid +
+//     purpose), so `gc` in another process — or the in-process timer while
+//     a job runs — can tell a busy checkout from an abandoned one. It is
+//     created with O_EXCL and a lease held by a dead pid is reclaimable; a
+//     live foreign pid is a collision, never overwritten.
+//   - the USAGE file records the last provision, which is what "age" means
+//     to the reaper. Refreshed on every provision AND every release, so a
+//     worktree from before this file existed is marked on its first run
+//     under this node.
+// ---------------------------------------------------------------------------
+
+export const FLEET_WORKSPACE_LEASE_FILE = 'ew-workspace-lease.json';
+export const FLEET_WORKSPACE_USAGE_FILE = 'ew-workspace-usage.json';
+
+export interface FleetWorkspaceLease {
+	version: 1;
+	/** `job` = a Task is running in it; `gc` = the reaper is removing it. */
+	purpose: 'job' | 'gc';
+	pid: number;
+	taskId?: string;
+	since: string;
+}
+
+export interface FleetWorkspaceUsage {
+	version: 1;
+	/** ISO instant of the last provision (or release) of this worktree. */
+	lastUsedAt: string;
+	taskId?: string;
+}
+
+export function workspaceLeasePath(gitDir: string): string {
+	return join(gitDir, FLEET_WORKSPACE_LEASE_FILE);
+}
+
+export function workspaceUsagePath(gitDir: string): string {
+	return join(gitDir, FLEET_WORKSPACE_USAGE_FILE);
+}
+
+/**
+ * Whether `pid` is a running process. `EPERM` means "exists, not ours" —
+ * alive. A reused pid reads as alive too, which keeps a workspace one
+ * cycle longer than necessary; the alternative misreads a live process as
+ * dead, which is the wrong side to be wrong on.
+ */
+export function defaultIsProcessAlive(pid: number): boolean {
+	if (!Number.isInteger(pid) || pid <= 0) return false;
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code === 'EPERM';
+	}
+}
+
+/** The lease in `gitDir`, or null when there is none or it is unreadable. */
+export async function readWorkspaceLease(gitDir: string): Promise<FleetWorkspaceLease | null> {
+	const raw = await readPrivateJsonFile(workspaceLeasePath(gitDir));
+	if (!raw || typeof raw !== 'object') return null;
+	const candidate = raw as Partial<FleetWorkspaceLease>;
+	if (
+		candidate.version !== 1 ||
+		(candidate.purpose !== 'job' && candidate.purpose !== 'gc') ||
+		typeof candidate.pid !== 'number' ||
+		!Number.isInteger(candidate.pid) ||
+		typeof candidate.since !== 'string'
+	) {
+		return null;
+	}
+	return {
+		version: 1,
+		purpose: candidate.purpose,
+		pid: candidate.pid,
+		since: candidate.since,
+		...(typeof candidate.taskId === 'string' ? { taskId: candidate.taskId } : {})
+	};
+}
+
+/** The usage record in `gitDir`, or null when absent / unreadable. */
+export async function readWorkspaceUsage(gitDir: string): Promise<FleetWorkspaceUsage | null> {
+	const raw = await readPrivateJsonFile(workspaceUsagePath(gitDir));
+	if (!raw || typeof raw !== 'object') return null;
+	const candidate = raw as Partial<FleetWorkspaceUsage>;
+	if (
+		candidate.version !== 1 ||
+		typeof candidate.lastUsedAt !== 'string' ||
+		!Number.isFinite(Date.parse(candidate.lastUsedAt))
+	) {
+		return null;
+	}
+	return {
+		version: 1,
+		lastUsedAt: candidate.lastUsedAt,
+		...(typeof candidate.taskId === 'string' ? { taskId: candidate.taskId } : {})
+	};
+}
+
+export type WorkspaceLeaseAcquisition =
+	| { acquired: true }
+	| { acquired: false; heldBy: FleetWorkspaceLease }
+	/**
+	 * A lease file is PRESENT and this build cannot read it as a lease — a
+	 * future `version`, an unknown `purpose`, a link where a file belongs,
+	 * or a torn write left by a hard kill. Nobody can be named, and nobody
+	 * may be evicted either: see the fail-closed note on
+	 * {@link acquireWorkspaceLease}.
+	 */
+	| { acquired: false; unreadable: string };
+
+/**
+ * Take the lease on a worktree, exclusively.
+ *
+ * An existing lease is replaced only when it is provably not in use: held
+ * by a pid that is no longer running, or by THIS process for the SAME
+ * purpose (a re-provision of a task this process already leased). A lease
+ * held by a live pid — or by this process for the OTHER purpose, which is
+ * the in-process reaper and a job meeting on one worktree — is reported,
+ * never overwritten.
+ *
+ * ## An unreadable lease is HELD, never reclaimable (review AO-3)
+ *
+ * This file is the only cross-process evidence that a job is running in a
+ * worktree, and the reaper's `removeWorktree` takes it immediately before
+ * `git worktree remove --force`. It used to delete any lease it could not
+ * PARSE and take the slot — so the one file that gates an irreversible
+ * delete opened when it became unreadable, which is the wrong side of
+ * every other rule in this slice ("unknown state means keep"). Two builds
+ * on one machine is the shipped pattern (the worker runs as a Windows
+ * service while an operator runs `ever-works-node gc` from a shell), so a
+ * lease this build does not recognise is a live job at least as often as
+ * it is litter.
+ *
+ * The write is made atomic for the same reason: the temp file is written
+ * in full and then hard-linked into place, so a crash mid-write can no
+ * longer leave a torn lease that this rule would then treat as held
+ * forever. `link` is the atomic-AND-exclusive primitive (`rename`, which
+ * the usage file uses, would clobber a live lease); where the filesystem
+ * has no hard links the exclusive create is used directly, exactly as
+ * before.
+ */
+export async function acquireWorkspaceLease(
+	gitDir: string,
+	lease: FleetWorkspaceLease,
+	isProcessAlive: (pid: number) => boolean = defaultIsProcessAlive
+): Promise<WorkspaceLeaseAcquisition> {
+	const path = workspaceLeasePath(gitDir);
+	const content = `${JSON.stringify(lease)}\n`;
+	for (let attempt = 0; attempt < 3; attempt += 1) {
+		try {
+			await createLeaseFileExclusive(path, content);
+			return { acquired: true };
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+		}
+		const existing = await readWorkspaceLease(gitDir);
+		if (!existing) {
+			// Present but not a lease this build understands: fail closed.
+			// (Gone between the create and the read is a plain race — retry.)
+			const stats = await lstatOrNull(path);
+			if (stats) {
+				return {
+					acquired: false,
+					unreadable: `the lease file at '${path}' exists but could not be read as a lease of this version`
+				};
+			}
+			continue;
+		}
+		const ours = existing.pid === lease.pid && existing.purpose === lease.purpose;
+		if (!ours && isProcessAlive(existing.pid)) {
+			return { acquired: false, heldBy: existing };
+		}
+		// Stale (dead pid) or ours: replace it and try again.
+		await fs.unlink(path).catch((error: NodeJS.ErrnoException) => {
+			if (error.code !== 'ENOENT') throw error;
+		});
+	}
+	const contended = await readWorkspaceLease(gitDir);
+	if (contended) return { acquired: false, heldBy: contended };
+	throw new Error(`workspace lease at '${path}' could not be taken`);
+}
+
+/**
+ * Create the lease file with its full content or fail with `EEXIST` —
+ * both properties at once. The content is written to a private temp file
+ * first, so the only thing that can appear at `path` is a complete lease.
+ */
+async function createLeaseFileExclusive(path: string, content: string): Promise<void> {
+	const temporary = `${path}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+	try {
+		await fs.writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+	} catch {
+		// No temp file (a read-only or exotic filesystem): the direct
+		// exclusive create is still correct, just not crash-atomic.
+		await fs.writeFile(path, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+		return;
+	}
+	try {
+		await fs.link(temporary, path);
+	} catch (error) {
+		// EEXIST is the contention this function exists to report; anything
+		// else means hard links are unavailable here, not that we may skip
+		// the exclusivity.
+		if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw error;
+		await fs.writeFile(path, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+	} finally {
+		await fs.unlink(temporary).catch(() => undefined);
+	}
+}
+
+async function lstatOrNull(path: string): Promise<Awaited<ReturnType<typeof fs.lstat>> | null> {
+	try {
+		return await fs.lstat(path);
+	} catch {
+		return null;
+	}
+}
+
+/** Drop a lease this process holds. A lease held by anyone else is left alone; a missing one is success. */
+export async function releaseWorkspaceLease(
+	gitDir: string,
+	pid: number,
+	purpose?: FleetWorkspaceLease['purpose']
+): Promise<void> {
+	const existing = await readWorkspaceLease(gitDir);
+	if (!existing || existing.pid !== pid || (purpose !== undefined && existing.purpose !== purpose)) return;
+	await fs.unlink(workspaceLeasePath(gitDir)).catch((error: NodeJS.ErrnoException) => {
+		if (error.code !== 'ENOENT') throw error;
+	});
+}
+
+/** Record the last use of a worktree. Written beside, then renamed over, so a crash never leaves a torn file. */
+export async function touchWorkspaceUsage(gitDir: string, usage: FleetWorkspaceUsage): Promise<void> {
+	const target = workspaceUsagePath(gitDir);
+	const temporary = `${target}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+	try {
+		await fs.writeFile(temporary, `${JSON.stringify(usage)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+		await fs.rename(temporary, target);
+	} finally {
+		await fs.unlink(temporary).catch(() => undefined);
+	}
+}
+
+/**
+ * The worktree's PRIVATE gitdir (`<pool>/worktrees/<id>`), canonical, or
+ * null when the path is not a Git worktree. Only ever consulted for a path
+ * whose `.git` is a plain FILE — the linked-worktree marker — so Git cannot
+ * walk up out of the fleet root looking for a repository.
+ */
+export async function resolvePrivateGitDir(worktreePath: string, signal?: AbortSignal): Promise<string | null> {
+	try {
+		const marker = await fs.lstat(join(worktreePath, '.git'));
+		if (!marker.isFile()) return null;
+		const gitDir = await runGitOutput(['rev-parse', '--path-format=absolute', '--git-dir'], worktreePath, signal);
+		if (!gitDir) return null;
+		return await fs.realpath(resolve(gitDir));
+	} catch (error) {
+		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+		if (signal?.aborted) throw cancelledError();
+		return null;
+	}
+}
+
+async function readPrivateJsonFile(path: string): Promise<unknown> {
+	try {
+		const stats = await fs.lstat(path);
+		if (stats.isSymbolicLink() || !stats.isFile()) return null;
+		return JSON.parse(await fs.readFile(path, 'utf8')) as unknown;
+	} catch {
+		return null;
+	}
+}
+
 export interface FleetTaskWorkspaceProvisionerOptions {
 	/** Persistent cache/worktree root owned by the node service account. */
 	readonly rootPath: string;
 	readonly plugin?: FleetWorkspacePlugin;
 	/** Test seam; production always resolves HEAD with shell-free `execFile`. */
 	readonly inspectHead?: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
+	/**
+	 * Free-space probe for the disk floor, measured on the root's volume
+	 * right before anything is written there. Absent = no pre-provision
+	 * check (the worker loop's gate, when wired, still applies).
+	 */
+	readonly diskProbe?: DiskProbeIo;
+	/**
+	 * The floor in bytes. Absent = the node default; `null` = switched off.
+	 * Mirrors `NodeResourceLimits.minFreeDiskBytes` exactly.
+	 */
+	readonly minFreeDiskBytes?: number | null;
+	/** Liveness oracle for the pid in a lease file; tests inject one. */
+	readonly isProcessAlive?: (pid: number) => boolean;
+	/** Wall clock for the usage/lease stamps; tests inject one. */
+	readonly now?: () => number;
+}
+
+interface HeldLease {
+	gitDir: string;
+	bindingKey: string;
+	taskId: string;
 }
 
 const SHA_PATTERN = /^[0-9a-f]{40,64}$/i;
@@ -169,6 +488,60 @@ export function defaultFleetTaskWorkspaceRoot(
 }
 
 /**
+ * Refuse to write into `targetPath`'s volume unless it can be PROVEN to
+ * have room. Fails closed: a floor that cannot be evaluated refuses.
+ *
+ * This is the LAST gate before a clone, a fetch and a model's whole
+ * budget go onto a volume, and there is no gate after it — so an
+ * unreadable reading refuses here, where a wrong guess costs a
+ * half-written worktree and the spend of a run that dies inside git or
+ * pnpm.
+ *
+ * That is no longer an asymmetry with the lease gate: `admitByResourceLimits`
+ * refuses the same unreadable reading (review AO-11). It had to. While it
+ * admitted, a host whose `statfs` cannot answer — a persistent condition,
+ * per `createDiskProbe` — leased every job it was offered and then
+ * deferred it here, burning one attempt per 300 s lapse until the platform
+ * failed the job with a message that never mentioned disk. Two gates only
+ * compose safely when the earlier one is at least as strict as the later.
+ *
+ * Refusing is cheap because it is a DEFERRAL, not a verdict: `disk-low`
+ * is in `DECLINED_PROVISION_CODES`, so the job goes back unsettled.
+ *
+ * The two early returns are not the same as an unknown reading. No probe
+ * wired, or a floor the operator explicitly switched off, means the
+ * control was never asked for — there is no limit to fail closed ON. An
+ * unknown reading means the control WAS asked for and could not be
+ * evaluated, which is exactly the case that must refuse.
+ */
+export async function assertWorkspaceDiskHeadroom(
+	diskProbe: DiskProbeIo | undefined,
+	minFreeDiskBytes: number | null,
+	targetPath: string,
+	signal?: AbortSignal
+): Promise<void> {
+	throwIfCancelled(signal);
+	if (!diskProbe || minFreeDiskBytes === null) return;
+	const free = await measureWorkspaceFreeBytes(diskProbe, targetPath);
+	throwIfCancelled(signal);
+	if (free === null) {
+		throw new FleetTaskWorkspaceError(
+			'disk-low',
+			`Refusing to provision: free space on the workspace volume (${targetPath}) could not be measured, so the ${formatBytes(
+				minFreeDiskBytes
+			)} floor cannot be checked. Run \`ever-works-node doctor\` on this node.`
+		);
+	}
+	if (free >= minFreeDiskBytes) return;
+	throw new FleetTaskWorkspaceError(
+		'disk-low',
+		`Refusing to provision: ${formatBytes(free)} free on the workspace volume (${targetPath}), below the ${formatBytes(
+			minFreeDiskBytes
+		)} floor. Run \`ever-works-node doctor\` on this node.`
+	);
+}
+
+/**
  * Fleet adapter over the existing local-workspace capability.
  *
  * The plugin continues to own the bare repository cache, fetch-first branch
@@ -181,11 +554,40 @@ export class FleetTaskWorkspaceProvisioner {
 	private readonly rootPath: string;
 	private readonly plugin: FleetWorkspacePlugin;
 	private readonly inspectHead: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
+	private readonly diskProbe: DiskProbeIo | undefined;
+	private readonly minFreeDiskBytes: number | null;
+	private readonly isProcessAlive: (pid: number) => boolean;
+	private readonly now: () => number;
+	/** Leases this process holds, keyed by the worktree's normalized canonical path. */
+	private readonly leases = new Map<string, HeldLease>();
+	/**
+	 * Run secrets (slice Y): the env-file paths THIS process wrote into each
+	 * checkout, keyed the same way as the leases.
+	 *
+	 * The on-disk manifest is the cross-process half of the same record and
+	 * is best-effort by construction — it is skipped entirely when the
+	 * worktree exposes no private gitdir (`resolvePrivateGitDir` returns
+	 * null for a plain clone, and for any transient failure of the `git`
+	 * call it makes), and its write failure is swallowed. Deleting by the
+	 * manifest alone therefore leaves a decrypted `.env` on disk forever in
+	 * exactly the cases where something already went wrong, so what this
+	 * process wrote is remembered here and is what the deletion leads with.
+	 */
+	private readonly runEnvPaths = new Map<string, string[]>();
 
 	constructor(options: FleetTaskWorkspaceProvisionerOptions) {
 		this.rootPath = validateRootPath(options.rootPath);
 		this.plugin = options.plugin ?? new LocalWorkspacePlugin();
 		this.inspectHead = options.inspectHead ?? inspectGitHead;
+		this.diskProbe = options.diskProbe;
+		this.minFreeDiskBytes = effectiveMinFreeDiskBytes({ minFreeDiskBytes: options.minFreeDiskBytes });
+		this.isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
+		this.now = options.now ?? (() => Date.now());
+	}
+
+	/** Bindings this process currently holds a lease on (in-flight jobs). */
+	activeBindingKeys(): ReadonlySet<string> {
+		return new Set([...this.leases.values()].map((lease) => lease.bindingKey));
 	}
 
 	async provision(
@@ -195,7 +597,29 @@ export class FleetTaskWorkspaceProvisioner {
 	): Promise<FleetTaskWorkspaceDescriptor> {
 		const normalizedTaskId = validateTaskId(taskId);
 		const spec = validateWorkspaceSpec(rawSpec);
-		const primary = await this.provisionOne(normalizedTaskId, spec, signal);
+		// The lease admitted this job on a reading taken seconds ago; disk
+		// can have dropped since (another job's fetch, the operator, a
+		// download). Re-checked here, before the first byte is written.
+		await this.assertDiskHeadroom(signal);
+		const leased: string[] = [];
+		try {
+			return await this.provisionAll(normalizedTaskId, spec, leased, signal);
+		} catch (error) {
+			// A provision that did not produce a workspace holds no job: drop
+			// whatever leases it took on the way, or the reaper would see a
+			// "running" job in a checkout nothing is using.
+			await this.dropLeases(leased);
+			throw error;
+		}
+	}
+
+	private async provisionAll(
+		normalizedTaskId: string,
+		spec: FleetTaskWorkspaceSpec,
+		leased: string[],
+		signal?: AbortSignal
+	): Promise<FleetTaskWorkspaceDescriptor> {
+		const primary = await this.provisionOne(normalizedTaskId, spec, leased, signal);
 		const mountSpecs = spec.mounts ?? [];
 		throwIfCancelled(signal);
 		// The primary worktree persists across runs, so `.mounts/` is
@@ -203,11 +627,26 @@ export class FleetTaskWorkspaceProvisioner {
 		// link left behind by an earlier spec would otherwise keep a repository
 		// the operator has since removed reachable (and editable) by the model.
 		const mountsDir = await reconcileMountsDir(primary.path, mountSpecs);
+		// Run secrets (slice Y). Two things happen for EVERY repository of
+		// the workspace, in this order and before a byte of content exists:
+		//
+		//   1. sweep whatever a previous run left here. The worktree is
+		//      reused in place, and the one exit path the executor's
+		//      `finally` cannot cover is a hard kill (SIGKILL, power loss).
+		//      The manifest in the private gitdir says exactly what that run
+		//      wrote, so this removes it even if the repository's file list
+		//      has changed since.
+		//   2. write the Git exclude rule. Before the file, never after:
+		//      another Task's finalize (`git add -A`) shares this
+		//      repository's `info/exclude`, and a delivered `.env` that is
+		//      visible to it for even a moment can be committed and pushed.
+		const primaryEnvPaths = runEnvFilePathsFor(spec);
+		await this.sweepRunEnvFiles(primary.path);
 		if (mountSpecs.length === 0) {
 			// Unconditional since slice Q: even a single-repository workspace
 			// may receive an owner-question file, and a forgotten one must
 			// never reach the finalize's `git add -A`.
-			await ensureFleetExcluded(primary.path, signal);
+			await ensureFleetExcluded(primary.path, signal, primaryEnvPaths);
 			return primary;
 		}
 
@@ -221,6 +660,9 @@ export class FleetTaskWorkspaceProvisioner {
 		const mounts: FleetTaskWorkspaceMountDescriptor[] = [];
 		for (const mount of mountSpecs) {
 			throwIfCancelled(signal);
+			// Every mount is another fetch onto the same volume: the floor is
+			// re-checked before each one, not only before the primary.
+			await this.assertDiskHeadroom(signal);
 			// Re-validated with the NODE's stricter URL / ref rules, exactly like
 			// the primary (the contracts normalizer only checks shape).
 			const mountSpec = validateWorkspaceSpec({
@@ -232,7 +674,7 @@ export class FleetTaskWorkspaceProvisioner {
 			});
 			let provisioned: FleetTaskWorkspaceDescriptor;
 			try {
-				provisioned = await this.provisionOne(normalizedTaskId, mountSpec, signal);
+				provisioned = await this.provisionOne(normalizedTaskId, mountSpec, leased, signal);
 				// A read-only mount is a pristine reference by contract. The
 				// binding is reused in place without a reset, so whatever a
 				// model left in it would survive into the next run — and be
@@ -252,7 +694,8 @@ export class FleetTaskWorkspaceProvisioner {
 			// The mount is a repository of its own: a question file the model
 			// writes while working under `.mounts/<dir>` must stay out of THAT
 			// repository's Git too (the node scans writable mounts for it).
-			await ensureFleetExcluded(provisioned.path, signal);
+			await this.sweepRunEnvFiles(provisioned.path);
+			await ensureFleetExcluded(provisioned.path, signal, runEnvFilePathsFor(spec, mount.mountDir));
 			const linkPath = await linkMountIntoPrimary(mountsDir, mount.mountDir, provisioned.path);
 			if (mount.writable) {
 				await assertMountWritableThroughLink(mount.mountDir, mount.repositoryId, linkPath, provisioned.path);
@@ -260,14 +703,297 @@ export class FleetTaskWorkspaceProvisioner {
 			mounts.push({ ...provisioned, mountDir: mount.mountDir, linkPath, writable: mount.writable });
 		}
 		throwIfCancelled(signal);
-		await ensureFleetExcluded(primary.path, signal);
+		await ensureFleetExcluded(primary.path, signal, primaryEnvPaths);
 		return { ...primary, mounts };
 	}
 
-	/** One repository binding — the slice A/B provision, unchanged. */
+	/**
+	 * Run secrets (slice Y) — write the run's decrypted env files into the
+	 * checkouts they belong to, owner-only.
+	 *
+	 * Called by the executor AFTER provisioning (so the exclude rules are
+	 * already in place) and BEFORE the model step. Throws on the first
+	 * failure, after removing whatever already landed: a run that starts
+	 * with part of its environment reports a red suite that looks like a
+	 * code problem, which is the exact failure this feature removes.
+	 *
+	 * The `files` argument is the ONLY place in this class where a secret
+	 * VALUE appears. It is not stored on the provisioner, not put on the
+	 * descriptor, and not logged — only the count is.
+	 */
+	async writeRunEnvFiles(
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		files: ReadonlyArray<RunEnvFileWrite & { mountDir?: string }>
+	): Promise<number> {
+		validateTaskId(taskId);
+		if (files.length === 0) return 0;
+		const byTarget = new Map<string | undefined, RunEnvFileWrite[]>();
+		for (const file of files) {
+			const key = file.mountDir ?? undefined;
+			const bucket = byTarget.get(key) ?? [];
+			bucket.push({ path: file.path, content: file.content });
+			byTarget.set(key, bucket);
+		}
+		let written = 0;
+		const done: Array<{ path: string; gitDir: string | null; paths: string[] }> = [];
+		try {
+			for (const [mountDir, bucket] of byTarget) {
+				const target = this.resolveEnvTarget(descriptor, mountDir);
+				if (!target) {
+					throw new FleetTaskWorkspaceError(
+						'invalid-spec',
+						`Run env files name mount '${mountDir}', which this workspace did not provision`
+					);
+				}
+				const canonical = await this.canonicalInsideRoot(target.path);
+				if (!canonical) {
+					throw new FleetTaskWorkspaceError(
+						'provision-failed',
+						'Run env files cannot be written: the checkout is no longer inside the fleet root'
+					);
+				}
+				const gitDir = await resolvePrivateGitDir(canonical);
+				// Remembered BEFORE the write, and by the paths that were
+				// ASKED for rather than the ones that landed: a write that
+				// throws half way rolls its own partial set back, but a crash
+				// between the two must still leave this process able to name
+				// every file it may have created.
+				const key = normalizedLeaseKey(canonical);
+				this.rememberRunEnvPaths(
+					key,
+					bucket.map((file) => file.path)
+				);
+				written += (await writeRunEnvFiles(canonical, gitDir, bucket)).length;
+				done.push({ path: canonical, gitDir, paths: bucket.map((file) => file.path) });
+			}
+		} catch (error) {
+			// All-or-nothing across repositories too, not only within one.
+			for (const entry of done) {
+				await removeRunEnvFiles(entry.path, entry.gitDir, entry.paths).catch(() => undefined);
+				this.runEnvPaths.delete(normalizedLeaseKey(entry.path));
+			}
+			throw error;
+		}
+		return written;
+	}
+
+	/** Union this process's record of what it wrote into one checkout. */
+	private rememberRunEnvPaths(key: string, paths: readonly string[]): void {
+		const known = this.runEnvPaths.get(key) ?? [];
+		const seen = new Set(known);
+		for (const path of paths) {
+			if (seen.has(path)) continue;
+			seen.add(path);
+			known.push(path);
+		}
+		this.runEnvPaths.set(key, known);
+	}
+
+	/**
+	 * Run secrets (slice Y) — delete every env file this run was given,
+	 * from the primary worktree and every mount.
+	 *
+	 * NEVER throws and never decides a verdict: it runs on the executor's
+	 * `finally`, which covers success, failure, a thrown model step and an
+	 * abort (an operator cancel and a lapsed lease both arrive as one), and
+	 * a cleanup error must not turn a finished run into a failed one.
+	 * `release()` calls it as well, so a caller that wires only the release
+	 * seam still gets the deletion.
+	 */
+	async removeRunEnvFiles(descriptor: FleetTaskWorkspaceDescriptor): Promise<number> {
+		let removed = 0;
+		const targets: Array<{ path: string }> = [descriptor, ...(descriptor?.mounts ?? [])];
+		for (const target of targets) {
+			if (!target || typeof target.path !== 'string') continue;
+			try {
+				const canonical = await this.canonicalInsideRoot(target.path);
+				if (!canonical) continue;
+				const key = normalizedLeaseKey(canonical);
+				const gitDir = this.leases.get(key)?.gitDir ?? (await resolvePrivateGitDir(canonical));
+				// This process's own record LEADS; the manifest is the
+				// cross-process half and may legitimately be absent.
+				removed += (await removeRunEnvFiles(canonical, gitDir, this.runEnvPaths.get(key) ?? [])).length;
+				this.runEnvPaths.delete(key);
+			} catch {
+				// Best-effort by contract: what survives here is covered by the
+				// Git exclude rule and swept at the next provision.
+			}
+		}
+		return removed;
+	}
+
+	/** The descriptor entry a `mountDir` names, or the primary when it is absent. */
+	private resolveEnvTarget(
+		descriptor: FleetTaskWorkspaceDescriptor,
+		mountDir: string | undefined
+	): { path: string } | null {
+		if (!mountDir) return descriptor;
+		const wanted = mountDir.toLowerCase();
+		return (descriptor.mounts ?? []).find((mount) => mount.mountDir.toLowerCase() === wanted) ?? null;
+	}
+
+	/** Canonical path when it is a strict descendant of the fleet root; null otherwise. */
+	private async canonicalInsideRoot(path: string): Promise<string | null> {
+		try {
+			const canonicalRoot = await fs.realpath(this.rootPath);
+			const canonical = await fs.realpath(path);
+			return isStrictDescendant(canonicalRoot, canonical) ? canonical : null;
+		} catch {
+			return null;
+		}
+	}
+
+	/** Provision-time sweep of whatever a previous run left in one checkout. Never throws. */
+	private async sweepRunEnvFiles(path: string): Promise<void> {
+		try {
+			const canonical = await this.canonicalInsideRoot(path);
+			if (!canonical) return;
+			await sweepStaleRunEnvFiles(canonical, await resolvePrivateGitDir(canonical));
+		} catch {
+			// A sweep that cannot run leaves the previous run's files behind;
+			// they stay Git-excluded and are overwritten by this run's write.
+		}
+	}
+
+	/**
+	 * Release the workspace a run held: drop this process's lease on the
+	 * primary worktree and every mount, and stamp their last use. Called by
+	 * the executor when the run is over, whatever its verdict. Paths are
+	 * re-validated against the root exactly like `finalize` does; anything
+	 * outside it, or no longer a directory, is skipped rather than touched.
+	 */
+	async release(taskId: string, descriptor: FleetTaskWorkspaceDescriptor): Promise<void> {
+		const normalizedTaskId = validateTaskId(taskId);
+		const targets: Array<{ path: string }> = [descriptor, ...(descriptor?.mounts ?? [])];
+		let canonicalRoot: string;
+		try {
+			canonicalRoot = await fs.realpath(this.rootPath);
+		} catch {
+			return;
+		}
+		for (const target of targets) {
+			if (!target || typeof target.path !== 'string') continue;
+			let canonicalPath: string;
+			try {
+				canonicalPath = await fs.realpath(target.path);
+			} catch {
+				continue;
+			}
+			if (!isStrictDescendant(canonicalRoot, canonicalPath)) continue;
+			const key = normalizedLeaseKey(canonicalPath);
+			const held = this.leases.get(key);
+			const gitDir = held?.gitDir ?? (await resolvePrivateGitDir(canonicalPath));
+			this.leases.delete(key);
+			// Run secrets (slice Y): the run is over — however it ended — so
+			// the decrypted `.env` files it was given come off the disk here
+			// too, not only through the executor's own cleanup. Belt AND
+			// braces on purpose: this is the seam every caller wires, and a
+			// secret left behind is worse than a lease left behind.
+			try {
+				await removeRunEnvFiles(canonicalPath, gitDir, this.runEnvPaths.get(key) ?? []);
+			} catch {
+				// Best-effort, exactly like the lease drop below.
+			}
+			this.runEnvPaths.delete(key);
+			if (!gitDir) continue;
+			try {
+				await releaseWorkspaceLease(gitDir, process.pid, 'job');
+				await touchWorkspaceUsage(gitDir, {
+					version: 1,
+					lastUsedAt: new Date(this.now()).toISOString(),
+					taskId: normalizedTaskId
+				});
+			} catch {
+				// Best-effort: the gitdir may already be gone (a branch change
+				// re-cut the worktree). A lease that survives here is held by a
+				// pid, and a pid that exits is what makes it reclaimable.
+			}
+		}
+	}
+
+	/** @see assertWorkspaceDiskHeadroom — the shared gate, so every writer refuses on the same evidence. */
+	private async assertDiskHeadroom(signal?: AbortSignal): Promise<void> {
+		throwIfCancelled(signal);
+		await assertWorkspaceDiskHeadroom(this.diskProbe, this.minFreeDiskBytes, this.rootPath, signal);
+	}
+
+	/**
+	 * Take the job lease on a worktree's private gitdir and remember it.
+	 * Idempotent for this process (a re-provision of the same task). A live
+	 * lease held by anyone else is a collision: the worktree is preserved
+	 * and the job fails naming the holder.
+	 */
+	private async leaseWorktree(
+		canonicalPath: string,
+		repositoryRoot: string,
+		bindingKey: string,
+		taskId: string,
+		leased: string[],
+		signal?: AbortSignal
+	): Promise<void> {
+		const gitDir = await resolvePrivateGitDir(canonicalPath, signal);
+		if (!gitDir) return;
+		// Only a gitdir inside THIS repository's pool is ever written to; a
+		// worktree registered elsewhere is not ours to lease (or to reap).
+		let canonicalRepos: string;
+		try {
+			canonicalRepos = await fs.realpath(join(repositoryRoot, 'repos'));
+		} catch {
+			return;
+		}
+		if (!isStrictDescendant(canonicalRepos, gitDir)) return;
+		const acquisition = await acquireWorkspaceLease(
+			gitDir,
+			{ version: 1, purpose: 'job', pid: process.pid, taskId, since: new Date(this.now()).toISOString() },
+			this.isProcessAlive
+		);
+		if (!acquisition.acquired) {
+			// An unreadable lease means a process this build cannot identify
+			// may be in this worktree right now. Refuse rather than write
+			// through it, and say exactly which file an operator must look
+			// at — this does not clear on its own and must not read as a
+			// transient the platform should retry forever.
+			if ('unreadable' in acquisition) {
+				throw new FleetTaskWorkspaceError(
+					'path-collision',
+					`Task workspace may be in use by another process: ${acquisition.unreadable}. The workspace was preserved; remove that file only once no job is running in it.`
+				);
+			}
+			// The reaper holding it is OUR housekeeping mid-removal: a transient
+			// the executor hands back rather than a verdict about the job. A
+			// live foreign job is an anomaly (two processes on one root) worth
+			// surfacing as the collision it is.
+			if (acquisition.heldBy.purpose === 'gc') {
+				throw new FleetTaskWorkspaceError(
+					'workspace-busy',
+					`Task workspace is being reclaimed by the workspace reaper (process ${acquisition.heldBy.pid}) and was preserved; a retry lands on a fresh checkout`
+				);
+			}
+			throw new FleetTaskWorkspaceError(
+				'path-collision',
+				`Task workspace is leased by process ${acquisition.heldBy.pid} (another run) and was preserved`
+			);
+		}
+		const key = normalizedLeaseKey(canonicalPath);
+		this.leases.set(key, { gitDir, bindingKey, taskId });
+		if (!leased.includes(key)) leased.push(key);
+	}
+
+	private async dropLeases(keys: readonly string[]): Promise<void> {
+		for (const key of keys) {
+			const held = this.leases.get(key);
+			this.leases.delete(key);
+			if (!held) continue;
+			await releaseWorkspaceLease(held.gitDir, process.pid, 'job').catch(() => undefined);
+		}
+	}
+
+	/** One repository binding — the slice A/B provision, plus the lease and usage stamps. */
 	private async provisionOne(
 		normalizedTaskId: string,
 		spec: FleetTaskWorkspaceSpec,
+		leased: string[],
 		signal?: AbortSignal
 	): Promise<FleetTaskWorkspaceDescriptor> {
 		throwIfCancelled(signal);
@@ -284,6 +1010,13 @@ export class FleetTaskWorkspaceProvisioner {
 		await prepareRepositoryRoot(this.rootPath, repositoryRoot);
 		throwIfCancelled(signal);
 		await assertExistingWorkspacePathSafe(expectedPath, repositoryRoot, signal);
+		// A REUSED worktree is leased before the provider touches it, so the
+		// reaper — in this process or another — cannot remove it between the
+		// ownership proof and the run. A path that is not (yet) a worktree is
+		// leased right after the provider creates it, below.
+		if (await existsNoFollow(expectedPath)) {
+			await this.leaseWorktree(expectedPath, repositoryRoot, bindingKey, normalizedTaskId, leased, signal);
+		}
 
 		let handle: WorkspaceHandle;
 		try {
@@ -357,6 +1090,20 @@ export class FleetTaskWorkspaceProvisioner {
 
 		if (!SHA_PATTERN.test(handle.baseSha) || !SHA_PATTERN.test(headSha)) {
 			throw new FleetTaskWorkspaceError('git-failed', 'Provisioned workspace returned invalid commit metadata');
+		}
+
+		// The provider may have re-cut the worktree (a branch change removes
+		// and recreates it, gitdir included), so the lease is (re)taken on
+		// the checkout that actually exists now; a lease this process already
+		// holds there is simply refreshed.
+		await this.leaseWorktree(canonicalPath, repositoryRoot, bindingKey, normalizedTaskId, leased, signal);
+		const held = this.leases.get(normalizedLeaseKey(canonicalPath));
+		if (held) {
+			await touchWorkspaceUsage(held.gitDir, {
+				version: 1,
+				lastUsedAt: new Date(this.now()).toISOString(),
+				taskId: normalizedTaskId
+			});
 		}
 
 		return {
@@ -560,14 +1307,46 @@ function validateWorkspaceSpec(raw: FleetTaskWorkspaceSpec): FleetTaskWorkspaceS
 	} catch (error) {
 		throw new FleetTaskWorkspaceError('invalid-spec', error instanceof Error ? error.message : String(error));
 	}
+	// Run secrets (self-build slice Y). Re-validated with the node's own
+	// gate, exactly like the mounts and the URL: the platform normalized
+	// these too, but this machine is where they become filesystem paths.
+	let envFilesRef: FleetRunEnvFileRef[];
+	try {
+		envFilesRef = normalizeFleetRunEnvFileRefs(raw.envFilesRef);
+	} catch (error) {
+		throw new FleetTaskWorkspaceError('invalid-spec', error instanceof Error ? error.message : String(error));
+	}
+	// A reference for a mount this spec does not carry cannot be honoured,
+	// and silently dropping it would start the run with a partial
+	// environment — the failure the whole feature exists to remove.
+	const mountDirs = new Set(mounts.map((mount) => mount.mountDir.toLowerCase()));
+	for (const ref of envFilesRef) {
+		if (ref.mountDir && !mountDirs.has(ref.mountDir.toLowerCase())) {
+			throw new FleetTaskWorkspaceError(
+				'invalid-spec',
+				`Fleet workspace envFilesRef names mount '${ref.mountDir}', which this workspace does not provision`
+			);
+		}
+	}
 	return {
 		repositoryId,
 		repoUrl,
 		baseRef,
 		branch,
 		...(depth === undefined ? {} : { depth }),
-		...(mounts.length > 0 ? { mounts } : {})
+		...(mounts.length > 0 ? { mounts } : {}),
+		...(envFilesRef.length > 0 ? { envFilesRef } : {})
 	};
+}
+
+/** Env-file paths this spec delivers into one checkout (primary when `mountDir` is undefined). */
+function runEnvFilePathsFor(spec: FleetTaskWorkspaceSpec, mountDir?: string): string[] {
+	const wanted = mountDir?.toLowerCase();
+	for (const ref of spec.envFilesRef ?? []) {
+		const target = ref.mountDir?.toLowerCase();
+		if (target === wanted) return [...ref.paths];
+	}
+	return [];
 }
 
 function validateRemoteUrl(raw: string): string {
@@ -859,9 +1638,26 @@ async function assertExistingWorkspacePathSafe(
 	}
 }
 
-function isStrictDescendant(rootPath: string, candidate: string): boolean {
+/** True when `candidate` is lexically INSIDE `rootPath` (not equal, not outside). */
+export function isStrictDescendant(rootPath: string, candidate: string): boolean {
 	const child = relative(rootPath, candidate);
 	return child !== '' && child.split(/[\\/]/)[0] !== '..' && !isAbsolute(child);
+}
+
+/** Map key for a worktree path: case-folded on Windows, exact elsewhere. */
+function normalizedLeaseKey(path: string): string {
+	const normalized = resolve(path);
+	return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+async function existsNoFollow(path: string): Promise<boolean> {
+	try {
+		await fs.lstat(path);
+		return true;
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+		throw error;
+	}
 }
 
 function isCrossPlatformAbsolute(value: string): boolean {
@@ -873,7 +1669,8 @@ function isWindowsLocalPath(value: string): boolean {
 	return /^[a-zA-Z]:/.test(value) || value.startsWith('\\\\') || value.startsWith('//');
 }
 
-function samePath(left: string, right: string): boolean {
+/** Path equality by the host's rules (case-insensitive on Windows). */
+export function samePath(left: string, right: string): boolean {
 	const normalizedLeft = resolve(left);
 	const normalizedRight = resolve(right);
 	return process.platform === 'win32'
@@ -990,8 +1787,12 @@ async function reconcileMountsDir(
  * symlinks everywhere and junctions on current Node; `rmdir` is the
  * documented fallback for a directory reparse point, and removes only the
  * reparse point itself. The caller has already proven the path is a link.
+ *
+ * Exported for the workspace reaper, which must drop every `.mounts/*`
+ * link before Git removes a worktree: a recursive delete that followed a
+ * junction would empty ANOTHER Task's checkout.
  */
-async function removeMountLink(linkPath: string): Promise<void> {
+export async function removeMountLink(linkPath: string): Promise<void> {
 	try {
 		await fs.unlink(linkPath);
 	} catch (error) {
@@ -1168,7 +1969,49 @@ async function assertMountWritableThroughLink(
  * workspace and for every mount, because the owner-question file
  * (slice Q) can appear in any of them.
  */
-async function ensureFleetExcluded(repoPath: string, signal?: AbortSignal): Promise<void> {
+/**
+ * Env-file paths as Git wants to read them: forward slashes, no leading
+ * or trailing slash, de-duplicated, and only paths that already passed
+ * the contracts normalizer (so nothing shell- or pattern-special reaches
+ * `git check-ignore`). Order is preserved so the rules and the probes
+ * line up one-to-one.
+ */
+function normalizeRunEnvExcludePaths(paths: readonly string[]): string[] {
+	const out: string[] = [];
+	const seen = new Set<string>();
+	for (const raw of paths) {
+		if (typeof raw !== 'string') continue;
+		const path = raw.trim().replace(/^\/+/, '').replace(/\/+$/, '');
+		if (!path) continue;
+		const key = process.platform === 'win32' ? path.toLowerCase() : path;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(path);
+	}
+	return out;
+}
+
+async function ensureFleetExcluded(
+	repoPath: string,
+	signal?: AbortSignal,
+	/**
+	 * Run secrets (self-build slice Y): the env-file paths delivered into
+	 * THIS repository, repository-relative (`apps/api/.env`).
+	 *
+	 * Dynamic and per-repository, so they cannot live in the static rule
+	 * list above. Each becomes an ANCHORED rule (`/apps/api/.env`) — the
+	 * file this run was given, not a same-named file the owner keeps
+	 * elsewhere in the tree — and its probe is NOT slash-terminated,
+	 * because a `dir/` pattern matches directories only and Git would then
+	 * report the rule ineffective for a plain file. That is the mirror
+	 * image of the incident recorded on the rule list above, and the
+	 * reason the probes are built here rather than reused from it.
+	 *
+	 * Written BEFORE any content lands, so there is no window in which a
+	 * concurrent finalize could stage a delivered `.env`.
+	 */
+	extraFilePaths: readonly string[] = []
+): Promise<void> {
 	let commonDir: string;
 	try {
 		commonDir = (await runGitOutput(['rev-parse', '--git-common-dir'], repoPath, signal)).trim();
@@ -1185,7 +2028,9 @@ async function ensureFleetExcluded(repoPath: string, signal?: AbortSignal): Prom
 		current = '';
 	}
 	const lines = current.split(/\r?\n/).map((line) => line.trim());
-	const missing = FLEET_TASK_WORKSPACE_EXCLUDE_RULES.filter((rule) => !lines.includes(rule));
+	const extraProbes = normalizeRunEnvExcludePaths(extraFilePaths);
+	const wantedRules = [...FLEET_TASK_WORKSPACE_EXCLUDE_RULES, ...extraProbes.map((path) => `/${path}`)];
+	const missing = wantedRules.filter((rule) => !lines.includes(rule));
 	if (missing.length > 0) {
 		await fs.mkdir(dirname(excludePath), { recursive: true });
 		const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
@@ -1209,7 +2054,7 @@ async function ensureFleetExcluded(repoPath: string, signal?: AbortSignal): Prom
 	// evaluates a slash-terminated pathname as a directory even before it
 	// exists — `.ever-works` never exists at provision time and `.mounts`
 	// only in a multi-repo workspace.
-	for (const probe of FLEET_TASK_WORKSPACE_EXCLUDE_PROBES) {
+	for (const probe of [...FLEET_TASK_WORKSPACE_EXCLUDE_PROBES, ...extraProbes]) {
 		// A probe path that exists as a LINK or a FILE cannot be verified this
 		// way, and does not need to be.
 		//

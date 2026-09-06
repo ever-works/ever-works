@@ -20,12 +20,19 @@ jest.mock('@ever-works/agent/database', () => ({
     DatabaseModule: class DatabaseModule {},
     GitHubAppInstallationRepository: class GitHubAppInstallationRepository {},
     GitHubAppUserLinkRepository: class GitHubAppUserLinkRepository {},
+    // Issue + incident intake (§6): the triage filer's Work lookup.
+    WorkRepository: class WorkRepository {},
 }));
 jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestModule: class EventIngestModule {},
     EventIngestService: class EventIngestService {},
     IngestedEventRepository: class IngestedEventRepository {},
     IngestInstallBindingRepository: class IngestInstallBindingRepository {},
+    // Issue + incident intake (§6): the triage filer's link lookups.
+    ExternalIssueLinkService: class ExternalIssueLinkService {},
+}));
+jest.mock('@ever-works/agent/utils', () => ({
+    redactSecrets: (body: string) => ({ cleaned: body, redactions: 0 }),
 }));
 jest.mock('@ever-works/agent/pr-review', () => ({
     PrReviewModule: class PrReviewModule {},
@@ -34,6 +41,37 @@ jest.mock('@ever-works/agent/pr-review', () => ({
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginSettingsService: class PluginSettingsService {},
     UserPluginRepository: class UserPluginRepository {},
+}));
+// CI feedback + autonomous fix loop (slice AC): the check intake asks
+// TasksDomainModule for the evaluator and two pure helpers. Stubbing the
+// subpath keeps this shape-guard off the facades → agent-plugins chain,
+// exactly as the sibling GitHub specs do.
+jest.mock('@ever-works/agent/tasks-domain', () => ({
+    TasksDomainModule: class TasksDomainModule {},
+    TaskCiAutoResumeService: class TaskCiAutoResumeService {},
+    TaskGitLinkService: class TaskGitLinkService {},
+    TaskReviewRejectionService: class TaskReviewRejectionService {},
+    TaskChatService: class TaskChatService {},
+    TaskRepository: class TaskRepository {},
+    TasksService: class TasksService {},
+    TaskPriority: { P0: 'p0', P1: 'p1', P2: 'p2', P3: 'p3', P4: 'p4' },
+    // `triage-task-filer.service.ts` reads `TaskStatus.DONE` at MODULE SCOPE
+    // (`CLOSED_TASK_STATUSES`), so leaving it out of this mock is not a
+    // missing-value problem at call time — the file throws
+    // "Cannot read properties of undefined" while it is still being
+    // imported, and the whole suite fails to run. Mirrors the real enum in
+    // `task.entity.ts` exactly.
+    TaskStatus: {
+        BACKLOG: 'backlog',
+        TODO: 'todo',
+        IN_PROGRESS: 'in_progress',
+        IN_REVIEW: 'in_review',
+        BLOCKED: 'blocked',
+        DONE: 'done',
+        CANCELLED: 'cancelled',
+    },
+    classifyCheckResult: () => 'pending',
+    computeCiFailureKey: () => 'k',
 }));
 jest.mock('../ai-conversation/ai-conversation.module', () => ({
     AiConversationModule: class AiConversationModule {},
@@ -58,6 +96,17 @@ import { GitHubPrReviewBridgeService } from './github/github-pr-review-bridge.se
 import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatcher.service';
 import { SlackChatBridgeService } from './slack/slack-chat-bridge.service';
 import { GitHubAppModule } from '../integrations/github-app/github-app.module';
+import { GitHubIssueIntakeService } from './github/github-issue-intake.service';
+import { GitHubCheckIntakeService } from './github/github-check-intake.service';
+import { DependabotIncidentSource } from './incidents/dependabot-incident.source';
+import { JiraEventsController } from './jira/jira-events.controller';
+import { JiraIssueBridgeService } from './jira/jira-issue-bridge.service';
+import { SentryBindingsController } from './sentry/sentry-bindings.controller';
+import { SentryIncidentSource } from './sentry/sentry-incident.source';
+import { SentryInstallBindingService } from './sentry/sentry-install-binding.service';
+import { SentryWebhookController } from './sentry/sentry-webhook.controller';
+import { TriageTaskFilerService } from './triage/triage-task-filer.service';
+import { EventIngestService } from '@ever-works/agent/ingest';
 
 const controllers = () => Reflect.getMetadata('controllers', IngestModule) ?? [];
 const providers = () => Reflect.getMetadata('providers', IngestModule) ?? [];
@@ -133,6 +182,94 @@ describe('IngestModule (consolidated GitHub receiver wiring)', () => {
             const injected = Reflect.getMetadata('design:paramtypes', controller) as unknown[];
             expect(injected).toEqual([GitHubWebhookDispatcherService]);
         }
+    });
+});
+
+/**
+ * Issue + incident intake (self-build program note §6, R2/R23) — the
+ * same shape-guard for the three new receivers and the triage filer. A
+ * receiver that drops out of this module silently 404s (the vendor sees
+ * a failed delivery and nothing is filed); a provider registered twice
+ * would register its consumer / kind processor twice.
+ */
+describe('IngestModule (issue + incident intake wiring)', () => {
+    it('registers the Jira receiver and both Sentry routes exactly once', () => {
+        const registered = controllers();
+        for (const controller of [
+            JiraEventsController,
+            SentryWebhookController,
+            SentryBindingsController,
+        ]) {
+            expect(registered.filter((c: unknown) => c === controller)).toHaveLength(1);
+        }
+    });
+
+    it('provides the intake services and the triage filer exactly once each', () => {
+        const provided = providers();
+        for (const provider of [
+            GitHubIssueIntakeService,
+            GitHubCheckIntakeService,
+            DependabotIncidentSource,
+            JiraIssueBridgeService,
+            SentryIncidentSource,
+            SentryInstallBindingService,
+            TriageTaskFilerService,
+        ]) {
+            expect(provided.filter((p: unknown) => p === provider)).toHaveLength(1);
+        }
+    });
+
+    it('feeds the GitHub issue intake from the ONE dispatcher (a registered consumer, not a new receiver)', () => {
+        const injected = Reflect.getMetadata(
+            'design:paramtypes',
+            GitHubIssueIntakeService,
+        ) as unknown[];
+        expect(injected[0]).toBe(GitHubWebhookDispatcherService);
+        expect(injected).toContain(DependabotIncidentSource);
+        // …and the dispatcher itself did NOT grow a constructor dependency
+        // on it (the arity pin above stays at 4).
+        expect(
+            Reflect.getMetadata('design:paramtypes', GitHubWebhookDispatcherService),
+        ).toHaveLength(4);
+    });
+
+    /**
+     * CI feedback + autonomous fix loop (slice AC, EW-806, R17). The
+     * SECOND registered consumer, and the same two hazards: dropping it
+     * from `providers` means `onModuleInit` never runs and check
+     * deliveries are silently ignored (the exact defect this slice
+     * closes); registering it twice means every delivery is handled
+     * twice, which for this consumer means paying for a model run twice.
+     */
+    it('feeds the CI check intake from the SAME dispatcher, exactly once', () => {
+        expect(providers().filter((p: unknown) => p === GitHubCheckIntakeService)).toHaveLength(1);
+        const injected = Reflect.getMetadata(
+            'design:paramtypes',
+            GitHubCheckIntakeService,
+        ) as unknown[];
+        expect(injected[0]).toBe(GitHubWebhookDispatcherService);
+        // …and, again, the dispatcher did NOT grow a dependency on it.
+        expect(
+            Reflect.getMetadata('design:paramtypes', GitHubWebhookDispatcherService),
+        ).toHaveLength(4);
+    });
+
+    it('gives the Sentry receiver exactly the source, the claim-backed bindings and the spine', () => {
+        expect(Reflect.getMetadata('design:paramtypes', SentryWebhookController)).toEqual([
+            SentryIncidentSource,
+            SentryInstallBindingService,
+            EventIngestService,
+        ]);
+        // The claim endpoint writes owners; the receiver only reads them.
+        expect(Reflect.getMetadata('design:paramtypes', SentryBindingsController)).toEqual([
+            SentryInstallBindingService,
+        ]);
+    });
+
+    it('keeps the Jira receiver a thin shell over its bridge', () => {
+        expect(Reflect.getMetadata('design:paramtypes', JiraEventsController)).toEqual([
+            JiraIssueBridgeService,
+        ]);
     });
 });
 

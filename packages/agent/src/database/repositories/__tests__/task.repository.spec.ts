@@ -38,6 +38,61 @@ describe('TaskRepository ownership scope', () => {
     });
 });
 
+describe('TaskRepository.findFanoutCandidates', () => {
+    function makeQb() {
+        const qb: any = {
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
+            take: jest.fn().mockReturnThis(),
+            getMany: jest.fn().mockResolvedValue([]),
+        };
+        return qb;
+    }
+
+    it('excludes every Task family another driver already dispatches', async () => {
+        const qb = makeQb();
+        const tasks = new TaskRepository({ createQueryBuilder: jest.fn(() => qb) } as never);
+
+        await tasks.findFanoutCandidates(50);
+
+        const clauses = qb.andWhere.mock.calls.map((call: unknown[]) => call[0]);
+        // A Goal's iteration Tasks are the GOAL LOOP's to drive (it creates
+        // them `todo`, dispatches them itself and bounds them with
+        // maxConcurrentIterations); a recurrence INSTANCE is the recurrence
+        // scan's. Both stay `todo` after their run, so without these the
+        // fan-out would re-run them and drive a serial Goal past its ceiling.
+        expect(clauses).toContain('task.goalId IS NULL');
+        expect(clauses).toContain('task.parentRecurringTaskId IS NULL');
+    });
+
+    it('only considers Tasks that have never been run', async () => {
+        const qb = makeQb();
+        const tasks = new TaskRepository({ createQueryBuilder: jest.fn(() => qb) } as never);
+
+        await tasks.findFanoutCandidates(50);
+
+        const clauses = qb.andWhere.mock.calls.map((call: unknown[]) => call[0]);
+        // Board "Run" dispatches a run and leaves the Task in `todo`, so
+        // "still todo" is not "never started".
+        expect(clauses).toContain('task.startedAt IS NULL');
+        expect(clauses).toContain('task.latestRunId IS NULL');
+    });
+
+    it('keeps the scan deterministic and bounded', async () => {
+        const qb = makeQb();
+        const tasks = new TaskRepository({ createQueryBuilder: jest.fn(() => qb) } as never);
+
+        await tasks.findFanoutCandidates(7);
+
+        expect(qb.orderBy).toHaveBeenCalledWith('task.priority', 'ASC');
+        expect(qb.addOrderBy).toHaveBeenCalledWith('task.createdAt', 'ASC');
+        expect(qb.addOrderBy).toHaveBeenCalledWith('task.id', 'ASC');
+        expect(qb.take).toHaveBeenCalledWith(7);
+    });
+});
+
 describe('TaskRepository.wouldCreateCycle', () => {
     function makeSvc(parentChain: Record<string, string | null>) {
         const repo = {

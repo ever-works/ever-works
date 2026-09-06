@@ -5,12 +5,26 @@ import {
     EventIngestService,
     IngestInstallBindingRepository,
     type IngestResult,
+    type RecordIngestBindingData,
 } from '@ever-works/agent/ingest';
 import { PrReviewService } from '@ever-works/agent/pr-review';
 import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/plugins';
-import { TaskGitLinkService, TaskReviewRejectionService } from '@ever-works/agent/tasks-domain';
+import {
+    TaskGitLinkService,
+    TaskReviewApprovalService,
+    TaskReviewRejectionService,
+} from '@ever-works/agent/tasks-domain';
 import type { TaskGitLink } from '@ever-works/agent/tasks-domain';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
+import { config } from '../../config/constants';
+import {
+    classifyReviewer,
+    formatInlineFinding,
+    isReviewBotNoise,
+    parseReviewBotSeverity,
+    stripReviewBotMarkup,
+    type ReviewBotPolicy,
+} from './github-review-bots';
 
 export const GITHUB_PLUGIN_ID = 'github';
 
@@ -120,7 +134,12 @@ export interface GitHubPushCommit {
 export interface GitHubWebhookBody {
     action?: string;
     installation?: {
-        id?: number;
+        /**
+         * GitHub sends a number; the field is typed wider because the
+         * body is unverified JSON when `extractGitHubWorkspaceRef` reads
+         * it (see `normalizeInstallationId`).
+         */
+        id?: number | string;
     };
     organization?: {
         login?: string;
@@ -177,6 +196,17 @@ export interface GitHubWebhookBody {
         body?: string;
         html_url?: string;
         user?: { login?: string; type?: string };
+        /**
+         * Trusted review bots (R16) — `pull_request_review_comment` only.
+         * The diff anchor of an inline finding: `line` on the current
+         * diff, `original_line` when the line has since moved. Recorded
+         * as `path:line` in front of the finding so the resumed run can
+         * open the file the reviewer bot meant.
+         */
+        path?: string;
+        line?: number | null;
+        original_line?: number | null;
+        pull_request_review_id?: number;
     };
     /**
      * Orchestration M9 - `pull_request_review` deliveries. A human
@@ -189,8 +219,43 @@ export interface GitHubWebhookBody {
         state?: string;
         body?: string;
         html_url?: string;
+        /**
+         * The commit the reviewer actually looked at. Load-bearing for
+         * merge approval (slice AE): an approval recorded against the
+         * branch head "now" rather than against this would silently
+         * launder a review of an old diff into a review of whatever has
+         * been pushed since.
+         */
+        commit_id?: string;
         user?: { login?: string; type?: string };
+        submitted_at?: string;
     };
+}
+
+/**
+ * Canonical `installation.id` out of whatever JSON the body carried.
+ *
+ * GitHub always sends a JSON NUMBER, but the body is attacker-shaped
+ * until the signature verifies, and a caller can send `"4242"` instead.
+ * A type-narrow check (`typeof === 'number'`) would then find no id, the
+ * workspace ref would come back WITHOUT the `installation:` key, and the
+ * exact-binding step of `resolveBinding` would have nothing to look up —
+ * while `GitHubAppSyncService.handleWebhook` happily `String()`s the very
+ * same field and acts on it. That divergence is a way to make the
+ * ownership check blind to the id the delivery is about to act on, so
+ * both string and number forms normalize to the same key here.
+ */
+function normalizeInstallationId(value: unknown): string | undefined {
+    if (typeof value === 'number') {
+        return Number.isSafeInteger(value) && value > 0 ? String(value) : undefined;
+    }
+    if (typeof value === 'string' && /^[0-9]{1,19}$/.test(value.trim())) {
+        // Strip leading zeros textually — `Number()` would lose precision
+        // on a 19-digit id and re-introduce the divergence this closes.
+        const digits = value.trim().replace(/^0+(?=[0-9])/, '');
+        return digits === '0' ? undefined : digits;
+    }
+    return undefined;
 }
 
 /**
@@ -205,8 +270,8 @@ export function extractGitHubWorkspaceRef(
     body: GitHubWebhookBody | undefined,
 ): GitHubWorkspaceRef | undefined {
     const keys: string[] = [];
-    const installationId = body?.installation?.id;
-    if (typeof installationId === 'number' && Number.isFinite(installationId)) {
+    const installationId = normalizeInstallationId(body?.installation?.id);
+    if (installationId) {
         keys.push(`installation:${installationId}`);
     }
     const owner =
@@ -300,8 +365,17 @@ function taskFields(link: TaskGitLink | null): Record<string, unknown> {
  *    not awaited: webhooks need a fast 200, and the review is
  *    best-effort (failures are logged, never thrown).
  *
- * Bot-authored comments (including our own review replies) are never
- * ingested — the loop must not echo its own output.
+ * ## Reviewer bots (self-build fleet, finding R16)
+ *
+ * The platform's OWN replies (`<GITHUB_APP_SLUG>[bot]`) and any bot that
+ * is not on the trusted allow-list are never ingested — the loop must not
+ * echo its own output, and an unknown automation must not steer a Task.
+ * Reviews, inline findings and summary comments from the TRUSTED reviewer
+ * bots (`config.githubReviewBots`; CodeRabbit, Copilot, Codex and Greptile
+ * by default) become Task rejection feedback carrying the bot's own
+ * severity, so the next resumed run fixes P2+ first. They are recorded,
+ * never reviewed: a bot comment does not enter the mention loop even when
+ * it happens to say `@ever-works`.
  *
  * ## Git activity (audit item j)
  *
@@ -335,6 +409,13 @@ export class GitHubPrReviewBridgeService {
         // and, like `rejections`, deliberately NOT @Optional(): the same
         // TasksDomainModule provides it.
         private readonly taskLinks: TaskGitLinkService,
+        // Merge approval (self-build slice AE, EW-805) - persist a HUMAN
+        // `approved` review against the commit it was given for. Appended
+        // LAST and, like the two above, deliberately NOT @Optional(): the
+        // same TasksDomainModule provides it, and an approval recorder
+        // that silently did nothing would leave the merge approval UI
+        // saying "nobody has reviewed this" forever.
+        private readonly approvals: TaskReviewApprovalService,
     ) {}
 
     /**
@@ -367,10 +448,26 @@ export class GitHubPrReviewBridgeService {
             if (!bound) continue;
             const owner = candidates.find((c) => c.userId === bound.userId);
             if (owner) {
-                return {
-                    status: 'resolved',
-                    binding: { ...owner, matchedBy: 'binding', workspace },
-                };
+                // The binding names an owner; the SIGNATURE decides whether
+                // it is the owner of THIS delivery. A stored row is a much
+                // weaker claim than a live HMAC: `owner:<login>` keys are
+                // written from an unverified body (see `recordBinding`), so
+                // one tenant can squat a workspace key they do not hold. If
+                // the bound install's secret does not verify this delivery,
+                // fall through to the signature proof below rather than
+                // resolving to a user who demonstrably did not send it —
+                // otherwise the squatted row 401s the real owner's webhook
+                // forever with no way for them to evict it.
+                if (!lookup.verifySignature || lookup.verifySignature(owner.webhookSecret)) {
+                    return {
+                        status: 'resolved',
+                        binding: { ...owner, matchedBy: 'binding', workspace },
+                    };
+                }
+                this.logger.warn(
+                    `GitHub delivery for ${key} does not verify against the bound install's secret; falling through to signature proof`,
+                );
+                break;
             }
             // The bound install was removed or lost its webhook secret.
             // Attributing its events to ANOTHER user is exactly the defect
@@ -449,20 +546,49 @@ export class GitHubPrReviewBridgeService {
      * signature verification, so the deployment self-migrates off the
      * legacy single-install path onto exact resolution.
      *
+     * ## What the delivery actually proved
+     *
+     * `IngestInstallBindingRepository.record` re-POINTS an existing row
+     * and documents the invariant it needs: the caller must have proven
+     * OWNERSHIP of the workspace, not merely authenticity of the sender.
+     * Only one of the paths here clears that bar:
+     *
+     *  * `app-install` — the owner came from platform state
+     *    (`github_app_installations`), so re-pointing is proven and uses
+     *    `record`;
+     *  * `single-install` / `signature` — the HMAC proves the sender knows
+     *    THEIR OWN webhook secret. The workspace key next to it
+     *    (`owner:<login>`, `installation:<id>`) was read out of the
+     *    UNVERIFIED body, so it is a claim, not a proof: any tenant with
+     *    an enabled `github` install can sign a body naming somebody
+     *    else's org. Those paths therefore go through `recordIfAbsent`,
+     *    which inserts only when the key is unheld — a squatter can never
+     *    take a binding away from whoever legitimately holds it, and a
+     *    row that is already right is never overwritten by a forgery.
+     *
      * Best-effort: a failure here must never break a webhook that has
      * already been verified and handled.
      */
     async recordBinding(binding: GitHubEventsBinding): Promise<void> {
         const key = binding.workspace?.keys[0];
         if (binding.matchedBy === 'binding' || !key) return;
+        const write: RecordIngestBindingData = {
+            provider: GITHUB_BINDING_PROVIDER,
+            externalWorkspaceId: key,
+            userId: binding.userId,
+            pluginId: GITHUB_PLUGIN_ID,
+            externalWorkspaceName: binding.workspace?.label ?? null,
+        };
         try {
-            await this.installBindings.record({
-                provider: GITHUB_BINDING_PROVIDER,
-                externalWorkspaceId: key,
-                userId: binding.userId,
-                pluginId: GITHUB_PLUGIN_ID,
-                externalWorkspaceName: binding.workspace?.label ?? null,
-            });
+            const proven = binding.matchedBy === 'app-install';
+            const recorded = proven
+                ? await this.installBindings.record(write)
+                : await this.installBindings.recordIfAbsent(write);
+            if (!proven && recorded && recorded.userId !== binding.userId) {
+                this.logger.warn(
+                    `GitHub workspace ${key} is already bound to another account; leaving the existing binding in place`,
+                );
+            }
         } catch (error) {
             this.logger.warn(
                 `Failed to record GitHub installation binding for ${key}: ${
@@ -514,7 +640,44 @@ export class GitHubPrReviewBridgeService {
         // react to being reviewed), so it is handled and returned before
         // normalize() is consulted.
         if (eventName === 'pull_request_review') {
-            await this.recordReviewRejection(binding, body);
+            // Merge approval (slice AE): an `approved` review used to be
+            // dropped on the floor here - `recordReviewRejection` returns
+            // immediately for any state other than `changes_requested`,
+            // and its spec pinned that ("ignores an approval - only a
+            // rejection carries feedback for the next run"). That was
+            // right about the FEEDBACK loop and it left the platform
+            // unable to answer "has a person read this pull request?",
+            // which is the first thing somebody authorising a merge wants
+            // to know. Both states are now recorded, on separate paths,
+            // and neither enters the review loop.
+            const reviewState = body.review?.state?.toLowerCase();
+            if (reviewState === 'approved') {
+                await this.recordReviewApproval(binding, body);
+            } else {
+                // A reviewer who DISMISSES their approval, or replaces it
+                // with `changes_requested`, has withdrawn the one signal
+                // the merge Inbox offers about whether a person read the
+                // diff. The head-SHA binding covers a new commit; it does
+                // not cover the reviewer changing their mind about the
+                // same one, which is precisely this case.
+                await this.withdrawReviewApproval(binding, body);
+                await this.recordReviewRejection(binding, body);
+            }
+            return { ingested: null };
+        }
+
+        // Trusted review bots (R16) - an inline finding or a summary
+        // comment from an allow-listed reviewer bot is rejection feedback
+        // for the Task, on the same footing as a human's. It is handled
+        // here, BEFORE normalize(), for the same reason a review is: the
+        // loop must never review its reviewers, so the comment cannot
+        // become a `github.mention` no matter what it says.
+        if (
+            (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') &&
+            body.action === 'created' &&
+            classifyReviewer(body.comment?.user, this.reviewBotPolicy()) === 'trusted-bot'
+        ) {
+            await this.recordBotCommentFeedback(binding, eventName, body);
             return { ingested: null };
         }
 
@@ -558,10 +721,16 @@ export class GitHubPrReviewBridgeService {
      * durable rejection feedback for the Task the PR belongs to.
      *
      * Best-effort throughout: a webhook must answer 200 fast, and every
-     * miss here (not a rejection, a bot reviewer, an empty body, a PR
+     * miss here (not a rejection, a dropped reviewer, an empty body, a PR
      * that maps to no Work/Task) is an ORDINARY outcome, not an error.
-     * Bot reviewers are excluded for the same reason bot comments are:
-     * the loop must never treat its own output as human feedback.
+     *
+     * Trusted review bots (R16): the platform's own identity and any bot
+     * NOT on the allow-list are dropped — the loop must never treat its
+     * own output as reviewer feedback. An allow-listed reviewer bot in
+     * "request changes" mode is a rejection exactly like a human's, with
+     * the bot's own severity marker carried along; its `COMMENTED`
+     * summaries are not (their findings arrive as inline comments and are
+     * recorded by {@link recordBotCommentFeedback}).
      */
     private async recordReviewRejection(
         binding: GitHubEventsBinding,
@@ -569,8 +738,11 @@ export class GitHubPrReviewBridgeService {
     ): Promise<void> {
         const review = body.review;
         if (!review || review.state?.toLowerCase() !== 'changes_requested') return;
-        if (review.user?.type === 'Bot') return;
-        const feedback = (review.body ?? '').trim();
+        const who = classifyReviewer(review.user, this.reviewBotPolicy());
+        if (who === 'self' || who === 'untrusted-bot') return;
+        const raw = review.body ?? '';
+        if (who === 'trusted-bot' && isReviewBotNoise(raw)) return;
+        const feedback = (who === 'trusted-bot' ? stripReviewBotMarkup(raw) : raw).trim();
         if (feedback.length === 0) return;
 
         const fullName = body.repository?.full_name ?? '';
@@ -587,6 +759,8 @@ export class GitHubPrReviewBridgeService {
                 feedback: feedback.slice(0, GITHUB_EVENT_TEXT_MAX_CHARS),
                 reviewerLabel: review.user?.login ?? null,
                 prUrl: body.pull_request?.html_url ?? review.html_url ?? null,
+                reviewerKind: who === 'trusted-bot' ? 'bot' : 'human',
+                severity: who === 'trusted-bot' ? parseReviewBotSeverity(raw) : null,
             });
         } catch (error) {
             this.logger.warn(
@@ -595,6 +769,200 @@ export class GitHubPrReviewBridgeService {
                 }`,
             );
         }
+    }
+
+    /**
+     * Merge approval (self-build slice AE, EW-805) — persist an
+     * `approved` PR review as provider-side review context for the Task.
+     *
+     * HUMANS ONLY, and that is the security property. `classifyReviewer`
+     * checks the platform's own `<slug>[bot]` identity BEFORE the
+     * trusted-bot allow-list, so the loop cannot launder its own review
+     * into a sign-off; and an allow-listed reviewer bot is dropped here
+     * too, even though its REJECTIONS are trusted. A bot saying "looks
+     * good" is not a person having looked.
+     *
+     * What is recorded is deliberately narrow: the commit the reviewer
+     * saw (`review.commit_id`), when, and their provider login as an
+     * untrusted display string. It is never an authorization — this repo
+     * has no provider-login → platform-user mapping on the review path,
+     * so an approval here cannot establish that somebody entitled to
+     * approve for the Task's Organization approved it. The authorising
+     * decision is the platform-side one in the Inbox.
+     *
+     * Best-effort, exactly like its rejection twin.
+     */
+    private async recordReviewApproval(
+        binding: GitHubEventsBinding,
+        body: GitHubWebhookBody,
+    ): Promise<void> {
+        const review = body.review;
+        if (!review || review.state?.toLowerCase() !== 'approved') return;
+        if (classifyReviewer(review.user, this.reviewBotPolicy()) !== 'human') return;
+
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        const prNumber = body.pull_request?.number;
+        if (!owner || !repo || typeof prNumber !== 'number') return;
+
+        const submittedAt = review.submitted_at ? new Date(review.submitted_at) : null;
+        try {
+            await this.approvals.recordPullRequestApproval({
+                userId: binding.userId,
+                owner,
+                repo,
+                prNumber,
+                // `review.commit_id` ONLY — never `pull_request.head.sha`.
+                // The branch head at delivery time may already be several
+                // commits past what the reviewer read, and storing it
+                // would launder an approval of an old diff into an
+                // approval of whatever has been pushed since. That is the
+                // exact invariant `TaskReviewApprovalService` states, and
+                // its no-commit-id branch already drops the record — a
+                // delivery without `commit_id` (a replay, a trimmed
+                // payload, a GHES variant) is simply not attributable.
+                headSha: review.commit_id ?? null,
+                reviewerLabel: review.user?.login ?? null,
+                approvedAt:
+                    submittedAt && !Number.isNaN(submittedAt.getTime()) ? submittedAt : new Date(),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `PR approval record failed for ${fullName}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Merge approval (self-build slice AE, EW-805) — retract a recorded
+     * provider-side approval when its author takes it back.
+     *
+     * GitHub delivers a `pull_request_review` with `state: 'dismissed'`
+     * when a review is dismissed, and a fresh `changes_requested` review
+     * when the same person reverses themselves at the same commit.
+     * Neither moves the head, so the SHA binding that protects against a
+     * new commit does nothing here — and without this the Inbox goes on
+     * telling whoever is authorising the merge that "alice reviewed this"
+     * long after alice explicitly withdrew that sign-off.
+     *
+     * Scoped to the SAME reviewer on purpose. Bob requesting changes does
+     * not unmake the fact that Alice read the diff; Alice withdrawing does.
+     * A delivery with no reviewer login cannot be attributed to the
+     * recorded approver and clears nothing.
+     *
+     * Best-effort, like everything else on this path.
+     */
+    private async withdrawReviewApproval(
+        binding: GitHubEventsBinding,
+        body: GitHubWebhookBody,
+    ): Promise<void> {
+        const review = body.review;
+        const state = review?.state?.toLowerCase();
+        if (!review || (state !== 'dismissed' && state !== 'changes_requested')) return;
+        // Bots never wrote one of these records, so they can never clear
+        // one either — the same rule, from the other side.
+        if (classifyReviewer(review.user, this.reviewBotPolicy()) !== 'human') return;
+
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        const prNumber = body.pull_request?.number;
+        if (!owner || !repo || typeof prNumber !== 'number') return;
+
+        try {
+            await this.approvals.clearPullRequestApproval({
+                userId: binding.userId,
+                owner,
+                repo,
+                prNumber,
+                reviewerLabel: review.user?.login ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `PR approval withdrawal failed for ${fullName}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Trusted review bots (R16) — persist one inline finding
+     * (`pull_request_review_comment`) or summary comment (`issue_comment`)
+     * from an allow-listed reviewer bot as rejection feedback for the
+     * Task the PR belongs to. The caller has already classified the
+     * author as `trusted-bot` and checked `action === 'created'`.
+     *
+     * Status chatter (rate limits, "too many files", usage caps) is
+     * dropped: it carries nothing to fix. Presentation markup — HTML
+     * comments, collapsed static-analysis dumps, badges — is stripped
+     * BEFORE the text cap so the finding itself survives the budget, and
+     * an inline finding is prefixed with its `path:line` anchor. Same
+     * best-effort posture as {@link recordReviewRejection}.
+     */
+    private async recordBotCommentFeedback(
+        binding: GitHubEventsBinding,
+        eventName: string,
+        body: GitHubWebhookBody,
+    ): Promise<void> {
+        const comment = body.comment;
+        if (!comment || typeof comment.id !== 'number') return;
+        const raw = comment.body ?? '';
+        if (isReviewBotNoise(raw)) return;
+        // issue_comment fires for plain issues too — only PR threads carry
+        // review feedback.
+        const prNumber =
+            eventName === 'issue_comment'
+                ? body.issue?.pull_request
+                    ? body.issue?.number
+                    : undefined
+                : body.pull_request?.number;
+        if (typeof prNumber !== 'number') return;
+
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        if (!owner || !repo) return;
+
+        const stripped = stripReviewBotMarkup(raw);
+        const feedback =
+            eventName === 'pull_request_review_comment'
+                ? formatInlineFinding(comment, stripped)
+                : stripped;
+        if (feedback.length === 0) return;
+
+        try {
+            await this.rejections.recordPullRequestRejection({
+                userId: binding.userId,
+                owner,
+                repo,
+                prNumber,
+                feedback: feedback.slice(0, GITHUB_EVENT_TEXT_MAX_CHARS),
+                reviewerLabel: comment.user?.login ?? null,
+                prUrl:
+                    comment.html_url ?? body.pull_request?.html_url ?? body.issue?.html_url ?? null,
+                reviewerKind: 'bot',
+                severity: parseReviewBotSeverity(raw),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Reviewer-bot feedback record failed for ${fullName}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * The allow-list and the self identity, resolved per delivery so an
+     * operator's env change (and a spec's) takes effect without a restart.
+     * Both sets hold canonical (lower-case) logins.
+     */
+    private reviewBotPolicy(): ReviewBotPolicy {
+        return {
+            trusted: new Set(config.githubReviewBots.trustedLogins()),
+            self: new Set(config.githubReviewBots.selfLogins()),
+        };
     }
 
     /**
@@ -861,7 +1229,10 @@ export class GitHubPrReviewBridgeService {
                 return null;
             }
             // Never ingest bot-authored comments (incl. our own review
-            // replies) — the loop must not echo its own output.
+            // replies) — the loop must not echo its own output. Trusted
+            // reviewer bots (R16) were intercepted in handleEvent() and
+            // recorded as feedback; whatever bot reaches this line is
+            // either the platform itself or one nobody vouched for.
             if (comment.user?.type === 'Bot') {
                 return null;
             }

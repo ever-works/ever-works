@@ -16,7 +16,7 @@
 - Third-party aggregators (contrast set): `packages/plugins/composio/`, `apps/api/src/plugins/composio-triggers/composio-triggers.controller.ts` (inbound webhook + SDK signature verify), `packages/plugins/{make,sim-ai,zapier,activepieces}/`
 - SSRF guard helpers: `packages/plugin/src/helpers/ssrf-guard.ts` (`isSafeWebhookUrl`, `safeFetchWithDnsPin`)
 - Scope-column conventions: EW-651 / EW-657 (Tier A / Tier C), see `docs/specs/features/tenants-and-organizations/spec.md` §2.3
-- Chat engine: `docs/specs/features/chat-everything/spec.md`; untrusted-content fencing: `apps/mcp/src/api-client/{fence-untrusted.ts,sanitize.ts}`
+- Chat engine: `docs/specs/features/chat-everything/README.md`; untrusted-content fencing: `apps/mcp/src/api-client/{fence-untrusted.ts,sanitize.ts}`
 
 > **Scope of this document:** define a NEW first-party **connector** plugin category — bidirectional communication-channel plugins that both send outbound (messages / records) AND accept inbound control (a message arrives → routes to an Agent/Team → replies). This is distinct from the existing outbound-only notification channels and from the third-party aggregators (Composio / Make / SIM / Zapier / Activepieces). The phased execution plan lives in the sibling [plan.md](plan.md); the task checklist in [tasks.md](tasks.md).
 >
@@ -567,7 +567,7 @@ Framed as an ongoing program, not a one-shot. The durable platform is the catego
 
 - Implementation plan: [plan.md](plan.md) · Task checklist: [tasks.md](tasks.md)
 - Sibling comms specs: [`notification-channels`](../notification-channels/spec.md), [`email-providers`](../email-providers/spec.md), [`event-subscriptions`](../event-subscriptions/spec.md)
-- Chat engine: [`chat-everything`](../chat-everything/spec.md)
+- Chat engine: [`chat-everything`](../chat-everything/README.md)
 - Scope conventions: [`tenants-and-organizations`](../tenants-and-organizations/spec.md) §2.3
 - Aggregator contrast: [`integrations-twenty-crm`](../integrations-twenty-crm/spec.md), Composio triggers (`apps/api/src/plugins/composio-triggers/`)
 - Catalog-repo precedent: [`ever-works/agents`](https://github.com/ever-works/agents) (ADR-011), dynamic distribution (`docs/specs/features/dynamic-plugin-distribution/spec.md`)

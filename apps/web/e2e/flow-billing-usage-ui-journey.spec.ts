@@ -183,9 +183,15 @@ test.describe('/settings/usage', () => {
 
         const exportLink = page.getByTestId('usage-export-csv');
         await expect(exportLink).toBeVisible();
+        // The export is an `<a href download>`, which cannot send a header, so
+        // the workspace selector rides on the URL as `?scope=` and the BFF
+        // route turns it into `X-Scope-Slug`. Asserted rather than tolerated:
+        // if the carrier ever disappears the export silently goes back to
+        // ignoring the Organization the user is standing in, which is the
+        // defect it was added to fix.
         await expect(exportLink).toHaveAttribute(
             'href',
-            /^\/api\/credits\/usage\/export\?period=(\d{4}-(0[1-9]|1[0-2])|7d|30d)$/,
+            /^\/api\/credits\/usage\/export\?period=(\d{4}-(0[1-9]|1[0-2])|7d|30d)&scope=(personal|org%3A[a-z0-9-]+)$/,
         );
 
         // The proxy must answer with a CSV attachment, not an HTML error

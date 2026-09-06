@@ -28,6 +28,29 @@ export interface LinkExternalIssueInput {
     url?: string | null;
     tenantId?: string | null;
     organizationId?: string | null;
+    /**
+     * Freshness breadcrumbs a server-side filer stamps in the SAME write
+     * that binds the issue (the triage intake files a Task and links it
+     * in one step, then uses `lastIngestedEventId` as its idempotency
+     * marker when the drain retries the row). Omitted = left untouched.
+     */
+    lastIngestedEventId?: string | null;
+    lastSeenAt?: Date | null;
+    /**
+     * Times this external issue has RE-OPENED work (a regression
+     * superseding a closed Task). Omitted = left untouched, which is
+     * every ordinary file / refresh.
+     */
+    regressionCount?: number;
+    /**
+     * Insert-only. When a link already exists for
+     * `(userId, source, externalIssueId)` it is returned UNCHANGED
+     * instead of being re-pointed at `taskId` — see
+     * `UpsertExternalIssueLinkData.onlyIfAbsent`. A caller that filed a
+     * Task must compare `taskId` on the returned row: a different id
+     * means it lost the race and its own Task is an orphan.
+     */
+    onlyIfAbsent?: boolean;
 }
 
 /**
@@ -99,7 +122,24 @@ export class ExternalIssueLinkService {
             url: input.url ?? null,
             tenantId: input.tenantId ?? null,
             organizationId: input.organizationId ?? null,
+            ...(input.lastIngestedEventId !== undefined
+                ? { lastIngestedEventId: input.lastIngestedEventId }
+                : {}),
+            ...(input.lastSeenAt !== undefined ? { lastSeenAt: input.lastSeenAt } : {}),
+            ...(input.regressionCount !== undefined
+                ? { regressionCount: input.regressionCount }
+                : {}),
+            ...(input.onlyIfAbsent ? { onlyIfAbsent: true } : {}),
         });
+    }
+
+    /** The full link row for an owner-scoped external issue, or null. */
+    async find(
+        userId: string,
+        source: string,
+        externalIssueId: string,
+    ): Promise<ExternalIssueLink | null> {
+        return this.links.findByExternal(userId, source, externalIssueId);
     }
 
     /** Remove a binding, owner-scoped. True when a row went. */

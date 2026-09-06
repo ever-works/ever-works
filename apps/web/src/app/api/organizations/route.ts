@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
 
 /**
  * EW-660 (Tenants & Organizations Phase 8) — web BFF proxy for
@@ -9,28 +8,15 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  *
  * Forwards to the NestJS API at `${API_URL}/organizations` with the
  * user's auth token attached as a Bearer header (the encrypted
- * `auth_token` cookie is decrypted here, NEVER shipped to the browser).
+ * `auth_token` cookie is decrypted by {@link bffProxy}, NEVER shipped to
+ * the browser).
  *
  * Returns the upstream `OrganizationResponse[]` payload as-is. On 401
  * or upstream error we fall through to `{ status }` so the client-side
  * `useOrganizations()` hook can surface a sensible `error` value without
  * mistaking the auth-failure for an empty-orgs list.
  */
-export async function GET(request: NextRequest) {
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Authorization: `Bearer ${token}`,
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
-
+export const GET = bffProxy(async ({ headers }) => {
     try {
         const upstream = await fetch(`${API_URL}/organizations`, {
             method: 'GET',
@@ -49,7 +35,7 @@ export async function GET(request: NextRequest) {
         console.error('Failed to proxy /api/organizations:', error);
         return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 });
     }
-}
+});
 
 /**
  * EW-661 (Tenants & Organizations Phase 9) — web BFF proxy for
@@ -64,13 +50,14 @@ export async function GET(request: NextRequest) {
  * Error status codes from the upstream are passed through (e.g. 409
  * slug-conflict, 400 validation failure) so the modal can render the
  * right copy.
+ *
+ * NOTE on ordering: {@link bffProxy} settles auth and scope before this
+ * handler runs, so a request that is BOTH unparseable and missing a valid
+ * selector now answers `Invalid workspace scope` where it previously
+ * answered `Invalid JSON body`. Both are 400; only the message differs,
+ * and failing closed on scope first is the wrapper's stated intent.
  */
-export async function POST(request: NextRequest) {
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export const POST = bffProxy(async ({ request, headers }) => {
     let body: unknown;
     try {
         body = await request.json();
@@ -78,15 +65,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+    // Previously folded into the base headers handed to
+    // `applyBffWorkspaceScope`; the wrapper's base is `Authorization` only,
+    // and it returns a fresh `Headers`, so setting it here is equivalent.
+    headers.set('Content-Type', 'application/json');
 
     try {
         const upstream = await fetch(`${API_URL}/organizations`, {
@@ -107,7 +89,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to proxy POST /api/organizations:', error);
         return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 });
     }
-}
+});
 
 function safeParse(text: string): unknown {
     try {

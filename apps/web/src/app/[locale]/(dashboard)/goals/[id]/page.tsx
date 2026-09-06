@@ -36,12 +36,13 @@ export default async function GoalDetailPage({ params }: { params: Params }) {
     // the orchestrator log and the session list are supporting evidence,
     // and losing one of them must not take the whole Goal page down.
     //
-    // The Agent list is what makes the loop reachable at all: the router
-    // only ever considers the Goal's pinned agent plus the agents that have
-    // already worked one of its iterations, so a Goal created in the UI has
-    // an EMPTY candidate pool and every advance answers `no-candidate-agent`
-    // until an operator pins one. `assignedAgentId` is the field that does
-    // that, and the Adjust-limits dialog is where it is set.
+    // The Agent list feeds the Adjust-limits dialog's routing pin
+    // (`assignedAgentId`). A pin is optional: without one the router
+    // round-robins over the agents that have already worked this Goal and,
+    // for a brand-new Goal, over the eligible agents in the Goal's own
+    // Organization / tenant scope (self-build slice AG, finding R1) — so a
+    // Goal created in the UI can start its loop as soon as the scope has
+    // an agent, and `no-candidate-agent` now means the scope has none.
     const [samples, events, sessions, agents]: [
         GoalMetricSample[],
         GoalEvent[],

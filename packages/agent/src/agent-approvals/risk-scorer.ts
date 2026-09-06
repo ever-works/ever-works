@@ -37,7 +37,14 @@ export const HIGH_FANOUT_DEPTH = 3;
  *
  * Rules (agents approval-queue spec):
  *   - `budget_override` — the action itself is a budget override.
- *   - `destructive`     — `payload.destructive` is truthy.
+ *   - `destructive`     — `payload.destructive` is truthy, OR the action
+ *                         is a `merge_pull_request`. Landing a pull
+ *                         request onto a real branch is the one action in
+ *                         this queue that no later commit can undo, and
+ *                         the flag is load-bearing rather than cosmetic:
+ *                         `evaluateGuardrails` refuses to auto-approve
+ *                         ANY flagged action, which is what stops an
+ *                         autonomous Agent from approving its own merge.
  *   - `cross_scope`     — the action reaches into another scope, i.e.
  *                         `payload.crossScope === true` OR a non-null
  *                         `sourceScope`/`targetScope` pair that differs.
@@ -51,7 +58,10 @@ export function RISK_SCORER(input: RiskScorerInput): AgentActionRiskFlag[] {
         flags.add('budget_override');
     }
 
-    if (payload.destructive) {
+    // A merge is destructive by construction — see the rule list above.
+    // It is NOT read off the payload: a caller that forgot to set
+    // `destructive: true` would otherwise mint a self-approvable merge.
+    if (payload.destructive || input.actionType === 'merge_pull_request') {
         flags.add('destructive');
     }
 

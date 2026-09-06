@@ -92,6 +92,7 @@ import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
 import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
+import { TaskCiAutoResumeAttempt } from '../entities/task-ci-auto-resume-attempt.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
 import { TaskRelation } from '../entities/task-relation.entity';
@@ -143,7 +144,10 @@ import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.en
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
+import { FleetAudit } from '../entities/fleet-audit.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
+import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
 import { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
@@ -250,6 +254,9 @@ export const ENTITIES = [
     TaskReviewer,
     // Orchestration M9 - durable rejection feedback for resume.
     TaskReviewRejection,
+    // CI feedback + autonomous fix loop (slice AC, EW-806) - the durable
+    // auto-resume attempt ledger, which IS the retry budget.
+    TaskCiAutoResumeAttempt,
     TaskApprover,
     TaskBlock,
     TaskRelation,
@@ -357,12 +364,20 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Panic controls (EW-778) — the single-row global stop flag read by
+    // the dispatch gate, the run router and every lease request, and the
+    // append-only audit trail every panic action writes to.
+    FleetKillSwitch,
+    FleetAudit,
     // Inbox (operator message center) — messages addressed to the human:
     // blocking questions, approval requests, escalation mirrors, notices.
     InboxItem,
     // Fleet local-runner routing — per Work / Goal / account preference
     // for local-runner vs cloud execution.
     FleetExecutionPreference,
+    // Fleet cost accounting (EW-777) — per-owner fleet-wide daily
+    // model-spend ceiling + its one-notice trip marker.
+    FleetCostPolicy,
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,

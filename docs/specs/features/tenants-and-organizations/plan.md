@@ -18,7 +18,7 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
 1. New TypeORM migration: `AddUniqueIndexToUsername`.
     - Pre-check: `SELECT username, COUNT(*) FROM users GROUP BY username HAVING COUNT(*) > 1` — fail the migration loudly with a clear message if any duplicates exist (operator decides resolution). No live users yet, so we expect zero.
     - Add a UNIQUE index on `lower(username)` (Postgres expression index for case-insensitive uniqueness).
-    - SQLite fallback: plain UNIQUE on the raw column (covers the better-sqlite3 internal-cli test driver — see [`database-migrations.md`](../../architecture/database-migrations.md)).
+    - SQLite fallback: plain UNIQUE on the raw column (covers the better-sqlite3 internal-cli test driver — see [`database.md` §6 Migrations](../../architecture/database.md)).
 2. New TypeORM migration: `AddSlugToUsers`.
     - Add nullable `slug` varchar column.
     - Backfill `slug` from `username` (URL-normalize per [spec.md §3.3](spec.md#33-url-safety)) for every existing user.
@@ -380,7 +380,7 @@ The bar: existing 26 agent test suites + 719 tests all keep passing. New phases 
 
 ### CI / release gates
 
-Refer to [`CI_RELEASE_GATES.md`](../../../../../../Workspace/knowledge/runbooks/CI_RELEASE_GATES.md):
+Refer to `knowledge/runbooks/CI_RELEASE_GATES.md` (operator workspace repository):
 
 - Lightweight CI runs on every PR + release-branch push (typecheck, lint, agent test suite).
 - Medium/heavy CI runs on `stage`/`main` pushes only.

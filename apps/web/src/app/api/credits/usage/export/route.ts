@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScopeFromNavigation } from '@/lib/api/bff-scope';
 
 /**
  * B29 (account-wide usage CSV export) — Next.js proxy for
@@ -10,15 +11,22 @@ import { getAuthAccessCookie } from '@/lib/auth/cookies';
  * keeps the whole period out of this process's memory — the API streams
  * page by page and so does this route.
  *
- * Org scoping is enforced upstream from the request scope context; there
- * is deliberately no org/user parameter to forward.
+ * **Workspace scope.** This is reached by an `<a href download>`, which
+ * cannot carry `x-ever-workspace`, so the selector travels as `?scope=`
+ * (`personal` | `org:<slug>`, built with `buildUsageExportQuery`) and is
+ * turned into the API's `X-Scope-Slug` here. Upstream, an Organization
+ * scope NARROWS the export to that Organization's events; personal — and a
+ * link with no selector at all, which is what every bookmark predating the
+ * carrier is — exports the caller's own events across every workspace,
+ * exactly as before. A present-but-invalid selector is a 400.
  *
  * Mirrors apps/web/src/app/api/works/[id]/usage/export/route.ts.
  */
 
 // Security: allowlist of query parameters forwarded to the upstream API.
-// Forwarding the raw query string would let a caller inject unknown
-// parameters (e.g. a scope override) into the internal API.
+// This is also what keeps the `scope` carrier OFF the upstream URL: the
+// API's ValidationPipe runs with `forbidNonWhitelisted`, so relaying it
+// would be a 400 upstream. The carrier is consumed here.
 const ALLOWED_PARAMS = new Set(['period', 'format']);
 
 // Security: the upstream sets the filename from the resolved period, but
@@ -29,9 +37,14 @@ const FALLBACK_DISPOSITION = 'attachment; filename="usage.csv"';
 export async function GET(request: NextRequest) {
     const token = await getAuthAccessCookie();
 
-    const headers = new Headers();
+    let headers = new Headers();
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
+    }
+    try {
+        headers = applyBffWorkspaceScopeFromNavigation(request, headers);
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
     }
 
     const upstreamParams = new URLSearchParams();

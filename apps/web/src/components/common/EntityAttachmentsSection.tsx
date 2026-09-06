@@ -1,6 +1,8 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
+import { withUploadServeScope } from '@/lib/api/upload-serve-url';
 import Image from 'next/image';
 import {
     File as FileIcon,
@@ -205,6 +207,9 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
     const [brokenThumbs, setBrokenThumbs] = useState<Record<string, true>>({});
     const [pending, startTransition] = useTransition();
     const [dragOver, setDragOver] = useState(false);
+    // Thumbnails and the open link are browser requests, so the tab's
+    // workspace rides on the serve URL at render time.
+    const workspace = useWorkspaceScope();
     const [error, setError] = useState<string | null>(initialError);
     const [busy, setBusy] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
@@ -366,7 +371,10 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                         const KindIcon = kind.icon;
                         // In-session uploads carry the URL in local meta;
                         // server-listed rows carry it on the row itself.
-                        const openUrl = m?.url ?? r.url ?? undefined;
+                        const openUrl = withUploadServeScope(
+                            m?.url ?? r.url ?? undefined,
+                            workspace,
+                        );
                         // Images render a real thumbnail (served same-origin via
                         // the auth proxy); everything else — and any image that
                         // fails to load — gets the type-aware icon tile.

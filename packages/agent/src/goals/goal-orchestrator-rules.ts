@@ -24,10 +24,13 @@ export interface GoalRoutingCandidate {
     /** Display name for the reasoning string; falls back to the id. */
     name?: string | null;
     /**
-     * Where the candidate came from — `assigned` (operator pin) or
-     * `history` (has already worked an iteration of this goal).
+     * Where the candidate came from — `assigned` (operator pin),
+     * `history` (has already worked an iteration of this goal), or
+     * `scope` (cold start: an eligible agent in the Goal's own
+     * Organization / tenant scope, offered only when there is no pin and
+     * no history — self-build slice AG, finding R1).
      */
-    source: 'assigned' | 'history';
+    source: 'assigned' | 'history' | 'scope';
 }
 
 export type GoalLoopAction =
@@ -55,17 +58,28 @@ export type GoalLoopReasonCode =
     | 'grace-period'
     | 'no-candidate-agent'
     | 'routed-assigned-agent'
-    | 'routed-round-robin';
+    | 'routed-round-robin'
+    | 'routed-scope-fallback';
 
 export interface GoalLoopDecision {
     action: GoalLoopAction;
     reasonCode: GoalLoopReasonCode;
     /** Verbatim orchestrator-log line. */
     reasoning: string;
-    /** Set only when `action === 'dispatch'`. */
+    /** Set only when `action === 'dispatch'`. The FIRST slot's agent. */
     agentId?: string;
-    /** The iteration number this decision produces (dispatch only). */
+    /** The iteration number this decision produces (dispatch only). The FIRST slot's. */
     nextIteration?: number;
+    /**
+     * Concurrent iterations (slice AH) — one entry per slot this decision
+     * dispatches, in order. Always present on a `dispatch`, and always
+     * length 1 unless the Goal opted into `maxConcurrentIterations > 1`,
+     * so `agentId` / `nextIteration` above stay the whole answer for
+     * every caller that predates the field.
+     */
+    agentIds?: string[];
+    /** Iteration numbers for {@link agentIds}, positionally paired. */
+    iterations?: number[];
 }
 
 export interface GoalLoopInput {
@@ -82,6 +96,20 @@ export interface GoalLoopInput {
     gracePeriodMinutes?: number | null;
     /** True when an iteration Task still has a queued/running agent run. */
     hasRunInFlight: boolean;
+    /**
+     * Concurrent iterations (slice AH) — HOW MANY iteration runs are in
+     * flight. Absent falls back to `hasRunInFlight ? 1 : 0`, which is
+     * what every caller written before this field effectively said, so
+     * omitting it changes nothing.
+     */
+    runsInFlight?: number | null;
+    /**
+     * Concurrent iterations (slice AH) — how many iterations this Goal
+     * may have in flight at once. Absent / null / `<= 1` all mean ONE,
+     * which is the serial loop every existing Goal runs; a Goal only
+     * speeds up when someone raises it deliberately.
+     */
+    maxConcurrentIterations?: number | null;
     candidates: GoalRoutingCandidate[];
     now: Date;
 }
@@ -106,11 +134,20 @@ const MS_PER_MINUTE = 60_000;
  *     because a loop that is both over budget AND stuck should report the
  *     ceiling: that is the actionable fact, and the operator surface for
  *     it (raise the cap) differs from the one for stuck (change the plan).
- *  6. **Run in flight** → wait. A second concurrent iteration would race
- *     the first one's workspace.
+ *  6. **Concurrency ceiling reached** → wait. By default the ceiling is
+ *     ONE, i.e. "a run is in flight" — a second concurrent iteration
+ *     would race the first one's workspace. A Goal whose iterations do
+ *     NOT share a branch can raise `maxConcurrentIterations`, and the
+ *     branch then waits only once that many are in flight; the tick
+ *     dispatches the free slots in one decision (`agentIds` /
+ *     `iterations`). Nothing changes for a Goal that never sets it.
  *  7. **No candidate agent** → stuck. Honest degradation: a loop with
  *     nothing to route to is not "running", it is waiting on a human.
- *  8. Otherwise → dispatch, pinned agent first, else round-robin.
+ *     (The service already widened the pool to the Goal's scope for a
+ *     fresh Goal, so reaching here means the scope has no agent at all.)
+ *  8. Otherwise → dispatch, pinned agent first, else round-robin over
+ *     the history — or, for a fresh unpinned Goal, over the eligible
+ *     agents of its scope (`routed-scope-fallback`).
  *
  * `gracePeriodMinutes` extends the WALL-CLOCK limit only, and only while
  * an iteration is actually in flight: the point is to let a session that
@@ -206,11 +243,21 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
         };
     }
 
-    if (input.hasRunInFlight) {
+    // Concurrent iterations (slice AH). At the default ceiling of ONE
+    // this reduces to `if (input.hasRunInFlight)` — same branch, same
+    // reasonCode, same reasoning string — which is what keeps every
+    // pre-existing decision-table case byte-identical.
+    const maxConcurrent = resolveMaxConcurrentIterations(input.maxConcurrentIterations);
+    const runsInFlight = resolveRunsInFlight(input);
+    if (runsInFlight >= maxConcurrent) {
         return {
             action: 'wait',
             reasonCode: 'run-in-flight',
-            reasoning: `Iteration ${input.iteration} is still running — router waiting.`,
+            reasoning:
+                maxConcurrent === 1
+                    ? `Iteration ${input.iteration} is still running — router waiting.`
+                    : `${runsInFlight} of ${maxConcurrent} concurrent iterations are still ` +
+                      'running — router waiting for a slot.',
         };
     }
 
@@ -219,38 +266,115 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
             action: 'stuck',
             reasonCode: 'no-candidate-agent',
             reasoning:
-                'No agent is available to run this Goal — assign an agent to the Goal (or run one ' +
-                'iteration manually) before the loop can route work.',
+                "No agent is available to run this Goal — create or assign an agent in this Goal's " +
+                'scope (or run one iteration manually) before the loop can route work.',
         };
     }
 
+    // Free slots this tick: the ceiling minus what is already running, so
+    // a Goal at 3 of 4 dispatches ONE more, never four.
+    const slots = maxConcurrent - runsInFlight;
     const nextIteration = input.iteration + 1;
+    const iterations = Array.from({ length: slots }, (_, index) => nextIteration + index);
+    const plural = slots > 1;
     const pinned = input.candidates.find((candidate) => candidate.source === 'assigned');
     if (pinned) {
+        // A pin is a pin: every free slot goes to it. Round-robin exists
+        // to spread work the operator did NOT direct.
         return {
             action: 'dispatch',
             reasonCode: 'routed-assigned-agent',
             agentId: pinned.agentId,
             nextIteration,
-            reasoning:
-                `Routed iteration ${nextIteration} → ${label(pinned)}: the Goal pins this agent, ` +
-                'so routing never round-robins.',
+            agentIds: iterations.map(() => pinned.agentId),
+            iterations,
+            reasoning: plural
+                ? `Routed iterations ${describeIterations(iterations)} → ${label(pinned)}: the Goal ` +
+                  `pins this agent, so routing never round-robins; ${slots} of ${maxConcurrent} ` +
+                  'concurrent slots were free.'
+                : `Routed iteration ${nextIteration} → ${label(pinned)}: the Goal pins this agent, ` +
+                  'so routing never round-robins.',
         };
     }
 
     // Round-robin keyed on the iteration ABOUT to run, so consecutive
     // iterations visit different agents and the sequence is reproducible
     // from the persisted counter alone (no hidden cursor to drift).
-    const chosen = input.candidates[nextIteration % input.candidates.length];
+    const chosenAgents = iterations.map(
+        (iteration) => input.candidates[iteration % input.candidates.length],
+    );
+    const chosen = chosenAgents[0];
+    const agentIds = chosenAgents.map((candidate) => candidate.agentId);
+    const routed = chosenAgents.map((candidate) => label(candidate)).join(', ');
+    if (chosen.source === 'scope') {
+        // Cold start: nobody has worked this Goal yet, so the service
+        // offered the eligible agents of the Goal's own scope. The log line
+        // says so explicitly — an operator must be able to tell "routed to
+        // the agent that already knows this Goal" from "routed to whoever
+        // is in the Organization".
+        return {
+            action: 'dispatch',
+            reasonCode: 'routed-scope-fallback',
+            agentId: chosen.agentId,
+            nextIteration,
+            agentIds,
+            iterations,
+            reasoning: plural
+                ? `Routed iterations ${describeIterations(iterations)} → ${routed}: the Goal pins no ` +
+                  'agent and no agent has worked it yet, so the router round-robins over the ' +
+                  `${input.candidates.length} eligible agent(s) in the Goal's scope; ${slots} of ` +
+                  `${maxConcurrent} concurrent slots were free.`
+                : `Routed iteration ${nextIteration} → ${label(chosen)}: the Goal pins no agent and no ` +
+                  'agent has worked it yet, so the router round-robins over the ' +
+                  `${input.candidates.length} eligible agent(s) in the Goal's scope.`,
+        };
+    }
     return {
         action: 'dispatch',
         reasonCode: 'routed-round-robin',
         agentId: chosen.agentId,
         nextIteration,
-        reasoning:
-            `Routed iteration ${nextIteration} → ${label(chosen)}: the Goal pins no agent, so the ` +
-            `router round-robins over ${input.candidates.length} agent(s) that have worked this Goal.`,
+        agentIds,
+        iterations,
+        reasoning: plural
+            ? `Routed iterations ${describeIterations(iterations)} → ${routed}: the Goal pins no ` +
+              `agent, so the router round-robins over ${input.candidates.length} agent(s) that have ` +
+              `worked this Goal; ${slots} of ${maxConcurrent} concurrent slots were free.`
+            : `Routed iteration ${nextIteration} → ${label(chosen)}: the Goal pins no agent, so the ` +
+              `router round-robins over ${input.candidates.length} agent(s) that have worked this Goal.`,
     };
+}
+
+/**
+ * Concurrent iterations (slice AH) — the ceiling, normalized.
+ *
+ * Absent, null, NaN and anything `<= 1` all collapse to ONE, which is
+ * the serial behaviour every Goal has always had. Raising it is opt-in
+ * per Goal and appropriate only where iterations do not share a branch:
+ * the `wait` branch it relaxes exists because "a second concurrent
+ * iteration would race the first one's workspace".
+ */
+function resolveMaxConcurrentIterations(raw: number | null | undefined): number {
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) return 1;
+    return Math.max(1, Math.trunc(raw));
+}
+
+/**
+ * How many iterations are in flight: `runsInFlight` when the caller
+ * counted them, else the boolean every pre-AH caller supplied.
+ */
+function resolveRunsInFlight(input: GoalLoopInput): number {
+    if (typeof input.runsInFlight === 'number' && Number.isFinite(input.runsInFlight)) {
+        return Math.max(0, Math.trunc(input.runsInFlight));
+    }
+    return input.hasRunInFlight ? 1 : 0;
+}
+
+/** `12` / `12 and 13` / `12, 13 and 14` for the multi-slot log line. */
+function describeIterations(iterations: number[]): string {
+    if (iterations.length === 1) return String(iterations[0]);
+    const head = iterations.slice(0, -1).join(', ');
+    return `${head} and ${iterations[iterations.length - 1]}`;
 }
 
 /** Cents → a `$12.34` string for the log line. */

@@ -674,7 +674,9 @@ export class AgentToolService {
         // broken source contributes zero tools — never a failed run.
         if (this.mcpTools) {
             try {
-                const mcpDescriptors = await this.mcpTools.buildTools(agent);
+                const mcpDescriptors = await this.mcpTools.buildTools(agent, {
+                    runId: runContext.runId,
+                });
                 const existing = new Set(tools.map((tool) => tool.name));
                 for (const descriptor of mcpDescriptors) {
                     // A server-supplied name must never shadow a built-in —
@@ -734,6 +736,29 @@ export class AgentToolService {
                 }`,
             );
             return { tools, refused: [] };
+        }
+    }
+
+    /**
+     * AP-14 prerequisite — the run-end half of the MCP tool source.
+     *
+     * `buildTools` may acquire per-run resources (a launched stdio server,
+     * an open client); this hands the run id back so the source can let
+     * them go. `AgentRunService` calls it on EVERY exit path of the tool
+     * loop. Failure-isolated: a source that cannot clean up is logged —
+     * the run already ended, and failing it now would report a working run
+     * as broken.
+     */
+    async releaseMcpRun(runId: string): Promise<void> {
+        if (!this.mcpTools) return;
+        try {
+            await this.mcpTools.releaseRun(runId);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: MCP tool source release failed (resources may linger until shutdown): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
         }
     }
 

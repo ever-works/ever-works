@@ -6,6 +6,7 @@ import {
     resolveAcceptanceChecks,
     resolveChecksPolicy,
     resolveMaxGateAttempts,
+    resolveSetupSteps,
 } from '../task-gates';
 
 function check(overrides: Partial<TaskAcceptanceCheck> & { id: string }): TaskAcceptanceCheck {
@@ -166,5 +167,79 @@ describe('resolveMaxGateAttempts', () => {
         expect(resolveMaxGateAttempts({ maxGateAttempts: Number.POSITIVE_INFINITY }, null)).toBe(
             DEFAULT_GATE_ATTEMPTS,
         );
+    });
+});
+
+/**
+ * Setup phase partitioning (EW-807).
+ *
+ * `phase: 'setup'` is a dependency install, not an acceptance check. Every
+ * existing caller of `resolveAcceptanceChecks` — the cloud gate runner,
+ * the L0 pre-check pass, the fleet instruction composer — treats what it
+ * returns as "the commands whose exit codes are the gate", so a setup step
+ * leaking into that list would be graded as a failing test. That is the
+ * exact conflation the phase exists to remove, and it is removed once,
+ * here, rather than at each call site.
+ */
+describe('setup phase vs acceptance checks', () => {
+    const install = check({ id: 'install', command: 'pnpm install', phase: 'setup' });
+    const tests = check({ id: 'test', kind: 'test', command: 'pnpm test' });
+    const lint = check({ id: 'lint', kind: 'lint', command: 'pnpm lint', phase: 'check' });
+
+    it('keeps setup entries OUT of the acceptance checks', () => {
+        expect(
+            resolveAcceptanceChecks(
+                { acceptanceChecks: [install, tests, lint] },
+                { checkDefaults: null },
+            ),
+        ).toEqual([tests, lint]);
+    });
+
+    it('returns only the setup entries from resolveSetupSteps', () => {
+        expect(
+            resolveSetupSteps(
+                { acceptanceChecks: [install, tests, lint] },
+                { checkDefaults: null },
+            ),
+        ).toEqual([install]);
+    });
+
+    it('an entry with no phase is an acceptance check, as every entry authored before this field is', () => {
+        expect(resolveAcceptanceChecks({ acceptanceChecks: [tests] }, null)).toEqual([tests]);
+        expect(resolveSetupSteps({ acceptanceChecks: [tests] }, null)).toEqual([]);
+    });
+
+    it('inherits a Work-level install and lets a Task override or suppress it by id', () => {
+        const workInstall = check({ id: 'install', command: 'npm ci', phase: 'setup' });
+        expect(
+            resolveSetupSteps({ acceptanceChecks: null }, { checkDefaults: [workInstall] }),
+        ).toEqual([workInstall]);
+        // Same id, different command: replaced wholesale, like a check.
+        expect(
+            resolveSetupSteps({ acceptanceChecks: [install] }, { checkDefaults: [workInstall] }),
+        ).toEqual([install]);
+        // `disabled: true` suppresses the inherited install for this Task.
+        expect(
+            resolveSetupSteps(
+                { acceptanceChecks: [{ ...workInstall, disabled: true }] },
+                { checkDefaults: [workInstall] },
+            ),
+        ).toEqual([]);
+    });
+
+    it('a Task that re-phases an inherited check moves it between the two lists', () => {
+        // The merge is by id and replaces wholesale, so re-declaring a
+        // Work default with `phase: 'setup'` moves it — it must not appear
+        // in both lists, which would run it twice.
+        const resolvedChecks = resolveAcceptanceChecks(
+            { acceptanceChecks: [{ ...tests, phase: 'setup' }] },
+            { checkDefaults: [tests] },
+        );
+        const resolvedSetup = resolveSetupSteps(
+            { acceptanceChecks: [{ ...tests, phase: 'setup' }] },
+            { checkDefaults: [tests] },
+        );
+        expect(resolvedChecks).toEqual([]);
+        expect(resolvedSetup.map((entry) => entry.id)).toEqual(['test']);
     });
 });

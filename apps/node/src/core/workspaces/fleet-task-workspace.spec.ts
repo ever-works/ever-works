@@ -179,6 +179,77 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 	});
 
 	/**
+	 * Run secrets (self-build slice Y, EW-781).
+	 *
+	 * The delivered `.env` files are per-repository and DYNAMIC, so they
+	 * cannot live in the static rule list. What must hold anyway: the rule
+	 * is anchored, Git actually honours it (`git add -A` stages nothing),
+	 * the merge stays idempotent across re-provisions, and the probe is NOT
+	 * slash-terminated — a `dir/` pattern matches directories only, so a
+	 * slashed probe would make `check-ignore` report the rule ineffective
+	 * for a plain file and fail provisioning outright.
+	 */
+	it('excludes the run env files it will deliver, before any content exists', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const spec = {
+			...workspace('task/fleet-secrets'),
+			envFilesRef: [
+				{
+					repoConnectionId: '22222222-2222-4222-8222-222222222222',
+					paths: ['.env', 'apps/api/.env']
+				}
+			]
+		};
+		const descriptor = await provisioner.provision('task-0016', spec);
+
+		const commonDir = git(descriptor.path, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+		const excludeLines = async (): Promise<string[]> =>
+			(await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8')).split(/\r?\n/).map((line) => line.trim());
+		expect(await excludeLines()).toContain('/.env');
+		expect(await excludeLines()).toContain('/apps/api/.env');
+
+		// The delivered files really are invisible to Git — which is the
+		// property the rule exists for, not the rule text itself.
+		writeFileSync(join(descriptor.path, '.env'), 'DATABASE_URL=postgres://u:p@db/app\n');
+		mkdirSync(join(descriptor.path, 'apps', 'api'), { recursive: true });
+		writeFileSync(join(descriptor.path, 'apps', 'api', '.env'), 'DATABASE_URL=postgres://u:p@db/app\n');
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		git(descriptor.path, 'add', '-A');
+		expect(git(descriptor.path, 'diff', '--cached', '--name-only')).toBe('');
+
+		// Re-provisioning the same task adds no duplicate rule.
+		await provisioner.provision('task-0016', spec);
+		const merged = await excludeLines();
+		for (const rule of ['/.env', '/apps/api/.env']) {
+			expect(merged.filter((line) => line === rule)).toHaveLength(1);
+		}
+
+		// …and a workspace that declares none adds no env rule of its own.
+		// (It cannot assert the rules are ABSENT: `info/exclude` is shared by
+		// every worktree of the repository's pool, which is exactly why the
+		// rules are anchored and why the merge has to be idempotent.)
+		const before = await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8');
+		await provisioner.provision('task-0017', workspace('task/fleet-plain'));
+		expect(await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8')).toBe(before);
+	});
+
+	it('refuses a spec whose env reference names a mount it does not provision', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		await expect(
+			provisioner.provision('task-0018', {
+				...workspace('task/fleet-badref'),
+				envFilesRef: [
+					{
+						repoConnectionId: '22222222-2222-4222-8222-222222222222',
+						mountDir: 'nowhere',
+						paths: ['.env']
+					}
+				]
+			})
+		).rejects.toMatchObject({ name: 'FleetTaskWorkspaceError', code: 'invalid-spec' });
+	});
+
+	/**
 	 * CI 2026-09-04, `lint-and-test` on #2297: provisioning a workspace with
 	 * NO mounts failed on Linux because `.mounts` existed as a symlink left by
 	 * an earlier run. Git treats a symlink as a FILE, so the then
