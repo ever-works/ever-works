@@ -210,7 +210,7 @@ describe('fleet node contract — the wire a deployed node actually speaks', () 
         }
     });
 
-    it('leaves the job work channel at exactly three node verbs', () => {
+    it('leaves the job work channel at exactly the admitted node verbs', () => {
         // A fourth verb on the node channel is a contract change nobody would
         // otherwise notice until a node met a platform that did not have it.
         const declared = Object.getOwnPropertyNames(FleetJobsController.prototype)
@@ -223,7 +223,14 @@ describe('fleet node contract — the wire a deployed node actually speaks', () 
                     ),
                 ),
             );
-        expect(declared.sort()).toEqual(['complete', 'heartbeat', 'lease']);
+        // ADMITTED DELIBERATELY, which is the whole point of this assertion.
+        // Slice Y (EW-781) added `envFiles`: POST /api/fleet/jobs/:id/env-files,
+        // the run-secret fetch. It is a node verb like the other three — same
+        // credential, same four lease checks — so it belongs on this list, and
+        // an older node simply never calls it. Admitting it is the deliberate
+        // act this gate exists to demand; the failure that brought us here was
+        // the gate working.
+        expect(declared.sort()).toEqual(['complete', 'envFiles', 'heartbeat', 'lease']);
     });
 
     it('keeps every node-facing fleet route @Public() — a node has no session to present', () => {
@@ -635,7 +642,17 @@ function buildRealJobsController(options: { stopped?: boolean } = {}) {
         undefined,
         { isStopped: async () => Boolean(options.stopped) } as never,
     );
-    return { controller: new FleetJobsController(service), secret, job };
+    // Slice Y (EW-781) gave the controller a second constructor argument.
+    // This suite drives the five protocol routes and never the env-file
+    // one, so a stub that refuses is the honest fixture: if a future change
+    // makes one of THESE routes reach it, the refusal surfaces here rather
+    // than being quietly satisfied by a permissive mock.
+    const runSecrets = {
+        resolve: async () => {
+            throw new Error('the node-contract routes must not resolve run secrets');
+        },
+    };
+    return { controller: new FleetJobsController(service, runSecrets as never), secret, job };
 }
 
 /** The pinned job object a lease answers with, for key-set comparison. */
