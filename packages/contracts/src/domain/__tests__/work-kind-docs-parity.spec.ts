@@ -80,10 +80,27 @@ describe('work-kinds.md documents the shipped vocabulary', () => {
 		const documented = [...doc.matchAll(/`([a-z][a-z-]{2,})`/g)].map((m) => m[1]);
 		const known = new Set<string>(WORK_KINDS);
 		const kindLike = new Set(
-			documented.filter((token) => ['website', 'landing-page', 'blog', 'directory', 'awesome-repo', 'repo', 'company', 'campaign', 'default'].includes(token))
+			documented.filter((token) =>
+				[
+					'website',
+					'landing-page',
+					'blog',
+					'directory',
+					'awesome-repo',
+					'repo',
+					'company',
+					'campaign',
+					'default'
+				].includes(token)
+			)
 		);
 		const stale = [...kindLike].filter((token) => !known.has(token));
 
-		expect(stale, stale.length ? `work-kinds.md still documents ${stale.join(', ')}, which WORK_KINDS no longer contains.` : '').toEqual([]);
+		expect(
+			stale,
+			stale.length
+				? `work-kinds.md still documents ${stale.join(', ')}, which WORK_KINDS no longer contains.`
+				: ''
+		).toEqual([]);
 	});
 });
