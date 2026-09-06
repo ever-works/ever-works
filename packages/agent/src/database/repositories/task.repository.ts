@@ -347,6 +347,67 @@ export class TaskRepository {
             })
             .where('id = :taskId', { taskId })
             .andWhere('prNumber = :prNumber', { prNumber })
+     * CI feedback loop (slice AC, EW-806) — record the head commit the
+     * provider is reporting checks against, and the red verdict that came
+     * with it.
+     *
+     * MONOTONIC by construction: the head pair is only written when the
+     * row still carries the head this caller read (or none at all), so two
+     * deliveries racing on one push cannot leave the newer commit
+     * overwritten by the older one. Returns whether this caller's head
+     * write landed.
+     *
+     * Query-builder update for the same reason `updatePrStatusCache` uses
+     * one: it must NOT bump `updatedAt`, or a busy CI would reshuffle the
+     * updatedAt-ordered board on every job.
+     *
+     * `ciState` is only ever written RED here. A single green check is not
+     * a green gate — only the poll, which sees every check at once, may
+     * write `passing` (see `deriveCiState`: red beats everything, never
+     * green early).
+     */
+    async recordCiHead(input: {
+        taskId: string;
+        expectedHeadSha: string | null;
+        headSha: string;
+        seenAt: Date;
+        failing?: boolean;
+    }): Promise<boolean> {
+        const patch: Partial<Task> = { ciHeadSha: input.headSha, ciHeadSeenAt: input.seenAt };
+        if (input.failing) {
+            patch.ciState = 'failing';
+            patch.ciCheckedAt = input.seenAt;
+        }
+        const qb = this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set(patch)
+            .where('id = :taskId', { taskId: input.taskId });
+        if (input.expectedHeadSha === null) {
+            qb.andWhere('ciHeadSha IS NULL');
+        } else {
+            qb.andWhere('ciHeadSha = :expected', { expected: input.expectedHeadSha });
+        }
+        const result = await qb.execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * CI feedback loop (slice AC) — claim the right to file the ONE
+     * "automatic retries stopped" Inbox notice for this Task.
+     *
+     * Compare-and-set from NULL in a single statement, so exactly one of N
+     * concurrent deliveries that all discover a spent budget files the
+     * notice and the rest are told they lost. Same shape as
+     * `FleetNodeRepository.casTripDailyCeiling`.
+     */
+    async casMarkCiAutoResumeNoticed(taskId: string, at: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ ciAutoResumeNoticedAt: at })
+            .where('id = :taskId', { taskId })
+            .andWhere('ciAutoResumeNoticedAt IS NULL')
             .execute();
         return (result.affected ?? 0) > 0;
     }

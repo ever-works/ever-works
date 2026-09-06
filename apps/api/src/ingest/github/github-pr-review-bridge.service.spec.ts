@@ -887,6 +887,13 @@ describe('GitHubPrReviewBridgeService', () => {
         });
     });
 
+    /**
+     * Still true, and still `workflow_run` on purpose. Slice AC (EW-806)
+     * DOES handle that delivery — but as a registered consumer on the
+     * dispatcher (`GitHubCheckIntakeService`), never here. This bridge
+     * must keep ignoring it: it owns the review loop, and a CI result is
+     * not something to review.
+     */
     it('ignores unknown event names', async () => {
         const { service, eventIngestService } = createService();
         const result = await service.handleEvent(BINDING, 'workflow_run', {

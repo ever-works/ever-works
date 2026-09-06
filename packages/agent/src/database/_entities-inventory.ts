@@ -92,6 +92,7 @@ import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
 import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
+import { TaskCiAutoResumeAttempt } from '../entities/task-ci-auto-resume-attempt.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
 import { TaskRelation } from '../entities/task-relation.entity';
@@ -253,6 +254,9 @@ export const ENTITIES = [
     TaskReviewer,
     // Orchestration M9 - durable rejection feedback for resume.
     TaskReviewRejection,
+    // CI feedback + autonomous fix loop (slice AC, EW-806) - the durable
+    // auto-resume attempt ledger, which IS the retry budget.
+    TaskCiAutoResumeAttempt,
     TaskApprover,
     TaskBlock,
     TaskRelation,

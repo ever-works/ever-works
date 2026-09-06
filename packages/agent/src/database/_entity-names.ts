@@ -159,6 +159,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskAttachment',
     'TaskBlock',
     'TaskChatMessage',
+    'TaskCiAutoResumeAttempt',
     'TaskKbMention',
     'TaskRelation',
     'TaskReviewRejection',

@@ -14,7 +14,10 @@ import {
     JOB_RUNTIME_NOT_CONFIGURED_REASON,
     type AgentTaskExecuteDispatcher,
 } from '../tasks-domain/task-dispatcher';
+import { MAX_REPLAYED_REJECTIONS } from '../tasks-domain/run-steering-port';
 import type {
+    RunResumeRequest,
+    RunResumeResult,
     RunSteerInput,
     RunSteerOutcome,
     RunSteeringPort,
@@ -33,17 +36,23 @@ type ScopedRunSteerInput = RunSteerInput & { ownershipScope?: OwnershipScope };
  */
 const RESUMABLE_ENDED_REASONS = ['parked'] as const;
 
+/**
+ * CI feedback + autonomous fix loop (slice AC, EW-806) — the ONE extra
+ * status an AUTOMATED resume may act on, opted into per call via
+ * `RunResumeOptions.allowCompleted`.
+ *
+ * A red build arrives minutes AFTER the run that pushed the branch has
+ * ended cleanly, so `completed` is the only state the fix loop ever finds
+ * its target in. It is deliberately not added to
+ * {@link RESUMABLE_ENDED_REASONS}: the human "Resume" button must keep
+ * refusing a finished run (there is nothing for a person to answer), and
+ * `failed` / `cancelled` runs stay un-resumable for everyone — a cancel is
+ * a human's explicit stop and must never be undone by a webhook.
+ */
+const AUTO_RESUMABLE_STATUSES = ['completed'] as const;
+
 /** Longest steering message accepted. Matches the task-chat body cap. */
 const MAX_STEER_BYTES = 16 * 1024;
-
-/**
- * Orchestration M9 — how many pending rejections a single resume replays.
- * Bounded so a Task that accumulated a rejection storm cannot blow the
- * resumed run's first prompt; the oldest are replayed first (a comment
- * thread reads in order), and anything beyond the cap stays pending for
- * the resume after this one.
- */
-const MAX_REPLAYED_REJECTIONS = 3;
 
 /**
  * Chat-template control markers a rejection body could try to forge.
@@ -119,6 +128,18 @@ export function composeRejectionFeedbackMessage(
         lines.push('');
     }
     return lines.join('\n').trimEnd();
+}
+
+/**
+ * Per-call widening of {@link RunSteeringService.resume} (slice AC).
+ * Absent = today's behaviour, byte for byte.
+ */
+export interface RunResumeOptions {
+    /**
+     * Permit resuming a run that finished NORMALLY. Set only by the
+     * automated CI fix loop; the human Resume endpoint never sets it.
+     */
+    allowCompleted?: boolean;
 }
 
 export interface RunInterruptOutcome {
@@ -219,6 +240,21 @@ export class RunSteeringService implements RunSteeringPort {
         );
     }
 
+    /**
+     * A run a CI-driven resume may continue (slice AC): everything
+     * {@link isResumable} accepts, PLUS a run that finished normally.
+     * Never a live run, never a failed or cancelled one.
+     */
+    static isAutoResumable(
+        run: Pick<AgentRun, 'status' | 'awaitingInput' | 'terminalEndedReason'>,
+    ) {
+        if (RunSteeringService.isResumable(run)) return true;
+        return (
+            !RunSteeringService.isLive(run) &&
+            AUTO_RESUMABLE_STATUSES.includes(run.status as (typeof AUTO_RESUMABLE_STATUSES)[number])
+        );
+    }
+
     // ── steer ──────────────────────────────────────────────────────
 
     async steer(input: ScopedRunSteerInput): Promise<RunSteerOutcome> {
@@ -283,17 +319,50 @@ export class RunSteeringService implements RunSteeringPort {
 
     // ── resume ─────────────────────────────────────────────────────
 
+    /**
+     * CI feedback + autonomous fix loop (slice AC, EW-806) — the object
+     * form the `RUN_STEERING_PORT` exposes, so `TaskCiAutoResumeService`
+     * can resume without importing this module (the port file explains
+     * why the import direction is one-way).
+     *
+     * A thin adapter on purpose: every guard, the dispatch gate, the
+     * rejection replay and the audit stamp are {@link resume}'s, unchanged.
+     */
+    async resumeRun(request: RunResumeRequest): Promise<RunResumeResult> {
+        const outcome = await this.resume(
+            request.runId,
+            request.userId,
+            request.message ?? null,
+            undefined,
+            { allowCompleted: request.allowCompleted === true },
+        );
+        return {
+            runId: outcome.runId,
+            resumedFromRunId: outcome.resumedFromRunId,
+            queued: outcome.queued,
+            rejectionsReplayed: outcome.rejectionsReplayed,
+        };
+    }
+
     async resume(
         runId: string,
         userId: string,
         message?: string | null,
         ownershipScope?: OwnershipScope,
+        // Appended LAST and optional, the house positional convention:
+        // every existing call site and every positional test construction
+        // keeps its meaning.
+        options?: RunResumeOptions,
     ): Promise<RunResumeOutcome> {
         const trimmed =
             message == null || message.trim().length === 0 ? null : this.assertMessage(message);
         const run = await this.requireOwnedRun(runId, userId, ownershipScope);
 
-        if (!RunSteeringService.isResumable(run)) {
+        const resumable =
+            options?.allowCompleted === true
+                ? RunSteeringService.isAutoResumable(run)
+                : RunSteeringService.isResumable(run);
+        if (!resumable) {
             throw new ConflictException(
                 `AgentRun ${runId} is not resumable — resume applies to runs awaiting input or ` +
                     `ended with reason '${RESUMABLE_ENDED_REASONS.join("' / '")}' ` +
@@ -444,6 +513,11 @@ export class RunSteeringService implements RunSteeringPort {
             hasMessage: Boolean(trimmed),
             queued: !admission.admitted,
             rejectionsReplayed: replayed.count,
+            // Slice AC — an automated resume is auditable as one. Without
+            // this the only trace of a machine-initiated model run would be
+            // a `resume` row stamped with the Task owner, indistinguishable
+            // from the owner pressing the button.
+            autoResume: options?.allowCompleted === true,
         });
         // Streaming terminal: the fan-out path gates on `requirePersistent`,
         // but resume dispatches `agent-task-execute` directly, so without this
