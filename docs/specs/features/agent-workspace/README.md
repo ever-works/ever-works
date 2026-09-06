@@ -20,7 +20,7 @@ The gap is not capability. It is **legibility and loop-closure**:
 
 | The user's question | Today | What this program adds |
 | --- | --- | --- |
-| "What is my team doing right now?" | Scattered across `/agents`, `/missions`, `/tasks`, `/activity` | One board, one feed, one home |
+| "What is my team doing right now?" | Scattered across `/agents`, `/tasks`, `/missions`, `/activity` | One board, one feed, one home |
 | "What needs *me*?" | Escalations and approvals live in separate places | A single decision queue that unblocks the work when answered |
 | "What did it actually do, and what did it cost?" | Partially in agent sessions, partially in usage | One run receipt per execution |
 | "How do I stop it?" | Per-surface controls | Pause / caps / approval gates as platform-enforced stops |
@@ -39,8 +39,9 @@ we already have. The mapping is fixed here and every epic spec must honour it.
 
 | Concept | Ever Works noun (canonical) | Do **not** introduce |
 | --- | --- | --- |
-| A unit of delegated work | **Mission** | "project", "job", "assignment" |
-| A step inside a mission | **Task** | "sub-mission", "todo" |
+| A unit of delegated work — the thing on a board card | **Task** | "mission", "job", "assignment", "ticket" |
+| A step inside a unit of work | **Task** (a sub-task, via `parentTaskId`) | "sub-mission", "todo" |
+| A standing initiative that keeps generating work | **Mission** | "campaign", "program" |
 | A person-shaped worker | **Agent** | "teammate", "bot", "employee" |
 | A decision only a human can make | **Approval** / **Escalation** → surfaced as **My Decisions** | "ticket", "request" |
 | One agent execution | **Run** (`AgentRun`) | "session" as a user-facing word |
@@ -54,20 +55,46 @@ we already have. The mapping is fixed here and every epic spec must honour it.
 > "Computer" is allowed as **UI copy only** for the node-observation surface (epic AW-11),
 > because it is the word an owner uses. The entity stays `FleetNode`.
 
+### 1.1 `Task` vs `Mission` — the distinction that matters most
+
+These two are the easiest thing in this program to get backwards, so the difference is settled
+here and every epic must honour it. The entity lifecycles decide it:
+
+| | `Task` | `Mission` |
+| --- | --- | --- |
+| What it is | "a trackable work item assigned to people or Agents" | a long-running initiative that continuously drives Idea generation, and via Ideas, Works |
+| Statuses | `backlog · todo · in_progress · in_review · blocked · done · cancelled` | `active · paused · completed · failed` |
+| Priority | `p0 · p1 · p2 · p3` | none |
+| Cardinality | may be a sub-task of another Task; may be scoped to a Work, Mission, Idea, Team, Agent or Goal, in any combination | 1 Mission → many Ideas → many Works |
+| Lifetime | finishes | ongoing until the owner ends it; ticks on a cron when `type = scheduled` |
+| Recurrence | `isRecurring` makes the row a template that clones instances | `one-shot` or `scheduled` |
+
+**Therefore:**
+
+- **The board is a board of Tasks.** Backlog / In flight / Needs you / Done maps onto
+  `TaskStatus`, not onto `MissionStatus`. A card is a Task.
+- **A Mission is a source of Tasks**, alongside schedules, triggers, agents and people. It belongs
+  on the board as a *filter* and as a *provenance chip on a card*, never as the card itself.
+- "Delegate one sentence" creates a **Task**. "Set up something that keeps producing work"
+  creates a **Mission**.
+
+Any spec that puts `Mission` on a Backlog→Done board, or that invents a Mission-scoped comment,
+watcher or priority, is wrong and must be rewritten onto `Task`.
+
 ## 2. The operating loop this program has to make obvious
 
 ```
         ┌───────────────────────────────────────────────────────────┐
         │  YOU DECIDE                        THEY DO                │
         │                                                           │
-        │   Home  ──delegate──►  Mission  ──picked up──►  Agent      │
+        │   Home  ──delegate──►   Task   ──picked up──►  Agent      │
         │    ▲                      │                       │       │
         │    │                      │ needs judgement       │ acts  │
         │    │                      ▼                       ▼       │
         │  My Decisions  ◄──opens── Approval        Run  ──►  Receipt│
         │    │                      ▲                       │       │
         │    └──answer──────────────┘                       ▼       │
-        │         (mission unblocks itself)          Live Feed / KB  │
+        │          (the Task unblocks itself)        Live Feed / KB  │
         └───────────────────────────────────────────────────────────┘
 ```
 
@@ -81,7 +108,7 @@ directory. `S` = size (S/M/L/XL), `Dep` = blocking dependencies.
 | ID | Epic | Extends (existing Ever Works) | S | Dep |
 | --- | --- | --- | --- | --- |
 | [AW-01](./AW-01-command-palette/) | Command palette & global search | dashboard shell, all entities | M | — |
-| [AW-02](./AW-02-mission-board/) | Mission board (columns, cards, staleness, steering) | `missions` | L | — |
+| [AW-02](./AW-02-task-board/) | Task board (columns, cards, staleness, steering) | `tasks` (Mission as a source + filter) | L | — |
 | [AW-03](./AW-03-decision-queue/) | My Decisions — one queue that unblocks work | `agent-approvals`, `escalations` | L | — |
 | [AW-04](./AW-04-live-feed/) | Live Feed & "while you were away" | `activity-log`, `events` | M | — |
 | [AW-05](./AW-05-agent-email/) | Agent email end to end (drafts, caps, domains) | `inbox`, `mail` | XL | — |

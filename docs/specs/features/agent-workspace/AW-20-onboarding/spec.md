@@ -883,7 +883,7 @@ traps focus: **Continue setup** is always reachable with one `Tab`.
 │                                                                              │
 │   ⬡  Market watch — Market watch                     reports to Ada          │
 │      Keeps an eye on the field and flags what changed.                        │
-│      Skills: competitor watch                                                │
+│      Skills: market watch, news signals                                      │
 │                                                                              │
 │  ⓘ  None of them acts on its own. They propose; you approve.                 │
 │                                                                              │

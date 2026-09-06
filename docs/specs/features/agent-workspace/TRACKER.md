@@ -8,7 +8,7 @@ Updated as work lands. Two independent axes per epic: **spec** and **implementat
 | ID | Epic | Spec | Impl | Branch / PR | Notes |
 | --- | --- | --- | --- | --- | --- |
 | AW-01 | Command palette & global search | — | — | | |
-| AW-02 | Mission board | — | — | | |
+| AW-02 | Task board | — | — | | |
 | AW-03 | My Decisions | — | — | | |
 | AW-04 | Live Feed | — | — | | |
 | AW-05 | Agent email | — | — | | |

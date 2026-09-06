@@ -56,7 +56,7 @@ They cannot answer any of the three. Here is what they do instead.
 | --- | --- | --- |
 | "Talk to *this* Agent" | The assistant panel is **not addressed at an Agent at all**. A Conversation row records a user, a provider and a model — there is no Agent on it. The tool-calling assistant is a single generalist. | Open the Agent's detail page and read its run history, then come back to the panel and describe the Agent in prose. |
 | "One conversation per job" | Conversations exist and persist, but a new one is created only by pressing **New chat**, which silently clears the panel. Nothing marks a Conversation as being *about* anything. | Let one Conversation run for weeks and scroll. |
-| "Name this one, it matters" | Titles exist but are **machine-written only** — auto-derived from the first message, then rewritten once by a model at four messages. There is no way to set or clear a name. | Recognise threads by their first line in the history list. |
+| "Name this one, it matters" | Titles exist but are **machine-written only** — auto-derived from the first message, then rewritten once by a model at four messages. There is no way to set or clear a name. | Recognise Conversations by their first line in the history list. |
 | "Keep it open while I work" | The panel does dock and does remember its width — but it holds exactly **one** live conversation, has no internal navigation, and reopening the history list replaces the whole panel body. | Keep two browser tabs open. |
 | "Loop in the research Agent" | Impossible. A Conversation belongs to **one user** and has no participant concept of any kind — no second Agent, no second person. | Copy the transcript into a new Conversation and re-explain. |
 | "Tell everyone the launch slipped" | Impossible. There is no broadcast of any kind. | Open eleven Conversations and paste eleven times. |
@@ -1001,7 +1001,7 @@ nothing — focus can always leave it with `Tab`.
   one Conversation is a teammate-access question owned by [AW-18](../AW-18-shared-dashboards/).
 - **Message editing, deletion, reactions and quoting.** Existing unused edit strings are left
   exactly where they are; this epic neither uses nor removes them.
-- **Threaded replies inside a group or the channel.** Group and channel Conversations are flat.
+- **Nested replies inside a group or the channel.** Group and channel Conversations are flat.
 - **Full-text search across Conversations.** [AW-01](../AW-01-command-palette/) reaches Conversation
   names; searching message bodies is explicitly deferred.
 - **Conversation export.** Owned by [AW-22](../README.md#3-epics).

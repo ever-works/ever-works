@@ -18,7 +18,7 @@ section of the catalogue links into the shelf it builds)
 > above them** and **one new kind of catalogue entry** underneath.
 >
 > **Two new nouns, justified in §5 and added to the program vocabulary table in the same PR**
-> (program rule #2): **Playbook** (a packaged outcome recipe in the catalogue) and **Playbook
+> (program rule #2): **Playbook** (a packaged outcome in the catalogue) and **Playbook
 > adoption** (the record of a workspace having set one up). Every *other* thing this epic touches
 > is an existing Ever Works noun — Agent, Skill, Task, Mission, Schedule, Trigger, Approval,
 > Escalation, Run, Knowledge Base, Plugin, Connection, Workflow.
@@ -30,7 +30,7 @@ section of the catalogue links into the shelf it builds)
 **Catalog** is one browsable page that answers "what can this workspace actually do?" — and, for
 each answer, lets somebody set it up without assembling it by hand.
 
-It has five sections. The headline one is **Playbooks**: packaged outcome recipes, each of which
+It has five sections. The headline one is **Playbooks**: packaged outcomes, each of which
 names its trigger, its steps, the connections it needs, the artefacts it produces and the exact
 moments it will stop and ask a human. A playbook is adoptable as a single confirmed action that
 provisions the real Ever Works rows behind it — an Agent from a template, the Skills it needs
@@ -445,13 +445,13 @@ Every threshold below is a number on purpose. "Reasonable", "quickly" and "a few
 
 #### Playbook (catalogue entry — **no table**)
 
-A **Playbook** is a packaged outcome recipe: trigger, steps, required connections, artefacts,
+A **Playbook** is a packaged outcome: trigger, steps, required connections, artefacts,
 escalation points, guardrails and caps, packaged under one slug and one version.
 
 *Why it cannot be an existing noun.* Every existing Ever Works template is a template of **one
 thing**: an Agent template makes an Agent, a Skill template makes a Skill, a Task template makes a
 Task tree, a Work template makes a Work. A Playbook is the only object that spans them — it is a
-recipe whose output is an Agent **and** its Skills **and** a Task template **and** a Schedule
+packaged outcome whose output is an Agent **and** its Skills **and** a Task template **and** a Schedule
 **and** a guardrail posture, plus the promise about what it will and will not do alone. Modelling
 it as a sixth kind of `Template` would misuse an entity whose whole shape (repository owner, repo
 name, branch, fork target) is about git-hosted starting points.

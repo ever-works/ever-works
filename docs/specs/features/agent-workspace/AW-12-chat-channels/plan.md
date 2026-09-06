@@ -7,6 +7,11 @@
 
 > Every path in this document was verified to exist before it was cited. Paths marked **(new)** are
 > files this epic creates.
+>
+> Read [EXISTING-SUBSTRATE.md](../EXISTING-SUBSTRATE.md) alongside this plan. Its row **S5** — a
+> complete server-sent-events endpoint with a 5 s poll, a 15 s heartbeat and a 10-minute lifetime
+> cap — is the transport this epic copies verbatim in shape (§4.5), which is why live delivery is a
+> one-controller task rather than an infrastructure project.
 
 ---
 
@@ -20,7 +25,7 @@
 | Message entity | [`packages/agent/src/entities/conversation-message.entity.ts`](../../../../../packages/agent/src/entities/conversation-message.entity.ts) — `@Entity('conversation_messages')`. `conversationId` (FK, CASCADE), `role` (`user \| assistant \| system \| tool`), `content` (text), `parts` (simple-json — the verbatim UI-message parts array so tool cards replay on reload), `model`, `usage`, `tenantId` / `organizationId`, `createdAt`. Index `['conversationId','createdAt']`. **No author, no mentions, no attachments, no status.** |
 | Repository | [`packages/agent/src/database/repositories/conversation.repository.ts`](../../../../../packages/agent/src/database/repositories/conversation.repository.ts) — `create`, `findById`, `findByUser`, `appendMessage`, `appendMessages`, `updateTitle`, `updateModel`, `delete`, `deleteAllByUser`. Barrelled from [`packages/agent/src/database/index.ts:35`](../../../../../packages/agent/src/database/index.ts). |
 | REST | [`apps/api/src/ai-conversation/conversation.controller.ts`](../../../../../apps/api/src/ai-conversation/conversation.controller.ts) — `@Controller` under `api/conversations`; `MAX_CONVERSATIONS_PAGE_SIZE = 200`; `CreateConversationDto` (`title` ≤ 200, `providerId` ≤ 100, `model` ≤ 100); the PATCH DTO deliberately omits `providerId` so `forbidNonWhitelisted` hard-400s an attempt to change it. |
-| Title generation | [`apps/api/src/ai-conversation/conversation-title.service.ts`](../../../../../apps/api/src/ai-conversation/conversation-title.service.ts) — `maybeGenerateTitle`, fired un-awaited from the append path once a thread reaches 4+ messages, guarded once by `metadata.aiTitle`. |
+| Title generation | [`apps/api/src/ai-conversation/conversation-title.service.ts`](../../../../../apps/api/src/ai-conversation/conversation-title.service.ts) — `maybeGenerateTitle`, fired un-awaited from the append path once a Conversation reaches 4+ messages, guarded once by `metadata.aiTitle`. |
 | Model proxy | [`apps/api/src/ai-conversation/openai-compat.service.ts`](../../../../../apps/api/src/ai-conversation/openai-compat.service.ts) — the single call-out point every chat surface hits. Already does `@kb:` mention parsing + `<kb>` injection, ~15-pattern secret redaction on provider errors, and 422 (not 500) when no provider is configured. |
 | Module | [`apps/api/src/ai-conversation/ai-conversation.module.ts`](../../../../../apps/api/src/ai-conversation/ai-conversation.module.ts) — imports `FacadesModule`, `DatabaseModule`, `KnowledgeBaseModule`; exports `OpenAiCompatService` for the external chat bridge. |
 
@@ -423,7 +428,7 @@ resolves.
 | File | Change |
 | --- | --- |
 | [`apps/web/src/components/ai/ChatPanel.tsx`](../../../../../apps/web/src/components/ai/ChatPanel.tsx) | Renders `ConversationPanelRouter` instead of `ChatInterface` directly; `ChatInterface` becomes the Conversation view |
-| [`ChatInterface.tsx`](../../../../../apps/web/src/components/ai/ChatInterface.tsx) | Accepts a `conversationId` + `kind` and stops assuming a single global thread |
+| [`ChatInterface.tsx`](../../../../../apps/web/src/components/ai/ChatInterface.tsx) | Accepts a `conversationId` + `kind` and stops assuming one global Conversation |
 | [`ChatInput.tsx`](../../../../../apps/web/src/components/ai/ChatInput.tsx) | Mounts `MentionPicker` + `ComposerHighlightLayer`; adds the 16 KB pre-send guard and the placeholder per kind |
 | [`ChatProvider.tsx`](../../../../../apps/web/src/components/ai/ChatProvider.tsx) | Gains the panel view stack, the active participant, unread state and the failed-message queue |
 | [`ChatHistory.tsx`](../../../../../apps/web/src/components/ai/ChatHistory.tsx) | Kept, unchanged, as the flat all-conversations list; the new per-participant list is a sibling, not a replacement |
@@ -734,7 +739,7 @@ Schema (P1 migration), the `conversations` domain module, mention parse/resolve/
 highlight layer, optimistic send with failure and retry, SSE delivery with the poll fallback, unread
 state, the i18n block, unit + controller + four e2e specs.
 
-**Shippable because**: on its own it converts one global assistant thread into per-Agent named
+**Shippable because**: on its own it converts one global assistant Conversation into per-Agent named
 Conversations with working addressing and a panel that navigates. Nothing else in the product
 changes.
 
