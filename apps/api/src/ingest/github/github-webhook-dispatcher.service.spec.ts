@@ -20,7 +20,10 @@ jest.mock('../../integrations/github-app/github-app-sync.service', () => ({
     GitHubAppSyncService: class {},
 }));
 
-import { GitHubWebhookDispatcherService } from './github-webhook-dispatcher.service';
+import {
+    INVALID_GITHUB_SIGNATURE,
+    GitHubWebhookDispatcherService,
+} from './github-webhook-dispatcher.service';
 import { computeGitHubSignature } from './github-signature.util';
 
 const INSTALL_SECRET = 'per-install-webhook-secret';
@@ -214,7 +217,15 @@ describe('GitHubWebhookDispatcherService', () => {
                 dispatcher.dispatch(
                     signed({ zen: 'Keep it logically awesome.' }, INSTALL_SECRET, 'ping'),
                 ),
-            ).rejects.toThrow(/not configured/);
+                // CONTRACT REVERSAL, stated so it is not "fixed" back: this used
+                // to assert a distinct 'not configured' message. A receiver that
+                // says 'not configured' when a secret is missing and 'invalid
+                // signature' when it is present hands an unauthenticated prober a
+                // configuration oracle. Both cases mean the same thing to a caller
+                // — nothing here verified you — so both now say it the same way.
+                // The property under test is unchanged and still asserted: this
+                // fails CLOSED, with a 401, even for `ping`.
+            ).rejects.toThrow(INVALID_GITHUB_SIGNATURE);
             expect(appSync.handleWebhook).not.toHaveBeenCalled();
         });
 
@@ -283,7 +294,23 @@ describe('GitHubWebhookDispatcherService', () => {
             expect(bridge.recordBinding).toHaveBeenCalledWith(INSTALL_BINDING);
         });
 
-        it('prefers an existing binding row over the App installation record', async () => {
+        it('prefers the App installation record over an existing binding row', async () => {
+            // CONTRACT REVERSAL, and the reason is a real vulnerability, so do
+            // not restore the old order. This case used to assert the exact
+            // opposite: that a binding row outranks `github_app_installations`.
+            //
+            // Binding rows on the `install-secret` path are written from an
+            // UNVERIFIED body by `recordBinding`, so a tenant can name
+            // `owner:<somebody-else>` in a body signed with their OWN webhook
+            // secret. With the binding consulted first, that squatted row beat
+            // the platform's own installation record, and every genuinely
+            // App-signed delivery for the victim's installation — their issues
+            // included — was filed into the squatter's organization.
+            //
+            // Platform state cannot be outranked by an inbound delivery that
+            // only proved the sender's own secret. The binding row remains the
+            // fallback for installations the App-install flow never recorded,
+            // which the sibling cases below still cover.
             const { dispatcher, bridge, installations } = createDispatcher({
                 appSecret: APP_SECRET,
                 boundUserId: 'user-bound',
@@ -292,17 +319,18 @@ describe('GitHubWebhookDispatcherService', () => {
 
             await dispatcher.dispatch(signed(PR_BODY, APP_SECRET));
 
-            expect(bridge.installBindingFor).toHaveBeenCalledWith('installation:4242');
-            expect(installations.findByInstallationId).not.toHaveBeenCalled();
+            expect(installations.findByInstallationId).toHaveBeenCalledWith('4242');
+            expect(bridge.installBindingFor).not.toHaveBeenCalled();
             expect(bridge.handleEvent).toHaveBeenCalledWith(
-                expect.objectContaining({ userId: 'user-bound', matchedBy: 'binding' }),
+                expect.objectContaining({ userId: 'user-app', matchedBy: 'app-install' }),
                 'pull_request',
                 PR_BODY,
             );
-            // `matchedBy: 'binding'` means the row already exists — no
-            // pointless rewrite.
+            // The squatted row is not merely ignored: the authoritative owner
+            // is written back, so the next delivery resolves to the same user
+            // even if the installation lookup is unavailable then.
             expect(bridge.recordBinding).toHaveBeenCalledWith(
-                expect.objectContaining({ matchedBy: 'binding' }),
+                expect.objectContaining({ userId: 'user-app', matchedBy: 'app-install' }),
             );
         });
 
