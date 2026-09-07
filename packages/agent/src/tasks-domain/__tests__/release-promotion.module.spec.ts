@@ -7,6 +7,8 @@ import {
     PROMOTION_MERGE_GUARD,
 } from '@src/policy/promotion-merge-guard.port';
 import { ENTITIES } from '@src/database/database.config';
+import { FleetJobService } from '@src/fleet/fleet-job.service';
+import { FleetJobRepository } from '@src/fleet/fleet-job.repository';
 import { PluginRegistryService } from '@src/plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '@src/plugins/services/plugin-settings.service';
 import { PluginUsageService } from '@src/usage/plugin-usage.service';
@@ -16,6 +18,7 @@ import { WorkCustomDomainRepository } from '@src/database/repositories/work-cust
 import { EverWorksK8sDeployProvider } from '@src/ever-works-providers/ever-works-k8s-deploy.provider';
 import { ReleasePromotionModule } from '../release-promotion.module';
 import { ReleasePromotionService } from '../release-promotion.service';
+import { ReleaseVerificationService } from '../release-verification.service';
 import { TasksDomainModule } from '../tasks.module';
 
 /**
@@ -125,6 +128,61 @@ describe('ReleasePromotionModule — dependency injection', () => {
         await moduleRef.close();
     });
 
+    it('resolves the post-deploy verification service from the REAL module', async () => {
+        // Slice AJ (EW-809). `ReleaseVerificationService` injects
+        // `FleetJobService`, which lives in a module this one did not use
+        // to import — and a service that injects a provider its module does
+        // not supply passes every unit spec (they construct it
+        // positionally) and then refuses to boot the API.
+        //
+        // MUTATION CHECK, executed rather than assumed:
+        //   - deleting `FleetModule` from the module's `imports` fails this
+        //     test with "Nest can't resolve dependencies of the
+        //     ReleaseVerificationService"; note that `FleetJobService` is
+        //     @Optional() on the constructor, so the failure surfaces on
+        //     the REQUIRED collaborators rather than silently leaving the
+        //     lane unable to enqueue — which is why the assertion below
+        //     checks the fleet dependency landed, not merely that the
+        //     service exists;
+        //   - deleting `ReleaseVerificationService` from `providers` fails
+        //     to compile as well.
+        const moduleRef = await compile();
+
+        const verification = moduleRef.get(ReleaseVerificationService);
+        expect(verification).toBeInstanceOf(ReleaseVerificationService);
+        // The @Optional() fleet dependency actually RESOLVED. Without
+        // `FleetModule` in `imports` this is `undefined` and the lane
+        // silently never produces a browser check — the exact failure an
+        // @Optional() dependency hides from a compile-only assertion.
+        expect(moduleRef.get(FleetJobService)).toBeDefined();
+        expect((verification as unknown as { fleet?: unknown }).fleet).toBe(
+            moduleRef.get(FleetJobService),
+        );
+        // And the READER added by the slice-AJ review, on the same
+        // argument. Without it the sweep cannot tell whether the job
+        // `enqueue` handed back is the check it asked for, and cannot
+        // recover a check that settled without its result being recorded —
+        // both of which degrade silently, so a compile-only assertion would
+        // not notice. `FleetJobRepository` is exported by the same
+        // `FleetModule` already in `imports`.
+        expect((verification as unknown as { fleetJobs?: unknown }).fleetJobs).toBe(
+            moduleRef.get(FleetJobRepository),
+        );
+
+        await moduleRef.close();
+    });
+
+    it('gives the promotion service the verification service it hands merges to', async () => {
+        const moduleRef = await compile();
+
+        const promotion = moduleRef.get(ReleasePromotionService);
+        expect((promotion as unknown as { verification?: unknown }).verification).toBe(
+            moduleRef.get(ReleaseVerificationService),
+        );
+
+        await moduleRef.close();
+    });
+
     it('exposes the lane to the rest of the app without TasksDomainModule importing it back', async () => {
         // The whole point of the @Global() binding: `TaskPrStatusService`
         // and `TaskMergeGateService` live INSIDE `TasksDomainModule` and
@@ -166,6 +224,15 @@ describe('ReleasePromotionModule — module shape', () => {
         expect(names).toContain('FacadesModule');
     });
 
+    it('imports FleetModule, the ONLY source of a browser check producer', () => {
+        // Slice AJ. `FleetModule` imports nothing but
+        // `TypeOrmModule.forFeature`, so it cannot cycle back into this
+        // one — which is why the verification service can inject
+        // `FleetJobService` directly instead of behind another token.
+        const names = imports().map((entry: { name?: string }) => entry?.name);
+        expect(names).toContain('FleetModule');
+    });
+
     it('registers its own entity with forFeature', () => {
         // A dynamic module has no `.name`, so the check above cannot see
         // it. Named explicitly because dropping it is an API that does not
@@ -184,6 +251,7 @@ describe('ReleasePromotionModule — module shape', () => {
         // platform for the benefit of one module.
         expect(providers()).toContain(ReleasePromotionRepository);
         expect(providers()).toContain(ReleasePromotionService);
+        expect(providers()).toContain(ReleaseVerificationService);
     });
 
     it('binds both tokens with useExisting, so consumers depend on the contract', () => {
@@ -211,6 +279,9 @@ describe('ReleasePromotionModule — module shape', () => {
             expect.arrayContaining([
                 ReleasePromotionRepository,
                 ReleasePromotionService,
+                // The api-side cron sweep and the fleet-completion listener
+                // reach the verification lane through this export.
+                ReleaseVerificationService,
                 PROMOTION_MERGE_GUARD,
                 PROMOTION_LANE_WATCHER,
             ]),

@@ -108,6 +108,12 @@ describe('ReleasePromotionService', () => {
             confirmedHead?: string | null;
             /** Make the writes that BIND the pull request to the Task fail. */
             bindError?: Error;
+            /**
+             * Slice AJ: run the lane with NO post-deploy verification
+             * bound, which is what a deployment that never imports
+             * `ReleaseModule` looks like.
+             */
+            noVerification?: boolean;
         } = {},
     ) {
         const created = makeTask();
@@ -196,6 +202,9 @@ describe('ReleasePromotionService', () => {
                 : jest.fn().mockResolvedValue(opts.workflowRun ?? null),
         };
         const inbox = { notice: jest.fn().mockResolvedValue(undefined) };
+        // Post-deploy verification (slice AJ, EW-809). APPENDED LAST, like
+        // the constructor parameter it stands in for.
+        const verification = { onPromotionMerged: jest.fn().mockResolvedValue(undefined) };
 
         const service = new ReleasePromotionService(
             works as never,
@@ -205,8 +214,19 @@ describe('ReleasePromotionService', () => {
             chat as never,
             opts.noGitFacade ? undefined : (gitFacade as never),
             opts.noInbox ? undefined : (inbox as never),
+            opts.noVerification ? undefined : (verification as never),
         );
-        return { service, works, tasks, tasksService, chat, gitFacade, inbox, created };
+        return {
+            service,
+            works,
+            tasks,
+            tasksService,
+            chat,
+            gitFacade,
+            inbox,
+            verification,
+            created,
+        };
     }
 
     function status(overrides: Partial<GitPullRequestStatus> = {}): GitPullRequestStatus {
@@ -901,6 +921,77 @@ describe('ReleasePromotionService', () => {
             expect(harness.chat.create.mock.calls.at(-1)?.[0].body).toMatch(
                 /not opened automatically/i,
             );
+        });
+
+        // ── Handing off to post-deploy verification (slice AJ) ────────
+
+        it('starts a post-deploy verification when the promotion MERGES', async () => {
+            // The only moment the platform learns a promotion landed.
+            // `closeLane` has already rewritten `laneKey`, so
+            // `findOpenByTaskId` will never match this row again and no
+            // existing sweep in the platform ever visits it — if the
+            // handoff does not happen here it never happens.
+            const harness = build();
+            const promotion = await openOne(harness);
+
+            await harness.service.onPullRequestStatusRefreshed(
+                makeTask() as never,
+                status({ state: 'merged', merged: true }),
+            );
+
+            expect(harness.verification.onPromotionMerged).toHaveBeenCalledTimes(1);
+            expect(harness.verification.onPromotionMerged.mock.calls[0][0].id).toBe(promotion.id);
+        });
+
+        it('starts NOTHING when the promotion is closed without merging', async () => {
+            // Nothing was deployed, so there is nothing to check — and a
+            // verification started here would sit until its deadline and
+            // then report `inconclusive` about a release that never
+            // happened.
+            const harness = build();
+            await openOne(harness);
+
+            await harness.service.onPullRequestStatusRefreshed(
+                makeTask() as never,
+                status({ state: 'closed' }),
+            );
+
+            expect(harness.verification.onPromotionMerged).not.toHaveBeenCalled();
+        });
+
+        it('still merges and closes cleanly with NO verification bound', async () => {
+            // A deployment that does not import `ReleaseModule` has no
+            // verification. The lane must behave byte-for-byte as it did
+            // before slice AJ: the promotion still lands, the lane is still
+            // freed, and nothing pretends a deployment was checked.
+            const harness = build({ noVerification: true });
+            const promotion = await openOne(harness);
+
+            const outcome = await harness.service.onPullRequestStatusRefreshed(
+                makeTask() as never,
+                status({ state: 'merged', merged: true }),
+            );
+
+            expect(outcome).toEqual({ action: 'closed', state: 'merged' });
+            const stored = await rows.findOne({ where: { id: promotion.id } });
+            expect(stored?.state).toBe('merged');
+            expect(stored?.verifyState).toBeNull();
+        });
+
+        it('records the merge even when the verification handoff throws', async () => {
+            // Best-effort by contract: this method keeps a PR-status cache
+            // honest for every Task behind this one.
+            const harness = build();
+            harness.verification.onPromotionMerged.mockRejectedValue(new Error('fleet is down'));
+            const promotion = await openOne(harness);
+
+            const outcome = await harness.service.onPullRequestStatusRefreshed(
+                makeTask() as never,
+                status({ state: 'merged', merged: true }),
+            );
+
+            expect(outcome).toEqual({ action: 'closed', state: 'merged' });
+            expect((await rows.findOne({ where: { id: promotion.id } }))?.state).toBe('merged');
         });
 
         it('frees the lane when the promotion pull request is closed unmerged', async () => {
