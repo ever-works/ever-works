@@ -5,6 +5,7 @@ import type {
 	FleetJobLeaseResponse,
 	FleetJobMcpCredentialResponse,
 	FleetJobMcpCredentialRevokeResponse,
+	FleetJobPushCredentialResponse,
 	FleetJobView,
 	FleetRunEnvFileContent,
 	FleetRunEnvFileRequestRef
@@ -23,6 +24,7 @@ import { extractRunEnvSecretValues } from './workspaces/run-env-files';
  *   POST /api/fleet/jobs/:id/env-files   → fetch the run's seed .env files
  *   POST /api/fleet/jobs/:id/mcp-credential          → mint a run token
  *   POST /api/fleet/jobs/:id/mcp-credential/revoke   → drop it early
+ *   POST /api/fleet/jobs/:id/push-credential         → mint a scoped write token
  *
  * Same posture as {@link FleetClient}: all three are `@Public()` and
  * self-authenticating (the `(nodeId, secret)` pair in the body IS the
@@ -292,6 +294,55 @@ export class FleetJobClient {
 		return typeof payload?.revoked === 'number' ? payload.revoked : 0;
 	}
 
+	/**
+	 * Self-build slice AM (EW-810) — fetch this run's commit attribution
+	 * and, when the job's plan pushes, the repository-scoped write
+	 * credential the finalize will authenticate with.
+	 *
+	 * Authenticated with the node secret and the CURRENT lease generation:
+	 * a claim that lapsed while this machine slept must not receive a
+	 * write credential for the owner's repositories, exactly as it must
+	 * not receive their decrypted `.env`.
+	 *
+	 * The token is registered with the redacting logger before it leaves
+	 * this method, so from that instant it cannot appear in any node log
+	 * line even by accident, and it is NOT stored on this client: the
+	 * caller holds it in one closure for the length of the finalize.
+	 *
+	 * A `422` is a REFUSAL the run must fail on, not a hint to push some
+	 * other way; `errorForJobStatus` maps it, and the caller reports it.
+	 */
+	async mintPushCredential(jobId: string, leaseGeneration?: number): Promise<FleetJobPushCredentialResponse> {
+		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
+
+		const payload = (await this.post(
+			`api/fleet/jobs/${encodeURIComponent(jobId)}/push-credential`,
+			'job-push-credential',
+			body
+		)) as FleetJobPushCredentialResponse;
+		const attribution = payload?.attribution;
+		if (!attribution || typeof attribution.nodeId !== 'string' || typeof attribution.jobId !== 'string') {
+			throw new FleetClientError('malformed', 'Push credential response did not contain attribution');
+		}
+		// The node holds the claim, so it knows which machine it is. An
+		// answer naming a DIFFERENT node is refused rather than signed:
+		// attribution that can name a machine the run did not use is worth
+		// less than none.
+		if (attribution.nodeId !== this.nodeId) {
+			throw new FleetClientError('malformed', 'Push credential response named a different node');
+		}
+		const push = payload.push ?? null;
+		if (push !== null) {
+			if (typeof push.token !== 'string' || !push.token || !Array.isArray(push.repositories)) {
+				throw new FleetClientError('malformed', 'Push credential response did not contain a usable token');
+			}
+			// BEFORE it is used anywhere, and before this method returns.
+			this.logger?.protect(push.token);
+		}
+		return payload;
+	}
+
 	private async post(
 		path: string,
 		operation: string,
@@ -374,6 +425,22 @@ export function errorForJobStatus(status: number, operation: string): FleetClien
 		return new FleetClientError(
 			'stale-lease',
 			'The platform holds a newer lease on this job (stale-lease); the claim this node is renewing or finalizing is void',
+			status
+		);
+	}
+	if (status === 422 && operation === 'job-push-credential') {
+		// Scoped push credentials (slice AM): the SAME posture as the
+		// env-file 422 below — a stable reason token is recorded
+		// platform-side against this job and this client still does not
+		// read the body. Named separately only so the run's failure text
+		// sends an operator to the right place: this refusal is about the
+		// GitHub App installation, not about a repository connection.
+		return new FleetClientError(
+			'unresolved',
+			'The platform could not issue a scoped push credential for this run (no GitHub App configured, or no ' +
+				'installation this owner controls covers every repository this run writes to). The run fails rather ' +
+				'than pushing with this machine’s own credential helper. The precise reason is recorded ' +
+				'platform-side against this job.',
 			status
 		);
 	}

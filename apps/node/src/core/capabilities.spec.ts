@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { FLEET_PUSH_CAPABILITY } from '@ever-works/contracts';
 import {
 	describePlatform,
 	describeSelf,
 	detectCapabilities,
 	detectDisplay,
+	gitSupportsScopedPush,
 	nodeMajor,
 	normalizeCapabilities,
+	probeGit,
 	readEnvironment,
 	type CapabilityEnvironment,
 	type CommandRunner
@@ -402,5 +405,73 @@ describe('describeSelf', () => {
 			expect('minFreeDiskBytes' in description).toBe(false);
 			expect('workspaceBytes' in description).toBe(false);
 		});
+	});
+});
+
+/**
+ * Scoped push credentials (self-build slice AM, EW-810) — the
+ * pre-dispatch push-capability probe.
+ *
+ * The tag is a promise the node can keep, in the sense the rest of this
+ * detector means it: the same fact the push depends on is the fact that
+ * turns it on. A machine whose Git cannot take the per-run credential
+ * through its environment would fall back to the operator's own
+ * long-lived credential helper — so the tag is withheld and the platform
+ * never hands it `agent-task` work at all.
+ */
+describe('git-push capability (scoped push credentials)', () => {
+	const gitRunner = (version: string | null): CommandRunner => ({
+		run: async (command) => {
+			if (command !== 'git') return { code: 127, stdout: '', stderr: 'not found' };
+			if (version === null) return { code: 127, stdout: '', stderr: 'not found' };
+			return { code: 0, stdout: version, stderr: '' };
+		}
+	});
+
+	it.each([
+		['git version 2.53.0.windows.1', true],
+		['git version 2.31.0', true],
+		['git version 2.31.1', true],
+		['git version 3.0.0', true],
+		['git version 2.30.2', false],
+		['git version 2.9.5', false],
+		['git version 1.9.1', false],
+		// Unparseable fails CLOSED: guessing "probably new enough" would
+		// put the tag on a machine whose push silently falls back to the
+		// ambient helper, which is the exact hole it keeps work away from.
+		['git version unknown', false],
+		['', false]
+	])('%s → scoped push %s', (output, expected) => {
+		expect(gitSupportsScopedPush(output)).toBe(expected);
+	});
+
+	it('offers git-push alongside git when the version supports it', async () => {
+		const tags = await detectCapabilities(gitRunner('git version 2.53.0.windows.1'), environment());
+		expect(tags).toContain('git');
+		expect(tags).toContain(FLEET_PUSH_CAPABILITY);
+	});
+
+	it('offers git but NOT git-push on a machine whose Git is too old', async () => {
+		const tags = await detectCapabilities(gitRunner('git version 2.20.1'), environment());
+		expect(tags).toContain('git');
+		expect(tags).not.toContain(FLEET_PUSH_CAPABILITY);
+	});
+
+	it('offers neither when git is absent, and a throwing probe is absence not a crash', async () => {
+		expect(await detectCapabilities(gitRunner(null), environment())).not.toContain(FLEET_PUSH_CAPABILITY);
+		const throwing: CommandRunner = {
+			run: async () => {
+				throw new Error('spawn git ENOENT');
+			}
+		};
+		const tags = await detectCapabilities(throwing, environment());
+		expect(tags).not.toContain('git');
+		expect(tags).not.toContain(FLEET_PUSH_CAPABILITY);
+	});
+
+	it('probeGit reports both facts from one invocation', async () => {
+		expect(await probeGit(gitRunner('git version 2.43.0'))).toEqual({ present: true, scopedPush: true });
+		expect(await probeGit(gitRunner('git version 2.17.1'))).toEqual({ present: true, scopedPush: false });
+		expect(await probeGit(gitRunner(null))).toEqual({ present: false, scopedPush: false });
 	});
 });

@@ -19,6 +19,7 @@ import type {
     FleetJobLeaseResponse,
     FleetJobMcpCredentialResponse,
     FleetJobMcpCredentialRevokeResponse,
+    FleetJobPushCredentialResponse,
 } from '@ever-works/contracts';
 import { FleetJobService, FleetRunCredentialService } from '@ever-works/agent/fleet';
 import { Public } from '../auth/decorators/public.decorator';
@@ -27,8 +28,13 @@ import {
     FleetJobEnvFilesDto,
     FleetJobHeartbeatDto,
     FleetJobNodeCredentialDto,
+    FleetJobPushCredentialDto,
     LeaseFleetJobsDto,
 } from './dto/fleet-job.dto';
+import {
+    FleetPushCredentialError,
+    FleetPushCredentialService,
+} from './fleet-push-credential.service';
 import { FleetRunSecretsError, FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
 import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
@@ -76,6 +82,15 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  *
  *   POST /api/fleet/jobs/:id/mcp-credential          mint a run-scoped token
  *   POST /api/fleet/jobs/:id/mcp-credential/revoke   drop it early
+ *   POST /api/fleet/jobs/:id/push-credential         mint a scoped write token
+ *
+ * The push credential (self-build slice AM) takes the env-files posture
+ * exactly: the same four checks, a 422 with a stable token on refusal, and
+ * no partial answer. It is the second place a secret leaves the platform
+ * for a node, and the first place one leaves that can WRITE — so it is
+ * scoped from platform state alone (this job's repositories,
+ * `contents: write`, under the hour) and there is no degraded path back to
+ * the machine's own credential helper.
  *
  * Throttles are sized for polling: a node with a 5-second idle poll
  * needs ~12 lease calls/minute, and job heartbeats fire at a third of
@@ -103,6 +118,9 @@ export class FleetJobsController {
         private readonly service: FleetJobService,
         private readonly runSecrets: FleetRunSecretsService,
         private readonly runCredentials: FleetRunCredentialService,
+        // Self-build slice AM (EW-810). Appended LAST so the positional
+        // constructions in the existing controller specs keep compiling.
+        private readonly pushCredentials: FleetPushCredentialService,
     ) {}
 
     @Public()
@@ -225,6 +243,75 @@ export class FleetJobsController {
             throw new UnauthorizedException('Invalid node credential');
         }
         return { ok: true, revoked };
+    }
+
+    /**
+     * Self-build slice AM (EW-810) — the run's commit attribution and,
+     * when its plan pushes, a SCOPED write credential for the repositories
+     * this job touches.
+     *
+     * The gap it closes: before this route a node's `git push` was
+     * authenticated by the machine's own Git credential helper — a
+     * long-lived PAT with write access to every repository that OS user
+     * can reach, which the platform could neither scope, rotate, revoke
+     * nor observe. What comes back here is a GitHub App installation token
+     * narrowed to this job's repositories and to `contents: write`,
+     * expiring within the hour, revoked by the node the moment the run
+     * ends.
+     *
+     * Same posture as `env-files`, and the SAME four checks: credential,
+     * recorded holder, active status, current lease generation. Handing a
+     * machine a write credential for the owner's repositories is at least
+     * as consequential as handing it their decrypted `.env`.
+     *
+     * The request carries NO scope of any kind — no repository, no
+     * installation, no branch. Everything the token is narrowed by comes
+     * from platform state, because a caller that could name its own scope
+     * would have defeated the narrowing.
+     *
+     * A refusal (no App configured, no installation covering every
+     * repository this run writes to, a GitHub failure) answers 422 with a
+     * STABLE machine token. There is deliberately no degraded answer: a
+     * node that cannot get a scoped credential must fail the run, because
+     * the only other way it could push is the ambient helper this route
+     * exists to replace.
+     */
+    @Public()
+    @Post(':id/push-credential')
+    @ApiOperation({
+        summary:
+            "Mint a repository-scoped push credential and the commit attribution for a job this node holds (public, node-secret-authenticated). Scoped from platform state to this job's repositories with contents:write only, expiring within the hour. Returned once; never recoverable.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async pushCredential(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetJobPushCredentialDto,
+    ): Promise<FleetJobPushCredentialResponse> {
+        let response: FleetJobPushCredentialResponse | null;
+        try {
+            response = await this.pushCredentials.mint({
+                nodeId: body.nodeId,
+                secret: body.secret,
+                jobId: id,
+                leaseGeneration: body.leaseGeneration,
+            });
+        } catch (error) {
+            // The stable token, and only the stable token. The refusal has
+            // already been logged server-side with the job id; the node
+            // gets a reason it can report, never an installation id or a
+            // GitHub response body.
+            if (error instanceof FleetPushCredentialError) {
+                throw new UnprocessableEntityException({ reason: error.reason });
+            }
+            // `FleetJobStaleLeaseError` propagates untouched, as 409
+            // `{ reason: 'stale-lease' }` — same as heartbeat and complete.
+            throw error;
+        }
+        if (!response) {
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return response;
     }
 
     @Public()

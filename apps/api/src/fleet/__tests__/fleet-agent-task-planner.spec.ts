@@ -117,9 +117,16 @@ describe('FleetAgentTaskPlannerService', () => {
     let skills: { resolveActiveForAgent: jest.Mock };
     let pluginSettings: { getResolvedSettings: jest.Mock };
     let runs: { findById: jest.Mock };
+    let pushCredentials: { describeScope: jest.Mock };
 
     const build = (
-        opts: { assembler?: boolean; skills?: boolean; settings?: boolean; runs?: boolean } = {},
+        opts: {
+            assembler?: boolean;
+            skills?: boolean;
+            settings?: boolean;
+            runs?: boolean;
+            pushCredentials?: boolean;
+        } = {},
     ) =>
         new FleetAgentTaskPlannerService(
             tasks as never,
@@ -133,6 +140,7 @@ describe('FleetAgentTaskPlannerService', () => {
             opts.skills === false ? undefined : (skills as never),
             opts.settings === false ? undefined : (pluginSettings as never),
             opts.runs === false ? undefined : (runs as never),
+            opts.pushCredentials === false ? undefined : (pushCredentials as never),
         );
 
     beforeEach(() => {
@@ -180,6 +188,18 @@ describe('FleetAgentTaskPlannerService', () => {
             ]),
         };
         pluginSettings = { getResolvedSettings: jest.fn().mockResolvedValue({}) };
+        // Scoped push credentials (slice AM): the platform CAN mint for
+        // this run unless a case says otherwise.
+        pushCredentials = {
+            describeScope: jest.fn().mockResolvedValue({
+                ok: true,
+                reason: null,
+                installationEntityId: 'inst-entity-1',
+                installationId: '9001',
+                repositoryIds: ['556677'],
+                repositories: ['ever-works/ever-works'],
+            }),
+        };
     });
 
     afterAll(() => {
@@ -192,7 +212,144 @@ describe('FleetAgentTaskPlannerService', () => {
         expect(taskWorkspace.describeFleetWorkspace).not.toHaveBeenCalled();
     });
 
+    /**
+     * Scoped push credentials (self-build slice AM, EW-810) — the PLATFORM
+     * half of the pre-dispatch push-capability probe.
+     *
+     * A fleet node no longer pushes with the machine's own Git credential
+     * helper; it pushes with a repository-scoped installation token this
+     * platform mints per job. Whether that CAN be minted is a fact about
+     * platform state, so a run that could never publish is refused here —
+     * where the reason lands on the run row — instead of twenty minutes
+     * later at the push.
+     */
+    describe('push scope — refusing a run the platform could never publish', () => {
+        beforeEach(() => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        });
+
+        it('asks about the PRIMARY repository and every writable mount', async () => {
+            taskWorkspace.describeFleetWorkspace.mockResolvedValue({
+                ...workspace,
+                mounts: [
+                    {
+                        repositoryId: 'ever-works/template',
+                        repoUrl: 'https://github.com/ever-works/template.git',
+                        baseRef: 'main',
+                        branch: 'task/task-1-tsk-7',
+                        mountDir: 'template',
+                        writable: true,
+                    },
+                    {
+                        repositoryId: 'ever-works/reference',
+                        repoUrl: 'https://github.com/ever-works/reference.git',
+                        baseRef: 'main',
+                        branch: 'task/task-1-tsk-7',
+                        mountDir: 'reference',
+                        writable: false,
+                    },
+                ],
+            });
+
+            await build().plan(payload);
+
+            // The CLONE URL travels with each name. `owner/repo` alone is
+            // not an identity a write credential may be scoped by: a `git`
+            // repo connection can point at any host and
+            // `repositoryIdFromCloneUrl` is host-agnostic, so a mount at
+            // `https://gitlab.example/acme/widgets` would otherwise resolve
+            // against a GitHub installation row called `acme/widgets` and
+            // buy a token for a repository this run never touches
+            // (slice AM review, F4).
+            expect(pushCredentials.describeScope).toHaveBeenCalledWith(USER, [
+                {
+                    repositoryId: 'ever-works/ever-works',
+                    repoUrl: 'https://github.com/ever-works/ever-works.git',
+                },
+                {
+                    repositoryId: 'ever-works/template',
+                    repoUrl: 'https://github.com/ever-works/template.git',
+                },
+            ]);
+        });
+
+        it('refuses when a writable mount is not on the host the credential can reach', async () => {
+            // The planner passes the URL through; the SERVICE decides. This
+            // pins the seam: a mount whose clone URL is not a github.com
+            // repository must reach `describeScope` with that URL, so the
+            // refusal can happen at plan time instead of twenty minutes into
+            // a node's run.
+            taskWorkspace.describeFleetWorkspace.mockResolvedValue({
+                ...workspace,
+                mounts: [
+                    {
+                        repositoryId: 'ever-works/template',
+                        repoUrl: 'https://gitlab.com/ever-works/template.git',
+                        baseRef: 'main',
+                        branch: 'task/task-1-tsk-7',
+                        mountDir: 'template',
+                        writable: true,
+                    },
+                ],
+            });
+
+            await build().plan(payload);
+
+            expect(pushCredentials.describeScope).toHaveBeenCalledWith(USER, [
+                {
+                    repositoryId: 'ever-works/ever-works',
+                    repoUrl: 'https://github.com/ever-works/ever-works.git',
+                },
+                {
+                    repositoryId: 'ever-works/template',
+                    repoUrl: 'https://gitlab.com/ever-works/template.git',
+                },
+            ]);
+        });
+
+        it('REFUSES the plan, naming the repositories and what an operator must fix', async () => {
+            pushCredentials.describeScope.mockResolvedValue({
+                ok: false,
+                reason: 'push-scope-unresolved',
+            });
+
+            await expect(build().plan(payload)).rejects.toBeInstanceOf(FleetAgentTaskPlanError);
+            await expect(build().plan(payload)).rejects.toThrow(/ever-works\/ever-works/);
+            await expect(build().plan(payload)).rejects.toThrow(/install the Ever Works app/);
+        });
+
+        it('does not ask at all for an Agent that may not commit', async () => {
+            // Nothing is published, so there is nothing to authorise — and
+            // a deployment with no GitHub App must still be able to run a
+            // read-only agent.
+            agents.findByIdAndUser.mockResolvedValue(
+                agent({ permissions: { canCommitToRepo: false } } as never),
+            );
+
+            await expect(build().plan(payload)).resolves.toMatchObject({
+                git: { commit: false, push: false },
+            });
+            expect(pushCredentials.describeScope).not.toHaveBeenCalled();
+        });
+
+        it('plans as before in a graph that cannot supply the checker', async () => {
+            // @Optional(): the NODE still fails closed at the publish, so an
+            // absent checker costs a late failure, never a token-free push.
+            await expect(build({ pushCredentials: false }).plan(payload)).resolves.toMatchObject({
+                git: { commit: true, push: true },
+            });
+        });
+    });
+
     describe('requirements — the tags the job will need, known BEFORE the plan (slice S)', () => {
+        /**
+         * Scoped push credentials (self-build slice AM, EW-810) added
+         * `git-push` to EVERY `agent-task` tag set. The old expectations
+         * were right for a fleet whose push was token-free; they are wrong
+         * now, because a node that does not advertise `git-push` would
+         * publish with the machine's own long-lived Git credential helper,
+         * which is precisely the work it must not be handed.
+         */
         beforeEach(() => {
             delete process.env.FLEET_NODE_REQUIRED_CAPABILITIES;
         });
@@ -201,7 +358,7 @@ describe('FleetAgentTaskPlannerService', () => {
             process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace,git';
 
             await expect(build().requirements(payload)).resolves.toEqual({
-                requiredCapabilities: ['workspace', 'git'],
+                requiredCapabilities: ['workspace', 'git', 'git-push'],
             });
             expect(tasks.findById).not.toHaveBeenCalled();
             expect(taskWorkspace.describeFleetWorkspace).not.toHaveBeenCalled();
@@ -213,7 +370,7 @@ describe('FleetAgentTaskPlannerService', () => {
             process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace,codex';
 
             await expect(build().requirements(payload)).resolves.toEqual({
-                requiredCapabilities: ['workspace', 'codex'],
+                requiredCapabilities: ['workspace', 'codex', 'git-push'],
             });
         });
 
@@ -225,7 +382,7 @@ describe('FleetAgentTaskPlannerService', () => {
             });
 
             await expect(build().requirements(payload)).resolves.toEqual({
-                requiredCapabilities: ['codex'],
+                requiredCapabilities: ['git-push', 'codex'],
             });
         });
 
@@ -235,7 +392,7 @@ describe('FleetAgentTaskPlannerService', () => {
             pluginSettings.getResolvedSettings.mockRejectedValue(new Error('settings down'));
 
             await expect(build().requirements(payload)).resolves.toEqual({
-                requiredCapabilities: ['claude-code'],
+                requiredCapabilities: ['git-push', 'claude-code'],
             });
         });
     });

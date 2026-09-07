@@ -113,7 +113,10 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         expect(store.enqueue).toHaveBeenCalledTimes(1);
         const request = store.enqueue.mock.calls[0][0];
         expect(request.kind).toBe('agent-task');
-        expect(request.requiredCapabilities).toEqual(['workspace', 'claude-code']);
+        // Slice AM (EW-810) adds `git-push` to every `agent-task` tag set:
+        // the fleet's publish is no longer token-free, so a node that
+        // cannot install a per-run credential must not be offered the work.
+        expect(request.requiredCapabilities).toEqual(['workspace', 'git-push', 'claude-code']);
         expect(request.payload).toEqual({
             taskId: 'task-1',
             agentId: 'agent-1',
@@ -172,7 +175,9 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         const planner = { plan: jest.fn().mockResolvedValue(null) };
         await buildDispatcher(planner).enqueue(payload());
         const request = store.enqueue.mock.calls[0][0];
-        expect(request.requiredCapabilities).toEqual(['workspace']);
+        // Even the legacy (planner-returned-null) job carries `git-push`:
+        // it is a fact about the NODE, not about the plan.
+        expect(request.requiredCapabilities).toEqual(['workspace', 'git-push']);
         expect(request.payload.execution).toBeUndefined();
         expect(request.payload.workspace).toBeUndefined();
         expect(request.payload.steps).toEqual([

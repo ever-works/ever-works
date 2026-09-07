@@ -36,9 +36,21 @@ const STEP_TITLES: Record<WizardStepId, string> = {
 	running: 'Running'
 };
 
-/** Tags that describe the machine itself — always advertised, never a choice. */
+/**
+ * Tags that are always advertised and are never an operator choice.
+ *
+ * Two families. The `os:` / `arch:` / `node:` prefixes describe the machine
+ * itself. `git-push` (self-build slice AM, EW-810) describes something it
+ * can DO, but withholding it is not a narrower offer: every agent run
+ * requires it, so an unchecked box would only stop this machine doing the
+ * work it already does — and the node re-adds the tag regardless, which
+ * would make the checkbox a lie. Kept as a literal rather than imported
+ * from the node core: this is renderer code, and the core is a Node
+ * module. The node's own `isAlwaysAdvertisedCapability` is the authority;
+ * this mirrors it for the UI only.
+ */
 function isIdentityTag(tag: string): boolean {
-	return tag.startsWith('os:') || tag.startsWith('arch:') || tag.startsWith('node:');
+	return tag.startsWith('os:') || tag.startsWith('arch:') || tag.startsWith('node:') || tag === 'git-push';
 }
 
 /**
@@ -337,7 +349,7 @@ export function WizardView({ bridge, onEnrolled }: WizardViewProps) {
 								</label>
 							))
 						)}
-						<p className="muted">Always reported (machine identity):</p>
+						<p className="muted">Always reported (machine identity and required capabilities):</p>
 						<div className="tags">
 							{identityTags.map((tag) => (
 								<span className="badge" key={tag}>

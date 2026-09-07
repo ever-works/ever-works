@@ -190,7 +190,11 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
         await buildTransition().dispatchAgentRun(buildTask(), 'agent-1');
 
         const enqueued = fleetJobs.enqueue.mock.calls[0][0];
-        expect(enqueued.requiredCapabilities).toEqual(['git', 'docker']);
+        // `git-push` joined the operator's own tags in slice AM (EW-810):
+        // every `agent-task` requires it now, because a node without it
+        // would publish with the machine's own long-lived Git credential
+        // helper. The old expectation was right for a token-free push.
+        expect(enqueued.requiredCapabilities).toEqual(['git', 'docker', 'git-push']);
         expect(enqueued.payload.workspacePath).toBe('/srv/ever-works');
     });
 

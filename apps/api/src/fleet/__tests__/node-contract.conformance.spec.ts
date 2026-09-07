@@ -233,12 +233,21 @@ describe('fleet node contract — the wire a deployed node actually speaks', () 
         // Slice Z (EW-782) adds the run-scoped MCP credential pair. Both are
         // node verbs on the same credential and the same lease proof, and an
         // older node simply never calls either, so they are admitted by name.
+        // Slice AM (EW-810) adds `pushCredential`: POST
+        // /api/fleet/jobs/:id/push-credential, the scoped write credential
+        // and commit attribution a node fetches right before it commits. It
+        // is a node verb like the others — same credential, same four lease
+        // checks, `@Public()` — and an older node simply never calls it,
+        // which is why the platform ALSO stops offering `agent-task` work to
+        // a node that does not advertise `git-push`: a node that would push
+        // with its own ambient helper must not be handed the work.
         expect(declared.sort()).toEqual([
             'complete',
             'envFiles',
             'heartbeat',
             'lease',
             'mintMcpCredential',
+            'pushCredential',
             'revokeMcpCredential',
         ]);
     });
@@ -675,8 +684,21 @@ function buildRealJobsController(options: { stopped?: boolean } = {}) {
             throw new Error('the node-contract routes must not revoke a run credential');
         },
     };
+    // Slice AM (EW-810): same posture as the run-credential stub above —
+    // the node-contract routes must never reach the scoped push credential,
+    // so its stub throws rather than answering.
+    const pushCredentials = {
+        mint: async () => {
+            throw new Error('the node-contract routes must not mint a push credential');
+        },
+    };
     return {
-        controller: new FleetJobsController(service, runSecrets as never, runCredentials as never),
+        controller: new FleetJobsController(
+            service,
+            runSecrets as never,
+            runCredentials as never,
+            pushCredentials as never,
+        ),
         secret,
         job,
     };

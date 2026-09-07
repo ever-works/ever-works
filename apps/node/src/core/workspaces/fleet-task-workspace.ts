@@ -13,11 +13,17 @@ import {
 	type FleetTaskWorkspaceSpec
 } from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation, LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
-import type { IWorkspacePlugin, WorkspaceHandle, WorkspacePublishFence } from '@ever-works/plugin';
+import type {
+	IWorkspacePlugin,
+	WorkspaceCommitIdentity,
+	WorkspaceHandle,
+	WorkspacePublishFence
+} from '@ever-works/plugin';
 import { formatBytes } from '../resource-limits';
 import type { DiskProbeIo } from '../telemetry-probe';
 import { effectiveMinFreeDiskBytes } from '../types';
 import { measureWorkspaceFreeBytes } from './disk-headroom';
+import { PushCredentialError, type PushCredentialProvider, type ScopedPushCredential } from './push-credential';
 import { removeRunEnvFiles, sweepStaleRunEnvFiles, writeRunEnvFiles, type RunEnvFileWrite } from './run-env-files';
 
 export type FleetTaskWorkspaceErrorCode =
@@ -38,7 +44,19 @@ export type FleetTaskWorkspaceErrorCode =
 	 * The worktree is being reclaimed by the workspace reaper right now;
 	 * nothing was written. Transient — a retry lands on a fresh checkout.
 	 */
-	| 'workspace-busy';
+	| 'workspace-busy'
+	/**
+	 * Scoped push credentials (self-build slice AM): this run may not
+	 * publish, because the platform could not issue a repository-scoped
+	 * write credential for it, or the checkout points at a remote the
+	 * credential does not cover.
+	 *
+	 * TERMINAL, not a deferral: retrying on another node reaches the same
+	 * platform state, and the one thing that would let the push succeed
+	 * without it — the machine's own long-lived credential helper — is
+	 * exactly what this code exists to stop from being used.
+	 */
+	| 'push-credential';
 
 /** Stable, non-secret failure surface suitable for Fleet job diagnostics. */
 export class FleetTaskWorkspaceError extends Error {
@@ -80,6 +98,21 @@ export interface FleetTaskWorkspaceFinalizeOptions {
 	 * platform cannot be asked.
 	 */
 	publishFence?: WorkspacePublishFence;
+	/**
+	 * Scoped push credentials + commit attribution (self-build slice AM).
+	 *
+	 * Absent is NOT "push the way we used to": a finalize that intends to
+	 * publish and finds this absent is refused with `push-credential`. The
+	 * only other way a node could authenticate a push is the machine's own
+	 * Git credential helper — a long-lived, unscoped, unrevocable token
+	 * with write access to every repository that OS user can reach — and
+	 * falling back to it would leave the gap exactly where it was.
+	 *
+	 * A commit-only finalize (`push: false`) may proceed without one; it
+	 * then commits with the provider's default identity, which is what a
+	 * caller with no job channel (a test, an embedder) already got.
+	 */
+	pushCredentials?: PushCredentialProvider;
 }
 
 /**
@@ -448,6 +481,13 @@ export interface FleetTaskWorkspaceProvisionerOptions {
 	/** Test seam; production always resolves HEAD with shell-free `execFile`. */
 	readonly inspectHead?: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
 	/**
+	 * Test seam; production reads the checkout's `origin` with shell-free
+	 * `execFile`. Read from the WORKTREE rather than taken from the job
+	 * spec on purpose (self-build slice AM): the scoped push credential is
+	 * checked against the remote Git is actually going to write to.
+	 */
+	readonly readOriginUrl?: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
+	/**
 	 * Free-space probe for the disk floor, measured on the root's volume
 	 * right before anything is written there. Absent = no pre-provision
 	 * check (the worker loop's gate, when wired, still applies).
@@ -554,6 +594,7 @@ export class FleetTaskWorkspaceProvisioner {
 	private readonly rootPath: string;
 	private readonly plugin: FleetWorkspacePlugin;
 	private readonly inspectHead: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
+	private readonly readOriginUrl: (workspacePath: string, signal?: AbortSignal) => Promise<string>;
 	private readonly diskProbe: DiskProbeIo | undefined;
 	private readonly minFreeDiskBytes: number | null;
 	private readonly isProcessAlive: (pid: number) => boolean;
@@ -579,6 +620,7 @@ export class FleetTaskWorkspaceProvisioner {
 		this.rootPath = validateRootPath(options.rootPath);
 		this.plugin = options.plugin ?? new LocalWorkspacePlugin();
 		this.inspectHead = options.inspectHead ?? inspectGitHead;
+		this.readOriginUrl = options.readOriginUrl ?? inspectGitOrigin;
 		this.diskProbe = options.diskProbe;
 		this.minFreeDiskBytes = effectiveMinFreeDiskBytes({ minFreeDiskBytes: options.minFreeDiskBytes });
 		this.isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
@@ -1123,9 +1165,29 @@ export class FleetTaskWorkspaceProvisioner {
 	 *
 	 * Delegates to the local-workspace provider's own `finalize` — the
 	 * same `git add -A` / commit / `push HEAD:refs/heads/<branch>` the
-	 * cloud worker runs — so a node-pushed branch is indistinguishable
-	 * from a cloud-pushed one. The push is token-free: the node's own Git
-	 * credential helper authenticates, exactly as the fetch did.
+	 * cloud worker runs.
+	 *
+	 * The push is NOT token-free (self-build slice AM, EW-810). It used to
+	 * be: the node's own Git credential helper authenticated it, exactly
+	 * as the fetch still does. In practice that helper holds a long-lived
+	 * personal access token with write access to every repository the
+	 * service account can reach, which the platform can neither scope per
+	 * run, nor rotate, nor revoke, nor observe. So a publish now carries a
+	 * repository-scoped installation token minted for THIS job over the
+	 * node-authenticated channel, installed for the single `git push`
+	 * child through its environment, and dropped when the run ends. A
+	 * finalize that intends to publish and has no such credential is
+	 * REFUSED (`push-credential`) rather than falling back — see
+	 * {@link authorizePublish}.
+	 *
+	 * The commit also stops being anonymous: the Agent is the author and
+	 * this node is the committer, and a reserved `Ever-Works-` trailer
+	 * block records the node, agent, job and run. Both come from platform
+	 * state on the same authenticated response as the credential.
+	 *
+	 * The FETCH is unchanged and still uses the machine's own helper: it
+	 * needs read access only, and it happens before the run's first model
+	 * byte. Scoping it is a separate change.
 	 *
 	 * The descriptor is re-validated against the configured root before
 	 * any Git command runs, so a job cannot point this at a directory the
@@ -1173,6 +1235,13 @@ export class FleetTaskWorkspaceProvisioner {
 		}
 		throwIfCancelled(signal);
 
+		// Scoped push credentials (self-build slice AM). Resolved HERE —
+		// after the path is proven, before any Git command — so the
+		// credential exists for exactly the commit-and-push and not one
+		// instant of the model's run.
+		const authorization = await this.authorizePublish(opts, canonicalPath, commitMessage, signal);
+		throwIfCancelled(signal);
+
 		const bindingKey = taskBindingKey(normalizedTaskId, repositoryId);
 		try {
 			const result = await this.plugin.finalize(
@@ -1189,10 +1258,12 @@ export class FleetTaskWorkspaceProvisioner {
 				// abort that arrives mid-push is already too late: the remote may
 				// have accepted the ref before the kill landed.
 				{
-					commitMessage,
+					commitMessage: authorization.commitMessage,
 					push: opts.push,
 					...(signal ? { signal } : {}),
-					...(opts.publishFence ? { publishFence: opts.publishFence } : {})
+					...(opts.publishFence ? { publishFence: opts.publishFence } : {}),
+					...(authorization.identity ? { identity: authorization.identity } : {}),
+					...(authorization.credential ? { pushCredential: authorization.credential } : {})
 				}
 			);
 			return {
@@ -1207,9 +1278,104 @@ export class FleetTaskWorkspaceProvisioner {
 			if (signal?.aborted) throw cancelledError();
 			throw new FleetTaskWorkspaceError(
 				'git-failed',
-				`Commit or push failed for branch '${branch}': ${error instanceof Error ? error.message : String(error)}`
+				// Last line of defence before this text becomes
+				// `FleetAgentTaskGitResult.error` and is stored verbatim in
+				// `fleet_jobs.result`. The provider scrubs its own stderr;
+				// this scrubs whatever else may have wrapped it on the way
+				// out, because a write credential in a job row is a finding
+				// no matter which layer put it there.
+				redactToken(
+					`Commit or push failed for branch '${branch}': ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+					authorization.credential
+				)
 			);
 		}
+	}
+
+	/**
+	 * May this finalize publish, who is it by, and with what credential?
+	 *
+	 * FAILS CLOSED in both directions:
+	 *
+	 *  - a publish with no credential provider wired is refused, because
+	 *    the only other way this node could authenticate a push is the
+	 *    machine's own Git credential helper — the long-lived, unscoped,
+	 *    unrevocable token this slice exists to stop using;
+	 *  - a provider that refuses (no installation covers this repository,
+	 *    the checkout points somewhere the credential does not reach, the
+	 *    commit message forged a reserved trailer) fails the finalize with
+	 *    the reason, and the run reports it.
+	 *
+	 * A commit-only finalize with no provider keeps the pre-slice
+	 * behaviour: nothing is published, so there is nothing to authorise,
+	 * and the provider's default identity applies.
+	 */
+	private async authorizePublish(
+		opts: FleetTaskWorkspaceFinalizeOptions,
+		canonicalPath: string,
+		commitMessage: string,
+		signal?: AbortSignal
+	): Promise<{
+		commitMessage: string;
+		identity?: WorkspaceCommitIdentity;
+		credential?: ScopedPushCredential;
+	}> {
+		const provider = opts.pushCredentials;
+		if (!provider) {
+			if (opts.push) {
+				throw new FleetTaskWorkspaceError(
+					'push-credential',
+					'Refusing to publish: this run has no scoped push credential, and a fleet node never pushes with the machine’s own Git credential helper'
+				);
+			}
+			return { commitMessage };
+		}
+
+		let attributed: Awaited<ReturnType<PushCredentialProvider['attribute']>>;
+		try {
+			attributed = await provider.attribute(commitMessage);
+		} catch (error) {
+			throw this.pushCredentialFailure(error);
+		}
+		if (!opts.push) {
+			return { commitMessage: attributed.commitMessage, identity: attributed.identity };
+		}
+
+		let originUrl: string;
+		try {
+			originUrl = (await this.readOriginUrl(canonicalPath, signal)).trim();
+		} catch (error) {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+			if (signal?.aborted) throw cancelledError();
+			throw new FleetTaskWorkspaceError(
+				'push-credential',
+				'Refusing to publish: this checkout has no readable origin remote to scope a push credential to'
+			);
+		}
+		let credential: ScopedPushCredential;
+		try {
+			credential = await provider.credentialFor(originUrl);
+		} catch (error) {
+			throw this.pushCredentialFailure(error);
+		}
+		return {
+			commitMessage: attributed.commitMessage,
+			identity: attributed.identity,
+			credential
+		};
+	}
+
+	private pushCredentialFailure(error: unknown): FleetTaskWorkspaceError {
+		if (error instanceof FleetTaskWorkspaceError) return error;
+		if (error instanceof PushCredentialError) {
+			return new FleetTaskWorkspaceError('push-credential', `Refusing to publish: ${error.message}`);
+		}
+		return new FleetTaskWorkspaceError(
+			'push-credential',
+			`Refusing to publish: ${error instanceof Error ? error.message : String(error)}`
+		);
 	}
 	/**
 	 * Multi-repo Task workspaces (self-build slice C): commit + push every
@@ -1688,6 +1854,37 @@ function cancelledError(): FleetTaskWorkspaceError {
 
 function inspectGitHead(workspacePath: string, signal?: AbortSignal): Promise<string> {
 	return runGitOutput(['rev-parse', '--verify', 'HEAD'], workspacePath, signal);
+}
+
+/**
+ * The remote this checkout actually pushes to (self-build slice AM).
+ *
+ * Read here, from the worktree, rather than carried down from the job
+ * spec: the scoped push credential is only allowed to authenticate the
+ * remote Git is about to write, and the pool repo's `origin` is the value
+ * Git will use. The provider re-reads the same value and refuses when it
+ * does not match the credential, so the two reads fence each other.
+ */
+function inspectGitOrigin(workspacePath: string, signal?: AbortSignal): Promise<string> {
+	return runGitOutput(['remote', 'get-url', 'origin'], workspacePath, signal);
+}
+
+/**
+ * Strip a scoped push credential — raw and in its base64 basic-auth
+ * form — from text that is about to become a job result.
+ *
+ * The node's own `logger.redact` only covers LOG lines; what a node
+ * REPORTS is scrubbed by `model-cli`'s redactor, which never sees a git
+ * error. So this is the seam that keeps a write credential out of
+ * `fleet_jobs.result` on the one path that could carry it.
+ */
+function redactToken(text: string, credential?: ScopedPushCredential): string {
+	if (!credential?.token) return text;
+	let out = text.split(credential.token).join('[redacted]');
+	out = out
+		.split(Buffer.from(`${credential.username}:${credential.token}`, 'utf8').toString('base64'))
+		.join('[redacted]');
+	return out;
 }
 
 function runGitOutput(args: string[], workspacePath: string, signal?: AbortSignal): Promise<string> {

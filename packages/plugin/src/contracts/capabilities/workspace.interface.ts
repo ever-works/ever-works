@@ -118,6 +118,55 @@ export interface WorkspacePublishFence {
 	readonly marginMs: number;
 }
 
+/**
+ * A short-lived, repository-scoped write credential lent to exactly ONE
+ * publish (self-build slice AM).
+ *
+ * Distinct from {@link WorkspaceProvisionSpec.auth}, which the cloud path
+ * injects as URL userinfo and which therefore appears in the `git` argv
+ * for the life of the command. A credential supplied HERE is installed
+ * through the child process ENVIRONMENT instead
+ * (`http.<url>.extraheader`, plus a `credential.helper` reset that leaves
+ * Git no ambient helper to fall back to), so it never reaches argv, never
+ * reaches a config file, and never reaches the remote URL.
+ *
+ * Providers that cannot honour it MUST refuse the push rather than fall
+ * back to whatever the machine's own credential helper would answer:
+ * that fallback is the exact hole this exists to close.
+ */
+export interface WorkspacePushCredential {
+	/** Basic-auth username (a GitHub installation token uses `x-access-token`). */
+	readonly username: string;
+	/** The secret. Held in memory for the length of one push and nowhere else. */
+	readonly token: string;
+	/**
+	 * The remote this credential was scoped to, verbatim.
+	 *
+	 * The provider refuses to push when the checkout's `origin` is not
+	 * byte-identical to it: the credential is good for a specific set of
+	 * repositories, and a checkout pointed somewhere else is either a
+	 * mistake or an attempt to aim a write token at a remote the platform
+	 * never authorised.
+	 */
+	readonly remoteUrl: string;
+}
+
+/**
+ * Who the commit is BY (self-build slice AM). Absent keeps the provider's
+ * own defaults, which is what every caller predating this field gets.
+ *
+ * Author and committer are separate on purpose: the author is the agent
+ * that produced the change and the committer is the machine that made it,
+ * so `git log` can answer both questions. Callers are responsible for
+ * sanitising these — a newline in a name is a forged trailer.
+ */
+export interface WorkspaceCommitIdentity {
+	readonly authorName: string;
+	readonly authorEmail: string;
+	readonly committerName: string;
+	readonly committerEmail: string;
+}
+
 /** Options for {@link IWorkspacePlugin.finalize}. */
 export interface WorkspaceFinalizeOptions {
 	commitMessage: string;
@@ -127,6 +176,10 @@ export interface WorkspaceFinalizeOptions {
 	signal?: AbortSignal;
 	/** Lease deadline the publish must fit inside; see {@link WorkspacePublishFence}. */
 	publishFence?: WorkspacePublishFence;
+	/** Per-publish scoped write credential; see {@link WorkspacePushCredential}. */
+	pushCredential?: WorkspacePushCredential;
+	/** Author / committer identity for this commit; see {@link WorkspaceCommitIdentity}. */
+	identity?: WorkspaceCommitIdentity;
 }
 
 export interface WorkspaceFinalizeResult {
