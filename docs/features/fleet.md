@@ -326,9 +326,11 @@ Useful flags: `-i, --heartbeat-interval <seconds>` (cadence, default 60s), `-c, 
 
 ### The tags a node reports
 
-Tags are detected at enroll and **re-detected on every heartbeat**, so installing Docker or Git on a running node shows up in Fleet without a restart: `os:<platform>`, `arch:<arch>`, `node:<major>`, `terminal`, `workspace`, plus `docker`, `git`, `display`, `browser`, `gpu` and `gpu:<vendor>` when present. They are normalized with the same rules the server applies, so what the node reports is exactly what Fleet stores.
+Tags are detected at enroll and **re-detected on every heartbeat**, so installing Docker or Git on a running node shows up in Fleet without a restart: `os:<platform>`, `arch:<arch>`, `node:<major>`, `terminal`, `workspace`, plus `docker`, `git`, `git-push`, `display`, `browser`, `gpu` and `gpu:<vendor>` when present. They are normalized with the same rules the server applies, so what the node reports is exactly what Fleet stores.
 
 Two rules govern what may appear. **A tag is a promise the node can keep** — `browser` is emitted only when a browser executable was actually resolved, the same path `browser-check` will spawn. And **detection never fails the beat** — a missing tool is a missing tag, not a missing heartbeat. `EVER_WORKS_NODE_BROWSER` pins the executable explicitly; a pinned path that does not exist disables the tag rather than falling through to some other browser.
+
+`git-push` is the one tag you cannot turn off. It means "this machine's Git can install the platform's per-run push credential" (Git 2.31 or newer), and **every** agent run requires it — a node without it would have to push with the machine's own credential helper, which is exactly the work it must not be handed. It is detected like any other tag, so a machine with no Git, or with a Git too old, simply does not offer it; it is only the operator opt-in that cannot remove it.
 
 You can also hand-edit a node's tags under **Settings → Fleet → Capability tags**. Editing them hands you ownership: the set is marked **Pinned** and the node's heartbeats stop overwriting it.
 
@@ -711,6 +713,102 @@ the token's own scope wins and a mismatch is refused.
 The run's result records whether the bridge was up and how many tool calls went through it. If the
 bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
 tool channel that fails never fails a Task.
+
+### How a fleet node pushes (scoped push credentials)
+
+A fleet node used to push **token-free**: `git push` ran against the plain remote and the machine's
+own Git credential helper answered. In practice that is a long-lived personal access token in the OS
+credential store with write access to **every repository that OS user can reach**. The platform
+could not scope it to one run, rotate it, revoke it when a laptop went missing, or even see that it
+had been used — and every unattended machine in the fleet held one.
+
+Now the node asks the platform for a credential, right before it commits, and pushes with that.
+
+**What the credential is.** A GitHub App **installation access token**, minted for that one job,
+narrowed to exactly the repositories the job writes (the Task's repository plus its writable mounts)
+and to the `contents: write` permission alone. GitHub expires installation tokens within the hour,
+and the node revokes it at GitHub the moment the run ends.
+
+**What it can and cannot do.** It can push branches to the repositories this run was planned for.
+It cannot touch any other repository the App is installed on, cannot open a pull request, cannot
+read a secret or an Action, cannot be used after the run, and cannot be used by a node that is not
+the recorded holder of the job's lease. It is never on the job payload, never on the job row, never
+in the run's result, never in a log line, never in a config file, never in a `git` command line and
+never in the model's environment: it exists in the node's memory for the length of one
+commit-and-push, reaches `git` through the environment of that single child process, and dies with
+it.
+
+**It only ever goes to `github.com`.** An installation token is a GitHub credential and means
+nothing anywhere else, and Git puts an `Authorization` header on its **first** request to a host —
+unprompted, before any challenge — so a remote merely _pointing_ somewhere else would be enough to
+hand that host a live write credential. Both ends therefore check the host, not just the
+`owner/repo` path: the platform refuses to scope a credential to a workspace whose clone URL is not
+an `https://github.com/owner/repo`, and the node re-derives the repository from the checkout's own
+`origin` and refuses to offer the credential if the host, the port or the scheme is anything else.
+A Task on a repository connection pointing at another forge is refused rather than pushed to with a
+GitHub token.
+
+**Nothing else on the machine can answer for the push, and nothing else can watch it.** The
+credentialed `git push` resets the credential-helper list _and_ the askpass hooks (`core.askpass`,
+`GIT_ASKPASS`, `SSH_ASKPASS`) and drops `GIT_CONFIG_PARAMETERS`, so a rejected credential **fails**
+instead of silently falling through to the machine's own long-lived one. It also runs **no Git
+hooks**: a `pre-push` hook is a child of the push and would inherit the credential, and hooks live
+in the shared pool directory rather than in the checkout, so one planted there would survive the run
+and harvest every later Task's token on that repository. The publish is refused outright if the
+repository's own config has grown a credential setting or a `url.*.insteadOf` / `pushInsteadOf`
+rewrite while the run was underway.
+
+**There is no fallback.** If the platform cannot mint — no GitHub App configured, no installation
+covering every repository the run writes to, GitHub refusing — the run **fails, and says why**. It
+does not quietly fall back to the machine's own credential helper; that fallback is the gap this
+replaces. The refusal is caught as early as it can be: when a run is planned, the platform checks
+whether it could mint at all, so a Task whose repository no installation covers is refused before it
+costs a machine twenty minutes of model time.
+
+**What an operator must configure.**
+
+1. `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` on the platform — the same GitHub App the rest of
+   the product uses. Without them, fleet runs that push are refused.
+2. The App installed on every repository your fleet Tasks write to, with **Contents: read & write**,
+   and installed by the same account that owns the Tasks — the platform will not mint against
+   somebody else's installation.
+3. All repositories of one run under a **single** installation. A run spanning two installations is
+   refused rather than half-served.
+4. Nodes upgraded to a build that advertises `git-push`. An older node stops attracting agent work
+   (see [The tags a node reports](#the-tags-a-node-reports)); depending on the tenant's execution
+   mode the work then falls back to the cloud rather than queueing.
+
+If the App's installation changes — you add a repository, or GitHub suspends the installation — the
+platform re-reads its own installation snapshot on the next run, so re-syncing the installation in
+**Settings → Integrations → GitHub** is what makes a newly added repository pushable.
+
+**The one thing this does not cover.** The _fetch_ still uses the machine's own credential helper.
+A fetch needs read access only and happens before the run's first model byte; scoping it is a
+separate change. And if a node is hard-killed mid-push (power cut, SIGKILL) it cannot run its own
+revoke — the token still expires on GitHub's clock, within the hour, scoped to that job's
+repositories.
+
+### Who a fleet commit is by
+
+Every fleet commit used to be authored `Ever Works Agent <agent@ever.works>`, on every machine, so
+Git history could not answer which machine or which agent produced a change. Now:
+
+- the **author** is the Agent (its committer name and email, or `<slug>@agents.ever.works`);
+- the **committer** is the node (`Ever Works node <node name>`, `node-<id>@nodes.ever.works`);
+- and the commit message carries a trailer block:
+
+```
+Ever-Works-Node: studio-win (0f2c…)
+Ever-Works-Agent: Refactor Bot (7a91…)
+Ever-Works-Job: 3b04…
+Ever-Works-Run: 91cd…
+```
+
+All of it comes from platform rows over the node-authenticated channel, and the node refuses an
+answer that names a machine other than itself. The `Ever-Works-` trailer namespace is **reserved**:
+a commit message that already contains one — a Task title can reach the message — fails the run
+rather than being appended to, because a trailer a reader cannot distinguish from the platform's own
+is worse than no trailer at all. If you see that failure, rename the Task.
 
 ## Related
 

@@ -102,6 +102,12 @@ describe('fleet-run token surface vs. the MCP whitelist', () => {
 
 	it('refuses the credential routes themselves — a token cannot mint another', () => {
 		expect(isFleetRunTokenRouteAllowed('POST', '/api/fleet/jobs/j1/mcp-credential')).toBe(false);
+		// Scoped push credentials (self-build slice AM, EW-810). This one
+		// matters more than its siblings: it is the only route on the whole
+		// surface that answers with a credential able to WRITE the owner's
+		// repositories. It is refused by the same `/api/fleet/jobs` rule, and
+		// pinned by name so a future widening of that rule is caught here.
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/fleet/jobs/j1/push-credential')).toBe(false);
 		expect(isFleetRunTokenRouteAllowed('POST', '/api/auth/api-keys')).toBe(false);
 		expect(WHITELIST.some((entry) => entry.path.startsWith('/api/auth'))).toBe(false);
 		// The run terminal is NOT a whitelisted tool, but it hangs off the

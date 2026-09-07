@@ -374,3 +374,110 @@ describe('FleetJobClient MCP run credentials (self-build slice Z)', () => {
 		await expect(client.revokeMcpCredential('job-1')).resolves.toBe(0);
 	});
 });
+
+/**
+ * Scoped push credentials (self-build slice AM, EW-810) —
+ * `mintPushCredential`.
+ *
+ * The request carries the credential pair and the claim generation and
+ * NOTHING else — no repository, no installation, no scope of any kind,
+ * because a caller that could name its own scope would have defeated the
+ * narrowing. The response carries the only write credential this channel
+ * ever moves, and it is handed to the redactor before the method returns.
+ */
+describe('FleetJobClient scoped push credential', () => {
+	const PUSH_TOKEN = 'ghs_0123456789abcdefghijklmnopqrstuvwxyz';
+	const JOB = 'job-1';
+
+	const answer = (overrides: Record<string, unknown> = {}) => ({
+		attribution: {
+			nodeId: NODE_ID,
+			nodeName: 'studio-win',
+			agentId: null,
+			agentName: null,
+			agentEmail: null,
+			jobId: JOB,
+			runId: null
+		},
+		push: {
+			token: PUSH_TOKEN,
+			username: 'x-access-token',
+			expiresAt: '2026-09-06T20:00:00.000Z',
+			repositories: ['ever-works/ever-works']
+		},
+		...overrides
+	});
+
+	const clientWith = (fetchFn: FetchLike, logger?: { protect: (v: string) => void }) =>
+		new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0,
+			...(logger ? { logger: logger as never } : {})
+		});
+
+	it('sends the claim and nothing that could widen the scope', async () => {
+		let sentBody = '';
+		const client = clientWith(async (_url, init) => {
+			sentBody = init.body;
+			return { ok: true, status: 200, text: async () => JSON.stringify(answer()) };
+		});
+
+		await client.mintPushCredential(JOB, 7);
+
+		expect(JSON.parse(sentBody) as Record<string, unknown>).toEqual({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			leaseGeneration: 7
+		});
+	});
+
+	it('registers the token with the redactor BEFORE returning it', async () => {
+		const protect = vi.fn();
+		const client = clientWith(response(200, answer()), { protect });
+
+		await client.mintPushCredential(JOB, 7);
+
+		expect(protect).toHaveBeenCalledWith(PUSH_TOKEN);
+	});
+
+	it('REFUSES an answer that names a different node', async () => {
+		// The node holds the claim, so it knows which machine it is.
+		// Attribution that can name a machine the run did not use is worth
+		// less than none.
+		const client = clientWith(
+			response(200, answer({ attribution: { ...answer().attribution, nodeId: 'someone-else' } }))
+		);
+
+		await expect(client.mintPushCredential(JOB, 7)).rejects.toMatchObject({ kind: 'malformed' });
+	});
+
+	it('THROWS rather than returning a credential-shaped blank', async () => {
+		const client = clientWith(response(200, answer({ push: { username: 'x-access-token' } })));
+
+		await expect(client.mintPushCredential(JOB, 7)).rejects.toMatchObject({ kind: 'malformed' });
+	});
+
+	it('accepts a commit-only run, which legitimately has no credential', async () => {
+		const client = clientWith(response(200, answer({ push: null })));
+
+		await expect(client.mintPushCredential(JOB, 7)).resolves.toMatchObject({ push: null });
+	});
+
+	it('maps 422 to a refusal that says the run failed rather than pushed another way', async () => {
+		const client = clientWith(response(422, { reason: 'push-scope-unresolved', detail: 'private' }));
+		const error = await client.mintPushCredential(JOB, 7).catch((e: unknown) => e);
+
+		expect(error).toMatchObject({ kind: 'unresolved', status: 422 });
+		expect((error as Error).message).toContain('scoped push credential');
+		expect((error as Error).message).not.toContain('private');
+	});
+
+	it('keeps 409 as stale-lease, from the STATUS alone', async () => {
+		const client = clientWith(response(409, { reason: 'stale-lease' }));
+
+		await expect(client.mintPushCredential(JOB, 7)).rejects.toMatchObject({ kind: 'stale-lease' });
+	});
+});
