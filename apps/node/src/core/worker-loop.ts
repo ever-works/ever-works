@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import type {
 	FleetJobKind,
+	FleetJobPushCredentialResponse,
 	FleetJobView,
 	FleetRunEnvFileContent,
 	FleetRunEnvFileRequestRef
@@ -234,6 +235,14 @@ export interface JobLeaseCapableClient {
 		refs: readonly FleetRunEnvFileRequestRef[],
 		leaseGeneration?: number
 	): Promise<FleetRunEnvFileContent[]>;
+	/**
+	 * Scoped push credentials (self-build slice AM). Optional for the same
+	 * reason as `fetchRunEnvFiles`: an embedder with an older client still
+	 * satisfies this interface. A run that intends to PUBLISH and finds it
+	 * absent fails naming the gap — it never publishes with the machine's
+	 * own credential helper instead.
+	 */
+	mintPushCredential?(jobId: string, leaseGeneration?: number): Promise<FleetJobPushCredentialResponse>;
 }
 
 /**
@@ -312,6 +321,21 @@ export interface JobLeaseHandle {
 	 * with part of its environment is worse than one that does not start.
 	 */
 	fetchRunEnvFiles(refs: readonly FleetRunEnvFileRequestRef[]): Promise<FleetRunEnvFileContent[]>;
+	/**
+	 * Mint this run's commit attribution and — when the job's own plan
+	 * pushes — the repository-scoped write credential the publish uses
+	 * (self-build slice AM).
+	 *
+	 * On the LEASE handle for the same reason `fetchRunEnvFiles` is: the
+	 * platform proves the claim with the same four checks before it hands
+	 * a machine a WRITE credential for the owner's repositories, and the
+	 * generation echoed is the one THIS run holds, so a claim that lapsed
+	 * while the machine slept is refused rather than served.
+	 *
+	 * Rejects rather than degrading: there is no version of this run that
+	 * publishes without the credential.
+	 */
+	mintPushCredential(): Promise<FleetJobPushCredentialResponse>;
 }
 
 /** The keep-alive as the LOOP sees it: the executor's half, plus control. */
@@ -1442,6 +1466,19 @@ export class WorkerLoop {
 						);
 					}
 					return fetchFn.call(this.options.client, jobId, refs, generation);
+				},
+				// Scoped push credentials: same channel, same claim, same
+				// generation. A write credential for the owner's
+				// repositories is at least as consequential as their
+				// decrypted `.env`, so it is proven the same way.
+				mintPushCredential: async () => {
+					const mintFn = this.options.client.mintPushCredential;
+					if (!mintFn) {
+						throw new Error(
+							'This node cannot mint a scoped push credential (the job client predates the push-credential protocol)'
+						);
+					}
+					return mintFn.call(this.options.client, jobId, generation);
 				}
 			}
 		};

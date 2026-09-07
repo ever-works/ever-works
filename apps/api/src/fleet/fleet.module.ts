@@ -13,6 +13,7 @@ import { FleetKillSwitchController } from './fleet-kill-switch.controller';
 import { FleetPanicController } from './fleet-panic.controller';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetMcpCredentialListener } from './fleet-mcp-credential.listener';
+import { FleetPushCredentialService } from './fleet-push-credential.service';
 import { FleetRunRouterService } from './fleet-run-router.service';
 import { FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
@@ -126,6 +127,15 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         // agent fleet graph would widen that module's dependency surface
         // for a route only this app exposes.
         FleetRunSecretsService,
+        // Scoped push credentials (self-build slice AM, EW-810). Provided
+        // HERE for the same reason as `FleetRunSecretsService`: it needs
+        // the GitHub App installation repositories from `DatabaseModule`,
+        // and pulling that into the agent-side fleet graph would widen a
+        // module every importer of this one carries. Exported below, too,
+        // because the api-side `TasksModule` gives it to the PLANNER — the
+        // pre-dispatch check that refuses a Task no installation can cover
+        // before it costs a node twenty minutes.
+        FleetPushCredentialService,
         // Self-build slice Z (EW-796) — revokes a job's run-scoped MCP
         // credentials on EVERY terminal path, by subscribing to the one
         // completion event they all emit. Additive: no edit to
@@ -148,6 +158,7 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         FleetRunRouterService,
         FleetRunnerStatusService,
         FleetPanicService,
+        FleetPushCredentialService,
     ],
 })
 export class FleetApiModule {}

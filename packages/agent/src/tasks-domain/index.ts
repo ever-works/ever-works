@@ -81,6 +81,7 @@ export {
 // -> main. Opens a promotion pull request and reports the gate; merging it
 // stays on the slice-AE human-approval path.
 export * from './release-promotion.service';
+export * from './release-verification.service';
 export * from './release-promotion.module';
 export { ReleasePromotion } from '../entities/release-promotion.entity';
 export {

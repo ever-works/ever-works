@@ -6,7 +6,12 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import type { PromotionGateVerdict, PromotionRung, PromotionState } from '@ever-works/contracts';
+import type {
+    PromotionGateVerdict,
+    PromotionRung,
+    PromotionState,
+    ReleaseVerifyState,
+} from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -42,9 +47,20 @@ import { PortableDateColumn } from './_types';
  * ever NARROWS that: `gateVerdict` must be an explicit `success` for the
  * exact head being merged, or the merge gate stands down.
  *
+ * ## What slice AJ (EW-809) added, and what it still does not do
+ *
+ * The `verify*` columns below record whether the DEPLOYMENT that followed
+ * the merge actually worked, and `revertTaskId` records that a revert was
+ * OFFERED to a human when it did not. Nothing on this row can revert
+ * anything: the offer is a Task filed for a person to decide on, and
+ * landing whatever pull request that Task eventually produces goes through
+ * the same `merge_pull_request` Inbox approval as everything else. There
+ * is deliberately no `revertedAt`, because the platform never reverts.
+ *
  * Scope columns are raw uuid references (no @ManyToOne) per the EW-654
- * cycle-avoidance rule; FKs live in the migration
- * (`1790000000000-CreateReleasePromotions`).
+ * cycle-avoidance rule; FKs live in the migrations
+ * (`1790000000000-CreateReleasePromotions`,
+ * `1790100000000-AddReleaseVerification`).
  *
  * NOTE: also registered in `database/_entities-inventory.ts` and
  * `_entity-names.ts` — this repo has no `autoLoadEntities`, so a
@@ -55,6 +71,10 @@ import { PortableDateColumn } from './_types';
 @Index('uq_release_promotions_lane', ['workId', 'rung', 'laneKey'], { unique: true })
 @Index('idx_release_promotions_task', ['taskId'])
 @Index('idx_release_promotions_work_state', ['workId', 'state'])
+// The post-deploy verification sweep's only query: rows still being
+// verified whose next probe is due. Without it the sweep table-scans
+// `release_promotions` every five minutes for ever.
+@Index('idx_release_promotions_verify', ['verifyState', 'verifyRetryAt'])
 export class ReleasePromotion {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -227,6 +247,148 @@ export class ReleasePromotion {
      */
     @Column({ type: 'varchar', length: 16, nullable: true })
     inboxFiledVerdict?: string | null;
+
+    // ── Post-deploy verification (self-build slice AJ, EW-809) ───────
+    //
+    // Everything below is written ONLY after the pull request has been
+    // observed merged, and only ever by the verification lane. It answers
+    // the question the gate cannot: did the promoted build reach the
+    // environment this rung deploys, and does that environment work?
+    //
+    // Kept on this row rather than in a table of its own because the
+    // relationship is 1:1 and permanent — a promotion has exactly one
+    // deployment to verify, for ever — and because "make the verdict
+    // visible ON the promotion" is the whole requirement.
+
+    /**
+     * `awaiting-rollout` | `checking-app` | `confirming-failure` |
+     * `passed` | `failed` | `inconclusive` | `unsupported`.
+     *
+     * NULL means the verification never started: the promotion has not
+     * merged, or this deployment predates the lane. NULL is NOT a pass,
+     * and the operator surface says "not verified" for it rather than
+     * leaving a blank a reader fills in optimistically.
+     */
+    @Column({ type: 'varchar', length: 24, nullable: true })
+    verifyState?: ReleaseVerifyState | null;
+
+    /**
+     * THE artefact identity: the commit that must be SERVING before this
+     * lane will say anything about the deployment.
+     *
+     * The tip of {@link baseBranch} read from the git provider immediately
+     * after the pull request was observed merged — NOT {@link headSha}.
+     * The merge produces a NEW commit (the platform merges with the
+     * provider default `merge` method) and `GitPullRequestStatus` carries
+     * no merge-commit sha, so a verification that compared the deployed
+     * `gitSha` against `headSha` would report "not rolled out" for ever.
+     *
+     * KNOWN LIMIT, stated because a green verdict leans on it: if another
+     * pull request lands on the base branch between our merge and this
+     * read, this records THAT commit. The promoted code is still an
+     * ancestor of it — so a pass never means "your change is absent" — but
+     * the artefact verified is then not exclusively this promotion's. The
+     * runbook says so too.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    verifyExpectedSha?: string | null;
+
+    /**
+     * The URL the LAST probe actually loaded.
+     *
+     * Recorded so an operator reading a verdict can see which deployment
+     * it was about without re-deriving it from the Work, and so a target
+     * edited under a running verification is visible rather than silent.
+     */
+    @Column({ type: 'varchar', length: 512, nullable: true })
+    verifyTargetUrl?: string | null;
+
+    @PortableDateColumn({ nullable: true })
+    verifyStartedAt?: Date | null;
+
+    /**
+     * When this verification stops, whatever it has found.
+     *
+     * One of the two independent stops that make the lane bounded (the
+     * other is {@link verifyAttempts}). A row past this settles
+     * `inconclusive` — never `failed`, and therefore never a revert offer.
+     */
+    @PortableDateColumn({ nullable: true })
+    verifyDeadlineAt?: Date | null;
+
+    /** Fleet browser checks enqueued so far. Hard-capped; see the deadline. */
+    @Column({ type: 'int', default: 0 })
+    verifyAttempts: number;
+
+    /**
+     * Consecutive same-direction results in the CURRENT state.
+     *
+     * Reset on every state change and on every result that breaks the run.
+     * Rollout needs `RELEASE_VERIFY_ROLLOUT_CONFIRMATIONS` in a row because
+     * ArgoCD replaces pods gradually and one sample is a coin flip;
+     * failure needs `RELEASE_VERIFY_FAILURE_CONFIRMATIONS` in a row because
+     * one failed page load is a transient and filing a revert offer on a
+     * transient is how a flapping check reverts a good release.
+     */
+    @Column({ type: 'int', default: 0 })
+    verifyStreak: number;
+
+    /**
+     * The fleet job currently in flight, or NULL when none is.
+     *
+     * Also the mutual exclusion: the sweep claims an attempt with a
+     * conditional UPDATE pinning this to NULL, so two API replicas cannot
+     * put two browsers on the same environment, and a promotion can never
+     * have more than one outstanding check.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    verifyJobId?: string | null;
+
+    /**
+     * When the sweep should next LOOK at this row.
+     *
+     * NOT nulled while a check is in flight, and that is load-bearing: it
+     * is the sweep’s WHERE clause, so a row that cleared it would drop out
+     * of the only query that can enforce {@link verifyDeadlineAt}, and a
+     * browser job that never came back would hold the promotion open for
+     * ever. A row with {@link verifyJobId} set is re-read and skipped for
+     * enqueueing, but can still be expired.
+     *
+     * NULL only on a settled verification, which is how a terminal row
+     * becomes invisible to the sweep permanently.
+     */
+    @PortableDateColumn({ nullable: true })
+    verifyRetryAt?: Date | null;
+
+    /** When a probe result was last recorded — "when did we last look". */
+    @PortableDateColumn({ nullable: true })
+    verifyCheckedAt?: Date | null;
+
+    /**
+     * Short plain-text note about the last reading, for the operator and
+     * the Inbox body.
+     *
+     * Length-capped at the write site because half of what lands here is
+     * derived from a NODE-REPORTED result, which is untrusted data.
+     */
+    @Column({ type: 'varchar', length: 512, nullable: true })
+    verifyDetail?: string | null;
+
+    /**
+     * The Task filed to OFFER a revert, when one was offered.
+     *
+     * Written exactly once, by a compare-and-set, and only from
+     * `verifyState = 'failed'`. Its presence means a human was handed a
+     * prepared revert to decide on. It does NOT mean anything was
+     * reverted: nothing in this platform reverts, and landing whatever
+     * pull request this Task eventually produces needs the same
+     * `merge_pull_request` Inbox approval as every other merge.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    revertTaskId?: string | null;
+
+    @PortableDateColumn({ nullable: true })
+    revertOfferedAt?: Date | null;
 
     // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
     // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.

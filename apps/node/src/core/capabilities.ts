@@ -1,4 +1,9 @@
-import { FLEET_BROWSER_CAPABILITY, FLEET_GPU_CAPABILITY } from '@ever-works/contracts';
+import {
+	FLEET_BROWSER_CAPABILITY,
+	FLEET_GPU_CAPABILITY,
+	FLEET_PUSH_CAPABILITY,
+	FLEET_PUSH_MIN_GIT_VERSION
+} from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
 import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
@@ -167,10 +172,65 @@ async function hasTool(runner: CommandRunner, command: string): Promise<boolean>
 }
 
 /**
+ * What this machine's Git can do (self-build slice AM).
+ *
+ * `present` keeps the exact meaning the `git` tag has always had:
+ * `git --version` exited 0. `scopedPush` is the new, narrower promise —
+ * this Git accepts configuration through `GIT_CONFIG_COUNT` /
+ * `GIT_CONFIG_KEY_<n>`, which is how the platform's per-run push
+ * credential is installed. Git 2.31 (March 2021) introduced it.
+ *
+ * A version this probe cannot PARSE reports `scopedPush: false`. That
+ * fails closed on purpose: guessing "probably new enough" would put the
+ * `git-push` tag on a machine whose push would silently fall through to
+ * its own ambient credential helper, which is the exact hole the tag
+ * exists to keep work away from.
+ */
+export async function probeGit(runner: CommandRunner): Promise<{ present: boolean; scopedPush: boolean }> {
+	let stdout = '';
+	try {
+		const result = await runner.run('git', ['--version']);
+		if (result.code !== 0) return { present: false, scopedPush: false };
+		stdout = result.stdout ?? '';
+	} catch {
+		return { present: false, scopedPush: false };
+	}
+	return { present: true, scopedPush: gitSupportsScopedPush(stdout) };
+}
+
+/**
+ * Minimum Git that accepts environment-carried configuration, parsed from
+ * the CONTRACTS constant rather than restated here: the platform's own
+ * documentation and this probe must name the same version, and two
+ * literals are two chances to drift.
+ */
+const MIN_SCOPED_PUSH_GIT: readonly [number, number] = (() => {
+	const parts = FLEET_PUSH_MIN_GIT_VERSION.split('.').map((part) => Number.parseInt(part, 10));
+	return [parts[0] ?? 2, parts[1] ?? 31];
+})();
+
+/**
+ * Parse `git version 2.53.0.windows.1` and compare against 2.31.
+ *
+ * Exported so the rule is testable on its own — the version string a
+ * fleet machine reports is the one fact this whole capability turns on,
+ * and it varies by platform packaging far more than any other probe here.
+ */
+export function gitSupportsScopedPush(versionOutput: string): boolean {
+	const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(String(versionOutput ?? ''));
+	if (!match) return false;
+	const major = Number.parseInt(match[1], 10);
+	const minor = Number.parseInt(match[2], 10);
+	if (!Number.isFinite(major) || !Number.isFinite(minor)) return false;
+	if (major !== MIN_SCOPED_PUSH_GIT[0]) return major > MIN_SCOPED_PUSH_GIT[0];
+	return minor >= MIN_SCOPED_PUSH_GIT[1];
+}
+
+/**
  * Detect this machine's capability tags:
  * `os:<platform>`, `arch:<arch>`, `node:<major>`, the always-on
- * `terminal`/`workspace`, plus `docker`, `git`, `display`, `browser`,
- * `gpu` and `gpu:<vendor>` when present.
+ * `terminal`/`workspace`, plus `docker`, `git`, `git-push`, `display`,
+ * `browser`, `gpu` and `gpu:<vendor>` when present.
  *
  * Two rules govern what may appear here:
  *
@@ -185,7 +245,7 @@ async function hasTool(runner: CommandRunner, command: string): Promise<boolean>
 export async function detectCapabilities(runner: CommandRunner, environment: CapabilityEnvironment): Promise<string[]> {
 	const [docker, git, gpu] = await Promise.all([
 		hasTool(runner, 'docker'),
-		hasTool(runner, 'git'),
+		probeGit(runner),
 		detectGpu(runner, environment.platform)
 	]);
 	const major = nodeMajor(environment.nodeVersion);
@@ -200,7 +260,15 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		major === null ? null : `node:${major}`,
 		...BASE_CAPABILITIES,
 		docker ? 'docker' : null,
-		git ? 'git' : null,
+		git.present ? 'git' : null,
+		// Scoped push (self-build slice AM): the SAME fact the push
+		// depends on turns the tag on — a Git that accepts the per-run
+		// credential through its environment. A machine whose Git is too
+		// old is not "a machine that pushes a bit differently"; it is a
+		// machine whose push would fall back to the operator's own
+		// long-lived credential helper, which is the thing this tag keeps
+		// work away from.
+		git.scopedPush ? FLEET_PUSH_CAPABILITY : null,
 		environment.hasDisplay ? 'display' : null,
 		hasBrowser ? FLEET_BROWSER_CAPABILITY : null,
 		// Agent execution v2 — a model CLI the node can actually spawn.
@@ -229,12 +297,34 @@ export function isIdentityCapability(tag: string): boolean {
 }
 
 /**
+ * Tags that are detected but NOT offered as an operator choice.
+ *
+ * `git-push` (self-build slice AM) is here because withholding it is not
+ * a narrower offer, it is a broken one: every `agent-task` the platform
+ * dispatches requires it, so a node that hid the tag would simply stop
+ * doing the work it already does — and an operator whose config predates
+ * the tag has, by definition, not opted into it. Detection still decides
+ * whether it appears at all; the opt-in only decides what a machine
+ * ADVERTISES from what it can do, and there is nothing to opt out of
+ * here that does not also opt out of fleet runs entirely.
+ */
+const NON_SELECTABLE_TAGS = new Set<string>([FLEET_PUSH_CAPABILITY]);
+
+/**
+ * True when a tag is advertised whatever the operator selected: machine
+ * identity, or a capability whose absence would only strand work.
+ */
+export function isAlwaysAdvertisedCapability(tag: string): boolean {
+	return isIdentityCapability(tag) || NON_SELECTABLE_TAGS.has(tag);
+}
+
+/**
  * The tags an operator is actually allowed to choose between — everything the
  * detector found minus the identity tags. This is what the wizard's capability
  * step renders as checkboxes.
  */
 export function selectableCapabilities(detected: readonly string[]): string[] {
-	return detected.filter((tag) => !isIdentityCapability(tag));
+	return detected.filter((tag) => !isAlwaysAdvertisedCapability(tag));
 }
 
 /**
@@ -258,7 +348,7 @@ export function applyCapabilitySelection(detected: readonly string[], selection?
 		return normalizeCapabilities([...detected]);
 	}
 	const chosen = new Set(normalizeCapabilities([...selection]));
-	return normalizeCapabilities(detected.filter((tag) => isIdentityCapability(tag) || chosen.has(tag)));
+	return normalizeCapabilities(detected.filter((tag) => isAlwaysAdvertisedCapability(tag) || chosen.has(tag)));
 }
 
 /**

@@ -670,6 +670,210 @@ describe('createNodeRuntime — agent-task publish fence', () => {
 	});
 });
 
+/**
+ * The join between the lease and the SCOPED PUSH CREDENTIAL.
+ *
+ * REGRESSION — the whole production wiring of slice AM had no coverage
+ * (its review, F8). Creating the session, threading it into
+ * `finalizeWorkspace` / `finalizeMounts`, and disposing it in the terminal
+ * `finally` all live in one closure in `runtime.ts`, and two mutations that
+ * destroy the slice's central guarantees left the entire `apps/node` suite
+ * green (1216 passed, only the pre-existing cargo-dependent
+ * windows-job-helper-trust failure):
+ *
+ *   1. Replacing `await pushCredentials?.dispose()` with a no-op. The
+ *      headline claim — "revoked on every terminal path" — was then
+ *      unprotected: every run would leave a live `contents: write`
+ *      installation token for the owner's repositories un-revoked.
+ *   2. Removing the `pushCredentials` spread from BOTH finalize calls.
+ *      `authorizePublish` then takes its no-provider branch and turns
+ *      EVERY fleet publish into a `push-credential` refusal — a fleet-wide
+ *      publish outage — and nothing said so.
+ *
+ * Both go red here now.
+ */
+describe('createNodeRuntime — agent-task scoped push credential', () => {
+	const LEASED_AT = Date.parse('2026-09-04T09:00:00.000Z');
+
+	interface PushHarness {
+		finalizeOpts: Record<string, unknown>[];
+		finalizeMountsOpts: Record<string, unknown>[];
+		disposals: number;
+		completedBodies: Record<string, unknown>[];
+	}
+
+	/**
+	 * Runs ONE leased `agent-task` through the real runtime with the
+	 * executor stubbed, a provisioner that records what `finalize` was
+	 * handed, and the REAL `PushCredentialSession` class instrumented on its
+	 * prototype — so what is asserted is the production class, not a double.
+	 */
+	async function withPushSession(run: (agentIo: Record<string, unknown>) => Promise<void>): Promise<PushHarness> {
+		const harness: PushHarness = {
+			finalizeOpts: [],
+			finalizeMountsOpts: [],
+			disposals: 0,
+			completedBodies: []
+		};
+		let leased = false;
+		const job = {
+			id: 'job-push-1',
+			kind: 'agent-task',
+			status: 'leased',
+			nodeId: NODE_ID,
+			requiredCapabilities: [],
+			payload: { taskId: 'task-push', steps: [] },
+			leaseExpiresAt: new Date(LEASED_AT + 60_000).toISOString(),
+			attempts: 1,
+			maxAttempts: 3,
+			createdAt: null,
+			startedAt: null,
+			completedAt: null
+		};
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/jobs/lease')) {
+				const jobs = leased ? [] : [job];
+				leased = true;
+				return { ok: true, status: 200, text: async () => JSON.stringify({ jobs }) };
+			}
+			if (url.endsWith('/heartbeat')) {
+				return {
+					ok: true,
+					status: 200,
+					text: async () => JSON.stringify({ ok: true, job: { ...job, status: 'running' } })
+				};
+			}
+			if (url.endsWith('/complete')) {
+				harness.completedBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+				return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, job: {} }) };
+			}
+			throw new Error(`unexpected request: ${url}`);
+		};
+
+		vi.resetModules();
+		vi.doMock('./executors/agent-task', () => ({
+			runAgentTaskJob: async (_job: unknown, agentIo: Record<string, unknown>) => {
+				await run(agentIo);
+				return {};
+			}
+		}));
+		try {
+			// Imported BEFORE `./runtime`, inside the same post-reset module
+			// registry, so the runtime binds this very module object and the
+			// prototype spy observes the production class.
+			const { PushCredentialSession } = await import('./workspaces/push-credential');
+			const realDispose = PushCredentialSession.prototype.dispose;
+			vi.spyOn(PushCredentialSession.prototype, 'dispose').mockImplementation(async function (
+				this: InstanceType<typeof PushCredentialSession>
+			) {
+				harness.disposals += 1;
+				await realDispose.call(this);
+			});
+
+			const { createNodeRuntime: create } = await import('./runtime');
+			const { io: deps } = io(fetchFn);
+			const config: NodeConfig = {
+				apiUrl: 'https://api.ever.works',
+				nodeId: NODE_ID,
+				secret: SECRET,
+				kind: 'node',
+				capabilities: ['os:linux'],
+				heartbeatIntervalMs: 30_000,
+				enrolledAt: '2026-07-25T10:00:00.000Z'
+			};
+			const runtime = create(
+				config,
+				{
+					...deps,
+					scheduler: { setTimeout: () => ({ scheduled: true }), clearTimeout: () => undefined },
+					now: () => LEASED_AT,
+					monotonicNow: () => LEASED_AT
+				},
+				{
+					workerEnabled: true,
+					workspaceProvisioner: {
+						provision: vi.fn(),
+						finalize: async (_taskId: string, _descriptor: unknown, opts: Record<string, unknown>) => {
+							harness.finalizeOpts.push(opts);
+							return { pushed: true, headSha: 'a'.repeat(40), empty: false };
+						},
+						finalizeMounts: async (
+							_taskId: string,
+							_descriptor: unknown,
+							opts: Record<string, unknown>
+						) => {
+							harness.finalizeMountsOpts.push(opts);
+							return [];
+						}
+					} as never
+				}
+			);
+			await runtime.worker?.start();
+			await runtime.worker?.drained();
+			await runtime.worker?.stop();
+		} finally {
+			vi.restoreAllMocks();
+			vi.resetModules();
+		}
+		return harness;
+	}
+
+	it('hands BOTH finalize seams a push-credential provider', async () => {
+		// Mutation 2 above. Without the spread, `authorizePublish` takes its
+		// no-provider branch and every fleet publish becomes a
+		// `push-credential` refusal — a fleet-wide outage that no other spec
+		// in the repository notices.
+		const harness = await withPushSession(async (agentIo) => {
+			const finalizeWorkspace = agentIo.finalizeWorkspace as (
+				taskId: string,
+				descriptor: unknown,
+				opts: Record<string, unknown>
+			) => Promise<unknown>;
+			const finalizeMounts = agentIo.finalizeMounts as (
+				taskId: string,
+				descriptor: unknown,
+				opts: Record<string, unknown>
+			) => Promise<unknown>;
+			await finalizeWorkspace('task-push', {}, { commitMessage: 'feat: x', push: true });
+			await finalizeMounts('task-push', {}, { commitMessage: 'feat: x', push: true });
+		});
+
+		expect(harness.finalizeOpts).toHaveLength(1);
+		expect(harness.finalizeMountsOpts).toHaveLength(1);
+		for (const opts of [...harness.finalizeOpts, ...harness.finalizeMountsOpts]) {
+			const provider = opts.pushCredentials as { attribute?: unknown; credentialFor?: unknown } | undefined;
+			// The real provider interface, not merely a truthy value: a stub
+			// missing either half would refuse at publish just as loudly.
+			expect(typeof provider?.attribute).toBe('function');
+			expect(typeof provider?.credentialFor).toBe('function');
+		}
+		// And the caller's own options survive alongside it.
+		expect(harness.finalizeOpts[0].commitMessage).toBe('feat: x');
+	});
+
+	it('disposes the session when the run SUCCEEDS', async () => {
+		// Mutation 1 above, success path.
+		const harness = await withPushSession(async () => undefined);
+		expect(harness.disposals).toBe(1);
+	});
+
+	it('disposes the session when the run THROWS', async () => {
+		// The path that matters most: a thrown model step, an operator
+		// cancel and a lapsed lease all arrive at the same `finally`. A
+		// credential left un-revoked because the failure path skipped
+		// disposal is a live write token for the owner's repositories.
+		const harness = await withPushSession(async () => {
+			throw new Error('model step exploded');
+		});
+
+		expect(harness.disposals).toBe(1);
+		// The failure still reaches the platform — disposal is not allowed
+		// to swallow it.
+		expect(harness.completedBodies).toHaveLength(1);
+		expect(harness.completedBodies[0]).toMatchObject({ success: false });
+	});
+});
+
 describe('installShutdownHandlers', () => {
 	it('registers both signals and runs the shutdown exactly once', () => {
 		const handlers = new Map<string, () => void>();

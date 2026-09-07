@@ -7,6 +7,10 @@ reuses wholesale for landing, and to
 [`FLEET_BREAK_GLASS.md`](./FLEET_BREAK_GLASS.md), whose manual `gh pr create`
 cascade this replaces for the platform's own repository.
 
+**What happens after a promotion merges** — the post-deploy check, the
+verdict you read, and the revert offer — is
+[`RELEASE_VERIFICATION.md`](./RELEASE_VERIFICATION.md) (slice AJ, EW-809).
+
 ---
 
 ## 1. What this fixes

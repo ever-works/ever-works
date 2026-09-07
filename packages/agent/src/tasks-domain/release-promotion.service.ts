@@ -30,6 +30,7 @@ import type {
     PromotionMergeSubject,
     PromotionMergeVerdict,
 } from '../policy/promotion-merge-guard.port';
+import { ReleaseVerificationService } from './release-verification.service';
 import { TasksService } from './tasks.service';
 
 /** Why a promotion could not be opened. All of them leave nothing behind. */
@@ -209,6 +210,13 @@ export class ReleasePromotionService implements PromotionMergeGuard {
         // treatment — this convention has bitten five times.
         @Optional() private readonly gitFacade?: GitFacadeService,
         @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
+        // Post-deploy verification (slice AJ, EW-809). APPENDED LAST and
+        // @Optional() per the positional-arity rule — every spec that
+        // builds this service with seven arguments keeps compiling, and a
+        // deployment without it behaves byte-for-byte as it did before:
+        // the promotion still merges and the lane still closes, nothing
+        // checks the deployment, and nothing pretends it did.
+        @Optional() private readonly verification?: ReleaseVerificationService,
     ) {}
 
     // ── Opening a promotion ───────────────────────────────────────────
@@ -698,6 +706,37 @@ export class ReleasePromotionService implements PromotionMergeGuard {
                           'The next rung is a separate promotion and is not opened automatically.'
                     : `Promotion closed without merging — ${promotion.headBranch} → ${promotion.baseBranch}.`,
             );
+            // THE ONLY MOMENT the platform learns a promotion landed, and
+            // therefore the only place a post-deploy verification can start
+            // (slice AJ, EW-809). `closeLane` above has already freed the
+            // lane, so `findOpenByTaskId` will not match this row again and
+            // this block runs exactly once per promotion — but the
+            // verification claims itself with `WHERE verifyState IS NULL`
+            // anyway, because "runs exactly once" is a property of the
+            // current call graph and not a guarantee.
+            //
+            // A CLOSED promotion gets nothing: nothing was deployed, so
+            // there is nothing to check. Only `merged`.
+            //
+            // Deliberately AFTER the close and the report, and deliberately
+            // unable to throw: this method is best-effort by contract, and a
+            // verification that failed to start must not cost the caller the
+            // record that the promotion merged.
+            if (status.state === 'merged' && this.verification) {
+                // Wrapped HERE as well as inside the verification service.
+                // The callee promises not to throw, but that promise is a
+                // property of another file that other slices edit; the
+                // guarantee this method owes its caller — that a merged
+                // promotion is recorded as merged — must not depend on it.
+                try {
+                    await this.verification.onPromotionMerged(promotion, task);
+                } catch (error) {
+                    this.logger.warn(
+                        `Promotion ${promotion.id}: post-deploy verification did not start ` +
+                            `(the merge is still recorded): ${describe(error)}`,
+                    );
+                }
+            }
             return { action: 'closed', state: status.state === 'merged' ? 'merged' : 'closed' };
         }
 

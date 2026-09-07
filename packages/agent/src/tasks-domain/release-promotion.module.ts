@@ -7,7 +7,9 @@ import {
     PROMOTION_MERGE_GUARD,
 } from '../policy/promotion-merge-guard.port';
 import { FacadesModule } from '../facades/facades.module';
+import { FleetModule } from '../fleet/fleet.module';
 import { ReleasePromotionService } from './release-promotion.service';
+import { ReleaseVerificationService } from './release-verification.service';
 import { TasksDomainModule } from './tasks.module';
 
 /**
@@ -44,6 +46,20 @@ import { TasksDomainModule } from './tasks.module';
  * `database/_entities-inventory.ts` — this repo has no `autoLoadEntities`,
  * so a forFeature'd-but-unregistered entity throws
  * EntityMetadataNotFoundError on first query.
+ *
+ * ## Post-deploy verification (slice AJ, EW-809)
+ *
+ * `ReleaseVerificationService` is provided here too, beside the promotion
+ * service that calls it, because the two share `ReleasePromotionRepository`
+ * and because the merge observation and the verification it starts are one
+ * feature. `FleetModule` is imported for `FleetJobService`: producing a
+ * `browser-check` is the whole point of the slice, and the fleet module has
+ * no imports beyond `TypeOrmModule.forFeature`, so it cannot cycle back
+ * into this one.
+ *
+ * The api-side cron sweep and the `fleet.job.completed` listener that drive
+ * it live in `apps/api/src/release/` and inject the service through this
+ * module's exports.
  */
 @Global()
 @Module({
@@ -55,9 +71,13 @@ import { TasksDomainModule } from './tasks.module';
         // Exports GitFacadeService (opens the pull request, reads the
         // branch tips and the gate run).
         FacadesModule,
+        // Exports FleetJobService — the ONLY producer of a `browser-check`
+        // in the platform is `ReleaseVerificationService.enqueueDueChecks`.
+        FleetModule,
     ],
     providers: [
         ReleasePromotionRepository,
+        ReleaseVerificationService,
         ReleasePromotionService,
         // Bound with `useExisting` so consumers depend on the CONTRACT and
         // never on the concrete class — and so both tokens resolve to ONE
@@ -67,6 +87,7 @@ import { TasksDomainModule } from './tasks.module';
     ],
     exports: [
         ReleasePromotionRepository,
+        ReleaseVerificationService,
         ReleasePromotionService,
         PROMOTION_MERGE_GUARD,
         PROMOTION_LANE_WATCHER,

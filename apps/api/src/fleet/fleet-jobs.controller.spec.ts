@@ -6,6 +6,10 @@ import {
 import type { FleetJobView } from '@ever-works/contracts';
 import { FLEET_JOB_STALE_LEASE_REASON } from '@ever-works/contracts';
 import { FleetJobsController } from './fleet-jobs.controller';
+import {
+    FleetPushCredentialError,
+    FleetPushCredentialService,
+} from './fleet-push-credential.service';
 import { FleetRunSecretsError, FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetJobStaleLeaseError } from '@ever-works/agent/fleet';
 import type { FleetJobService, FleetRunCredentialService } from '@ever-works/agent/fleet';
@@ -63,11 +67,19 @@ function makeController(
     service: Partial<FleetJobService>,
     runSecrets: Partial<FleetRunSecretsService> = { resolve: jest.fn(async () => null) },
     runCredentials: Partial<FleetRunCredentialService> = {},
+    // Self-build slice AM (EW-810) — appended LAST, like every slot before
+    // it. Defaults to a refusal, not a permissive stub: a route that
+    // accidentally minted a WRITE credential for the owner's repositories
+    // must fail this suite rather than pass it quietly.
+    pushCredentials: Partial<FleetPushCredentialService> = {
+        mint: jest.fn(async () => null),
+    },
 ): FleetJobsController {
     return new FleetJobsController(
         service as FleetJobService,
         runSecrets as FleetRunSecretsService,
         runCredentials as FleetRunCredentialService,
+        pushCredentials as FleetPushCredentialService,
     );
 }
 
@@ -357,6 +369,101 @@ describe('FleetJobsController', () => {
                 },
             );
             const error = await controller.envFiles(JOB_ID, body).catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).getResponse()).toMatchObject({
+                reason: FLEET_JOB_STALE_LEASE_REASON,
+            });
+        });
+    });
+
+    /**
+     * Scoped push credentials (self-build slice AM, EW-810) — the second
+     * route on this channel that returns a secret, and the FIRST that
+     * returns one which can WRITE.
+     *
+     * Same three answers as env-files, deliberately: one undifferentiated
+     * 401, one 409 stale-lease, and a 422 carrying a stable reason token.
+     * A node that gets the 422 fails the run; there is no fourth answer
+     * that lets it push some other way.
+     */
+    describe('POST /api/fleet/jobs/:id/push-credential', () => {
+        const body = { nodeId: NODE_ID, secret: SECRET, leaseGeneration: GENERATION };
+        const answer = {
+            attribution: {
+                nodeId: NODE_ID,
+                nodeName: 'studio-win',
+                agentId: null,
+                agentName: null,
+                agentEmail: null,
+                jobId: JOB_ID,
+                runId: null,
+            },
+            push: {
+                token: 'ghs_scoped',
+                username: 'x-access-token',
+                expiresAt: '2026-09-06T21:00:00.000Z',
+                repositories: ['ever-works/ever-works'],
+            },
+        };
+
+        it('forwards the claim exactly as the node sent it and returns the credential once', async () => {
+            const mint = jest.fn(async () => answer);
+            const controller = makeController({}, undefined, {}, { mint });
+
+            await expect(controller.pushCredential(JOB_ID, body)).resolves.toEqual(answer);
+            expect(mint).toHaveBeenCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                jobId: JOB_ID,
+                leaseGeneration: GENERATION,
+            });
+        });
+
+        it('collapses a refused claim to the SAME 401 as every other route', async () => {
+            const controller = makeController(
+                {},
+                undefined,
+                {},
+                { mint: jest.fn(async () => null) },
+            );
+
+            await expect(controller.pushCredential(JOB_ID, body)).rejects.toBeInstanceOf(
+                UnauthorizedException,
+            );
+        });
+
+        it('answers 422 with the stable reason token, and never the installation detail', async () => {
+            const controller = makeController(
+                {},
+                undefined,
+                {},
+                {
+                    mint: jest.fn(async () => {
+                        throw new FleetPushCredentialError('push-scope-unresolved');
+                    }),
+                },
+            );
+
+            const error = await controller.pushCredential(JOB_ID, body).catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(UnprocessableEntityException);
+            expect((error as UnprocessableEntityException).getResponse()).toEqual({
+                reason: 'push-scope-unresolved',
+            });
+        });
+
+        it('lets a stale lease surface as the channel-wide 409, not as a 422', async () => {
+            const controller = makeController(
+                {},
+                undefined,
+                {},
+                {
+                    mint: jest.fn(async () => {
+                        throw new FleetJobStaleLeaseError();
+                    }),
+                },
+            );
+
+            const error = await controller.pushCredential(JOB_ID, body).catch((e: unknown) => e);
             expect(error).toBeInstanceOf(ConflictException);
             expect((error as ConflictException).getResponse()).toMatchObject({
                 reason: FLEET_JOB_STALE_LEASE_REASON,

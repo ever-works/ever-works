@@ -28,6 +28,7 @@ import {
     FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
     FLEET_AGENT_EXECUTION_MODEL_PATTERN,
     FLEET_AGENT_TASK_QUESTION_FILE,
+    describeFleetPushCredentialRefusal,
     fleetAgentExecutionProviderSupportsMountGrants,
     isFleetAgentExecutionEffort,
     isFleetAgentExecutionMode,
@@ -43,6 +44,7 @@ import {
     type TaskAcceptanceCheck,
 } from '@ever-works/contracts';
 import { agentTaskRequiredCapabilities } from './fleet-agent-task-capabilities';
+import { FleetPushCredentialService } from './fleet-push-credential.service';
 import type {
     FleetAgentTaskPlan,
     FleetAgentTaskPlanner,
@@ -164,6 +166,13 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // positional spec constructions keep compiling; absent = no owner
         // answer is ever rendered (today's instructions, unchanged).
         @Optional() private readonly runs?: AgentRunRepository,
+        // Scoped push credentials (self-build slice AM, EW-810) — the
+        // PLATFORM half of the pre-dispatch push-capability probe. Appended
+        // LAST + @Optional() so positional spec constructions keep
+        // compiling; absent = no plan-time refusal, and the NODE still
+        // fails closed at the publish (which is the guarantee that
+        // matters — this only moves the failure twenty minutes earlier).
+        @Optional() private readonly pushCredentials?: FleetPushCredentialService,
     ) {}
 
     /**
@@ -328,6 +337,53 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             );
         }
 
+        // Scoped push credentials (self-build slice AM, EW-810) — refuse a
+        // run the platform could never publish, BEFORE it costs a node
+        // twenty minutes of model time.
+        //
+        // A fleet node no longer pushes with the machine's own Git
+        // credential helper; it pushes with a repository-scoped
+        // installation token this platform mints per job. Whether that
+        // token CAN be minted is a fact about platform state — is a GitHub
+        // App configured, does an installation this owner controls cover
+        // every repository this run writes to — and platform state is
+        // exactly what a plan is allowed to refuse on. Precedent: the
+        // writable-mount refusal above, and the no-repository refusal
+        // before it.
+        //
+        // No GitHub call happens here: this reads the installation
+        // snapshot the platform already keeps, so the check costs a query
+        // and cannot fail a plan because GitHub was slow.
+        const canCommit = agent.permissions?.canCommitToRepo !== false;
+        if (canCommit && this.pushCredentials) {
+            // The CLONE URL travels with the name. `owner/repo` alone is not
+            // an identity a write credential may be scoped by — a `git` repo
+            // connection can point anywhere, and `repositoryIdFromCloneUrl`
+            // is host-agnostic, so a mount at
+            // `https://gitlab.example/acme/widgets` would otherwise resolve
+            // against a GitHub installation row called `acme/widgets` and
+            // buy a `contents: write` token for a repository this run never
+            // touches (slice AM review, F4).
+            const pushTargets = [
+                { repositoryId: workspace.repositoryId, repoUrl: workspace.repoUrl },
+                ...writableMounts.map((mount) => ({
+                    repositoryId: mount.repositoryId,
+                    repoUrl: mount.repoUrl,
+                })),
+            ];
+            const scope = await this.pushCredentials.describeScope(payload.userId, pushTargets);
+            if (!scope.ok) {
+                throw new FleetAgentTaskPlanError(
+                    `Task ${task.slug ?? task.id} would push to ${pushTargets
+                        .map((target) => target.repositoryId)
+                        .join(', ')}, but ` +
+                        `${describeFleetPushCredentialRefusal(scope.reason)}. A fleet node never pushes with the ` +
+                        `machine's own Git credential helper, so this run is refused now rather than after the ` +
+                        `model has already done the work.`,
+                );
+            }
+        }
+
         const work = task.workId ? await this.works.findById(task.workId) : null;
         // Owner-authored, from the Work's defaults and the Task's own list.
         // `safeResolveChecks` swallows a read failure to `[]` deliberately:
@@ -425,7 +481,6 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         if (settings.maxBudgetUsd !== undefined) execution.maxBudgetUsd = settings.maxBudgetUsd;
         if (settings.skipPermissions) execution.skipPermissions = true;
 
-        const canCommit = agent.permissions?.canCommitToRepo !== false;
         return {
             execution,
             workspace,
