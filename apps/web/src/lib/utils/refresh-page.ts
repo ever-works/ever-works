@@ -16,7 +16,10 @@ function toInternalPathname(pathname: string): string {
  * @param intervalInMs - interval in milliseconds (default 10s)
  * @returns
  */
-export function pageIntervalRefresh(router: AppRouterInstance, intervalInMs: number = 10 * 1000) {
+export function pageIntervalRefresh(
+    router: Pick<AppRouterInstance, 'replace'>,
+    intervalInMs: number = 10 * 1000,
+) {
     const interval = setInterval(() => {
         // Save current scroll position
         const scrollY = window.scrollY;
