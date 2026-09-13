@@ -6,6 +6,8 @@ import { FleetAuditService } from '../fleet/fleet-audit.service';
 import { FleetJobRepository } from '../fleet/fleet-job.repository';
 import { FleetNodeRepository } from '../fleet/fleet-node.repository';
 import { computerAuditDetails } from './computer-audit';
+import { resolveComputerSessionLimits, resolveSessionExpiry } from './computer-session.policy';
+import { ComputerSessionRepository } from './computer-session.repository';
 import { NodeAgentProfileRepository } from './node-agent-profile.repository';
 
 /** The Agent a profile belongs to, as the caller already resolved it (ownership checked). */
@@ -14,6 +16,12 @@ export interface ComputerAgentRef {
     name: string;
     organizationId: string | null;
 }
+
+/** The columns a reset writes — and a refused reset puts back. */
+type ProfileResetFields = Pick<
+    NodeAgentProfile,
+    'profileKey' | 'signedInSiteCount' | 'diskBytes' | 'lastResetAt' | 'lastResetByUserId'
+>;
 
 export type ResetNodeAgentProfileOutcome =
     | { reset: NodeAgentProfileView }
@@ -41,6 +49,10 @@ export class NodeAgentProfileService {
         private readonly nodes: FleetNodeRepository,
         private readonly jobs: FleetJobRepository,
         @Optional() private readonly audit?: FleetAuditService,
+        // Appended LAST + @Optional(): the live views on a machine (which a
+        // reset must not land under) and the machine's admission lock.
+        // Absent, a reset checks claimed jobs only and runs unlocked.
+        @Optional() private readonly sessions?: ComputerSessionRepository,
     ) {}
 
     /** The profile for (Node, Agent), created on first use. */
@@ -100,7 +112,8 @@ export class NodeAgentProfileService {
      * Refused, by value: when the typed name does not match the Agent's
      * name, when the Node is not the caller's, when there is nothing to
      * reset, and — the one that protects work — while a job for that Agent
-     * is live on that Node. A reset never lands under a running Run.
+     * is live on that Node, or a live view of that Agent there is still
+     * open. A reset never lands under a running Run or an open view.
      */
     async reset(input: {
         userId: string;
@@ -122,12 +135,31 @@ export class NodeAgentProfileService {
         if (!row || row.userId !== input.userId) {
             return { refused: 'profile-not-found' };
         }
-        if (await this.hasLiveJob(input.userId, input.nodeId, input.agent.id)) {
+        // The machine's admission lock — the one a live-view open holds while
+        // it reads this profile's key and reserves its slot — so a view can
+        // never be opened carrying the key this reset is rotating away.
+        return this.withNodeLock(input.nodeId, () => this.resetUnderLock(input, node, row));
+    }
+
+    private async resetUnderLock(
+        input: { userId: string; agent: ComputerAgentRef; nodeId: string },
+        node: { id: string; userId: string },
+        row: NodeAgentProfile,
+    ): Promise<ResetNodeAgentProfileOutcome> {
+        if (await this.hasLiveWork(input.userId, input.nodeId, input.agent.id)) {
             return { refused: 'run-live' };
         }
 
         const before = toCount(row.signedInSiteCount);
         const previousRef = toProfileRef(row.profileKey);
+        // Snapshotted before the write: what a refused reset puts back.
+        const previous: ProfileResetFields = {
+            profileKey: row.profileKey,
+            signedInSiteCount: row.signedInSiteCount,
+            diskBytes: row.diskBytes,
+            lastResetAt: row.lastResetAt ?? null,
+            lastResetByUserId: row.lastResetByUserId ?? null,
+        };
         const patch = {
             profileKey: mintProfileKey(),
             signedInSiteCount: 0,
@@ -140,6 +172,21 @@ export class NodeAgentProfileService {
             const current = await this.profiles.findForNodeAgent(input.nodeId, input.agent.id);
             return current ? { reset: toProfileView(current) } : { refused: 'profile-not-found' };
         }
+
+        // Rotate, THEN re-check. The work a node leases is claimed by the
+        // fleet's own conditional write, which no lock here can join, so the
+        // first check alone leaves a window: a job admitted after it and
+        // before the rotation would run on the superseded profile while the
+        // reset reported success. Any claim committed before the rotation is
+        // visible to this second read; one committed after it started on the
+        // reset profile, which is exactly the order a reset promises. Work
+        // found now is put back with a compare-and-set on the key this call
+        // minted (a later reset's key is never overwritten) and refused.
+        if (await this.hasLiveWork(input.userId, input.nodeId, input.agent.id)) {
+            await this.restore(row, patch.profileKey, previous);
+            return { refused: 'run-live' };
+        }
+
         await this.audit?.tryRecord({
             action: 'computer.profile-reset',
             actorUserId: input.userId,
@@ -154,24 +201,70 @@ export class NodeAgentProfileService {
         return { reset: toProfileView({ ...row, ...patch } as NodeAgentProfile) };
     }
 
-    private async hasLiveJob(userId: string, nodeId: string, agentId: string): Promise<boolean> {
+    /**
+     * Is anything using — or about to use — this Agent's profile on this
+     * machine? Any claimed job for that Agent there (a Run, or a live view,
+     * which is handed the profile key itself), and any unfinished live view
+     * of that Agent there that is still within its time (a view not yet
+     * claimed carries the current key in its queued job). Fails closed.
+     */
+    private async hasLiveWork(userId: string, nodeId: string, agentId: string): Promise<boolean> {
         try {
             const active = await this.jobs.findActiveForUser(userId);
-            return active.some(
-                (job) =>
-                    job.nodeId === nodeId &&
-                    job.kind !== 'computer-session' &&
-                    (job.payload as Record<string, unknown> | null)?.agentId === agentId,
+            if (
+                active.some(
+                    (job) =>
+                        job.nodeId === nodeId &&
+                        (job.payload as Record<string, unknown> | null)?.agentId === agentId,
+                )
+            ) {
+                return true;
+            }
+            if (!this.sessions) return false;
+            const now = new Date();
+            const limits = resolveComputerSessionLimits(process.env);
+            const views = await this.sessions.findOpenForNode(nodeId);
+            return views.some(
+                (view) =>
+                    view.agentId === agentId && resolveSessionExpiry(view, now, limits) === null,
             );
         } catch (error) {
             // Fail closed: if we cannot tell whether a Run is live, do not reset under it.
             this.logger.warn(
-                `profile reset refused for agent ${agentId} on node ${nodeId}: live-job check failed: ${
+                `profile reset refused for agent ${agentId} on node ${nodeId}: live-work check failed: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
             return true;
         }
+    }
+
+    /** Put back the key (and usage) a refused reset rotated, only if it is still the one this reset minted. */
+    private async restore(
+        row: NodeAgentProfile,
+        mintedKey: string,
+        previous: ProfileResetFields,
+    ): Promise<void> {
+        try {
+            const restored = await this.profiles.reset(row.id, mintedKey, previous);
+            if (!restored) {
+                this.logger.warn(
+                    `profile ${toProfileRef(mintedKey)} for agent ${row.agentId} on node ${row.nodeId} was reset again before it could be restored`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(
+                `profile for agent ${row.agentId} on node ${row.nodeId} could not be restored after a refused reset: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    private async withNodeLock<T>(nodeId: string, fn: () => Promise<T>): Promise<T> {
+        return this.sessions && typeof this.sessions.withAdmissionLock === 'function'
+            ? this.sessions.withAdmissionLock({ nodeId }, fn)
+            : fn();
     }
 }
 

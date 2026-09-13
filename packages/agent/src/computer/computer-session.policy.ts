@@ -234,9 +234,14 @@ export const COMPUTER_SESSION_LIMIT_DEFAULTS: Readonly<ComputerSessionLimits> = 
     claimTimeoutMs: 40_000,
 });
 
+/** A whole base-10 integer and nothing else — `2oops`, `2.9`, `0x10` and `` are not. */
+const WHOLE_INTEGER = /^[+-]?\d+$/;
+
 function clampInt(raw: string | undefined, fallback: number, min: number, max: number): number {
-    const parsed = parseInt(raw ?? '', 10);
-    if (!Number.isFinite(parsed)) return fallback;
+    const value = typeof raw === 'string' ? raw.trim() : '';
+    if (!WHOLE_INTEGER.test(value)) return fallback;
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed)) return fallback;
     return Math.min(Math.max(parsed, min), max);
 }
 

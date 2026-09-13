@@ -30,8 +30,19 @@ import {
     resolveWatchability,
     type ComputerSessionLimits,
 } from './computer-session.policy';
-import { ComputerSessionRepository } from './computer-session.repository';
+import {
+    ComputerSessionRepository,
+    computerSessionScopeKey,
+    type ComputerAdmissionLockKeys,
+} from './computer-session.repository';
 import { NodeAgentProfileService, type ComputerAgentRef } from './node-agent-profile.service';
+
+/** What the admission critical section hands back when it reserved a slot. */
+interface AdmittedComputerSession {
+    row: ComputerSession;
+    profileKey: string;
+    dispatcher: ComputerSessionDispatcher;
+}
 
 /** Emitted once per session, when it ends — the relay publishes the pinned `end` frame on it. */
 export class ComputerSessionEndedEvent {
@@ -98,7 +109,14 @@ const NODE_REPORTABLE_CLOSE_REASONS: ReadonlySet<ComputerCloseReason> = new Set(
  * Unfinished sessions are expired INLINE on every open and read — a view no
  * machine claimed within 40 seconds is ended as `abandoned` and its job is
  * withdrawn — so a stale row can never hold a slot against the caps, with or
- * without a background sweep running.
+ * without a background sweep running. The caps expire every row they count,
+ * whoever opened it, and the machine side expires owner-independently too:
+ * on the heartbeat hint, on a lease of the job, and on every machine-facing
+ * route, so an expired view can never be claimed into going live.
+ *
+ * Admission (count, then insert the `requested` row) is serialized per
+ * machine and per Organization by an advisory lock, so a burst of opens
+ * cannot walk past a cap.
  */
 @Injectable()
 export class ComputerSessionService {
@@ -189,61 +207,89 @@ export class ComputerSessionService {
             };
         }
 
+        const target = chosen;
         const limits = this.limits();
-        await this.expireDue(await this.sessions.findOpenForOwner(input.userId), limits);
-
-        const onNode = await this.sessions.findOpenForNode(chosen.id);
-        if (onNode.length >= limits.perNode) {
-            return {
-                refused: 'node-session-cap',
-                limit: limits.perNode,
-                sessions: onNode.map(toHolder),
-            };
-        }
-        const inScope = await this.sessions.findOpenForScope({
-            userId: input.userId,
-            organizationId: input.agent.organizationId,
-        });
-        if (inScope.length >= limits.perOrganization) {
-            return {
-                refused: 'organization-session-cap',
-                limit: limits.perOrganization,
-                sessions: inScope.map(toHolder),
-            };
-        }
-
-        if (!this.dispatcher) {
-            return { refused: 'dispatcher-unavailable' };
-        }
-
-        const profile = await this.profiles.ensure({
-            userId: input.userId,
-            organizationId: input.agent.organizationId,
-            nodeId: chosen.id,
-            agentId: input.agent.id,
-        });
         const quality = resolveQuality(input.quality);
-        const row = await this.sessions.create({
-            userId: input.userId,
-            organizationId: input.agent.organizationId,
-            agentId: input.agent.id,
-            nodeId: chosen.id,
-            openedByUserId: input.userId,
-            channels,
-            activeChannel: channels[0],
-            quality,
-            status: 'requested',
-            controlSpans: [],
-        });
+        const scope = { userId: input.userId, organizationId: input.agent.organizationId };
+
+        // Count-then-insert is ONE critical section per machine and per
+        // Organization: two opens racing each other would otherwise both see
+        // the pre-burst count and both insert, walking past the caps. The
+        // `requested` row IS the reservation, so it is written inside the lock
+        // and the job is enqueued after it is released.
+        const admitted = await this.withAdmissionLock(
+            { nodeId: target.id, scopeKey: computerSessionScopeKey(scope) },
+            async (): Promise<OpenComputerSessionRefusal | AdmittedComputerSession> => {
+                await this.expireDue(await this.sessions.findOpenForOwner(input.userId), limits);
+
+                // Every unfinished row the caps read is expired first — including
+                // another member's rows in the same Organization — and only the
+                // rows still within their time hold a slot.
+                const onNode = await this.holdingSlots(
+                    await this.sessions.findOpenForNode(target.id),
+                    limits,
+                );
+                if (onNode.length >= limits.perNode) {
+                    return {
+                        refused: 'node-session-cap',
+                        limit: limits.perNode,
+                        sessions: onNode.map(toHolder),
+                    };
+                }
+                const inScope = await this.holdingSlots(
+                    await this.sessions.findOpenForScope(scope),
+                    limits,
+                );
+                if (inScope.length >= limits.perOrganization) {
+                    return {
+                        refused: 'organization-session-cap',
+                        limit: limits.perOrganization,
+                        sessions: inScope.map(toHolder),
+                    };
+                }
+
+                const dispatcher = this.dispatcher;
+                if (!dispatcher) {
+                    return { refused: 'dispatcher-unavailable' };
+                }
+
+                // Read under the machine's lock, which a profile reset also
+                // takes: a view can never carry a key a concurrent reset is
+                // rotating away.
+                const profile = await this.profiles.ensure({
+                    userId: input.userId,
+                    organizationId: input.agent.organizationId,
+                    nodeId: target.id,
+                    agentId: input.agent.id,
+                });
+                const row = await this.sessions.create({
+                    userId: input.userId,
+                    organizationId: input.agent.organizationId,
+                    agentId: input.agent.id,
+                    nodeId: target.id,
+                    openedByUserId: input.userId,
+                    channels,
+                    activeChannel: channels[0],
+                    quality,
+                    status: 'requested',
+                    controlSpans: [],
+                });
+                return { row, profileKey: profile.profileKey, dispatcher };
+            },
+        );
+        if ('refused' in admitted) {
+            return admitted;
+        }
+        const { row, profileKey, dispatcher } = admitted;
 
         try {
-            const { jobId } = await this.dispatcher.enqueue({
+            const { jobId } = await dispatcher.enqueue({
                 sessionId: row.id,
                 userId: input.userId,
                 organizationId: input.agent.organizationId,
                 agentId: input.agent.id,
-                nodeId: chosen.id,
-                profileKey: profile.profileKey,
+                nodeId: target.id,
+                profileKey,
                 channels,
                 quality,
             });
@@ -336,16 +382,8 @@ export class ComputerSessionService {
         if (!(await this.sessions.close(row.id, { closeReason: reason, endedAt }))) {
             return false;
         }
-        if (row.fleetJobId && this.dispatcher?.cancel) {
-            try {
-                await this.dispatcher.cancel(row.fleetJobId);
-            } catch (error) {
-                this.logger.warn(
-                    `computer session ${row.id}: job ${row.fleetJobId} could not be withdrawn: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
-            }
+        if (row.fleetJobId) {
+            await this.withdrawJob(row.id, row.fleetJobId);
         }
         const startedMs = row.startedAt ? new Date(row.startedAt).getTime() : NaN;
         await this.audit?.tryRecord({
@@ -427,9 +465,56 @@ export class ComputerSessionService {
         return true;
     }
 
-    /** Ids of views waiting for this node — the heartbeat hint. */
+    /**
+     * Ids of views waiting for this node — the heartbeat hint. Every
+     * unfinished view on the machine is expired first, whoever opened it, so
+     * a view nobody claimed in time is ended as `abandoned` (and its job
+     * withdrawn) before the machine is told to go and claim it.
+     */
     async pendingForNode(nodeId: string): Promise<string[]> {
+        await this.expireDue(await this.sessions.findOpenForNode(nodeId), this.limits());
         return this.sessions.findPendingIdsForNode(nodeId);
+    }
+
+    /**
+     * End one unfinished session now if it is past its claim timeout, dead
+     * stall or ceiling — owner-independent, for the machine-facing routes.
+     * Returns the session as it stands afterwards (ended when it expired,
+     * whoever's close won), or the row unchanged when it was not due.
+     */
+    async expireIfDue(row: ComputerSession): Promise<ComputerSession> {
+        const limits = this.limits();
+        const now = new Date();
+        if (!resolveSessionExpiry(row, now, limits)) return row;
+        const ended = await this.expireDue([row], limits, now);
+        return ended.get(row.id) ?? (await this.sessions.findById(row.id)) ?? row;
+    }
+
+    /**
+     * A machine just leased a `computer-session` job. If the view it carries
+     * is already over — ended while the claim was racing its withdrawal, or
+     * past its claim timeout with nobody having noticed yet — end it (as
+     * `abandoned` when it was never claimed in time) and withdraw the job,
+     * so the machine aborts on its next job heartbeat instead of showing a
+     * view nobody is waiting for. True when the lease was withdrawn.
+     *
+     * The node-facing routes refuse to make such a view live on their own
+     * (see {@link expireIfDue}); this only makes the machine stop sooner.
+     */
+    async withdrawLeaseIfOver(sessionId: string, jobId: string): Promise<boolean> {
+        const row = await this.sessions.findById(sessionId);
+        if (row && row.fleetJobId && row.fleetJobId !== jobId) {
+            // Not the job that carries this session — nothing of ours to settle.
+            return false;
+        }
+        if (row && row.status !== 'ended') {
+            const current = await this.expireIfDue(row);
+            if (current.status !== 'ended') return false;
+            // `close` already withdrew the job it knew about.
+            if (row.fleetJobId === jobId) return true;
+        }
+        await this.withdrawJob(sessionId, jobId);
+        return true;
     }
 
     /**
@@ -460,11 +545,55 @@ export class ComputerSessionService {
         return [...ended.values()].filter((row) => row.status === 'ended').length;
     }
 
+    /**
+     * Expire what is due among `rows`, then answer the rows that still hold a
+     * slot: those NOT past their time at the same instant. A row that was due
+     * is not counted even when another caller's close won it, or its close
+     * failed — it is over either way, and must never refuse a new view.
+     */
+    private async holdingSlots(
+        rows: ComputerSession[],
+        limits: ComputerSessionLimits,
+    ): Promise<ComputerSession[]> {
+        const now = new Date();
+        const expired = await this.expireDue(rows, limits, now);
+        return rows.filter(
+            (row) =>
+                !expired.has(row.id) &&
+                row.status !== 'ended' &&
+                resolveSessionExpiry(row, now, limits) === null,
+        );
+    }
+
+    private async withAdmissionLock<T>(
+        keys: ComputerAdmissionLockKeys,
+        fn: () => Promise<T>,
+    ): Promise<T> {
+        // Optional on the repository so hand-built doubles keep working; the
+        // real repository always has it (a no-op off Postgres).
+        return typeof this.sessions.withAdmissionLock === 'function'
+            ? this.sessions.withAdmissionLock(keys, fn)
+            : fn();
+    }
+
+    private async withdrawJob(sessionId: string, jobId: string): Promise<void> {
+        if (!this.dispatcher?.cancel) return;
+        try {
+            await this.dispatcher.cancel(jobId);
+        } catch (error) {
+            this.logger.warn(
+                `computer session ${sessionId}: job ${jobId} could not be withdrawn: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
     private async expireDue(
         rows: ComputerSession[],
         limits: ComputerSessionLimits,
+        now: Date = new Date(),
     ): Promise<Map<string, ComputerSession>> {
-        const now = new Date();
         const out = new Map<string, ComputerSession>();
         for (const row of rows) {
             const reason = resolveSessionExpiry(row, now, limits);

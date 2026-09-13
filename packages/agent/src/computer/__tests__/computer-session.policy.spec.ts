@@ -260,6 +260,31 @@ describe('session limits', () => {
             resolveComputerSessionLimits({ COMPUTER_SESSION_MAX_PER_NODE: 'lots' }).perNode,
         ).toBe(2);
     });
+
+    it.each(['2oops', '2.9', '', '   ', '0x4', '1e1', '4 per node'])(
+        'treats the partially numeric value %p as unset, not as a limit',
+        (raw) => {
+            const limits = resolveComputerSessionLimits({
+                COMPUTER_SESSION_MAX_PER_NODE: raw,
+                COMPUTER_SESSION_MAX_PER_ORGANIZATION: raw,
+                COMPUTER_SESSION_MAX_DURATION_MINUTES: raw,
+            });
+            expect(limits).toEqual(COMPUTER_SESSION_LIMIT_DEFAULTS);
+        },
+    );
+
+    it('accepts a whole integer with surrounding whitespace or an explicit sign', () => {
+        expect(resolveComputerSessionLimits({ COMPUTER_SESSION_MAX_PER_NODE: ' 3 ' }).perNode).toBe(
+            3,
+        );
+        expect(
+            resolveComputerSessionLimits({ COMPUTER_SESSION_MAX_PER_ORGANIZATION: '+7' })
+                .perOrganization,
+        ).toBe(7);
+        expect(resolveComputerSessionLimits({ COMPUTER_SESSION_MAX_PER_NODE: '-4' }).perNode).toBe(
+            1,
+        );
+    });
 });
 
 describe('resolveSessionExpiry', () => {

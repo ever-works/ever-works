@@ -44,6 +44,7 @@ function build(
 ) {
     const rows = new Map<string, ComputerSession>();
     let seq = 0;
+    let lockTail: Promise<unknown> = Promise.resolve();
     const sessions = {
         create: jest.fn(async (data: Partial<ComputerSession>) => {
             const row = {
@@ -72,9 +73,15 @@ function build(
         findOpenForScope: jest.fn(async () =>
             [...rows.values()].filter((row) => row.status !== 'ended'),
         ),
-        findOpenForOwner: jest.fn(async () =>
-            [...rows.values()].filter((row) => row.status !== 'ended'),
+        findOpenForOwner: jest.fn(async (userId: string) =>
+            [...rows.values()].filter((row) => row.userId === userId && row.status !== 'ended'),
         ),
+        // A real mutex: each critical section runs to completion before the next starts.
+        withAdmissionLock: jest.fn(async (_keys: unknown, fn: () => Promise<unknown>) => {
+            const run = lockTail.then(fn);
+            lockTail = run.catch(() => undefined);
+            return run;
+        }),
         findPendingIdsForNode: jest.fn(async (nodeId: string) =>
             [...rows.values()]
                 .filter((r) => r.nodeId === nodeId && r.status === 'requested')
@@ -322,6 +329,83 @@ describe('ComputerSessionService.open', () => {
         expect(dispatcher.cancel).toHaveBeenCalledTimes(2);
     });
 
+    it('does not let another member’s abandoned view hold an Organization slot', async () => {
+        const saved = process.env.COMPUTER_SESSION_MAX_PER_ORGANIZATION;
+        process.env.COMPUTER_SESSION_MAX_PER_ORGANIZATION = '1';
+        try {
+            const { service, rows, dispatcher } = build({
+                nodes: [nodeView(NODE_A), nodeView(NODE_B)],
+            });
+            rows.set('stale-of-another-member', {
+                id: 'stale-of-another-member',
+                userId: 'another-member',
+                organizationId: AGENT.organizationId,
+                agentId: AGENT.id,
+                nodeId: NODE_B,
+                openedByUserId: 'another-member',
+                status: 'requested',
+                fleetJobId: 'job-stale',
+                createdAt: new Date(Date.now() - 41_000),
+                frameCount: 0,
+                bytesOut: 0,
+            } as ComputerSession);
+
+            const outcome = await service.open({ userId: USER, agent: AGENT, nodeId: NODE_A });
+
+            expect('opened' in outcome).toBe(true);
+            expect(rows.get('stale-of-another-member')).toMatchObject({
+                status: 'ended',
+                closeReason: 'abandoned',
+            });
+            expect(dispatcher.cancel).toHaveBeenCalledWith('job-stale');
+        } finally {
+            if (saved === undefined) delete process.env.COMPUTER_SESSION_MAX_PER_ORGANIZATION;
+            else process.env.COMPUTER_SESSION_MAX_PER_ORGANIZATION = saved;
+        }
+    });
+
+    it('never names a due view as a holder, even when another caller already ended it', async () => {
+        const { service, rows, sessions } = build();
+        await service.open({ userId: USER, agent: AGENT });
+        await service.open({ userId: USER, agent: AGENT });
+        for (const row of rows.values()) row.createdAt = new Date(Date.now() - 41_000);
+        // Another replica's close wins every race: this caller's CAS never lands.
+        sessions.close.mockResolvedValue(false);
+
+        const outcome = await service.open({ userId: USER, agent: AGENT });
+
+        expect('opened' in outcome).toBe(true);
+    });
+
+    it('serializes admission, so a burst of opens cannot walk past the per-machine cap', async () => {
+        const { service, sessions, dispatcher } = build();
+
+        const outcomes = await Promise.all(
+            Array.from({ length: 5 }, () => service.open({ userId: USER, agent: AGENT })),
+        );
+
+        expect(outcomes.filter((outcome) => 'opened' in outcome)).toHaveLength(2);
+        expect(
+            outcomes.filter(
+                (outcome) => (outcome as { refused?: string }).refused === 'node-session-cap',
+            ),
+        ).toHaveLength(3);
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(2);
+        expect(sessions.withAdmissionLock).toHaveBeenCalledWith(
+            { nodeId: NODE_A, scopeKey: `org:${AGENT.organizationId}` },
+            expect.any(Function),
+        );
+    });
+
+    it('locks a personal workspace’s admission on its owner', async () => {
+        const { service, sessions } = build();
+        await service.open({ userId: USER, agent: { ...AGENT, organizationId: null } });
+        expect(sessions.withAdmissionLock).toHaveBeenCalledWith(
+            { nodeId: NODE_A, scopeKey: `user:${USER}` },
+            expect.any(Function),
+        );
+    });
+
     it('reports dispatcher-unavailable when no fleet runtime is wired', async () => {
         const { service } = build();
         (service as unknown as { dispatcher: undefined }).dispatcher = undefined;
@@ -423,6 +507,71 @@ describe('ComputerSessionService lifecycle', () => {
         const { service, id } = await opened();
         expect(await service.pendingForNode(NODE_A)).toEqual([id]);
         expect(await service.pendingForNode(NODE_B)).toEqual([]);
+    });
+
+    it('expires every view on the machine before hinting, whoever opened it', async () => {
+        const { service, id, rows, dispatcher } = await opened();
+        const row = rows.get(id) as ComputerSession;
+        row.userId = 'another-member';
+        row.createdAt = new Date(Date.now() - 41_000);
+
+        expect(await service.pendingForNode(NODE_A)).toEqual([]);
+        expect(row).toMatchObject({ status: 'ended', closeReason: 'abandoned' });
+        expect(dispatcher.cancel).toHaveBeenCalledWith('job-1');
+    });
+
+    it('expires a due view for the machine-facing routes, and leaves a fresh one alone', async () => {
+        const { service, row } = await opened();
+        expect(await service.expireIfDue(row)).toBe(row);
+        expect(row.status).toBe('requested');
+
+        row.createdAt = new Date(Date.now() - 41_000);
+        expect(await service.expireIfDue(row)).toMatchObject({
+            status: 'ended',
+            closeReason: 'abandoned',
+        });
+    });
+
+    describe('a lease of the job a view rides on', () => {
+        it('withdraws the lease when the view was never claimed in time, ending it as abandoned', async () => {
+            const { service, id, row, dispatcher } = await opened();
+            row.createdAt = new Date(Date.now() - 41_000);
+
+            expect(await service.withdrawLeaseIfOver(id, 'job-1')).toBe(true);
+            expect(row).toMatchObject({ status: 'ended', closeReason: 'abandoned' });
+            expect(dispatcher.cancel).toHaveBeenCalledTimes(1);
+            expect(dispatcher.cancel).toHaveBeenCalledWith('job-1');
+        });
+
+        it('withdraws the lease of a view that already ended, or no longer exists', async () => {
+            const { service, id, dispatcher } = await opened();
+            await service.closeForOwner(USER, AGENT.id, id);
+            dispatcher.cancel.mockClear();
+
+            expect(await service.withdrawLeaseIfOver(id, 'job-1')).toBe(true);
+            expect(await service.withdrawLeaseIfOver('gone', 'job-9')).toBe(true);
+            expect(dispatcher.cancel.mock.calls).toEqual([['job-1'], ['job-9']]);
+        });
+
+        it('withdraws a lease that won the race against the job id being recorded', async () => {
+            const { service, id, row, dispatcher } = await opened();
+            row.fleetJobId = null;
+            row.createdAt = new Date(Date.now() - 41_000);
+            dispatcher.cancel.mockClear();
+
+            expect(await service.withdrawLeaseIfOver(id, 'job-1')).toBe(true);
+            expect(dispatcher.cancel).toHaveBeenCalledWith('job-1');
+        });
+
+        it('keeps the lease of a view still within its time, and ignores a job that is not the view’s', async () => {
+            const { service, id, row, dispatcher } = await opened();
+
+            expect(await service.withdrawLeaseIfOver(id, 'job-1')).toBe(false);
+            row.createdAt = new Date(Date.now() - 41_000);
+            expect(await service.withdrawLeaseIfOver(id, 'some-other-job')).toBe(false);
+            expect(row.status).toBe('requested');
+            expect(dispatcher.cancel).not.toHaveBeenCalled();
+        });
     });
 
     it.each([...COMPUTER_CLOSE_REASONS])('can end a session with %s', async (reason) => {

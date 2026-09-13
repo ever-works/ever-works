@@ -1,8 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { COMPUTER_SESSION_OPEN_STATUSES } from '@ever-works/contracts';
+import { advisoryLockObjectId } from '../database/repositories/agent-run.repository';
 import { ComputerSession } from '../entities/computer-session.entity';
+
+/**
+ * Advisory-lock namespaces (`classid`) for live-view admission — one per
+ * kind of key, so a machine's key and an Organization's key can never
+ * collide with each other, and neither can collide with the run-admission
+ * namespace (`0x6577_0001`). Arbitrary but STABLE: changing one would make
+ * an old and a new replica lock on different keys during a rolling restart.
+ */
+export const COMPUTER_NODE_ADMISSION_LOCK_CLASS_ID = 0x6577_000b | 0;
+export const COMPUTER_SCOPE_ADMISSION_LOCK_CLASS_ID = 0x6577_000c | 0;
+
+/** What one live-view admission serializes on. */
+export interface ComputerAdmissionLockKeys {
+    /** The machine whose per-node cap (and whose Agent profiles) the critical section reads. */
+    nodeId: string;
+    /** The Organization (or personal workspace) whose cap it reads; omitted when none is read. */
+    scopeKey?: string | null;
+}
+
+/** The admission scope key of a session: its Organization, else its owner's personal workspace. */
+export function computerSessionScopeKey(scope: {
+    userId: string;
+    organizationId: string | null;
+}): string {
+    return scope.organizationId ? `org:${scope.organizationId}` : `user:${scope.userId}`;
+}
 
 /**
  * Data access for `computer_sessions`. Every transition is a conditional
@@ -12,10 +39,70 @@ import { ComputerSession } from '../entities/computer-session.entity';
  */
 @Injectable()
 export class ComputerSessionRepository {
+    private readonly logger = new Logger(ComputerSessionRepository.name);
+
     constructor(
         @InjectRepository(ComputerSession)
         private readonly repository: Repository<ComputerSession>,
     ) {}
+
+    /**
+     * Serialize a live-view admission's count-then-insert (and a profile
+     * reset's check-then-rotate) against every other one on the same
+     * machine and in the same Organization — the run-admission lock's
+     * pattern (`AgentRunRepository.withAdmissionLock`), in its own namespace.
+     *
+     * POSTGRES: takes `pg_advisory_xact_lock` on the machine key, then on the
+     * scope key, inside one throwaway transaction held for the whole of `fn`.
+     * The order is fixed (machine first, always), so two admissions can
+     * never hold one key each while waiting for the other's. `fn` runs on the
+     * pool's normal connection, so the row it inserts is committed — and
+     * visible to the next admission's count — before the lock is released.
+     *
+     * EVERY OTHER DRIVER (better-sqlite3 — the e2e/CI stack): advisory locks
+     * do not exist, so this is a documented no-op that calls `fn` directly.
+     *
+     * A failure to TAKE the lock degrades to running `fn` unlocked (logged),
+     * like the run-admission lock: a broken safety valve must never stop a
+     * legitimate view. A failure INSIDE `fn` is re-raised and `fn` is never
+     * re-run, since it may already have inserted its row.
+     */
+    async withAdmissionLock<T>(keys: ComputerAdmissionLockKeys, fn: () => Promise<T>): Promise<T> {
+        const driver = this.repository.manager.connection.options.type;
+        if (driver !== 'postgres') {
+            return fn();
+        }
+        const locks: Array<[number, number]> = [
+            [COMPUTER_NODE_ADMISSION_LOCK_CLASS_ID, advisoryLockObjectId(`node:${keys.nodeId}`)],
+        ];
+        if (keys.scopeKey) {
+            locks.push([
+                COMPUTER_SCOPE_ADMISSION_LOCK_CLASS_ID,
+                advisoryLockObjectId(`scope:${keys.scopeKey}`),
+            ]);
+        }
+        let entered = false;
+        try {
+            return await this.repository.manager.connection.transaction(async (manager) => {
+                for (const [classId, objectId] of locks) {
+                    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+                        classId,
+                        objectId,
+                    ]);
+                }
+                entered = true;
+                return fn();
+            });
+        } catch (error) {
+            if (entered) throw error;
+            this.logger.warn(
+                `Live-view admission lock unavailable for node ${keys.nodeId} — admitting unlocked: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return fn();
+        }
+    }
 
     async create(data: Partial<ComputerSession>): Promise<ComputerSession> {
         return this.repository.save(this.repository.create(data));
