@@ -625,6 +625,43 @@ describe('FleetController', () => {
                 });
             });
 
+            it('runs the waiting-job promotion and the live-view lookup concurrently, not one after the other', async () => {
+                let releasePromotion: () => void = () => undefined;
+                jobs.promoteWaitingForNode.mockImplementationOnce(
+                    () =>
+                        new Promise<number>((resolve) => {
+                            releasePromotion = () => resolve(0);
+                        }),
+                );
+                const pendingForNode = jest.fn(async () => [SESSION]);
+                service.heartbeat.mockResolvedValue({ node: attended });
+
+                const beating = withLookup(pendingForNode).heartbeat(beat);
+                await new Promise((resolve) => setImmediate(resolve));
+
+                // The lookup started while the promotion is still in flight.
+                expect(jobs.promoteWaitingForNode).toHaveBeenCalledWith(nodeView.id);
+                expect(pendingForNode).toHaveBeenCalledWith(nodeView.id);
+                releasePromotion();
+                await expect(beating).resolves.toEqual({
+                    ok: true,
+                    node: attended,
+                    pendingComputerSessions: [SESSION],
+                });
+            });
+
+            it('still carries the waiting views when the promotion fails', async () => {
+                jobs.promoteWaitingForNode.mockRejectedValueOnce(new Error('db down'));
+                service.heartbeat.mockResolvedValue({ node: attended });
+                await expect(
+                    withLookup(jest.fn(async () => [SESSION])).heartbeat(beat),
+                ).resolves.toEqual({
+                    ok: true,
+                    node: attended,
+                    pendingComputerSessions: [SESSION],
+                });
+            });
+
             it('is absent — not an empty list — when nothing is waiting', async () => {
                 service.heartbeat.mockResolvedValue({ node: attended });
                 const result = await withLookup(jest.fn(async () => [])).heartbeat(beat);

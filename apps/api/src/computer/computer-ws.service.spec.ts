@@ -82,6 +82,43 @@ describe('ComputerWsService (integration)', () => {
         await expect(connect(`/ws/computer/${SESSION}?token=${token}`)).rejects.toBeTruthy();
     });
 
+    describe('with the fleet switched off (FLEET_ENABLED=false)', () => {
+        const savedFlag = process.env.FLEET_ENABLED;
+        afterEach(() => {
+            if (savedFlag === undefined) delete process.env.FLEET_ENABLED;
+            else process.env.FLEET_ENABLED = savedFlag;
+        });
+
+        it('refuses the upgrade before any token is presented', async () => {
+            process.env.FLEET_ENABLED = 'false';
+            await expect(connect(`/ws/computer/${SESSION}`)).rejects.toBeTruthy();
+        });
+
+        it('lets no still-valid token authenticate a socket opened before the switch', async () => {
+            const view = 'ab000000-0000-4000-8000-000000000005';
+            const ws = await connect(`/ws/computer/${view}`);
+            const closing = closed(ws);
+            process.env.FLEET_ENABLED = 'false';
+            ws.send(
+                JSON.stringify({
+                    kind: 'auth',
+                    token: attach.mint({ userId: 'u1', sessionId: view, role: 'viewer' }).token,
+                }),
+            );
+            expect(await closing).toBe(4001);
+            expect(relay.getStatus(view).clientCount).toBe(0);
+        });
+
+        it('takes live views back the moment the flag is on again, with no restart', async () => {
+            process.env.FLEET_ENABLED = 'false';
+            await expect(connect(`/ws/computer/${SESSION}`)).rejects.toBeTruthy();
+            process.env.FLEET_ENABLED = 'true';
+            const ws = await connect(`/ws/computer/${SESSION}`);
+            expect(ws.readyState).toBe(WebSocket.OPEN);
+            ws.close();
+        });
+    });
+
     it('refuses a malformed live-view path', async () => {
         await expect(connect('/ws/computer/not-a-uuid')).rejects.toBeTruthy();
     });

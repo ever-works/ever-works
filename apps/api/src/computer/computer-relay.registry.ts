@@ -1,4 +1,11 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import {
+    Inject,
+    Injectable,
+    Logger,
+    OnModuleDestroy,
+    OnModuleInit,
+    Optional,
+} from '@nestjs/common';
 import {
     COMPUTER_INPUT_KINDS,
     decodeComputerFrame,
@@ -48,6 +55,12 @@ import {
  *    NEVER forwarded. Nothing inbound is ever fanned out to other viewers.
  *  - **Reclaim.** Memory is released only when no client is attached AND
  *    the session ended AND at least one attach saw it (`force` overrides).
+ *    A periodic {@link ComputerRelayRegistry.sweep} is what applies that in
+ *    production: an ended view someone saw goes on the next pass, an ended
+ *    view nobody saw is kept {@link COMPUTER_RELAY_ENDED_RETENTION_MS} for a
+ *    late viewer and then dropped, and a view with no client and no traffic
+ *    for {@link COMPUTER_RELAY_IDLE_RETENTION_MS} is dropped whatever its
+ *    state — so the map is bounded by live views, never by lifetime views.
  *
  * A picture's bytes live only in this map and on the wire. Nothing here
  * writes a picture anywhere.
@@ -58,6 +71,24 @@ export type ComputerRelayClient = TerminalRelayClient;
 
 export const COMPUTER_FANOUT_BUS = 'COMPUTER_FANOUT_BUS' as const;
 export const COMPUTER_BANNERS_CAP_DEFAULT = 16;
+/** An ended view nobody attached to is kept this long for a late viewer. */
+export const COMPUTER_RELAY_ENDED_RETENTION_MS = 5 * 60_000;
+/** A view with no client attached and no traffic is dropped after this, ended or not. */
+export const COMPUTER_RELAY_IDLE_RETENTION_MS = 60 * 60_000;
+/** How often {@link ComputerRelayRegistry.sweep} runs. */
+export const COMPUTER_RELAY_SWEEP_INTERVAL_MS = 60_000;
+
+/**
+ * The terminal relay's cross-replica seam, with one addition: `publishRemote`
+ * MAY answer whether a peer replica accepted the frame (a pub/sub publish
+ * reports its receiver count). `true` lets a platform request to the machine
+ * report delivery when the machine's leg is attached to another replica; a
+ * bus that answers nothing (`void`, the terminal bus shape) is treated as
+ * "no peer took it", exactly as before.
+ */
+export interface ComputerFanoutBus extends TerminalFanoutBus {
+    publishRemote(sessionId: string, wire: string): boolean | void;
+}
 
 export interface ComputerSessionRelayStatus {
     exists: boolean;
@@ -80,17 +111,22 @@ interface ComputerRelaySession {
     seenSeqMax: number;
     end: ComputerEndFrame | null;
     everAttached: boolean;
+    /** When the `end` frame was pinned (epoch ms), null while the view is open. */
+    endedAtMs: number | null;
+    /** Last publish, attach or detach (epoch ms) — what the idle sweep measures. */
+    lastActivityMs: number;
 }
 
 const INPUT_KINDS: ReadonlySet<string> = new Set(COMPUTER_INPUT_KINDS);
 
 @Injectable()
-export class ComputerRelayRegistry {
+export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(ComputerRelayRegistry.name);
     private readonly sessions = new Map<string, ComputerRelaySession>();
-    private readonly bus: TerminalFanoutBus;
+    private readonly bus: ComputerFanoutBus;
+    private sweeper: NodeJS.Timeout | null = null;
 
-    constructor(@Optional() @Inject(COMPUTER_FANOUT_BUS) bus?: TerminalFanoutBus) {
+    constructor(@Optional() @Inject(COMPUTER_FANOUT_BUS) bus?: ComputerFanoutBus) {
         this.bus = bus ?? new InProcessTerminalFanoutBus();
         this.bus.onRemote((sessionId, wire) => {
             const frame = decodeComputerFrame(wire);
@@ -105,6 +141,17 @@ export class ComputerRelayRegistry {
         });
     }
 
+    onModuleInit(): void {
+        if (this.sweeper) return;
+        this.sweeper = setInterval(() => this.sweep(), COMPUTER_RELAY_SWEEP_INTERVAL_MS);
+        this.sweeper.unref?.();
+    }
+
+    onModuleDestroy(): void {
+        if (this.sweeper) clearInterval(this.sweeper);
+        this.sweeper = null;
+    }
+
     /**
      * The machine's publish leg (pictures, terminal frames, stats, banners,
      * end). Anything a browser could send is refused regardless of shape.
@@ -117,6 +164,7 @@ export class ComputerRelayRegistry {
         if (session.end) {
             return false;
         }
+        session.lastActivityMs = Date.now();
         switch (frame.kind) {
             case 'frame':
                 if (frame.seq <= session.seenSeqMax) return false;
@@ -127,7 +175,10 @@ export class ComputerRelayRegistry {
                 session.stats = frame;
                 break;
             case 'error':
-                if (session.clients.size === 0) {
+                // Retained while no BROWSER is watching. The machine's own
+                // leg is attached from the start of a view, so counting it
+                // would drop exactly the startup banner a first viewer needs.
+                if (!hasBrowser(session)) {
                     session.banners.push(frame);
                     while (session.banners.length > COMPUTER_BANNERS_CAP_DEFAULT) {
                         session.banners.shift();
@@ -136,6 +187,7 @@ export class ComputerRelayRegistry {
                 break;
             case 'end':
                 session.end = frame;
+                session.endedAtMs = session.lastActivityMs;
                 break;
             default:
                 break;
@@ -154,10 +206,16 @@ export class ComputerRelayRegistry {
 
     /**
      * Attach a socket: replay banners → keyframe → stats → end to it alone,
-     * then join the live set.
+     * then join the live set. The replay is browser-directed output, so the
+     * machine's own leg (`worker`) is never sent it — it joins silently.
      */
     attach(sessionId: string, client: ComputerRelayClient): ComputerSessionRelayStatus {
         const session = this.getOrCreate(sessionId);
+        session.lastActivityMs = Date.now();
+        if (client.role === 'worker') {
+            session.clients.set(client.id, client);
+            return this.getStatus(sessionId);
+        }
         const keyframeBeforeReplay = session.keyframe;
         const endBeforeReplay = session.end;
 
@@ -185,7 +243,10 @@ export class ComputerRelayRegistry {
     }
 
     detach(sessionId: string, clientId: string): void {
-        this.sessions.get(sessionId)?.clients.delete(clientId);
+        const session = this.sessions.get(sessionId);
+        if (!session) return;
+        session.clients.delete(clientId);
+        session.lastActivityMs = Date.now();
     }
 
     /**
@@ -216,17 +277,22 @@ export class ComputerRelayRegistry {
 
     /**
      * A platform-originated request for the machine (`quality`, `refresh`),
-     * e.g. from the owner's REST call. False when no machine leg is attached
-     * on this replica and no peer could be told.
+     * e.g. from the owner's REST call. True when a machine leg attached on
+     * this replica took it, or the bus reports that a peer replica accepted
+     * it; false when neither happened.
+     *
+     * A replica with no local state for the view still tells its peers: the
+     * owner's REST call can land on any replica, and the machine's leg may be
+     * attached to another one. No local entry is created for that.
      */
     deliverToNode(sessionId: string, frame: ComputerFrame): boolean {
         const session = this.sessions.get(sessionId);
-        if (!session || session.end) return false;
+        if (session?.end) return false;
         const wire = encodeComputerFrame(frame);
         if (wire === null) return false;
-        const delivered = this.sendToRole(session, wire, 'worker');
-        this.safePublishRemote(sessionId, wire);
-        return delivered > 0;
+        const delivered = session ? this.sendToRole(session, wire, 'worker') : 0;
+        const acceptedByPeer = this.safePublishRemote(sessionId, wire);
+        return delivered > 0 || acceptedByPeer;
     }
 
     getStatus(sessionId: string): ComputerSessionRelayStatus {
@@ -275,6 +341,37 @@ export class ComputerRelayRegistry {
         return true;
     }
 
+    /**
+     * Release the memory of views nothing is using any more. Never touches a
+     * view with a client attached. Drops an ended view someone saw
+     * ({@link canReclaim}); an ended view nobody saw once
+     * {@link COMPUTER_RELAY_ENDED_RETENTION_MS} has passed; and any view idle
+     * for {@link COMPUTER_RELAY_IDLE_RETENTION_MS} — the floor for a view whose
+     * end was recorded on a replica this one never heard from. Runs on a
+     * timer in production; returns how many views it dropped.
+     */
+    sweep(now: number = Date.now()): number {
+        let dropped = 0;
+        for (const [sessionId, session] of this.sessions) {
+            if (session.clients.size > 0) continue;
+            const endedAndSeen = session.end !== null && session.everAttached;
+            const endedLongAgo =
+                session.endedAtMs !== null &&
+                now - session.endedAtMs >= COMPUTER_RELAY_ENDED_RETENTION_MS;
+            const idle = now - session.lastActivityMs >= COMPUTER_RELAY_IDLE_RETENTION_MS;
+            if (endedAndSeen || endedLongAgo || idle) {
+                this.sessions.delete(sessionId);
+                dropped += 1;
+            }
+        }
+        return dropped;
+    }
+
+    /** How many views this replica holds in memory. */
+    size(): number {
+        return this.sessions.size;
+    }
+
     private getOrCreate(sessionId: string): ComputerRelaySession {
         let session = this.sessions.get(sessionId);
         if (!session) {
@@ -286,6 +383,8 @@ export class ComputerRelayRegistry {
                 seenSeqMax: -1,
                 end: null,
                 everAttached: false,
+                endedAtMs: null,
+                lastActivityMs: Date.now(),
             };
             this.sessions.set(sessionId, session);
         }
@@ -354,15 +453,25 @@ export class ComputerRelayRegistry {
         }
     }
 
-    private safePublishRemote(sessionId: string, wire: string): void {
+    /** True only when the bus says a peer replica accepted the frame. Never throws. */
+    private safePublishRemote(sessionId: string, wire: string): boolean {
         try {
-            this.bus.publishRemote(sessionId, wire);
+            return this.bus.publishRemote(sessionId, wire) === true;
         } catch (error) {
             this.logger.warn(
                 `Computer fan-out bus publish failed for session ${sessionId}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
+            return false;
         }
     }
+}
+
+/** Is a browser (a watching or controlling socket) attached? The machine's own leg does not count. */
+function hasBrowser(session: ComputerRelaySession): boolean {
+    for (const client of session.clients.values()) {
+        if (client.role !== 'worker') return true;
+    }
+    return false;
 }

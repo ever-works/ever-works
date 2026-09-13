@@ -19,6 +19,7 @@ import {
     isComputerNodeToServerFrame,
     normalizeComputerFrame,
     type ComputerCloseReason,
+    type ComputerEndFrame,
 } from '@ever-works/contracts';
 import {
     ComputerSession,
@@ -91,7 +92,7 @@ export class ComputerInternalController {
         if (items.length > COMPUTER_PUBLISH_MAX_ITEMS || !isComputerFrameBatchWithinCaps(items)) {
             throw new PayloadTooLargeException('Frame batch exceeds the live-view publish caps');
         }
-        const row = await this.requireSession(node, sessionId);
+        const row = await this.requireOpenSession(node, sessionId);
         if (row.status === 'ended' || (await this.sessions.endIfStopped(row))) {
             return this.endedAnswer(node, sessionId, row, items.length);
         }
@@ -100,14 +101,28 @@ export class ComputerInternalController {
         let dropped = 0;
         let pictures = 0;
         let pictureBytes = 0;
-        let endReason: ComputerCloseReason | null = null;
+        let end: ComputerEndFrame | null = null;
         for (const item of items) {
             const frame = normalizeComputerFrame(item);
-            if (
-                !frame ||
-                !isComputerNodeToServerFrame(frame) ||
-                !this.relay.publish(sessionId, frame)
-            ) {
+            // Nothing after the machine's own end frame is relayed, exactly as
+            // the relay itself refuses anything after a pinned end.
+            if (!frame || !isComputerNodeToServerFrame(frame) || end) {
+                dropped += 1;
+                continue;
+            }
+            if (frame.kind === 'end') {
+                // NOT relayed here. The end is persisted first and pinned on
+                // the relay only after that write succeeded: pinned first, a
+                // failed write would leave the relay refusing the machine's
+                // retry of the same end frame, and the session could never be
+                // recorded as ended. Until the pin, a retry is simply the same
+                // request again.
+                end = frame;
+                if (this.relay.getStatus(sessionId).ended) dropped += 1;
+                else accepted += 1;
+                continue;
+            }
+            if (!this.relay.publish(sessionId, frame)) {
                 dropped += 1;
                 continue;
             }
@@ -115,14 +130,20 @@ export class ComputerInternalController {
             if (frame.kind === 'frame') {
                 pictures += 1;
                 pictureBytes += decodedComputerBase64Bytes(frame.data);
-            } else if (frame.kind === 'end') {
-                endReason = frame.reason;
             }
         }
         await this.sessions.recordPublished(row, { frames: pictures, bytes: pictureBytes });
-        if (endReason) {
-            await this.sessions.recordNodeReport(row, { status: 'ended', closeReason: endReason });
-            return { accepted, dropped, ended: true, closeReason: endReason };
+        if (end) {
+            // Idempotent: the close is a compare-and-set, so a retry after a
+            // partial failure records the end once and never a second time.
+            await this.sessions.recordNodeReport(row, { status: 'ended', closeReason: end.reason });
+            const current = (await this.sessions.findForNode(sessionId, node.id)) ?? row;
+            const closeReason = (current.closeReason ?? end.reason) as ComputerCloseReason;
+            // Usually already pinned by the session's `ended` event with this
+            // same reason; this makes the relay agree with the record even
+            // where nothing listens for that event. A no-op on an ended relay.
+            this.relay.end(sessionId, closeReason);
+            return { accepted, dropped, ended: true, closeReason };
         }
         return { accepted, dropped, ended: false, closeReason: null };
     }
@@ -136,7 +157,7 @@ export class ComputerInternalController {
         @Param('sessionId') sessionId: string,
         @Body() body: ComputerSessionHeartbeatDto,
     ): Promise<{ ok: true; ended: boolean; closeReason: ComputerCloseReason | null }> {
-        const row = await this.requireSession(node, sessionId);
+        const row = await this.requireOpenSession(node, sessionId);
         if (row.status !== 'ended' && !(await this.sessions.endIfStopped(row))) {
             await this.sessions.recordNodeReport(row, {
                 status: body.status,
@@ -166,8 +187,10 @@ export class ComputerInternalController {
         // Validated so the credential body has the one shape every node route accepts.
         @Body() _credential: FleetJobNodeCredentialDto,
     ): Promise<{ token: string; wsPath: string; expiresInSec: number }> {
-        const row = await this.requireSession(node, sessionId);
-        if (row.status === 'ended') {
+        const row = await this.requireOpenSession(node, sessionId);
+        // A stopped fleet ends the view here and mints nothing — the same
+        // check every other machine-facing route makes before it acts.
+        if (row.status === 'ended' || (await this.sessions.endIfStopped(row))) {
             throw new UnauthorizedException(FLEET_NODE_UNAUTHORIZED_MESSAGE);
         }
         const { token, expiresInSec } = this.attach.mint({
@@ -212,6 +235,20 @@ export class ComputerInternalController {
             throw new UnauthorizedException(FLEET_NODE_UNAUTHORIZED_MESSAGE);
         }
         return row;
+    }
+
+    /**
+     * {@link requireSession}, then expired if it is past its time — owner-
+     * independent, so a view no machine claimed within its claim timeout is
+     * ended as `abandoned` here rather than being made live by a machine that
+     * leased its job late.
+     */
+    private async requireOpenSession(
+        node: AuthenticatedFleetNode,
+        sessionId: string,
+    ): Promise<ComputerSession> {
+        const row = await this.requireSession(node, sessionId);
+        return row.status === 'ended' ? row : this.sessions.expireIfDue(row);
     }
 
     private async endedAnswer(

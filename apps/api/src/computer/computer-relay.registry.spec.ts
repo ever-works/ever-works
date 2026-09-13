@@ -1,5 +1,11 @@
 import type { ComputerFrame } from '@ever-works/contracts';
-import { ComputerRelayRegistry, type ComputerRelayClient } from './computer-relay.registry';
+import {
+    COMPUTER_RELAY_ENDED_RETENTION_MS,
+    COMPUTER_RELAY_IDLE_RETENTION_MS,
+    COMPUTER_RELAY_SWEEP_INTERVAL_MS,
+    ComputerRelayRegistry,
+    type ComputerRelayClient,
+} from './computer-relay.registry';
 
 /**
  * The live-view relay. What a viewer relies on, pinned: a re-attaching
@@ -80,6 +86,45 @@ describe('ComputerRelayRegistry — replay on attach', () => {
         const late = client('v2', 'viewer');
         relay.attach(SESSION, late);
         expect(late.received).toEqual([]);
+    });
+
+    it('retains a startup banner published while only the machine’s own leg is attached', () => {
+        const relay = new ComputerRelayRegistry();
+        const node = client('node', 'worker');
+        relay.attach(SESSION, node);
+        relay.publish(SESSION, { kind: 'error', message: 'No browser found on studio' });
+
+        const first = client('first', 'viewer');
+        relay.attach(SESSION, first);
+
+        expect(first.received).toEqual([{ kind: 'error', message: 'No browser found on studio' }]);
+        expect(node.received).toEqual([]);
+    });
+
+    it('never replays browser-directed output to a machine leg that (re)attaches', () => {
+        const relay = new ComputerRelayRegistry();
+        relay.publish(SESSION, { kind: 'error', message: 'starting the capture…' });
+        relay.publish(SESSION, picture(0));
+        relay.publish(SESSION, {
+            kind: 'stats',
+            nodeLocalTime: '2026-09-13T09:41:07+02:00',
+            quality: 'sharp',
+            effectiveQuality: 'sharp',
+            fps: 8,
+            backlog: 0,
+            bytesOut: 10,
+        });
+        const node = client('node', 'worker');
+        relay.attach(SESSION, node);
+        relay.end(SESSION, 'closed-by-user');
+        const again = client('node-again', 'worker');
+        relay.attach(SESSION, again);
+
+        expect(node.received).toEqual([]);
+        expect(again.received).toEqual([]);
+        expect(relay.getStatus(SESSION)).toMatchObject({ nodeAttached: true, viewerCount: 0 });
+        // A machine leg is not a viewer: it does not count as having seen the end.
+        expect(relay.canReclaim(SESSION)).toBe(false);
     });
 });
 
@@ -254,6 +299,65 @@ describe('ComputerRelayRegistry — status and reclaim', () => {
     });
 });
 
+describe('ComputerRelayRegistry — the sweep releases what nothing uses', () => {
+    const OTHER = '3a9d1f2a-9c7e-4b1a-8f0d-0a1b2c3d4e5f';
+    const later = (ms: number) => Date.now() + ms;
+
+    it('drops an ended view someone saw once they left, on the next pass', () => {
+        const relay = new ComputerRelayRegistry();
+        relay.publish(SESSION, picture(0));
+        relay.attach(SESSION, client('v1', 'viewer'));
+        relay.end(SESSION, 'closed-by-user');
+
+        expect(relay.sweep()).toBe(0); // still attached
+        relay.detach(SESSION, 'v1');
+        expect(relay.sweep()).toBe(1);
+        expect(relay.getStatus(SESSION).exists).toBe(false);
+        expect(relay.size()).toBe(0);
+    });
+
+    it('keeps an ended view nobody saw for a late viewer, then drops it', () => {
+        const relay = new ComputerRelayRegistry();
+        relay.publish(SESSION, { kind: 'error', message: 'No browser found' });
+        relay.end(SESSION, 'abandoned');
+
+        expect(relay.sweep(later(COMPUTER_RELAY_ENDED_RETENTION_MS - 1_000))).toBe(0);
+        expect(relay.getStatus(SESSION).ended).toBe(true);
+        expect(relay.sweep(later(COMPUTER_RELAY_ENDED_RETENTION_MS + 1_000))).toBe(1);
+        expect(relay.size()).toBe(0);
+    });
+
+    it('drops an idle view whose end never reached this replica, and keeps a busy one', () => {
+        const relay = new ComputerRelayRegistry();
+        relay.publish(SESSION, picture(0));
+        relay.publish(OTHER, picture(0));
+        relay.attach(OTHER, client('node', 'worker'));
+
+        expect(relay.sweep(later(COMPUTER_RELAY_IDLE_RETENTION_MS - 1_000))).toBe(0);
+        expect(relay.sweep(later(COMPUTER_RELAY_IDLE_RETENTION_MS + 1_000))).toBe(1);
+        expect(relay.getStatus(SESSION).exists).toBe(false);
+        // A view with any client attached — even only the machine leg — is never swept.
+        expect(relay.getStatus(OTHER).exists).toBe(true);
+    });
+
+    it('runs on an unref’d timer from module init, and stops on destroy', () => {
+        jest.useFakeTimers();
+        try {
+            const relay = new ComputerRelayRegistry();
+            const sweep = jest.spyOn(relay, 'sweep');
+            relay.onModuleInit();
+            relay.onModuleInit(); // idempotent: one timer
+            jest.advanceTimersByTime(COMPUTER_RELAY_SWEEP_INTERVAL_MS * 2);
+            expect(sweep).toHaveBeenCalledTimes(2);
+            relay.onModuleDestroy();
+            jest.advanceTimersByTime(COMPUTER_RELAY_SWEEP_INTERVAL_MS * 2);
+            expect(sweep).toHaveBeenCalledTimes(2);
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+});
+
 describe('ComputerRelayRegistry — cross-replica seam', () => {
     it('publishes accepted frames to the bus and fans peer frames out locally without echoing them', () => {
         let remoteHandler: ((sessionId: string, wire: string) => void) | null = null;
@@ -283,5 +387,46 @@ describe('ComputerRelayRegistry — cross-replica seam', () => {
             onRemote: () => undefined,
         });
         expect(relay.publish(SESSION, picture(0))).toBe(true);
+    });
+
+    it('reports a platform request delivered when a peer replica accepted it, even with no local state', () => {
+        const bus = { publishRemote: jest.fn(() => true), onRemote: () => undefined };
+        const relay = new ComputerRelayRegistry(bus);
+
+        // Nothing about this view lives on this replica; the machine's leg is elsewhere.
+        expect(relay.deliverToNode(SESSION, { kind: 'refresh' })).toBe(true);
+        expect(bus.publishRemote).toHaveBeenCalledWith(
+            SESSION,
+            JSON.stringify({ kind: 'refresh' }),
+        );
+        expect(relay.getStatus(SESSION).exists).toBe(false);
+
+        // A viewer here, the machine on a peer.
+        relay.attach(SESSION, client('viewer', 'viewer'));
+        expect(relay.deliverToNode(SESSION, { kind: 'quality', quality: 'steady' })).toBe(true);
+    });
+
+    it('reports not delivered when no local leg took it and the bus cannot say a peer did', () => {
+        for (const publishRemote of [jest.fn(() => false), jest.fn(() => undefined)]) {
+            const relay = new ComputerRelayRegistry({ publishRemote, onRemote: () => undefined });
+            expect(relay.deliverToNode(SESSION, { kind: 'refresh' })).toBe(false);
+            expect(publishRemote).toHaveBeenCalledTimes(1);
+        }
+        const throwing = new ComputerRelayRegistry({
+            publishRemote: () => {
+                throw new Error('bus down');
+            },
+            onRemote: () => undefined,
+        });
+        expect(throwing.deliverToNode(SESSION, { kind: 'refresh' })).toBe(false);
+    });
+
+    it('tells no peer about a request for a view that has ended here', () => {
+        const bus = { publishRemote: jest.fn(() => true), onRemote: () => undefined };
+        const relay = new ComputerRelayRegistry(bus);
+        relay.end(SESSION, 'closed-by-user');
+        bus.publishRemote.mockClear();
+        expect(relay.deliverToNode(SESSION, { kind: 'refresh' })).toBe(false);
+        expect(bus.publishRemote).not.toHaveBeenCalled();
     });
 });

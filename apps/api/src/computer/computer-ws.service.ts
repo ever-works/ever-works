@@ -17,6 +17,7 @@ import {
     makeComputerErrorFrame,
 } from '@ever-works/contracts';
 import { ComputerSessionService } from '@ever-works/agent/computer';
+import { config } from '@ever-works/agent/config';
 import { ComputerAttachService } from './computer-attach.service';
 import { ComputerRelayRegistry } from './computer-relay.registry';
 import type { TerminalClientRole } from '../terminal/terminal-relay.registry';
@@ -28,6 +29,9 @@ import type { TerminalClientRole } from '../terminal/terminal-relay.registry';
  * HTTP server (`/ws/computer/:sessionId`): raw `ws` with `noServer`, no
  * socket.io, the token in the FIRST frame and never in the URL.
  *
+ *  - With `FLEET_ENABLED=false` every live-view upgrade is refused, and an
+ *    already-open socket cannot authenticate: the gateway goes dark with
+ *    the REST surface, whatever token a client still holds.
  *  - A query string on a live-view upgrade is refused outright.
  *  - An unauthenticated socket is closed `4001` after {@link AUTH_TIMEOUT_MS}.
  *  - A ping every 30 s; a socket that misses two pongs is reaped (`4002`).
@@ -116,6 +120,14 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
             // Not ours — the terminal gateway on the same server owns it.
             return;
         }
+        if (!config.fleet.isEnabled()) {
+            // `FLEET_ENABLED=false` takes the whole live-view surface dark,
+            // this socket included — refused before any token is looked at,
+            // like the REST routes' `FleetEnabledGuard`. Read per upgrade,
+            // like that guard, so flipping the flag needs no restart.
+            socket.destroy();
+            return;
+        }
         if (rawUrl.includes('?')) {
             // The token rides the first frame. A query string here is a
             // mistake or an attempt to put a credential in an access log.
@@ -165,6 +177,11 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
             if (!state.authenticated) {
                 if (frame.kind !== 'auth') {
                     this.safeClose(ws, 4001, 'auth required');
+                    return;
+                }
+                if (!config.fleet.isEnabled()) {
+                    // Switched off after the upgrade: an unexpired token buys nothing.
+                    this.safeClose(ws, 4001, 'unavailable');
                     return;
                 }
                 const claims = this.attach.verify(frame.token);

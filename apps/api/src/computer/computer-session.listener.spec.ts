@@ -1,6 +1,6 @@
 import type { ComputerSessionService } from '@ever-works/agent/computer';
 import { ComputerSessionEndedEvent } from '@ever-works/agent/computer';
-import { FleetJobCompletedEvent } from '@ever-works/agent/events';
+import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
 import { NodeDispatcherFactory, type FleetJobStore } from '@ever-works/job-runtime-node-plugin';
 import { ComputerRelayRegistry } from './computer-relay.registry';
 import { createComputerSessionDispatcher } from './computer-session.dispatcher.provider';
@@ -17,7 +17,10 @@ const SESSION = '2f9d1f2a-9c7e-4b1a-8f0d-0a1b2c3d4e5f';
 
 describe('ComputerSessionListener', () => {
     function build() {
-        const sessions = { closeForSettledJob: jest.fn(async () => undefined) };
+        const sessions = {
+            closeForSettledJob: jest.fn(async () => undefined),
+            withdrawLeaseIfOver: jest.fn(async () => false),
+        };
         const relay = new ComputerRelayRegistry();
         const listener = new ComputerSessionListener(
             sessions as unknown as ComputerSessionService,
@@ -68,6 +71,32 @@ describe('ComputerSessionListener', () => {
             ),
         );
         expect(sessions.closeForSettledJob).toHaveBeenCalledWith(SESSION, 'job-1');
+    });
+
+    it('checks every leased session job against its view, and ignores every other kind of job', async () => {
+        const { listener, sessions } = build();
+        const leased = (kind: string, payload: Record<string, unknown> | null) =>
+            new FleetJobLeasedEvent(
+                { id: 'job-1', kind, status: 'leased', payload } as never,
+                'node-1',
+                'owner-1',
+            );
+
+        await listener.onJobLeased(leased('agent-task', { sessionId: SESSION }));
+        await listener.onJobLeased(leased('computer-session', null));
+        expect(sessions.withdrawLeaseIfOver).not.toHaveBeenCalled();
+
+        await listener.onJobLeased(leased('computer-session', { sessionId: SESSION }));
+        expect(sessions.withdrawLeaseIfOver).toHaveBeenCalledWith(SESSION, 'job-1');
+
+        sessions.withdrawLeaseIfOver.mockRejectedValueOnce(new Error('db down'));
+        jest.spyOn(
+            (listener as never as { logger: { warn: () => void } }).logger,
+            'warn',
+        ).mockImplementation(() => undefined);
+        await expect(
+            listener.onJobLeased(leased('computer-session', { sessionId: SESSION })),
+        ).resolves.toBeUndefined();
     });
 
     it('never throws into the event bus', async () => {

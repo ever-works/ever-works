@@ -603,6 +603,10 @@ export class FleetController {
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');
         }
+        // Two independent follow-ups, started together and awaited together
+        // (neither can reject: each swallows its own failure), so the beat
+        // pays for the slower of the two, not their sum.
+        //
         // Self-build slice S — an eligible runner is back: clear
         // `waiting-for-runner` on the owner's queued jobs this node can
         // take, so the Fleet UI stops saying "waiting" the moment it is
@@ -611,33 +615,41 @@ export class FleetController {
         // node keeps beating but will not lease — and never able to fail
         // or refuse the beat: the service re-reads the node row itself
         // and swallows its own errors; this guard is the belt.
-        if (result.node.status === 'online') {
-            try {
-                await this.jobs.promoteWaitingForNode(result.node.id);
-            } catch (err) {
-                this.logger.debug(
-                    `waiting-job promotion skipped for node ${result.node.id}: ${
-                        err instanceof Error ? err.message : String(err)
-                    }`,
-                );
-            }
-        }
-        const response: FleetHeartbeatResponse = {
-            ok: true,
-            node: result.node,
-            rotationRequested: result.rotationRequested,
-        };
+        //
         // Agent computers — tell an attended machine a live view is already
         // waiting for it, so it claims the view now rather than on its next
         // poll. Added ONLY when non-empty (an older daemon ignores the field;
         // every other response keeps its exact shape), only for an online
         // machine that switched live viewing on, and never able to fail the
         // beat.
-        const pending = await this.pendingComputerSessionsFor(result.node);
+        const [, pending] = await Promise.all([
+            this.promoteWaitingJobsFor(result.node),
+            this.pendingComputerSessionsFor(result.node),
+        ]);
+        const response: FleetHeartbeatResponse = {
+            ok: true,
+            node: result.node,
+            rotationRequested: result.rotationRequested,
+        };
         if (pending.length > 0) {
             response.pendingComputerSessions = pending;
         }
         return response;
+    }
+
+    private async promoteWaitingJobsFor(node: FleetHeartbeatResponse['node']): Promise<void> {
+        if (node?.status !== 'online') {
+            return;
+        }
+        try {
+            await this.jobs.promoteWaitingForNode(node.id);
+        } catch (err) {
+            this.logger.debug(
+                `waiting-job promotion skipped for node ${node.id}: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
     }
 
     private async pendingComputerSessionsFor(
