@@ -300,7 +300,7 @@
       [plan.md §3.1](./plan.md#31-entity-changes).
     - MODIFY `packages/agent/src/entities/plugin-usage-event.entity.ts` — add `inputTokens`,
       `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`.
-    - CREATE `apps/api/src/migrations/1789200000000-AddRunReceiptTelemetry.ts` — additive
+    - CREATE `apps/api/src/migrations/1791090000000-AddRunReceiptTelemetry.ts` — additive
       `ALTER TABLE` for both tables plus
       `CREATE INDEX idx_agent_runs_user_started ON agent_runs (userId, startedAt)`. Generate with
       `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddRunReceiptTelemetry`,
@@ -401,7 +401,7 @@ repeat-failure banner.*
       `effectiveTimeoutSeconds`.
     - MODIFY `packages/agent/src/entities/agent.entity.ts` — add `maxRunDurationSeconds`
       (nullable; `null` = inherit the deployment default).
-    - CREATE `apps/api/src/migrations/1789300000000-AddAgentRunFailureAndTimeout.ts`.
+    - CREATE `apps/api/src/migrations/1791090100000-AddAgentRunFailureAndTimeout.ts`.
     - **Done when**: additive-only SQL, `down()` drops only the three new columns, and boot applies
       it cleanly twice.
 

@@ -318,12 +318,14 @@ tables in the scope-stamped set.
 **Done:** the entity-barrel drift spec in `database.module.spec.ts` and the Tier C spec are green.
 
 **T-36 — The forward-only migration (same PR as T-34).**
-Create `apps/api/src/migrations/1789600000000-AddWorkspaceSearchIndex.ts`, class
-`AddWorkspaceSearchIndex1789600000000`. Two existence-guarded `CREATE TABLE`s plus their
+Create `apps/api/src/migrations/1791010000000-AddWorkspaceSearchIndex.ts`, class
+`AddWorkspaceSearchIndex1791010000000`. Two existence-guarded `CREATE TABLE`s plus their
 indexes, expressed with TypeORM `Table`/`TableIndex` objects (portable — CI and e2e run
 `better-sqlite3`, production runs Postgres). No `ALTER`, no `DROP`, no data movement on any
 existing table. `down()` drops exactly the two tables it created.
 Follow the doc-comment style of `apps/api/src/migrations/1789100000000-AddTaskGraphFanout.ts`.
+The timestamp is AW-01's reserved slot 00 ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)); before merge, rebase on `develop` and
+re-stamp filename and class name if a newer migration has landed.
 **Done:** `pnpm typeorm migration:run` applies cleanly on an empty DB **and** on a DB where it
 already ran; the API boots with `RUN_MIGRATIONS=true`.
 

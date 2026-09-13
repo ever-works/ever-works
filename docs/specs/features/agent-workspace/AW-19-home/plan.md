@@ -50,7 +50,7 @@ The five known weaknesses this epic fixes, all verified in source:
 | Needs you — "Also broken" | `composeAttentionItems()` + `AttentionSection` | [`apps/web/src/components/dashboard/AttentionSection.tsx`](../../../../../apps/web/src/components/dashboard/AttentionSection.tsx) |
 | Glance counters + Working now | `AgentRun` rows: `status`, `startedAt`, `finishedAt`, `awaitingInput`, `currentActivity` (varchar 300), `attentionReason` | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts), [`packages/agent/src/database/repositories/agent-run.repository.ts`](../../../../../packages/agent/src/database/repositories/agent-run.repository.ts) |
 | Today | `SchedulesService` → `ScheduleView[]` with all seven `sourceType`s, sorted by `nextRunAt` ascending, per-source `try/catch`, `MAX_PER_SOURCE = 500` | [`packages/agent/src/schedules/schedules.service.ts`](../../../../../packages/agent/src/schedules/schedules.service.ts), [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts), cadence text in [`packages/agent/src/schedules/cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts) |
-| This week | `CostsSummaryService.getSummary(userId, windowDays)` with `COSTS_WINDOW_DAYS = [7, 30, 90]`, plus `BudgetService`'s account-wide cap read behind `GET /me/usage/account-wide` | [`packages/agent/src/subscriptions/credits/costs-summary.service.ts`](../../../../../packages/agent/src/subscriptions/credits/costs-summary.service.ts), [`apps/api/src/subscriptions/costs.controller.ts`](../../../../../apps/api/src/subscriptions/costs.controller.ts), [`packages/agent/src/budgets/budget.service.ts`](../../../../../packages/agent/src/budgets/budget.service.ts), [`apps/api/src/budgets/account-usage.controller.ts`](../../../../../apps/api/src/budgets/account-usage.controller.ts), [`apps/web/src/lib/api/usage.ts`](../../../../../apps/web/src/lib/api/usage.ts) |
+| This week | `CostsSummaryService.getSummary(userId, windowDays)` with `COSTS_WINDOW_DAYS = [7, 30, 90]`, plus `BudgetService.summarizeForUser(userId, prefs)` behind `GET /me/usage/account-wide`. **Both aggregate by `userId` only** — `PluginUsageRepository.getTotalSpendCentsForUser` filters `e.userId = :userId` with no scope predicate — so neither follows the active Organization as they stand. §3.5 adds the scoped read; the cap stays account-wide by definition | [`packages/agent/src/subscriptions/credits/costs-summary.service.ts`](../../../../../packages/agent/src/subscriptions/credits/costs-summary.service.ts), [`apps/api/src/subscriptions/costs.controller.ts`](../../../../../apps/api/src/subscriptions/costs.controller.ts), [`packages/agent/src/budgets/budget.service.ts`](../../../../../packages/agent/src/budgets/budget.service.ts), [`apps/api/src/budgets/account-usage.controller.ts`](../../../../../apps/api/src/budgets/account-usage.controller.ts), [`apps/web/src/lib/api/usage.ts`](../../../../../apps/web/src/lib/api/usage.ts) |
 | Recent activity | `ActivityLogRepository` / `ActivityLogService` (`activity_log`, indexed on `(userId, createdAt)`) | [`packages/agent/src/database/repositories/activity-log.repository.ts`](../../../../../packages/agent/src/database/repositories/activity-log.repository.ts), [`apps/api/src/activity-log/activity-log.controller.ts`](../../../../../apps/api/src/activity-log/activity-log.controller.ts) |
 | Composer | `POST /api/tasks` (60/min throttle) via `createTaskAction`; a body with no `status` gets the entity default `backlog`, so the Task lands in the board's first lane | [`apps/api/src/tasks/tasks.controller.ts`](../../../../../apps/api/src/tasks/tasks.controller.ts), [`apps/web/src/app/actions/tasks.ts`](../../../../../apps/web/src/app/actions/tasks.ts), client in [`apps/web/src/lib/api/tasks.ts`](../../../../../apps/web/src/lib/api/tasks.ts) |
 | Scope | `ScopeContextService` (request-scoped `AsyncLocalStorage`, `getOrganizationId()`) | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts) |
@@ -247,13 +247,13 @@ No column is added, altered or dropped.
 
 Constitution V: a TypeORM entity/schema change ships a migration in the **same
 PR**. Both live in [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations)
-(the newest there today is `1789100000000-AddTaskGraphFanout.ts`), are
-timestamp-prefixed and ascend past it.
+(the newest on `develop` at time of writing is `1790100000000-AddReleaseVerification.ts`), are
+timestamp-prefixed from AW-19's reserved block ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)), and are re-stamped before merge if `develop` has moved past them.
 
 | Phase | File | Contents |
 | --- | --- | --- |
-| **P1** | `apps/api/src/migrations/1789300000000-AddAgentRunHomeIndexes.ts` | `CREATE INDEX IF NOT EXISTS` for `idx_agent_runs_user_status` and `idx_agent_runs_user_finished`, guarded with `queryRunner.getTable('agent_runs')` + `table.indices.some(...)` existence checks; `down()` drops exactly those two. |
-| **P2** | `apps/api/src/migrations/1789400000000-AddUserHomePreferences.ts` | `CREATE TABLE user_home_preferences` (userId uuid PK, hiddenBlocks text nullable, blockOrder text nullable, workspaceSectionExpanded boolean nullable, updatedAt timestamptz default now) + FK to `users(id)` `ON DELETE CASCADE`; existence-guarded; `down()` drops the table. |
+| **P1** | `apps/api/src/migrations/1791190000000-AddAgentRunHomeIndexes.ts` | `CREATE INDEX IF NOT EXISTS` for `idx_agent_runs_user_status` and `idx_agent_runs_user_finished`, guarded with `queryRunner.getTable('agent_runs')` + `table.indices.some(...)` existence checks; `down()` drops exactly those two. |
+| **P2** | `apps/api/src/migrations/1791190100000-AddUserHomePreferences.ts` | `CREATE TABLE user_home_preferences` (userId uuid PK, hiddenBlocks text nullable, blockOrder text nullable, workspaceSectionExpanded boolean nullable, updatedAt timestamptz default now) + FK to `users(id)` `ON DELETE CASCADE`; existence-guarded; `down()` drops the table. |
 
 Both use portable `Table` / `TableIndex` / `TableForeignKey` DDL rather than raw
 Postgres SQL, because CI and the e2e stack run better-sqlite3 while production
@@ -326,11 +326,16 @@ export interface HomeScheduleRow {
 export interface HomeToday { ran: HomeScheduleRow[]; due: HomeScheduleRow[]; dueTotal: number; }
 
 export interface HomeSpend {
+    // Scoped to the active Organization (or personal scope) — spec FR-37, FR-38.
     windowDays: 7; totalCents: number; currency: string;
     runsCount: number; avgPerRunCents: number | null;
-    periodSpendCents: number; periodCapCents: number | null;
-    percentUsed: number | null; blocked: boolean; allowOverage: boolean;
-    everSpent: boolean;               // false ⇒ hide the panel (spec FR-43)
+    scope: { kind: 'organization' | 'personal'; name: string | null };
+    // Account-wide by definition — spec FR-39a. Never combined with the fields above.
+    accountCap: {
+        periodSpendCents: number; periodCapCents: number | null;
+        percentUsed: number | null; blocked: boolean; allowOverage: boolean;
+    };
+    everSpent: boolean;               // account-wide; false ⇒ hide the panel (spec FR-43)
 }
 
 export interface HomeRunningRow {
@@ -365,6 +370,37 @@ export interface HomePreferencesDto {
 Truncation (titles to 120, activity to 100, schedule names to 60) happens
 **server-side** so every client renders the same string and no client has to
 re-implement a boundary rule.
+
+### 3.5 Scoped spend read (additive, no schema change)
+
+Home promises every block follows the active Organization (spec FR-69), but the
+two spend sources it reuses aggregate across all of a user's Organizations. The
+fix follows the repo's existing workspace-scope convention —
+[`packages/agent/src/database/ownership-scope.ts`](../../../../../packages/agent/src/database/ownership-scope.ts)
+(`OwnershipScope`, `ownershipWhereWith`, `ownershipSqlPredicate`), which
+`AgentRunRepository` already uses for its scoped reads — rather than inventing a
+Home-only filter:
+
+- `PluginUsageRepository.getTotalSpendCentsForUser(userId, from, to, currency?, scope?)`
+  gains an optional trailing `scope`. When present it `andWhere`s
+  `ownershipSqlPredicate('e', scope)` over the `tenantId` / `organizationId`
+  columns `plugin_usage_events` already carries; when omitted the SQL is
+  unchanged, so `BudgetService` enforcement and the costs controller keep today's
+  user-wide totals (Constitution X).
+- `CostsSummaryService.getSummary(userId, windowDays?, scope?)` threads the same
+  optional `scope` to that call and to its run count (the scoped
+  `AgentRunRepository` count T4 adds). `CostsController` does not pass it, so the
+  costs surface is unchanged.
+- `spend.builder.ts` calls `getSummary(userId, 7, scope)` with the request's
+  `OwnershipScope` from `ScopeContextService` for `totalCents`, `runsCount` and
+  `avgPerRunCents`, and calls `BudgetService.summarizeForUser` **unscoped** for
+  `accountCap`. The cap (`accountWideMonthlyCapCents`, `accountWideAllowOverage`)
+  is a per-user preference enforced against the user's spend in every
+  Organization, so it cannot be scoped in this epic; per-Organization caps belong
+  to AW-17's scoped budgets. The UI labels it account-wide (spec FR-39a) instead
+  of mixing it silently with the scoped headline.
+- `everSpent` is an account-wide existence check (spec FR-43), so an Organization
+  with no usage shows `$0.00` rather than hiding the panel.
 
 ---
 
@@ -633,10 +669,13 @@ dashboard.home.glance.failedToday          "failed today"
 dashboard.home.glance.overflow             "999+"
 
 dashboard.home.thisWeek.title              "This week"
-dashboard.home.thisWeek.window             "last 7 days"
+dashboard.home.thisWeek.window             "last 7 days in {scope}"
+dashboard.home.thisWeek.personalScope      "Personal"
 dashboard.home.thisWeek.runs               "{count} runs · {avg} avg per run"
 dashboard.home.thisWeek.noAverage          "—"
-dashboard.home.thisWeek.capBar             "{percent}% of this billing period"
+dashboard.home.thisWeek.capBar             "{percent}% of your account-wide cap this billing period"
+dashboard.home.thisWeek.capScopeNote       "The cap applies across all your Organizations."
+dashboard.home.thisWeek.manageDescription  "Opens account-wide spend"
 dashboard.home.thisWeek.blocked            "New runs are blocked."
 dashboard.home.thisWeek.overage            "Overage is allowed."
 dashboard.home.thisWeek.noCap              "No spend cap set."
@@ -761,7 +800,9 @@ an assertion.
 | `packages/agent/src/home/__tests__/decision-set.spec.ts` | Kind filter excludes `notice`; oldest-first ordering; the ≥72 h float; preview cap 5 with an exact total; the proposal/escalation de-dup against `proposalId`/`escalationId`; un-mirrored rows carry `href` and no `options`; options of length 0, 1, 3 and 4 |
 | `packages/agent/src/home/__tests__/run-counters.spec.ts` | `running AND awaitingInput` counts as `needsYou`, never `workingNow`; `done today` / `failed today` boundaries at 23:59:59 and 00:00:00 local; `999+` clamping; longest-running-first ordering; the 30 min and 120 min chip thresholds |
 | `packages/agent/src/home/__tests__/today-panel.spec.ts` | All seven kinds map to a label; a null `nextRunAt` is excluded and not counted in `dueTotal`; ran/due split; `disabled` and `ended` excluded, `paused` and `error` included; caps 3 and 6 |
-| `packages/agent/src/home/__tests__/spend-panel.spec.ts` | 7-day window pinned; `avgPerRunCents` null at zero runs; the 80% / 100% thresholds; `blocked` vs `allowOverage`; `everSpent: false` for a never-spent account |
+| `packages/agent/src/home/__tests__/spend-panel.spec.ts` | 7-day window pinned; `avgPerRunCents` null at zero runs; the 80% / 100% thresholds; `blocked` vs `allowOverage`; `everSpent: false` for a never-spent account; **scope**: the builder passes the request's `OwnershipScope` to `getSummary` and never to `summarizeForUser`; an Organization with no usage but an account with spend yields `totalCents: 0` and `everSpent: true` |
+| `packages/agent/src/database/repositories/plugin-usage.repository.scope.spec.ts` | Usage in Organization A, Organization B and personal scope: `getTotalSpendCentsForUser` with A's scope sums only A, with personal scope sums only personal rows, and with no scope returns the unchanged user-wide total |
+| `packages/agent/src/subscriptions/credits/costs-summary.service.scope.spec.ts` | `getSummary` with a scope scopes both spend and run count; without one it is byte-identical to today's result |
 | `packages/agent/src/home/__tests__/home-preferences.service.spec.ts` | Upsert on first write; unknown block ids rejected; unknown ids read from an older row ignored; array de-duplication |
 | `packages/agent/src/database/repositories/__tests__/user-home-preference.repository.spec.ts` | Owner scoping; cascade on user delete |
 
@@ -813,7 +854,7 @@ Each phase is one or more PRs, each independently shippable, each leaving
   `HomeWindow`; the `./home` subpath in `packages/agent/package.json`.
 - `packages/contracts/src/home/` types, re-exported from the root index.
 - `apps/api/src/home/` controller + module + query DTO; registered in `api.module.ts`.
-- Migration `1789300000000-AddAgentRunHomeIndexes.ts`.
+- Migration `1791190000000-AddAgentRunHomeIndexes.ts`.
 - Web: `home.shared.ts`, `HomeBlockShell`, `HomeGreeting`, `HomeComposer`,
   `NeedsYouBlock`, `GlanceCounters`, extended `SoonSection`, `ThisWeekPanel`,
   `WorkingNowPanel`, `RecentActivityBlock`, `WorkspaceSection`; `page.tsx` and
@@ -831,7 +872,7 @@ fold, nothing is configurable, refresh is on navigation only.
 - Inline decision answering wired to `replyToInboxItemAction` with the routed
   toasts and the already-decided path.
 - `UserHomePreference` entity + repository + the four registration points;
-  migration `1789400000000-AddUserHomePreferences.ts`;
+  migration `1791190100000-AddUserHomePreferences.ts`;
   `GET`/`PUT /api/home/preferences`; `HomeBlockMenu`; `WorkspaceSection`
   expansion persistence.
 - Composer `Expand` handing the typed text to the full Task form.

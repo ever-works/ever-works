@@ -87,6 +87,8 @@
 
 - [ ] **T6** `(P1)` Migration 1 — new tables.
   - `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddAgentInboxesAndEmailRules`
+  - Land it as `apps/api/src/migrations/1791050000000-AddAgentInboxesAndEmailRules.ts` (AW-05 slot 00,
+    [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)).
   - Hand-edit the generated file to match the house style of
     `apps/api/src/migrations/1789100000000-AddTaskGraphFanout.ts`: a block comment explaining
     each table and why it is not an existing one, portable `TableColumn` / `Table` DDL,
@@ -95,7 +97,7 @@
     no-op; `down()` drops only what `up()` created.
 
 - [ ] **T7** `(P1)` Migration 2 — message and thread lifecycle columns + status backfill.
-  - `apps/api/src/migrations/<ts>-AddEmailMessageLifecycle.ts`.
+  - `apps/api/src/migrations/1791050100000-AddEmailMessageLifecycle.ts`.
   - Adds the columns from T5 and the four new indices.
   - Backfill, batched at 5,000 rows: inbound → `status='received'`, outbound → `status='sent'`,
     outbound → `readAt = createdAt`.
@@ -103,7 +105,7 @@
     `status` after the migration and no row's existing data changed.
 
 - [ ] **T8** `(P1)` Migration 3 — thread backfill.
-  - `apps/api/src/migrations/<ts>-BackfillEmailThreads.ts`.
+  - `apps/api/src/migrations/1791050200000-BackfillEmailThreads.ts`.
   - For every `email_messages` row with `conversationId IS NULL`, find-or-create an
     `email_conversations` row keyed `(agentId, deriveThreadKey(subject))` — import the **existing**
     `deriveThreadKey` from

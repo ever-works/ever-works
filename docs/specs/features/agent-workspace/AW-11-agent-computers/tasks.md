@@ -86,8 +86,9 @@
       `ComputerSessionStatus`, `ComputerChannel`, `ComputerQuality`, `ComputerSessionView`,
       `ComputerControlSpan`, `ComputerNodeOption` (with `watchable: boolean` and
       `unwatchableReason: ComputerUnwatchableReason | null`), `COMPUTER_UNWATCHABLE_REASONS`
-      (`offline` `paused` `disabled` `draining` `no-display` `no-browser` `not-attended`
-      `cluster`), `NodeAgentProfileView`.
+      (`offline` `paused` `disabled` `draining` `no-display` `no-browser` `no-terminal`
+      `not-attended` `cluster`), `servableChannels: ComputerChannel[]` on `ComputerNodeOption`,
+      `NodeAgentProfileView`.
     - **Done when**: every string union has a `readonly` array constant beside it and a
       `isX(value: unknown)` guard, matching the house pattern in
       `packages/contracts/src/fleet/fleet-jobs.types.ts`.
@@ -147,7 +148,8 @@
 - [ ] **T8. Author and hand-review migration A.**
     - From `apps/api/`:
       `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateComputerSessions`
-    - Land it as `apps/api/src/migrations/<timestamp>-CreateComputerSessions.ts`, following
+    - Land it as `apps/api/src/migrations/1791110000000-CreateComputerSessions.ts` (AW-11 slot 00,
+      [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)), following
       `apps/api/src/migrations/1789000000000-AddFleetCredentialRotation.ts` for shape.
     - Hand-check: two `CREATE TABLE`, seven `ADD COLUMN` on `fleet_nodes`, six `CREATE INDEX`,
       the FKs on `agentId` / `nodeId` / `runId` / `userId`. **No `DROP`, no `ALTER … TYPE`, no
@@ -167,9 +169,14 @@
 - [ ] **T10. Write the pure session-policy functions.**
     - Create `packages/agent/src/computer/computer-session.policy.ts` exporting, with **no**
       TypeORM / NestJS imports:
-        - `resolveWatchability(node, opts): { watchable: boolean; reason: ComputerUnwatchableReason | null }`
+        - `resolveWatchability(node, opts): { watchable: boolean; reason: ComputerUnwatchableReason | null; servableChannels: ComputerChannel[] }`
           — precedence exactly as spec §4.10: cluster → disabled → paused → draining → offline →
-          not-attended → no-browser → no-display → watchable.
+          not-attended → per channel (`no-browser` → `no-display` remove only `screen`;
+          `no-terminal` removes only `terminal`) → watchable when at least one channel remains
+          (spec FR-4a, FR-70).
+        - `requiredCapabilitiesForChannels(channels)` — `attended` always, `screen` only for the
+          screen channel, `terminal` only for the terminal channel (plan §2.5). The single source
+          of the job's `requiredCapabilities`; nothing else builds that list.
         - `resolveQuality(requested, stored): ComputerQuality` (default `sharp`).
         - `shouldDegrade(stats, sinceMs)` / `shouldRecover(stats, sinceMs)` — the 3-frame backlog
           and 1500 ms ack thresholds over a 5 s window, recovery after 30 s.
@@ -179,7 +186,9 @@
           `noViewerMs: 30 min`, `lastViewerGraceMs: 15 s`, `claimTimeoutMs: 40 s`, each with a
           documented clamp.
     - **Test**: `packages/agent/src/computer/__tests__/computer-session.policy.spec.ts` — a truth
-      table over every watchability branch and every threshold at ±1 ms.
+      table over every watchability branch and every threshold at ±1 ms, and every channel
+      combination of `requiredCapabilitiesForChannels` (a terminal-only result never contains
+      `screen`).
     - **Done when**: the file imports nothing but types from `@ever-works/contracts`.
 
 - [ ] **T11. Write `ComputerSessionService`.**
@@ -217,11 +226,15 @@
       `NodeDispatcherFactory`, exactly as `apps/api/src/fleet/fleet-agent-task.dispatcher.ts`
       does for `agent-task` — **not** by calling `FleetJobService` directly, so idempotency,
       capability tags and lease-TTL mapping follow the same `JobEnqueueOptions` semantics.
-    - `requiredCapabilities: ['screen','attended']` (plus `'terminal'` when the terminal channel
-      is requested in P3). Lease TTL 120 s.
+    - `requiredCapabilities: requiredCapabilitiesForChannels(session.channels)` (T10) — derived
+      from the requested channels, never a fixed list: a screen session requires
+      `['attended','screen']`, a terminal-only session `['attended','terminal']`, both channels
+      all three. The lease matcher requires every listed tag, so a fixed `screen` would lock
+      display-less Nodes out of terminal-only sessions (plan §2.5). Lease TTL 120 s.
     - **Test**: `packages/agent/src/computer/__tests__/computer-session.dispatcher.spec.ts` —
-      payload shape, required capabilities, `targetNodeId` always set (a session must never be
-      claimed by a different machine).
+      payload shape, required capabilities per channel combination (terminal-only has no
+      `screen`), `targetNodeId` always set (a session must never be claimed by a different
+      machine).
     - **Done when**: a session job can only ever be leased by the node it named.
 
 - [ ] **T14. Extend the fleet audit writer with the eight computer actions.**
@@ -521,6 +534,7 @@
 - [ ] **T40. Author and hand-review migration B.**
     - From `apps/api/`:
       `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateAgentDemonstrations`
+    - Land it as `apps/api/src/migrations/1791110100000-CreateAgentDemonstrations.ts` (AW-11 slot 01).
     - Hand-check: two `CREATE TABLE`, four `CREATE INDEX`, one unique index on
       `(demonstrationId, seq)`, FKs on `agentId` / `nodeId` / `sessionId` / `userId`. No drops.
     - **Done when**: it applies twice cleanly and re-generation produces an empty diff.
@@ -638,6 +652,7 @@
       needs no join".
     - From `apps/api/`:
       `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateComputerRecordings`
+    - Land it as `apps/api/src/migrations/1791110200000-CreateComputerRecordings.ts` (AW-11 slot 02).
     - Hand-check: one `CREATE TABLE`, two `CREATE INDEX`, one `ADD COLUMN` on `agent_runs`, no
       drops.
     - **Done when**: it applies twice cleanly.
@@ -690,6 +705,23 @@
     - **Done when**: the existing `/agents/[id]/terminal` tab and
       `apps/web/e2e/flow-terminal-attach-contract.spec.ts` are provably unchanged, and the Node's
       long-advertised `terminal` capability finally has an executor behind it.
+
+- [ ] **T55a. Prove a display-less Node leases a terminal-only session.**
+    - **Test (agent, Jest)**: add
+      `packages/agent/src/fleet/__tests__/fleet-job.computer-session-capabilities.spec.ts` — a
+      lease case that enqueues a `computer-session`
+      job through the T13 dispatcher with `channels: ['terminal']` and leases it as a Node
+      advertising `['terminal','workspace','attended']` (no `screen`, no `input`): the job is
+      leased. The same Node leasing a `['screen']` session gets nothing, and a Node advertising
+      `['terminal','workspace']` (not attended) gets neither.
+    - **Test (node)**: extend `apps/node/src/core/executors/computer-session.spec.ts` — with the
+      browser probe resolving nothing and no display, a terminal-only session spawns the PTY,
+      publishes `ComputerTerminalFrame`s and never starts a capture.
+    - **Test (web unit)**: extend `computer-session.shared.unit.spec.ts` — that Node is listed as
+      watchable with `servableChannels: ['terminal']` and the screen channel's *no display*
+      reason beside it.
+    - **Done when**: spec FR-4a and its acceptance criterion hold end to end on a headless
+      machine started with `--attend`.
 
 - [ ] **T56. Add the `screen-stream` plugin capability.**
     - Create `packages/plugin/src/contracts/capabilities/screen-stream.interface.ts`, mirroring

@@ -261,9 +261,29 @@ export const HELP_BLOCK_KINDS = [
 	'unorderedList',
 	'note',
 	'shortcut',
-	'code'
+	'code',
+	'link'
 ] as const;
 export type HelpBlockKind = (typeof HELP_BLOCK_KINDS)[number];
+
+/** Spec FR-27a — what a `link` block may point at. Closed. */
+export const HELP_LINK_TARGET_TYPES = ['article', 'screen', 'external'] as const;
+export type HelpLinkTargetType = (typeof HELP_LINK_TARGET_TYPES)[number];
+
+export type HelpLinkTarget =
+	/** Another article, optionally at a heading. Resolved like a help link (spec FR-22). */
+	| { type: 'article'; articleId: string; headingId: string | null }
+	/** A KEY of `ROUTES` — never a literal path, the same rule as `documents` (spec FR-5.2). */
+	| { type: 'screen'; routeKey: string }
+	/** Absolute `https:` URL, no userinfo, <= 2048 chars (spec FR-27a). */
+	| { type: 'external'; href: string };
+
+export interface HelpLinkBlock {
+	kind: 'link';
+	/** Plain text, 1-80 chars, no inline markup. */
+	label: string;
+	target: HelpLinkTarget;
+}
 ```
 
 `packages/contracts/src/api/help/help.dto.ts`
@@ -300,12 +320,12 @@ which already re-exports several such folders. Additive only (Constitution X).
 
 ### 3.4 Migration — ships in the SAME PR as the entity (Constitution V)
 
-`apps/api/src/migrations/1789300000000-CreateHelpArticleFeedback.ts`
+`apps/api/src/migrations/1791250000000-CreateHelpArticleFeedback.ts`
 
-The newest migration in the tree today is `1789100000000-AddTaskGraphFanout.ts`, and
-[AW-14](../AW-14-whats-new/plan.md#34-migration-constitution-v--ships-in-the-same-pr-as-the-entity)
-reserves `1789200000000`, so `1789300000000` is the next free slot. Re-stamp if another migration
-lands first.
+`1791250000000` is AW-25 slot 00 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)).
+It sits above the newest migration on `develop` at time of writing (`1790100000000-AddReleaseVerification.ts`) and
+cannot collide with another epic's plan. Before merge, rebase on `develop`; if a newer migration
+has landed, re-stamp the filename and class name to exceed it.
 
 ```ts
 import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
@@ -320,7 +340,7 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm
  * Forward-only. `ifNotExists` on create; `down()` drops only the table this
  * migration created and touches no pre-existing object.
  */
-export class CreateHelpArticleFeedback1789300000000 implements MigrationInterface {
+export class CreateHelpArticleFeedback1791250000000 implements MigrationInterface {
 	public async up(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.createTable(
 			new Table({
@@ -416,6 +436,21 @@ three scripts already in that folder):
 3. Parse the body into the closed block grammar (spec FR-27). Anything outside the grammar —
    raw HTML, images, tables, block quotes — is a hard error naming the line. Nothing becomes raw
    markup (spec FR-28).
+   **Link blocks** (spec FR-27a). A line whose entire content is one Markdown link becomes
+   `{ kind: 'link', label, target }`; the target's scheme picks the type:
+
+   | Authored | Parsed target | Generator validation (hard error naming the line) |
+   | --- | --- | --- |
+   | `[Write a brief](help:missions#writing-a-brief)` | `{ type: 'article', articleId: 'missions', headingId: 'writing-a-brief' }` | the article id exists in the corpus; the heading id, when given, exists in that article (checked after step 4 for every article) |
+   | `[Open Missions](route:DASHBOARD_MISSIONS)` | `{ type: 'screen', routeKey: 'DASHBOARD_MISSIONS' }` | the key matches `^[A-Z][A-Z0-9_]*$`; existence in `ROUTES` is checked by the unit spec below, because the generator does not parse TypeScript |
+   | `[Status page](https://status.example.org)` | `{ type: 'external', href }` | `new URL(href)` succeeds; `protocol === 'https:'`; no `username` / `password`; length <= 2048 |
+
+   Everything else is a hard error: a link inside paragraph or list text (inline links are not in
+   the grammar); an empty or > 80-character label, or a label containing markup; a relative or
+   literal in-product path such as `/missions` (the message points the author at `route:`); any
+   other scheme — `http:`, `javascript:`, `data:`, `mailto:`, protocol-relative `//host`. The
+   `help:` targets are also collected into the `HelpTarget` union check, so an article link that
+   rots fails `tsc` exactly like a help link does (spec FR-5.3, FR-5.7).
 4. Slugify every `##` heading into an anchor id; duplicates inside one article are a hard error.
 5. Emit:
    - `apps/web/src/lib/help/help-catalog.generated.ts` — `HELP_ARTICLES` (metadata only:
@@ -437,7 +472,11 @@ the life of the page (spec FR-17).
 `documents` keys are validated by `apps/web/src/lib/help/help-catalog.unit.spec.ts`, which
 imports both the generated catalogue and `ROUTES` from
 [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) and asserts that
-every key exists and that none is `DASHBOARD_NOTIFICATIONS` (the documented dead route). Both
+every key exists and that none is `DASHBOARD_NOTIFICATIONS` (the documented dead route). The same
+spec walks every `link` block in `help-content.generated.json`: each `screen` `routeKey` exists in
+`ROUTES`, is not `DASHBOARD_NOTIFICATIONS`, and has no dynamic `:param` segment (a help article
+cannot know which record to open); each `external` `href` is re-parsed and must still be
+`https:` with no userinfo. Both
 `pnpm type-check` and `pnpm test` already gate every PR, so this is a real build gate.
 
 ---
@@ -770,6 +809,8 @@ audit trail.
 | `apps/web/src/lib/help/help-recents.unit.spec.ts` | 5-entry cap; move-to-top on repeat; 90-day expiry; a throwing storage API does not throw into render |
 | `apps/web/src/components/help/HelpCenterPanel.unit.spec.tsx` | browse / results / article / no-results / degraded / index-loading views; `Esc` precedence (article → results → browse → close); re-opening preserves query and scroll (spec S-22) |
 | `apps/web/src/components/help/HelpArticleReader.unit.spec.tsx` | Every block kind renders; no block kind produces raw markup; the "Open the screen" action disables with `Needs owner access`; the English-only notice appears only for non-`en` locales |
+| `apps/web/src/components/help/HelpArticleBlocks.unit.spec.tsx` | **`link` blocks**: an `article` target calls `openHelpAt` in the panel and renders a same-origin link on `/help/[slug]`; a `screen` target renders the `ROUTES` href and disables with `Needs owner access` when unreachable; an `external` target renders `target="_blank"`, `rel="noopener noreferrer"`, the leaving-the-app icon and the `externalLink` accessible text; a stale block with `javascript:`, `http:`, `data:` or an unresolvable article/route renders its label as plain text with no anchor |
+| `apps/web/src/lib/help/help-link-blocks.unit.spec.ts` | Imports the pure `parseArticleBody` the generator exports (the Vitest glob is `src/**/*.unit.spec.*`, so the spec lives beside the catalogue) and runs it over fixture articles: each of the three authored forms produces the exact `HelpLinkBlock`; an inline link, an empty or 81-character label, `/missions`, `http:`, `javascript:`, `data:`, `mailto:`, `//host`, a userinfo URL, a missing article and a missing heading each fail with the article path and line number |
 | `apps/web/src/components/help/HelpLink.unit.spec.tsx` | Renders the empty-state phrase and the error phrase; renders **nothing** for an unresolvable target; never renders as a primary button; calls `openHelpAt` rather than navigating |
 | `apps/web/src/components/help/HelpFeedback.unit.spec.tsx` | All six states in spec §6.10; the note field appears only after **No**; the 500-character cap; disabled while in flight; a second submission replaces rather than adds |
 | `apps/web/src/app/api/help/feedback/route.unit.spec.ts` | `bffProxy` wiring; article-id pattern rejection; note-length rejection; `422` and `429` mapped to the two copy strings without leaking the upstream body |

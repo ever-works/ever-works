@@ -385,16 +385,17 @@ Longest is 25 characters. Appended at the end; nothing reordered or removed (Con
 All three live in `apps/api/src/migrations/`, timestamp-prefixed, following the portable-DDL
 convention of `1789000000000-AddFleetCredentialRotation.ts` (`TableColumn` / `Table` objects,
 every step guarded on the current table shape so a partially-applied database converges,
-`down()` reverses everything).
+`down()` reverses everything). Timestamps are AW-16 slots 00–02 of the program's reserved
+migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)); re-stamp before merge if `develop` has moved past them.
 
-1. `apps/api/src/migrations/1789200000000-CreateModelAccountsAndPolicies.ts`
+1. `apps/api/src/migrations/1791160000000-CreateModelAccountsAndPolicies.ts`
    - `CREATE TABLE model_accounts` with the two unique indexes and the FK.
    - `CREATE TABLE model_policies` with its unique index.
    - No backfill: a workspace with no rows resolves to today's behaviour (spec FR-35).
-2. `apps/api/src/migrations/1789210000000-AddAgentRunModelRouting.ts`
+2. `apps/api/src/migrations/1791160100000-AddAgentRunModelRouting.ts`
    - `ALTER TABLE agent_runs ADD COLUMN modelRouting` (nullable json/text). No default, no
      backfill — a pre-existing run genuinely has no routing record and must not claim one.
-3. `apps/api/src/migrations/1789220000000-CreateModelCredentialBundle.ts`
+3. `apps/api/src/migrations/1791160200000-CreateModelCredentialBundle.ts`
    - `CREATE TABLE model_credential_bundle` with its unique index.
    - `ALTER TABLE fleet_nodes ADD COLUMN appliedModelBundleVersion` (int NULL) and
      `modelBundleRequestedAt` (timestamp NULL).

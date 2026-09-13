@@ -301,9 +301,11 @@ export const SKILL_CAPTURE_BUDGET_MS = 90_000;
 
 ### 3.4 The migration (Constitution V, forward-only)
 
-One file, one PR: `apps/api/src/migrations/1789300000000-AddSkillShelfReadinessAndTags.ts`.
-The timestamp sits above the current head, `1789100000000-AddTaskGraphFanout.ts` — verified by
-listing [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations).
+One file, one PR: `apps/api/src/migrations/1791080000000-AddSkillShelfReadinessAndTags.ts`.
+The timestamp is AW-08 slot 00 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)),
+above the newest on `develop` at time of writing, `1790100000000-AddReleaseVerification.ts` — verified by
+listing [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations). Re-stamp before merge
+if a newer migration has landed.
 
 `up()`:
 

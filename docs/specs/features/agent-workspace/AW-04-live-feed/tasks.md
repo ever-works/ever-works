@@ -55,8 +55,8 @@
 
 - [ ] **T3 · P1.** Ship the migration for T2, in the same PR.
     - From `apps/api/`: `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddActivityLogFeedActor`
-    - Rename the emitted file to `apps/api/src/migrations/1789400000000-AddActivityLogFeedActor.ts`
-      (the timestamp must sort after `1789100000000-AddTaskGraphFanout.ts`).
+    - Rename the emitted file to `apps/api/src/migrations/1791040000000-AddActivityLogFeedActor.ts`
+      (AW-04 slot 00, [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow); re-stamp before merge if a newer migration has landed on `develop`).
     - Hand-edit both index statements to `CREATE INDEX CONCURRENTLY` / `DROP INDEX CONCURRENTLY`
       and remove the migration's implicit transaction if the driver requires it.
     - **Done**: `up()` contains only `ADD COLUMN … NULL` and the two `CREATE INDEX`; there is no
@@ -322,7 +322,7 @@
     - **Test**: `packages/agent/src/database/repositories/feed-read-state.repository.spec.ts`.
 
 - [ ] **T31 · P2.** Migration for T30, in the same PR.
-    - `apps/api/src/migrations/1789410000000-CreateFeedReadState.ts` — `CREATE TABLE`, the FK to
+    - `apps/api/src/migrations/1791040100000-CreateFeedReadState.ts` (AW-04 slot 01) — `CREATE TABLE`, the FK to
       `users` with `ON DELETE CASCADE`, and the two partial unique indexes.
     - **Done**: forward-only; `down()` drops only the table and its indexes.
 

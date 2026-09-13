@@ -109,7 +109,7 @@ the in-process event bus rather than a per-connection DB poll (§2.2).
 | --- | --- |
 | Request-scoped `{tenantId, organizationId}` via `AsyncLocalStorage` | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts) |
 | Tier-C auto-stamping subscriber | [`apps/api/src/scope/scope-stamping.subscriber.ts`](../../../../../apps/api/src/scope/scope-stamping.subscriber.ts) |
-| Migrations (latest: `1789100000000-AddTaskGraphFanout.ts`) | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) |
+| Migrations (latest on `develop` at time of writing: `1790100000000-AddReleaseVerification.ts`) | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) |
 | Contracts package | [`packages/contracts/src/api/`](../../../../../packages/contracts/src/api/) + [`index.ts`](../../../../../packages/contracts/src/api/index.ts) |
 | Deterministic-counts + optional-AI-narrative precedent, with scan caps and degradation reasons | [`packages/agent/src/digest/digest.service.ts`](../../../../../packages/agent/src/digest/digest.service.ts) |
 | The only sanctioned model path | [`packages/agent/src/facades/ai.facade.ts`](../../../../../packages/agent/src/facades/ai.facade.ts) |
@@ -259,12 +259,13 @@ aspirational.
 
 ## 3. Data model
 
-> **Migration timestamp band.** This epic reserves `17894000000xx`. Sibling epics in this program
-> have reserved their own bands (AW-06 at `1789200000000`, AW-09 at `1789200000000`/`1789300000000`,
-> AW-01 at `1789600000000`), and they land in an arbitrary order. Re-check
-> [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) immediately before generating
-> each file and bump within the band if the number is taken — a duplicate timestamp is a silent
-> ordering bug, not a build error.
+> **Migration timestamps.** This epic uses its reserved block from the program rules
+> ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)): slot 00 `1791040000000`, slot 01 `1791040100000`. Every epic has
+> its own block, so no two plans can name the same timestamp. Epics still land in an arbitrary
+> order, so before merge the implementing PR rebases on `develop` and, if a migration newer than
+> its own has landed in [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/),
+> re-stamps to exceed it — a duplicate or out-of-order timestamp is a silent ordering bug, not a
+> build error.
 
 ### 3.1 Additive columns on `activity_log` (P1)
 
@@ -299,7 +300,7 @@ New indexes on the same entity:
 gains the same three fields, all optional — every one of the ~35 existing call sites compiles
 unchanged.
 
-**Migration:** `apps/api/src/migrations/1789400000000-AddActivityLogFeedActor.ts` — three
+**Migration:** `apps/api/src/migrations/1791040000000-AddActivityLogFeedActor.ts` — three
 `ADD COLUMN ... NULL` plus two `CREATE INDEX`. Forward-only, no backfill, no `NOT NULL`, no
 `DROP`. `down()` drops only what `up()` added.
 
@@ -354,7 +355,7 @@ Null-safe uniqueness, following the partial-unique-index style already used on `
 Exported from
 [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts).
 
-**Migration:** `apps/api/src/migrations/1789410000000-CreateFeedReadState.ts` — `CREATE TABLE` +
+**Migration:** `apps/api/src/migrations/1791040100000-CreateFeedReadState.ts` — `CREATE TABLE` +
 the two partial unique indexes + the FK. Forward-only.
 
 ### 3.4 Contracts
@@ -757,7 +758,7 @@ Sequencing: P1 has no dependencies. P2 depends on P1's read model only. P3 depen
 | **II — Capability-driven, no hardcoded plugin ids** | ✅ | The only place a plugin id appears is as *data* in `metadata.source`, rendered through a generic narration key with the source as a parameter. No `if (source === …)` branch exists in feed code (§7). |
 | **III — Source-of-truth repos** | ✅ N/A | The feed reads platform metadata (the audit trail). No work content moves into the database. |
 | **IV — Job runtime via `*_DISPATCHER`** | ✅ | P1/P2 introduce no long-running or retryable work, and say so explicitly (§6). P3's model call is dispatched through `FEED_AWAY_SUMMARY_DISPATCHER`; no call site imports a vendor SDK. |
-| **V — Forward-only migrations, same PR** | ✅ | Two migrations, each shipping in the PR that changes the entity: `1789400000000-AddActivityLogFeedActor.ts` (3 nullable columns + 2 indexes, no backfill) and `1789410000000-CreateFeedReadState.ts` (new table). No `DROP`, no `NOT NULL` on an existing table, no rename. The three new action-type members need no migration — `actionType` is a plain `varchar(50)` (§3.2). |
+| **V — Forward-only migrations, same PR** | ✅ | Two migrations, each shipping in the PR that changes the entity: `1791040000000-AddActivityLogFeedActor.ts` (3 nullable columns + 2 indexes, no backfill) and `1791040100000-CreateFeedReadState.ts` (new table). No `DROP`, no `NOT NULL` on an existing table, no rename. The three new action-type members need no migration — `actionType` is a plain `varchar(50)` (§3.2). |
 | **VI — Tests are a prerequisite** | ✅ | 8 unit specs, 3 controller specs, 5 web unit specs, 7 e2e specs, plus the untouched-`/activity` regression guard (§10). |
 | **VII — Secret hygiene** | ✅ | Narration reads an explicit per-action-type allow-list of `details` keys; every param is `<`/`>`-stripped and truncated. No credential can reach a feed line, and nothing new is logged. |
 | **VIII — Plugin counts in the canonical doc** | ✅ N/A | No plugin is added or removed. |

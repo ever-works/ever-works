@@ -231,13 +231,13 @@ zero count in the window.
 ### 3.2 Migrations
 
 Both live in [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations) (timestamp-prefixed,
-following the newest file there, `1789100000000-AddTaskGraphFanout.ts`). Per Constitution V they
+stamped from AW-09's reserved block — [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow) — and re-stamped before merge if `develop` has moved past them). Per Constitution V they
 ship in the **same PR** as the entity change.
 
 | File | Phase | Contents |
 | --- | --- | --- |
-| `apps/api/src/migrations/1789200000000-AddRunReceiptTelemetry.ts` | P2 | `ALTER TABLE agent_runs` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `modelIds`, `primaryModelId`, `skillsUsed`, `toolCallCount`, `creditsDebited`; `CREATE INDEX idx_agent_runs_user_started ON agent_runs (userId, startedAt)`; `ALTER TABLE plugin_usage_events` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`. |
-| `apps/api/src/migrations/1789300000000-AddAgentRunFailureAndTimeout.ts` | P3 | `ALTER TABLE agent_runs` add `failureCode`, `effectiveTimeoutSeconds`; `ALTER TABLE agents` add `maxRunDurationSeconds`. |
+| `apps/api/src/migrations/1791090000000-AddRunReceiptTelemetry.ts` | P2 | `ALTER TABLE agent_runs` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `modelIds`, `primaryModelId`, `skillsUsed`, `toolCallCount`, `creditsDebited`; `CREATE INDEX idx_agent_runs_user_started ON agent_runs (userId, startedAt)`; `ALTER TABLE plugin_usage_events` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`. |
+| `apps/api/src/migrations/1791090100000-AddAgentRunFailureAndTimeout.ts` | P3 | `ALTER TABLE agent_runs` add `failureCode`, `effectiveTimeoutSeconds`; `ALTER TABLE agents` add `maxRunDurationSeconds`. |
 
 Generation command from `apps/api/`:
 `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddRunReceiptTelemetry`,
@@ -941,7 +941,7 @@ Ships the whole navigation and reading experience over data that already exists.
 
 ### P2 — The cost breakdown (migration A)
 
-- Entity + migration `1789200000000-AddRunReceiptTelemetry.ts`.
+- Entity + migration `1791090000000-AddRunReceiptTelemetry.ts`.
 - Token tracker → AI operations → dispatch facade → AI facade token-split pass-through.
 - Per-run rollups (`inputTokens`…`toolCallCount`, `skillsUsed`) and settlement stamps
   (`primaryModelId`, `creditsDebited`).
@@ -951,7 +951,7 @@ Ships the whole navigation and reading experience over data that already exists.
 
 ### P3 — Upcoming and remediation (migration B)
 
-- Entity + migration `1789300000000-AddAgentRunFailureAndTimeout.ts`.
+- Entity + migration `1791090100000-AddAgentRunFailureAndTimeout.ts`.
 - Failure classification in the run tasks and the sweeper; `effectiveTimeoutSeconds` stamped at
   dispatch; `maxDuration` resolved from the Agent then the deployment default.
 - `maxRunDurationSeconds` on `UpdateAgentDto`; the dialog and server action.

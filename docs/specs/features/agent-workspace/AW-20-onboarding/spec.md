@@ -174,10 +174,12 @@ to use it.
 
 ### 2.3 The seven concrete gaps
 
-1. **Setup ends at infrastructure.** The wizard's thirteen steps are: welcome,
-   AI, storage, database, deployment, where-does-this-run, roles, chat
-   connection, plugins, create a Work. Nine of those are about *provisioning
-   plumbing*; none of them is about *delegating work*. The product's whole value
+1. **Setup ends at infrastructure.** With every default choice the wizard has
+   ten steps — welcome, AI, storage, database, deployment, where-does-this-run,
+   roles, chat connection, plugins, create a Work — and thirteen when the AI,
+   storage and deployment choices each add their configuration step. After the
+   welcome, every one of them is about *provisioning plumbing* or the account's
+   profile; none of them is about *delegating work*. The product's whole value
    proposition begins one screen after the wizard closes, and nothing carries the
    user across that line.
 
@@ -428,7 +430,10 @@ What is missing is a **spine** that walks a person through them in order, and a
 
 - **FR-1** Setup gains exactly **one** new step, **Your agents**, positioned
   immediately after the roles step and before the chat-connection step. Step
-  order, ids and skip semantics of every existing step are unchanged.
+  order, ids and skip semantics of every existing step are unchanged. The setup
+  flow therefore grows from **10 to 11** steps with every default choice and from
+  **13 to 14** when all three configuration steps apply, and any step counter
+  shows those totals.
 - **FR-2** The step is always shown and always skippable. Skipping records the
   skip and creates nothing.
 - **FR-3** The step proposes a **roster blueprint**: an ordered list of lanes.
@@ -1139,6 +1144,9 @@ A reviewer can run this list top to bottom against a build.
 
 - [ ] The setup flow has exactly one new step, titled **Your agents**, after the
       roles step and before the chat-connection step.
+- [ ] With every default choice the step counter on **Your agents** reads
+      `Step 8 of 11`; with a non-default AI choice, GitHub storage and a Vercel or
+      Kubernetes deployment it reads `Step 11 of 14`.
 - [ ] Skipping it creates nothing and records the skip.
 - [ ] With no roles answered, the general blueprint is proposed with the notice
       about having picked a starting point.

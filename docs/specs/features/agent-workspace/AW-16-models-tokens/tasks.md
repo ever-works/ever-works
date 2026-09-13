@@ -60,7 +60,7 @@ it does today.
     - **Done**: as T2.
 
 - [ ] **T4. Migration — model accounts and policies.**
-    - Create `apps/api/src/migrations/1789200000000-CreateModelAccountsAndPolicies.ts`.
+    - Create `apps/api/src/migrations/1791160000000-CreateModelAccountsAndPolicies.ts`.
     - `CREATE TABLE model_accounts` + `CREATE TABLE model_policies` with the unique indexes in
       plan §3.1 / §3.2 and the FK `model_accounts.userId → users(id) ON DELETE CASCADE`.
     - Portable DDL (`Table` / `TableColumn` / `TableIndex` objects, not raw SQL) and every step
@@ -72,7 +72,7 @@ it does today.
       T2 and T3 (Constitution V).
 
 - [ ] **T5. Migration — routing record on runs.**
-    - Create `apps/api/src/migrations/1789210000000-AddAgentRunModelRouting.ts` adding a
+    - Create `apps/api/src/migrations/1791160100000-AddAgentRunModelRouting.ts` adding a
       nullable `modelRouting` json column to `agent_runs`. No default, no backfill.
     - Add the matching `@Column({ type: 'simple-json', nullable: true }) modelRouting?:
       AgentRunModelRouting | null;` to `packages/agent/src/entities/agent-run.entity.ts`,
@@ -432,7 +432,7 @@ not. A workspace with no enrolled computers must see nothing new at all.
       export it from `packages/agent/src/entities/index.ts`.
     - Add `appliedModelBundleVersion` (int NULL) and `modelBundleRequestedAt` (timestamp NULL)
       to `packages/agent/src/entities/fleet-node.entity.ts`.
-    - Create `apps/api/src/migrations/1789220000000-CreateModelCredentialBundle.ts` doing both,
+    - Create `apps/api/src/migrations/1791160200000-CreateModelCredentialBundle.ts` doing both,
       portable DDL, guarded, with a full `down()`.
     - **Done**: `apps/api/src/migrations/__tests__/CreateModelCredentialBundle.spec.ts` proves
       apply / re-apply / revert and that no pre-existing `fleet_nodes` column is touched.

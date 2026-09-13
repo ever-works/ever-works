@@ -70,7 +70,7 @@
 
 - [ ] **T4. Migration — `memory_facts`.**
       From `apps/api/`, author
-      `apps/api/src/migrations/<timestamp>-CreateMemoryFacts.ts`.
+      `apps/api/src/migrations/1791070000000-CreateMemoryFacts.ts`.
       Branch on `queryRunner.connection.options.type === 'postgres'` for
       `vector(1536)` vs `TEXT`, and create the `ivfflat … vector_cosine_ops WITH
       (lists = 100)` index on Postgres only — copy the shape from
@@ -294,20 +294,20 @@
 - [ ] **T25. `WorkspaceContextFile` entity + migration.**
       Create `packages/agent/src/entities/workspace-context-file.entity.ts`
       (export from the entities barrel) and
-      `apps/api/src/migrations/<timestamp>-CreateWorkspaceContextFiles.ts`.
+      `apps/api/src/migrations/1791070100000-CreateWorkspaceContextFiles.ts`.
       Columns per plan §3.2; unique `(userId, organizationId, slug)`. No seed
       migration — rows are created lazily on first read.
 
 - [ ] **T26. `ContextFileRevision` entity + migration.**
       Create `packages/agent/src/entities/context-file-revision.entity.ts` and
-      `apps/api/src/migrations/<timestamp>-CreateContextFileRevisions.ts`.
+      `apps/api/src/migrations/1791070200000-CreateContextFileRevisions.ts`.
       Columns per plan §3.3; index
       `(targetType, targetId, fileKey, createdAt DESC)`.
 
 - [ ] **T27. `agents.notes_md` + migration.**
       Modify `packages/agent/src/entities/agent.entity.ts` to add `notesMd`
       beside `agentYml`; create
-      `apps/api/src/migrations/<timestamp>-AddAgentNotesMd.ts`
+      `apps/api/src/migrations/1791070300000-AddAgentNotesMd.ts`
       (`ADD COLUMN "notes_md" text NULL`).
 
 - [ ] **T28. Repositories.** `(parallel with T27)`
@@ -399,7 +399,7 @@
 - [ ] **T36. `agent_runs.context_load`.**
       Modify `packages/agent/src/entities/agent-run.entity.ts` to add
       `contextLoad?: RunContextLoad | null` (`simple-json`, nullable); create
-      `apps/api/src/migrations/<timestamp>-AddAgentRunContextLoad.ts`; write it
+      `apps/api/src/migrations/1791070400000-AddAgentRunContextLoad.ts`; write it
       from `AgentRunService` after assembly.
       **Done when**: existing runs read back `null` with no error.
 

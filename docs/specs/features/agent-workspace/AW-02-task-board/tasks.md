@@ -528,7 +528,8 @@ Re-read these before every task. They are what makes this epic additive.
       `packages/agent/src/entities/work-agent-preference.entity.ts`, documented like
       its neighbour `missionDefaultOutstandingCap` ("NULL = inherit the platform
       default of 2; clamped 1–30 at the service layer"), plus **one additive
-      forward-only migration** in `apps/api/src/migrations/` in the same PR.
+      forward-only migration** in `apps/api/src/migrations/` in the same PR, stamped
+      `1791020000000` (AW-02 slot 00, [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)).
     - Hand-check the generated migration: one `ADD COLUMN`, no `DROP`, no
       `ALTER … TYPE`, no `NOT NULL` without a default; `down` reverses only what `up`
       added.

@@ -163,12 +163,12 @@ is deliberately left unimplemented.
 
 ## 3. Data model
 
-Two migrations, one per phase, each shipping in the PR that changes the entity
-(Constitution V). Timestamps are chosen to sort after
-`apps/api/src/migrations/1789100000000-AddTaskGraphFanout.ts` and to avoid the ranges other
-Agent-Workspace epics have claimed.
+Three migrations, one per phase, each shipping in the PR that changes the entity
+(Constitution V). Timestamps are AW-13 slots 00–02 of the program's reserved migration blocks
+([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)), which sit above every migration on `develop` at time of writing
+and cannot collide with another epic; re-stamp before merge if `develop` has moved past them.
 
-### 3.1 P1 — `apps/api/src/migrations/1789500000000-AttentionMatrixFoundations.ts`
+### 3.1 P1 — `apps/api/src/migrations/1791130000000-AttentionMatrixFoundations.ts`
 
 **a. `notifications` — one additive column**
 
@@ -221,7 +221,7 @@ Users with the column `true` (the default) get no row and inherit the new defaul
 **e. `users` — nothing.** `emailBudgetAlerts` is retained and deprecated in a doc comment;
 `digestFrequency`'s default is changed in P3 (§3.3), not here.
 
-### 3.2 P2 — `apps/api/src/migrations/1789510000000-CreateAttentionHolds.ts`
+### 3.2 P2 — `apps/api/src/migrations/1791130100000-CreateAttentionHolds.ts`
 
 **a. `user_notification_preferences` — three additive columns**
 
@@ -266,7 +266,7 @@ test driver keeps working.
 Repository: `packages/agent/src/database/repositories/attention-hold.repository.ts`, exported from
 `packages/agent/src/database/index.ts` beside the other notification repositories.
 
-### 3.3 P3 — `apps/api/src/migrations/1789520000000-DigestDefaultWeekly.ts`
+### 3.3 P3 — `apps/api/src/migrations/1791130200000-DigestDefaultWeekly.ts`
 
 One statement: `ALTER TABLE "users" ALTER COLUMN "digestFrequency" SET DEFAULT 'weekly'`, plus the
 matching change to the entity's `@Column({ default: 'off' })`. **No `UPDATE`** — FR-40 says
@@ -650,7 +650,7 @@ Registry completion and correction (§3.1c), the empty-selection fix, `'email'` 
 target end to end (sentinel, sender port, delivery-log widening), `isSilent`, the `GET /matrix`
 and `POST /matrix/reset` routes, the rebuilt matrix UI with autosave, the full i18n namespace, the
 bell footer link, the budget-alert move onto the matrix with its opt-out backfill, and the
-regression-guard test. Migration `1789500000000-AttentionMatrixFoundations.ts`.
+regression-guard test. Migration `1791130000000-AttentionMatrixFoundations.ts`.
 
 Shipping P1 alone already closes every defect in §1.2 and delivers the scope brief's first four
 clauses (matrix, independent in-app/email switches, defaults, autosave).
@@ -660,7 +660,7 @@ clauses (matrix, independent in-app/email switches, defaults, autosave).
 The three preference columns, the `attention_holds` table and repository, the admission service in
 the fan-out listener, the budget card with its meters and dialog, `GET`/`PUT /attention-budget`,
 `GET /held`, the digest's two new sections, and hold expiry folded into the existing cleanup cron.
-Migration `1789510000000-CreateAttentionHolds.ts`.
+Migration `1791130100000-CreateAttentionHolds.ts`.
 
 P2 depends on P1's delivery-log `userId` column (it is what the count reads) and on the registry
 being complete (it is what `urgent` means).
@@ -683,7 +683,7 @@ Sequencing: **P1 → P2 → P3**, with no work in a later phase required for an 
 | **II — Capability-driven, no hardcoded plugin ids** | ✅ | The matrix's columns are derived from the user's channel rows; provider labels are resolved server-side through the plugin registry and travel in the DTO. This epic adds no plugin-id branch and explicitly must not import the existing hard-coded provider array from the Channels page (§7). |
 | **III — Source-of-truth repositories** | ✅ N/A | Nothing here touches work content. Everything read and written is platform preference metadata. |
 | **IV — Job runtime via `*_DISPATCHER`** | ✅ | **Zero new job types.** Email delivery reuses the existing `notification-channel-delivery` task through the already-bound `NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER` symbol; hold release rides digest composition on its existing schedule; hold expiry folds into the existing daily cleanup cron. No call site imports a third-party job-runtime SDK (§6). |
-| **V — Forward-only migrations, same PR** | ✅ | Three migrations, each in the PR that changes the entity: `1789500000000-AttentionMatrixFoundations` (one additive boolean, one nullability relaxation, two additive columns, two concurrent indexes, idempotent registry data), `1789510000000-CreateAttentionHolds` (three additive columns + one new table), `1789520000000-DigestDefaultWeekly` (a column default only). No `DROP COLUMN`, no `NOT NULL` on an existing populated column, no rename, no `UPDATE` against `users` (§3). |
+| **V — Forward-only migrations, same PR** | ✅ | Three migrations, each in the PR that changes the entity: `1791130000000-AttentionMatrixFoundations` (one additive boolean, one nullability relaxation, two additive columns, two concurrent indexes, idempotent registry data), `1791130100000-CreateAttentionHolds` (three additive columns + one new table), `1791130200000-DigestDefaultWeekly` (a column default only). No `DROP COLUMN`, no `NOT NULL` on an existing populated column, no rename, no `UPDATE` against `users` (§3). |
 | **VI — Tests are a prerequisite** | ✅ | Six Jest suites in the agent package, five in the API, three Vitest web units, four new Playwright specs, plus a named regression suite that must stay green — and a coverage test that fails when a producer gains an unregistered event key (§10). |
 | **VII — Privacy & secret hygiene** | ✅ | No new secret is introduced. Notification email bodies are composed from producer strings that are already sanitised and secret-redacted before storage; the sender adds no raw error text. The recipient address is never logged above debug. The encrypted channel `targetConfig` column is neither read nor rendered by the matrix — columns are labelled by `name` only. |
 | **VIII — Single source of truth for plugin lists** | ✅ N/A | No plugin is added or removed, so `docs/plugin-system/built-in-plugins.md` does not change. |

@@ -95,7 +95,7 @@ screen. Held actions are filed but not yet executed.*
   asserts there is **no** decorator-level unique index on the pair.
 
 - [ ] **T5. P1 migration.**
-  **Create** `apps/api/src/migrations/1789300000000-AddSafetyRailsCore.ts`.
+  **Create** `apps/api/src/migrations/1791240000000-AddSafetyRailsCore.ts`.
   `up()`: `CREATE TABLE autonomy_grants`, `rail_refusals`, `workspace_pauses` with every index
   from [plan §3.1–3.3](./plan.md); the hand-written
   `CREATE UNIQUE INDEX uq_workspace_pauses_scope ON workspace_pauses (tenantId, organizationId)`
@@ -336,7 +336,7 @@ screen. Held actions are filed but not yet executed.*
   `varchar`, so the enum itself needs no migration).
   **Modify** `packages/agent/src/entities/agent-run.entity.ts` — add nullable
   `stoppedByRefusalId`.
-  **Create** `apps/api/src/migrations/1789400000000-AddHeldActionExecution.ts` adding the eleven
+  **Create** `apps/api/src/migrations/1791240100000-AddHeldActionExecution.ts` adding the eleven
   columns plus the partial index
   `idx_proposals_execution_pending ON agent_action_proposals (expiresAt) WHERE executionState = 'pending'`.
   `down()` drops the columns.
@@ -512,7 +512,7 @@ write-only-credential invariant made total.*
   `refreshToken` and `idToken` to `text` and apply the transformer from
   `packages/agent/src/entities/_secret-json-column.ts`. Keep the existing `@Exclude()` markers —
   encryption is defence in depth, not a replacement.
-  **Create** `apps/api/src/migrations/1789500000000-EncryptAuthAccountTokens.ts` — column type
+  **Create** `apps/api/src/migrations/1791240200000-EncryptAuthAccountTokens.ts` — column type
   changes only; **no data transformation inside the migration**, so a boot-time `migrationsRun`
   never blocks on a crypto pass. `down()` reverts the types.
   **Test**: **create** `packages/agent/src/entities/__tests__/auth-account.encryption.spec.ts` — a

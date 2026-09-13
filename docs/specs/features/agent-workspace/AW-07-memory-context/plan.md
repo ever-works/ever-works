@@ -368,13 +368,16 @@ skippedChars }> }`. Additive, nullable, no backfill. Feeds AW-09's run receipt.
 
 ### 3.6 Migrations (forward-only, `apps/api/src/migrations/`)
 
+Timestamps are AW-07 slots 00–04 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)),
+in apply order; the implementing PR re-stamps them before merge if `develop` has moved past them.
+
 | File | Contents |
 | --- | --- |
-| `<ts>-CreateMemoryFacts.ts` | `memory_facts` table, all indexes, both CHECKs. `vector(1536)` when `connection.options.type === 'postgres'`, else `TEXT`; `ivfflat` index Postgres-only. Copy the branching from `1779975000000-CreateWorkKnowledgeChunks.ts`. `down()` drops indexes then the table. |
-| `<ts>-CreateWorkspaceContextFiles.ts` | `workspace_context_files` + unique index. |
-| `<ts>-CreateContextFileRevisions.ts` | `context_file_revisions` + target index. |
-| `<ts>-AddAgentNotesMd.ts` | `ALTER TABLE "agents" ADD COLUMN "notes_md" text NULL`. |
-| `<ts>-AddAgentRunContextLoad.ts` (P2) | `ALTER TABLE "agent_runs" ADD COLUMN "context_load" text NULL`. |
+| `1791070000000-CreateMemoryFacts.ts` | `memory_facts` table, all indexes, both CHECKs. `vector(1536)` when `connection.options.type === 'postgres'`, else `TEXT`; `ivfflat` index Postgres-only. Copy the branching from `1779975000000-CreateWorkKnowledgeChunks.ts`. `down()` drops indexes then the table. |
+| `1791070100000-CreateWorkspaceContextFiles.ts` | `workspace_context_files` + unique index. |
+| `1791070200000-CreateContextFileRevisions.ts` | `context_file_revisions` + target index. |
+| `1791070300000-AddAgentNotesMd.ts` | `ALTER TABLE "agents" ADD COLUMN "notes_md" text NULL`. |
+| `1791070400000-AddAgentRunContextLoad.ts` (P2) | `ALTER TABLE "agent_runs" ADD COLUMN "context_load" text NULL`. |
 
 All additive. No `DROP COLUMN`, no rename, no data loss on revert.
 

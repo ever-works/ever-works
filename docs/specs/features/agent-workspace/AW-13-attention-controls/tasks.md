@@ -123,7 +123,7 @@
 - [ ] **T8 · P1.** Ship the migration for T7 and the registry data, in the same PR.
     - From `apps/api/`: `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AttentionMatrixFoundations`,
       then rename the emitted file to
-      `apps/api/src/migrations/1789500000000-AttentionMatrixFoundations.ts`.
+      `apps/api/src/migrations/1791130000000-AttentionMatrixFoundations.ts`.
     - Hand-edit `up()` so it contains **only**:
       `ALTER TABLE "notifications" ADD COLUMN "isSilent" boolean NOT NULL DEFAULT false`;
       `ALTER TABLE "notification_channel_delivery_log" ALTER COLUMN "channelId" DROP NOT NULL`;
@@ -380,7 +380,7 @@
 
 - [ ] **T27 · P2.** The hold entity and its repository.
     - Create `packages/agent/src/entities/attention-hold.entity.ts` (`attention_holds`) with the
-      columns and two indexes in [plan §3.2b](./plan.md#32--p2--appsapisrcmigrations1789510000000-createattentionholdsts).
+      columns and two indexes in [plan §3.2b](./plan.md#32--p2--appsapisrcmigrations1791130100000-createattentionholdsts).
       Use `PortableDateColumn` from `packages/agent/src/entities/_types.ts` for every timestamp,
       as `notification-channel-delivery-log.entity.ts` already does, so the SQLite test driver
       keeps working.
@@ -393,7 +393,7 @@
       test harness; `pnpm --filter @ever-works/agent type-check` is green.
 
 - [ ] **T28 · P2.** Ship the migration for T26 + T27, in the same PR.
-    - `apps/api/src/migrations/1789510000000-CreateAttentionHolds.ts` — three `ADD COLUMN … NOT
+    - `apps/api/src/migrations/1791130100000-CreateAttentionHolds.ts` — three `ADD COLUMN … NOT
       NULL DEFAULT` on `user_notification_preferences`, `CREATE TABLE attention_holds` with its
       FK to `users` (`ON DELETE CASCADE`) and its two indexes.
     - **Done**: `up()` has no `DROP`, no rename, no backfill; `down()` reverses exactly it;
@@ -495,7 +495,7 @@
 - [ ] **T37 · P3.** Weekly digest for new accounts.
     - `packages/agent/src/entities/user.entity.ts` — change `digestFrequency`'s column default
       from `'off'` to `'weekly'`.
-    - Create `apps/api/src/migrations/1789520000000-DigestDefaultWeekly.ts` with a single
+    - Create `apps/api/src/migrations/1791130200000-DigestDefaultWeekly.ts` with a single
       `ALTER TABLE "users" ALTER COLUMN "digestFrequency" SET DEFAULT 'weekly'` and a comment
       stating that **no `UPDATE` is intentional** (spec FR-40).
     - **Done**: a freshly registered user has `weekly`; every existing row is unchanged.

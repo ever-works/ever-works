@@ -249,7 +249,7 @@ Indexes:
 
 ### 3.4 Migration (Constitution V — same PR)
 
-`apps/api/src/migrations/1789700000000-CreatePlaybookAdoptions.ts`
+`apps/api/src/migrations/1791210000000-CreatePlaybookAdoptions.ts`
 
 Forward-only. `up()` creates both tables and all seven indexes; `down()` drops them in reverse
 order. Nothing is backfilled — before this migration no adoption existed, so there is no data to
@@ -259,8 +259,8 @@ The partial unique index is written as raw SQL in the migration (`CREATE UNIQUE 
 status = 'provisioning'`) and declared on the entity with TypeORM's `where` option so
 `migration:generate` does not keep proposing it.
 
-> Migrations live in `apps/api/src/migrations/` (verified: 160+ files, latest
-> `1789100000000-AddTaskGraphFanout.ts`) and self-apply on boot via `migrationsRun`. Constitution
+> Migrations live in `apps/api/src/migrations/` (latest on `develop` at time of writing
+> `1790100000000-AddReleaseVerification.ts`; this epic's timestamp is its reserved block's slot 00, [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)) and self-apply on boot via `migrationsRun`. Constitution
 > §V's `src/database/migrations` path predates the move; the live directory is the one above.
 
 ### 3.5 New contract types (no schema)
@@ -858,7 +858,7 @@ P1's catalogue is unaffected.
 | **II — Capability-driven** | ✅ | Playbooks declare **capabilities** (`search`, `email-outbound`), never provider ids. Readiness resolves them through the registry. No plugin id literal exists under `apps/api/src/catalog/**` or `apps/web/src/components/catalog/**`. |
 | **III — Source-of-truth repos** | ✅ | Nothing here writes Work content. The artefacts playbooks produce (Knowledge Base documents) go through the existing KB path, which already mirrors to the user's data repo. |
 | **IV — Job runtime** | ✅ | Provisioning and the stuck sweep both go through `PLAYBOOK_ADOPTION_DISPATCHER`; no call site imports `@trigger.dev/sdk`; `adopt` returns 202 immediately. |
-| **V — Forward-only migrations** | ✅ | `apps/api/src/migrations/1789700000000-CreatePlaybookAdoptions.ts` ships in the same PR as both entities. Creates only; alters nothing; `down()` drops in reverse. |
+| **V — Forward-only migrations** | ✅ | `apps/api/src/migrations/1791210000000-CreatePlaybookAdoptions.ts` ships in the same PR as both entities. Creates only; alters nothing; `down()` drops in reverse. |
 | **VI — Tests first-class** | ✅ | 14 named spec files across Vitest (plugin, web unit), Jest (agent, api) and Playwright (7 e2e flows), listed in §10 and enumerated as tasks. |
 | **VII — Secrets** | ✅ | No new setting holds a credential. The optional remote-source token, if configured, is declared `x-secret: true` in the plugin's settings schema and never returned. Telemetry carries slugs and counts only. |
 | **VIII — Canonical plugin list** | ✅ | The new plugin is added to `docs/plugin-system/built-in-plugins.md` and to no other count. |

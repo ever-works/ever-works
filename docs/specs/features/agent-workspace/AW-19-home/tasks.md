@@ -128,16 +128,35 @@
       and 6, `dueTotal` correctness.
 
 - [ ] **T6** (parallel with T3). Build the spend builder.
+    - **Scope the spend read first** ([plan §3.5](./plan.md)). Today
+      `CostsSummaryService.getSummary(userId, windowDays)` and
+      `BudgetService.summarizeForUser(userId, prefs)` both aggregate by `userId`
+      only. Add an optional trailing `scope?: OwnershipScope` to
+      `PluginUsageRepository.getTotalSpendCentsForUser` (applied with
+      `ownershipSqlPredicate('e', scope)` from
+      `packages/agent/src/database/ownership-scope.ts`) and to
+      `CostsSummaryService.getSummary`, threading it to the spend sum and the run
+      count. Omitted ⇒ the SQL is unchanged, so the costs controller and budget
+      enforcement keep today's totals.
     - Create `packages/agent/src/home/builders/spend.builder.ts` calling
-      `CostsSummaryService.getSummary(userId, HOME_SPEND_WINDOW_DAYS)`
-      (`packages/agent/src/subscriptions/credits/costs-summary.service.ts`) and
-      the account-wide budget summary that backs `GET /me/usage/account-wide`.
-    - Compute `percentUsed` from period spend vs period cap; set `blocked` and
-      `allowOverage` from the budget summary; set `everSpent` false only when the
-      account has never recorded spend (so a brand-new account hides the panel).
+      `CostsSummaryService.getSummary(userId, HOME_SPEND_WINDOW_DAYS, scope)`
+      with the request's `OwnershipScope` for `totalCents`, `runsCount`,
+      `avgPerRunCents` and `scope { kind, name }`, and the **unscoped** account-wide
+      budget summary that backs `GET /me/usage/account-wide` for `accountCap`.
+    - Compute `accountCap.percentUsed` from account period spend vs the account
+      cap; set `blocked` and `allowOverage` from the budget summary; never derive
+      a cap percentage from the scoped total. Set `everSpent` false only when the
+      account has never recorded spend in any scope (so a brand-new account hides
+      the panel, but an empty Organization shows `$0.00`).
     - **Test**: `packages/agent/src/home/__tests__/spend-panel.spec.ts` — the
       pinned 7-day window, a null average at zero runs, the 80% / 100%
-      thresholds, blocked vs overage, `everSpent: false`.
+      thresholds, blocked vs overage, `everSpent: false`, the scope passed to
+      `getSummary` and not to `summarizeForUser`, and an empty Organization in a
+      spending account.
+    - **Test**: `packages/agent/src/database/repositories/plugin-usage.repository.scope.spec.ts`
+      and `packages/agent/src/subscriptions/credits/costs-summary.service.scope.spec.ts`
+      — usage in two Organizations and personal scope sums per scope; no scope
+      returns the unchanged user-wide total.
 
 - [ ] **T7** (parallel with T3). Build the recent-activity builder.
     - Create `packages/agent/src/home/builders/activity.builder.ts` reading the
@@ -207,7 +226,7 @@
       narrows; a foreign scope sees nothing; no scope parameter is accepted.
 
 - [ ] **T11.** Ship the index migration.
-    - Create `apps/api/src/migrations/1789300000000-AddAgentRunHomeIndexes.ts`
+    - Create `apps/api/src/migrations/1791190000000-AddAgentRunHomeIndexes.ts`
       adding `idx_agent_runs_user_status (userId, status)` and
       `idx_agent_runs_user_finished (userId, finishedAt)` to `agent_runs`.
     - Use `queryRunner.getTable('agent_runs')` + an `indices.some(...)` existence
@@ -329,10 +348,16 @@
 
 - [ ] **T21** (parallel with T18). The spend panel.
     - Create `apps/web/src/components/home/ThisWeekPanel.tsx`: headline total with
-      the `last 7 days` sublabel, the runs/average line (`—` at zero runs), the cap
-      bar with its neutral/amber/danger thresholds, the blocked-or-overage line,
-      the no-cap variant, and `Manage spend →` pointing at
-      `ROUTES.DASHBOARD_USAGE_COSTS`.
+      the `last 7 days in {scope}` sublabel, the runs/average line (`—` at zero
+      runs), then — visually separated — the account-wide cap bar labelled
+      `{percent}% of your account-wide cap this billing period` with its
+      neutral/amber/danger thresholds and the `capScopeNote` line, the
+      blocked-or-overage line, the no-cap variant, and `Manage spend →` pointing at
+      `ROUTES.DASHBOARD_USAGE_COSTS` with the `Opens account-wide spend`
+      accessible description (spec FR-39a, FR-42).
+    - **Test**: `apps/web/src/components/home/ThisWeekPanel.unit.spec.tsx` — the
+      scope name renders in the sublabel (`Personal` without an Organization), and
+      the cap bar and blocked/overage line always contain `account-wide`.
     - Render nothing at all when `everSpent` is false.
 
 - [ ] **T22** (parallel with T18). The working-now panel.
@@ -441,7 +466,7 @@
       — owner scoping, cascade on user delete.
 
 - [ ] **T31.** The preference migration (**same PR as T30**).
-    - Create `apps/api/src/migrations/1789400000000-AddUserHomePreferences.ts`
+    - Create `apps/api/src/migrations/1791190100000-AddUserHomePreferences.ts`
       creating `user_home_preferences` (`userId` uuid PK, `hiddenBlocks` text
       nullable, `blockOrder` text nullable, `workspaceSectionExpanded` boolean
       nullable, `updatedAt` timestamp default now) plus a foreign key to
@@ -556,8 +581,9 @@
     - Create `apps/web/e2e/home-degradation.spec.ts` — spec scenarios S9, S10,
       S11, S18, S19, S21: first-run empty, one block failed with a working
       `Retry`, the whole summary failed with a live composer, the UTC footnote, an
-      Organization switch leaving no stale number, refresh suspended on a hidden
-      tab.
+      Organization switch leaving no stale number (seed usage in two Organizations:
+      the 7-day headline and run count change, the account-wide cap bar does not and
+      says so), refresh suspended on a hidden tab.
     - Create `apps/web/e2e/home-a11y.spec.ts` — landmarks and accessible names,
       keyboard-only decision answering, visible focus rings, 4.5:1 contrast in both
       themes, and a locale switch leaving no English behind.

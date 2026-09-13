@@ -34,7 +34,7 @@ the spec says so explicitly and justifies it.
 
 ## 1. Vocabulary — no new synonyms
 
-The single largest risk in a parity program is accidentally shipping a second word for a thing
+The single largest risk in a program this broad is accidentally shipping a second word for a thing
 we already have. The mapping is fixed here and every epic spec must honour it.
 
 | Concept | Ever Works noun (canonical) | Do **not** introduce |
@@ -133,12 +133,10 @@ directory. `S` = size (S/M/L/XL), `Dep` = blocking dependencies.
 | [AW-24](./AW-24-safety-rails/) | Safety rails & the trust ladder | `policy`, `merge-policy` | M | AW-03,15,17 |
 | [AW-25](./AW-25-help-center/) | Help centre in product | *new (small)* | S | AW-01 |
 
-## 4. Where parity is tracked
+## 4. Where progress is tracked
 
-- **[PARITY-MATRIX.md](./PARITY-MATRIX.md)** — every leaf capability, its current Ever Works
-  state, its target, its epic, and its implementation status. This is the scoreboard.
 - **[TRACKER.md](./TRACKER.md)** — spec status and implementation status per epic, updated as
-  work lands.
+  work lands. It is the single place progress on this program is recorded.
 
 ## 5. Rules every epic spec in this program must follow
 
@@ -156,3 +154,27 @@ directory. `S` = size (S/M/L/XL), `Dep` = blocking dependencies.
    camelCase and must never contain a literal `.`.
 9. **Every new surface answers "what did it cost?"** — if a feature can spend money or tokens, its
    receipt links to the run that spent it.
+10. **Migration timestamps come from the epic's reserved block.** TypeORM orders migrations in
+    `apps/api/src/migrations/` by the 13-digit timestamp prefix, and 25 epics authored in
+    parallel will otherwise all pick "the next free slot" and collide with each other and with
+    `develop`. Each epic owns the block
+    `1791` + *two-digit epic number* + *two-digit slot* + `00000`:
+
+    | Epic, slot | Timestamp |
+    | --- | --- |
+    | AW-03 slot 00 | `1791030000000` |
+    | AW-03 slot 01 | `1791030100000` |
+    | AW-11 slot 00 | `1791110000000` |
+
+    Slots are numbered from `00` in the order the epic applies its migrations (phase order,
+    then task order inside a phase), and the class name suffix carries the same timestamp
+    (`CreateDecisionAsks1791030000000`). Every block sits above the newest migration on `develop`
+    when the program was authored (`1790100000000-AddReleaseVerification.ts`). The rule has
+    two parts:
+    1. **While authoring**, the block guarantees uniqueness: no two epic plans can name the same
+       timestamp, and no plan can name one that already exists on disk.
+    2. **Before merge**, the implementing PR rebases on `develop`. If any migration with a
+       timestamp newer than its own has landed on `develop` in the meantime, the PR re-stamps
+       its migration(s) — filename and class name — to exceed the newest on `develop`, keeping
+       their relative order. Applied order must stay monotonic: a migration never merges with a
+       timestamp lower than one a deployed database has already run.

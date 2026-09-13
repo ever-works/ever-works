@@ -91,7 +91,7 @@
       `task_chat_messages`) could not be reused.
 
 - [ ] **T7 · Migration — SAME PR as T2–T6 (Constitution V)**
-      Create `apps/api/src/migrations/1789200000000-AddConversationKindAndParticipants.ts`.
+      Create `apps/api/src/migrations/1791120000000-AddConversationKindAndParticipants.ts`.
       `up()`: `ADD COLUMN` for every field in T4/T5/T6, `CREATE TABLE conversation_participants`,
       every P1 index, then the backfill — one `owner` participant row per existing conversation
       from its `userId`; `lastMessageAt = (SELECT MAX("createdAt") FROM conversation_messages …)`;
@@ -387,7 +387,7 @@
       `authorType='user'`.
 
 - [ ] **T41 · Migration — SAME PR as T40**
-      Create `apps/api/src/migrations/1789300000000-AddConversationGroupsAndPeers.ts`: `ADD COLUMN`
+      Create `apps/api/src/migrations/1791120100000-AddConversationGroupsAndPeers.ts`: `ADD COLUMN`
       for the four fields, the self-FK, and the index refresh on
       `idx_conversations_user_kind_activity` to include `archivedAt`.
       **Done:** additive only; `down()` drops in reverse order; the API boots against a P1 database.
@@ -517,7 +517,7 @@
       the channel a singleton under concurrent first use (spec FR-63).
 
 - [ ] **T58 · Migration — SAME PR as T57**
-      Create `apps/api/src/migrations/1789400000000-AddConversationChannelReach.ts`: `ADD COLUMN
+      Create `apps/api/src/migrations/1791120200000-AddConversationChannelReach.ts`: `ADD COLUMN
       reach`, `CREATE UNIQUE INDEX … WHERE kind = 'organization_channel'`.
       **Done:** additive only; the index creation is guarded so an existing duplicate (impossible by
       construction, but checked) fails loudly at migration time rather than silently.

@@ -187,7 +187,8 @@ person posts a message
 ## 3. Data model
 
 Entities live in `packages/agent/src/entities/`; migrations live in `apps/api/src/migrations/`
-(timestamp-prefixed; the newest on `develop` today is `1789100000000-AddTaskGraphFanout.ts`).
+(timestamp-prefixed; the newest on `develop` at time of writing is `1790100000000-AddReleaseVerification.ts`, and this epic
+stamps from its reserved block — [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)).
 **Constitution V: each entity change below ships its migration in the same PR.**
 
 ### 3.1 `conversations` — additive columns (P1 + P2 + P3)
@@ -311,9 +312,9 @@ existing `./tasks-domain` entry.
 
 | Phase | File **(new)** | Contents |
 | --- | --- | --- |
-| P1 | `apps/api/src/migrations/1789200000000-AddConversationKindAndParticipants.ts` | `ALTER TABLE conversations ADD` the six P1 columns; `ALTER TABLE conversation_messages ADD` the eight P1 columns; `ALTER TABLE agent_runs ADD conversationMessageId`; `CREATE TABLE conversation_participants`; all P1 indexes; a backfill that inserts one `owner` participant row per existing conversation from its `userId` and sets `lastMessageAt` from `MAX(conversation_messages.createdAt)` and `titleSource = 'auto'` where `metadata->>'aiTitle' = 'true'`. |
-| P2 | `apps/api/src/migrations/1789300000000-AddConversationGroupsAndPeers.ts` | `archivedAt`, `linkedConversationId`, `pausedReason`, `agentMessageStreak` + their FK and indexes. |
-| P3 | `apps/api/src/migrations/1789400000000-AddConversationChannelReach.ts` | `conversation_messages.reach`; `uq_conversations_org_channel`. |
+| P1 | `apps/api/src/migrations/1791120000000-AddConversationKindAndParticipants.ts` | `ALTER TABLE conversations ADD` the six P1 columns; `ALTER TABLE conversation_messages ADD` the eight P1 columns; `ALTER TABLE agent_runs ADD conversationMessageId`; `CREATE TABLE conversation_participants`; all P1 indexes; a backfill that inserts one `owner` participant row per existing conversation from its `userId` and sets `lastMessageAt` from `MAX(conversation_messages.createdAt)` and `titleSource = 'auto'` where `metadata->>'aiTitle' = 'true'`. |
+| P2 | `apps/api/src/migrations/1791120100000-AddConversationGroupsAndPeers.ts` | `archivedAt`, `linkedConversationId`, `pausedReason`, `agentMessageStreak` + their FK and indexes. |
+| P3 | `apps/api/src/migrations/1791120200000-AddConversationChannelReach.ts` | `conversation_messages.reach`; `uq_conversations_org_channel`. |
 
 Every statement is `ADD COLUMN` / `CREATE TABLE` / `CREATE INDEX`. No `DROP`, no rename, no retype.
 `down()` reverses each with `DROP COLUMN` / `DROP TABLE` in reverse order, per repo convention.

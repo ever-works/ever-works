@@ -93,7 +93,7 @@ the requirements enumeration, the detail panels, and the hourly sweep. No repair
   **Done when**: `pnpm --filter @ever-works/agent build` is clean.
 
 - [ ] **T5. Migration + backfill.**
-  **Create** `apps/api/src/migrations/1789300000000-AddSkillShelfReadinessAndTags.ts`.
+  **Create** `apps/api/src/migrations/1791080000000-AddSkillShelfReadinessAndTags.ts`.
   Generate the skeleton with
   `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddSkillShelfReadinessAndTags`,
   then hand-write the tag backfill described in [plan §3.4](./plan.md) — normalised in SQL,

@@ -188,12 +188,15 @@ time, so a renamed record shows its new name in Recent and a deleted one simply 
 One forward-only migration, in the **same PR** as the entities:
 
 ```
-apps/api/src/migrations/1789600000000-AddWorkspaceSearchIndex.ts
+apps/api/src/migrations/1791010000000-AddWorkspaceSearchIndex.ts
 ```
 
+The timestamp is AW-01 slot 00 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)); the
+implementing PR rebases on `develop` and re-stamps it before merge if a newer migration has landed.
+
 > **Path note.** The epic brief pointed at `packages/agent/src/migrations/`. That directory
-> does not exist in this repo. Migrations live in `apps/api/src/migrations/` (175 files, newest
-> `1789100000000-AddTaskGraphFanout.ts`) and are self-applied on API boot via TypeORM's
+> does not exist in this repo. Migrations live in `apps/api/src/migrations/` (newest on `develop`
+> at time of writing: `1790100000000-AddReleaseVerification.ts`) and are self-applied on API boot via TypeORM's
 > `migrationsRun`. The entity files live in `packages/agent/src/entities/`; the migration lives
 > with the API. This plan follows the repo.
 
@@ -697,7 +700,7 @@ Ships FR-23 and FR-24's confirming half. No new endpoint, no schema change.
 | **II — Capability-driven, no hardcoded plugin ids** | ✅ | The P2 `connection` kind resolves installed plugins through the existing registry/facade. A dedicated spec fails the build if a known plugin id appears in this epic's source tree. |
 | **III — Source-of-truth repositories** | ✅ | The palette indexes *platform metadata* (names, titles, paths, destinations) only. A Work's generated items live in the user's repositories and are explicitly out of scope (spec §7.6). |
 | **IV — Job runtime** | ✅ | The only background work is P2's refresh + reconcile, both dispatched via `WORKSPACE_SEARCH_INDEX_DISPATCHER` and a `schedules.task` cron on the configured provider. No call site imports a third-party SDK. |
-| **V — Forward-only migrations** | ✅ | P1 has no schema change. P2 ships `apps/api/src/migrations/1789600000000-AddWorkspaceSearchIndex.ts` in the same PR as the entities — two guarded `CREATE TABLE`s, no `ALTER`, no `DROP`, portable DDL, a `down()` that only drops what it created. |
+| **V — Forward-only migrations** | ✅ | P1 has no schema change. P2 ships `apps/api/src/migrations/1791010000000-AddWorkspaceSearchIndex.ts` in the same PR as the entities — two guarded `CREATE TABLE`s, no `ALTER`, no `DROP`, portable DDL, a `down()` that only drops what it created. |
 | **VI — Tests are a prerequisite** | ✅ | §10: 9 agent unit/integration specs, 2 controller specs, 8 web unit specs, 7 e2e specs — including a SQLite portability spec that exists precisely because a previous search path shipped a Postgres-only operator. |
 | **VII — Secrets** | ✅ | FR-34: no secret-bearing column enters the read model or the index. FR-36: the raw query never reaches a log or an analytics event, enforced by the event payload's type. |
 | **VIII — Plugin counts doc** | ✅ n/a | No plugin is added or removed; the canonical list is untouched. |

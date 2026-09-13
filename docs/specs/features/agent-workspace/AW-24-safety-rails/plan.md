@@ -221,7 +221,8 @@ set.
 ## 3. Data model
 
 > Migrations live in `apps/api/src/migrations/` (timestamp-prefixed; the highest on `develop`
-> today is `1789100000000-AddTaskGraphFanout.ts`). Entities live in
+> at time of writing is `1790100000000-AddReleaseVerification.ts`; this epic stamps from its reserved block,
+> [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). Entities live in
 > `packages/agent/src/entities/` and **must** also be registered in
 > [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts)
 > — this repo has no `autoLoadEntities`, so a `forFeature`'d-but-unregistered entity throws
@@ -347,9 +348,9 @@ for correctness and *required* for the guarantee — hence the one-shot job in �
 
 | Phase | File *(new)* | Contents |
 | --- | --- | --- |
-| P1 | `apps/api/src/migrations/1789300000000-AddSafetyRailsCore.ts` | `CREATE TABLE autonomy_grants`, `rail_refusals`, `workspace_pauses` with all indexes and the hand-written partial unique on `workspace_pauses`; FK `setByUserId`/`pausedByUserId` → `users(id) ON DELETE SET NULL`. `down()` drops the three tables only. |
-| P2 | `apps/api/src/migrations/1789400000000-AddHeldActionExecution.ts` | The ten `agent_action_proposals` columns and `agent_runs.stopped_by_refusal_id`; a partial index `idx_proposals_execution_pending ON agent_action_proposals (expiresAt) WHERE executionState = 'pending'`. `down()` drops the columns. |
-| P3 | `apps/api/src/migrations/1789500000000-EncryptAuthAccountTokens.ts` | `ALTER TABLE account ALTER COLUMN "accessToken" TYPE text` (and the two siblings). **No data is transformed inside the migration** — encryption happens in the backfill job (§6.4) so a long-running crypto pass never blocks a boot-time `migrationsRun`. `down()` reverts the types. |
+| P1 | `apps/api/src/migrations/1791240000000-AddSafetyRailsCore.ts` | `CREATE TABLE autonomy_grants`, `rail_refusals`, `workspace_pauses` with all indexes and the hand-written partial unique on `workspace_pauses`; FK `setByUserId`/`pausedByUserId` → `users(id) ON DELETE SET NULL`. `down()` drops the three tables only. |
+| P2 | `apps/api/src/migrations/1791240100000-AddHeldActionExecution.ts` | The ten `agent_action_proposals` columns and `agent_runs.stopped_by_refusal_id`; a partial index `idx_proposals_execution_pending ON agent_action_proposals (expiresAt) WHERE executionState = 'pending'`. `down()` drops the columns. |
+| P3 | `apps/api/src/migrations/1791240200000-EncryptAuthAccountTokens.ts` | `ALTER TABLE account ALTER COLUMN "accessToken" TYPE text` (and the two siblings). **No data is transformed inside the migration** — encryption happens in the backfill job (§6.4) so a long-running crypto pass never blocks a boot-time `migrationsRun`. `down()` reverts the types. |
 
 Generate each with
 `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>`

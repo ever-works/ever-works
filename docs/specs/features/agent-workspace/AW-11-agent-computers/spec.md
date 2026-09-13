@@ -397,6 +397,12 @@ operator-configurable the default and the clamp are both given.
   MUST state the current mode in prose on screen at all times, never only by colour or icon.
 - **FR-4** The surface MUST offer exactly two channels — **screen** and **terminal** — with at
   most one active at a time, and MUST show which channels the selected Node can serve.
+- **FR-4a** A session MUST ask of its Node only what the channels it requests need: the screen
+  channel needs a Node that can show a screen, the terminal channel needs a Node that can serve a
+  shell, and every session — whatever its channels — needs live viewing switched on for that
+  machine (attended mode, U4). A Node with no display session and no browser MUST still be able to
+  serve a terminal-only session; only a request that includes the screen channel is refused for
+  lacking a display or a browser.
 - **FR-5** Opening the surface MUST NOT pause, cancel, steer or otherwise alter any Run.
 
 ### 4.2 The session
@@ -577,7 +583,11 @@ operator-configurable the default and the clamp are both given.
   Node first, then online Nodes by most recent heartbeat, then the rest.
 - **FR-70** Every Node row MUST carry a status dot, name, platform, last heartbeat in relative
   time, and — when it cannot be watched — a one-line reason drawn from a closed set: offline,
-  paused, disabled, draining, no display, no browser, not attended, cluster node.
+  paused, disabled, draining, no display, no browser, no terminal, not attended, cluster node.
+  *No display* and *no browser* make only the screen channel unavailable, and *no terminal* only
+  the terminal channel; a Node is unwatchable only when it can serve **neither** channel, and a
+  Node that can serve one channel is listed as watchable on that channel with the other channel's
+  reason shown beside it (FR-4a).
 - **FR-71** Selecting a Node to watch MUST NOT change the Agent's affinity binding, and the picker
   MUST say so and link to where the binding is changed.
 - **FR-72** Cluster-derived Nodes MUST be listed as unwatchable with that reason, never hidden.
@@ -1262,6 +1272,9 @@ When there is nothing to play: *"This run was not recorded."* with the reason wh
 **Terminal channel**
 
 - [ ] The terminal channel streams a shell on the selected Node and names that machine.
+- [ ] An attended Node with no display session and no browser opens a terminal-only session: that
+      Node leases it and the shell streams, while a screen request to the same Node is refused
+      with the missing piece named.
 - [ ] It is read-only while watching and typable while in control.
 - [ ] The existing Agent Terminal tab behaves exactly as before.
 

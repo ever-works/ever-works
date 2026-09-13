@@ -474,12 +474,15 @@ Three files, all using `queryRunner.getTable()` existence guards and portable
 [`1789100000000-AddTaskGraphFanout.ts`](../../../../../apps/api/src/migrations/1789100000000-AddTaskGraphFanout.ts)
 exactly. Column names are camelCase — that is this database's convention, verified
 against every recent migration.
+Timestamps are AW-23 slots 00–02 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)),
+numbered in apply order (P1 halt, P2 level, P3 personality); re-stamp before merge if `develop`
+has moved past them.
 
 | File | Contents |
 | --- | --- |
-| `1789200000000-AddAgentLevel.ts` | `agents.level varchar(16) NULL`, `agents.levelSetAt timestamp NULL`, `agents.levelSetByUserId uuid NULL`. No backfill: every existing agent stays "not set" (FR-35). |
-| `1789210000000-AddAgentHaltReason.ts` | `agents.haltReason varchar(16) NULL`, `agents.haltNote varchar(200) NULL`, `agents.haltedAt timestamp NULL`, `agents.haltedByUserId uuid NULL`, `agents.haltedRunId uuid NULL`, `agents.haltDetail text NULL`, `agents.haltRepeatCount int NOT NULL DEFAULT 0`. Existing paused agents read as *"Paused by you"* with no time and no note, which is the truthful rendering of what we know about them. |
-| `1789220000000-AddAgentPersonality.ts` | `agents.personalityMd text NULL`, `agent_runs.personalityHash varchar(64) NULL`. |
+| `1791230000000-AddAgentHaltReason.ts` | `agents.haltReason varchar(16) NULL`, `agents.haltNote varchar(200) NULL`, `agents.haltedAt timestamp NULL`, `agents.haltedByUserId uuid NULL`, `agents.haltedRunId uuid NULL`, `agents.haltDetail text NULL`, `agents.haltRepeatCount int NOT NULL DEFAULT 0`. Existing paused agents read as *"Paused by you"* with no time and no note, which is the truthful rendering of what we know about them. |
+| `1791230100000-AddAgentLevel.ts` | `agents.level varchar(16) NULL`, `agents.levelSetAt timestamp NULL`, `agents.levelSetByUserId uuid NULL`. No backfill: every existing agent stays "not set" (FR-35). |
+| `1791230200000-AddAgentPersonality.ts` | `agents.personalityMd text NULL`, `agent_runs.personalityHash varchar(64) NULL`. |
 
 Every `down()` drops in reverse order with `findColumnByName` guards, re-reading the table
 between drops (sqlite rebuilds the table on `dropColumn`, which staleness the fan-out
@@ -1061,7 +1064,7 @@ Each phase is independently shippable and leaves `develop` green on its own.
 
 The safety half. Ships without levels and without personality.
 
-- `1789210000000-AddAgentHaltReason.ts`.
+- `1791230000000-AddAgentHaltReason.ts`.
 - `AgentHaltReason` enum, halt columns, `AgentHaltService`, `AgentHaltClassifier`.
 - `AgentStatusReasonResolver` + its unit spec.
 - `agentId` on `RunAdmissionInput`; `run-agent-brake.ts`; `agentBrakeMiddleware` in
@@ -1083,7 +1086,7 @@ The safety half. Ships without levels and without personality.
 
 ### P2 — Levels
 
-- `1789200000000-AddAgentLevel.ts`.
+- `1791230100000-AddAgentLevel.ts`.
 - `AgentLevel` enum, level columns, `AgentLevelService` (defaults, diff, preview,
   readiness).
 - `GET /levels`, `GET :id/level`, `POST :id/level/preview`, `PUT :id/level`;
@@ -1098,7 +1101,7 @@ back it.
 
 ### P3 — Personality and the finished card
 
-- `1789220000000-AddAgentPersonality.ts`.
+- `1791230200000-AddAgentPersonality.ts`.
 - `PERSONALITY.md` in the file name list, the read/write mapper and `hashOf`.
 - `personality` in `PROMPT_SEGMENTS` with a 600 cap; `personalityHash` stamped at
   assembly.

@@ -120,14 +120,14 @@ the repository is importable from `@ever-works/agent/database`.
 ### T-07 · Migration (same PR as T-04 — Constitution V)
 
 **Phase:** P1
-**Create:** `apps/api/src/migrations/1789200000000-CreateProductChangelogReads.ts`
+**Create:** `apps/api/src/migrations/1791140000000-CreateProductChangelogReads.ts`
 
 Copy the body from [plan.md §3.4](./plan.md#34-migration-constitution-v--ships-in-the-same-pr-as-the-entity).
 Create-only with `ifNotExists`; unique constraint; index; FK on `userId` → `users(id)`
 `ON DELETE CASCADE`; `down()` drops only `product_changelog_reads`.
 
-**Before committing:** confirm no migration with a higher timestamp has landed on `develop`
-since `1789100000000-AddTaskGraphFanout.ts`; if one has, re-stamp the filename and class name.
+**Before merge:** the timestamp is AW-14's reserved slot 00 ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). Rebase on
+`develop`; if a migration with a higher timestamp has landed, re-stamp the filename and class name.
 
 **Done when:** `cd apps/api && pnpm typeorm migration:run -d typeorm.config.ts` applies cleanly
 against a fresh database, a second run is a no-op, and `migration:revert` drops the table
@@ -759,7 +759,7 @@ control).
 | T-04 | Entity: `ProductChangelogRead` | P1 |
 | T-05 | Entity registration (4 files) | P1 |
 | T-06 | Repository + inventory + barrel | P1 |
-| T-07 | Migration `1789200000000-CreateProductChangelogReads.ts` | P1 |
+| T-07 | Migration `1791140000000-CreateProductChangelogReads.ts` | P1 |
 | T-08 | The catalogue | P1 |
 | T-09 | Changelog service | P1 |
 | T-10 | `MarkChangelogReadDto` | P1 |

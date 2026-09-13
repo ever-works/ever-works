@@ -270,12 +270,12 @@ Modify `packages/agent/src/entities/index.ts`,
 **Done:** `packages/agent/src/database/database.module.spec.ts` drift checks pass.
 
 **T031 [P2] — Migration (same PR as T029, Constitution V)**
-Create `apps/api/src/migrations/1789700000000-CreatePlaybookAdoptions.ts`. `up()` creates
+Create `apps/api/src/migrations/1791210000000-CreatePlaybookAdoptions.ts`. `up()` creates
 `playbook_adoptions` and `playbook_adoption_artifacts` plus all seven indexes, including the raw
 `CREATE UNIQUE INDEX uq_playbook_adoptions_inflight ON playbook_adoptions (userId, playbookSlug)
 WHERE status = 'provisioning'`. `down()` drops them in reverse. Alters no existing table.
 **Done:** `pnpm typeorm migration:run` applies cleanly on a fresh database and on one already
-carrying `1789100000000-AddTaskGraphFanout`; `migration:generate` afterwards proposes nothing.
+carrying every migration on `develop` (re-stamp before merge if one is newer than this file); `migration:generate` afterwards proposes nothing.
 
 ### Background work
 
@@ -489,7 +489,7 @@ indexes them.
 - [ ] Every acceptance-criteria checkbox in [spec.md §8](./spec.md#8-acceptance-criteria) passes on
       a running build.
 - [ ] `pnpm lint`, `pnpm type-check` and `pnpm test` are green from the repo root.
-- [ ] The migration applies forward on a database already at `1789100000000` and
+- [ ] The migration applies forward on a database already at the newest `develop` migration and
       `migration:generate` afterwards proposes no further change.
 - [ ] `grep -rn "'everworks-" apps/api/src/catalog apps/web/src/components/catalog` returns
       nothing (Constitution II).

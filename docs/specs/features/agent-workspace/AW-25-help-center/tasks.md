@@ -30,9 +30,11 @@ matches titles, summaries and keywords from the eager catalogue.
 Export `HELP_SECTIONS` (`as const` tuple of exactly `start-here`, `running-the-loop`,
 `your-agents`, `setup-and-connections`, `money-and-limits`, `when-something-goes-wrong`) with
 derived type `HelpSection`, and `HELP_BLOCK_KINDS` (`paragraph`, `heading`, `orderedList`,
-`unorderedList`, `note`, `shortcut`, `code`) with derived type `HelpBlockKind`. Doc-comment each
-citing spec FR-4 and FR-27 and stating that the sets are closed — adding a seventh section is a
-spec change.
+`unorderedList`, `note`, `shortcut`, `code`, `link`) with derived type `HelpBlockKind`. Also
+export `HELP_LINK_TARGET_TYPES` (`article`, `screen`, `external`), the `HelpLinkTarget`
+discriminated union and `HelpLinkBlock` exactly as in [plan §3.3](./plan.md). Doc-comment each
+citing spec FR-4, FR-27 and FR-27a and stating that the sets are closed — adding a seventh
+section or a ninth block kind is a spec change.
 
 **Done when:** both tuples are `as const`, both derived types are unions of string literals, and
 the tuple order matches the reading order in spec FR-4.
@@ -62,7 +64,10 @@ to the API barrel, following the existing one-line comment style naming the epic
 
 The README is the authoring contract. It must state: the frontmatter fields and their limits (spec
 FR-2, FR-3); that `documents` holds **keys of `ROUTES`**, never literal paths; the closed block
-grammar (spec FR-27) and that raw HTML, images, tables and block quotes are build errors; the rule
+grammar (spec FR-27) and that raw HTML, images, tables and block quotes are build errors; the three
+link-block forms — `[label](help:<article>#<heading>)`, `[label](route:<ROUTES key>)` and
+`[label](https://…)` — each on its own line, and that inline links, literal in-product paths and
+non-`https` schemes are build errors (spec FR-27a); the rule
 that an article may only be added alongside the screen it documents (spec FR-6); that a plugin
 count or list must link to `docs/plugin-system/built-in-plugins.md` rather than restate it
 (Constitution VIII); and the two approved help-link phrases (spec FR-24).
@@ -83,6 +88,13 @@ Implements plan §3.5 steps 1–6:
 - read every `.md` under `apps/web/src/content/help/`;
 - validate every limit in spec FR-3 and fail with the article path and the violated rule;
 - parse bodies into the closed block grammar, erroring with a line number on anything outside it;
+- parse **link blocks** per plan §3.5 step 3: a line that is exactly one Markdown link becomes
+  `{ kind: 'link', label, target }` with `help:` → `article`, `route:` → `screen`, `https:` →
+  `external`; reject inline links, empty or > 80-character labels, literal in-product paths,
+  every other scheme (`http:`, `javascript:`, `data:`, `mailto:`, `//host`) and userinfo URLs;
+  after headings are slugified, resolve every `article` target's article id and heading id;
+- export the pure `parseArticleBody(source, articlePath)` (no file I/O) so the grammar, including
+  link blocks, is unit-testable from `apps/web/src/lib/help/help-link-blocks.unit.spec.ts` (T-23);
 - slugify `##` headings into anchor ids, erroring on duplicates within an article;
 - emit `apps/web/src/lib/help/help-catalog.generated.ts` (metadata, `HELP_ARTICLES`,
   `HELP_SECTION_ORDER`, and `export type HelpTarget` as the union of every `id` and every
@@ -182,11 +194,24 @@ and the panel opens there, with no navigation.
 - `apps/web/src/components/help/HelpRelated.tsx`
 - `apps/web/src/components/help/HelpBuildStamp.tsx`
 
-`HelpArticleBlocks` renders exactly the seven block kinds from T-01 and **must not** use
-`dangerouslySetInnerHTML` anywhere (spec FR-28). External links are marked as leaving the app.
+`HelpArticleBlocks` renders exactly the eight block kinds from T-01 and **must not** use
+`dangerouslySetInnerHTML` anywhere (spec FR-28). The `link` case switches on `target.type`
+(spec FR-27a): `article` → `openHelpAt(formatHelpTarget(articleId, headingId))` inside the panel
+and a same-origin link on `/help/[slug]`, both via `resolveHelpTarget` from T-06; `screen` →
+the `ROUTES[routeKey]` href through the locale-aware link, disabled with `Needs owner access`
+under the same reachability check as "Open the screen" (spec FR-29); `external` →
+`<a target="_blank" rel="noopener noreferrer">` with the leaving-the-app icon and the
+`dashboard.helpCenter.externalLink` accessible text. The renderer re-checks the target at
+render time — an `href` that is not `https:`, or an article or route that does not resolve —
+and renders the label as plain text with no anchor. The `switch` has no `default`, so a future
+block kind is a compile error.
 `HelpOnThisPage` renders the heading list and collapses to a single expandable control below 768 px
 (spec FR-43). `HelpBuildStamp` reads the version already fetched for the footer and renders
 **nothing** when it is unknown (spec FR-8).
+
+**Test:** `apps/web/src/components/help/HelpArticleBlocks.unit.spec.tsx` — all three link
+target types, the disabled screen link, `rel`/`target` and the accessible text on external
+links, and plain-text fallback for `javascript:`, `http:`, `data:` and unresolvable targets.
 
 **Done when:** every block kind renders in both themes, and grepping these files for
 `dangerouslySetInnerHTML` returns nothing.
@@ -413,8 +438,16 @@ and every `helpTarget` used in T-19 and T-20 resolves.
 `help-catalog.unit.spec.ts` is the build gate for spec FR-5: it imports the generated catalogue and
 `ROUTES` from `apps/web/src/lib/constants.ts` and asserts every FR-3 limit, unique ids, unique
 anchors per article, exactly six sections, every `documents` key present in `ROUTES`, that none is
-`DASHBOARD_NOTIFICATIONS` (the documented dead route), every `related` id resolving, and the FR-9
-floor.
+`DASHBOARD_NOTIFICATIONS` (the documented dead route), every `related` id resolving, the FR-9
+floor, and for every `link` block: each `screen` `routeKey` present in `ROUTES`, not
+`DASHBOARD_NOTIFICATIONS` and free of `:param` segments, and each `external` `href` still
+`https:` with no userinfo (spec FR-5.7, FR-27a).
+
+Also create `apps/web/src/lib/help/help-link-blocks.unit.spec.ts` (it lives under `src/` because
+the Vitest glob is `src/**/*.unit.spec.*`): import the pure `parseArticleBody` that
+`scripts/build-help-catalog.mjs` exports and run it over fixture articles — the three authored
+forms produce the exact `HelpLinkBlock`, and every rejected form listed in T-04 fails with the
+article path and line number.
 
 **Done when:** `cd apps/web && pnpm test` passes and deliberately breaking any one invariant fails
 the suite with a message naming the article.
@@ -630,13 +663,13 @@ and `database.config.spec.ts` drift checks.
 ### T-36 · Migration (Constitution V — same PR as T-34)
 
 **Phase:** P3
-**Create:** `apps/api/src/migrations/1789300000000-CreateHelpArticleFeedback.ts`
+**Create:** `apps/api/src/migrations/1791250000000-CreateHelpArticleFeedback.ts`
 
 Exactly as in [plan.md §3.4](./plan.md#34-migration--ships-in-the-same-pr-as-the-entity-constitution-v):
 `createTable` with `ifNotExists`, the unique constraint, both indices, and the `userId` foreign key
-to `users(id)` `ON DELETE CASCADE`. `down()` drops only this table. The newest migration on
-`develop` today is `1789100000000-AddTaskGraphFanout.ts` and AW-14 reserves `1789200000000` —
-re-stamp to the next free slot if either has moved.
+to `users(id)` `ON DELETE CASCADE`. `down()` drops only this table. The timestamp is AW-25's
+reserved slot 00 ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). Before merge, rebase on `develop`
+and re-stamp the filename and class name if a newer migration has landed.
 
 **Done when:** from `apps/api/`, `pnpm typeorm migration:run -d typeorm.config.ts` applies cleanly
 on a fresh database **and** is a no-op on a database that already has the table, and `revert`

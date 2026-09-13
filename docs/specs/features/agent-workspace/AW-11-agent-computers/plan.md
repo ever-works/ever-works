@@ -210,6 +210,42 @@ executor behind the `terminal` capability tag every Node already advertises.
 
 The existing `/agents/[id]/terminal` tab and its worker-hosted session are untouched.
 
+#### Required capabilities are derived from the requested channels
+
+The fleet lease matcher requires **every** tag on a job: `nodeSatisfiesCapabilities` in
+`packages/contracts/src/fleet/fleet-jobs.types.ts` returns `required.every((tag) => available.has(tag))`,
+and `FleetJobService`'s lease loop (`packages/agent/src/fleet/fleet-job.service.ts`) skips any
+candidate that fails it. A fixed tag list would therefore lock out every display-less Node from
+a terminal-only session. The dispatcher never hard-codes the list; it calls one pure function in
+`computer-session.policy.ts`:
+
+```ts
+requiredCapabilitiesForChannels(channels: readonly ComputerChannel[]): string[]
+// ['screen']             -> ['attended', 'screen']
+// ['terminal']           -> ['attended', 'terminal']
+// ['screen', 'terminal'] -> ['attended', 'screen', 'terminal']
+// []                     -> refused before enqueue (FR-4 requires a channel)
+```
+
+- `screen` is added only when the screen channel is requested; `terminal` only when the terminal
+  channel is requested.
+- `attended` is added for **every** session and is not a display requirement. It is the Node's
+  live-viewing switch (`--attend`, spec U4), advertised independently of any display. It has to
+  stay on terminal-only sessions because it is the only server-side gate on them: lease
+  candidates are not filtered by job kind (`FleetJobRepository.findQueuedForNode`), and
+  `terminal` is in `BASE_CAPABILITIES` (`apps/node/src/core/capabilities.ts`), so without
+  `attended` any enrolled Node's ordinary work lane could lease a live shell session its owner
+  never switched on.
+- A headless server started with `--attend` advertises `terminal`, `workspace` and `attended` and
+  no `screen`, so it satisfies a terminal-only session and fails a screen session — which is the
+  behaviour spec FR-4a requires.
+
+`resolveWatchability` applies the same split: `no-browser` and `no-display` remove only the screen
+channel, `no-terminal` removes only the terminal channel, and a Node is unwatchable only when no
+channel remains. `POST /sessions` validates the requested channels against that result before
+enqueueing, so a refused channel is a `422` naming the missing capability rather than a job no
+Node will ever lease.
+
 ---
 
 ## 3. Data model
@@ -303,12 +339,14 @@ on boot. One migration per phase, additive only, `down` dropping exactly what `u
 
 | Phase | File | Contents |
 | --- | --- | --- |
-| P1 | `<ts>-CreateComputerSessions.ts` | `computer_sessions`, `node_agent_profiles`, 7 `ADD COLUMN` on `fleet_nodes`, their indexes. No `NOT NULL` without a default; no `ALTER … TYPE`. |
-| P2 | `<ts>-CreateAgentDemonstrations.ts` | `agent_demonstrations`, `agent_demonstration_steps`, indexes. |
-| P3 | `<ts>-CreateComputerRecordings.ts` | `computer_recording_segments`, its indexes, and `agent_runs.computerRecordedAt`. |
+| P1 | `1791110000000-CreateComputerSessions.ts` | `computer_sessions`, `node_agent_profiles`, 7 `ADD COLUMN` on `fleet_nodes`, their indexes. No `NOT NULL` without a default; no `ALTER … TYPE`. |
+| P2 | `1791110100000-CreateAgentDemonstrations.ts` | `agent_demonstrations`, `agent_demonstration_steps`, indexes. |
+| P3 | `1791110200000-CreateComputerRecordings.ts` | `computer_recording_segments`, its indexes, and `agent_runs.computerRecordedAt`. |
 
 `apps/api/src/migrations/` already holds 175 migrations; follow the neighbouring
-`1789000000000-AddFleetCredentialRotation.ts` for naming and shape.
+`1789000000000-AddFleetCredentialRotation.ts` for naming and shape. Timestamps are AW-11 slots
+00–02 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)); re-stamp before merge if
+`develop` has moved past them.
 
 ### 3.4 Contracts
 
@@ -330,7 +368,8 @@ New: `packages/contracts/src/computer/`
 - `computer-frame.codec.ts` — encode/decode/normalize, hand-rolled (the package is
   zero-dependency by design).
 - `computer-session.types.ts` — `ComputerSessionView`, `ComputerNodeOption` (with the closed-set
-  `unwatchableReason`), `NodeAgentProfileView`, `DemonstrationView`, `DemonstrationStepView`,
+  `unwatchableReason`, plus `servableChannels: ComputerChannel[]` and a per-channel reason so the
+  picker can say which channel is unavailable and why — spec FR-4, FR-70), `NodeAgentProfileView`, `DemonstrationView`, `DemonstrationStepView`,
   `DraftSkillView`.
 
 Changed (additive only, Constitution X):
@@ -372,7 +411,7 @@ explicit widening on top, never a default.
 | Method | Path | Body / query | Returns | Notes |
 | --- | --- | --- | --- | --- |
 | GET | `/nodes` | — | `ComputerNodeOption[]` | Every visible Node with `watchable` and a closed-set `unwatchableReason`. Composes from `FleetService.listForUser` + `FleetJobService.loadByNodeForUser`, the same pair the settings table and the runner pill use, so three surfaces cannot disagree. |
-| POST | `/sessions` | `{ nodeId?, channels?, quality? }` | `202 { sessionId, status }` | Refuses on kill switch (409), node state (409), session caps (429), missing capability (422). Throttled 10/min. |
+| POST | `/sessions` | `{ nodeId?, channels?, quality? }` | `202 { sessionId, status }` | `channels` defaults to `['screen']` when the Node can show a screen and to `['terminal']` otherwise. Refuses on kill switch (409), node state (409), session caps (429), and a requested channel the Node cannot serve (422, naming the channel and its missing capability — §2.5). Throttled 10/min. |
 | GET | `/sessions/:sessionId` | — | `ComputerSessionView` | Live relay view merged with the persisted row, exactly as the terminal status route does. |
 | PATCH | `/sessions/:sessionId` | `{ quality?, activeChannel? }` | `ComputerSessionView` | |
 | DELETE | `/sessions/:sessionId` | — | `204` | Idempotent. |
@@ -626,6 +665,7 @@ dashboard.computer
     noBrowserTitle         "No browser found on {node}"
     noBrowserBody          "{agent} needs its own browser on a machine before you can watch it work. Install Chrome, Edge or Chromium there, or point the node at one you already have."
     noDisplayTitle         "{node} has no display session"
+    noTerminalTitle        "{node} cannot serve a terminal right now"
     watchTerminalInstead   "Watch the terminal instead"
   notAttended
     title                  "Live view is switched off on {node}"
@@ -858,7 +898,14 @@ Runners, verified from each package's `package.json`: `packages/agent` → **Jes
 
 - `packages/agent/src/computer/__tests__/computer-session.service.spec.ts` — open/close state
   machine, every close reason, the 40 s abandon, the caps (2 per node / 5 per org), kill-switch
-  refusal, node-state refusals, run binding set once and never re-bound.
+  refusal, node-state refusals, run binding set once and never re-bound; a terminal-only open on
+  a display-less Node is accepted and a screen open on the same Node is refused `422`.
+- `packages/agent/src/computer/__tests__/computer-session.policy.spec.ts` —
+  `requiredCapabilitiesForChannels` for every channel combination (terminal-only never contains
+  `screen`; every result contains `attended`), and a lease-matcher case feeding those results
+  through the real `nodeSatisfiesCapabilities`: a Node advertising
+  `['terminal', 'workspace', 'attended']` satisfies `['terminal']` and fails `['screen']`, and a
+  Node without `attended` fails both.
 - `packages/agent/src/computer/__tests__/control-arbiter.spec.ts` — CAS win/lose, the stale
   releaser cannot evict a newer holder, idle release at the boundary ±1 ms, the 60-minute ceiling,
   one extension only, disconnect release at 30 s, request auto-decline at 60 s, hand-over.
@@ -911,15 +958,19 @@ Runners, verified from each package's `package.json`: `packages/agent` → **Jes
   probe resolves a binary (the same rule `browser` already follows), `attended` only under
   `--attend`.
 - `apps/node/src/core/executors/computer-session.spec.ts` — lease → capture → publish → complete,
-  graceful stop on drain, keep-alive at 1/3 TTL, `LEASE_TERMINATION_SAFETY_MS` respected.
+  graceful stop on drain, keep-alive at 1/3 TTL, `LEASE_TERMINATION_SAFETY_MS` respected; a
+  terminal-only session on a Node with no display and no browser spawns the PTY and never starts
+  a capture.
 - `apps/node/src/core/worker-loop.spec.ts` — extend: the attended fast poll runs at 2 s, backs off
   to 15 s after 10 empty polls, and returns to fast on a heartbeat carrying a pending session.
 
 ### 10.5 Web unit (Vitest, beside the component)
 
 - `apps/web/src/components/computer/computer-session.shared.unit.spec.ts` — watchability and its
-  reason for every node shape (offline, paused, disabled, draining, no display, no browser, not
-  attended, cluster), quality resolution, control eligibility, stall thresholds.
+  reason for every node shape (offline, paused, disabled, draining, no display, no browser, no
+  terminal, not attended, cluster), the servable channels for each (a display-less Node is
+  watchable on the terminal channel only), quality resolution, control eligibility, stall
+  thresholds.
 - `apps/web/src/components/computer/ComputerNodePicker.unit.spec.tsx` — ordering (bound first,
   then online by heartbeat), reason strings, the "does not change where work runs" note.
 - `apps/web/src/components/computer/TeachTaskDialog.unit.spec.tsx` — the guard blocks Start, the

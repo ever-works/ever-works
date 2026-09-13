@@ -390,9 +390,10 @@ read.
 ### 3.5 Migrations (Constitution V, forward-only)
 
 Authored from `apps/api/`, landing in
-[`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/):
+[`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/), stamped from AW-03's reserved
+block ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)) and re-stamped before merge if `develop` has moved past them:
 
-1. **`<ts>-CreateDecisionAsks.ts`** (P1) — `CREATE TABLE decision_asks` + its three
+1. **`1791030000000-CreateDecisionAsks.ts`** (P1) — `CREATE TABLE decision_asks` + its three
    indexes; `ALTER TABLE agent_escalations` ADD 5 columns + 1 index;
    `ALTER TABLE agent_action_proposals` ADD 6 columns + 2 indexes; then the
    provenance backfills — `agent_escalations.missionId` from `tasks.missionId`
@@ -400,7 +401,7 @@ Authored from `apps/api/`, landing in
    `agent_runs.taskId` followed by `missionId` from `tasks.missionId` — and a
    batched insert of one derived ask per currently-open escalation and pending
    proposal. `down` drops only what `up` created.
-2. **`<ts>-CreateDecisionHealthSnapshots.ts`** (P3) — `CREATE TABLE
+2. **`1791030100000-CreateDecisionHealthSnapshots.ts`** (P3) — `CREATE TABLE
    decision_health_snapshots` + 2 indexes; `ALTER TABLE work_agent_preferences`
    ADD 2 nullable int columns.
 

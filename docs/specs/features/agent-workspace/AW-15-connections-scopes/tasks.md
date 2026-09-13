@@ -55,7 +55,7 @@ two-level presets, scheduled health, reconnect.*
   will stamp it.
 
 - [ ] **T3. Migration + backfill.**
-  **Create** `apps/api/src/migrations/1789200000000-AddConnectionRegistry.ts`.
+  **Create** `apps/api/src/migrations/1791150000000-AddConnectionRegistry.ts`.
   `up()`: `CREATE TABLE connections` with all five indexes, then the three idempotent backfill
   statements from [plan §3.7](./plan.md) (MCP servers, plugin-prefixed `account` rows,
   `repo_connections`), each guarded by `WHERE NOT EXISTS`, ordering by `createdAt` for the
@@ -274,7 +274,7 @@ two-level presets, scheduled health, reconnect.*
   index has no nullable member (`targetId` is the owning `userId` for `workspace` rows).
 
 - [ ] **T21. Migration.**
-  **Create** `apps/api/src/migrations/1789210000000-AddConnectionGrantsAndUsage.ts`:
+  **Create** `apps/api/src/migrations/1791150100000-AddConnectionGrantsAndUsage.ts`:
   `CREATE TABLE connection_grants` (+ FK `connectionId → connections(id) ON DELETE CASCADE`,
   + its three indexes), `CREATE TABLE connection_run_usage` (+ its two indexes),
   `ALTER TABLE plugin_usage_events ADD COLUMN "connectionId" uuid NULL` +
@@ -419,7 +419,7 @@ two-level presets, scheduled health, reconnect.*
   **modify** `packages/agent/src/entities/index.ts`.
   **Create** `packages/contracts/src/connections/vault.types.ts` with `VaultSecretDto` whose
   `value` field is the **literal type** `'●●●●●●●●'` (a real secret then fails to type-check).
-  **Create** `apps/api/src/migrations/1789220000000-AddVaultAndMcpInteractiveAuth.ts`:
+  **Create** `apps/api/src/migrations/1791150200000-AddVaultAndMcpInteractiveAuth.ts`:
   `CREATE TABLE vault_secrets` (+ two indexes) and
   `ALTER TABLE mcp_server_connections ADD "authMode" varchar(16) NOT NULL DEFAULT 'header',
   ADD "oauthTokens" text NULL, ADD "oauthMetadata" text NULL`.
@@ -509,9 +509,36 @@ two-level presets, scheduled health, reconnect.*
   justification in a doc-comment above it.
   Name-collision check spans installed plugin ids **and** existing Connection labels; on
   collision nothing is persisted, including the pasted secret.
+  **Depends on T41a**: storing a `{{cred.key}}` reference in `authHeaders` is only correct once
+  the MCP client resolves it at connect time; do not merge T41 without it.
   **Test**: `apps/api/src/connections/mcp-onboarding.controller.spec.ts` — parse persists
   nothing; collision persists nothing; duplicate URL returns the existing Connection id;
   callback rejects an unknown state.
+
+- [ ] **T41a. Resolve MCP header credentials at connect time.**
+  **Create** `packages/agent/src/mcp/mcp-header-credentials.ts` — pure, no NestJS import:
+  `resolveHeaderCredentials(headers, resolved)` built on the existing `collectCredentialRefs` /
+  `interpolateCredentials` from `packages/agent/src/policy/credential-interpolation.ts`, returning
+  `{ headers, missing }` as a new object, plus `McpHeaderCredentialMissingError { keys }`.
+  **Modify** `packages/agent/src/mcp/mcp-client.service.ts` per [plan §4.3.1](./plan.md): inject
+  `@Optional() @Inject(CREDENTIAL_RESOLVER)`; in `connect()`, resolve with
+  `{ userId, organizationId, tenantId }` from the Connection, throw on `missing` **before**
+  `factory.connect`, and pass the resolved object only to the factory; extend
+  `redactHeaderValues` to scrub the resolved values; map the error in `classifyError` to
+  ``Missing credential `<key>` ``. Never assign resolved headers to the entity, the tools cache,
+  a log call or a monitoring breadcrumb.
+  **Modify** the T10 health classifier (`packages/agent/src/connections/connection-health.ts`)
+  so `McpHeaderCredentialMissingError` maps to `expired` with error code `credential_missing`,
+  and extend `connection-health.spec.ts` for it; add the *Missing credential* copy from
+  [spec §7.9](./spec.md) to `apps/web/messages/en.json`.
+  **Test**: `packages/agent/src/mcp/__tests__/mcp-header-credentials.spec.ts` (new) and an
+  extension of `packages/agent/src/mcp/__tests__/mcp-client.service.spec.ts` — resolved headers
+  reach the factory while the entity keeps the reference; a missing key throws before the
+  factory is called and names the key; an unbound resolver fails closed; a header with no
+  reference is sent unchanged; an SDK error echoing the resolved value is redacted; a spy logger
+  and the stamped `lastError` never contain the resolved value.
+  **Done when**: spec FR-47a and its two acceptance criteria hold, and every existing
+  `mcp-client.service.spec.ts` case passes unchanged.
 
 - [ ] **T42. MCP wizard UI + i18n.**
   **Create** `apps/web/src/components/settings/connections/AddMcpServerDialog.tsx` and

@@ -72,7 +72,7 @@
 | [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts) | The `ENTITIES` array consumed by the datasource config. |
 | [`packages/agent/src/database/_repository-inventory.ts`](../../../../../packages/agent/src/database/_repository-inventory.ts) + [`database/index.ts`](../../../../../packages/agent/src/database/index.ts) | `REPOSITORY_PROVIDERS` and the barrel. |
 | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts), [`scope-stamping.subscriber.ts`](../../../../../apps/api/src/scope/scope-stamping.subscriber.ts), [`scope-ownership.guard.ts`](../../../../../apps/api/src/scope/scope-ownership.guard.ts) | Resolve the active workspace, stamp `tenantId`/`organizationId` on insert, and gate reads. |
-| [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) | 175 timestamp-prefixed files; highest at time of writing is `1789100000000-AddTaskGraphFanout.ts`. |
+| [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) | Timestamp-prefixed files; highest on `develop` at time of writing is `1790100000000-AddReleaseVerification.ts`. This epic stamps from its reserved block ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). |
 
 ### 1.5 What does not exist today
 
@@ -260,7 +260,7 @@ collector, so adding a domain without a collector fails CI.
 
 ### 3.3 Migration (Constitution V — same PR as §3.1)
 
-**Create:** `apps/api/src/migrations/1789200000000-CreateWorkspaceBackups.ts` **(new)**
+**Create:** `apps/api/src/migrations/1791220000000-CreateWorkspaceBackups.ts` **(new)**
 
 - `up()` creates `workspace_backups` with `ifNotExists`, portable `Table` / `TableColumn` DDL so
   the better-sqlite3 CI driver and Postgres both apply it, a foreign key `userId → users(id)`
@@ -269,8 +269,8 @@ collector, so adding a domain without a collector fails CI.
 - `down()` drops only `workspace_backups`.
 - Forward-only, additive, no data movement, and every step existence-guarded so a partially
   applied database converges.
-- **Before committing**, confirm no migration with a higher timestamp landed on `develop` since
-  `1789100000000-AddTaskGraphFanout.ts`; re-stamp filename and class if one did.
+- The timestamp is AW-22 slot 00 ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). **Before merge**, rebase on `develop`;
+  if a migration with a higher timestamp has landed, re-stamp filename and class to exceed it.
 
 ### 3.4 Activity action types (no migration)
 

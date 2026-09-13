@@ -81,7 +81,7 @@
 | Storage plugin token | `KB_STORAGE_PLUGIN`, provided globally by [`apps/api/src/uploads/kb-storage.module.ts`](../../../../../apps/api/src/uploads/kb-storage.module.ts) |
 | Activity log enum | [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts) — has `KB_DOCUMENT_CREATED/UPDATED/DELETED/LOCKED/UNLOCKED/RESTORED`, `MEMORY_FOLDER_CREATED/DELETED/SYNCED`. **No archive, un-archive, filed, renamed or exported members yet.** |
 | Entity registries | [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts), [`packages/agent/src/database/_entity-names.ts`](../../../../../packages/agent/src/database/_entity-names.ts) (`AGENT_ENTITY_NAMES`), [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts) (`ENTITIES`, line 171) |
-| Migrations | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) — 175 files, latest `1789100000000-AddTaskGraphFanout.ts` |
+| Migrations | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) — latest on `develop` at time of writing `1790100000000-AddReleaseVerification.ts`; this epic stamps from its reserved block ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)) |
 | Contracts | [`packages/contracts/src/kb/`](../../../../../packages/contracts/src/kb/) — `kb-document.types.ts`, `kb-tree.types.ts`, `kb-search.types.ts`, `index.ts`, re-exported from [`packages/contracts/src/index.ts:5`](../../../../../packages/contracts/src/index.ts) |
 
 ---
@@ -255,7 +255,7 @@ MEMORY_FOLDER_RENAMED  = 'memory_folder_renamed'
 
 ### 3.5 The migration
 
-**File (new):** `apps/api/src/migrations/1789200000000-AddKnowledgeLibraryFoldersAndReadState.ts`
+**File (new):** `apps/api/src/migrations/1791060000000-AddKnowledgeLibraryFoldersAndReadState.ts`
 
 Ordered steps in `up()`:
 

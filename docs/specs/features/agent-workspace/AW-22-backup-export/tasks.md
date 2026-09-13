@@ -115,7 +115,7 @@ repository imports cleanly from `@ever-works/agent/database`.
 ### T-06 · Migration (same PR as T-03 — Constitution V)
 
 **Phase:** P1
-**Create:** `apps/api/src/migrations/1789200000000-CreateWorkspaceBackups.ts`
+**Create:** `apps/api/src/migrations/1791220000000-CreateWorkspaceBackups.ts`
 
 Follow [plan.md §3.3](./plan.md#33-migration-constitution-v--same-pr-as-31). Portable
 `Table`/`TableColumn` DDL with `ifNotExists`; FK `userId → users(id) ON DELETE CASCADE`; the two
@@ -124,8 +124,8 @@ plain indexes; the partial unique index via `queryRunner.query(...)` guarded on
 Model the file header and guard style on
 `apps/api/src/migrations/1789100000000-AddTaskGraphFanout.ts`.
 
-**Before committing:** confirm no migration with a higher timestamp has landed on `develop` since
-`1789100000000-AddTaskGraphFanout.ts`; if one has, re-stamp the filename **and** the class name.
+**Before merge:** the timestamp is AW-22's reserved slot 00 ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). Rebase on
+`develop`; if a migration with a higher timestamp has landed, re-stamp the filename **and** the class name.
 
 **Done when:** `cd apps/api && pnpm typeorm migration:run -d typeorm.config.ts` applies cleanly to
 a fresh database, a second run is a no-op, `migration:revert` drops only the new table, and the
@@ -770,9 +770,8 @@ domain table from `BACKUP_DOMAINS` rather than hand-maintaining it.
 **Phase:** P1
 **Modify:** `docs/specs/features/agent-workspace/README.md` (add *Workspace backup* to the
 vocabulary table in §1, per program rule #2),
-`docs/specs/features/agent-workspace/TRACKER.md` (AW-22 spec + P1 status). The program README also
-names `PARITY-MATRIX.md` as the leaf-capability scoreboard; it does not exist in the worktree yet,
-so add this epic's rows only once that file lands — do not create it from here.
+`docs/specs/features/agent-workspace/TRACKER.md` (AW-22 spec + P1 status, and the capabilities
+this phase delivered). TRACKER.md is the program's only progress record — do not create another.
 
 **Done when:** the vocabulary table names the one new noun this epic introduces and the tracker
 reflects the phase that shipped.
@@ -949,7 +948,7 @@ telemetry).
 **Phase:** P3
 **Modify:** `packages/agent/src/entities/workspace-backup.entity.ts` (add `origin` —
 `manual` | `scheduled` — and `retainedBy` so automatic archives can have their own retention)
-**Create:** `apps/api/src/migrations/<next-timestamp>-AddWorkspaceBackupSchedule.ts` plus a small
+**Create:** `apps/api/src/migrations/1791220100000-AddWorkspaceBackupSchedule.ts` (AW-22 slot 01) plus a small
 `workspace_backup_schedules` table (scope, cadence, hour, timezone, enabled, lastRunAt, nextRunAt)
 
 Additive columns and one new table; forward-only; same PR as the entity change (Constitution V).

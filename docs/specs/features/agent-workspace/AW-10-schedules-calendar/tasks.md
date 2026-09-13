@@ -36,7 +36,7 @@ safety.
 
 ### T2 · Migration A — **P1**
 
-**Create** `apps/api/src/migrations/<timestamp>-AddSchedulePauseColumns.ts`
+**Create** `apps/api/src/migrations/1791100000000-AddSchedulePauseColumns.ts`
 
 Generate with `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts
 src/migrations/AddSchedulePauseColumns`, then hand-edit to match the house style of
@@ -368,7 +368,7 @@ behaviour.
 
 ### T23 · Migration B — **P2**
 
-**Create** `apps/api/src/migrations/<timestamp>-AddScheduleDefinitionOptions.ts` — the nine columns
+**Create** `apps/api/src/migrations/1791100100000-AddScheduleDefinitionOptions.ts` — the nine columns
 and the health index, same style rules as T2, header comment stating that the defaults reproduce
 current behaviour for every existing row.
 
@@ -631,7 +631,7 @@ Same gate as T21. Ship P2 only on a green tree, and include the PR URL in the ha
 
 ### T42 · Migration C — **P3**
 
-**Create** `apps/api/src/migrations/<timestamp>-CreateScheduleBulkActions.ts` — the table and its
+**Create** `apps/api/src/migrations/1791100200000-CreateScheduleBulkActions.ts` — the table and its
 index, same style rules as T2. `down()` drops only this table.
 
 ### T43 · Bulk-action service — **P3**

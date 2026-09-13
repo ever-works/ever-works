@@ -57,7 +57,7 @@
       **Done:** compiles; the existing per-person semantics are unchanged when `scope = 'user'`.
 
 - [ ] **T5 · Migration (SAME PR as T1–T4 — Constitution V)**
-      Create `apps/api/src/migrations/1789200000000-AddKnowledgeLibraryFoldersAndReadState.ts`
+      Create `apps/api/src/migrations/1791060000000-AddKnowledgeLibraryFoldersAndReadState.ts`
       implementing the eight ordered steps in [plan §3.5](./plan.md#35-the-migration). Generate the
       starting point from `apps/api/` with
       `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddKnowledgeLibraryFoldersAndReadState`,

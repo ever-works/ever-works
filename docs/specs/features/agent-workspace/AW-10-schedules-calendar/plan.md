@@ -73,9 +73,9 @@ Dispatch indirection to respect (Constitution IV): [`packages/agent/src/tasks-do
 
 ### 1.5 Migrations
 
-Migrations live in **`apps/api/src/migrations/`** (175 files today; the highest timestamp is
-`1789200000000-AddRepoConnectionEnvGrants.ts`, so each migration this epic adds must sort after
-it). Note the drift: the constitution text says
+Migrations live in **`apps/api/src/migrations/`** (the highest timestamp on `develop` at time of writing is
+`1790100000000-AddReleaseVerification.ts`; each migration this epic adds takes a slot from AW-10's reserved
+block — [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow) — and is re-stamped before merge if `develop` has moved past it). Note the drift: the constitution text says
 `apps/api/src/database/migrations/`, and the repo `CLAUDE.md` says `apps/api/src/migrations/` —
 the second is correct on disk and is what this plan uses. Style to copy from
 `1789100000000-AddTaskGraphFanout.ts`:
@@ -319,9 +319,9 @@ and written with portable `TableColumn` DDL:
 
 | File | Phase | Contents |
 | --- | --- | --- |
-| `<ts>-AddSchedulePauseColumns.ts` | P1 | `tasks.recurrencePausedAt`; `agents.heartbeatPausedAt`; indexes `idx_tasks_recurrence_due_active`, `idx_agents_heartbeat_due`. No backfill — `NULL` on every existing row reads as "not paused", which is the current behaviour exactly. |
-| `<ts>-AddScheduleDefinitionOptions.ts` | P2 | The nine remaining `tasks.recurrence*` columns and `idx_tasks_recurrence_health`. `recurrenceAnnounce` defaults `true` and `recurrenceHideInstances` defaults `false`, both of which reproduce today's behaviour for existing rows (they announce nothing today because nothing reads the column, and their instances are already visible). |
-| `<ts>-CreateScheduleBulkActions.ts` | P3 | The `schedule_bulk_actions` table and its index. |
+| `1791100000000-AddSchedulePauseColumns.ts` | P1 | `tasks.recurrencePausedAt`; `agents.heartbeatPausedAt`; indexes `idx_tasks_recurrence_due_active`, `idx_agents_heartbeat_due`. No backfill — `NULL` on every existing row reads as "not paused", which is the current behaviour exactly. |
+| `1791100100000-AddScheduleDefinitionOptions.ts` | P2 | The nine remaining `tasks.recurrence*` columns and `idx_tasks_recurrence_health`. `recurrenceAnnounce` defaults `true` and `recurrenceHideInstances` defaults `false`, both of which reproduce today's behaviour for existing rows (they announce nothing today because nothing reads the column, and their instances are already visible). |
+| `1791100200000-CreateScheduleBulkActions.ts` | P3 | The `schedule_bulk_actions` table and its index. |
 
 No column is renamed, no data is destroyed, and every `down()` drops only what its `up()` added.
 

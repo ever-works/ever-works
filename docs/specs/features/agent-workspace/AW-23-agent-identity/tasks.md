@@ -60,8 +60,8 @@
       on the entity metadata.
 
 - [ ] **T3. Halt migration.**
-      Create `apps/api/src/migrations/1789210000000-AddAgentHaltReason.ts`, class
-      `AddAgentHaltReason1789210000000`. Seven `queryRunner.addColumn` calls guarded by
+      Create `apps/api/src/migrations/1791230000000-AddAgentHaltReason.ts`, class
+      `AddAgentHaltReason1791230000000`. Seven `queryRunner.addColumn` calls guarded by
       `getTable('agents')` + `findColumnByName`, portable `TableColumn` DDL, camelCase
       column names — copy the structure of
       `apps/api/src/migrations/1789100000000-AddTaskGraphFanout.ts` verbatim, including its
@@ -70,7 +70,7 @@
       **No backfill** — existing paused agents read as "Paused by you" with no time.
       **Done when**: `cd apps/api && pnpm typeorm migration:run -d typeorm.config.ts`
       applies cleanly on an empty database and on one already at
-      `1789100000000`, and `migration:revert` reverses it.
+      the newest `develop` migration, and `migration:revert` reverses it.
 
 - [ ] **T4. Parked-run reason and the admission input. (parallel with T5)**
       Modify `packages/agent/src/agents/run-admission-chain.ts`: add
@@ -326,8 +326,8 @@
       **Done when**: `pnpm --filter @ever-works/agent build` passes.
 
 - [ ] **T25. Level migration.**
-      Create `apps/api/src/migrations/1789200000000-AddAgentLevel.ts`, class
-      `AddAgentLevel1789200000000`. Three guarded additive columns, camelCase names,
+      Create `apps/api/src/migrations/1791230100000-AddAgentLevel.ts`, class
+      `AddAgentLevel1791230100000`. Three guarded additive columns, camelCase names,
       portable `TableColumn` DDL, guarded `down()`.
       **No backfill** — every existing agent stays `NULL` ("Level not set", spec FR-35).
       **Done when**: run and revert both clean, and a post-migration query confirms zero
@@ -434,8 +434,8 @@
       **Done when**: both packages build.
 
 - [ ] **T34. Personality migration.**
-      Create `apps/api/src/migrations/1789220000000-AddAgentPersonality.ts`, class
-      `AddAgentPersonality1789220000000`: `agents.personalityMd text NULL` and
+      Create `apps/api/src/migrations/1791230200000-AddAgentPersonality.ts`, class
+      `AddAgentPersonality1791230200000`: `agents.personalityMd text NULL` and
       `agent_runs.personalityHash varchar(64) NULL`, guarded, portable, with a guarded
       `down()` that re-reads each table between drops.
       **Done when**: run and revert both clean.

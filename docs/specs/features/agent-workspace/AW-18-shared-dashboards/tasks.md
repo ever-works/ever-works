@@ -54,7 +54,7 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
       spec in `packages/agent/src/database/__tests__/` is green.
 
 - [ ] **T2**. Write the migration for `shared_views`.
-    - Create `apps/api/src/migrations/1789200000000-CreateSharedViews.ts` (generate with
+    - Create `apps/api/src/migrations/1791180000000-CreateSharedViews.ts` (generate with
       `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateSharedViews`
       from `apps/api/`, then hand-check it).
     - Must create the table plus `UNIQUE(organizationId)`, `UNIQUE(tokenHash)` and
@@ -194,14 +194,77 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
     - Create `apps/api/src/shared-views/shared-view-public.controller.ts`,
       `@Controller('api/public/shared-view')`, `@Public()` (decorator from
       `apps/api/src/auth/decorators/public.decorator.ts`).
-    - `GET /:token/board`. Knowledge routes are added in P3 and return `404` until then.
-    - Two throttle buckets: 60/min keyed on the token hash, 600/hour keyed on the client;
-      both evaluated **before** the projection query. `429` carries `Retry-After: 60`.
-    - Unknown / rotated / paused tokens must produce a byte-identical response.
+    - `POST /sessions` with body `{ token }` (DTO field named `token`, so
+      `SentryInterceptor.SENSITIVE_BODY_KEYS` already drops it) → `{ viewSession, expiresAt }`,
+      and `GET /board` authorised by `Authorization: Bearer <viewSession>` through a
+      `SharedViewSessionGuard` (T14a). **No route takes the token in its path or query
+      string** (spec FR-7a; plan §4.2). Knowledge routes are added in P3 and return `404`
+      until then.
+    - Two throttle buckets: 60/min keyed on the token hash (the Shared view id for reads),
+      600/hour keyed on the client; both evaluated **before** the projection query. `429`
+      carries `Retry-After: 60`.
+    - Unknown / rotated / paused tokens, and a view session whose link was regenerated or
+      paused, must produce a byte-identical response.
+    - Drive the view counter and first-view notification from `POST /sessions`, not from
+      each read.
     - **Test**: `apps/api/src/shared-views/shared-view-public.controller.spec.ts` —
-      identical bodies for the three failure causes; every header present; `X-Robots-Tag`
-      omitted only when indexable; the `429` shape; and an assertion that no route accepts
-      a write verb.
+      identical bodies for every failure cause; every header present; `X-Robots-Tag`
+      omitted only when indexable; the `429` shape; an assertion that no read route accepts
+      a write verb; and a reflective assertion over the controller's route metadata that no
+      path or query parameter carries the token.
+
+- [ ] **T14a**. Add the view-session service and guard.
+    - Create `apps/api/src/shared-views/shared-view-session.service.ts` and
+      `shared-view-session.guard.ts` per plan §4.2: HMAC-SHA256 compact token with claims
+      `{ v, sid, rot, exp }`, 15-minute TTL, secret `SHARED_VIEW_SESSION_SECRET` falling back
+      to `BETTER_AUTH_SECRET` / `AUTH_SECRET` (the `TerminalAttachService` posture), fail
+      closed with no secret. The guard verifies MAC and expiry with `timingSafeEqual`, then
+      requires `status = 'active'` and `rotationCount = rot` on the row.
+    - **Test**: `apps/api/src/shared-views/shared-view-session.service.spec.ts` — round trip;
+      tampered MAC, expired, stale `rot` and paused view all refused identically; no secret
+      refuses everything; the claims contain no token and no token hash.
+    - **Done when**: a view session minted before `POST /regenerate` is refused on its next
+      request.
+
+- [ ] **T14b**. Redact share tokens in every request recorder.
+    - Create `packages/monitoring/src/redaction/secret-url.ts` exporting `redactSecretUrl` and
+      `redactSecretValue` (share token after a `/share/` segment, with or without a locale
+      prefix; `Bearer` view sessions; body `token` values → `[redacted]`), exported from the
+      package index.
+    - Modify `apps/api/src/logging.interceptor.ts` to log `redactSecretUrl(originalUrl)` on
+      the request, response and error lines.
+    - Modify `packages/monitoring/src/interceptors/sentry.interceptor.ts` (context `url`,
+      `transaction` and `endpoint` tags), `packages/monitoring/src/sentry/sentry.config.ts`
+      (`beforeSend` / `beforeSendTransaction`: `request.url`, transaction name, breadcrumb
+      `data.url`) and `packages/monitoring/src/interceptors/posthog.interceptor.ts` (`endpoint`).
+    - Route the public controller's thrown errors, and any message or URL logged by an
+      `APP_FILTER` filter under `apps/api/src/common/filters/`, through `redactSecretValue`.
+    - Modify `apps/web/src/components/posthog/PostHogProvider.tsx`: no `posthog.init` and no
+      page-view capture on a share route (spec FR-40), plus a `sanitize_properties` hook
+      redacting `$current_url`, `$pathname` and `$referrer`.
+    - **Test**: `packages/monitoring/src/redaction/__tests__/secret-url.spec.ts` (new); extend
+      `apps/api/src/logging.interceptor.spec.ts`,
+      `packages/monitoring/src/interceptors/__tests__/sentry.interceptor.spec.ts`,
+      `posthog.interceptor.spec.ts` and `packages/monitoring/src/sentry/__tests__/sentry.config.spec.ts`;
+      a web unit spec that the provider does not initialise on `/share/<token>` or
+      `/<locale>/share/<token>`.
+    - **Done when**: the specs pass, and the edge access-log format for the web host has been
+      confirmed to drop or redact `/share/` paths (recorded in the PR description).
+
+- [ ] **T14c**. Prove the token never reaches a log line.
+    - Create `apps/api/test/shared-view-log-hygiene.e2e-spec.ts`: boot the API with the real
+      `LoggingInterceptor`, `SentryInterceptor` and `PostHogInterceptor`, a capturing Nest
+      `Logger`, and spies on `Sentry.captureException` / `setContext` / `setTag` /
+      `addBreadcrumb` and PostHog `trackEvent`. Run an exchange, a board read, an
+      unknown-token exchange, a read after regenerate, a throttled read and a forced `500`
+      with `config.debug()` on.
+    - Assert that neither the raw token nor the view session occurs as a substring in any
+      captured log line, Sentry payload or PostHog property.
+    - Create `apps/web/e2e/shared-view-token-transport.spec.ts`: record every request the
+      published page issues over three poll cycles in a fresh context; assert no request URL
+      contains the token, no analytics request is issued, and the token appears only in
+      `POST /sessions` bodies.
+    - **Done when**: both specs are green and part of the P1 gate.
 
 ### Background work
 
@@ -252,15 +315,19 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
 
 - [ ] **T18**. Build the published page.
     - Create `apps/web/src/app/[locale]/share/[token]/page.tsx` (server component; first
-      paint requires no client JS), `apps/web/src/app/[locale]/share/[token]/not-active.tsx`,
+      paint requires no client JS; exchanges the token via `POST /sessions` in a request body
+      and passes only `{ viewSession, expiresAt }` to client components — plan §4.4),
+      `apps/web/src/app/[locale]/share/[token]/not-active.tsx`,
       `apps/web/src/components/share/PublishedShell.tsx`,
       `apps/web/src/components/share/PublishedBoard.tsx`.
     - Implement all states from `spec.md` §6.7: loading skeleton, empty board, not
       active, throttled, poll-paused, preview banner, and the ≥360 px single-column
       layout with sticky column headers.
-    - Poll every 20 s; pause on `document.hidden`; stop after 30 min idle with a
-      **Resume** control; back off to 60 s on `429`; keep the last good render on a
-      network error.
+    - Poll every 20 s with `Authorization: Bearer <viewSession>`; never build an API URL from
+      the token. Re-exchange (token in a body) when `expiresAt` is under 60 s away or a read
+      returns the not-active response; a failed re-exchange renders not-active. Pause on
+      `document.hidden`; stop after 30 min idle with a **Resume** control; back off to 60 s
+      on `429`; keep the last good render on a network error.
     - Keyboard map and polite live region per `spec.md` §6.12.
     - **Test**: `apps/web/src/components/share/__tests__/PublishedBoard.unit.spec.tsx`
       for the poll state machine.
@@ -330,11 +397,11 @@ Ships FR-50…FR-79.
     - **Test**: `packages/agent/src/entities/__tests__/channel-guest.entity.spec.ts`.
 
 - [ ] **T24**. Write the `channel_guests` migration.
-    - Create `apps/api/src/migrations/1789210000000-CreateChannelGuests.ts`.
+    - Create `apps/api/src/migrations/1791180100000-CreateChannelGuests.ts`.
     - **Done when**: additive only; `down()` drops just the table and its indexes.
 
 - [ ] **T25**. Write the attribution-columns migration.
-    - Create `apps/api/src/migrations/1789220000000-AddRequesterAttribution.ts` adding
+    - Create `apps/api/src/migrations/1791180200000-AddRequesterAttribution.ts` adding
       `requestedByGuestId` (FK → `channel_guests`, `ON DELETE SET NULL`) and
       `requestedByLabel varchar(160)` to `tasks`, `missions`,
       `agent_action_proposals`, `agent_escalations`, plus `originConversationRef
@@ -518,16 +585,19 @@ Ships FR-25…FR-33 and the deferred half of FR-28.
 - [ ] **T40**. Add the per-document exclusion flag.
     - Add `sharedViewExcluded: boolean` (default `false`) to
       `packages/agent/src/entities/work-knowledge-document.entity.ts` and ship
-      `apps/api/src/migrations/1789230000000-AddKbSharedViewExcluded.ts` in the same PR.
+      `apps/api/src/migrations/1791180300000-AddKbSharedViewExcluded.ts` in the same PR.
     - **Done when**: the column is `NOT NULL DEFAULT false`, `down()` drops only it, and
       existing KB specs still pass.
 
 - [ ] **T41**. Extend the projection and public API for knowledge.
     - Add `projectKnowledgeList` and `projectKnowledgeDocument` to
       `packages/agent/src/shared-views/shared-view-projection.service.ts`.
-    - Add `GET /:token/knowledge` and `GET /:token/knowledge/:docId` to
-      `apps/api/src/shared-views/shared-view-public.controller.ts` — `q` min 2 characters,
-      50 per page, 200 total, 200 distinct documents per hour per token.
+    - Add `GET /knowledge` and `GET /knowledge/:docId` to
+      `apps/api/src/shared-views/shared-view-public.controller.ts`, both behind
+      `SharedViewSessionGuard` (T14a) — the token is never in the path — `q` min 2
+      characters, 50 per page, 200 total, 200 distinct documents per hour per Shared view.
+      Extend `apps/api/test/shared-view-log-hygiene.e2e-spec.ts` (T14c) with a knowledge list,
+      a search and a document read.
     - **Test**: extend `apps/api/src/shared-views/shared-view-public.controller.spec.ts`
       — a deselected class 404s on the next request; git history, citations, retrieval
       trail, uploads and originals are never in the response.

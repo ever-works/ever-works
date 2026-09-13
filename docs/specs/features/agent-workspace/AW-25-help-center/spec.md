@@ -313,6 +313,9 @@ sidebar, top bar, panel chrome and feedback control omitted.
   4. An article's related-article reference does not resolve.
   5. Any limit in FR-3 is exceeded.
   6. An article is not reachable from its section index.
+  7. A link inside an article body (FR-27) points at an article or heading this build does not
+     have, at a screen that is not in this build's route map, or at an external address that
+     is not a secure (`https`) absolute web address.
 - **FR-6** An article may only be added in the same change that ships — or in a change after the
   one that shipped — the screen it documents. There is no state in which the manual describes a
   screen the build does not contain (guaranteed by FR-1 and FR-5.2, not by discipline).
@@ -420,6 +423,20 @@ sidebar, top bar, panel chrome and feedback control omitted.
   list, heading, note/callout, keyboard-shortcut row, code or command block, and a link. Links may
   point at another article, at a screen in this product, or at an external address. External
   links are marked as leaving the product.
+- **FR-27a** A **link** is its own block: one line holding one label and one target, nothing
+  else. Its label is plain text of 1–80 characters. Its target is exactly one of:
+  1. **another article**, optionally at a heading — opens in place, in the panel or on the full
+     page, exactly as a help link does (FR-22);
+  2. **a screen in this product**, named the same way an article names the screens it documents
+     — never as a literal address — and subject to the same reachability rule as "Open the
+     screen" (FR-29);
+  3. **an external address**, which must be an absolute `https` address with no embedded
+     credentials. It opens in a new tab, never passes the current page as a referrer, and is
+     visibly and audibly marked as leaving the product.
+  A link written inside a paragraph, a link with no label, a literal in-product address, or an
+  external address using any other scheme is a build error naming the article and the line
+  (FR-5.7). If a link that passed the build somehow reaches the reader with an unsafe or
+  unresolvable target, its label renders as plain text with no link at all.
 - **FR-28** Article bodies are rendered from structured content produced at build time. No article
   content is ever injected into the page as raw markup.
 - **FR-29** An article's "Open the screen" action, when present, resolves through the same route
@@ -922,6 +939,9 @@ A reviewer can run this list against a build.
 - [ ] The panel footer and the full page both show the same version and commit as the dashboard
       footer.
 - [ ] With the build identity unset, the stamp is absent — not `undefined`, not a placeholder.
+- [ ] An article-body link to a missing article or heading, to a screen not in the route map, to a
+      literal in-product address, or to a non-`https` external address fails the build with a
+      message naming the article and the line.
 
 **Searching**
 - [ ] Typing 1 character produces no results and leaves browse in place; 2 characters searches.
@@ -945,6 +965,9 @@ A reviewer can run this list against a build.
 
 **Reading**
 - [ ] An article renders section, title, reviewed date, "On this page", body and related list.
+- [ ] A link block to another article opens it in place; a link block to a screen navigates there
+      and is disabled with `Needs owner access` when unreachable; a link block to an external
+      address opens a new tab, sends no referrer, and is announced as opening outside the app.
 - [ ] The "Open {screen}" action is disabled with `Needs owner access` for a reader who cannot
       reach it, and is skipped by arrow-key navigation.
 - [ ] "Copy link" copies an absolute URL and toasts `Link copied`.

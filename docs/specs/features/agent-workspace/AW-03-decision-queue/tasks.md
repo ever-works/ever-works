@@ -131,7 +131,7 @@
 - [ ] **T6. Author the P1 migration.**
     - From `apps/api/`:
       `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateDecisionAsks`
-    - Land it at `apps/api/src/migrations/<timestamp>-CreateDecisionAsks.ts` and
+    - Land it at `apps/api/src/migrations/1791030000000-CreateDecisionAsks.ts` and
       hand-edit it to add, after the generated DDL:
         1. `UPDATE agent_escalations SET "missionId" = t."missionId" FROM tasks t WHERE t.id = agent_escalations."taskId" AND agent_escalations."taskId" IS NOT NULL`
         2. `UPDATE agent_action_proposals SET "taskId" = r."taskId" FROM agent_runs r WHERE r.id = agent_action_proposals."runId" AND agent_action_proposals."runId" IS NOT NULL`,
@@ -603,6 +603,8 @@
 - [ ] **T37. Author the P3 migration.**
     - From `apps/api/`:
       `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/CreateDecisionHealthSnapshots`
+    - Land it at `apps/api/src/migrations/1791030100000-CreateDecisionHealthSnapshots.ts`
+      (AW-03 slot 01, [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)).
     - Hand-check: 1 `CREATE TABLE`, 2 `CREATE INDEX`, 2 `ADD COLUMN` on
       `work_agent_preferences`. No drop, no type change. `down` reverses exactly.
     - **Done when**: it applies on a fresh and a seeded database and a re-generate

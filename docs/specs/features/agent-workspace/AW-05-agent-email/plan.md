@@ -279,15 +279,18 @@ Index: `idx_email_conversations_inbox_state_last (inboxId, state, lastMessageAt)
 
 ### 3.3 The migrations (three, in order)
 
-1. **`<ts>-AddAgentInboxesAndEmailRules.ts`** — creates `agent_inboxes`, `email_rules`,
+Timestamps are AW-05 slots 00–02 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow));
+the implementing PR re-stamps them before merge if `develop` has moved past them.
+
+1. **`1791050000000-AddAgentInboxesAndEmailRules.ts`** — creates `agent_inboxes`, `email_rules`,
    `email_sending_domains`. Pure `CREATE TABLE` + indices. No data touched.
-2. **`<ts>-AddEmailMessageLifecycle.ts`** — the additive columns on `email_messages` and
+2. **`1791050100000-AddEmailMessageLifecycle.ts`** — the additive columns on `email_messages` and
    `email_conversations`, plus the three new indices. **Backfill in the same migration:**
    - `UPDATE email_messages SET status='received' WHERE direction='inbound' AND status IS NULL`
    - `UPDATE email_messages SET status='sent' WHERE direction='outbound' AND status IS NULL`
    - `UPDATE email_messages SET readAt = createdAt WHERE direction='outbound'` (own sends are read)
    Batched at 5,000 rows so a large table does not hold a long transaction.
-3. **`<ts>-BackfillEmailThreads.ts`** — for every `email_messages` row with a NULL
+3. **`1791050200000-BackfillEmailThreads.ts`** — for every `email_messages` row with a NULL
    `conversationId`, find-or-create an `email_conversations` row keyed
    `(agentId, deriveThreadKey(subject))` using the **existing** helper from
    [`agent-inbound-email-dispatcher.ts`](../../../../../packages/agent/src/notifications/agent-inbound-email-dispatcher.ts),

@@ -200,9 +200,9 @@ created without a lane still round-trips.
 ### T-09 · Migration — `agents.lane`
 
 **Phase:** P1
-**Create:** `apps/api/src/migrations/1789200000000-AddAgentLane.ts`
+**Create:** `apps/api/src/migrations/1791200000000-AddAgentLane.ts`
 
-Class `AddAgentLane1789200000000`. `up()`:
+Class `AddAgentLane1791200000000`. `up()`:
 1. `if (!(await queryRunner.hasColumn('agents', 'lane')))` → `addColumn` nullable
    `varchar(32)`.
 2. Create the partial unique index
@@ -439,14 +439,18 @@ dispatcher result records `failed` rather than pretending success.
   `case 'roster'` render branch.
 - `apps/web/src/components/onboarding/useOnboardingFlow.unit.spec.ts` — assert
   `roster` appears exactly once, immediately after `profile`, in every choice
-  permutation, and that the list length grows by exactly one.
+  permutation, and that the list length grows by exactly one: **11** steps for
+  `ONBOARDING_DEFAULT_STATE` (was 10) with `roster` at position 8, and **14**
+  (was 13) with a non-default AI choice, `user-github` storage and `k8s` deploy,
+  with `roster` at position 11.
 
 Do **not** touch the reducer: the roster's own state lives in its component and
 on the server, never in the wizard blob.
 
 **Done when:** the header badge in
-`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx` shows the new total
-with no edit to that file, because it calls the same `computeStepList`.
+`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx` shows the new total —
+11 with every default choice, 14 with all three configuration steps — with no
+edit to that file, because it calls the same `computeStepList`.
 
 ---
 
@@ -623,7 +627,7 @@ produce exactly one `true`.
 ### T-27 · Migration — `onboarding_checklists`
 
 **Phase:** P2
-**Create:** `apps/api/src/migrations/1789210000000-CreateOnboardingChecklists.ts`
+**Create:** `apps/api/src/migrations/1791200100000-CreateOnboardingChecklists.ts`
 
 `hasTable` guard → `createTable` with the columns and both indexes from
 [plan.md §3.2](./plan.md#32-new-entity--onboardingchecklist). `simple-json`
@@ -939,9 +943,8 @@ completed checklist.
 **Phase:** P3
 **Modify:**
 - `docs/specs/features/agent-workspace/TRACKER.md` — mark AW-20 spec/plan/tasks
-  complete and record the implementation status per phase.
-- `docs/specs/features/agent-workspace/PARITY-MATRIX.md` — record the leaf
-  capabilities this epic delivers, if the file exists at implementation time.
+  complete and record the implementation status per phase, including the capabilities
+  this epic delivers.
 - `docs/specs/features/agent-workspace/README.md` §1 — add **lane** to the
   vocabulary table as an attribute of Agent, per program rule #2, in the same PR
   that lands T-08.

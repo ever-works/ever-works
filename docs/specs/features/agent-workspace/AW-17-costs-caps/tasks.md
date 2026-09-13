@@ -67,7 +67,7 @@ the truth about money without stopping anything new.*
   `agents.missionId`.
 
 - [ ] **T4. Migration `AddUsageMeterClassification` + the Mission backfill.**
-  **Create** `apps/api/src/migrations/1789700000000-AddUsageMeterClassification.ts`.
+  **Create** `apps/api/src/migrations/1791170000000-AddUsageMeterClassification.ts`.
   Generate with `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddUsageMeterClassification`,
   then hand-edit to: guard every `ADD COLUMN` with `hasColumn` and every index with `hasIndex`;
   **not** backfill `meter` (spec FR-8 — inferring it is exactly the guess the spec forbids);
@@ -370,7 +370,7 @@ the truth about money without stopping anything new.*
   **Done when**: all four entity specs pass.
 
 - [ ] **T28. Migration `AddSpendCapsAndMeterScopedBudgets`.**
-  **Create** `apps/api/src/migrations/1789710000000-AddSpendCapsAndMeterScopedBudgets.ts`.
+  **Create** `apps/api/src/migrations/1791170100000-AddSpendCapsAndMeterScopedBudgets.ts`.
   `up()`: create `workspace_spend_caps`; declare `uq_workspace_spend_caps_owner_meter` **in the
   migration** as two partial unique indexes (`WHERE "organizationId" IS NULL` and its complement)
   for the same NULL-is-distinct reason documented on `work_budgets`, and **omit** the
@@ -540,7 +540,7 @@ the truth about money without stopping anything new.*
   `refId` for exactly that reason).
   **Modify** `packages/agent/src/entities/index.ts` and
   `packages/agent/src/database/_entities-inventory.ts`.
-  **Create** `apps/api/src/migrations/1789720000000-AddAccountAddons.ts` — create the table with
+  **Create** `apps/api/src/migrations/1791170200000-AddAccountAddons.ts` — create the table with
   both indexes, then backfill one `pending` row per existing agent inbox
   (`tenant_email_addresses`) and per enrolled `fleet_nodes` row so nothing is billed until an
   operator promotes them.

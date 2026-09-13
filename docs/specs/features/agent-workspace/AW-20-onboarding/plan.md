@@ -30,7 +30,7 @@ Every path below was opened in this worktree before being cited.
 
 | File | What it does today | Why it matters here |
 | --- | --- | --- |
-| `apps/web/src/components/onboarding/useOnboardingFlow.ts` | 517-line `useReducer` state machine. `computeStepList(state)` (lines 44–77) returns the effective step list; provider config sub-steps are inserted only when the choice is not the Ever Works default, so the list is 7 steps with all defaults and up to 10 with all BYOK + `k8s`. | The new `roster` step is **one array push** in `computeStepList`, between the `profile` push and the `communication` push. Everything downstream — the footer, the step badge, `skippedSteps`, telemetry — is derived from this list and needs no change. |
+| `apps/web/src/components/onboarding/useOnboardingFlow.ts` | 517-line `useReducer` state machine. `computeStepList(state)` (lines 44–77) returns the effective step list; provider config sub-steps are inserted only when the choice needs one — `ai-config` for any AI choice other than `ever-works`, `storage-config` for `user-github`, `deploy-config` for `vercel` or `k8s` — so the list is **10** steps with all defaults (`welcome`, `ai-choice`, `storage-choice`, `db-choice`, `deploy-choice`, `desktop-choice`, `profile`, `communication`, `plugins-catalog`, `create-work`) and **13** with all three sub-steps. Adding `roster` makes those **11** and **14**. | The new `roster` step is **one array push** in `computeStepList`, between the `profile` push and the `communication` push. Everything downstream — the footer, the step badge, `skippedSteps`, telemetry — is derived from this list and needs no change. |
 | `apps/web/src/components/onboarding/EverWorksOnboardingWizard.tsx` | Renders the current step by `kind` and owns the dialog chrome. | One new `case 'roster'` branch. |
 | `apps/web/src/components/onboarding/steps/ProfileStep.tsx` | 333 lines. Renders the 14 role checkboxes + 5 team-size options, and a "suggested starter agents" block that calls the seeding server actions. | The direct precedent for the new step, and the source of the answers the blueprint is derived from. **Left untouched** — the suggestion block keeps working exactly as it does today (program rule #1). |
 | `apps/web/src/components/onboarding/steps/CommunicationStep.tsx` | Connects Slack in place; reserves `slack-connector` / `discord-connector` out of the generic plugin list. | The step the roster step sits immediately before. Unchanged. |
@@ -433,15 +433,17 @@ without P2 and neither file is ever edited twice:
 
 | File | Phase | Contents |
 | --- | --- | --- |
-| `apps/api/src/migrations/1789200000000-AddAgentLane.ts` | P1 | `hasColumn('agents','lane')` guard → `addColumn` nullable `varchar(32)`; then the **partial** unique index `uq_agents_user_lane` on `("userId","lane") WHERE "lane" IS NOT NULL`, spelled as guarded raw SQL because TypeORM's `TableIndex` has no partial-index form. |
-| `apps/api/src/migrations/1789210000000-CreateOnboardingChecklists.ts` | P2 | `hasTable('onboarding_checklists')` guard → `createTable` with the columns and both indexes from §3.2. `simple-json` columns are spelled `text` — the portability note `1784750000000-CreateOrganizationOnboardingProfiles.ts` already makes. No foreign key to `users`, matching the entity's no-`@ManyToOne` posture. |
+| `apps/api/src/migrations/1791200000000-AddAgentLane.ts` | P1 | `hasColumn('agents','lane')` guard → `addColumn` nullable `varchar(32)`; then the **partial** unique index `uq_agents_user_lane` on `("userId","lane") WHERE "lane" IS NOT NULL`, spelled as guarded raw SQL because TypeORM's `TableIndex` has no partial-index form. |
+| `apps/api/src/migrations/1791200100000-CreateOnboardingChecklists.ts` | P2 | `hasTable('onboarding_checklists')` guard → `createTable` with the columns and both indexes from §3.2. `simple-json` columns are spelled `text` — the portability note `1784750000000-CreateOrganizationOnboardingProfiles.ts` already makes. No foreign key to `users`, matching the entity's no-`@ManyToOne` posture. |
 
 `down()` in each drops only what its own `up()` created, in reverse order. No
 backfill anywhere: every column added is nullable and every existing row is
 already valid.
 
-> The migrations directory's highest timestamp today is
-> `1789100000000-AddTaskGraphFanout.ts`. Both new files sit after it. Migrations
+> The migrations directory's highest timestamp on `develop` at time of writing is
+> `1790100000000-AddReleaseVerification.ts`. Both new files take AW-20 slots 00–01 of the program's
+> reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)), and are re-stamped before merge if
+> `develop` has moved past them. Migrations
 > self-apply on API boot via `migrationsRun: true`, so nothing is run by hand on
 > deploy.
 
@@ -970,7 +972,7 @@ activity and must not appear in an audit trail.
 
 | File | Covers |
 | --- | --- |
-| `apps/web/src/components/onboarding/useOnboardingFlow.unit.spec.ts` *(extend existing)* | `roster` appears exactly once, immediately after `profile`, in every choice permutation; the step count grows by exactly one |
+| `apps/web/src/components/onboarding/useOnboardingFlow.unit.spec.ts` *(extend existing)* | `roster` appears exactly once, immediately after `profile`, in every choice permutation; the step count grows by exactly one — **11** for `ONBOARDING_DEFAULT_STATE` with `roster` at position 8, and **14** with a non-default AI choice + `user-github` + `k8s` with `roster` at position 11 |
 | `apps/web/src/components/onboarding/steps/RosterStep.unit.spec.tsx` | Name validation; remove disabled on the coordinator; add disabled at 8; read-only rendering without permission |
 | `apps/web/src/components/get-started/SetupChecklistCard.unit.spec.tsx` | Counter arithmetic with skips; error state; completed state; renders nothing when hidden or dismissed |
 | `apps/web/src/components/get-started/RosterProvisionProgress.unit.spec.tsx` | Per-lane outcome rendering; the four result states; polling stops at a terminal state and at 150 s |
@@ -1042,7 +1044,7 @@ proved.
 | **II — Capability-driven, no hardcoded plugin ids** | ✅ | The provider milestone asks the capability layer for "a connected plugin advertising an AI capability" and never names one. No plugin id string appears in any added or modified file. |
 | **III — Source-of-truth repositories** | ✅ n/a | Nothing here is Work content. The persisted data is five milestone states, one provisioning record and one label on an Agent — all platform metadata, which belongs in our database by definition. |
 | **IV — Background work via the job-runtime provider** | ✅ | Roster provisioning is enqueued through the new `ROSTER_PROVISION_DISPATCHER` DI symbol, added to `DISPATCHER_SYMBOLS` so `buildJobRuntimeProviders()` routes it to whichever runtime the operator has selected. No call site imports `@trigger.dev/sdk`. The provisioning endpoint returns `202` immediately (§6). |
-| **V — Forward-only migrations, same PR** | ✅ | Two migrations, each landing with the entity change it pairs with: `1789200000000-AddAgentLane.ts` with the `agents.lane` column (P1), and `1789210000000-CreateOnboardingChecklists.ts` with `packages/agent/src/entities/onboarding-checklist.entity.ts` (P2). Both `hasTable`/`hasColumn` guarded, no backfill needed (every added column is nullable), and each `down()` drops only what its own `up()` created. |
+| **V — Forward-only migrations, same PR** | ✅ | Two migrations, each landing with the entity change it pairs with: `1791200000000-AddAgentLane.ts` with the `agents.lane` column (P1), and `1791200100000-CreateOnboardingChecklists.ts` with `packages/agent/src/entities/onboarding-checklist.entity.ts` (P2). Both `hasTable`/`hasColumn` guarded, no backfill needed (every added column is nullable), and each `down()` drops only what its own `up()` created. |
 | **VI — Tests are a prerequisite** | ✅ | Six Jest suites in the agent package (three new, three extended), four API specs, five Vitest component specs and five Playwright specs, named in §10. The blueprint totality spec and the template-integrity spec are themselves requirements (FR-4). |
 | **VII — Privacy & secret hygiene** | ✅ | No secret is added, read, stored or logged. The provider check returns reachable/not-reachable plus the provider's own message and never the credential (FR-62). Telemetry carries only closed-vocabulary enums and counts (FR-65). Checklist responses are `private, no-store`. Every row is scoped to `(userId, scopeKey)`. |
 | **VIII — Single source of truth for plugin counts** | ✅ n/a | No plugin is added or removed; `docs/plugin-system/built-in-plugins.md` is untouched. |

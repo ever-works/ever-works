@@ -369,11 +369,14 @@ that asserts no exported DTO type has a field assignable from `VaultSecret['secr
 
 ### 3.6 Migrations (forward-only, one per phase, shipped with its entities)
 
+Timestamps are AW-15 slots 00–02 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow));
+re-stamp before merge if `develop` has moved past them.
+
 | File | Phase | Contents |
 | --- | --- | --- |
-| `apps/api/src/migrations/1789200000000-AddConnectionRegistry.ts` | P1 | `CREATE TABLE connections` + its five indexes + backfill (§3.7) |
-| `apps/api/src/migrations/1789210000000-AddConnectionGrantsAndUsage.ts` | P2 | `CREATE TABLE connection_grants` (+ FK cascade), `CREATE TABLE connection_run_usage`, `ALTER TABLE plugin_usage_events ADD COLUMN connectionId` + index |
-| `apps/api/src/migrations/1789220000000-AddVaultAndMcpInteractiveAuth.ts` | P3 | `CREATE TABLE vault_secrets`, `ALTER TABLE mcp_server_connections ADD authMode/oauthTokens/oauthMetadata` |
+| `apps/api/src/migrations/1791150000000-AddConnectionRegistry.ts` | P1 | `CREATE TABLE connections` + its five indexes + backfill (§3.7) |
+| `apps/api/src/migrations/1791150100000-AddConnectionGrantsAndUsage.ts` | P2 | `CREATE TABLE connection_grants` (+ FK cascade), `CREATE TABLE connection_run_usage`, `ALTER TABLE plugin_usage_events ADD COLUMN connectionId` + index |
+| `apps/api/src/migrations/1791150200000-AddVaultAndMcpInteractiveAuth.ts` | P3 | `CREATE TABLE vault_secrets`, `ALTER TABLE mcp_server_connections ADD authMode/oauthTokens/oauthMetadata` |
 
 Every `ALTER` is `ADD COLUMN … NULL` or `ADD COLUMN … NOT NULL DEFAULT`; no `DROP`, no rename,
 no type change. `down()` drops only what `up()` created.
@@ -511,12 +514,53 @@ agents path, mirroring how `agent-mcp-servers.controller.ts` already does it.
 - `POST /api/connections/mcp` moves any supplied header value into the Vault first, stores only
   the resulting `{{cred.key}}` reference in `mcp_server_connections.authHeaders`, then delegates
   row creation to the **existing** `McpConnectionsService.create` so the tenant-inherit binding,
-  the name pattern and the SSRF guard all still apply unchanged.
+  the name pattern and the SSRF guard all still apply unchanged. Storing a reference is only
+  safe together with the connect-time resolution below — without it the reference would be sent
+  to the server literally.
 - `GET /api/connections/mcp/callback` is the only `@Public()` endpoint added. Justification: the
   provider's browser redirect cannot be relied on to carry a session cookie (`SameSite`). It is
   protected by a **signed, single-use `state`** bound to `(connectionId, userId)` with a
   **10-minute TTL**, stored server-side and deleted on first use; an unknown or expired state is
   a `400` that reveals nothing.
+
+#### 4.3.1 Header credentials are resolved at connect time
+
+Today `McpClientService.connect` ([`packages/agent/src/mcp/mcp-client.service.ts`](../../../../../packages/agent/src/mcp/mcp-client.service.ts))
+passes `headers: connection.authHeaders ?? {}` straight to the SDK client factory, and
+`{{cred.key}}` interpolation runs only over **tool arguments**, in
+[`AgentToolService`](../../../../../packages/agent/src/agents/agent-tool.service.ts) via
+[`interpolateCredentials`](../../../../../packages/agent/src/policy/credential-interpolation.ts).
+Nothing resolves a reference inside a header, so the placeholder stored by §4.3 would reach the
+MCP server as the literal text `{{cred.key}}`. This epic adds one step, inside `connect()`, before
+the factory is called:
+
+1. **Collect.** `collectCredentialRefs(connection.authHeaders)` (existing helper). No references
+   ⇒ the stored headers are used unchanged, so every existing literal-header row keeps working
+   (Constitution X).
+2. **Resolve.** `CREDENTIAL_RESOLVER.resolve(ctx, keys)` with
+   `ctx = { userId, organizationId, tenantId }` taken from the Connection row — the same port the
+   tool-argument path uses, bound to `VaultCredentialResolver` by T36. `McpClientService` takes
+   it as `@Optional() @Inject(CREDENTIAL_RESOLVER)`; when it is unbound every reference counts as
+   missing (fail closed), never forwarded verbatim.
+3. **Substitute.** `interpolateCredentials(connection.authHeaders, resolved)` into a **new local
+   object**. The resolved headers live only in the `connect()` stack frame and are handed to
+   `factory.connect` once. They are never assigned to the `McpServerConnection` entity, the tools
+   cache, `stampConnectionResult`, a logger, a Sentry/PostHog breadcrumb or an error message.
+4. **Refuse on missing.** If `missing.length > 0` the method throws
+   `McpHeaderCredentialMissingError { keys }` **before** `factory.connect` — no request leaves the
+   platform. `classifyError` maps it to the stored message ``Missing credential `<key>` `` (keys
+   only), `listTools` / `callTool` / the health probe surface that message, and the health
+   classifier maps it to `expired` (spec FR-26, FR-47a) so *Reconnect* — which re-enters the
+   header value into the Vault — is the offered fix.
+5. **Redact what was actually sent.** `redactHeaderValues` scrubs the values of
+   `connection.authHeaders`, which are now references rather than secrets. It gains the resolved
+   map as a second source, so a header-echoing SDK error cannot put a Vault value into
+   `lastError`, the API response or the model's conversation — the exact leak its doc-comment
+   already describes. `redactCredentialValues` supplies the `[redacted:cred.<key>]` token.
+
+The pure half (collect → substitute → missing) lives in
+`packages/agent/src/mcp/mcp-header-credentials.ts` with no NestJS import, so every branch is a
+unit test; `McpClientService` only wires the resolver and the error.
 
 ### 4.4 Vault — `apps/api/src/vault/vault.controller.ts` (`@Controller('api/vault')`)
 
@@ -821,6 +865,7 @@ reason }`.
 | Grant lookup throws | the **Connection's own preset**, warn-logged | fails toward the ceiling the owner explicitly set, never to `write` (FR-24) |
 | Health sweep down | rows keep last known health + "checked N ago" | a stale probe must never flip a working row to `expired` or block a call (FR-31) |
 | `VaultCredentialResolver` cannot resolve a key | the tool call is **refused**, naming the key | a half-authenticated outbound call is worse than a clear refusal — the existing `assertToolCredentialsAvailable` contract, unchanged |
+| An MCP header references a Vault key that cannot be resolved | the connection attempt fails **before any request is sent**, naming the key; health `expired` | sending the literal `{{cred.key}}` would look like a server-side auth failure and hide the real cause; §4.3.1 |
 | `PLUGIN_SECRET_ENCRYPTION_KEY` unset | vault **writes are rejected** with a clear error | the existing plaintext-passthrough fallback is acceptable for plugin settings in dev; for a write-only vault it is not, so this path opts out of the fallback explicitly |
 | Interactive sign-in never completes | `timeout` after 10 min, nothing persisted | no half-created Connection, no orphan state row |
 | Config parse fails | `400` with the field-level message, nothing persisted | the parse endpoint writes nothing by construction |
@@ -840,6 +885,8 @@ reason }`.
 | `packages/agent/src/connections/__tests__/connection-usage-buffer.spec.ts` | flush at 10 s / 100 calls / run teardown; one upsert per `(connection, run)` |
 | `packages/agent/src/vault/__tests__/vault.service.spec.ts` | key pattern, 200 cap, 8 KB cap, replace-only semantics, `referenceCount` maintenance, delete does not cascade from a Connection delete (FR-46) |
 | `packages/agent/src/vault/__tests__/vault-credential-resolver.spec.ts` | resolves declared keys, **omits** unknown ones (never empty string), never logs a value, stamps `lastUsedAt` |
+| `packages/agent/src/mcp/__tests__/mcp-header-credentials.spec.ts` | a header with no reference passes through byte-identical; a whole-value and an embedded reference (`Bearer {{cred.k}}`) both substitute; the input object is never mutated; a missing key is reported by name and the output keeps no partial substitution |
+| `packages/agent/src/mcp/__tests__/mcp-client.service.spec.ts` (extend) | the factory receives resolved headers while the entity still holds the reference; a missing key throws before the factory is called and stamps ``Missing credential `<key>` ``; an unbound resolver fails closed; an SDK error echoing the resolved value is redacted; a spy logger and the stamped error never contain the resolved value |
 | `packages/agent/src/vault/__tests__/vault-no-read-path.spec.ts` | reflective guard: no exported DTO type or controller method can return `VaultSecret['secret']` |
 | `packages/agent/src/facades/__tests__/connection-scopes.facade.spec.ts` | preset lookup against a mock plugin, `[]` when undeclared, `coversTool` pattern identity with the tool-grant matcher |
 | `packages/agent/src/agents/__tests__/agent-tool.connection-gate.spec.ts` | blocked Connection's tools absent from the descriptor list; preset filters write tools; enforcer unbound = today's list |
@@ -881,7 +928,7 @@ Connections table + backfill, labels, primary, presets, health sweep, reconnect,
 Settings → Connections page with today's MCP list preserved verbatim as a tab, and the
 `connection-scopes` capability with one declaring plugin.
 
-*Ships:* migration `1789200000000`, `apps/api/src/connections/` (registry controller only),
+*Ships:* migration `1791150000000`, `apps/api/src/connections/` (registry controller only),
 `packages/agent/src/connections/`, the health tasks, the facade, the web registry.
 *User-visible value on its own:* two accounts per provider, plain-English levels, and a page
 that tells you what is broken before a Run does.
@@ -892,7 +939,7 @@ that tells you what is broken before a Run does.
 Grant table, the resolution ladder, both enforcement seams, the Manage drawer's agent list, the
 per-agent Connections tab, last-used attribution and the Runs link.
 
-*Ships:* migration `1789210000000`, grants controller, `ConnectionAccessService` +
+*Ships:* migration `1791150100000`, grants controller, `ConnectionAccessService` +
 `CONNECTION_ACCESS_ENFORCER`, the two seam edits, `ConnectionUsageBuffer`.
 *Green on develop because:* the enforcer is `@Optional()`; with no grant rows the ladder returns
 the Connection's preset, and with no Connections it returns "allow", i.e. today's behaviour.
@@ -902,7 +949,7 @@ the Connection's preset, and with no Connections it returns "allow", i.e. today'
 Vault table + controller + `VaultCredentialResolver` bound to `CREDENTIAL_RESOLVER`, the paste
 parser, interactive sign-in detection and handshake, presets on the connector plugins.
 
-*Ships:* migration `1789220000000`, `apps/api/src/vault/`, `packages/agent/src/vault/`,
+*Ships:* migration `1791150200000`, `apps/api/src/vault/`, `packages/agent/src/vault/`,
 `mcp-config-parser.ts`, `mcp-auth-detect.ts`, `mcp-authorize.service.ts`, the wizard.
 *Green on develop because:* `EnvCredentialResolver` remains the bound implementation until the
 vault module is imported; the existing manual MCP form keeps working beside the wizard.

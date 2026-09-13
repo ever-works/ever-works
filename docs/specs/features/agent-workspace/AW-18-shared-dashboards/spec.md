@@ -379,6 +379,20 @@ number.
 - **FR-7.** The token is stored **encrypted at rest** and is returned **only** to the
   Tenant owner. It never appears in an activity-log row, a notification, a telemetry
   event, an error message, a log line, or any response to a non-owner.
+- **FR-7a.** The token MUST NOT travel in the path or query string of any API request. A
+  visit presents it **once**, in a request body, and receives a **view session** in return:
+  an opaque credential valid for **15 minutes**, renewed by presenting the token again in a
+  body. Every other share-link read carries only the view session, in a request header. A
+  view session grants nothing but the published projection of its one Shared view, and it
+  dies with its link: it is refused on its **next request** after the link is regenerated,
+  turned off or deleted (FR-5, FR-8, FR-10), with the same response as FR-11. No view
+  session is ever stored in a cookie (FR-12).
+- **FR-7b.** As defence in depth, every place the platform records a request — request
+  logs, error monitoring (events, transaction names and breadcrumbs), product analytics
+  (including page-view URLs) and error context — MUST replace a share token or a view
+  session found in a URL, header or body with a fixed redaction marker **before** the
+  record is written. The published page MUST NOT initialise product analytics at all
+  (FR-40), so its own address is never sent as a page view.
 - **FR-8.** **Regenerate** replaces the token atomically. The previous token stops
   resolving on its **next request** — 0 seconds of grace, no cached response, no
   stale-while-revalidate.
@@ -1198,6 +1212,19 @@ A reviewer can run this checklist top to bottom.
 - [ ] An unknown token, a regenerated-away token and a disabled token return byte-for-byte
       identical responses.
 - [ ] Deleting the Organization makes its link inactive in the same transaction.
+- [ ] A view session obtained before a regenerate, or before sharing is turned off, is
+      refused on its next request with the same response as an unknown token.
+
+**Token hygiene**
+
+- [ ] Opening a share link and leaving it polling for 20 minutes issues no API request whose
+      path or query string contains the token; the token travels only in exchange request
+      bodies.
+- [ ] Across an exchange, a board read, a knowledge read, an unknown-token request, a
+      regenerated-away request and a throttled request, no emitted log line, monitoring
+      event, breadcrumb, analytics event or error context contains the token or the view
+      session.
+- [ ] The published page sends no page-view analytics event.
 
 **Boundaries**
 
@@ -1334,7 +1361,7 @@ A reviewer can run this checklist top to bottom.
 | Throughput | 60 requests/min/token, 600/hour/client, enforced before any database read beyond the token lookup |
 | Availability | The published page degrades to its last successful render plus a "couldn't refresh" line rather than blanking |
 | Data retention | View counters are cumulative; the salted client bucket lives ≤ 24 h and is never persisted |
-| Secret hygiene | The token is encrypted at rest, never logged, never in telemetry, never in an activity-log row, never returned to a non-owner |
+| Secret hygiene | The token is encrypted at rest, never logged, never in telemetry, never in an activity-log row, never returned to a non-owner, never in an API URL (FR-7a), and redacted by every request recorder before it writes (FR-7b) |
 | Auditability | Every owner-side change and every gate outcome writes exactly one activity-log entry |
 | Isolation | A share token resolves to exactly one Organization; no request derived from it can read another Organization's data even within the same Tenant |
 | Cost | A denied inbound message costs zero model tokens; the gate runs before any facade call |

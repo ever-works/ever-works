@@ -329,8 +329,10 @@ can render the price that actually applied (spec FR-22, S28) without a database 
 ### 3.2 Migrations — forward-only, additive, one per phase
 
 Constitution V: every entity change above ships its migration in the **same** pull request.
+Timestamps are AW-17 slots 00–02 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow));
+re-stamp before merge if `develop` has moved past them.
 
-**`apps/api/src/migrations/1789700000000-AddUsageMeterClassification.ts`** (P1)
+**`apps/api/src/migrations/1791170000000-AddUsageMeterClassification.ts`** (P1)
 `up()`:
 1. `ALTER TABLE plugin_usage_events ADD COLUMN meter varchar(16) NULL`, then `payer varchar(16)
    NULL`, `outcome varchar(12) NULL`, `creditsCharged int NOT NULL DEFAULT 0`,
@@ -346,7 +348,7 @@ Constitution V: every entity change above ships its migration in the **same** pu
    — additive, re-runnable, and safe to interrupt.
 `down()`: drop the three indexes and the seven columns. No data is destroyed that existed before.
 
-**`apps/api/src/migrations/1789710000000-AddSpendCapsAndMeterScopedBudgets.ts`** (P2)
+**`apps/api/src/migrations/1791170100000-AddSpendCapsAndMeterScopedBudgets.ts`** (P2)
 `up()`:
 1. `CREATE TABLE workspace_spend_caps` with the unique index
    `uq_workspace_spend_caps_owner_meter` — declared **in the migration**, not as a decorator
@@ -361,7 +363,7 @@ Constitution V: every entity change above ships its migration in the **same** pu
    auto-recharge is silently left unbounded and none is silently switched off.
 `down()`: drop the table and the five columns.
 
-**`apps/api/src/migrations/1789720000000-AddAccountAddons.ts`** (P3)
+**`apps/api/src/migrations/1791170200000-AddAccountAddons.ts`** (P3)
 `up()`: `CREATE TABLE account_addons` with both indexes; backfill one `active` row per existing
 agent inbox (`tenant_email_addresses`) and per enrolled `fleet_nodes` row, with
 `status = 'pending'` and `unitPriceCents` from the shipped catalogue, so nothing is billed until
@@ -863,7 +865,7 @@ app under CI load.
 
 Each phase is independently shippable and leaves `develop` green and deployable.
 
-### P1 — Separate the meters (migration `1789700000000`)
+### P1 — Separate the meters (migration `1791170000000`)
 
 *Delivers spec FR-1…FR-34, FR-65…FR-74, FR-79…FR-88.*
 
@@ -884,7 +886,7 @@ Each phase is independently shippable and leaves `develop` green and deployable.
 anything new. Nothing regresses: the existing balance, packs, ledger and pay-as-you-go behave
 exactly as before for credits-meter spend.
 
-### P2 — Caps that stop (migration `1789710000000`)
+### P2 — Caps that stop (migration `1791170100000`)
 
 *Delivers spec FR-42…FR-64.*
 
@@ -899,7 +901,7 @@ exactly as before for credits-meter spend.
 7. Web: the caps table, the cap dialog, the auto-recharge ceiling field, the stopped banners, the
    two decision cards.
 
-### P3 — Add-ons (migration `1789720000000`)
+### P3 — Add-ons (migration `1791170200000`)
 
 *Delivers spec FR-35…FR-41.*
 

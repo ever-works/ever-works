@@ -384,8 +384,9 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 
 - **FR-26** Every Connection MUST carry a **health** state from exactly this set: `unknown`
   (never checked), `healthy`, `degraded` (1–2 consecutive failed checks), `expired` (the
-  provider rejected the credential), `unreachable` (3 or more consecutive failures that were not
-  credential rejections).
+  provider rejected the credential, or a Vault credential the Connection references no longer
+  exists — FR-47a), `unreachable` (3 or more consecutive failures that were not credential
+  rejections).
 - **FR-27** The system MUST probe Connection health **on a schedule without user action**, at
   these per-kind intervals: interactive-sign-in Connections every **60 minutes**, MCP server
   Connections every **30 minutes**, key-based Connections every **360 minutes**.
@@ -440,6 +441,14 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
   references MUST be labelled "Not used by any connection" rather than removed.
 - **FR-47** A tool call whose `{{cred.key}}` cannot be resolved MUST be **refused with a message
   naming the key** (never the value), rather than sent half-authenticated.
+- **FR-47a** A `{{cred.key}}` reference stored in an MCP server Connection's request headers MUST
+  be resolved from the Vault **immediately before every connection attempt** — listing tools,
+  calling a tool, and a health probe alike. The resolved value MUST exist only for that attempt:
+  it MUST NOT be written back to the Connection, cached, logged, attached to monitoring, or
+  echoed in any error. When a referenced key cannot be resolved, the attempt MUST fail **before
+  any request is sent** with a message naming the key (never a value), the Connection's health
+  MUST become `expired`, and the literal `{{cred.key}}` text MUST never be sent as a header
+  value. A header value that contains no reference is sent exactly as stored today.
 
 ### 4.7 Adding an MCP server
 
@@ -821,6 +830,7 @@ ADD / REPLACE                               EMPTY                    FULL
 | Health `healthy` | "Healthy · checked {relativeTime}" |
 | Health `degraded` | "Having trouble · checked {relativeTime}" |
 | Health `expired` | "Expired — {provider} rejected this credential." |
+| Health `expired`, credential missing | "Missing credential {key}. Add it to the Vault or reconnect." |
 | Health `unreachable` | "Couldn't reach this server. Last tried {relativeTime}." |
 | Health `unknown` | "Not checked yet" |
 | Last used | "Last used {relativeTime}" / "Never used" |
@@ -901,6 +911,11 @@ ADD / REPLACE                               EMPTY                    FULL
 - [ ] `{{cred.acme_api_key}}` resolves at call time from the Vault and is absent from the Run
       transcript.
 - [ ] A tool whose credential cannot be resolved is refused with a message naming the key.
+- [ ] An MCP server added with a pasted header connects with the Vault value while its stored
+      header still reads `{{cred.key}}`; after that Vault entry is deleted, the next connection
+      attempt fails naming the key, sends no request, and the row shows *Missing credential*.
+- [ ] No log line, monitoring event, stored error or API response produced by an MCP connection
+      attempt contains a resolved header value.
 - [ ] The 201st Vault entry and the 11th Connection on a provider are both refused with their
       own error codes and the exact copy in §7.9.
 - [ ] Pasting a `"name": { … }` block with a trailing comma parses; the header value lands in

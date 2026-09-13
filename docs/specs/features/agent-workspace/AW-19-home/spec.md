@@ -49,9 +49,9 @@
    │   3 need you    2 working now    7 done today    1 failed today         │
    ├──────────────────────────────────┬──────────────────────────────────────┤
    │ TODAY                            │ THIS WEEK                            │
-   │  ✓ 06:15  Daily inbox sweep      │  $18.42  last 7 days                 │
+   │  ✓ 06:15  Daily inbox sweep      │  $18.42  last 7 days · Acme          │
    │    09:00  Weekly report          │  61 runs · $0.30 avg per run         │
-   │    14:00  Catalog price check    │  [████████░░] 78% of this period cap │
+   │    14:00  Catalog price check    │  [████████░░] 78% account-wide cap   │
    │    +2 more →                     │  Manage spend →                      │
    ├──────────────────────────────────┴──────────────────────────────────────┤
    │ WORKING NOW (2)                                        See all runs →   │
@@ -226,14 +226,16 @@ the 18:00 catalog check as still due — and does **not** show tomorrow's 09:00 
 because "today" is the user's own calendar day and not a rolling window.
 
 **S5 — Spend with the cap in view.**
-**Given** an account with a monthly cap of $50 and $39.10 spent so far this
-billing period, of which $18.42 landed in the last 7 days across 61 Runs,
+**Given** the active Organization *Acme*, in which $18.42 of usage landed in the
+last 7 days across 61 Runs, and an account with an account-wide monthly cap of
+$50 of which $39.10 has been spent so far this billing period across all of the
+user's Organizations,
 **when** they read the This-week panel,
-**then** the headline reads `$18.42` with the sublabel `last 7 days`, the second
-line reads `61 runs · $0.30 avg per run`, a bar shows `78% of this billing
-period` in amber (because it is at or above 80%… it is not, so the bar is
-neutral), and `Manage spend →` links to the costs surface with the 7-day window
-already selected.
+**then** the headline reads `$18.42` with the sublabel `last 7 days in Acme`, the
+second line reads `61 runs · $0.30 avg per run`, a neutral bar (78% is below the
+80% amber threshold) reads `78% of your account-wide cap this billing period`,
+and `Manage spend →` links to the costs surface with the 7-day window already
+selected.
 
 **S6 — Following a live run.**
 **Given** two Runs executing, one started 14 minutes ago and one 3 minutes ago,
@@ -348,7 +350,9 @@ count is explainable rather than mysterious.
 **when** Home re-renders,
 **then** every block reflects only the newly-active scope, no counter carries a
 number from the previous scope, and the block preference (which blocks are
-hidden) is per-user and therefore unchanged by the switch.
+hidden) is per-user and therefore unchanged by the switch. The one figure that
+does not change is the This-week cap bar, because the spend cap is an
+account-wide setting; it is labelled account-wide in both scopes (FR-39a).
 
 **S20 — Background job runtime is not configured.**
 **Given** an installation with no configured job runtime, so nothing will ever be
@@ -493,24 +497,38 @@ that backs the morning stack.
 
 ### 4.6 This week (spend)
 
-- **FR-37.** The headline is total AI spend over a **rolling 7-day** window,
-  formatted in the account's currency, with the sublabel `last 7 days`. The
-  window is explicitly 7 days and is never described as "this week" in copy.
+- **FR-37.** The headline is total AI spend over a **rolling 7-day** window **in
+  the active scope** — the active Organization's usage when one is active, the
+  user's personal usage otherwise (FR-69) — formatted in the account's currency,
+  with the sublabel `last 7 days in {scope}`, where `{scope}` is the Organization's
+  name or `Personal`. The window is explicitly 7 days and is never described as
+  "this week" in copy.
 - **FR-38.** The second line reads `{runs} runs · {avg} avg per run`, where
-  `avg` is the 7-day total divided by the 7-day run count, rounded to the
-  currency's minor unit, and reads `—` when the run count is zero.
+  `runs` counts the active scope's Runs in the same window and `avg` is the
+  scoped 7-day total divided by that count, rounded to the currency's minor unit,
+  and reads `—` when the run count is zero. Spend and runs from another
+  Organization are never mixed into either number.
 - **FR-39.** When the account has a spend cap for the current billing period, a
-  bar shows period-to-date spend as a percentage of that cap, labelled
-  `{n}% of this billing period`. The bar is neutral below **80%**, amber from
-  **80%**, and danger from **100%**.
+  bar shows the account's period-to-date spend as a percentage of that cap,
+  labelled `{n}% of your account-wide cap this billing period`. The bar is neutral
+  below **80%**, amber from **80%**, and danger from **100%**.
+- **FR-39a.** The spend cap is an account-wide setting and is enforced against the
+  account's spend in every Organization, so the cap bar and the FR-40 line cannot
+  be scoped to one Organization. They MUST always carry the words `account-wide`,
+  MUST be visually separated from the scoped headline, and MUST NOT be presented
+  as a share of the headline figure. No other number in the panel may be
+  account-wide.
 - **FR-40.** At or above 100% the panel adds one line: `New runs are blocked.`
   when the account blocks on overage, or `Overage is allowed.` when it does not.
 - **FR-41.** With no cap set the bar is replaced by the line
   `No spend cap set.` and the action `Set a cap →`.
 - **FR-42.** `Manage spend →` opens the costs surface with the 7-day window
-  pre-selected.
+  pre-selected. That surface reports account-wide spend, so the link's accessible
+  description reads `Opens account-wide spend`.
 - **FR-43.** The panel is hidden entirely for a user whose account has never
-  recorded any spend, so a brand-new account is not shown a $0.00 meter.
+  recorded any spend, in any scope, so a brand-new account is not shown a $0.00
+  meter. An account with spend elsewhere that opens an Organization with none
+  sees `$0.00` for that Organization, not a hidden panel.
 
 ### 4.7 Working now
 
@@ -762,11 +780,11 @@ sidebar entry and no modal.
 │ │ TODAY                    +2 more →  │ │ THIS WEEK           Manage spend → │ │
 │ ├─────────────────────────────────────┤ ├────────────────────────────────────┤ │
 │ │ ✓ 06:15  Daily sweep       heartbeat│ │  $18.42                            │ │
-│ │ ✓ 07:00  Catalog sync      data sync│ │  last 7 days                       │ │
+│ │ ✓ 07:00  Catalog sync      data sync│ │  last 7 days in Acme               │ │
 │ │ ─────────────────────────────────── │ │  61 runs · $0.30 avg per run       │ │
 │ │   14:00  Catalog check     recurring│ │                                    │ │
 │ │   18:00  Nightly report     schedule│ │  ████████████░░░░  78%             │ │
-│ │   22:00  Mission tick   ⏸ paused    │ │  of this billing period            │ │
+│ │   22:00  Mission tick   ⏸ paused    │ │  of your account-wide cap          │ │
 │ └─────────────────────────────────────┘ └────────────────────────────────────┘ │
 │                                                                                │
 │ ┌────────────────────────────────────────────────────────────────────────────┐ │
@@ -853,7 +871,7 @@ Each block renders its own empty line rather than collapsing:
 ├──────────────────────────────┬─────────────────────────────────────┤
 │ TODAY                        │ THIS WEEK          Manage spend →   │
 │   Nothing scheduled today.   │   $0.00                             │
-│   Set something up →         │   last 7 days                       │
+│   Set something up →         │   last 7 days in Acme               │
 ├──────────────────────────────┴─────────────────────────────────────┤
 │ WORKING NOW                                                        │
 │   Nobody is working right now.        Hand out some work ↑         │
@@ -1070,9 +1088,11 @@ are registered through the same mechanism so the help panel lists them.
 | Today nothing left | `Nothing else scheduled today.` |
 | Today paused chip | `paused` · `error` |
 | This-week heading | `This week` |
-| This-week sublabel | `last 7 days` |
+| This-week sublabel | `last 7 days in {scope}` (Organization name, or `Personal`) |
 | This-week second line | `{n} runs · {amount} avg per run` |
-| This-week cap bar | `{n}% of this billing period` |
+| This-week cap bar | `{n}% of your account-wide cap this billing period` |
+| This-week cap note | `The cap applies across all your Organizations.` |
+| This-week link description | `Opens account-wide spend` |
 | This-week blocked | `New runs are blocked.` |
 | This-week overage | `Overage is allowed.` |
 | This-week no cap | `No spend cap set.` · action `Set a cap` |
@@ -1206,8 +1226,12 @@ A reviewer can run this list against a build.
 
 ### This week
 
-- [ ] The headline equals the 7-day total from the costs surface for the same
-      account, to the cent.
+- [ ] The headline equals the sum of the active scope's usage over the same 7-day
+      window, to the cent; with all of an account's usage in one Organization it
+      equals the costs surface's 7-day total.
+- [ ] With usage in two Organizations, each Organization's headline, run count and
+      average count only that Organization's usage and Runs, while the cap bar
+      shows the same percentage in both and reads `account-wide`.
 - [ ] The average line reads `—` when the 7-day run count is zero.
 - [ ] With a cap and 78% used, the bar is neutral; at 80% amber; at 100% danger
       with the blocked-or-overage line.
@@ -1248,8 +1272,9 @@ A reviewer can run this list against a build.
 
 ### Scope, security and a11y
 
-- [ ] Switching the active Organization changes every number on the screen and
-      leaves no stale value.
+- [ ] Switching the active Organization changes every scoped number on the screen
+      and leaves no stale value; the only unchanged figure is the cap bar labelled
+      `account-wide`.
 - [ ] No request Home issues accepts a user id or an organization id parameter.
 - [ ] An id belonging to another account answers "not found" identically to an id
       that does not exist.

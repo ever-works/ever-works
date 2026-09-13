@@ -217,10 +217,12 @@ No database enum type is created — nothing persists a category or a kind.
 
 ### 3.4 Migration (Constitution V — ships in the SAME PR as the entity)
 
-`apps/api/src/migrations/1789200000000-CreateProductChangelogReads.ts`
+`apps/api/src/migrations/1791140000000-CreateProductChangelogReads.ts`
 
-The newest migration in the tree today is `1789100000000-AddTaskGraphFanout.ts`, so
-`1789200000000` is the next free slot; re-stamp if another migration lands first.
+`1791140000000` is AW-14 slot 00 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)).
+It sits above the newest migration on `develop` at time of writing (`1790100000000-AddReleaseVerification.ts`) and
+cannot collide with another epic's plan. Before merge, rebase on `develop`; if a newer migration
+has landed, re-stamp the filename and class name to exceed it.
 
 ```ts
 import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm';
@@ -236,7 +238,7 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey } from 'typeorm
  * Forward-only. `ifNotExists` on create; `down()` drops only the table this
  * migration created and touches no pre-existing object.
  */
-export class CreateProductChangelogReads1789200000000 implements MigrationInterface {
+export class CreateProductChangelogReads1791140000000 implements MigrationInterface {
 	public async up(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.createTable(
 			new Table({
@@ -720,7 +722,7 @@ The half that turns a list into a discovery surface.
 | **II — Capability-driven, no hardcoded plugin ids** | ✅ | No plugin id appears in any added or modified file. Category values are product areas, defined once in `packages/contracts/src/api/changelog/changelog.enum.ts`, and are not resolvable to plugins. |
 | **III — Source-of-truth repositories** | ✅ n/a | Nothing here is Work content. The catalogue is product metadata that ships with the build; the only persisted data is per-person read state, which belongs in our database by definition. |
 | **IV — Background work via the job-runtime provider** | ✅ | No background work is introduced (§6). The one deferred candidate is specified to go through a `*_DISPATCHER` DI symbol bound in `packages/agent/src/tasks/job-runtime.providers.ts`, never `@Cron` and never a direct vendor SDK import. |
-| **V — Forward-only migrations, same PR** | ✅ | `apps/api/src/migrations/1789200000000-CreateProductChangelogReads.ts` ships in the same PR as `packages/agent/src/entities/product-changelog-read.entity.ts`. Create-only, `ifNotExists`, no backfill needed (the signup baseline is a query-time comparison), `down()` drops only what `up()` created. |
+| **V — Forward-only migrations, same PR** | ✅ | `apps/api/src/migrations/1791140000000-CreateProductChangelogReads.ts` ships in the same PR as `packages/agent/src/entities/product-changelog-read.entity.ts`. Create-only, `ifNotExists`, no backfill needed (the signup baseline is a query-time comparison), `down()` drops only what `up()` created. |
 | **VI — Tests are a prerequisite** | ✅ | Jest service + controller specs, Vitest component/hook specs, three Playwright specs, and a catalogue spec that is itself a product requirement (FR-41). Named in §10. |
 | **VII — Privacy & secret hygiene** | ✅ | No secrets exist in this feature. Read rows hold `(userId, entrySlug, readAt)` and nothing else (FR-49). Analytics carry no free text (FR-50). Responses are `private, no-store`. The `:slug` 404 is not an existence oracle. |
 | **VIII — Single source of truth for plugin counts** | ✅ n/a | No plugin is added; `docs/plugin-system/built-in-plugins.md` is untouched. |

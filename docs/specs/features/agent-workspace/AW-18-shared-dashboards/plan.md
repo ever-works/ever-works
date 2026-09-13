@@ -41,6 +41,18 @@ helper (AES-256-GCM, `enc::v1::` prefix — the same mechanism
 `notification_channels.targetConfig` uses). Lookup is still by hash; decryption happens
 only on the owner's own settings read.
 
+The same precedent settles the **transport**. `OrgInviteController.preview` is a `POST`
+even though it is a read, and its comment says why: a token in the URL is persisted by
+[`apps/api/src/logging.interceptor.ts`](../../../../../apps/api/src/logging.interceptor.ts),
+which logs `Incoming Request: ${method} ${originalUrl}` unredacted, and by Sentry, which
+attaches the request URL. The same is true of the two interceptors registered beside it in
+`apps/api/src/api.module.ts`: `SentryInterceptor` puts `originalUrl` into the request context,
+the `transaction` tag and the `endpoint` tag, and `PostHogInterceptor` strips only the query
+string, so a path segment reaches the `endpoint` property intact. A request **body** field
+named `token` reaches none of them — `SentryInterceptor.SENSITIVE_BODY_KEYS` already drops
+it — and an `Authorization` header is deleted by `sanitizeHeaders`. §4.2 is built on exactly
+those two facts.
+
 ### 1.3 The public-route precedent in the web app
 
 - [`apps/web/src/app/[locale]/org-invite/[token]/page.tsx`](../../../../../apps/web/src/app/%5Blocale%5D/org-invite/%5Btoken%5D/page.tsx)
@@ -159,8 +171,8 @@ Slack delivery ─► apps/api/src/ingest/slack/slack-events.controller.ts     (
 ### 1.11 Migrations
 
 174 timestamp-prefixed files live in
-[`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/); the newest is
-`1789100000000-AddTaskGraphFanout.ts`. New entities must also be registered in
+[`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/); the newest on `develop` at time of writing is
+`1790100000000-AddReleaseVerification.ts`. New entities must also be registered in
 [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts)
 and [`_entity-names.ts`](../../../../../packages/agent/src/database/_entity-names.ts) —
 this repo has no `autoLoadEntities`, so a `forFeature`'d-but-unregistered entity throws
@@ -177,7 +189,7 @@ flowchart TB
     subgraph PUB["Slice A — publish (P1, P3)"]
         V["Visitor browser<br/>no account, no cookie"]
         SP["apps/web /share/[token]<br/>server component + 20s poll"]
-        PC["SharedViewPublicController<br/>@Public + token guard + throttle"]
+        PC["SharedViewPublicController<br/>@Public + token exchange + view-session guard + throttle"]
         PS["SharedViewProjectionService<br/>board + roster + strip + docs"]
     end
     subgraph OWN["Owner surfaces"]
@@ -363,14 +375,15 @@ flood the feed. Views are a counter on the row (FR-44).
 
 ### 3.5 Migrations — forward-only, same PR (Constitution V)
 
-Timestamps continue the existing sequence (newest on disk is `1789100000000`).
+Timestamps are AW-18's slots of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)),
+in apply order; re-stamp before merge if `develop` has moved past them.
 
 | File (in `apps/api/src/migrations/`) | Contents | Phase |
 | --- | --- | --- |
-| `1789200000000-CreateSharedViews.ts` | `CREATE TABLE shared_views` + 3 indexes | P1 |
-| `1789210000000-CreateChannelGuests.ts` | `CREATE TABLE channel_guests` + 3 indexes | P2 |
-| `1789220000000-AddRequesterAttribution.ts` | 10 nullable columns across `tasks`, `missions`, `agent_action_proposals`, `agent_escalations` + FKs `ON DELETE SET NULL` | P2 |
-| `1789230000000-AddKbSharedViewExcluded.ts` | `work_knowledge_documents.shared_view_excluded boolean NOT NULL DEFAULT false` | P3 |
+| `1791180000000-CreateSharedViews.ts` | `CREATE TABLE shared_views` + 3 indexes | P1 |
+| `1791180100000-CreateChannelGuests.ts` | `CREATE TABLE channel_guests` + 3 indexes | P2 |
+| `1791180200000-AddRequesterAttribution.ts` | 10 nullable columns across `tasks`, `missions`, `agent_action_proposals`, `agent_escalations` + FKs `ON DELETE SET NULL` | P2 |
+| `1791180300000-AddKbSharedViewExcluded.ts` | `work_knowledge_documents.shared_view_excluded boolean NOT NULL DEFAULT false` | P3 |
 
 Every `down()` is a plain `DROP`/`DROP COLUMN` of only what its `up()` added. No
 existing column is altered, renamed or dropped anywhere in this epic.
@@ -416,15 +429,65 @@ escape hatch (§2.2).
 
 ### 4.2 Public — `apps/api/src/shared-views/shared-view-public.controller.ts`
 
-`@Controller('api/public/shared-view')`, `@Public()`, no session, no cookie. Every route
-takes the token as a **path segment**, resolves it by hash, and 404s identically for
-unknown / rotated / paused (FR-11).
+`@Controller('api/public/shared-view')`, `@Public()`, no user session, no cookie. **No route
+takes the token in its path or query string** (spec FR-7a). The token is exchanged once, in a
+body, for a short-lived **view session**; every read presents only that.
 
-| Method | Path | Query | Notes |
+| Method | Path | Body / header | Notes |
 | --- | --- | --- | --- |
-| `GET` | `/:token/board` | — | `PublishedBoardDto`. Throttle 60/min per token (FR-42). |
-| `GET` | `/:token/knowledge` | `?q=&cursor=` | `PublishedDocumentSummaryDto[]`; `q` min 2 chars, page 50, cap 200 (FR-30). |
-| `GET` | `/:token/knowledge/:docId` | — | `PublishedDocumentDto`; 404 if class deselected (FR-32) or excluded. |
+| `POST` | `/sessions` | body `{ token }` | Resolves the token by hash; `200 { viewSession, expiresAt }`. Unknown / rotated / paused → the identical "no longer active" `404` (FR-11). Throttle 60/min per token hash + 600/hour per client (FR-42). A `POST` for the reason `OrgInviteController.preview` gives (§1.2). |
+| `GET` | `/board` | `Authorization: Bearer <viewSession>` | `PublishedBoardDto`. Throttle 60/min per Shared view (FR-42). |
+| `GET` | `/knowledge` | `Authorization: Bearer <viewSession>`; `?q=&cursor=` | `PublishedDocumentSummaryDto[]`; `q` min 2 chars, page 50, cap 200 (FR-30). |
+| `GET` | `/knowledge/:docId` | `Authorization: Bearer <viewSession>` | `PublishedDocumentDto`; 404 if class deselected (FR-32) or excluded. |
+
+**The view session** — `apps/api/src/shared-views/shared-view-session.service.ts`, modelled on
+[`TerminalAttachService`](../../../../../apps/api/src/terminal/terminal-attach.service.ts)'s
+compact HMAC token:
+
+- Format `base64url(claims).base64url(HMAC-SHA256)`, claims
+  `{ v: 1, sid: sharedViewId, rot: rotationCount, exp }`, TTL **15 minutes**. It carries no
+  token, no token hash, no Organization id and no user id.
+- Secret `SHARED_VIEW_SESSION_SECRET`, falling back to `BETTER_AUTH_SECRET` / `AUTH_SECRET`
+  exactly as the terminal attach token does; **fail closed** — with no secret, minting is a
+  `503` and verification refuses everything.
+- **Revocable without storage.** A guard verifies the MAC (`timingSafeEqual`) and `exp`, then
+  loads the row by `sid` and requires `status = 'active'` **and** `rotationCount = rot`.
+  Regenerate already increments `rotationCount` (§3.1), so every outstanding view session
+  dies on its next request with zero grace (FR-8); pausing (FR-10) and deleting (FR-5) kill
+  them the same way. Every refusal is the identical FR-11 response. No table, no migration.
+- **Renewal.** The client re-exchanges when `expiresAt` is under 60 s away or a read answers
+  the FR-11 response, by posting the token again in a body. A failed renewal renders the
+  not-active state.
+- View counting (FR-44) and the first-view notification (FR-46) are driven from the exchange,
+  not from each read, so a 20 s poll never inflates the count.
+
+**Redaction as defence in depth** (spec FR-7b) —
+`packages/monitoring/src/redaction/secret-url.ts` exports `redactSecretUrl(url)` and
+`redactSecretValue(text)`, which replace a 43-character share token after a `/share/` path
+segment, any `Bearer` view session, and any body `token` value with `[redacted]`. They are
+applied at every recorder, not left to downstream filters:
+
+- `apps/api/src/logging.interceptor.ts` — both the request and the response/error lines log
+  `redactSecretUrl(originalUrl)` instead of `originalUrl`.
+- `SentryInterceptor` — the request-context `url`, the `transaction` tag and the `endpoint`
+  tag; `sentry.config.ts` `beforeSend` / `beforeSendTransaction` — `event.request.url`, the
+  transaction name and every breadcrumb `data.url`.
+- `PostHogInterceptor` — the `endpoint` property.
+- API error context — every error the public controller throws, and any message or URL an
+  `APP_FILTER` exception filter under `apps/api/src/common/filters/` logs, go through
+  `redactSecretValue`; no share-link error message ever interpolates the token or the view
+  session.
+- Web — `apps/web/src/components/posthog/PostHogProvider.tsx` skips `posthog.init` and the
+  page-view capture when the pathname is a share route (spec FR-40), and adds a
+  `sanitize_properties` hook applying `redactSecretUrl` to `$current_url`, `$pathname` and
+  `$referrer` in case a share URL is ever captured from another page.
+
+**What still carries the token, and why that is acceptable.** The visitor-facing page
+address `/share/<token>` *is* the link, as the invitation link is for `/org-invite/[token]`.
+That request line reaches the web app, which does not log request lines; the page sets
+`Referrer-Policy: no-referrer` (FR-39) and loads no analytics (above). The edge access log
+in front of the web host is outside the application: T14b's Done-when requires confirming
+that its log format drops or redacts `/share/` paths before P1 ships.
 
 Response headers on **every** public route, set by a dedicated interceptor:
 
@@ -456,7 +519,11 @@ the client (600/hour) — and runs **before** the projection query (NFR "Through
 
 Owner-side reads/writes go through server actions (§5.2). The **public** page calls the
 API directly from its server component — it must never touch a Next.js route handler
-that could accidentally read the session cookie.
+that could accidentally read the session cookie. The server component performs the
+`POST /sessions` exchange with the token in the body, renders the first view with the
+resulting view session, and passes only `{ viewSession, expiresAt }` to the client
+components; the 20 s poll sends the view session in the `Authorization` header and never
+builds an API URL from the token.
 
 ---
 
@@ -466,7 +533,7 @@ that could accidentally read the session cookie.
 
 | Path | Kind | Notes |
 | --- | --- | --- |
-| `apps/web/src/app/[locale]/share/[token]/page.tsx` | Server component | The published page. Sibling of `org-invite/`, so the static `share` segment wins over `[slug]`. Renders board + knowledge tabs; **no** client JS required for first paint (FR-85). |
+| `apps/web/src/app/[locale]/share/[token]/page.tsx` | Server component | The published page. Sibling of `org-invite/`, so the static `share` segment wins over `[slug]`. Exchanges the token for a view session in a request body (§4.2, §4.4) and renders board + knowledge tabs with it; **no** client JS required for first paint (FR-85). |
 | `apps/web/src/app/[locale]/share/[token]/not-active.tsx` | Server component | The identical "no longer active" body used by every failure (FR-11). |
 | `apps/web/src/components/share/PublishedBoard.tsx` | Client | Columns, cards, roster, strip; 20 s poll with visibility + idle handling (FR-43). |
 | `apps/web/src/components/share/PublishedKnowledge.tsx` | Client | Two-pane list/reader with debounced search. |
@@ -656,8 +723,10 @@ in every file.
 | `channel_guest.gate` | Admission service | `outcome` (`admitted` \| `denied` \| `throttled`), `provider` |
 | `decision.postback` | Post-back task | `outcome`, `attempt`, `succeeded` |
 
-Redaction: the share token, the external user id and every message body are excluded at
-the emit site, not filtered downstream.
+Redaction: the share token, the view session, the external user id and every message body
+are excluded at the emit site, not filtered downstream. The generic request recorders
+(request log, Sentry, PostHog, error context) additionally apply `redactSecretUrl` /
+`redactSecretValue` (§4.2) so a future route or a mistake cannot reintroduce the token.
 
 ### 9.2 Failure modes and the chosen behaviour
 
@@ -672,6 +741,8 @@ the emit site, not filtered downstream.
 | Two tabs regenerate simultaneously | The write is an atomic `UPDATE … WHERE rotationCount = :seen`; the loser gets `409` and re-reads | S-10. |
 | Guest revoked mid-run | The reply suppression check runs at post time, not at dispatch time | S-17. |
 | A `429` on the public path | Never counted as a view, never logged per-request (aggregated only) | FR-45 and log-volume sanity. |
+| View session expires or its link is regenerated mid-poll | The next read returns the FR-11 response; the client re-exchanges once with the token in a body; if that also fails, the page shows *no longer active* | FR-7a, FR-8. |
+| No session secret configured | `POST /sessions` returns `503` and every read is refused | Fail closed, as the terminal attach token does. |
 
 ---
 
@@ -698,7 +769,11 @@ the emit site, not filtered downstream.
 | File | Covers |
 | --- | --- |
 | `apps/api/src/shared-views/shared-views.controller.spec.ts` | Owner-only writes; non-owner member gets settings without the link; non-member `404`; throttle decorators present |
-| `apps/api/src/shared-views/shared-view-public.controller.spec.ts` | Unknown / rotated / paused tokens return byte-identical bodies; every security header present; `X-Robots-Tag` omitted only when `searchIndexable`; `429` carries `Retry-After` |
+| `apps/api/src/shared-views/shared-view-public.controller.spec.ts` | Unknown / rotated / paused tokens return byte-identical bodies; every security header present; `X-Robots-Tag` omitted only when `searchIndexable`; `429` carries `Retry-After`; **no route declares a path or query parameter named or shaped like a token** (reflective check over the controller's route metadata) |
+| `apps/api/src/shared-views/shared-view-session.service.spec.ts` | Mint/verify round trip; tampered MAC, expired `exp`, wrong `rot` and paused view all refused identically; no secret → mint `503`, verify refuses; claims contain no token or token hash |
+| `apps/api/src/logging.interceptor.spec.ts` (extend) | A request to `/share/<token>` and a failing request carrying a token both log `[redacted]`, never the token |
+| `packages/monitoring/src/redaction/__tests__/secret-url.spec.ts` | `redactSecretUrl` / `redactSecretValue` over share paths with and without locale prefix, query strings, `Bearer` sessions, JSON bodies; a non-secret path is unchanged |
+| `packages/monitoring/src/interceptors/__tests__/sentry.interceptor.spec.ts`, `posthog.interceptor.spec.ts`, `packages/monitoring/src/sentry/__tests__/sentry.config.spec.ts` (extend) | URL, tags, `endpoint`, transaction name and breadcrumbs are redacted |
 | `apps/api/src/shared-views/shared-view-owner.guard.spec.ts` | Resolves the Tenant owner; throws `NotFoundException`, never `ForbiddenException` |
 | `apps/api/src/channel-guests/channel-guests.controller.spec.ts` | CRUD; `bindingReady:false` shape; duplicate `409`; caps `422`; non-owner `404` |
 | `apps/api/src/ingest/slack/slack-chat-bridge.service.spec.ts` (extend the existing spec) | The gate is called after signature verification and before `OpenAiCompatService`; a denial short-circuits |
@@ -707,7 +782,9 @@ the emit site, not filtered downstream.
 
 | File | Covers |
 | --- | --- |
-| `apps/api/test/shared-view.e2e-spec.ts` | Full publish → read → regenerate → old-token-dead cycle against a real HTTP stack |
+| `apps/api/test/shared-view.e2e-spec.ts` | Full publish → exchange → read → regenerate → old-token-dead **and old-view-session-dead** cycle against a real HTTP stack |
+| `apps/api/test/shared-view-log-hygiene.e2e-spec.ts` | Captures every line emitted by the Nest `Logger`, every `Sentry` capture/context/breadcrumb call and every PostHog `trackEvent` call while running an exchange, a board read, a knowledge read, an unknown-token exchange, a regenerated-away read, a throttled read and a forced `500`; asserts neither the token nor the view session appears as a substring anywhere |
+| `apps/web/e2e/shared-view-token-transport.spec.ts` | Records every network request the published page makes over three poll cycles; asserts no request URL contains the token, no PostHog request is issued, and the token appears only in `POST /sessions` bodies |
 | `apps/web/e2e/shared-view-publish.spec.ts` | Owner turns sharing on, copies the link, previews as a visitor |
 | `apps/web/e2e/shared-view-public-page.spec.ts` | Visit in a **fresh context with no storage state**; board renders; no cookie is set; no sign-in prompt; footer updates |
 | `apps/web/e2e/shared-view-revoke.spec.ts` | Regenerate in one context, assert the other context's open page shows "no longer active" within 20 s |
@@ -730,7 +807,8 @@ Each phase is independently shippable and leaves `develop` green.
 2. Token service (generate / hash / encrypt / decrypt).
 3. Publish filters + closed DTOs + the activity classification spec.
 4. Owner controller + owner guard + Settings → Sharing page.
-5. Public controller + security-header interceptor + throttle buckets.
+5. Public controller (token exchange + view-session guard) + security-header interceptor +
+   throttle buckets + the request-recorder redaction and its log-hygiene e2e.
 6. `/share/[token]` page, `PUBLIC_ROUTES` entry, `robots.ts`.
 7. Counter-flush task + first-view notification + event-type registration.
 8. i18n (`dashboard.sharing`, `share`) + the tests in §10.
@@ -775,7 +853,7 @@ soon" behind the existing `soon` copy pattern), guests, attribution.
 | **IV — Job runtime via `*_DISPATCHER`** | ✓ | Both background jobs (§6) are enqueued through DI symbols registered in `_tasks-symbols.ts`; no call site imports a job-runtime SDK directly. |
 | **V — Forward-only migrations, same PR** | ✓ | Four migrations in `apps/api/src/migrations/` (§3.5), each shipping with the entity change that needs it. Every `down()` drops only what its `up()` added. |
 | **VI — Tests are a prerequisite** | ✓ | §10: 10 unit files, 5 controller specs, 7 end-to-end specs, including the key-set assertions that make an accidental field leak a CI failure. |
-| **VII — Secret hygiene** | ✓ | The token is stored with `EncryptedJsonColumn`, returned only to the Tenant owner, excluded at every telemetry emit site, and never written to an activity-log row. Visitor IPs are never persisted. |
+| **VII — Secret hygiene** | ✓ | The token is stored with `EncryptedJsonColumn`, returned only to the Tenant owner, excluded at every telemetry emit site, and never written to an activity-log row. It never appears in an API URL — it is exchanged in a body for a short-lived, revocable view session (§4.2) — and every request recorder redacts it before writing. Visitor IPs are never persisted. |
 | **VIII — Single source of truth for plugin lists** | n/a | No plugin is added, removed or re-categorised. |
 | **IX — Behaviour-first spec** | ✓ | `spec.md` names no class, no path and no code; every implementation detail lives here. |
 | **X — Forward-looking backwards compatibility** | ✓ | Every new column is nullable or defaulted; every endpoint is new; no existing DTO field is renamed or removed; `ActivityActionType` members are appended, never reordered. |
