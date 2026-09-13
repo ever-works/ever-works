@@ -267,6 +267,35 @@ describe('Task board read model (integration)', () => {
             });
             expect(ordered.map((t) => t.title)).toEqual(['p0', 'p1', 'p2']);
         });
+
+        it.each([
+            ['updatedAt (omitted)', {}],
+            ['priorityThenUpdated', { orderBy: 'priorityThenUpdated' as const }],
+            ['stalledThenPriority', { orderBy: 'stalledThenPriority' as const, stallCutoff: NOW }],
+        ])(
+            'breaks full ties on the unique id under %s, so offset pages neither repeat nor skip',
+            async (_label, order) => {
+                const stamp = daysAgo(1);
+                const seeded: string[] = [];
+                for (let i = 0; i < 6; i += 1) {
+                    seeded.push((await seed(ownerId, { updatedAt: stamp })).id);
+                }
+
+                const pages: string[] = [];
+                for (const offset of [0, 2, 4]) {
+                    const { rows: page, total } = await taskRepository.findByUserIdFiltered(
+                        ownerId,
+                        { ...order, limit: 2, offset },
+                    );
+                    expect(total).toBe(6);
+                    pages.push(...page.map((t) => t.id));
+                }
+
+                expect(new Set(pages).size).toBe(6);
+                expect(pages).toEqual([...seeded].sort());
+                expect(selectStatements().pop()).toMatch(/"task"\."id" ASC/);
+            },
+        );
     });
 
     // ── TaskBoardService ─────────────────────────────────────────────────

@@ -69,6 +69,12 @@ export interface TaskBoardOrderInput {
 	priority: string;
 	latestRunStatus?: string | null;
 	updatedAt: Date | string;
+	/**
+	 * The Task id. When both cards carry one it is the final tie-breaker,
+	 * ascending, exactly as the API's read ends on `id ASC`, so two cards tied
+	 * on every other key still sit in the order the server pages them.
+	 */
+	id?: string;
 }
 
 function timeOf(value: Date | string): number {
@@ -88,10 +94,14 @@ function timeOf(value: Date | string): number {
  *   3. then the oldest update first, so the longest-waiting work leads.
  *
  * `updated` mirrors the `updatedAt DESC` read: the most recently updated
- * card first, nothing else considered.
+ * card first.
+ *
+ * Under either order, cards tied on every key above fall back to their `id`,
+ * ascending, when both carry one: the API ends every board read on `id ASC`.
  *
  * A comparator for `Array.prototype.sort`, which is stable: two cards equal
- * on every key of the chosen order keep the order they arrived in.
+ * on every key of the chosen order (and without ids to split them) keep the
+ * order they arrived in.
  */
 export function compareTaskBoardCards(
 	a: TaskBoardOrderInput,
@@ -100,10 +110,18 @@ export function compareTaskBoardCards(
 	stallAfterDays: number | null | undefined = TASK_BOARD_DEFAULT_STALL_AFTER_DAYS,
 	sort: TaskBoardSort = 'priority'
 ): number {
-	if (sort === 'updated') return timeOf(b.updatedAt) - timeOf(a.updatedAt);
+	if (sort === 'updated') {
+		return timeOf(b.updatedAt) - timeOf(a.updatedAt) || compareIds(a.id, b.id);
+	}
 	const stalledA = isTaskStalled({ ...a, latestRunStatus: a.latestRunStatus, now, stallAfterDays });
 	const stalledB = isTaskStalled({ ...b, latestRunStatus: b.latestRunStatus, now, stallAfterDays });
 	if (stalledA !== stalledB) return stalledA ? -1 : 1;
 	if (a.priority !== b.priority) return a.priority < b.priority ? -1 : 1;
-	return timeOf(a.updatedAt) - timeOf(b.updatedAt);
+	return timeOf(a.updatedAt) - timeOf(b.updatedAt) || compareIds(a.id, b.id);
+}
+
+/** `id ASC` as the database compares ids; 0 unless both cards carry one. */
+function compareIds(a: string | undefined, b: string | undefined): number {
+	if (a === undefined || b === undefined || a === b) return 0;
+	return a < b ? -1 : 1;
 }

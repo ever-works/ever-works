@@ -131,6 +131,34 @@ describe('compareTaskBoardCards', () => {
 		expect(order([card('bad', { updatedAt: 'nope' }), card('ok')])).toEqual(['bad', 'ok']);
 	});
 
+	it('breaks a full tie on the id, ascending, under both orders — as the API read ends on id ASC', () => {
+		const same = hoursAgo(3).toISOString();
+		const tied = [
+			card('c', { id: 'c0ffee00-0000-4000-8000-000000000003', updatedAt: same }),
+			card('a', { id: '0a000000-0000-4000-8000-000000000001', updatedAt: same }),
+			card('b', { id: '0b000000-0000-4000-8000-000000000002', updatedAt: same })
+		];
+		expect(order(tied)).toEqual(['a', 'b', 'c']);
+		expect(
+			[...tied].sort((x, y) => compareTaskBoardCards(x, y, NOW, undefined, 'updated')).map((c) => c.title)
+		).toEqual(['a', 'b', 'c']);
+		// The id never outranks a real key.
+		expect(
+			order([
+				card('newer, low id', {
+					id: '00000000-0000-4000-8000-000000000000',
+					updatedAt: hoursAgo(1).toISOString()
+				}),
+				card('older, high id', {
+					id: 'ffffffff-0000-4000-8000-000000000000',
+					updatedAt: hoursAgo(5).toISOString()
+				})
+			])
+		).toEqual(['older, high id', 'newer, low id']);
+		// Only one side carries an id: no tie-break, arrival order stands.
+		expect(order([card('x', { id: 'ffff', updatedAt: same }), card('y', { updatedAt: same })])).toEqual(['x', 'y']);
+	});
+
 	it("orders by priority when the sort is omitted or 'priority' — the same result either way", () => {
 		const cards = [
 			card('fresh normal', { updatedAt: hoursAgo(1).toISOString() }),

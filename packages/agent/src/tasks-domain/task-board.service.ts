@@ -203,7 +203,7 @@ export class TaskBoardService {
         const now = input.now ?? new Date();
         const terminalWindowDays = resolveTaskBoardTerminalWindow(input.terminalWindowDays);
         const sort = resolveTaskBoardSort(input.sort);
-        const filter: ListTasksFilter = {
+        let filter: ListTasksFilter = {
             priority: input.priority,
             label: input.label,
             search: input.search,

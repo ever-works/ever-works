@@ -22,6 +22,7 @@ describe('TaskRepository ownership scope', () => {
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
             orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
             take: jest.fn().mockReturnThis(),
             skip: jest.fn().mockReturnThis(),
             getCount: jest.fn().mockResolvedValue(0),
@@ -213,6 +214,7 @@ describe('TaskRepository.findByUserIdFiltered board visibility', () => {
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
             orderBy: jest.fn().mockReturnThis(),
+            addOrderBy: jest.fn().mockReturnThis(),
             take: jest.fn().mockReturnThis(),
             skip: jest.fn().mockReturnThis(),
             getCount: jest.fn().mockResolvedValue(0),
@@ -221,6 +223,13 @@ describe('TaskRepository.findByUserIdFiltered board visibility', () => {
         const repo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
         return { svc: new TaskRepository(repo), qb };
     }
+
+    it('keeps the default order and breaks its ties on the unique id', async () => {
+        const { svc, qb } = makeListSvc();
+        await svc.findByUserIdFiltered('u1', {});
+        expect(qb.orderBy).toHaveBeenCalledWith('task.updatedAt', 'DESC');
+        expect(qb.addOrderBy).toHaveBeenLastCalledWith('task.id', 'ASC');
+    });
 
     const hiddenClauses = (qb: any) =>
         qb.andWhere.mock.calls.filter((call: unknown[]) =>

@@ -49,7 +49,8 @@ export interface ListTasksFilter {
     terminalUpdatedSince?: Date;
     /**
      * Row order. Omitted and `'updatedAt'` both emit today's
-     * `updatedAt DESC`, so every existing caller is unchanged.
+     * `updatedAt DESC`, so every existing caller is unchanged. Every order
+     * then breaks remaining ties on `id ASC`, so offset pages never overlap.
      *   - `'priorityThenUpdated'` — `p0` first, then oldest update first.
      *   - `'stalledThenPriority'` — stalled `in_progress` Tasks first (see
      *     `stallCutoff`), then priority, then oldest update first. The
@@ -302,8 +303,20 @@ export class TaskRepository {
      * `varchar(4)` holding `p0`..`p4`, so lexicographic order IS priority
      * order (`'p0' < 'p1' < … < 'p4'`). No CASE mapping or numeric column is
      * needed. It looks accidental; it is not.
+     *
+     * Every order ends on `task.id ASC`. `updatedAt` is not unique, and rows
+     * tied on every other key have no defined relative order: two OFFSET
+     * reads may then be served by different plans and repeat one row while
+     * never returning another. The unique final key makes each page a fixed
+     * slice of one total order. It only breaks ties, so it never moves a row
+     * that the earlier keys already placed.
      */
     private applyListOrder(qb: SelectQueryBuilder<Task>, filter: ListTasksFilter): void {
+        this.applyListOrderKeys(qb, filter);
+        qb.addOrderBy('task.id', 'ASC');
+    }
+
+    private applyListOrderKeys(qb: SelectQueryBuilder<Task>, filter: ListTasksFilter): void {
         switch (filter.orderBy) {
             case 'priorityThenUpdated':
                 qb.orderBy('task.priority', 'ASC').addOrderBy('task.updatedAt', 'ASC');
