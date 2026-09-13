@@ -108,6 +108,10 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
+    // Runs ledger (AW-09) — every agent run on a Day / Week / Month calendar,
+    // each with a receipt. `?g=` granularity, `?d=` anchor date, `?run=` opens
+    // a receipt; the filters ride along as `agent` / `kind` / `status` / `q`.
+    DASHBOARD_RUNS: '/runs',
     // Inbox (operator message center) — messages addressed to the human:
     // blocking agent questions, approval requests, escalations, notices.
     // `?view=archived` switches tabs; `?id=` deep-links one message (the
