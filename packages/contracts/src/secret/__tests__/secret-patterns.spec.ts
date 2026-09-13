@@ -68,6 +68,44 @@ describe('redactSecrets', () => {
 		expect(redactSecrets(family)).toEqual({ cleaned: family, redactions: 0 });
 	});
 
+	it('redacts a whole PEM private-key block — the key material and footer, not just the header', () => {
+		const payload = 'MIIEowIBAAKCAQEAu1SU1LfVLPHCozMxH2Mo4lgOEePzNm0tRgeLezV6ffAt0gun';
+		const block = [
+			'-----BEGIN RSA PRIVATE KEY-----',
+			payload,
+			'Vl9GQUtFX0tFWV9NQVRFUklBTF9GT1JfVEVTVFNfT05MWQ==',
+			'-----END RSA PRIVATE KEY-----'
+		].join('\n');
+		const { cleaned, redactions } = redactSecrets(`config:\n${block}\ntrailing prose`);
+		expect(redactions).toBe(1);
+		expect(cleaned).toBe('config:\n[redacted secret]\ntrailing prose');
+		expect(cleaned).not.toContain(payload);
+		expect(cleaned).not.toContain('END RSA PRIVATE KEY');
+	});
+
+	it('redacts every block separately and handles an escaped-newline key and an unmatched header', () => {
+		const pkcs8 = '-----BEGIN PRIVATE KEY-----\\nQUJDREVGR0g=\\n-----END PRIVATE KEY-----';
+		const openssh = '-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaA==\n-----END OPENSSH PRIVATE KEY-----';
+		const { cleaned, redactions } = redactSecrets(`a ${pkcs8} b ${openssh} c`);
+		expect(redactions).toBe(2);
+		expect(cleaned).toBe('a [redacted secret] b [redacted secret] c');
+
+		const truncated = redactSecrets('-----BEGIN EC PRIVATE KEY-----\nMHcCAQEE');
+		expect(truncated.redactions).toBe(1);
+		expect(truncated.cleaned).not.toContain('BEGIN EC PRIVATE KEY');
+	});
+
+	it('pairs a block with the footer of its own key type only', () => {
+		const rsa = '-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----';
+		const body = `-----BEGIN EC PRIVATE KEY-----\nBBBB\n${rsa}`;
+		const hits = scanForSecrets(body).filter((hit) => hit.pattern === 'pem_private_key');
+		// The EC header has no EC footer, so it is flagged on its own; the RSA
+		// block is still flagged (and redacted) whole.
+		expect(hits).toHaveLength(2);
+		const { cleaned } = redactSecrets(body);
+		expect(cleaned).not.toContain('PRIVATE KEY-----');
+	});
+
 	it('defeats a zero-width split token without keeping the invisible joiner', () => {
 		const token = 'sk-​abcdefghij1234567890';
 		expect(containsSecret(token)).toBe(true);

@@ -63,9 +63,13 @@ const PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
 	{ name: 'generic_pat', re: /\bpat_[A-Za-z0-9]{30,}\b/g },
 	// Security: PEM private-key block — the leak the scanner is documented to
 	// stop (header comment / spec §6). Literal marker keeps false positives ~0.
+	// The match spans the WHOLE block — header, key material and the footer of
+	// the same key type — so a redaction removes the key itself, not just its
+	// label. A header with no matching footer (a truncated paste) still matches
+	// on its own, exactly as before.
 	{
 		name: 'pem_private_key',
-		re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/g
+		re: /-----BEGIN ((?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY)-----(?:[\s\S]*?-----END \1-----)?/g
 	},
 	// Security: Google API key (AIza…) — fixed 4-char prefix + 35 chars.
 	{ name: 'google_api_key', re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
