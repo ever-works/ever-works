@@ -10,6 +10,9 @@ export * from './agent-inbox-tools';
 export { InboxItemRepository } from '../database/repositories/inbox-item.repository';
 export type {
     CreateInboxItemInput,
+    InboxDecisionCountsRow,
+    InboxDecisionRow,
+    ListInboxDecisionsOptions,
     ListInboxItemsOptions,
 } from '../database/repositories/inbox-item.repository';
 export { InboxItem } from '../entities/inbox-item.entity';

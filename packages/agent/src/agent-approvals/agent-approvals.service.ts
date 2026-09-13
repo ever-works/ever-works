@@ -163,6 +163,9 @@ export class AgentApprovalsService {
                     riskFlags: saved.riskFlags,
                     agentId: saved.agentId,
                     runId: saved.runId ?? null,
+                    // The Task a merge approval is about — platform-derived
+                    // by the merge gate, never model-supplied.
+                    taskId: typeof payload.taskId === 'string' ? payload.taskId : null,
                     organizationId: saved.organizationId ?? null,
                 });
             } catch (error) {
@@ -243,6 +246,7 @@ export class AgentApprovalsService {
         row.decidedVia = 'user';
         row.updatedAt = now;
         const saved = await this.proposals.save(row);
+        await this.closeInboxMirror(saved.id, decision, userId);
         return toAgentActionProposalDto(saved);
     }
 
@@ -301,10 +305,37 @@ export class AgentApprovalsService {
             row.updatedAt = now;
         }
         await this.proposals.save(pending);
+        for (const row of pending) {
+            await this.closeInboxMirror(row.id, 'approved', userId);
+        }
         return { approved: pending.length, skipped, excluded };
     }
 
     // ── internals ─────────────────────────────────────────────────
+
+    /**
+     * My Decisions — a proposal decided here (the approvals endpoints,
+     * approve-all) closes its Inbox mirror too, so the owner never finds
+     * an approval still "waiting" in the Inbox after deciding it on Home.
+     * The Inbox reply claims its item before calling `decide`, so on that
+     * door this is a no-op. Best-effort: the decision stands regardless.
+     */
+    private async closeInboxMirror(
+        proposalId: string,
+        decision: 'approved' | 'rejected',
+        decidedByUserId: string,
+    ): Promise<void> {
+        if (!this.inbox?.proposalDecided) return;
+        try {
+            await this.inbox.proposalDecided({ proposalId, decision, decidedByUserId });
+        } catch (error) {
+            this.logger.warn(
+                `Proposal ${proposalId} inbox close failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
 
     private async requireOwned(userId: string, id: string): Promise<AgentActionProposal> {
         const row = await this.proposals.findOne({ where: { id, userId } });

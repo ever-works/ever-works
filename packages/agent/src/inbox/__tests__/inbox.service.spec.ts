@@ -127,6 +127,12 @@ function makeStore(seed: InboxItem[] = []) {
                 return true;
             },
         ),
+        stampFirstViewed: jest.fn(async (id: string, userId: string) => {
+            const row = rows.get(id);
+            if (!row || row.userId !== userId || row.firstViewedAt) return false;
+            row.firstViewedAt = new Date('2026-08-01T12:00:00.000Z');
+            return true;
+        }),
         reopen: jest.fn(async (id: string, userId: string) => {
             const row = rows.get(id);
             if (!row || row.userId !== userId || row.status !== 'answered') return false;
@@ -1178,6 +1184,568 @@ describe('InboxService', () => {
 
             const actions = activityLog.log.mock.calls.map((call) => call[0].actionType);
             expect(actions).toEqual(['inbox_item_created', 'inbox_item_answered']);
+        });
+    });
+});
+
+/**
+ * My Decisions — the decision view of the Inbox and the doors that close it.
+ *
+ * The queue is the Inbox (no second record), so these pin what the service
+ * adds on top of the store: the DTO mapping of the decision context, the
+ * opt-in reason rule, the first-view stamp, what happened to the WORK after
+ * an answer (`restart`), and that a decision taken through another door
+ * closes the mirror exactly once and restarts the work exactly once.
+ */
+describe('InboxService — My Decisions', () => {
+    const APPROVAL_OPTIONS = [
+        { id: 'approve', label: 'Approve' },
+        { id: 'reject', label: 'Reject' },
+    ];
+
+    function silenceWarnings(service: InboxService): void {
+        jest.spyOn(
+            (service as never as { logger: { warn: () => void } }).logger,
+            'warn',
+        ).mockImplementation(() => undefined);
+    }
+
+    function parkedRun(overrides: Record<string, unknown> = {}) {
+        return makeRuns({
+            id: 'run-1',
+            userId: 'u1',
+            status: 'completed',
+            awaitingInput: true,
+            taskId: 't1',
+            ...overrides,
+        });
+    }
+
+    const emptyContext = {
+        runStatus: null,
+        runParked: false,
+        taskId: null,
+        taskTitle: null,
+        taskStatus: null,
+        missionId: null,
+        reasonCode: null,
+        confidence: null,
+        confidenceSource: 'ai-judge',
+        attempted: null,
+        actionType: null,
+        riskFlags: null,
+        agentName: null,
+    };
+
+    describe('listDecisions / decisionCounts', () => {
+        it('maps the linked context and returns the header counts', async () => {
+            const createdAt = new Date('2026-08-01T00:00:00.000Z');
+            const store = {
+                ...makeStore(),
+                listDecisionsForUser: jest.fn(async () => ({
+                    rows: [
+                        {
+                            item: makeRow({ id: 'i1', kind: 'escalation', createdAt }),
+                            runStatus: 'completed',
+                            runParked: true,
+                            taskId: 't1',
+                            taskTitle: 'Refresh the pricing page',
+                            taskStatus: 'in_progress',
+                            missionId: 'm1',
+                            reasonCode: 'budget-stop',
+                            confidence: 1.7,
+                            confidenceSource: 'heuristic',
+                            attempted: [
+                                { label: 'fetch', outcome: '402' },
+                                { label: 42 },
+                                'garbage',
+                            ],
+                            actionType: null,
+                            riskFlags: null,
+                            agentName: 'Researcher',
+                        },
+                    ],
+                    total: 1,
+                })),
+                countDecisionsForUser: jest.fn(async () => ({
+                    open: 3,
+                    blocking: 1,
+                    lastRaisedAt: createdAt,
+                })),
+            };
+            const { service } = build({ store: store as never });
+
+            const result = await service.listDecisions('u1', { kind: 'escalation', limit: 10 });
+
+            expect(store.listDecisionsForUser).toHaveBeenCalledWith('u1', {
+                kind: 'escalation',
+                limit: 10,
+            });
+            expect(result.total).toBe(1);
+            expect(result.counts).toEqual({
+                open: 3,
+                blocking: 1,
+                lastRaisedAt: '2026-08-01T00:00:00.000Z',
+            });
+            expect(result.items[0].decision).toEqual({
+                blocking: true,
+                blockingReason: 'run-parked',
+                // Clamped into 0..1 — a score is a probability, whatever the store holds.
+                confidence: 1,
+                confidenceSource: 'heuristic',
+                reasonCode: 'budget-stop',
+                attempted: [{ label: 'fetch', outcome: '402' }],
+                actionType: null,
+                riskFlags: [],
+                agentName: 'Researcher',
+                taskId: 't1',
+                taskTitle: 'Refresh the pricing page',
+                taskStatus: 'in_progress',
+                missionId: 'm1',
+                runStatus: 'completed',
+                dormant: false,
+            });
+        });
+
+        it('flags an old open decision with nothing live behind it as dormant, never a blocking or live one', async () => {
+            const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+            const store = {
+                ...makeStore(),
+                listDecisionsForUser: jest.fn(async () => ({
+                    rows: [
+                        { ...emptyContext, item: makeRow({ id: 'dormant', createdAt: old }) },
+                        {
+                            ...emptyContext,
+                            taskStatus: 'blocked',
+                            item: makeRow({ id: 'blocking', createdAt: old }),
+                        },
+                        {
+                            ...emptyContext,
+                            runStatus: 'running',
+                            item: makeRow({ id: 'live', createdAt: old }),
+                        },
+                    ],
+                    total: 3,
+                })),
+                countDecisionsForUser: jest.fn(async () => ({
+                    open: 3,
+                    blocking: 1,
+                    lastRaisedAt: null,
+                })),
+            };
+            const { service } = build({ store: store as never });
+
+            const { items, counts } = await service.listDecisions('u1');
+
+            expect(items.map((item) => [item.id, item.decision.dormant])).toEqual([
+                ['dormant', true],
+                ['blocking', false],
+                ['live', false],
+            ]);
+            expect(items[1].decision.blockingReason).toBe('task-blocked');
+            // No score, no source — a source with no number describes nothing.
+            expect(items[0].decision.confidenceSource).toBeNull();
+            expect(counts.lastRaisedAt).toBeNull();
+        });
+    });
+
+    describe('first view', () => {
+        it('stamps the first view on the first read flip and keeps it on later flips', async () => {
+            const store = makeStore([makeRow({ id: 'i1' })]);
+            const { service } = build({ store });
+
+            const read = await service.setUnread('i1', 'u1', false);
+            expect(read.firstViewedAt).toBe('2026-08-01T12:00:00.000Z');
+
+            await service.setUnread('i1', 'u1', true);
+            const again = await service.setUnread('i1', 'u1', false);
+            expect(again.firstViewedAt).toBe('2026-08-01T12:00:00.000Z');
+            expect(store.stampFirstViewed).toHaveBeenCalledTimes(2);
+        });
+
+        it('marking unread never stamps a view', async () => {
+            const store = makeStore([makeRow({ id: 'i1', unread: false })]);
+            const { service } = build({ store });
+
+            await service.setUnread('i1', 'u1', true);
+
+            expect(store.stampFirstViewed).not.toHaveBeenCalled();
+        });
+
+        it('answering stamps the view, and a failing stamp never fails the answer', async () => {
+            const store = makeStore([makeRow({ id: 'i1', kind: 'notice' })]);
+            store.stampFirstViewed.mockRejectedValue(new Error('db hiccup'));
+            const { service } = build({ store });
+            silenceWarnings(service);
+
+            const outcome = await service.reply('u1', 'i1', { text: 'seen' });
+
+            expect(outcome.item.status).toBe('answered');
+            expect(store.stampFirstViewed).toHaveBeenCalledWith('i1', 'u1');
+        });
+    });
+
+    describe('reply — the opt-in reason rule', () => {
+        it('refuses a rejection without a reason, before claiming anything', async () => {
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const approvals = { decide: jest.fn() };
+            const { service } = build({ store, approvals });
+
+            await expect(
+                service.reply('u1', 'i1', { optionId: 'reject', requireReason: true }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(store.markAnswered).not.toHaveBeenCalled();
+            expect(approvals.decide).not.toHaveBeenCalled();
+        });
+
+        it('accepts the rejection with a reason and records it as the answer text', async () => {
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const approvals = { decide: jest.fn(async () => ({ id: 'p1' })) };
+            const { service } = build({ store, approvals });
+
+            const outcome = await service.reply('u1', 'i1', {
+                optionId: 'reject',
+                text: 'Budget is capped this quarter.',
+                requireReason: true,
+            });
+
+            expect(outcome.routed).toBe('rejected');
+            expect(outcome.item.answerText).toBe('Budget is capped this quarter.');
+        });
+
+        it('refuses a non-recommended option without a reason, and allows the recommended one', async () => {
+            const options = [
+                { id: 'pro', label: 'Pro', recommended: true },
+                { id: 'standard', label: 'Standard' },
+            ];
+            const store = makeStore([
+                makeRow({ id: 'i1', options }),
+                makeRow({ id: 'i2', options }),
+            ]);
+            const { service } = build({ store });
+
+            await expect(
+                service.reply('u1', 'i1', { optionId: 'standard', requireReason: true }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.reply('u1', 'i2', { optionId: 'pro', requireReason: true }),
+            ).resolves.toMatchObject({ item: { status: 'answered' } });
+        });
+
+        it('without the opt-in, a bare rejection is accepted exactly as before', async () => {
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const approvals = { decide: jest.fn(async () => ({ id: 'p1' })) };
+            const { service } = build({ store, approvals });
+
+            const outcome = await service.reply('u1', 'i1', { optionId: 'reject' });
+
+            expect(outcome.routed).toBe('rejected');
+        });
+    });
+
+    describe('reply — what happened to the work (restart)', () => {
+        it('reports injected for a steered question', async () => {
+            const runs = makeRuns({ id: 'run-1', userId: 'u1', status: 'running', taskId: 't1' });
+            const store = makeStore([makeRow({ id: 'i1', agentRunId: 'run-1' })]);
+            const { service } = build({ store, runs, steering: makeSteering() });
+
+            await expect(service.reply('u1', 'i1', { text: 'Postgres' })).resolves.toMatchObject({
+                routed: 'steered',
+                restart: 'injected',
+            });
+        });
+
+        it('reports queued when the resumed run waits for a free slot', async () => {
+            const steering = {
+                ...makeSteering(),
+                resume: jest.fn(async () => ({ runId: 'run-2', queued: true })),
+            };
+            const store = makeStore([makeRow({ id: 'i1', agentRunId: 'run-1' })]);
+            const { service } = build({ store, runs: parkedRun(), steering });
+
+            await expect(service.reply('u1', 'i1', { text: 'Postgres' })).resolves.toMatchObject({
+                routed: 'resumed',
+                restart: 'queued',
+                runId: 'run-2',
+            });
+        });
+
+        it('injects an escalation answer into the run that is still going', async () => {
+            const store = makeStore([
+                makeRow({ id: 'i1', kind: 'escalation', escalationId: 'e1', agentRunId: 'run-1' }),
+            ]);
+            const runs = makeRuns({ id: 'run-1', userId: 'u1', status: 'running', taskId: 't1' });
+            const steering = makeSteering();
+            const escalations = { resolve: jest.fn(async () => true) };
+            const { service } = build({ store, runs, steering, escalations });
+
+            const outcome = await service.reply('u1', 'i1', { text: 'Use the cached copy' });
+
+            expect(steering.steer).toHaveBeenCalledWith({
+                runId: 'run-1',
+                userId: 'u1',
+                message: 'Use the cached copy',
+            });
+            expect(steering.resume).not.toHaveBeenCalled();
+            expect(outcome).toMatchObject({ restart: 'injected', runId: 'run-1' });
+        });
+
+        it('reports failed, and keeps the escalation answered, when the restart throws', async () => {
+            const store = makeStore([
+                makeRow({ id: 'i1', kind: 'escalation', escalationId: 'e1', agentRunId: 'run-1' }),
+            ]);
+            const steering = makeSteering();
+            steering.resume.mockRejectedValue(new Error('no job runtime'));
+            const escalations = { resolve: jest.fn(async () => true) };
+            const { service } = build({ store, runs: parkedRun(), steering, escalations });
+            silenceWarnings(service);
+
+            const outcome = await service.reply('u1', 'i1', { text: 'Carry on' });
+
+            expect(outcome.restart).toBe('failed');
+            expect(outcome.item.status).toBe('answered');
+        });
+
+        it('reports failed when work is waiting but no steering runtime is bound', async () => {
+            const store = makeStore([
+                makeRow({ id: 'i1', kind: 'escalation', escalationId: 'e1', agentRunId: 'run-1' }),
+            ]);
+            const escalations = { resolve: jest.fn(async () => true) };
+            const { service } = build({ store, runs: parkedRun(), escalations });
+
+            await expect(service.reply('u1', 'i1', { text: 'Carry on' })).resolves.toMatchObject({
+                routed: 'escalation-resolved',
+                restart: 'failed',
+            });
+        });
+
+        it('resumes a run that parked waiting for an approval', async () => {
+            const steering = makeSteering();
+            const approvals = { decide: jest.fn(async () => ({ id: 'p1' })) };
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    agentRunId: 'run-1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const { service } = build({ store, runs: parkedRun(), steering, approvals });
+
+            const outcome = await service.reply('u1', 'i1', { optionId: 'approve' });
+
+            expect(steering.resume).toHaveBeenCalledWith('run-1', 'u1', 'Approve');
+            expect(outcome).toMatchObject({
+                routed: 'approved',
+                restart: 'resumed',
+                runId: 'run-2',
+            });
+        });
+
+        it('leaves a run that never parked for the approval alone', async () => {
+            const steering = makeSteering();
+            const approvals = { decide: jest.fn(async () => ({ id: 'p1' })) };
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    agentRunId: 'run-1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const runs = parkedRun({ awaitingInput: false, status: 'running' });
+            const { service } = build({ store, runs, steering, approvals });
+
+            await expect(service.reply('u1', 'i1', { optionId: 'approve' })).resolves.toMatchObject(
+                { routed: 'approved', restart: 'none' },
+            );
+            expect(steering.resume).not.toHaveBeenCalled();
+            expect(steering.steer).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('other doors — escalationResolved / proposalDecided', () => {
+        it('closes the escalation mirror with the note and resumes the parked run once', async () => {
+            const store = makeStore([
+                makeRow({ id: 'i1', kind: 'escalation', escalationId: 'e1', agentRunId: 'run-1' }),
+            ]);
+            const steering = makeSteering();
+            const activityLog = {
+                log: jest.fn(async (_entry: { details: Record<string, unknown> }) => undefined),
+            };
+            const { service } = build({ store, runs: parkedRun(), steering, activityLog });
+            const input = {
+                escalationId: 'e1',
+                resolvedByUserId: 'u1',
+                note: 'Raised the budget',
+            };
+
+            await service.escalationResolved(input);
+            await service.escalationResolved(input);
+
+            const row = store.rows.get('i1')!;
+            expect(row.status).toBe('answered');
+            expect(row.answerText).toBe('Raised the budget');
+            expect(steering.resume).toHaveBeenCalledTimes(1);
+            expect(steering.resume).toHaveBeenCalledWith('run-1', 'u1', 'Raised the budget');
+            await new Promise((resolve) => setImmediate(resolve));
+            const details = activityLog.log.mock.calls.at(-1)![0].details;
+            expect(details).toMatchObject({ via: 'escalation', restart: 'resumed' });
+            // Shapes only: the note never lands in the activity trail.
+            expect(JSON.stringify(details)).not.toContain('Raised the budget');
+        });
+
+        it('is a no-op when the Inbox reply already closed the item: one answer, one restart', async () => {
+            const store = makeStore([
+                makeRow({ id: 'i1', kind: 'escalation', escalationId: 'e1', agentRunId: 'run-1' }),
+            ]);
+            const steering = makeSteering();
+            // The real escalation service calls back into the Inbox from
+            // `resolve`; model that loop, so the reply's own claim is what
+            // stops a second restart.
+            let service: InboxService | undefined;
+            const escalations = {
+                resolve: jest.fn(async (escalationId: string, userId: string, note: string) => {
+                    await service!.escalationResolved({
+                        escalationId,
+                        resolvedByUserId: userId,
+                        note,
+                    });
+                    return true;
+                }),
+            };
+            service = build({ store, runs: parkedRun(), steering, escalations }).service;
+
+            await service.reply('u1', 'i1', { text: 'Carry on' });
+
+            expect(escalations.resolve).toHaveBeenCalledTimes(1);
+            expect(steering.resume).toHaveBeenCalledTimes(1);
+        });
+
+        it('does nothing for an unknown escalation', async () => {
+            const store = makeStore();
+            const { service } = build({ store });
+
+            await expect(
+                service.escalationResolved({ escalationId: 'nope', resolvedByUserId: 'u1' }),
+            ).resolves.toBeUndefined();
+            expect(store.markAnswered).not.toHaveBeenCalled();
+        });
+
+        it('closes the approval mirror with the decided option and leaves an unparked run alone', async () => {
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    agentRunId: 'run-1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const runs = makeRuns({ id: 'run-1', userId: 'u1', status: 'running', taskId: 't1' });
+            const steering = makeSteering();
+            const { service } = build({ store, runs, steering });
+
+            await service.proposalDecided({
+                proposalId: 'p1',
+                decision: 'rejected',
+                decidedByUserId: 'u1',
+            });
+
+            const row = store.rows.get('i1')!;
+            expect(row.status).toBe('answered');
+            expect(row.answerOptionId).toBe('reject');
+            expect(steering.steer).not.toHaveBeenCalled();
+            expect(steering.resume).not.toHaveBeenCalled();
+        });
+
+        it('leaves an archived mirror archived', async () => {
+            const store = makeStore([
+                makeRow({ id: 'i1', kind: 'approval', proposalId: 'p1', status: 'archived' }),
+            ]);
+            const { service } = build({ store });
+
+            await service.proposalDecided({
+                proposalId: 'p1',
+                decision: 'approved',
+                decidedByUserId: 'u1',
+            });
+
+            expect(store.rows.get('i1')!.status).toBe('archived');
+            expect(store.markAnswered).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('proposalPending — the Task link', () => {
+        it('keeps the producer’s own Task link', async () => {
+            const store = makeStore();
+            const { service } = build({ store });
+
+            await service.proposalPending({
+                userId: 'u1',
+                proposalId: 'p1',
+                title: 'Merge #12',
+                actionType: 'merge_pull_request',
+                taskId: 't-merge',
+            });
+
+            expect(store.create.mock.calls[0][0].taskId).toBe('t-merge');
+        });
+
+        it('falls back to the owned proposing run’s Task', async () => {
+            const store = makeStore();
+            const runs = makeRuns({ id: 'run-1', userId: 'u1', taskId: 't1' });
+            const { service } = build({ store, runs });
+
+            await service.proposalPending({
+                userId: 'u1',
+                proposalId: 'p1',
+                title: 't',
+                actionType: 'send_message',
+                runId: 'run-1',
+            });
+
+            expect(store.create.mock.calls[0][0].taskId).toBe('t1');
+        });
+
+        it('never links a foreign run’s Task', async () => {
+            const store = makeStore();
+            const runs = makeRuns({ id: 'run-1', userId: 'someone-else', taskId: 't9' });
+            const { service } = build({ store, runs });
+
+            await service.proposalPending({
+                userId: 'u1',
+                proposalId: 'p2',
+                title: 't',
+                actionType: 'send_message',
+                runId: 'run-1',
+            });
+
+            expect(store.create.mock.calls[0][0].taskId).toBeNull();
         });
     });
 });

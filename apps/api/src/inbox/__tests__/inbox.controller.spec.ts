@@ -2,7 +2,12 @@ import { NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { InboxController } from '../inbox.controller';
-import { ListInboxQueryDto, ReplyInboxItemDto, SetInboxReadStateDto } from '../dto/inbox.dto';
+import {
+    ListInboxDecisionsQueryDto,
+    ListInboxQueryDto,
+    ReplyInboxItemDto,
+    SetInboxReadStateDto,
+} from '../dto/inbox.dto';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 
 /**
@@ -29,6 +34,12 @@ function makeService() {
         setUnread: jest.fn(async () => ({ id: 'i1', unread: false })),
         setArchived: jest.fn(async () => ({ id: 'i1', status: 'archived' })),
         delete: jest.fn(async () => undefined),
+        listDecisions: jest.fn(async () => ({
+            items: [],
+            total: 7,
+            counts: { open: 4, blocking: 2, lastRaisedAt: '2026-08-01T00:00:00.000Z' },
+        })),
+        decisionCounts: jest.fn(async () => ({ open: 4, blocking: 2, lastRaisedAt: null })),
     };
 }
 
@@ -116,6 +127,100 @@ describe('InboxController', () => {
         });
     });
 
+    describe('GET /api/inbox/decisions (My Decisions)', () => {
+        it('is declared before :id so the literal path is not swallowed by the UUID route', () => {
+            const names = Object.getOwnPropertyNames(InboxController.prototype);
+            const routeIndex = (method: string) => names.indexOf(method);
+            expect(routeIndex('listDecisions')).toBeGreaterThan(-1);
+            expect(routeIndex('listDecisions')).toBeLessThan(routeIndex('getOne'));
+            expect(routeIndex('decisionCounts')).toBeLessThan(routeIndex('getOne'));
+            expect(Reflect.getMetadata('path', InboxController.prototype.listDecisions)).toBe(
+                'decisions',
+            );
+            expect(Reflect.getMetadata('path', InboxController.prototype.decisionCounts)).toBe(
+                'decisions/counts',
+            );
+        });
+
+        it('defaults to the open queue with a page of 25 and reports the header counts', async () => {
+            const result = await controller.listDecisions(auth, {});
+
+            expect(service.listDecisions).toHaveBeenCalledWith('u1', {
+                status: 'open',
+                limit: 25,
+                offset: 0,
+            });
+            expect(result.meta).toEqual({
+                total: 7,
+                limit: 25,
+                offset: 0,
+                openCount: 4,
+                blockingCount: 2,
+                lastRaisedAt: '2026-08-01T00:00:00.000Z',
+            });
+        });
+
+        it('forwards every filter, trimming the search term', async () => {
+            await controller.listDecisions(auth, {
+                status: 'answered',
+                kind: 'approval',
+                agentId: 'a1',
+                taskId: 't1',
+                missionId: 'm1',
+                q: '  budget  ',
+                limit: 50,
+                offset: 25,
+            });
+
+            expect(service.listDecisions).toHaveBeenCalledWith('u1', {
+                status: 'answered',
+                kind: 'approval',
+                agentId: 'a1',
+                taskId: 't1',
+                missionId: 'm1',
+                search: 'budget',
+                limit: 50,
+                offset: 25,
+            });
+        });
+
+        it('drops a blank search rather than matching everything by accident', async () => {
+            await controller.listDecisions(auth, { q: '   ' });
+
+            expect(service.listDecisions).toHaveBeenCalledWith('u1', {
+                status: 'open',
+                limit: 25,
+                offset: 0,
+            });
+        });
+
+        it('returns the counts owner-scoped', async () => {
+            await expect(controller.decisionCounts(auth)).resolves.toEqual({
+                open: 4,
+                blocking: 2,
+                lastRaisedAt: null,
+            });
+            expect(service.decisionCounts).toHaveBeenCalledWith('u1');
+        });
+    });
+
+    describe('POST /api/inbox/:id/reply — the reason opt-in', () => {
+        it('forwards requireReason only when the caller opted in', async () => {
+            await controller.reply(auth, 'i1', { optionId: 'reject', requireReason: true });
+            expect(service.reply).toHaveBeenLastCalledWith('u1', 'i1', {
+                text: null,
+                optionId: 'reject',
+                requireReason: true,
+            });
+
+            await controller.reply(auth, 'i1', { optionId: 'reject', requireReason: false });
+            expect(service.reply).toHaveBeenLastCalledWith('u1', 'i1', {
+                text: null,
+                optionId: 'reject',
+            });
+        });
+    });
+
     describe('read-state / archive / delete', () => {
         it('PATCH read defaults to marking READ and honours {unread:true}', async () => {
             await controller.setReadState(auth, 'i1', {});
@@ -198,6 +303,43 @@ describe('inbox DTO validation', () => {
         // Emptiness is a ROUTING rule (text or option or both), not a shape
         // rule; the service raises the 400 so every caller gets it.
         expect(await errorsFor(ReplyInboxItemDto, {})).toEqual([]);
+    });
+
+    it('accepts a well-formed decisions query and rejects every malformed filter', async () => {
+        const uuid = '3f2b6c1e-4d5a-4b7c-9e8f-0a1b2c3d4e5f';
+        expect(
+            await errorsFor(ListInboxDecisionsQueryDto, {
+                status: 'archived',
+                kind: 'escalation',
+                agentId: uuid,
+                taskId: uuid,
+                missionId: uuid,
+                q: 'budget',
+                limit: '100',
+                offset: '25',
+            }),
+        ).toEqual([]);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { kind: 'notice' })).toEqual(['kind']);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { status: 'resolved' })).toEqual([
+            'status',
+        ]);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { limit: '101' })).toEqual(['limit']);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { limit: '0' })).toEqual(['limit']);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { offset: '-1' })).toEqual(['offset']);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { agentId: 'agent-1' })).toEqual([
+            'agentId',
+        ]);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { missionId: 'm' })).toEqual([
+            'missionId',
+        ]);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { q: 'x'.repeat(201) })).toEqual(['q']);
+    });
+
+    it('accepts a boolean reason opt-in and rejects anything else', async () => {
+        expect(await errorsFor(ReplyInboxItemDto, { requireReason: true })).toEqual([]);
+        expect(await errorsFor(ReplyInboxItemDto, { requireReason: 'yes' })).toEqual([
+            'requireReason',
+        ]);
     });
 
     it('rejects a non-boolean read state', async () => {

@@ -15,10 +15,20 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { InboxService, type InboxReplyOutcome } from '@ever-works/agent/inbox';
-import type { InboxItemDto } from '@ever-works/contracts';
+import {
+    INBOX_DECISION_PAGE_SIZE,
+    type InboxDecisionCounts,
+    type InboxDecisionDto,
+    type InboxItemDto,
+} from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { ListInboxQueryDto, ReplyInboxItemDto, SetInboxReadStateDto } from './dto/inbox.dto';
+import {
+    ListInboxDecisionsQueryDto,
+    ListInboxQueryDto,
+    ReplyInboxItemDto,
+    SetInboxReadStateDto,
+} from './dto/inbox.dto';
 
 /**
  * Inbox (operator message center) — API surface.
@@ -26,6 +36,9 @@ import { ListInboxQueryDto, ReplyInboxItemDto, SetInboxReadStateDto } from './dt
  *   GET    /api/inbox                 my messages (?status= filter; default = active view;
  *                                     ?taskId= narrows to one Task) + unread count
  *   GET    /api/inbox/unread-count    badge count (polled by the sidebar)
+ *   GET    /api/inbox/decisions       My Decisions — the questions, approvals and escalations
+ *                                     waiting on me, ranked blocking-first, with filters
+ *   GET    /api/inbox/decisions/counts open + blocking decision counts (header, sidebar)
  *   GET    /api/inbox/:id             one message
  *   POST   /api/inbox/:id/reply       answer it — routed per kind (steer/resume run,
  *                                     approve/reject proposal, resolve escalation)
@@ -78,6 +91,67 @@ export class InboxController {
         return { count: await this.inbox.unreadCount(auth.userId) };
     }
 
+    // The two decision routes are declared BEFORE `:id`: Nest matches in
+    // declaration order, and `:id` would otherwise swallow `decisions` and
+    // 400 it through ParseUUIDPipe.
+
+    @Get('decisions')
+    @ApiOperation({
+        summary:
+            'My Decisions — the Inbox items that need me to decide (agent questions, approvals, escalations). The open tab is ranked: work stopped behind it first, then escalation confidence (unscored counts as 0.5), then oldest first. Filter by Agent, Task, Mission, kind, or search.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async listDecisions(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ListInboxDecisionsQueryDto,
+    ): Promise<{
+        data: InboxDecisionDto[];
+        meta: {
+            total: number;
+            limit: number;
+            offset: number;
+            openCount: number;
+            blockingCount: number;
+            lastRaisedAt: string | null;
+        };
+    }> {
+        const limit = query.limit ?? INBOX_DECISION_PAGE_SIZE;
+        const offset = query.offset ?? 0;
+        const { items, total, counts } = await this.inbox.listDecisions(auth.userId, {
+            status: query.status ?? 'open',
+            limit,
+            offset,
+            ...(query.kind ? { kind: query.kind } : {}),
+            ...(query.agentId ? { agentId: query.agentId } : {}),
+            ...(query.taskId ? { taskId: query.taskId } : {}),
+            ...(query.missionId ? { missionId: query.missionId } : {}),
+            ...(query.q?.trim() ? { search: query.q.trim() } : {}),
+        });
+        return {
+            data: items,
+            meta: {
+                total,
+                limit,
+                offset,
+                openCount: counts.open,
+                blockingCount: counts.blocking,
+                lastRaisedAt: counts.lastRaisedAt,
+            },
+        };
+    }
+
+    @Get('decisions/counts')
+    @ApiOperation({
+        summary:
+            'My Decisions counts — open decisions, how many have work stopped behind them, and when the latest one was raised.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async decisionCounts(@CurrentUser() auth: AuthenticatedUser): Promise<InboxDecisionCounts> {
+        return this.inbox.decisionCounts(auth.userId);
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get one of my inbox messages.' })
     @HttpCode(HttpStatus.OK)
@@ -110,6 +184,9 @@ export class InboxController {
         return this.inbox.reply(auth.userId, id, {
             text: body.text ?? null,
             optionId: body.optionId ?? null,
+            // Conditional so a caller that never opts in reaches the
+            // service with exactly the call shape it always had.
+            ...(body.requireReason === true ? { requireReason: true } : {}),
         });
     }
 
