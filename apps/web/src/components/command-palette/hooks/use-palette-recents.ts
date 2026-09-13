@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { WorkspaceSearchHit, WorkspaceSearchKind } from '@ever-works/contracts/api';
+import { isInAppDestination } from '../registry/destination';
+import { isRecordKind } from '../registry/kinds';
 
 /** A record the operator opened from the palette. Commands are never recorded. */
 export interface PaletteRecentEntry {
@@ -28,25 +30,37 @@ function storageKey(scopeKey: string): string {
     return `${STORAGE_PREFIX}${scopeKey}`;
 }
 
-/**
- * An in-app path only. Security: storage is writable by anything running on
- * the origin, so a `//host` or `/\host` value (both resolve off-site) must
- * never be navigated to from a Recent row.
- */
-const IN_APP_PATH = /^\/(?![/\\])/;
+function isNullableString(value: unknown): value is string | null | undefined {
+    return value === null || value === undefined || typeof value === 'string';
+}
 
+/**
+ * A stored entry the palette can render and open. Storage is writable by
+ * anything running on the origin and may hold entries from an older build, so
+ * every field is checked: an unknown kind would break the group filter, a
+ * non-string label would break rendering, and a destination that is not an
+ * in-app path must never be navigated to (see {@link isInAppDestination}).
+ */
 function isEntry(value: unknown): value is PaletteRecentEntry {
     if (!value || typeof value !== 'object') return false;
     const entry = value as Record<string, unknown>;
     return (
         typeof entry.key === 'string' &&
         typeof entry.kind === 'string' &&
+        isRecordKind(entry.kind) &&
         typeof entry.sourceId === 'string' &&
         typeof entry.title === 'string' &&
-        typeof entry.destination === 'string' &&
-        IN_APP_PATH.test(entry.destination) &&
-        typeof entry.openedAt === 'number'
+        isNullableString(entry.subtitle) &&
+        isNullableString(entry.statusLabel) &&
+        isInAppDestination(entry.destination) &&
+        typeof entry.openedAt === 'number' &&
+        Number.isFinite(entry.openedAt)
     );
+}
+
+/** Missing optional labels read back as null, matching what was written. */
+function normalizeEntry(entry: PaletteRecentEntry): PaletteRecentEntry {
+    return { ...entry, subtitle: entry.subtitle ?? null, statusLabel: entry.statusLabel ?? null };
 }
 
 /**
@@ -62,6 +76,7 @@ export function readRecents(scopeKey: string, now = Date.now()): PaletteRecentEn
         if (!Array.isArray(parsed)) return [];
         return parsed
             .filter(isEntry)
+            .map(normalizeEntry)
             .filter((entry) => now - entry.openedAt <= PALETTE_RECENTS_MAX_AGE_MS)
             .sort((a, b) => b.openedAt - a.openedAt)
             .slice(0, PALETTE_RECENTS_MAX);

@@ -64,6 +64,7 @@ import { useShortcut } from '@/lib/hooks/use-shortcut';
 import { CommandPalette } from './CommandPalette';
 import { CommandPaletteProvider, useCommandPalette } from './CommandPaletteProvider';
 import { CommandPaletteTrigger } from './CommandPaletteTrigger';
+import { KbSearchPalette } from '@/components/kb/workbench/KbSearchPalette';
 
 function searchResponse(overrides: Partial<WorkspaceSearchResponse> = {}): WorkspaceSearchResponse {
     return {
@@ -132,7 +133,11 @@ function Shortcuts() {
 const onOpenHelp = vi.fn();
 
 function renderShell(extra?: React.ReactNode) {
-    return render(
+    return render(shell(extra));
+}
+
+function shell(extra?: React.ReactNode) {
+    return (
         <CommandPaletteProvider>
             <Shortcuts />
             <button type="button">before</button>
@@ -144,7 +149,7 @@ function renderShell(extra?: React.ReactNode) {
                 chatOpen={false}
                 onChatOpenChange={vi.fn()}
             />
-        </CommandPaletteProvider>,
+        </CommandPaletteProvider>
     );
 }
 
@@ -350,6 +355,59 @@ describe('CommandPalette', () => {
         pressCtrlK(input());
         expect(screenPalette).toHaveBeenCalledTimes(2);
         await waitFor(() => expect(screen.queryByTestId('command-palette')).toBeNull());
+    });
+
+    it('closes an open Knowledge-Base palette when the top-bar trigger opens this one', async () => {
+        renderShell(<KbSearchPalette workId="work-1" defaultOpen />);
+        const kbPalette = screen.getByTestId('kb-workbench-search-palette-root');
+        expect(kbPalette).toHaveAttribute('data-open', 'true');
+
+        fireEvent.click(screen.getByTestId('command-palette-trigger'));
+
+        expect(await screen.findByTestId('command-palette')).toBeInTheDocument();
+        expect(kbPalette).toHaveAttribute('data-open', 'false');
+        expect(screen.queryByTestId('kb-workbench-search-palette')).toBeNull();
+        expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    });
+
+    it('closes this palette when a Knowledge-Base palette opens', async () => {
+        const view = renderShell();
+        fireEvent.click(screen.getByTestId('command-palette-trigger'));
+        await screen.findByTestId('command-palette');
+
+        view.rerender(shell(<KbSearchPalette workId="work-1" defaultOpen />));
+
+        await waitFor(() => expect(screen.queryByTestId('command-palette')).toBeNull());
+        expect(screen.getByTestId('kb-workbench-search-palette-root')).toHaveAttribute(
+            'data-open',
+            'true',
+        );
+    });
+
+    it('never opens or remembers a record whose destination leaves the app', async () => {
+        const offsite = searchResponse();
+        offsite.groups[0].hits[0].destination = '/\t/evil.example';
+        respondWith(offsite);
+        const openWindow = vi.spyOn(window, 'open').mockImplementation(() => null);
+        try {
+            renderShell();
+            pressCtrlK();
+            await screen.findByTestId('command-palette');
+            fireEvent.change(input(), { target: { value: 'invoice' } });
+            await waitFor(() => expect(groupKinds()).toEqual(['mission', 'task']));
+
+            fireEvent.keyDown(input(), { key: 'Enter', ctrlKey: true });
+            fireEvent.keyDown(input(), { key: 'Enter' });
+
+            expect(mocks.push).not.toHaveBeenCalled();
+            expect(openWindow).not.toHaveBeenCalled();
+            expect(screen.getByTestId('command-palette')).toBeInTheDocument();
+
+            fireEvent.change(input(), { target: { value: '' } });
+            expect(groupKinds()).not.toContain('recent');
+        } finally {
+            openWindow.mockRestore();
+        }
     });
 
     it('opens Help from the palette without navigating', async () => {

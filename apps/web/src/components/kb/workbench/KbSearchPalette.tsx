@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Command } from 'cmdk';
 import { Search, X, Lock as LockIcon } from 'lucide-react';
+import { useScopedPaletteHandover } from '@/components/command-palette/CommandPaletteProvider';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { useShortcut } from '@/lib/hooks/use-shortcut';
@@ -81,6 +82,11 @@ export function KbSearchPalette({
     const [filters, setFilters] = useState<PaletteFilters>(EMPTY_FILTERS);
     const [hits, setHits] = useState<KbSearchHit[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Never open together with the dashboard palette: opening this one closes
+    // it, and opening it (trigger, `/`) closes this one.
+    const close = useCallback(() => setOpen(false), []);
+    useScopedPaletteHandover(open, close);
 
     // Cmd/Ctrl+K toggles the palette from any focused element within the
     // workbench. Bound through the shared shortcut registry at screen scope,
@@ -182,7 +188,9 @@ export function KbSearchPalette({
     const onResultSelect = useCallback(
         (hit: KbSearchHit) => {
             setOpen(false);
-            router.push(`/works/${workId}/kb/${hit.path}`);
+            // Encode each segment so a `#` or `?` in a stored path stays part of it.
+            const path = hit.path.split('/').map(encodeURIComponent).join('/');
+            router.push(`/works/${encodeURIComponent(workId)}/kb/${path}`);
         },
         [router, workId],
     );

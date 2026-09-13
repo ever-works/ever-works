@@ -59,7 +59,8 @@ function isOffline(): boolean {
  *   response for a superseded query is discarded;
  * - a request that has not answered within 3.5 s is aborted (status
  *   `timeout`), keeping the previous results visible;
- * - a 429 pauses requests for five seconds (status `throttled`).
+ * - a 429 pauses requests for five seconds (status `throttled`);
+ * - an `offline` query is re-issued when the browser comes back online.
  */
 export function useWorkspaceSearch(options: UseWorkspaceSearchOptions): UseWorkspaceSearchResult {
     const {
@@ -187,6 +188,21 @@ export function useWorkspaceSearch(options: UseWorkspaceSearchOptions): UseWorks
 
     // Abort anything still in flight on unmount.
     useEffect(() => () => controllerRef.current?.abort(), []);
+
+    // Coming back online re-issues the query that went offline; nothing else
+    // would, because the query on screen has not changed.
+    const statusRef = useRef(status);
+    useEffect(() => {
+        statusRef.current = status;
+    }, [status]);
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+        const onOnline = () => {
+            if (statusRef.current === 'offline') setAttempt((value) => value + 1);
+        };
+        window.addEventListener('online', onOnline);
+        return () => window.removeEventListener('online', onOnline);
+    }, []);
 
     const retry = useCallback(() => setAttempt((value) => value + 1), []);
 

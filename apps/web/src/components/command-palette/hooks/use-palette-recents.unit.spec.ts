@@ -72,6 +72,58 @@ describe('palette Recent list', () => {
         expect(readRecents('scope', now).map((entry) => entry.sourceId)).toEqual(['fresh']);
     });
 
+    it('drops destinations a browser would resolve off-site once it strips control characters', () => {
+        const now = 1_000_000;
+        const planted = (sourceId: string, destination: string) => ({
+            ...withRecent([], target(sourceId), now)[0],
+            destination,
+        });
+        window.localStorage.setItem(
+            'ever-works:command-palette:recents:v1:scope',
+            JSON.stringify([
+                withRecent([], target('safe'), now)[0],
+                planted('tab', '/\t/elsewhere.example'),
+                planted('newline', '/\n/elsewhere.example'),
+                planted('carriageReturn', '/\r\\elsewhere.example'),
+                planted('nul', `/${String.fromCharCode(0)}/elsewhere.example`),
+            ]),
+        );
+        expect(readRecents('scope', now).map((entry) => entry.sourceId)).toEqual(['safe']);
+    });
+
+    it('drops entries with an unknown kind or labels that are not text', () => {
+        const now = 1_000_000;
+        const entry = (sourceId: string) => withRecent([], target(sourceId), now)[0];
+        window.localStorage.setItem(
+            'ever-works:command-palette:recents:v1:scope',
+            JSON.stringify([
+                entry('valid'),
+                { ...entry('bogusKind'), kind: 'bogus' },
+                { ...entry('inheritedKind'), kind: 'toString' },
+                { ...entry('objectSubtitle'), subtitle: { text: 'x' } },
+                { ...entry('numberStatus'), statusLabel: 7 },
+                { ...entry('nanOpenedAt'), openedAt: 'yesterday' },
+            ]),
+        );
+        expect(readRecents('scope', now).map((recent) => recent.sourceId)).toEqual(['valid']);
+    });
+
+    it('reads a missing subtitle or status back as null', () => {
+        const now = 1_000_000;
+        const {
+            subtitle: _subtitle,
+            statusLabel: _statusLabel,
+            ...bare
+        } = withRecent([], target('bare'), now)[0];
+        window.localStorage.setItem(
+            'ever-works:command-palette:recents:v1:scope',
+            JSON.stringify([bare]),
+        );
+        const [entry] = readRecents('scope', now);
+        expect(entry.subtitle).toBeNull();
+        expect(entry.statusLabel).toBeNull();
+    });
+
     it('keeps separate lists per workspace scope', () => {
         const { result: acme } = renderHook(() => usePaletteRecents('user:org:acme'));
         act(() => acme.current.record(target('a')));

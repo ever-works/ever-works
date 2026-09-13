@@ -183,6 +183,80 @@ describe('useWorkspaceSearch', () => {
         expect(result.current.status).toBe('offline');
     });
 
+    it('re-issues the unchanged query when the browser comes back online', async () => {
+        setOnline(false);
+        const fetcher = vi.fn<Fetcher>(async () => ok('report'));
+        const { result } = run({ query: 'report' }, fetcher);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500);
+        });
+        expect(result.current.status).toBe('offline');
+
+        setOnline(true);
+        act(() => {
+            window.dispatchEvent(new Event('online'));
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(150);
+        });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(result.current.status).toBe('ready');
+        expect(result.current.response?.query).toBe('report');
+    });
+
+    it('recovers when a request fails because the connection dropped mid-flight', async () => {
+        const fetcher = vi.fn<Fetcher>(async () => {
+            if (fetcher.mock.calls.length === 1) {
+                setOnline(false);
+                throw new TypeError('Failed to fetch');
+            }
+            return ok('report');
+        });
+        const { result } = run({ query: 'report' }, fetcher);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(150);
+        });
+        expect(result.current.status).toBe('offline');
+
+        setOnline(true);
+        act(() => {
+            window.dispatchEvent(new Event('online'));
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(150);
+        });
+        expect(fetcher).toHaveBeenCalledTimes(2);
+        expect(result.current.status).toBe('ready');
+    });
+
+    it('does not re-issue a settled query on an online event', async () => {
+        const fetcher = vi.fn<Fetcher>(async () => ok('report'));
+        const { result } = run({ query: 'report' }, fetcher);
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(150);
+        });
+        expect(result.current.status).toBe('ready');
+
+        act(() => {
+            window.dispatchEvent(new Event('online'));
+        });
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500);
+        });
+        expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops listening for the online event on unmount', async () => {
+        const remove = vi.spyOn(window, 'removeEventListener');
+        const { unmount } = run(
+            { query: 'report' },
+            vi.fn<Fetcher>(async () => ok('report')),
+        );
+        unmount();
+        expect(remove).toHaveBeenCalledWith('online', expect.any(Function));
+        remove.mockRestore();
+    });
+
     it('sends the group filter, the per-group cap and recent keys', async () => {
         const fetcher = vi.fn<Fetcher>(async () => ok('ab'));
         run({ query: 'ab', kinds: ['task'], perKindLimit: 25, recent: ['task:t1'] }, fetcher);

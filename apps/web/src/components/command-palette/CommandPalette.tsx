@@ -34,6 +34,7 @@ import { useIsMac } from './hooks/use-is-mac';
 import { usePaletteKeyboard } from './hooks/use-palette-keyboard';
 import { PALETTE_RECENT_BOOST_WINDOW_MS, usePaletteRecents } from './hooks/use-palette-recents';
 import { useWorkspaceSearch } from './hooks/use-workspace-search';
+import { isInAppDestination } from './registry/destination';
 import { commandsFor, workSwitchCommands } from './registry/commands';
 import { screensFor } from './registry/screens';
 import {
@@ -256,6 +257,8 @@ export function CommandPalette({
 
     const openHref = useCallback(
         (href: string, newTab: boolean) => {
+            // Security: the palette only ever navigates inside the app.
+            if (!isInAppDestination(href)) return;
             if (newTab) {
                 window.open(withWorkspaceHref(href, pathname), '_blank', 'noopener,noreferrer');
                 return;
@@ -283,6 +286,9 @@ export function CommandPalette({
                     openHref(action.href, newTab);
                     return;
                 case 'record':
+                    // A destination that is not an in-app path is neither opened
+                    // nor remembered, so it can never come back as a Recent row.
+                    if (!isInAppDestination(action.record.destination)) return;
                     record(action.record);
                     close();
                     openHref(action.record.destination, newTab);

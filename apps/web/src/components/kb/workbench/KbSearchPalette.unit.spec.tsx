@@ -203,6 +203,37 @@ describe('workbench KbSearchPalette', () => {
         });
     });
 
+    it('encodes each path segment so a # or ? in a stored path stays part of the route', async () => {
+        mockSearchFetchOnce({
+            hits: [
+                hit({
+                    documentId: 'd2',
+                    path: 'faq/refunds?#top.md',
+                    title: 'Refunds',
+                    class: 'brand',
+                }),
+            ],
+            total: 1,
+        });
+
+        render(<KbSearchPalette workId="work-1" defaultOpen debounceMs={10} />);
+
+        const input = screen.getByTestId('kb-workbench-search-palette-input') as HTMLInputElement;
+        fireEvent.change(input, { target: { value: 'refunds' } });
+
+        await waitFor(
+            () => {
+                expect(screen.getByTestId('kb-workbench-search-palette-result')).toBeTruthy();
+            },
+            { timeout: 3000 },
+        );
+        fireEvent.click(screen.getByTestId('kb-workbench-search-palette-result'));
+
+        await waitFor(() => {
+            expect(pushMock).toHaveBeenCalledWith('/works/work-1/kb/faq/refunds%3F%23top.md');
+        });
+    });
+
     it('shows a noResults branch when the search returns an empty hit list', async () => {
         mockSearchFetchOnce({ hits: [], total: 0 });
 
