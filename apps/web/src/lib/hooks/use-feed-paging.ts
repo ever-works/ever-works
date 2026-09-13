@@ -51,6 +51,40 @@ export function prependFeedEntries(current: FeedEntryDto[], newer: FeedEntryDto[
     );
 }
 
+/**
+ * Extra pages a head refresh may follow to reach what is already on screen.
+ * When more than this much activity arrived since the last refresh, the list
+ * restarts from the fresh head instead, so nothing is left unreachable.
+ */
+export const FEED_HEAD_GAP_MAX_PAGES = 5;
+
+/**
+ * Whether entries fetched from the head of the feed join up with what is
+ * already on screen, leaving no record unreachable between them.
+ *
+ * They join when the fetched run reached the end of history, shares an
+ * entry with the screen, or ends strictly older than the newest entry on
+ * screen. An equal timestamp with no shared entry is treated as a gap: the
+ * next page will settle it, and assuming a join there could skip a record.
+ */
+export function feedHeadJoins(
+    current: readonly FeedEntryDto[],
+    fetched: readonly FeedEntryDto[],
+    fetchedHasMore: boolean,
+): boolean {
+    if (!fetchedHasMore || fetched.length === 0) return true;
+    if (current.length === 0) return false;
+    const onScreen = new Set(current.map((entry) => entry.id));
+    if (fetched.some((entry) => onScreen.has(entry.id))) return true;
+    const oldestFetched = Date.parse(fetched[fetched.length - 1].createdAt);
+    const newestOnScreen = Date.parse(current[0].createdAt);
+    return (
+        Number.isFinite(oldestFetched) &&
+        Number.isFinite(newestOnScreen) &&
+        oldestFetched < newestOnScreen
+    );
+}
+
 interface UseFeedPagingOptions {
     /** Identity of the current filter set; a change resets to the first page. */
     filterKey: string;
@@ -100,6 +134,12 @@ export function useFeedPaging({
     /** Bumped on every reset so a slow response for old filters is dropped. */
     const generationRef = useRef(0);
     const loadingOlderRef = useRef(false);
+    /** One head refresh at a time: a gap fill spans several requests. */
+    const refreshingRef = useRef(false);
+    const entriesRef = useRef(entries);
+    useEffect(() => {
+        entriesRef.current = entries;
+    });
     /** The filter set the server-rendered page belongs to, until it is used or superseded. */
     const initialKeyRef = useRef<string | null>(initialPage ? filterKey : null);
 
@@ -170,22 +210,68 @@ export function useFeedPaging({
     }, [cursor, hasMore, loadFirst, reachedCap, status]);
 
     const refreshHead = useCallback(async () => {
-        if (status === 'loading') return;
-        const generation = generationRef.current;
-        const result = await fetchRef
-            .current(null)
-            .catch(() => ({ success: false, error: 'load-failed' }) as FeedFetchResult);
-        if (generation !== generationRef.current || !result.success) return;
-        if (status === 'error') {
-            // The feed recovered on its own: show the fresh first page.
-            setEntries(appendFeedEntries([], result.data.items));
-            setCursor(result.data.nextCursor);
-            setHasMore(result.data.hasMore && result.data.nextCursor !== null);
-            setPagesLoaded(1);
-            setStatus('ready');
-            return;
+        if (status === 'loading' || refreshingRef.current) return;
+        refreshingRef.current = true;
+        try {
+            const generation = generationRef.current;
+            const fetchSafely = (at: string | null) =>
+                fetchRef
+                    .current(at)
+                    .catch(() => ({ success: false, error: 'load-failed' }) as FeedFetchResult);
+            const result = await fetchSafely(null);
+            if (generation !== generationRef.current || !result.success) return;
+            if (status === 'error') {
+                // The feed recovered on its own: show the fresh first page.
+                setEntries(appendFeedEntries([], result.data.items));
+                setCursor(result.data.nextCursor);
+                setHasMore(result.data.hasMore && result.data.nextCursor !== null);
+                setPagesLoaded(1);
+                setStatus('ready');
+                return;
+            }
+
+            // More than a page may have arrived since the last refresh. The
+            // older-page cursor continues below what is on screen, so the
+            // head must be followed down until it meets the screen — or the
+            // list restarts from the head — or the records in between would
+            // never be reachable this visit.
+            let fetched = appendFeedEntries([], result.data.items);
+            let tail = result.data;
+            let pages = 1;
+            while (
+                !feedHeadJoins(
+                    entriesRef.current,
+                    fetched,
+                    tail.hasMore && tail.nextCursor !== null,
+                )
+            ) {
+                if (entriesRef.current.length === 0 || pages > FEED_HEAD_GAP_MAX_PAGES) {
+                    // Nothing on screen to join, or too far to follow: start
+                    // the list over from the fresh head and its own cursor.
+                    // An older page still in flight belongs to the old chain.
+                    generationRef.current += 1;
+                    loadingOlderRef.current = false;
+                    setLoadingOlder(false);
+                    setOlderFailed(false);
+                    setEntries(fetched);
+                    setCursor(tail.nextCursor);
+                    setHasMore(tail.hasMore && tail.nextCursor !== null);
+                    setPagesLoaded(pages);
+                    return;
+                }
+                const next = await fetchSafely(tail.nextCursor);
+                // Leave the screen as it is on a failure; the next refresh
+                // tries again rather than showing a list with a hole in it.
+                if (generation !== generationRef.current || !next.success) return;
+                fetched = appendFeedEntries(fetched, next.data.items);
+                tail = next.data;
+                pages += 1;
+            }
+            const joined = fetched;
+            setEntries((current) => prependFeedEntries(current, joined));
+        } finally {
+            refreshingRef.current = false;
         }
-        setEntries((current) => prependFeedEntries(current, result.data.items));
     }, [status]);
 
     const observerRef = useRef<IntersectionObserver | null>(null);
