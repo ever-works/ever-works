@@ -161,6 +161,7 @@ import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-al
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
+import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 
 import {
     PluginEntity,
@@ -408,4 +409,8 @@ export const ENTITIES = [
     // UNIQUE (workId, rung, laneKey) index on it is what stops two merges
     // to develop opening two competing promotion pull requests.
     ReleasePromotion,
+    // AW-14 What's new — one row per (person, product changelog entry) they
+    // have read. Deliberately not workspace-scoped: read state follows the
+    // person, never the active Organization.
+    ProductChangelogRead,
 ];
