@@ -10,6 +10,7 @@ import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { Footer } from '@/components/footer';
 import { HelpDrawer } from '@/components/dashboard/HelpDrawer';
+import { WhatsNewPanel } from '@/components/whats-new/WhatsNewPanel';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
 import { ChatPanelProvider } from '@/lib/hooks/use-chat-panel';
@@ -50,6 +51,8 @@ interface DashboardLayoutClientProps {
     /** health `job_runtime.configured` — false = agent runs cannot execute
      *  on this install (loud-degradation banner); null = unknown. */
     jobRuntimeConfigured?: boolean | null;
+    /** What's new (AW-14) — unread product changelog entries; null = unknown (no badge). */
+    changelogUnreadCount?: number | null;
 }
 
 // Security: include the Secure flag when the page is served over HTTPS so these
@@ -75,11 +78,17 @@ export function DashboardLayoutClient({
     initialOnboardingCatalog,
     apiVersion,
     jobRuntimeConfigured = null,
+    changelogUnreadCount = null,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const DEFAULT_CHAT_WIDTH = 380;
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [helpOpen, setHelpOpen] = useState(false);
+    // What's new (AW-14): the panel's open state mirrors `helpOpen`; the count
+    // is seeded once from the server layout and then only updated from the
+    // panel's own responses — no polling (spec FR-31).
+    const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+    const [whatsNewUnread, setWhatsNewUnread] = useState<number | null>(changelogUnreadCount);
     const [onboardingOpenManually, setOnboardingOpenManually] = useState(false);
     const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
     const [sidebarCollapsed, setSidebarCollapsedRaw] = useState(initialSidebarCollapsed);
@@ -267,6 +276,8 @@ export function DashboardLayoutClient({
 
     const openHelp = useCallback(() => setHelpOpen(true), []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
+    const openWhatsNew = useCallback(() => setWhatsNewOpen(true), []);
+    const closeWhatsNew = useCallback(() => setWhatsNewOpen(false), []);
     const toggleChat = useCallback(() => setChatOpen(!chatOpen), [chatOpen, setChatOpen]);
     const openOnboarding = useCallback(() => setOnboardingOpenManually(true), []);
     const closeOnboarding = useCallback(() => {
@@ -502,6 +513,11 @@ export function DashboardLayoutClient({
                                       }
                                     : undefined
                             }
+                            whatsNew={{
+                                unreadCount: whatsNewUnread,
+                                onOpen: openWhatsNew,
+                                isOpen: whatsNewOpen,
+                            }}
                         />
 
                         <main
@@ -533,6 +549,12 @@ export function DashboardLayoutClient({
                         totalSteps: onboardingTotalSteps,
                         onOpen: openOnboarding,
                     }}
+                />
+                <WhatsNewPanel
+                    open={whatsNewOpen}
+                    onClose={closeWhatsNew}
+                    unreadCount={whatsNewUnread}
+                    onUnreadCountChange={setWhatsNewUnread}
                 />
             </ChatProvider>
         </BackgroundActivityProvider>

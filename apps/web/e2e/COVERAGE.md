@@ -26,6 +26,7 @@
 | `budgets/admin-usage.controller.ts`                            | [x]    | budgets.spec.ts                                                |
 | `budgets/budgets.controller.ts`                                | [x]    | budgets.spec.ts                                                |
 | `budgets/usage.controller.ts`                                  | [x]    | budgets.spec.ts                                                |
+| `changelog/changelog.controller.ts`                            | [x]    | whats-new-panel.spec.ts, whats-new-degraded.spec.ts            |
 | `data-sync.controller.ts`                                      | [x]    | data-sync.spec.ts                                              |
 | `integrations/github-app/github-app.controller.ts`             | [x]    | github-app.spec.ts                                             |
 | `integrations/github-app/github-app-webhook.controller.ts`     | [x]    | github-app.spec.ts                                             |
