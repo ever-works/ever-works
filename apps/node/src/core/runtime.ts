@@ -18,6 +18,7 @@ import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
+import { runComputerSessionJob } from './executors/computer-session';
 import type { ModelCliPaths } from './executors/model-cli';
 import {
 	assertWorkspaceDiskHeadroom,
@@ -27,6 +28,13 @@ import {
 import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
 import { PushCredentialSession } from './workspaces/push-credential';
 import type { Logger } from './logger';
+import { PtyLocalPlugin } from '@ever-works/pty-local-plugin';
+import type { ITerminalStreamPlugin } from '@ever-works/plugin';
+import { AttendedPollCadence, clampAttendedPollMs } from './screen/attended-cadence';
+import { AgentProfileManager, createAgentProfileFs, defaultAgentProfileRoot } from './screen/agent-profile';
+import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
+import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
+import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -271,6 +279,19 @@ export interface NodeRuntime {
 	 * meet through this object rather than through a constructor.
 	 */
 	housekeeping?: NodeHousekeepingReporter;
+	/**
+	 * Agent computers — the attended live-view lane, present when the node
+	 * was started with `--attend`. A separate worker loop that leases ONLY
+	 * `computer-session` jobs on a fast cadence, independent of `--work`:
+	 * a machine can be watchable without taking work, and a long agent task
+	 * never delays the owner's "Waking up the view…".
+	 */
+	attended?: {
+		worker: WorkerLoop;
+		cadence: AttendedPollCadence;
+		/** The capture backend this machine selected, or null (terminal-only views). */
+		captureBackend: CaptureBackend | null;
+	};
 }
 
 /** The provisioner surface the runtime composes over; the real one and every test double satisfy it. */
@@ -356,6 +377,25 @@ export interface CreateNodeRuntimeOptions {
 	 * their own. See `api-base.ts`.
 	 */
 	env?: Record<string, string | undefined>;
+
+	/**
+	 * Agent computers — allow live viewing of this machine from the dashboard
+	 * (`start --attend`). Off by default: enrolling a machine, running work on
+	 * it and letting its owner watch it are three separate consents.
+	 */
+	attendEnabled?: boolean;
+	/** The attended lane's fast poll, ms (clamped 500–10000; default 2000). */
+	attendedPollMs?: number;
+	/** Capture backends in preference order; defaults to the headless-browser backend. */
+	captureBackends?: readonly CaptureBackend[];
+	/** The `terminal-stream` provider for a view's terminal channel; defaults to `pty-local`. Null disables it. */
+	terminalHost?: ITerminalStreamPlugin | null;
+	/** Where each Agent's profile directory lives; defaults to `~/.ever-works/agent-profiles`. */
+	agentProfileRoot?: string;
+	/** Owner-only access for a new profile directory (the CLI supplies icacls on Windows). */
+	restrictProfileDir?: (path: string) => Promise<void> | void;
+	/** Test seam for the live-view socket leg and the capture backend's debugging connection. */
+	webSocketFactory?: WebSocketFactory | null;
 }
 
 /**
@@ -395,6 +435,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// the service manager's cwd happens to be on (OPS-12).
 	const workspaceRoot = options.agentTaskWorkspaceRoot ?? defaultFleetTaskWorkspaceRoot();
 	const telemetry = buildSelfDescriptionTelemetry({ ...io, workspacePath: io.workspacePath ?? workspaceRoot });
+	// Agent computers: `--attend` is process-scoped consent, so it rides the
+	// environment the capability probe reads rather than the stored config —
+	// `attended` (and `screen`) are advertised only by a process started with it.
+	const environment = options.attendEnabled ? { ...io.environment, attended: true } : io.environment;
+	// Set once the attended lane exists (below); the heartbeat hint wakes it.
+	let attendedWake: ((pending: readonly string[] | undefined) => void) | null = null;
 	const loopOptions = {
 		client,
 		nodeId: config.nodeId,
@@ -402,24 +448,32 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// Re-probed on EVERY beat, like the capability tags: installing an
 		// agent CLI or filling a disk is exactly the kind of change an
 		// operator needs to see without restarting the node.
-		describe: () => describeSelf(io.runner, io.environment, io.version, selection, telemetry),
+		describe: () => describeSelf(io.runner, environment, io.version, selection, telemetry),
 		intervalMs: clampHeartbeatInterval(config.heartbeatIntervalMs),
 		logger: io.logger,
 		...(io.scheduler ? { scheduler: io.scheduler } : {}),
-		...(io.now ? { now: io.now } : {})
+		...(io.now ? { now: io.now } : {}),
+		onAccepted: (response: { pendingComputerSessions?: string[] }) =>
+			attendedWake?.(response.pendingComputerSessions)
 	};
 
 	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions) };
 
-	if (options.workerEnabled) {
-		const jobClient = new FleetJobClient({
+	// ONE job client per process, shared by the work lane and the live-view
+	// lane, so both talk to the same pinned control plane with the same credential.
+	let sharedJobClient: FleetJobClient | null = null;
+	const jobClientFor = (): FleetJobClient =>
+		(sharedJobClient ??= new FleetJobClient({
 			apiUrl: apiBase.url,
 			nodeId: config.nodeId,
 			secret: config.secret,
 			fetchFn: io.fetchFn,
 			logger: io.logger,
 			userAgent
-		});
+		}));
+
+	if (options.workerEnabled) {
+		const jobClient = jobClientFor();
 		// Precedence: explicit override → the node's stored limits → the
 		// legacy `concurrency` option → defaults.
 		const limits = clampResourceLimits(
@@ -448,7 +502,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.workerSafetyGate ? { safetyGate: options.workerSafetyGate } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {}),
 			...(io.now ? { now: io.now } : {}),
-			...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
+			...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {}),
+			// Agent computers: on an attended machine, live views belong to the
+			// attended lane alone — never parked in (or holding a slot of) the
+			// work lane. Sent only under `--attend`, so a work-only node's lease
+			// body is exactly what it always was.
+			...(options.attendEnabled ? { excludeKinds: ['computer-session' as const] } : {})
 		});
 		// Fleet health signals (EW-776). Wired onto the SAME telemetry
 		// object `describe` already closed over above, so the heartbeat
@@ -687,7 +746,88 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		runtime.workspaceProvisioner = workspaceProvisioner;
 	}
 
+	if (options.attendEnabled) {
+		const lane = createAttendedLane(config, io, options, environment, jobClientFor());
+		runtime.attended = lane;
+		runtime.jobClient ??= jobClientFor();
+		attendedWake = (pending) => {
+			if (lane.cadence.notePendingSessions(pending)) lane.worker.pollSoon();
+		};
+	}
+
 	return runtime;
+}
+
+/** Most live views one machine serves at once — the platform's per-machine default. */
+export const ATTENDED_MAX_CONCURRENT_VIEWS = 2;
+/** Lease requested for a live view; kept alive at a third of it while the view runs. */
+export const ATTENDED_LEASE_TTL_SEC = 120;
+
+/**
+ * Agent computers — the attended live-view lane: its own worker loop, its
+ * own cadence, and the `computer-session` executor wired to this machine's
+ * capture backend, `terminal-stream` provider and per-Agent profiles.
+ *
+ * The executor is registered for every attended machine, not only one that
+ * can show a screen: a display-less server started with `--attend` still
+ * serves terminal-only views, and the platform only offers it those (a
+ * screen view requires the `screen` tag, which that machine does not
+ * advertise).
+ */
+function createAttendedLane(
+	config: NodeConfig,
+	io: NodeIo,
+	options: CreateNodeRuntimeOptions,
+	environment: CapabilityEnvironment,
+	jobClient: FleetJobClient
+): NonNullable<NodeRuntime['attended']> {
+	const webSocketFactory =
+		options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
+	const backends =
+		options.captureBackends ??
+		(environment.browserPath
+			? [new HeadlessBrowserCaptureBackend({ browserPath: environment.browserPath, webSocketFactory })]
+			: []);
+	const captureBackend = selectCaptureBackend(backends, environment);
+	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;
+	const profiles = new AgentProfileManager({
+		root: options.agentProfileRoot ?? defaultAgentProfileRoot(options.env ?? process.env),
+		fs: createAgentProfileFs(),
+		...(options.restrictProfileDir ? { restrictToOwner: options.restrictProfileDir } : {})
+	});
+	const fastPollMs = clampAttendedPollMs(options.attendedPollMs);
+	const cadence = new AttendedPollCadence({ fastPollMs, ...(io.now ? { now: io.now } : {}) });
+	const worker = new WorkerLoop({
+		client: jobClient,
+		logger: io.logger,
+		limits: clampResourceLimits({ maxConcurrentJobs: ATTENDED_MAX_CONCURRENT_VIEWS }),
+		leaseTtlSec: ATTENDED_LEASE_TTL_SEC,
+		idlePollMs: fastPollMs,
+		kinds: ['computer-session'],
+		pollCadence: cadence,
+		...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
+		...(io.scheduler ? { scheduler: io.scheduler } : {}),
+		...(io.now ? { now: io.now } : {}),
+		...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
+	});
+	worker.register('computer-session', (job, signal) =>
+		runComputerSessionJob(
+			job,
+			{
+				nodeId: config.nodeId,
+				apiUrl: jobClient.baseUrl,
+				client: jobClient,
+				profiles,
+				captureBackend,
+				terminalHost,
+				webSocketFactory,
+				logger: io.logger,
+				platform: environment.platform
+			},
+			signal
+		)
+	);
+	return { worker, cadence, captureBackend };
 }
 
 /**

@@ -1,13 +1,16 @@
 import {
+	FLEET_ATTENDED_CAPABILITY,
 	FLEET_BROWSER_CAPABILITY,
 	FLEET_GPU_CAPABILITY,
 	FLEET_PUSH_CAPABILITY,
-	FLEET_PUSH_MIN_GIT_VERSION
+	FLEET_PUSH_MIN_GIT_VERSION,
+	FLEET_SCREEN_CAPABILITY
 } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
 import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
 import type { NodeHousekeepingReport } from './housekeeping-report';
+import { isScreenCaptureAvailable } from './screen/capture-backend';
 import type { WorkerHealth } from './worker-health';
 import {
 	MAX_CAPABILITY_TAG_LENGTH,
@@ -61,6 +64,13 @@ export interface CapabilityEnvironment {
 	modelCli?: ModelCliPaths;
 	/** Startup log lines explaining each model-CLI decision. */
 	modelCliNotes?: string[];
+	/**
+	 * Agent computers — the owner switched live viewing on for this machine
+	 * (`ever-works-node start --attend`). Process-scoped consent, like
+	 * `--work`: absent or false, the node advertises neither `attended` nor
+	 * `screen`, and no live view can ever be leased here.
+	 */
+	attended?: boolean;
 }
 
 /**
@@ -279,7 +289,16 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		// Vendor is a second, narrower tag rather than a replacement:
 		// a job that needs "any accelerator" must not have to enumerate
 		// vendors, and one that needs CUDA must be able to say so.
-		gpu ? `${FLEET_GPU_CAPABILITY}:${gpu.vendor}` : null
+		gpu ? `${FLEET_GPU_CAPABILITY}:${gpu.vendor}` : null,
+		// Agent computers. `attended` only under `--attend` — the owner's
+		// switch for live viewing. `screen` only under `--attend` AND when a
+		// capture backend can actually take a picture here (the headless
+		// browser backend needs the SAME resolved browser the `browser` tag
+		// stands on): the live-view executor is registered by exactly that
+		// fact, so the tag and the executor cannot disagree. `input` is NOT
+		// advertised: nothing on this node injects input yet.
+		environment.attended === true ? FLEET_ATTENDED_CAPABILITY : null,
+		environment.attended === true && isScreenCaptureAvailable(environment) ? FLEET_SCREEN_CAPABILITY : null
 	]);
 }
 
@@ -308,7 +327,14 @@ export function isIdentityCapability(tag: string): boolean {
  * ADVERTISES from what it can do, and there is nothing to opt out of
  * here that does not also opt out of fleet runs entirely.
  */
-const NON_SELECTABLE_TAGS = new Set<string>([FLEET_PUSH_CAPABILITY]);
+const NON_SELECTABLE_TAGS = new Set<string>([
+	FLEET_PUSH_CAPABILITY,
+	// Agent computers: both exist only under `--attend`, which IS the opt-in.
+	// A capability selection written before these tags existed must not
+	// silently withhold a live view its owner just switched on.
+	FLEET_ATTENDED_CAPABILITY,
+	FLEET_SCREEN_CAPABILITY
+]);
 
 /**
  * True when a tag is advertised whatever the operator selected: machine

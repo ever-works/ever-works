@@ -58,7 +58,10 @@ async function main() {
 		// (src/cli.ts) as the first line — a second copy is a syntax error.
 		// Native addon, loaded lazily by the secret store; ships as an
 		// optional dependency rather than being inlined.
-		external: ['@napi-rs/keyring'],
+		// The PTY prebuild the `pty-local` terminal host requires at runtime
+		// is the same kind of addon: kept external, and without it a live
+		// view's terminal channel runs on that plugin's pipe floor.
+		external: ['@napi-rs/keyring', '@homebridge/node-pty-prebuilt-multiarch'],
 		keepNames: true,
 		minify: false,
 		sourcemap: false,
