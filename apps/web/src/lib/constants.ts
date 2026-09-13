@@ -187,6 +187,8 @@ export const ROUTES = {
     DASHBOARD_AGENT_DASHBOARD: (id: string) => `/agents/${id}`,
     DASHBOARD_AGENT_ACTIVITY: (id: string) => `/agents/${id}/activity`,
     DASHBOARD_AGENT_TERMINAL: (id: string) => `/agents/${id}/terminal`,
+    // Agent computers — watch the machine an Agent works on (fleet-gated).
+    DASHBOARD_AGENT_COMPUTER: (id: string) => `/agents/${id}/computer`,
     DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
     DASHBOARD_AGENT_MCP_SERVERS: (id: string) => `/agents/${id}/mcp-servers`,
