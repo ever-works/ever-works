@@ -51,6 +51,23 @@ export interface WorkspaceSearchSourceQuery {
     containsPattern: string;
     /** Lower-cased, LIKE-escaped in-order subsequence `%q%u%e%r%y%`, or null when too short. */
     subsequencePattern: string | null;
+    /**
+     * Trimmed, lower-cased query compared for equality. This and the fields
+     * below let a source order rows by relevance before the cap, so the cap
+     * keeps the best matches rather than merely the newest ones.
+     */
+    exactValue: string;
+    /** Lower-cased, LIKE-escaped `query%`. */
+    prefixPattern: string;
+    /**
+     * Lower-cased, LIKE-escaped "a word starts with the query" patterns
+     * (`% query%`, `%-query%`, …); empty when the query itself spans words.
+     */
+    wordPrefixPatterns: string[];
+    /** `${kind}:${sourceId}` keys the caller opened recently. */
+    recentKeys: string[];
+    /** The instant freshness is measured from. */
+    now: Date;
     /** Maximum candidates to read. */
     cap: number;
 }
@@ -72,7 +89,10 @@ export interface WorkspaceSearchSourceDefinition<T extends ObjectLiteral> {
     identifierColumn?: string;
     /** Description / path / tag-list properties. */
     secondaryColumns?: string[];
-    /** Property ordering candidates before the cap (newest first). */
+    /**
+     * Last-changed property: breaks relevance ties before the cap (newest
+     * first) and measures freshness.
+     */
     updatedAtColumn?: string;
     /**
      * Restrict rows to what the caller may open. Defaults to

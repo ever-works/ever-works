@@ -14,7 +14,13 @@ import {
 } from '@ever-works/contracts/api';
 import { KIND_PRIORITY, orderAndCutGroups, scoreCandidate } from './ranking';
 import { WORKSPACE_SEARCH_SOURCES } from './sources';
-import { buildContainsPattern, buildSubsequencePattern, runSource } from './sources/run-source';
+import {
+    buildContainsPattern,
+    buildPrefixPattern,
+    buildSubsequencePattern,
+    buildWordPrefixPatterns,
+    runSource,
+} from './sources/run-source';
 import type {
     WorkspaceSearchFilters,
     WorkspaceSearchScope,
@@ -110,13 +116,18 @@ export class WorkspaceSearchService {
             : available;
         const recent = new Set((filters.recent ?? []).slice(0, WORKSPACE_SEARCH_MAX_RECENT));
 
+        const now = new Date();
         const sourceQuery: WorkspaceSearchSourceQuery = {
             scope,
             containsPattern: buildContainsPattern(query),
             subsequencePattern: buildSubsequencePattern(query),
+            exactValue: query.toLowerCase(),
+            prefixPattern: buildPrefixPattern(query),
+            wordPrefixPatterns: buildWordPrefixPatterns(query),
+            recentKeys: [...recent],
+            now,
             cap: Math.max(MIN_CANDIDATES, perKindLimit * CANDIDATE_MULTIPLIER),
         };
-        const now = new Date();
         const degradedKinds: WorkspaceSearchKind[] = [];
 
         const groups = await Promise.all(

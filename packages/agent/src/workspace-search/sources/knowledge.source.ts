@@ -37,6 +37,17 @@ export function applyKnowledgeAccess(
     });
 }
 
+/**
+ * The workbench URL for one document. The path keeps its `/` separators (the
+ * route is a catch-all) but each segment is percent-encoded, so a `#`, `?` or
+ * `%` in a stored path reaches the route as part of the path instead of
+ * starting a fragment or query string.
+ */
+export function knowledgeDocumentDestination(workId: string, path: string): string {
+    const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+    return `/works/${encodeURIComponent(workId)}/kb/${encodedPath}`;
+}
+
 /** Knowledge — matched on document title, slug, path, description and tags. */
 export const knowledgeSource: WorkspaceSearchSourceDefinition<WorkKnowledgeDocument> = {
     kind: 'knowledge',
@@ -54,7 +65,7 @@ export const knowledgeSource: WorkspaceSearchSourceDefinition<WorkKnowledgeDocum
         secondary: [row.path, row.description ?? '', ...(row.tags ?? [])],
         subtitle: row.path ?? null,
         statusLabel: row.status ?? null,
-        destination: `/works/${row.workId}/kb/${row.path}`,
+        destination: knowledgeDocumentDestination(row.workId, row.path ?? ''),
         updatedAt: row.updatedAt ?? null,
     }),
 };

@@ -257,6 +257,53 @@ describe('WorkspaceSearchService — live fan-out on SQLite (integration)', () =
         expect(matching).toMatch(/LOWER\(.+\) LIKE \? ESCAPE/);
     });
 
+    it('ranks candidates before the cap, so an older strong match beats newer weak ones', async () => {
+        const inA = { userId: ownerId, tenantId: TENANT, organizationId: ORG_A };
+        const zephyr = (title: string) =>
+            save(Mission, {
+                ...inA,
+                title,
+                description: 'Cap seed',
+                type: MissionType.ONE_SHOT,
+                status: MissionStatus.ACTIVE,
+            });
+        const age = (id: string, iso: string) =>
+            dataSource
+                .createQueryBuilder()
+                .update(Mission)
+                .set({ updatedAt: new Date(iso) })
+                .where('id = :id', { id })
+                .execute();
+
+        const exact = await zephyr('Zephyr');
+        await age(exact.id, '2020-01-01T00:00:00.000Z');
+        const prefix = await zephyr('Zephyr roadmap');
+        await age(prefix.id, '2020-01-02T00:00:00.000Z');
+        const reopened = await zephyr('Legacy zephyr notes');
+        await age(reopened.id, '2020-01-03T00:00:00.000Z');
+        // More newer, weaker (substring-only) matches than the candidate cap of 25.
+        for (let index = 0; index < 30; index += 1) {
+            await zephyr(`Note about myzephyr${index}`);
+        }
+
+        const response = await service.search(scopeA(), {
+            query: 'zephyr',
+            perKindLimit: 5,
+            recent: [`mission:${reopened.id}`, 'mission:not-a-uuid'],
+        });
+        expect(response.degradedKinds).toEqual([]);
+        const missions = response.groups.find((group) => group.kind === 'mission');
+        expect(missions?.total).toBe(33);
+        expect(missions?.hits.slice(0, 3).map((hit) => [hit.title, hit.score])).toEqual([
+            ['Zephyr', 100],
+            // A recent open lifts a word-prefix match level with a prefix match; the tie
+            // then goes to the more recently changed row, before and after the cap alike.
+            ['Legacy zephyr notes', 90],
+            ['Zephyr roadmap', 90],
+        ]);
+        expect(missions?.hits[3].matchReason).toBe('contains');
+    });
+
     describe('workspace scope and access', () => {
         it('never returns a record from another Organization', async () => {
             const { byKind } = await titlesByKind('Organization B');
@@ -301,6 +348,23 @@ describe('WorkspaceSearchService — live fan-out on SQLite (integration)', () =
                 .find((g) => g.kind === 'knowledge')
                 ?.hits.find((h) => h.title === 'Invoice policy');
             expect(policy?.destination).toMatch(/^\/works\/[^/]+\/kb\/legal\/invoice-policy\.md$/);
+        });
+
+        it('encodes Knowledge path segments so # and ? stay part of the route path', async () => {
+            const [ownWork] = await dataSource
+                .getRepository(Work)
+                .find({ where: { slug: 'acme-invoice-directory' } });
+            await save(WorkKnowledgeDocument, {
+                workId: ownWork.id,
+                path: 'faq/refunds?#top.md',
+                slug: 'refunds-faq',
+                title: 'Refunds FAQ',
+                kbDocumentClass: KbDocumentClass.FREEFORM,
+                status: KbDocumentStatus.ACTIVE,
+            });
+            const { response } = await titlesByKind('refunds faq');
+            const hit = response.groups.find((g) => g.kind === 'knowledge')?.hits[0];
+            expect(hit?.destination).toBe(`/works/${ownWork.id}/kb/faq/refunds%3F%23top.md`);
         });
 
         it('returns Organization Teams to any caller in that Organization, and only that one', async () => {
