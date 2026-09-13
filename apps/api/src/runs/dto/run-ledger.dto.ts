@@ -12,8 +12,11 @@ import {
     MaxLength,
     Min,
     MinLength,
+    ValidateBy,
+    type ValidationOptions,
 } from 'class-validator';
 import {
+    isRunLedgerCalendarDate,
     RUN_LEDGER_GRANULARITIES,
     RUN_LEDGER_MAX_AGENT_FILTERS,
     RUN_LEDGER_MAX_LIMIT,
@@ -44,6 +47,31 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 /** `<epochMillis>_<uuid>` — the same cursor shape the session timeline uses. */
 const CURSOR_PATTERN = /^\d{1,15}_[0-9a-fA-F-]{36}$/;
+
+/**
+ * A real Gregorian calendar date. The `YYYY-MM-DD` shape alone admits
+ * `2026-02-31`, which the window resolver would otherwise treat as "no
+ * anchor" and silently answer with today's runs — so an impossible date is
+ * rejected here, at the edge, with the predicate the dashboard's URL parser
+ * shares.
+ */
+function IsCalendarDate(validationOptions?: ValidationOptions): PropertyDecorator {
+    return ValidateBy(
+        {
+            name: 'isCalendarDate',
+            validator: {
+                // A wrong type or shape is already reported by `@IsString` /
+                // `@Matches`; only a well-shaped impossible date fails here.
+                validate: (value: unknown): boolean =>
+                    typeof value !== 'string' ||
+                    !DATE_PATTERN.test(value) ||
+                    isRunLedgerCalendarDate(value),
+                defaultMessage: () => 'date must be a real calendar date',
+            },
+        },
+        validationOptions,
+    );
+}
 
 /**
  * A multi-value query parameter arrives as a string (`?status=failed`) or an
@@ -78,6 +106,7 @@ export class RunLedgerFilterQueryDto {
     @IsOptional()
     @IsString()
     @Matches(DATE_PATTERN, { message: 'date must be YYYY-MM-DD' })
+    @IsCalendarDate()
     date?: string;
 
     @ApiProperty({ required: false, description: 'IANA timezone; UTC when omitted.' })

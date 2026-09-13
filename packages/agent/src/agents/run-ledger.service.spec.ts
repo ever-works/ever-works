@@ -308,9 +308,15 @@ describe('RunLedgerService', () => {
                 { at: new Date('2026-09-09T01:00:00.000Z'), status: 'completed' },
             ]);
 
+            // A clock at which all of September is reachable, so the read
+            // spans the whole month (partial months are pinned below).
             const month = await service.getCalendar(
                 USER,
-                { month: '2026-09', timezone: 'Asia/Tokyo', now: NOW },
+                {
+                    month: '2026-09',
+                    timezone: 'Asia/Tokyo',
+                    now: new Date('2026-10-15T10:00:00.000Z'),
+                },
                 SCOPE,
             );
 
@@ -323,6 +329,84 @@ describe('RunLedgerService', () => {
             expect(range.from.toISOString()).toBe('2026-08-31T15:00:00.000Z');
             expect(range.to.toISOString()).toBe('2026-09-30T15:00:00.000Z');
             expect(scope).toBe(SCOPE);
+        });
+
+        /** A repository double that honours the half-open range it is given, like the SQL does. */
+        function instantsInRange(all: Array<{ at: Date; status: string }>) {
+            repo.listLedgerInstants.mockImplementation(
+                async (_user: string, range: { from: Date; to: Date }) =>
+                    all.filter(({ at }) => at >= range.from && at < range.to),
+            );
+        }
+
+        it('clips the month 7 days ahead at the last reachable day, matching the day window there', async () => {
+            // NOW is 13 Sep 2026, so the latest reachable day is 20 Sep.
+            instantsInRange([
+                { at: new Date('2026-09-20T12:00:00.000Z'), status: 'completed' },
+                { at: new Date('2026-09-21T12:00:00.000Z'), status: 'failed' },
+                { at: new Date('2026-09-29T12:00:00.000Z'), status: 'completed' },
+            ]);
+
+            const month = await service.getCalendar(USER, {
+                month: '2026-09',
+                timezone: 'UTC',
+                now: NOW,
+            });
+
+            expect(month.days).toEqual([{ date: '2026-09-20', runs: 1, failures: 0 }]);
+            const [, range] = repo.listLedgerInstants.mock.calls[0];
+            expect(range.from.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+            expect(range.to.toISOString()).toBe('2026-09-21T00:00:00.000Z');
+
+            // The list and the totals for the furthest day stop at the same instant.
+            const lastDay = service.resolveWindow({
+                date: '2026-09-21',
+                timezone: 'UTC',
+                now: NOW,
+            });
+            expect(lastDay.clamped).toBe(true);
+            expect(lastDay.to).toBe(range.to.toISOString());
+        });
+
+        it('clips the month 12 months back at the earliest reachable day, matching the day window there', async () => {
+            // NOW is 13 Sep 2026, so the earliest reachable day is 13 Sep 2025.
+            instantsInRange([
+                { at: new Date('2025-09-12T12:00:00.000Z'), status: 'failed' },
+                { at: new Date('2025-09-13T12:00:00.000Z'), status: 'failed' },
+            ]);
+
+            const month = await service.getCalendar(USER, {
+                month: '2025-09',
+                timezone: 'UTC',
+                now: NOW,
+            });
+
+            expect(month.days).toEqual([{ date: '2025-09-13', runs: 1, failures: 1 }]);
+            const [, range] = repo.listLedgerInstants.mock.calls[0];
+            expect(range.from.toISOString()).toBe('2025-09-13T00:00:00.000Z');
+            expect(range.to.toISOString()).toBe('2025-10-01T00:00:00.000Z');
+
+            const firstDay = service.resolveWindow({
+                date: '2025-09-12',
+                timezone: 'UTC',
+                now: NOW,
+            });
+            expect(firstDay.clamped).toBe(true);
+            expect(firstDay.from).toBe(range.from.toISOString());
+        });
+
+        it('clips a partial month on local-midnight boundaries of the viewer timezone', async () => {
+            const month = await service.getCalendar(
+                USER,
+                { month: '2026-09', timezone: 'Asia/Tokyo', now: NOW },
+                SCOPE,
+            );
+
+            expect(month.days).toEqual([]);
+            const [, range] = repo.listLedgerInstants.mock.calls[0];
+            // 1 Sep 00:00 and 21 Sep 00:00 in Tokyo (UTC+9).
+            expect(range.from.toISOString()).toBe('2026-08-31T15:00:00.000Z');
+            expect(range.to.toISOString()).toBe('2026-09-20T15:00:00.000Z');
         });
 
         it('reads nothing for a month wholly outside the 12-month reach', async () => {

@@ -1,4 +1,5 @@
 import {
+    isRunLedgerCalendarDate,
     RUN_LEDGER_GRANULARITIES,
     RUN_LEDGER_SEARCH_MAX_LENGTH,
     RUN_LEDGER_SEARCH_MIN_LENGTH,
@@ -37,7 +38,6 @@ export interface RunsViewState {
     runId: string | null;
 }
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ParamSource = { get(name: string): string | null };
@@ -88,7 +88,10 @@ export function parseRunsViewState(
 
     return {
         granularity: isGranularity(g) ? g : fallbackGranularity,
-        date: d && DATE_PATTERN.test(d) ? d : null,
+        // A well-shaped but impossible day (`2026-02-31`) is dropped like any
+        // other invalid value — the API rejects it, so passing it on would
+        // turn a mistyped link into an error instead of today's window.
+        date: isRunLedgerCalendarDate(d) ? d : null,
         filters,
         runId: run && UUID_PATTERN.test(run) ? run : null,
     };

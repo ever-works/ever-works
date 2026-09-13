@@ -1,4 +1,5 @@
 import {
+    isRunLedgerCalendarDate,
     RUN_LEDGER_GRANULARITIES,
     RUN_LEDGER_REACH_BACK_MONTHS,
     RUN_LEDGER_REACH_FORWARD_DAYS,
@@ -36,19 +37,18 @@ export function isValidTimezone(timezone: unknown): timezone is string {
     }
 }
 
-/** A calendar date string, or null when it is not a real `YYYY-MM-DD` date. */
+/**
+ * A calendar date string, or null when it is not a real `YYYY-MM-DD` date.
+ *
+ * Validity is the shared contracts predicate — the same one the API query
+ * DTO and the dashboard URL parser apply — so a date an edge accepts is
+ * never one the resolver silently reads as "no anchor".
+ */
 export function parseCalendarDate(value: unknown): { y: number; m: number; d: number } | null {
-    if (typeof value !== 'string') return null;
+    if (!isRunLedgerCalendarDate(value)) return null;
     const match = DATE_PATTERN.exec(value);
     if (!match) return null;
-    const y = Number(match[1]);
-    const m = Number(match[2]);
-    const d = Number(match[3]);
-    const probe = new Date(Date.UTC(y, m - 1, d));
-    if (probe.getUTCFullYear() !== y || probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) {
-        return null;
-    }
-    return { y, m, d };
+    return { y: Number(match[1]), m: Number(match[2]), d: Number(match[3]) };
 }
 
 function formatCalendarDate(y: number, m: number, d: number): string {

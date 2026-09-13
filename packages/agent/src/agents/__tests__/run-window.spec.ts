@@ -158,6 +158,15 @@ describe('run-window', () => {
             expect(window.granularity).toBe('day');
         });
 
+        it('clamps a real date far in the past, even one with a two-digit-era year', () => {
+            // `Date.UTC(50, …)` means 1950; the year 0050 must still read as a
+            // real (and long unreachable) date the API accepts, not as "no anchor".
+            expect(parseCalendarDate('0050-01-01')).toEqual({ y: 50, m: 1, d: 1 });
+            const window = resolveRunWindow({ date: '0050-01-01', now: NOW });
+            expect(window.clamped).toBe(true);
+            expect(window.anchorDate).toBe('2025-09-13');
+        });
+
         it('anchors on today when the date is not a real date', () => {
             expect(resolveRunWindow({ date: '2026-02-31', now: NOW }).anchorDate).toBe(
                 '2026-09-13',

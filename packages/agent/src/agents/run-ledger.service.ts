@@ -21,6 +21,7 @@ import type { OwnershipScope } from '../database/ownership-scope';
 import type { AgentRun } from '../entities/agent-run.entity';
 import { buildCapturePreview, CAPTURE_MESSAGE_MAX_CHARS } from './run-capture';
 import {
+    addCalendarDays,
     addCalendarMonths,
     calendarDateInTimezone,
     isValidTimezone,
@@ -133,6 +134,12 @@ export class RunLedgerService {
      * Days of one calendar month (`YYYY-MM`) that had runs, with how many
      * failed — the mini-calendar's two markers. A month entirely outside the
      * reachable range reads nothing and returns no days.
+     *
+     * A month the reachable range only partly covers (the one 12 months back,
+     * the one 7 days ahead) is read from the first reachable day through the
+     * end of the last reachable day, never the whole month: the calendar only
+     * marks days that can be jumped to, so a marker can never point at a day
+     * the ledger would clamp away and answer with a different day's runs.
      */
     async getCalendar(
         userId: string,
@@ -156,9 +163,14 @@ export class RunLedgerService {
             return { month: request.month, timezone, days: [], truncated: false };
         }
 
+        // Calendar-date strings compare in date order, so clipping is done on
+        // dates and only the final bounds are turned into instants.
+        const fromDate = firstDay < earliest ? earliest : firstDay;
+        const dayAfterLatest = addCalendarDays(latest, 1);
+        const toDate = nextMonth > dayAfterLatest ? dayAfterLatest : nextMonth;
         const range = {
-            from: startOfCalendarDate(firstDay, timezone),
-            to: startOfCalendarDate(nextMonth, timezone),
+            from: startOfCalendarDate(fromDate, timezone),
+            to: startOfCalendarDate(toDate, timezone),
         };
         const instants = await this.runs.listLedgerInstants(
             userId,

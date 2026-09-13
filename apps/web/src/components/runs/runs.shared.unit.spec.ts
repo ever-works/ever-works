@@ -93,6 +93,19 @@ describe('runs.shared', () => {
             expect(state).toEqual({ granularity: 'day', date: null, filters: {}, runId: null });
         });
 
+        it('drops a well-shaped date that names no real calendar day', () => {
+            for (const d of [
+                '2026-02-31',
+                '2026-02-29',
+                '2026-13-01',
+                '2026-04-31',
+                '2026-09-00',
+            ]) {
+                expect(parseRunsViewState(params(`g=day&d=${d}`)).date).toBeNull();
+            }
+            expect(parseRunsViewState(params('g=day&d=2028-02-29')).date).toBe('2028-02-29');
+        });
+
         it('uses the fallback granularity when the URL names none', () => {
             expect(parseRunsViewState(params(''), 'month').granularity).toBe('month');
         });

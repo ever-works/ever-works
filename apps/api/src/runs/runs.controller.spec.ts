@@ -19,7 +19,7 @@ jest.mock('../scope', () => ({ ScopeContextService: class ScopeContextService {}
 import { RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
+import { validate, type ValidationError } from 'class-validator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { ListRunsQueryDto, RunCalendarQueryDto, RunStatsQueryDto } from './dto/run-ledger.dto';
 import { RunsController } from './runs.controller';
@@ -31,11 +31,11 @@ const AGENT = '0b7e7c1e-6f6a-4c55-9a4c-1f2b3c4d5e6f';
 async function validateDto<T extends object>(
     Dto: new () => T,
     payload: Record<string, unknown>,
-): Promise<{ properties: string[]; instance: T }> {
+): Promise<{ properties: string[]; instance: T; errors: ValidationError[] }> {
     const instance = plainToInstance(Dto, payload);
     // Same options as the global ValidationPipe in main.ts.
     const errors = await validate(instance, { whitelist: true, forbidNonWhitelisted: true });
-    return { properties: errors.map((error) => error.property), instance };
+    return { properties: errors.map((error) => error.property), instance, errors };
 }
 
 describe('RunsController', () => {
@@ -191,6 +191,37 @@ describe('RunsController', () => {
             expect(
                 (await validateDto(ListRunsQueryDto, { date: '8/9/2026' })).properties,
             ).toContain('date');
+        });
+
+        it('rejects a well-shaped date that is not a real calendar day', async () => {
+            // Without this the resolver would read "no anchor" and answer
+            // with today's runs, as though the request had been valid.
+            for (const date of [
+                '2026-02-31',
+                '2026-02-29',
+                '2026-13-01',
+                '2026-04-31',
+                '2026-09-00',
+            ]) {
+                const { properties, errors } = await validateDto(ListRunsQueryDto, { date });
+                expect(properties).toContain('date');
+                expect(
+                    errors.find((error) => error.property === 'date')?.constraints,
+                ).toHaveProperty('isCalendarDate');
+            }
+            for (const dto of [ListRunsQueryDto, RunStatsQueryDto]) {
+                expect((await validateDto(dto, { date: '2026-02-31' })).properties).toContain(
+                    'date',
+                );
+            }
+            expect(
+                (await validateDto(RunCalendarQueryDto, { month: '2026-02', date: '2026-02-30' }))
+                    .properties,
+            ).toContain('date');
+            // Leap day in a leap year, and month ends, stay valid.
+            for (const date of ['2028-02-29', '2026-01-31', '2026-04-30', '2026-12-31']) {
+                expect((await validateDto(ListRunsQueryDto, { date })).properties).toEqual([]);
+            }
         });
 
         it('normalises repeated and comma-separated multi-value filters', async () => {
