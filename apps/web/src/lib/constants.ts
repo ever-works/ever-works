@@ -195,6 +195,8 @@ export const ROUTES = {
     DASHBOARD_AGENT_COLLABORATORS: (id: string) => `/agents/${id}/collaborators`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
+    // Agent email (AW-05) — the per-Agent inbox (list, drafts, sending policy).
+    DASHBOARD_AGENT_INBOX: (id: string) => `/agents/${id}/inbox`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
     DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
     // Navigation consolidation (docs/specs/features/navigation-consolidation):
@@ -263,6 +265,9 @@ export const ROUTES = {
     DASHBOARD_NOTIFICATIONS: '/notifications',
     // The page that actually exists — /notifications has no route and soft-404s.
     DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
+    // Agent email (AW-05) — the tenant email address registry an Agent's
+    // addresses are assigned from.
+    DASHBOARD_SETTINGS_EMAILS: '/settings/integrations/emails',
 
     // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',
