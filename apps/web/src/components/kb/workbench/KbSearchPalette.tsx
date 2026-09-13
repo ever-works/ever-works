@@ -6,6 +6,8 @@ import { Command } from 'cmdk';
 import { Search, X, Lock as LockIcon } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
+import { useShortcut } from '@/lib/hooks/use-shortcut';
+import { SHORTCUT_PRIORITY } from '@/lib/keyboard/shortcut-registry';
 import {
     KB_DOCUMENT_CLASSES,
     KB_DOCUMENT_STATUSES,
@@ -63,6 +65,9 @@ const EMPTY_FILTERS: PaletteFilters = {
 
 const DEFAULT_DEBOUNCE_MS = 200;
 
+/** Shortcut-registry scope owned by the Knowledge-Base workbench screens. */
+export const KB_WORKBENCH_SHORTCUT_SCOPE = 'kb-workbench';
+
 export function KbSearchPalette({
     workId,
     debounceMs = DEFAULT_DEBOUNCE_MS,
@@ -77,15 +82,24 @@ export function KbSearchPalette({
     const [hits, setHits] = useState<KbSearchHit[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Global keyboard shortcut. Listens on `window` so the palette can be
-    // triggered from any focused element within the workbench.
+    // Cmd/Ctrl+K toggles the palette from any focused element within the
+    // workbench. Bound through the shared shortcut registry at screen scope,
+    // so on workbench routes this binding — not the dashboard-wide one that
+    // opens the global palette — owns the keystroke.
+    useShortcut(
+        {
+            id: 'kb-workbench.searchPalette',
+            scope: KB_WORKBENCH_SHORTCUT_SCOPE,
+            priority: SHORTCUT_PRIORITY.screen,
+            allowInInput: true,
+        },
+        (event) => (event.metaKey || event.ctrlKey) && (event.key === 'k' || event.key === 'K'),
+        () => setOpen((prev) => !prev),
+    );
+
     useEffect(() => {
         const handler = (event: KeyboardEvent) => {
-            const mod = event.metaKey || event.ctrlKey;
-            if (mod && (event.key === 'k' || event.key === 'K')) {
-                event.preventDefault();
-                setOpen((prev) => !prev);
-            } else if (event.key === 'Escape' && open) {
+            if (event.key === 'Escape' && open) {
                 event.preventDefault();
                 setOpen(false);
             }
