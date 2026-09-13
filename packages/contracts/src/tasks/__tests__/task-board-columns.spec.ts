@@ -5,11 +5,17 @@ import {
 	clampTaskBoardTerminalWindowDays,
 	findTaskBoardColumn,
 	isTaskBoardLayout,
+	isTaskBoardSort,
 	isTaskBoardStatus,
 	resolveTaskBoardDrop,
+	resolveTaskBoardSort,
+	resolveTaskBoardTerminalWindow,
+	TASK_BOARD_DEFAULT_SORT,
 	TASK_BOARD_FOCUS_COLUMNS,
+	TASK_BOARD_SORTS,
 	TASK_BOARD_STATUS_COLUMNS,
 	TASK_BOARD_STATUSES,
+	TASK_BOARD_TERMINAL_WINDOW_ALL,
 	TASK_BOARD_TRANSITIONS,
 	taskBoardColumnForStatus,
 	taskBoardColumnsFor,
@@ -220,5 +226,53 @@ describe('board read-model clamps', () => {
 		['30', 30]
 	])('terminal window %p → %p', (input, expected) => {
 		expect(clampTaskBoardTerminalWindowDays(input)).toBe(expected);
+	});
+
+	it.each([
+		['all', 'all'],
+		[' ALL ', 'all'],
+		[undefined, 7],
+		['', 7],
+		['junk', 7],
+		[0, 1],
+		['0', 1],
+		[90, 90],
+		[91, 90],
+		['365', 90],
+		['30', 30]
+	])('resolved terminal window %s → %s (the sentinel is the only way past 90)', (input, expected) => {
+		expect(resolveTaskBoardTerminalWindow(input)).toBe(expected);
+	});
+
+	it('names the all-time sentinel once', () => {
+		expect(TASK_BOARD_TERMINAL_WINDOW_ALL).toBe('all');
+	});
+});
+
+describe('board card order', () => {
+	it('offers exactly priority and updated, defaulting to priority', () => {
+		expect(TASK_BOARD_SORTS).toEqual(['priority', 'updated']);
+		expect(TASK_BOARD_DEFAULT_SORT).toBe('priority');
+	});
+
+	it.each([
+		['priority', true],
+		['updated', true],
+		['updatedAt', false],
+		['', false],
+		[undefined, false]
+	])('isTaskBoardSort(%s) → %s', (input, expected) => {
+		expect(isTaskBoardSort(input)).toBe(expected);
+	});
+
+	it.each([
+		['priority', 'priority'],
+		['updated', 'updated'],
+		[' Updated ', 'updated'],
+		['recent', 'priority'],
+		[undefined, 'priority'],
+		[42, 'priority']
+	])('resolveTaskBoardSort(%s) → %s', (input, expected) => {
+		expect(resolveTaskBoardSort(input)).toBe(expected);
 	});
 });

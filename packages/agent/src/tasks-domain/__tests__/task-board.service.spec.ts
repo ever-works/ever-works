@@ -89,6 +89,118 @@ describe('TaskBoardService', () => {
         });
     });
 
+    it('reports the default sort and a 7-day window when neither is asked for', async () => {
+        const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+        const result = await make(list).getBoard('user-1', { now: NOW });
+        expect(result).toMatchObject({ sort: 'priority', terminalWindowDays: 7 });
+    });
+
+    describe("terminalWindowDays: 'all'", () => {
+        it('omits the recency predicate entirely, for every column, and reports the window', async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            const result = await make(list).getBoard('user-1', {
+                now: NOW,
+                terminalWindowDays: 'all',
+            });
+
+            expect(result.terminalWindowDays).toBe('all');
+            expect(list).toHaveBeenCalledTimes(7);
+            for (const call of list.mock.calls) {
+                expect(call[1]).not.toHaveProperty('terminalUpdatedSince');
+            }
+            // Still paged per column: all time never means an unbounded page.
+            expect(list.mock.calls[0][1]).toMatchObject({ limit: 50, offset: 0 });
+        });
+
+        it('changes nothing but that one predicate', async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            const service = make(list);
+            await service.getBoard('user-1', { now: NOW });
+            const windowed = { ...list.mock.calls[0][1] };
+            list.mockClear();
+            await service.getBoard('user-1', { now: NOW, terminalWindowDays: 'all' });
+            const allTime = { ...list.mock.calls[0][1] };
+
+            delete windowed.terminalUpdatedSince;
+            expect(allTime).toEqual(windowed);
+        });
+
+        it('pages a Done column with the same unbounded predicate', async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            await make(list).getColumn(
+                'user-1',
+                { now: NOW, terminalWindowDays: 'all' },
+                'done',
+                50,
+            );
+            expect(list.mock.calls[0][1]).not.toHaveProperty('terminalUpdatedSince');
+            expect(list.mock.calls[0][1]).toMatchObject({ status: 'done', offset: 50 });
+        });
+
+        it('keeps clamping a numeric window: only the sentinel goes past 90 days', async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            const result = await make(list).getBoard('user-1', {
+                now: NOW,
+                terminalWindowDays: 365,
+            });
+            expect(result.terminalWindowDays).toBe(90);
+            expect(list.mock.calls[0][1].terminalUpdatedSince).toEqual(
+                new Date('2026-06-12T12:00:00.000Z'),
+            );
+        });
+    });
+
+    describe('sort', () => {
+        it("'priority' (and the default) orders stalled first, then priority", async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            const service = make(list);
+            await service.getBoard('user-1', { now: NOW, sort: 'priority' });
+            const explicit = { ...list.mock.calls[0][1] };
+            list.mockClear();
+            await service.getBoard('user-1', { now: NOW });
+            expect(list.mock.calls[0][1]).toEqual(explicit);
+            expect(explicit).toMatchObject({
+                orderBy: 'stalledThenPriority',
+                stallCutoff: new Date('2026-09-08T12:00:00.000Z'),
+            });
+        });
+
+        it("'updated' orders most recently updated first and matches the same rows", async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            const service = make(list);
+            await service.getBoard('user-1', { now: NOW });
+            const priority = { ...list.mock.calls[0][1] };
+            list.mockClear();
+            const result = await service.getBoard('user-1', { now: NOW, sort: 'updated' });
+            const updated = { ...list.mock.calls[0][1] };
+
+            expect(result.sort).toBe('updated');
+            expect(updated.orderBy).toBe('updatedAt');
+            expect(updated).not.toHaveProperty('stallCutoff');
+            // Only the order fields differ — never which rows a column holds.
+            delete priority.orderBy;
+            delete priority.stallCutoff;
+            delete updated.orderBy;
+            expect(updated).toEqual(priority);
+        });
+
+        it('pages one column in the same order the board read used', async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            await make(list).getColumn('user-1', { now: NOW, sort: 'updated' }, 'todo', 50);
+            expect(list.mock.calls[0][1]).toMatchObject({ orderBy: 'updatedAt', offset: 50 });
+        });
+
+        it('treats an unknown sort as the default', async () => {
+            const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
+            const result = await make(list).getBoard('user-1', {
+                now: NOW,
+                sort: 'newest' as never,
+            });
+            expect(result.sort).toBe('priority');
+            expect(list.mock.calls[0][1].orderBy).toBe('stalledThenPriority');
+        });
+    });
+
     it('takes a column total from the read, never from the number of cards', async () => {
         const list = jest.fn().mockResolvedValue({ rows: [{ id: 't1' }], total: 140 });
         const result = await make(list).getBoard('user-1', { now: NOW });

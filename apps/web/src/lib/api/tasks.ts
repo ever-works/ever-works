@@ -3,6 +3,8 @@ import type {
     DecisionConflictReportDto,
     GateStatus,
     TaskAcceptanceCheck,
+    TaskBoardSort,
+    TaskBoardTerminalWindow,
     TaskExtraRepo,
 } from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
@@ -287,8 +289,13 @@ export interface TaskBoardQuery {
     layout?: TaskBoardLayout;
     /** Cards per column (API default 50, clamped 1..100). */
     columnLimit?: number;
-    /** Days of done / cancelled history (API default 7, clamped 1..90). */
-    terminalWindowDays?: number;
+    /**
+     * Days of done / cancelled history (API default 7, clamped 1..90), or
+     * `'all'` for every completed Task of any age.
+     */
+    terminalWindowDays?: TaskBoardTerminalWindow;
+    /** Card order (API default `priority`); `updated` = most recently updated first. */
+    sort?: TaskBoardSort;
     /** Restrict the board to these statuses; other columns read as empty. */
     status?: TaskStatus | TaskStatus[];
     priority?: TaskPriority | TaskPriority[];
@@ -322,7 +329,10 @@ export interface TaskBoardResult {
     layout: TaskBoardLayout;
     columns: TaskBoardColumn[];
     columnLimit: number;
-    terminalWindowDays: number;
+    /** The window the API applied: days, or `'all'` for no bound. */
+    terminalWindowDays: TaskBoardTerminalWindow;
+    /** The card order the API applied. */
+    sort: TaskBoardSort;
 }
 
 function buildBoardQuery(q: TaskBoardQuery = {}, extra: Record<string, string> = {}): string {
@@ -331,6 +341,7 @@ function buildBoardQuery(q: TaskBoardQuery = {}, extra: Record<string, string> =
     if (q.columnLimit !== undefined) params.set('columnLimit', String(q.columnLimit));
     if (q.terminalWindowDays !== undefined)
         params.set('terminalWindowDays', String(q.terminalWindowDays));
+    if (q.sort) params.set('sort', q.sort);
     if (q.status) params.set('status', Array.isArray(q.status) ? q.status.join(',') : q.status);
     if (q.priority)
         params.set('priority', Array.isArray(q.priority) ? q.priority.join(',') : q.priority);

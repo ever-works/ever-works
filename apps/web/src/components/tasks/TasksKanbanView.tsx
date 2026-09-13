@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { compareTaskBoardCards, TASK_BOARD_TRANSITIONS } from '@ever-works/contracts';
+import {
+    compareTaskBoardCards,
+    TASK_BOARD_TERMINAL_WINDOW_ALL,
+    TASK_BOARD_TRANSITIONS,
+    type TaskBoardSort,
+    type TaskBoardTerminalWindow,
+} from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -410,6 +416,7 @@ function TaskKanbanColumn({
     total,
     failed = false,
     terminalWindowDays,
+    sort,
     pageSize = 50,
     onLoadMore,
     errors,
@@ -434,8 +441,13 @@ function TaskKanbanColumn({
     total: number;
     /** This column's read failed; the rest of the board still rendered. */
     failed?: boolean;
-    /** Bound on done / cancelled, stated in those columns' header and empty copy. */
-    terminalWindowDays?: number | null;
+    /**
+     * Bound on done / cancelled, stated in those columns' header and empty
+     * copy: a number of days, or `'all'` for every completed Task.
+     */
+    terminalWindowDays?: TaskBoardTerminalWindow | null;
+    /** The card order in force — the header tooltip describes it. */
+    sort: TaskBoardSort;
     /** Cards one server page returns — what "show N more" can promise. */
     pageSize?: number;
     /**
@@ -464,7 +476,11 @@ function TaskKanbanColumn({
     const Icon = col.icon;
     const label = t(`status.${col.key}`);
     const isTerminal = col.key === 'done' || col.key === 'cancelled';
-    const windowDays = isTerminal && terminalWindowDays ? terminalWindowDays : null;
+    const allTime = isTerminal && terminalWindowDays === TASK_BOARD_TERMINAL_WINDOW_ALL;
+    const windowDays =
+        isTerminal && typeof terminalWindowDays === 'number' && terminalWindowDays > 0
+            ? terminalWindowDays
+            : null;
 
     const serverPaged = Boolean(onLoadMore);
     const visibleTasks = serverPaged ? tasks : tasks.slice(0, visibleCount);
@@ -512,7 +528,7 @@ function TaskKanbanColumn({
 
     const nextStep = Math.min(remaining, serverPaged ? pageSize : MAX_VISIBLE);
     // A windowed done / cancelled column says which window it is empty for;
-    // an unwindowed one (a plain list handed to the board) must not claim one.
+    // an all-time one, or a plain list handed to the board, must not claim one.
     const emptyCopy =
         isTerminal && !windowDays
             ? t(col.key === 'done' ? 'board.emptyDoneAll' : 'board.emptyCancelledAll')
@@ -528,7 +544,8 @@ function TaskKanbanColumn({
         >
             {/* Column header */}
             <div
-                title={t('board.sortTooltip')}
+                data-testid="task-board-column-header"
+                title={t('board.sortTooltip', { sort })}
                 className={cn(
                     'flex items-center gap-2 px-3 py-2.5 rounded-t-lg border border-b-0',
                     col.headerClass,
@@ -571,9 +588,14 @@ function TaskKanbanColumn({
                 </span>
             </div>
 
-            {windowDays && (
-                <p className="px-3 py-1 text-[10px] text-text-muted border-x border-slate-200/60 dark:border-white/8">
-                    {t('board.terminalWindow', { days: windowDays })}
+            {(allTime || windowDays !== null) && (
+                <p
+                    data-testid="task-board-column-window"
+                    className="px-3 py-1 text-[10px] text-text-muted border-x border-slate-200/60 dark:border-white/8"
+                >
+                    {allTime
+                        ? t('board.terminalWindowAll')
+                        : t('board.terminalWindow', { days: windowDays ?? 0 })}
                 </p>
             )}
 
@@ -698,8 +720,18 @@ export interface TasksKanbanViewProps {
     totals?: TasksKanbanTotals;
     /** Columns whose server read failed; each shows its own error panel. */
     failedStatuses?: TaskStatus[];
-    /** The done / cancelled window the server applied, stated on those columns. */
-    terminalWindowDays?: number | null;
+    /**
+     * The done / cancelled window the server applied, stated on those
+     * columns: days, or `'all'`. Omitted = a plain list, which claims none.
+     */
+    terminalWindowDays?: TaskBoardTerminalWindow | null;
+    /**
+     * Card order inside every column. Default `priority`: stalled first,
+     * then Urgent to Low, then the oldest update. `updated` is most recently
+     * updated first. Either way a moved or paged-in card lands where the
+     * server's read in the same order would have put it.
+     */
+    sort?: TaskBoardSort;
     /** Cards one server column page holds. */
     pageSize?: number;
     /**
@@ -720,16 +752,17 @@ export interface TasksKanbanViewProps {
  * board then shows each column's TRUE total (kept honest across optimistic
  * moves and replaced by the server's own number whenever a column page
  * arrives) and pages each column on its own. Either way, cards inside a
- * column are ordered the way the board read orders them — stalled first,
- * then Urgent → Low, then the oldest update first — a refused move shows
- * the server's reason, and a drag out of Cancelled explains why it cannot
- * land.
+ * column are ordered the way the board read orders them for the chosen
+ * `sort` — by priority (stalled first, then Urgent → Low, then the oldest
+ * update first) or most recently updated first — a refused move shows the
+ * server's reason, and a drag out of Cancelled explains why it cannot land.
  */
 export function TasksKanbanView({
     tasks: initialTasks,
     totals: initialTotals,
     failedStatuses,
     terminalWindowDays,
+    sort = 'priority',
     pageSize,
     loadColumn,
 }: TasksKanbanViewProps) {
@@ -793,14 +826,15 @@ export function TasksKanbanView({
     const grouped = useMemo(() => {
         const map = new Map<TaskStatus, Task[]>(COLUMNS.map((c) => [c.key, []]));
         for (const t of tasks) map.get(t.status)?.push(t);
-        // Priority orders the board: the same comparator the board read's
-        // SQL mirrors, so a moved or paged-in card lands where the server
-        // would have put it, and a plain list is ordered the same way.
+        // The chosen order orders the board: the same comparator the board
+        // read's SQL mirrors for that order, so a moved or paged-in card
+        // lands where the server would have put it, and a plain list is
+        // ordered the same way.
         for (const column of map.values()) {
-            column.sort((a, b) => compareTaskBoardCards(a, b, orderedAt));
+            column.sort((a, b) => compareTaskBoardCards(a, b, orderedAt, undefined, sort));
         }
         return map;
-    }, [tasks, orderedAt]);
+    }, [tasks, orderedAt, sort]);
 
     /** Keep a server total honest across an optimistic move (and its rollback). */
     const shiftTotals = (from: TaskStatus, to: TaskStatus) => {
@@ -929,6 +963,7 @@ export function TasksKanbanView({
                             total={totals ? (totals[col.key] ?? 0) : columnTasks.length}
                             failed={failedStatuses?.includes(col.key) ?? false}
                             terminalWindowDays={terminalWindowDays}
+                            sort={sort}
                             pageSize={pageSize}
                             onLoadMore={
                                 handleLoadMore

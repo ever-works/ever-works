@@ -15,9 +15,13 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *      even when the p0 is the oldest Task, pages ONE column through
  *      `GET /api/tasks/board/column`, refuses an unknown column, and never
  *      shows one user another user's Tasks.
+ *      Both card orders are reachable (`sort=priority`, the default, and
+ *      `sort=updated`), and `terminalWindowDays=all` lifts the 90-day clamp.
  *   B. UI (seeded user) — `?view=board` is an address: it opens the board,
  *      the header count is the filtered total, the p0 card leads its column,
  *      and the chosen view is remembered across a visit without the query.
+ *      The card order (`?sort=`) and the completed-Task window (`?done=`)
+ *      are addresses too, chosen from the board's own controls.
  *
  * The seeded user is shared with every other spec, so the UI journeys narrow
  * the board to their own fixtures with a unique `label` — the same filter a
@@ -28,7 +32,13 @@ type BoardColumn = {
     key: string;
     statuses: string[];
     total: number;
-    cards: Array<{ id: string; title: string; priority: string; status: string }>;
+    cards: Array<{
+        id: string;
+        title: string;
+        priority: string;
+        status: string;
+        updatedAt: string;
+    }>;
     offset: number;
     limit: number;
     failed: boolean;
@@ -38,7 +48,8 @@ type BoardResult = {
     layout: string;
     columns: BoardColumn[];
     columnLimit: number;
-    terminalWindowDays: number;
+    terminalWindowDays: number | 'all';
+    sort: 'priority' | 'updated';
 };
 
 function uniq(tag: string): string {
@@ -141,6 +152,77 @@ test.describe('Task board read — true totals (API)', () => {
         const todo = columnOf(await getBoard(request, token), 'todo');
         expect(todo.cards.map((card) => card.priority)).toEqual(['p0', 'p1', 'p3']);
         expect(todo.cards[0].id).toBe(urgent.id);
+    });
+
+    test('sort=updated orders a column most recently updated first; the default stays priority', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const token = user.access_token;
+
+        const urgent = await createTask(request, token, {
+            title: 'Old but urgent',
+            status: 'todo',
+            priority: 'p0',
+        });
+        // A clear gap, so the two updates can never share a timestamp.
+        await new Promise((resolve) => setTimeout(resolve, 1_100));
+        const fresh = await createTask(request, token, {
+            title: 'Fresh normal',
+            status: 'todo',
+            priority: 'p3',
+        });
+
+        const byPriority = await getBoard(request, token);
+        expect(byPriority.sort).toBe('priority');
+        expect(columnOf(byPriority, 'todo').cards.map((card) => card.id)).toEqual([
+            urgent.id,
+            fresh.id,
+        ]);
+
+        const byUpdated = await getBoard(request, token, '?sort=updated');
+        expect(byUpdated.sort).toBe('updated');
+        const todo = columnOf(byUpdated, 'todo');
+        expect(todo.cards.map((card) => card.id)).toEqual([fresh.id, urgent.id]);
+        expect(todo.total).toBe(2);
+
+        // "Show more" pages in the same order the board read used.
+        const pageRes = await request.get(
+            `${API_BASE}/api/tasks/board/column?column=todo&offset=1&sort=updated`,
+            { headers: authedHeaders(token) },
+        );
+        expect(pageRes.status()).toBe(200);
+        const page = (await pageRes.json()) as BoardColumn;
+        expect(page.cards.map((card) => card.id)).toEqual([urgent.id]);
+    });
+
+    test('terminalWindowDays=all is the one way past the 90-day clamp, and still pages', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const token = user.access_token;
+        await createTask(request, token, { title: 'Finished', status: 'done' });
+
+        const week = await getBoard(request, token);
+        expect(week.terminalWindowDays).toBe(7);
+
+        const capped = await getBoard(request, token, '?terminalWindowDays=365');
+        expect(capped.terminalWindowDays).toBe(90);
+
+        const allTime = await getBoard(request, token, '?terminalWindowDays=all');
+        expect(allTime.terminalWindowDays).toBe('all');
+        const done = columnOf(allTime, 'done');
+        // Every completed Task the 7-day board counts, all time counts too.
+        expect(done.total).toBeGreaterThanOrEqual(columnOf(week, 'done').total);
+        expect(done.total).toBe(1);
+        expect(done.cards.map((card) => card.title)).toEqual(['Finished']);
+
+        const pageRes = await request.get(
+            `${API_BASE}/api/tasks/board/column?column=done&terminalWindowDays=all`,
+            { headers: authedHeaders(token) },
+        );
+        expect(pageRes.status()).toBe(200);
+        expect(await pageRes.json()).toMatchObject({ key: 'done', total: 1 });
     });
 
     test('filters narrow every column and every count', async ({ request }) => {
@@ -255,6 +337,80 @@ test.describe('Task board — true totals and the view address (seeded UI)', () 
 
         // Priority orders the column: the p0 leads even though it is not the newest.
         await expect(todo.getByTestId('task-kanban-card').first()).toContainText(`${label} urgent`);
+    });
+
+    test('?sort= and ?done= are addresses: the board controls write them and a link reproduces them', async ({
+        page,
+        request,
+    }) => {
+        const token = await seededToken(request);
+        const label = uniq('board-options').toLowerCase();
+        await createTask(request, token, {
+            title: `${label} old urgent`,
+            status: 'todo',
+            priority: 'p0',
+            labels: [label],
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1_100));
+        await createTask(request, token, {
+            title: `${label} fresh normal`,
+            status: 'todo',
+            priority: 'p3',
+            labels: [label],
+        });
+
+        // A linked board opens in the order the link names.
+        await page.goto(`/en/tasks?view=board&sort=updated&label=${encodeURIComponent(label)}`, {
+            waitUntil: 'domcontentloaded',
+        });
+        await expect(page).not.toHaveURL(/\/login/);
+        const sortGroup = page.getByTestId('task-board-sort');
+        await expect(sortGroup.getByRole('button', { name: 'Recently updated' })).toHaveAttribute(
+            'aria-pressed',
+            'true',
+            { timeout: 30_000 },
+        );
+        const todo = boardColumn(page, 'todo');
+        await expect(todo.getByTestId('task-board-column-count')).toHaveText('2', {
+            timeout: 30_000,
+        });
+        await expect(todo.getByTestId('task-kanban-card').first()).toContainText(
+            `${label} fresh normal`,
+        );
+
+        // Choosing Priority writes it to the URL and re-orders the column.
+        await expect(async () => {
+            const priority = sortGroup.getByRole('button', { name: 'Priority' });
+            if ((await priority.getAttribute('aria-pressed')) !== 'true') {
+                await priority.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            await expect(page).toHaveURL(/[?&]sort=priority/, { timeout: 4_000 });
+        }).toPass({ timeout: 30_000 });
+        await expect(todo.getByTestId('task-kanban-card').first()).toContainText(
+            `${label} old urgent`,
+            { timeout: 30_000 },
+        );
+
+        // Choosing All time writes ?done=all and the Done header says so.
+        const doneGroup = page.getByTestId('task-board-done-window');
+        await expect(doneGroup.getByRole('button', { name: '7 days' })).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
+        await expect(async () => {
+            const allTime = doneGroup.getByRole('button', { name: 'All time' });
+            if ((await allTime.getAttribute('aria-pressed')) !== 'true') {
+                await allTime.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            await expect(page).toHaveURL(/[?&]done=all/, { timeout: 4_000 });
+        }).toPass({ timeout: 30_000 });
+        await expect(boardColumn(page, 'done').getByTestId('task-board-column-window')).toHaveText(
+            'All time',
+            { timeout: 30_000 },
+        );
+        // The earlier choice and the filter survive the second one.
+        await expect(page).toHaveURL(/[?&]sort=priority/);
+        await expect(page).toHaveURL(new RegExp(`[?&]label=${label}`));
     });
 
     test('choosing the board is remembered for the next visit without ?view=', async ({ page }) => {

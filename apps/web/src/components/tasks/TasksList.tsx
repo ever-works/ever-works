@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useState, useTransition } from 'react';
+import { useCallback, useId, useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { TASK_BOARD_TERMINAL_WINDOW_ALL, type TaskBoardSort } from '@ever-works/contracts';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
@@ -15,7 +16,19 @@ import type {
 } from '@/lib/api/tasks';
 import type { TaskScopeRef } from '@/lib/api/tasks.shared';
 import { getTaskBoardColumnAction } from '@/app/actions/tasks';
-import { tasksViewCookie, type TasksView } from '@/lib/tasks-view';
+import {
+    DEFAULT_SCOPED_BOARD_SORT,
+    DEFAULT_TASKS_BOARD_DONE_WINDOW,
+    parseTasksBoardDoneWindow,
+    resolveTasksBoardDoneWindow,
+    resolveTasksBoardSort,
+    TASKS_BOARD_DONE_PARAM,
+    TASKS_BOARD_DONE_WINDOWS,
+    TASKS_BOARD_SORT_PARAM,
+    tasksViewCookie,
+    type TasksBoardDoneWindow,
+    type TasksView,
+} from '@/lib/tasks-view';
 import {
     TasksKanbanEmptyNotice,
     TasksKanbanErrorPanel,
@@ -63,6 +76,13 @@ const VIEW_TABS = [
 ] as const satisfies ReadonlyArray<{ key: TasksView; icon: LucideIcon; labelKey: string }>;
 
 type ViewKey = TasksView;
+
+// Both card orders stay one click away: priority is the board's improvement,
+// recently updated is the order Task lists have always used.
+const SORT_OPTIONS = [
+    { key: 'priority', labelKey: 'board.sortPriority' },
+    { key: 'updated', labelKey: 'board.sortUpdated' },
+] as const satisfies ReadonlyArray<{ key: TaskBoardSort; labelKey: string }>;
 
 // Pill names come from the already-translated `status.*` catalogue.
 const STATUS_FILTERS: (TaskStatus | 'all')[] = [
@@ -130,10 +150,69 @@ export function TasksList({
     const searchParams = useSearchParams();
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
 
+    // Board options — card order and how far back Done / Cancelled reach.
+    // URL-driven (`/tasks`): read from `?sort=` / `?done=` (the board read
+    // carries the values it was made with), written back to the URL so a
+    // board link reproduces them. Scoped lists: local state, like the view.
+    const [localSort, setLocalSort] = useState<TaskBoardSort>(DEFAULT_SCOPED_BOARD_SORT);
+    const urlSort = resolveTasksBoardSort(
+        board?.query.sort ?? searchParams?.get(TASKS_BOARD_SORT_PARAM),
+    );
+    const urlDone: TasksBoardDoneWindow =
+        board?.query.terminalWindowDays !== undefined
+            ? (parseTasksBoardDoneWindow(board.query.terminalWindowDays) ??
+              DEFAULT_TASKS_BOARD_DONE_WINDOW)
+            : resolveTasksBoardDoneWindow(searchParams?.get(TASKS_BOARD_DONE_PARAM));
+    const optionsKey = `${urlSort}|${urlDone}`;
+    const [pendingOptions, setPendingOptions] = useState<{
+        from: string;
+        sort: TaskBoardSort;
+        done: TasksBoardDoneWindow;
+    } | null>(null);
+    const livePendingOptions =
+        urlDriven && pendingOptions && pendingOptions.from === optionsKey ? pendingOptions : null;
+    const sort: TaskBoardSort = urlDriven ? (livePendingOptions?.sort ?? urlSort) : localSort;
+    const doneWindow: TasksBoardDoneWindow = livePendingOptions?.done ?? urlDone;
+
     const pendingView = pending && pending.from === serverView ? pending.to : null;
     const view: ViewKey = urlDriven ? (pendingView ?? serverView) : localView;
-    // Between a click and the server render that carries the new view's data.
-    const awaitingData = urlDriven && pendingView !== null && pendingView !== serverView;
+    // Between a click and the server render that carries the new data: a
+    // new view, or the board read again under a new order or window.
+    const awaitingData =
+        urlDriven &&
+        ((pendingView !== null && pendingView !== serverView) ||
+            (view === 'board' && livePendingOptions !== null));
+
+    const selectBoardOptions = useCallback(
+        (next: { sort?: TaskBoardSort; done?: TasksBoardDoneWindow }) => {
+            if (!urlDriven) {
+                if (next.sort) setLocalSort(next.sort);
+                return;
+            }
+            const nextSort = next.sort ?? sort;
+            const nextDone = next.done ?? doneWindow;
+            if (nextSort === sort && nextDone === doneWindow) return;
+            setPendingOptions(
+                nextSort === urlSort && nextDone === urlDone
+                    ? null
+                    : { from: optionsKey, sort: nextSort, done: nextDone },
+            );
+            const params = new URLSearchParams(searchParams?.toString() ?? '');
+            // The options belong to the board, so the link names the board too.
+            params.set('view', 'board');
+            // Write the option just chosen, and any earlier choice whose
+            // navigation has not landed yet, so a quick second click never
+            // drops the first from the URL.
+            if (next.sort || nextSort !== urlSort) params.set(TASKS_BOARD_SORT_PARAM, nextSort);
+            if (next.done !== undefined || nextDone !== urlDone) {
+                params.set(TASKS_BOARD_DONE_PARAM, String(nextDone));
+            }
+            startViewTransition(() => {
+                router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+            });
+        },
+        [urlDriven, sort, doneWindow, urlSort, urlDone, optionsKey, searchParams, pathname, router],
+    );
 
     const selectView = useCallback(
         (next: ViewKey) => {
@@ -285,6 +364,44 @@ export function TasksList({
                 </div>
             )}
 
+            {/* ── Board options ───────────────────────────────────────────── */}
+            {/* Card order on every board; how far back Done / Cancelled reach
+                only where the server windows them (the `/tasks` board — a
+                scoped list already holds every Task it was handed). */}
+            {view === 'board' && (
+                <div
+                    data-testid="task-board-options"
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2"
+                >
+                    <BoardOptionGroup
+                        label={t('board.sortLabel')}
+                        testId="task-board-sort"
+                        value={sort}
+                        onSelect={(next) => selectBoardOptions({ sort: next })}
+                        options={SORT_OPTIONS.map(({ key, labelKey }) => ({
+                            value: key,
+                            label: t(labelKey),
+                            title: t('board.sortTooltip', { sort: key }),
+                        }))}
+                    />
+                    {urlDriven && (
+                        <BoardOptionGroup
+                            label={t('board.doneWindowLabel')}
+                            testId="task-board-done-window"
+                            value={doneWindow}
+                            onSelect={(next) => selectBoardOptions({ done: next })}
+                            options={TASKS_BOARD_DONE_WINDOWS.map((window) => ({
+                                value: window,
+                                label:
+                                    window === TASK_BOARD_TERMINAL_WINDOW_ALL
+                                        ? t('board.terminalWindowAll')
+                                        : t('board.doneWindowDays', { days: window }),
+                            }))}
+                        />
+                    )}
+                </div>
+            )}
+
             {/* ── Content ─────────────────────────────────────────────────── */}
             {awaitingData ? (
                 view === 'board' ? (
@@ -306,6 +423,7 @@ export function TasksList({
                             totals={boardTotals}
                             failedStatuses={boardFailedStatuses}
                             terminalWindowDays={boardResult.terminalWindowDays}
+                            sort={sort}
                             pageSize={boardResult.columnLimit}
                             loadColumn={loadBoardColumn}
                         />
@@ -317,7 +435,7 @@ export function TasksList({
                 // A plain list handed to the board — its own columns are the
                 // status filter. The list-level `statusFilter` only governs
                 // cards/table.
-                <TasksKanbanView tasks={tasks} />
+                <TasksKanbanView tasks={tasks} sort={sort} />
             ) : filtered.length === 0 ? (
                 <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-8 text-center">
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
@@ -335,6 +453,59 @@ export function TasksList({
             ) : (
                 <TaskTable tasks={filtered} scope={scope} />
             )}
+        </div>
+    );
+}
+
+/**
+ * One board option as a segmented control: a visible label naming the
+ * group, and one pressed button per choice (the same shape as the view
+ * switcher, so the toolbar reads as one set of controls).
+ */
+function BoardOptionGroup<T extends string | number>({
+    label,
+    testId,
+    value,
+    options,
+    onSelect,
+}: {
+    label: string;
+    testId: string;
+    value: T;
+    options: ReadonlyArray<{ value: T; label: string; title?: string }>;
+    onSelect: (value: T) => void;
+}) {
+    const labelId = useId();
+    return (
+        <div
+            role="group"
+            aria-labelledby={labelId}
+            data-testid={testId}
+            className="flex items-center gap-2"
+        >
+            <span id={labelId} className="text-xs text-text-muted dark:text-text-muted-dark">
+                {label}
+            </span>
+            <div className="flex items-center gap-0.5 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-0.5">
+                {options.map((option) => (
+                    <button
+                        key={String(option.value)}
+                        type="button"
+                        onClick={() => onSelect(option.value)}
+                        aria-pressed={value === option.value}
+                        data-value={String(option.value)}
+                        title={option.title}
+                        className={cn(
+                            'px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all duration-150',
+                            value === option.value
+                                ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark',
+                        )}
+                    >
+                        {option.label}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }

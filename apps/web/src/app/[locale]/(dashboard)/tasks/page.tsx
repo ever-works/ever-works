@@ -12,7 +12,17 @@ import {
     type TaskPriority,
     type TaskStatus,
 } from '@/lib/api/tasks';
-import { resolveTasksView, TASKS_VIEW_COOKIE, type TasksView } from '@/lib/tasks-view';
+import type { TaskBoardSort } from '@ever-works/contracts';
+import {
+    parseTasksBoardDoneWindow,
+    parseTasksBoardSort,
+    resolveTasksBoardDoneWindow,
+    resolveTasksBoardSort,
+    resolveTasksView,
+    TASKS_VIEW_COOKIE,
+    type TasksBoardDoneWindow,
+    type TasksView,
+} from '@/lib/tasks-view';
 import { TasksFilterSelects } from '@/components/tasks/TasksFilterSelects';
 import { TasksList } from '@/components/tasks/TasksList';
 import { TasksTabsNav } from '@/components/tasks/TasksTabsNav';
@@ -35,8 +45,13 @@ export async function generateMetadata(): Promise<Metadata> {
  *    column header is that column's TRUE total under the filters and a column
  *    pages without re-reading the others.
  *
- * The filter form below drives every view; it carries the view through a
- * hidden field, so applying a filter never drops the user out of the board.
+ * The board's card order (`?sort=`, default priority) and how far back its
+ * Done / Cancelled columns reach (`?done=`, default 7 days, or `all`) are
+ * also addresses, so a board link reproduces both.
+ *
+ * The filter form below drives every view; it carries the view (and any
+ * chosen board options) through hidden fields, so applying a filter never
+ * drops the user out of the board or resets how it is ordered.
  */
 const TASK_STATUSES: TaskStatus[] = [
     'backlog',
@@ -57,6 +72,8 @@ type TasksSearchParams = Promise<{
     label?: string;
     offset?: string;
     view?: string;
+    sort?: string;
+    done?: string;
 }>;
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -70,6 +87,8 @@ function buildTasksHref(input: {
     label?: string;
     offset?: number;
     view?: TasksView;
+    sort?: TaskBoardSort;
+    done?: TasksBoardDoneWindow;
 }): string {
     const params = new URLSearchParams();
     if (input.status) params.set('status', input.status);
@@ -78,6 +97,8 @@ function buildTasksHref(input: {
     if (input.label) params.set('label', input.label);
     if (input.offset && input.offset > 0) params.set('offset', String(input.offset));
     if (input.view) params.set('view', input.view);
+    if (input.sort) params.set('sort', input.sort);
+    if (input.done !== undefined) params.set('done', String(input.done));
     const qs = params.toString();
     return qs ? `${ROUTES.DASHBOARD_TASKS}?${qs}` : ROUTES.DASHBOARD_TASKS;
 }
@@ -95,6 +116,12 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
     const search = firstParam(params.search)?.trim();
     const label = firstParam(params.label)?.trim();
     const offset = Math.max(0, parseInt(firstParam(params.offset) ?? '0', 10) || 0);
+    // Board options. The explicit URL values ride along on links and the
+    // filter form; the resolved values (with defaults) drive the board read.
+    const sortParam = parseTasksBoardSort(firstParam(params.sort)) ?? undefined;
+    const doneParam = parseTasksBoardDoneWindow(firstParam(params.done)) ?? undefined;
+    const boardSort = resolveTasksBoardSort(firstParam(params.sort));
+    const boardDone = resolveTasksBoardDoneWindow(firstParam(params.done));
     const limit = 50;
     const query = {
         status: TASK_STATUSES.includes(status as TaskStatus) ? (status as TaskStatus) : undefined,
@@ -115,6 +142,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
         search: query.search,
         label: query.label,
     };
+    const boardOptionsHrefInput = { sort: sortParam, done: doneParam };
     const filtersActive = Boolean(query.status || query.priority || query.search || query.label);
 
     // The board: true per-column totals. It carries sub-tasks and recurring
@@ -128,6 +156,8 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
         label: query.label,
         includeSubtasks: true,
         includeTemplates: true,
+        sort: boardSort,
+        terminalWindowDays: boardDone,
     };
     // The list views: one offset-paged page, unchanged.
     let listResult: {
@@ -184,6 +214,10 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
             <form className="mb-4 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
                 {/* Applying a filter keeps the view the user is looking at. */}
                 <input type="hidden" name="view" value={view} />
+                {sortParam && <input type="hidden" name="sort" value={sortParam} />}
+                {doneParam !== undefined && (
+                    <input type="hidden" name="done" value={String(doneParam)} />
+                )}
                 <label className="flex-1 min-w-0">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
                         {t('list.filter.search')}
@@ -255,6 +289,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                             <Link
                                 href={buildTasksHref({
                                     ...baseHrefInput,
+                                    ...boardOptionsHrefInput,
                                     offset: prevOffset,
                                     view,
                                 })}
@@ -267,6 +302,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                             <Link
                                 href={buildTasksHref({
                                     ...baseHrefInput,
+                                    ...boardOptionsHrefInput,
                                     offset: nextOffset,
                                     view,
                                 })}

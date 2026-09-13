@@ -143,12 +143,10 @@ describe('TasksKanbanView', () => {
         });
 
         it('slots a paged-in Urgent card ahead of the cards already shown', async () => {
-            const loadColumn = vi
-                .fn()
-                .mockResolvedValue({
-                    total: 3,
-                    cards: [task({ title: 'Late urgent', priority: 'p0' })],
-                });
+            const loadColumn = vi.fn().mockResolvedValue({
+                total: 3,
+                cards: [task({ title: 'Late urgent', priority: 'p0' })],
+            });
             renderBoard({
                 tasks: [task({ title: 'Normal A' }), task({ title: 'Normal B' })],
                 totals: { todo: 3 },
@@ -196,6 +194,59 @@ describe('TasksKanbanView', () => {
                 within(column('cancelled')).getByText('Nothing cancelled in the last 7 days.'),
             ).toBeTruthy();
             expect(within(column('in_progress')).getByText('Nothing running.')).toBeTruthy();
+        });
+
+        it('says "All time" on Done and Cancelled under the all-time window, and claims no day count', () => {
+            renderBoard({ tasks: [], totals: {}, terminalWindowDays: 'all', loadColumn: vi.fn() });
+            expect(within(column('done')).getByTestId('task-board-column-window').textContent).toBe(
+                'All time',
+            );
+            expect(
+                within(column('cancelled')).getByTestId('task-board-column-window').textContent,
+            ).toBe('All time');
+            expect(within(column('done')).getByText('Nothing finished.')).toBeTruthy();
+            expect(within(column('cancelled')).getByText('Nothing cancelled.')).toBeTruthy();
+            expect(within(column('done')).queryByText(/Last \d+ days/)).toBeNull();
+            // Only the terminal columns state a window.
+            expect(within(column('todo')).queryByTestId('task-board-column-window')).toBeNull();
+        });
+
+        it.each([
+            [30, 'Last 30 days'],
+            [90, 'Last 90 days'],
+        ])('states a %s-day window in the header it was chosen for', (days, text) => {
+            renderBoard({ tasks: [], totals: {}, terminalWindowDays: days, loadColumn: vi.fn() });
+            expect(within(column('done')).getByTestId('task-board-column-window').textContent).toBe(
+                text,
+            );
+        });
+
+        it("slots a paged-in card by recency under sort 'updated', not by priority", async () => {
+            const loadColumn = vi.fn().mockResolvedValue({
+                total: 3,
+                cards: [
+                    task({
+                        title: 'Late urgent',
+                        priority: 'p0',
+                        updatedAt: '2026-08-01T12:00:00.000Z',
+                    }),
+                ],
+            });
+            renderBoard({
+                tasks: [
+                    task({ title: 'Newest', updatedAt: '2026-09-09T12:00:00.000Z' }),
+                    task({ title: 'Older', updatedAt: '2026-09-05T12:00:00.000Z' }),
+                ],
+                totals: { todo: 3 },
+                pageSize: 2,
+                sort: 'updated',
+                loadColumn,
+            });
+            fireEvent.click(within(column('todo')).getByTestId('task-board-show-more'));
+            await waitFor(() => expect(cardsIn('todo')).toHaveLength(3));
+            expect(
+                cardsIn('todo').map((card) => within(card).getAllByRole('link')[1].textContent),
+            ).toEqual(['Newest', 'Older', 'Late urgent']);
         });
 
         it('moves a total with an optimistic move, and back when the server refuses it', async () => {
@@ -267,6 +318,62 @@ describe('TasksKanbanView', () => {
             expect(
                 cardsIn('todo').map((card) => within(card).getAllByRole('link')[1].textContent),
             ).toEqual(['Old urgent', 'High', 'Old normal', 'Fresh normal', 'Low']);
+        });
+
+        it("orders each column most recently updated first with sort 'updated'", () => {
+            renderBoard({
+                sort: 'updated',
+                tasks: [
+                    task({
+                        title: 'Old urgent',
+                        priority: 'p0',
+                        updatedAt: '2026-08-01T12:00:00.000Z',
+                    }),
+                    task({
+                        title: 'Fresh normal',
+                        priority: 'p3',
+                        updatedAt: '2026-09-09T12:00:00.000Z',
+                    }),
+                    task({ title: 'Low', priority: 'p4', updatedAt: '2026-07-01T12:00:00.000Z' }),
+                    task({ title: 'High', priority: 'p1', updatedAt: '2026-09-09T13:00:00.000Z' }),
+                ],
+            });
+            expect(
+                cardsIn('todo').map((card) => within(card).getAllByRole('link')[1].textContent),
+            ).toEqual(['High', 'Fresh normal', 'Old urgent', 'Low']);
+        });
+
+        it('re-orders the cards it holds when the sort changes, without a read', () => {
+            const tasks = [
+                task({
+                    title: 'Old urgent',
+                    priority: 'p0',
+                    updatedAt: '2026-08-01T12:00:00.000Z',
+                }),
+                task({ title: 'Fresh low', priority: 'p4', updatedAt: '2026-09-09T12:00:00.000Z' }),
+            ];
+            const titles = () =>
+                cardsIn('todo').map((card) => within(card).getAllByRole('link')[1].textContent);
+            const view = renderBoard({ tasks, sort: 'updated' });
+            expect(titles()).toEqual(['Fresh low', 'Old urgent']);
+            view.rerender(
+                <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+                    <TasksKanbanView tasks={tasks} sort="priority" />
+                </NextIntlClientProvider>,
+            );
+            expect(titles()).toEqual(['Old urgent', 'Fresh low']);
+        });
+
+        it('describes the active order in the column header tooltip', () => {
+            const header = () => within(column('todo')).getByTestId('task-board-column-header');
+            const view = renderBoard({ tasks: [], sort: 'updated' });
+            expect(header().getAttribute('title')).toBe('Most recently updated first.');
+            view.rerender(
+                <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+                    <TasksKanbanView tasks={[]} />
+                </NextIntlClientProvider>,
+            );
+            expect(header().getAttribute('title')).toBe('Urgent first, then oldest first.');
         });
 
         it('does not claim a time window for an unwindowed Done column', () => {

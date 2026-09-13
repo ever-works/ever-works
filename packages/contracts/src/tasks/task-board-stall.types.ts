@@ -16,7 +16,7 @@
  * the flag with this function, so ordering and flag cannot drift.
  */
 
-import type { TaskBoardStatus } from './task-board-columns.types.js';
+import type { TaskBoardSort, TaskBoardStatus } from './task-board-columns.types.js';
 
 /** Platform default stall threshold, in days. */
 export const TASK_BOARD_DEFAULT_STALL_AFTER_DAYS = 2;
@@ -77,23 +77,30 @@ function timeOf(value: Date | string): number {
 }
 
 /**
- * Card order inside one board column — the same order the API's
- * `stalledThenPriority` read produces, so a card a user moves or pages in
- * lands where the server would have put it:
+ * Card order inside one board column — the same order the API's board read
+ * produces for the chosen sort, so a card a user moves or pages in lands
+ * where the server would have put it under EITHER order.
+ *
+ * `priority` (the default) mirrors the `stalledThenPriority` read:
  *
  *   1. stalled first (see {@link isTaskStalled});
  *   2. then priority, `p0` (Urgent) first — the values sort lexicographically;
  *   3. then the oldest update first, so the longest-waiting work leads.
  *
+ * `updated` mirrors the `updatedAt DESC` read: the most recently updated
+ * card first, nothing else considered.
+ *
  * A comparator for `Array.prototype.sort`, which is stable: two cards equal
- * on all three keys keep the order they arrived in.
+ * on every key of the chosen order keep the order they arrived in.
  */
 export function compareTaskBoardCards(
 	a: TaskBoardOrderInput,
 	b: TaskBoardOrderInput,
 	now: Date,
-	stallAfterDays: number | null | undefined = TASK_BOARD_DEFAULT_STALL_AFTER_DAYS
+	stallAfterDays: number | null | undefined = TASK_BOARD_DEFAULT_STALL_AFTER_DAYS,
+	sort: TaskBoardSort = 'priority'
 ): number {
+	if (sort === 'updated') return timeOf(b.updatedAt) - timeOf(a.updatedAt);
 	const stalledA = isTaskStalled({ ...a, latestRunStatus: a.latestRunStatus, now, stallAfterDays });
 	const stalledB = isTaskStalled({ ...b, latestRunStatus: b.latestRunStatus, now, stallAfterDays });
 	if (stalledA !== stalledB) return stalledA ? -1 : 1;

@@ -401,6 +401,70 @@ describe('Task board read model (integration)', () => {
             expect(monthTotals).toMatchObject({ done: 2, cancelled: 1 });
         });
 
+        it('shows every completed Task of any age with the all-time window, in the count and the cards', async () => {
+            await seed(ownerId, {
+                title: 'Done recent',
+                status: TaskStatus.DONE,
+                updatedAt: daysAgo(3),
+            });
+            await seed(ownerId, {
+                title: 'Done old',
+                status: TaskStatus.DONE,
+                updatedAt: daysAgo(400),
+            });
+            await seed(ownerId, {
+                title: 'Cancelled ancient',
+                status: TaskStatus.CANCELLED,
+                updatedAt: daysAgo(1000),
+            });
+
+            const capped = await board.getBoard(ownerId, { now: NOW, terminalWindowDays: 90 });
+            expect(capped.columns.find((c) => c.key === 'done')!.total).toBe(1);
+
+            const allTime = await board.getBoard(ownerId, { now: NOW, terminalWindowDays: 'all' });
+            expect(allTime.terminalWindowDays).toBe('all');
+            const done = allTime.columns.find((c) => c.key === 'done')!;
+            const cancelled = allTime.columns.find((c) => c.key === 'cancelled')!;
+            expect(done.total).toBe(2);
+            expect(done.cards.map((t) => t.title).sort()).toEqual(['Done old', 'Done recent']);
+            expect(cancelled.total).toBe(1);
+
+            // "Show more" under all time reaches the same rows.
+            const page = await board.getColumn(
+                ownerId,
+                { now: NOW, terminalWindowDays: 'all', columnLimit: 1 },
+                'done',
+                1,
+            );
+            expect(page.total).toBe(2);
+            expect(page.cards).toHaveLength(1);
+        });
+
+        it("orders a column most recently updated first with sort: 'updated'", async () => {
+            await seed(ownerId, {
+                title: 'Old p0',
+                priority: TaskPriority.P0,
+                updatedAt: daysAgo(20),
+            });
+            await seed(ownerId, { title: 'Recent p3', updatedAt: daysAgo(0.1) });
+            await seed(ownerId, {
+                title: 'Middle p2',
+                priority: TaskPriority.P2,
+                updatedAt: daysAgo(2),
+            });
+
+            const result = await board.getBoard(ownerId, { now: NOW, sort: 'updated' });
+            expect(result.sort).toBe('updated');
+            expect(result.columns.find((c) => c.key === 'todo')!.cards.map((t) => t.title)).toEqual(
+                ['Recent p3', 'Middle p2', 'Old p0'],
+            );
+
+            const priority = await board.getBoard(ownerId, { now: NOW });
+            expect(
+                priority.columns.find((c) => c.key === 'todo')!.cards.map((t) => t.title),
+            ).toEqual(['Old p0', 'Middle p2', 'Recent p3']);
+        });
+
         it('keeps sub-tasks, templates and trigger-hidden Tasks off by default; each toggle restores one', async () => {
             const parent = await seed(ownerId, { title: 'Parent' });
             await seed(ownerId, { title: 'Child', parentTaskId: parent.id });

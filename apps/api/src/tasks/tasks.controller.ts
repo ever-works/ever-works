@@ -34,9 +34,10 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import {
     clampTaskBoardColumnLimit,
-    clampTaskBoardTerminalWindowDays,
     findTaskBoardColumn,
     isTaskBoardLayout,
+    resolveTaskBoardSort,
+    resolveTaskBoardTerminalWindow,
 } from '@ever-works/contracts';
 // Tasks upgrades — the per-Task activity feed reads the activity rows the
 // task-domain writers stamp with details.resourceType='task'.
@@ -345,7 +346,7 @@ export class TasksController {
     @Get('board')
     @ApiOperation({
         summary:
-            'Task board: each column with its TRUE total under the filters and its first page of cards (stalled first, then p0 → p4, then oldest update).',
+            "Task board: each column with its TRUE total under the filters and its first page of cards. Order: sort=priority (default; stalled first, then p0 → p4, then oldest update) or sort=updated (most recently updated first). Done / Cancelled: terminalWindowDays (default 7, clamped 1..90) or 'all' for every completed Task.",
     })
     @HttpCode(HttpStatus.OK)
     async board(@CurrentUser() auth: AuthenticatedUser, @Query() query: TaskBoardQueryDto) {
@@ -1000,8 +1001,9 @@ export class TasksController {
 
     /**
      * Board query → service input. Total by design: an unknown layout is the
-     * status layout, junk numbers are the defaults, and only an exact `'true'`
-     * turns a toggle on. Status and priority reuse the list route's parsers,
+     * status layout, an unknown sort is `priority`, junk numbers are the
+     * defaults (`'all'` is the one non-numeric window), and only an exact
+     * `'true'` turns a toggle on. Status and priority reuse the list route's parsers,
      * so an invalid value is the same 400 it is there.
      */
     private toBoardInput(query: TaskBoardQueryDto = {}): TaskBoardInput {
@@ -1009,7 +1011,8 @@ export class TasksController {
         return {
             layout: isTaskBoardLayout(query.layout) ? query.layout : 'status',
             columnLimit: clampTaskBoardColumnLimit(query.columnLimit),
-            terminalWindowDays: clampTaskBoardTerminalWindowDays(query.terminalWindowDays),
+            terminalWindowDays: resolveTaskBoardTerminalWindow(query.terminalWindowDays),
+            sort: resolveTaskBoardSort(query.sort),
             status: status === undefined ? undefined : Array.isArray(status) ? status : [status],
             priority: this.parsePriorityList(query.priority),
             label: query.label || undefined,

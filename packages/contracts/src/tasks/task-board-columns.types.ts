@@ -30,7 +30,9 @@ export type TaskBoardStatus = (typeof TASK_BOARD_STATUSES)[number];
 
 /**
  * Statuses a Task rests in once its work has stopped. The board bounds these
- * columns to a recent window, because an all-time Done column grows forever.
+ * columns to a recent window by default, because an all-time Done column
+ * grows forever; all time stays one choice away
+ * ({@link TASK_BOARD_TERMINAL_WINDOW_ALL}).
  */
 export const TASK_BOARD_TERMINAL_STATUSES: readonly TaskBoardStatus[] = ['done', 'cancelled'];
 
@@ -174,4 +176,55 @@ export function clampTaskBoardColumnLimit(value: unknown): number {
 /** Total, like {@link clampTaskBoardColumnLimit}; clamped into 1..90. */
 export function clampTaskBoardTerminalWindowDays(value: unknown): number {
 	return clampInt(value, TASK_BOARD_DEFAULT_TERMINAL_WINDOW_DAYS, TASK_BOARD_MAX_TERMINAL_WINDOW_DAYS);
+}
+
+/**
+ * The one way past the 90-day clamp: `done` / `cancelled` of any age. A
+ * board read with this window applies no recency bound at all, so the
+ * column total and its pages cover every completed Task. Paging per column
+ * is unchanged, so a long history still costs one page at a time.
+ */
+export const TASK_BOARD_TERMINAL_WINDOW_ALL = 'all' as const;
+
+/** A terminal window: a clamped number of days, or all time. */
+export type TaskBoardTerminalWindow = number | typeof TASK_BOARD_TERMINAL_WINDOW_ALL;
+
+/**
+ * Total, like {@link clampTaskBoardTerminalWindowDays}, but also accepts the
+ * all-time sentinel (`'all'`, any case, surrounding space ignored). Every
+ * other value keeps the numeric rules exactly: absent or junk is 7 days,
+ * numbers clamp into 1..90.
+ */
+export function resolveTaskBoardTerminalWindow(value: unknown): TaskBoardTerminalWindow {
+	if (typeof value === 'string' && value.trim().toLowerCase() === TASK_BOARD_TERMINAL_WINDOW_ALL) {
+		return TASK_BOARD_TERMINAL_WINDOW_ALL;
+	}
+	return clampTaskBoardTerminalWindowDays(value);
+}
+
+// ── Card order ──────────────────────────────────────────────────────
+
+/**
+ * How cards are ordered inside a board column. Both are offered because a
+ * user can reasonably want either:
+ *   - `priority` — stalled first, then `p0` → `p4`, then the oldest update
+ *     first (the longest-waiting work leads).
+ *   - `updated`  — the most recently updated first; the order Task lists
+ *     have always used.
+ */
+export type TaskBoardSort = 'priority' | 'updated';
+
+export const TASK_BOARD_SORTS: readonly TaskBoardSort[] = ['priority', 'updated'];
+
+/** The order a board read uses when none is asked for. */
+export const TASK_BOARD_DEFAULT_SORT: TaskBoardSort = 'priority';
+
+export function isTaskBoardSort(value: unknown): value is TaskBoardSort {
+	return value === 'priority' || value === 'updated';
+}
+
+/** Total: anything but a known sort is {@link TASK_BOARD_DEFAULT_SORT}. */
+export function resolveTaskBoardSort(value: unknown): TaskBoardSort {
+	const normalized = typeof value === 'string' ? value.trim().toLowerCase() : value;
+	return isTaskBoardSort(normalized) ? normalized : TASK_BOARD_DEFAULT_SORT;
 }

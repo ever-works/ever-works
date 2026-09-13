@@ -130,6 +130,54 @@ describe('compareTaskBoardCards', () => {
 		expect(order([card('a', { updatedAt: same }), card('b', { updatedAt: same })])).toEqual(['a', 'b']);
 		expect(order([card('bad', { updatedAt: 'nope' }), card('ok')])).toEqual(['bad', 'ok']);
 	});
+
+	it("orders by priority when the sort is omitted or 'priority' — the same result either way", () => {
+		const cards = [
+			card('fresh normal', { updatedAt: hoursAgo(1).toISOString() }),
+			card('old urgent', { priority: 'p0', updatedAt: hoursAgo(24 * 30).toISOString() }),
+			card('stalled low', { status: 'in_progress', priority: 'p4', updatedAt: hoursAgo(49).toISOString() })
+		];
+		const explicit = [...cards]
+			.sort((a, b) => compareTaskBoardCards(a, b, NOW, undefined, 'priority'))
+			.map((c) => c.title);
+		expect(explicit).toEqual(['stalled low', 'old urgent', 'fresh normal']);
+		expect(order(cards)).toEqual(explicit);
+	});
+
+	describe("sort: 'updated'", () => {
+		const byUpdated = (cards: ReturnType<typeof card>[]) =>
+			[...cards].sort((a, b) => compareTaskBoardCards(a, b, NOW, undefined, 'updated')).map((c) => c.title);
+
+		it('puts the most recently updated card first, whatever its priority', () => {
+			expect(
+				byUpdated([
+					card('old urgent', { priority: 'p0', updatedAt: hoursAgo(24 * 30).toISOString() }),
+					card('newest low', { priority: 'p4', updatedAt: hoursAgo(1).toISOString() }),
+					card('middle high', { priority: 'p1', updatedAt: hoursAgo(5).toISOString() })
+				])
+			).toEqual(['newest low', 'middle high', 'old urgent']);
+		});
+
+		it('does not lift a stalled card — recency is the only key', () => {
+			expect(
+				byUpdated([
+					card('stalled', { status: 'in_progress', updatedAt: hoursAgo(72).toISOString() }),
+					card('touched', { status: 'in_progress', updatedAt: hoursAgo(2).toISOString() })
+				])
+			).toEqual(['touched', 'stalled']);
+		});
+
+		it('accepts Date and ISO string updatedAt alike, and keeps arrival order on a tie', () => {
+			const same = hoursAgo(3);
+			expect(
+				byUpdated([
+					card('a', { updatedAt: same }),
+					card('b', { updatedAt: same.toISOString() }),
+					card('newer', { updatedAt: hoursAgo(1) })
+				])
+			).toEqual(['newer', 'a', 'b']);
+		});
+	});
 });
 
 describe('taskBoardStallCutoff', () => {

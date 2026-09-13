@@ -28,7 +28,10 @@ jest.mock('@ever-works/agent/database', () => ({
 jest.mock('@ever-works/agent/services', () => ({ DecisionConflictService: class {} }));
 
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { TasksController } from './tasks.controller';
+import { TaskBoardColumnQueryDto, TaskBoardQueryDto } from './tasks.dto';
 
 /**
  * `GET /api/tasks/board` and `GET /api/tasks/board/column` at the API
@@ -78,6 +81,7 @@ describe('TasksController — Task board routes', () => {
                 layout: 'status',
                 columnLimit: 50,
                 terminalWindowDays: 7,
+                sort: 'priority',
                 status: undefined,
                 priority: undefined,
                 label: undefined,
@@ -129,6 +133,42 @@ describe('TasksController — Task board routes', () => {
             const { controller, service } = make();
             await controller.board(auth, { terminalWindowDays: raw });
             expect(inputOf(service.getBoard).terminalWindowDays).toBe(expected);
+        });
+
+        it.each([
+            ['all', 'all'],
+            ['ALL', 'all'],
+            [' all ', 'all'],
+            ['365', 90],
+            ['always', 7],
+        ])(
+            "reads terminalWindowDays=%p as %p — 'all' is the only way past the 90-day clamp",
+            async (raw, expected) => {
+                const { controller, service } = make();
+                await controller.board(auth, { terminalWindowDays: raw });
+                expect(inputOf(service.getBoard).terminalWindowDays).toBe(expected);
+            },
+        );
+
+        it.each([
+            [undefined, 'priority'],
+            ['priority', 'priority'],
+            ['updated', 'updated'],
+            ['Updated', 'updated'],
+            ['updatedAt', 'priority'],
+            ['', 'priority'],
+        ])('reads sort=%p as %p, never a 400 or a 500', async (raw, expected) => {
+            const { controller, service } = make();
+            await controller.board(auth, raw === undefined ? {} : { sort: raw });
+            expect(inputOf(service.getBoard).sort).toBe(expected);
+        });
+
+        it('changes only the order when sort=updated is added to an otherwise identical query', async () => {
+            const { controller, service } = make();
+            await controller.board(auth, { label: 'pricing' });
+            await controller.board(auth, { label: 'pricing', sort: 'updated' });
+            const [baseline, updated] = service.getBoard.mock.calls.map((call) => call[1]);
+            expect({ ...updated, sort: 'priority' }).toEqual(baseline);
         });
 
         it.each([
@@ -227,6 +267,20 @@ describe('TasksController — Task board routes', () => {
             );
         });
 
+        it('pages a column with the same sort and all-time window as the board read', async () => {
+            const { controller, service } = make();
+            await controller.boardColumn(auth, {
+                column: 'done',
+                offset: '50',
+                sort: 'updated',
+                terminalWindowDays: 'all',
+            });
+            expect(service.getColumn.mock.calls[0][1]).toMatchObject({
+                sort: 'updated',
+                terminalWindowDays: 'all',
+            });
+        });
+
         it('resolves focus-layout keys against the focus table', async () => {
             const { controller, service } = make();
             await controller.boardColumn(auth, { column: 'needs_you', layout: 'focus' });
@@ -256,5 +310,46 @@ describe('TasksController — Task board routes', () => {
             await controller.boardColumn(auth, { column: 'done', offset: raw });
             expect(service.getColumn.mock.calls[0][3]).toBe(expected);
         });
+    });
+});
+
+/**
+ * The new board query fields must survive the app's global ValidationPipe
+ * (`whitelist` + `forbidNonWhitelisted`, see `main.ts`): a field missing from
+ * the DTO is a 400 before the controller ever sees it.
+ */
+describe('Task board query DTOs — the global validation pipe', () => {
+    const pipeOptions = { whitelist: true, forbidNonWhitelisted: true };
+
+    it.each([
+        [{ sort: 'priority' }],
+        [{ sort: 'updated' }],
+        [{ terminalWindowDays: 'all' }],
+        [{ terminalWindowDays: '30' }],
+        [{ sort: 'updated', terminalWindowDays: 'all', label: 'pricing' }],
+    ])('accepts %p on the board read', async (query) => {
+        const errors = await validate(plainToInstance(TaskBoardQueryDto, query), pipeOptions);
+        expect(errors).toEqual([]);
+    });
+
+    it('accepts sort and the all-time window on the column read too', async () => {
+        const errors = await validate(
+            plainToInstance(TaskBoardColumnQueryDto, {
+                column: 'done',
+                offset: '50',
+                sort: 'updated',
+                terminalWindowDays: 'all',
+            }),
+            pipeOptions,
+        );
+        expect(errors).toEqual([]);
+    });
+
+    it('still refuses a field the board does not know', async () => {
+        const errors = await validate(
+            plainToInstance(TaskBoardQueryDto, { orderBy: 'updatedAt' }),
+            pipeOptions,
+        );
+        expect(errors.map((error) => error.property)).toEqual(['orderBy']);
     });
 });

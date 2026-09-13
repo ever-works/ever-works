@@ -620,11 +620,21 @@ export class TaskBoardQueryDto {
     columnLimit?: string;
 
     @ApiPropertyOptional({
-        description: 'Days of done / cancelled history (default 7, clamped 1..90)',
+        description:
+            "Days of done / cancelled history (default 7, clamped 1..90), or 'all' for every completed Task of any age",
     })
     @IsOptional()
     @IsString()
     terminalWindowDays?: string;
+
+    @ApiPropertyOptional({
+        enum: ['priority', 'updated'],
+        description:
+            "Card order in every column. 'priority' (default) = stalled first, then p0 → p4, then oldest update; 'updated' = most recently updated first. Anything else is 'priority'.",
+    })
+    @IsOptional()
+    @IsString()
+    sort?: string;
 
     @ApiPropertyOptional({
         description: 'Comma-separated TaskStatus list. Columns holding none of them read as empty.',

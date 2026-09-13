@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
     clampTaskBoardColumnLimit,
-    clampTaskBoardTerminalWindowDays,
     findTaskBoardColumn,
+    resolveTaskBoardSort,
+    resolveTaskBoardTerminalWindow,
     taskBoardColumnsFor,
     taskBoardStallCutoff,
     TASK_BOARD_DEFAULT_STALL_AFTER_DAYS,
+    TASK_BOARD_TERMINAL_WINDOW_ALL,
     type TaskBoardColumnDef,
     type TaskBoardLayout,
+    type TaskBoardSort,
+    type TaskBoardTerminalWindow,
 } from '@ever-works/contracts';
 import type { TaskPriority, TaskStatus } from '../entities/task.entity';
 import type { ListTasksFilter } from '../database/repositories/task.repository';
@@ -22,8 +26,17 @@ export interface TaskBoardInput {
     layout?: TaskBoardLayout;
     /** Cards per column, clamped 1..100. Default 50. */
     columnLimit?: number;
-    /** Days of `done` / `cancelled` history, clamped 1..90. Default 7. */
-    terminalWindowDays?: number;
+    /**
+     * Days of `done` / `cancelled` history, clamped 1..90. Default 7.
+     * `'all'` applies no recency bound: every completed Task, of any age.
+     */
+    terminalWindowDays?: TaskBoardTerminalWindow;
+    /**
+     * Card order inside every column. Default `priority` (stalled first,
+     * then p0 → p4, then oldest update); `updated` is most recently updated
+     * first — the order Task lists have always used.
+     */
+    sort?: TaskBoardSort;
     /**
      * Restrict the board to these statuses. A column holding none of them
      * reads as empty without a query. Omitted = every status.
@@ -69,7 +82,10 @@ export interface TaskBoardResult {
     layout: TaskBoardLayout;
     columns: TaskBoardColumnResult[];
     columnLimit: number;
-    terminalWindowDays: number;
+    /** The window applied: a number of days, or `'all'` for no bound. */
+    terminalWindowDays: TaskBoardTerminalWindow;
+    /** The card order applied. */
+    sort: TaskBoardSort;
 }
 
 /**
@@ -105,7 +121,8 @@ export class TaskBoardService {
     ): Promise<TaskBoardResult> {
         const layout = input.layout ?? 'status';
         const columnLimit = clampTaskBoardColumnLimit(input.columnLimit);
-        const terminalWindowDays = clampTaskBoardTerminalWindowDays(input.terminalWindowDays);
+        const terminalWindowDays = resolveTaskBoardTerminalWindow(input.terminalWindowDays);
+        const sort = resolveTaskBoardSort(input.sort);
         const filter = this.buildBoardFilter(input);
         const columns = taskBoardColumnsFor(layout, {
             includeCancelled: input.includeCancelled === true,
@@ -127,6 +144,7 @@ export class TaskBoardService {
             layout,
             columnLimit,
             terminalWindowDays,
+            sort,
             columns: settled.map((entry, index) => {
                 if (entry.status === 'fulfilled') return entry.value;
                 const column = columns[index];
@@ -178,11 +196,13 @@ export class TaskBoardService {
     /**
      * THE board predicate. Built once per read and handed unchanged to every
      * column, so the only thing that differs between two columns is their
-     * statuses. Every toggle flips exactly one field.
+     * statuses. Every toggle flips exactly one field; the sort changes only
+     * the order fields, never which rows match.
      */
     private buildBoardFilter(input: TaskBoardInput): ListTasksFilter {
         const now = input.now ?? new Date();
-        const terminalWindowDays = clampTaskBoardTerminalWindowDays(input.terminalWindowDays);
+        const terminalWindowDays = resolveTaskBoardTerminalWindow(input.terminalWindowDays);
+        const sort = resolveTaskBoardSort(input.sort);
         const filter: ListTasksFilter = {
             priority: input.priority,
             label: input.label,
@@ -194,10 +214,18 @@ export class TaskBoardService {
             agentId: input.agentId,
             goalId: input.goalId,
             includeHidden: input.includeHidden === true,
-            terminalUpdatedSince: new Date(now.getTime() - terminalWindowDays * DAY_MS),
-            orderBy: 'stalledThenPriority',
-            stallCutoff: taskBoardStallCutoff(now, TASK_BOARD_DEFAULT_STALL_AFTER_DAYS),
         };
+        // All time = no recency predicate at all, so the count and the page
+        // cover every completed Task. Paging per column keeps it cheap.
+        if (terminalWindowDays !== TASK_BOARD_TERMINAL_WINDOW_ALL) {
+            filter.terminalUpdatedSince = new Date(now.getTime() - terminalWindowDays * DAY_MS);
+        }
+        if (sort === 'updated') {
+            filter.orderBy = 'updatedAt';
+        } else {
+            filter.orderBy = 'stalledThenPriority';
+            filter.stallCutoff = taskBoardStallCutoff(now, TASK_BOARD_DEFAULT_STALL_AFTER_DAYS);
+        }
         if (input.includeSubtasks !== true) filter.parentTaskId = 'none';
         if (input.includeTemplates !== true) filter.isRecurring = false;
         return filter;
