@@ -164,8 +164,13 @@ export class AgentApprovalsService {
                     agentId: saved.agentId,
                     runId: saved.runId ?? null,
                     // The Task a merge approval is about — platform-derived
-                    // by the merge gate, never model-supplied.
-                    taskId: typeof payload.taskId === 'string' ? payload.taskId : null,
+                    // by the merge gate. Only that action type is trusted:
+                    // any other payload may carry model-authored fields.
+                    taskId:
+                        saved.actionType === 'merge_pull_request' &&
+                        typeof payload.taskId === 'string'
+                            ? payload.taskId
+                            : null,
                     organizationId: saved.organizationId ?? null,
                 });
             } catch (error) {

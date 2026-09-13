@@ -155,6 +155,38 @@ describe('AgentApprovalsService → inbox', () => {
         );
     });
 
+    it('links the mirror to the Task only for a merge approval, whose payload the platform writes', async () => {
+        const inbox = makeInbox();
+        const svc = new AgentApprovalsService(
+            makeProposalsRepo() as never,
+            agentsRepo() as never,
+            inbox,
+        );
+
+        await svc.createProposal('u1', {
+            agentId: 'a1',
+            actionType: 'merge_pull_request',
+            title: 'Merge PR #42',
+            payload: { taskId: 'task-1', prNumber: 42 },
+        } as never);
+        // Any other action type's payload may be model-authored: never trusted as a link.
+        await svc.createProposal('u1', {
+            agentId: 'a1',
+            actionType: 'send_message',
+            title: 'Ping the ops channel',
+            payload: { taskId: 'task-2' },
+        } as never);
+
+        expect(inbox.proposalPending).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({ actionType: 'merge_pull_request', taskId: 'task-1' }),
+        );
+        expect(inbox.proposalPending).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({ actionType: 'send_message', taskId: null }),
+        );
+    });
+
     it('does NOT mirror a proposal the guardrails already auto-decided', async () => {
         const inbox = makeInbox();
         const svc = new AgentApprovalsService(
