@@ -62,6 +62,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
+import { WorkspaceSearchModule } from './workspace-search/workspace-search.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
@@ -230,6 +231,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // user-owned scheduled source into GET /api/schedules. Additive;
         // reuses existing entity tables (no new schema).
         SchedulesModule,
+        // Workspace search (AW-01) — read-only GET /api/workspace-search
+        // behind the dashboard command palette. Additive; reads existing
+        // entity tables (no new schema).
+        WorkspaceSearchModule,
         // Inbound Triggers ("Trigger Schedules") — signed webhook/API
         // triggers that spawn Tasks on verified HMAC deliveries.
         // Management CRUD + the public /:id/fire endpoint.
