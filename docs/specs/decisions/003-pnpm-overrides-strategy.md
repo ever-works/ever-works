@@ -145,14 +145,24 @@ the root `package.json`. The bar is both of:
    input in our usage.
 
 Current entries. The first two are `image-size`, reached via
-`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`; the third is
+`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`; the last two are
 `extract-zip`, reached via `packages/plugins/opencode`:
 
-| GHSA                  | Issue                                          | Why it's ignored                                                                                                  |
-| --------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)     | Runs only while **building** the docs site, over images committed to this repo                                    |
-| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS) | Same path — no request-time, attacker-supplied image ever reaches it                                              |
-| `GHSA-jmr9-qjv8-65gv` | `extract-zip` unvalidated symlink traversal    | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below |
+| GHSA                  | Issue                                                         | Why it's ignored                                                                                                  |
+| --------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)                    | Runs only while **building** the docs site, over images committed to this repo                                    |
+| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS)                | Same path — no request-time, attacker-supplied image ever reaches it                                              |
+| `GHSA-jmr9-qjv8-65gv` | `extract-zip` unvalidated symlink traversal                   | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below |
+| `GHSA-7pqw-9j4j-h8q3` | `extract-zip` write through a planted same-name symlink entry | No fix exists (`patched_versions` is `<0.0.0`); same call site, same symlink vector — see below                   |
+
+**On `GHSA-7pqw-9j4j-h8q3`.** Added 2026-09-13. The advisory needs the
+archive to contain a symlink entry followed by a regular file of the same
+name. extract-zip 2.0.1 calls `onEntry` before it writes the entry itself,
+and our `onEntry` throws on any symlink entry (point 3 below), which
+rejects the whole extraction before the link exists, so the follow-up write
+has nothing to write through. On Linux, which is what the API and workers
+run on, the plugin unpacks a `.tar.gz` via `tar`, and never calls
+`extract-zip`. Same re-check trigger as below.
 
 **On `GHSA-jmr9-qjv8-65gv` specifically.** The only consumer is
 `packages/plugins/opencode/src/utils/binary-manager.ts`, which downloads an
