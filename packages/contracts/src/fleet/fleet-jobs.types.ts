@@ -1319,6 +1319,19 @@ export interface FleetJobLeaseRequest {
 	 * lets a node narrow its own eligibility without re-enrolling.
 	 */
 	capabilities?: string[];
+	/**
+	 * Claim ONLY jobs of these kinds on this poll. Omitted means every kind,
+	 * exactly as before the field existed. An attended node's live-view lane
+	 * asks for `['computer-session']` so a quick poll can never pick up a
+	 * long agent task.
+	 */
+	kinds?: FleetJobKind[];
+	/**
+	 * Never claim jobs of these kinds on this poll. Omitted excludes nothing.
+	 * The same attended node's work lane excludes `computer-session`, so a
+	 * live view is never parked behind (or occupying the slot of) real work.
+	 */
+	excludeKinds?: FleetJobKind[];
 }
 
 /** Response body for `POST /api/fleet/jobs/lease`. */

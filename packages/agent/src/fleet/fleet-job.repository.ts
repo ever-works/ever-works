@@ -124,11 +124,24 @@ export class FleetJobRepository {
      * another PC's targeted backlog could fill the over-fetch window and hide
      * later unbound work from an otherwise idle node.
      */
-    async findQueuedForNode(userId: string, nodeId: string, limit: number): Promise<FleetJob[]> {
+    async findQueuedForNode(
+        userId: string,
+        nodeId: string,
+        limit: number,
+        filter: { kinds?: FleetJobKind[]; excludeKinds?: FleetJobKind[] } = {},
+    ): Promise<FleetJob[]> {
+        // Optional kind narrowing for a lane that polls for one kind (or
+        // never wants one). Absent = the exact query this always ran.
+        const kind =
+            filter.kinds && filter.kinds.length > 0
+                ? { kind: In(filter.kinds) }
+                : filter.excludeKinds && filter.excludeKinds.length > 0
+                  ? { kind: Not(In(filter.excludeKinds)) }
+                  : {};
         return this.repository.find({
             where: [
-                { userId, status: 'queued', targetNodeId: IsNull() },
-                { userId, status: 'queued', targetNodeId: nodeId },
+                { userId, status: 'queued', targetNodeId: IsNull(), ...kind },
+                { userId, status: 'queued', targetNodeId: nodeId, ...kind },
             ],
             order: { createdAt: 'ASC' },
             take: limit,
