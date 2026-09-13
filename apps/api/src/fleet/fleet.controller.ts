@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Inject,
     Logger,
     Optional,
     Param,
@@ -41,7 +42,11 @@ import type {
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
 import { AgentRunRepository } from '@ever-works/agent/database';
-import { FLEET_AUDIT_DEFAULT_LIMIT } from '@ever-works/contracts';
+import {
+    COMPUTER_PENDING_SESSIONS,
+    type ComputerPendingSessionsLookup,
+} from '@ever-works/agent/computer';
+import { FLEET_ATTENDED_CAPABILITY, FLEET_AUDIT_DEFAULT_LIMIT } from '@ever-works/contracts';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
@@ -162,6 +167,12 @@ export class FleetController {
         // specs keeps working, and a missing binding degrades to an empty
         // audit list rather than a 500 on the drawer.
         @Optional() private readonly audit?: FleetAuditService,
+        // Agent computers — the live views waiting for a machine, read for
+        // the heartbeat hint. Appended LAST + @Optional() like the two
+        // above: unbound, the heartbeat response is exactly what it was.
+        @Optional()
+        @Inject(COMPUTER_PENDING_SESSIONS)
+        private readonly pendingComputerSessions?: ComputerPendingSessionsLookup,
     ) {}
 
     @Get('cost-ceiling')
@@ -611,7 +622,44 @@ export class FleetController {
                 );
             }
         }
-        return { ok: true, node: result.node, rotationRequested: result.rotationRequested };
+        const response: FleetHeartbeatResponse = {
+            ok: true,
+            node: result.node,
+            rotationRequested: result.rotationRequested,
+        };
+        // Agent computers — tell an attended machine a live view is already
+        // waiting for it, so it claims the view now rather than on its next
+        // poll. Added ONLY when non-empty (an older daemon ignores the field;
+        // every other response keeps its exact shape), only for an online
+        // machine that switched live viewing on, and never able to fail the
+        // beat.
+        const pending = await this.pendingComputerSessionsFor(result.node);
+        if (pending.length > 0) {
+            response.pendingComputerSessions = pending;
+        }
+        return response;
+    }
+
+    private async pendingComputerSessionsFor(
+        node: FleetHeartbeatResponse['node'],
+    ): Promise<string[]> {
+        if (
+            !this.pendingComputerSessions ||
+            node?.status !== 'online' ||
+            !(node.capabilities ?? []).includes(FLEET_ATTENDED_CAPABILITY)
+        ) {
+            return [];
+        }
+        try {
+            return await this.pendingComputerSessions.pendingForNode(node.id);
+        } catch (err) {
+            this.logger.debug(
+                `pending live-view lookup skipped for node ${node.id}: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return [];
+        }
     }
 
     @Public()
