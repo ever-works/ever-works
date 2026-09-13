@@ -83,6 +83,23 @@ export class AgentRepository {
     }
 
     /**
+     * Live Feed — one batched lookup for the agents a page of activity
+     * records refers to (at most one `IN (...)` query per page, never one
+     * query per row). Owner-bounded by `userId`; archived agents are
+     * included on purpose, because history about an archived agent still
+     * names it. Ids the user does not own simply do not come back, which is
+     * how a deleted (or foreign) agent is told apart from a live one.
+     */
+    async findManyByIdsForUser(userId: string, ids: readonly string[]): Promise<Agent[]> {
+        const unique = [...new Set(ids)].filter((id) => typeof id === 'string' && id.length > 0);
+        if (unique.length === 0) return [];
+        return this.repository.find({
+            where: { userId, id: In(unique) },
+            select: ['id', 'userId', 'name', 'status', 'avatarMode'],
+        });
+    }
+
+    /**
      * Uniqueness check used by `AgentService.create`. This intentionally
      * follows the durable database key, which is global to the user + Agent
      * scope and does not include Tenant/Organization columns. Catalog and

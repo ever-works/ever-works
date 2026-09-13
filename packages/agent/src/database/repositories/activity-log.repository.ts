@@ -1,14 +1,43 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import { Brackets, Repository, type SelectQueryBuilder } from 'typeorm';
 import { ActivityLog } from '../../entities/activity-log.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
+import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
 import type {
     ActivityLogQueryOptions,
     ActivityActionType,
+    ActivityFeedKindFilter,
+    ActivityFeedQueryOptions,
     ActivityStatus,
     CreateActivityLogDto,
 } from '../../entities/activity-log.types';
+
+/** One page of the Live Feed as the repository returns it. */
+export interface ActivityFeedPageRows {
+    /** Newest first; at most `limit` rows. */
+    rows: ActivityLog[];
+    /**
+     * The exact ordering timestamp of each row, keyed by row id, for building
+     * the next keyset cursor. On Postgres this keeps the column's microsecond
+     * precision, which a JS `Date` would silently round away.
+     */
+    sortKeys: Map<string, string>;
+    hasMore: boolean;
+}
+
+/** Entries attributed to one agent inside a window. */
+export interface ActivityFeedActorCount {
+    agentId: string;
+    count: number;
+    /** ISO timestamp of the newest attributed entry. */
+    lastActivityAt: string | null;
+}
+
+type ActivityQueryBuilder = SelectQueryBuilder<ActivityLog>;
+
+/** Placeholder for an empty `IN (...)` list, which is not valid SQL. */
+const NO_MATCH = ['__none__'];
 
 @Injectable()
 export class ActivityLogRepository {
@@ -286,6 +315,242 @@ export class ActivityLogRepository {
         return { activities, total };
     }
 
+    /**
+     * Live Feed — one keyset page, newest first.
+     *
+     * Ordered by `(createdAt DESC, id DESC)` and continued with a strict
+     * "older than this `(createdAt, id)` pair" predicate, never OFFSET: rows
+     * written at the head of the feed between two reads cannot shift a page
+     * boundary, so nothing is skipped or repeated. The predicate is the
+     * expanded `a < x OR (a = x AND b < y)` form, portable across Postgres
+     * and better-sqlite3 (mirrors `AgentRunLogRepository.findTimelineByRun`).
+     *
+     * Always bounded by the owner AND the request's ownership scope; the
+     * scope is a separate argument so no filter object can widen it.
+     * Reads `limit + 1` rows to answer `hasMore` without a COUNT.
+     */
+    async findFeedPage(
+        options: ActivityFeedQueryOptions,
+        ownershipScope: OwnershipScope,
+    ): Promise<ActivityFeedPageRows> {
+        const postgres = this.isPostgres();
+        const qb = this.repository
+            .createQueryBuilder('activity')
+            .leftJoin('activity.work', 'work')
+            .addSelect(['work.id', 'work.name'])
+            .where('activity.userId = :feedUserId', { feedUserId: options.userId })
+            .andWhere('activity.createdAt >= :feedSince', { feedSince: options.since });
+
+        const ownership = ownershipSqlPredicate('activity', ownershipScope, 'feedOwnership');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+
+        if (options.agentIds && options.agentIds.length > 0) {
+            this.applyFeedAgentFilter(qb, options.agentIds);
+        }
+
+        if (options.kindFilter && options.kindFilter.kinds.length > 0) {
+            this.applyFeedKindFilter(qb, options.kindFilter);
+        }
+
+        if (options.cursor) {
+            // Postgres compares the microsecond-precise text key against the
+            // column; better-sqlite3 stores milliseconds, so a Date is exact.
+            const cursorCreatedAt = postgres
+                ? options.cursor.createdAt
+                : new Date(options.cursor.createdAt);
+            qb.andWhere(
+                '(activity.createdAt < :feedCursorCreatedAt OR (activity.createdAt = :feedCursorCreatedAt AND activity.id < :feedCursorId))',
+                { feedCursorCreatedAt: cursorCreatedAt, feedCursorId: options.cursor.id },
+            );
+        }
+
+        if (postgres) {
+            qb.addSelect(
+                `to_char(activity."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
+                'feed_sort_key',
+            );
+        }
+
+        qb.orderBy('activity.createdAt', 'DESC')
+            .addOrderBy('activity.id', 'DESC')
+            .limit(options.limit + 1);
+
+        const { entities, raw } = await qb.getRawAndEntities();
+        const sortKeys = new Map<string, string>();
+        if (postgres) {
+            for (const record of raw as Array<Record<string, unknown>>) {
+                const id = record.activity_id;
+                const key = record.feed_sort_key;
+                if (typeof id === 'string' && typeof key === 'string') sortKeys.set(id, key);
+            }
+        }
+        const rows = entities.slice(0, options.limit);
+        for (const row of rows) {
+            if (!sortKeys.has(row.id)) {
+                sortKeys.set(row.id, new Date(row.createdAt).toISOString());
+            }
+        }
+        return { rows, sortKeys, hasMore: entities.length > options.limit };
+    }
+
+    /**
+     * Live Feed — entries per acting agent inside a window, busiest first.
+     * Reads the indexed `actorAgentId` column; rows that predate it are not
+     * counted (the roster still lists every agent, with a zero).
+     */
+    async aggregateFeedActors(
+        userId: string,
+        ownershipScope: OwnershipScope,
+        since: Date,
+        limit: number,
+    ): Promise<ActivityFeedActorCount[]> {
+        const qb = this.repository
+            .createQueryBuilder('activity')
+            .select('activity.actorAgentId', 'agentId')
+            .addSelect('COUNT(*)', 'count')
+            .addSelect('MAX(activity.createdAt)', 'lastActivityAt')
+            .where('activity.userId = :feedUserId', { feedUserId: userId })
+            .andWhere('activity.actorAgentId IS NOT NULL')
+            .andWhere('activity.createdAt >= :feedSince', { feedSince: since });
+
+        const ownership = ownershipSqlPredicate('activity', ownershipScope, 'feedOwnership');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+
+        const raw = await qb
+            .groupBy('activity.actorAgentId')
+            .orderBy('COUNT(*)', 'DESC')
+            .limit(limit)
+            .getRawMany<{ agentId: unknown; count: string | number; lastActivityAt: unknown }>();
+
+        const counts: ActivityFeedActorCount[] = [];
+        for (const record of raw) {
+            if (typeof record.agentId !== 'string' || record.agentId.length === 0) continue;
+            counts.push({
+                agentId: record.agentId,
+                count: Number(record.count) || 0,
+                lastActivityAt: toIsoTimestamp(record.lastActivityAt),
+            });
+        }
+        return counts;
+    }
+
+    /**
+     * Live Feed agent filter. New rows carry `actorAgentId`; rows written
+     * before that column existed are matched on the agent reference their
+     * writer put in `details` — the same serialized-fragment LIKE
+     * {@link findAgentEvents} uses, with wildcards escaped.
+     */
+    private applyFeedAgentFilter(qb: ActivityQueryBuilder, agentIds: readonly string[]): void {
+        const escape = (value: string) => value.replace(/[\\%_]/g, '\\$&');
+        const ids = [...new Set(agentIds)];
+        qb.andWhere(
+            new Brackets((outer) => {
+                outer
+                    .where('activity.actorAgentId IN (:...feedAgentIds)', { feedAgentIds: ids })
+                    .orWhere(
+                        new Brackets((legacy) => {
+                            legacy.where('activity.actorAgentId IS NULL').andWhere(
+                                new Brackets((anyReference) => {
+                                    ids.forEach((id, index) => {
+                                        const resourceParam = `feedAgentResource${index}`;
+                                        const referenceParam = `feedAgentReference${index}`;
+                                        anyReference
+                                            .orWhere(
+                                                `activity.details LIKE :${resourceParam} ESCAPE '\\'`,
+                                                {
+                                                    [resourceParam]: `%"resourceId":"${escape(id)}"%`,
+                                                },
+                                            )
+                                            .orWhere(
+                                                `activity.details LIKE :${referenceParam} ESCAPE '\\'`,
+                                                {
+                                                    [referenceParam]: `%"agentId":"${escape(id)}"%`,
+                                                },
+                                            );
+                                    });
+                                }),
+                            );
+                        }),
+                    );
+            }),
+        );
+    }
+
+    /**
+     * Live Feed kind filter. A kind is derived from `(actionType, status)`,
+     * so each requested kind becomes a predicate over those two columns,
+     * built from the same sets the in-memory classifier uses. `problem` wins
+     * over every other bucket, so the other four are all `NOT problem AND
+     * ...`, and `work` is the complement of every explicitly-bucketed type —
+     * which is how an action type nobody mapped still reaches it.
+     */
+    private applyFeedKindFilter(qb: ActivityQueryBuilder, filter: ActivityFeedKindFilter): void {
+        const sets = filter.sets;
+        const list = (values: readonly string[]) => (values.length > 0 ? [...values] : NO_MATCH);
+        const problem =
+            '(activity.status IN (:...feedProblemStatuses) OR activity.actionType IN (:...feedProblemTypes))';
+        const notProblem = `NOT ${problem}`;
+        const deliveredWhenCompleted =
+            '(activity.actionType IN (:...feedDeliveryWhenCompletedTypes) AND activity.status = :feedCompletedStatus)';
+        const runningWhenNotCompleted =
+            '(activity.actionType IN (:...feedDeliveryWhenCompletedTypes) AND activity.status <> :feedCompletedStatus)';
+        const branches: string[] = [];
+        for (const kind of new Set(filter.kinds)) {
+            switch (kind) {
+                case 'problem':
+                    branches.push(problem);
+                    break;
+                case 'decision':
+                    branches.push(
+                        `(${notProblem} AND activity.actionType IN (:...feedDecisionTypes))`,
+                    );
+                    break;
+                case 'system':
+                    branches.push(
+                        `(${notProblem} AND activity.actionType IN (:...feedSystemTypes))`,
+                    );
+                    break;
+                case 'delivery':
+                    branches.push(
+                        `(${notProblem} AND (activity.actionType IN (:...feedDeliveryTypes) OR ${deliveredWhenCompleted}))`,
+                    );
+                    break;
+                case 'work':
+                    branches.push(
+                        `(${notProblem} AND (activity.actionType NOT IN (:...feedNonWorkTypes) OR ${runningWhenNotCompleted}))`,
+                    );
+                    break;
+                default:
+                    break;
+            }
+        }
+        if (branches.length === 0) return;
+        qb.andWhere(`(${branches.join(' OR ')})`, {
+            feedProblemStatuses: list(sets.problemStatuses),
+            feedProblemTypes: list(sets.problemActionTypes),
+            feedDecisionTypes: list(sets.decisionActionTypes),
+            feedSystemTypes: list(sets.systemActionTypes),
+            feedDeliveryTypes: list(sets.deliveryActionTypes),
+            feedDeliveryWhenCompletedTypes: list(sets.deliveryWhenCompletedActionTypes),
+            feedNonWorkTypes: list([
+                ...sets.problemActionTypes,
+                ...sets.decisionActionTypes,
+                ...sets.systemActionTypes,
+                ...sets.deliveryActionTypes,
+                ...sets.deliveryWhenCompletedActionTypes,
+            ]),
+            feedCompletedStatus: 'completed',
+        });
+    }
+
+    private isPostgres(): boolean {
+        return this.repository.manager?.connection?.options?.type === 'postgres';
+    }
+
     async countByStatus(userId: string, status: ActivityStatus): Promise<number> {
         return this.repository.count({
             where: { userId, status },
@@ -315,4 +580,20 @@ export class ActivityLogRepository {
 
         return counts;
     }
+}
+
+/**
+ * Normalise a raw aggregate timestamp to ISO: Postgres drivers hand back a
+ * `Date`, better-sqlite3 a `YYYY-MM-DD HH:MM:SS.SSS` string stored in UTC.
+ */
+function toIsoTimestamp(value: unknown): string | null {
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value.toISOString();
+    }
+    if (typeof value === 'string' && value.length > 0) {
+        const hasZone = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(value);
+        const parsed = new Date(hasZone ? value : `${value.replace(' ', 'T')}Z`);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+    }
+    return null;
 }

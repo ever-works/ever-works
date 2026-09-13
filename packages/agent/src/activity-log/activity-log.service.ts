@@ -3,6 +3,7 @@ import { WorkGenerationHistoryRepository } from '../database/repositories/work-g
 import { ActivityLogRepository } from '../database/repositories/activity-log.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { formatGenerationCountsSummary, formatStoredActivitySummary } from './activity-log-summary';
+import { withDerivedActor } from './feed-actor';
 import {
     ActivityActionType,
     ActivityStatus,
@@ -93,7 +94,11 @@ export class ActivityLogService {
     }
 
     async log(entry: CreateActivityLogDto, overrides?: { createdAt?: Date }): Promise<ActivityLog> {
-        const activity = await this.repository.create(entry, overrides);
+        // Live Feed: stamp the acting agent from the reference the writer
+        // already put in `details` when it passed no actor of its own, so
+        // the per-agent filter reads an indexed column. A payload with
+        // nothing to derive is passed through as the same object.
+        const activity = await this.repository.create(withDerivedActor(entry), overrides);
         this.dispatchAnalytics(activity);
         this.logger.debug(
             `Activity logged: [${entry.actionType}] ${entry.summary} (user: ${entry.userId})`,

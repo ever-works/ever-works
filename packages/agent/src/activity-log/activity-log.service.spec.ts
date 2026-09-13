@@ -254,4 +254,45 @@ describe('ActivityLogService', () => {
             ).toBe('Added 2. Changed 3. Total: 5');
         });
     });
+    describe('log — Live Feed actor', () => {
+        const AGENT_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const buildLogService = () => {
+            const repo = {
+                create: jest
+                    .fn()
+                    .mockImplementation((entry) => Promise.resolve({ id: 'al-1', ...entry })),
+            };
+            return { svc: new ActivityLogService(repo as never, {} as never, {} as never), repo };
+        };
+
+        it('stamps the acting agent from the reference the writer put in details', async () => {
+            const { svc, repo } = buildLogService();
+            await svc.log({
+                userId: 'user-1',
+                actionType: ActivityActionType.AGENT_PAUSED,
+                action: 'agent_paused',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Agent paused',
+                details: { resourceType: 'agent', resourceId: AGENT_ID },
+            });
+            expect(repo.create).toHaveBeenCalledWith(
+                expect.objectContaining({ actorKind: 'agent', actorAgentId: AGENT_ID }),
+                undefined,
+            );
+        });
+
+        it('passes a payload with no agent reference through untouched', async () => {
+            const { svc, repo } = buildLogService();
+            const entry = {
+                userId: 'user-1',
+                actionType: ActivityActionType.SETTINGS_UPDATED,
+                action: 'settings_updated',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Settings updated',
+            };
+            await svc.log(entry);
+            expect(repo.create).toHaveBeenCalledWith(entry, undefined);
+            expect(repo.create.mock.calls[0][0]).toBe(entry);
+        });
+    });
 });

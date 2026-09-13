@@ -24,3 +24,6 @@ export * from './inbox/index.js';
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Live Feed — the narrated, filterable view of the activity log. Structure
+// only (narration keys + typed destinations); renderers own the words.
+export * from './feed/index.js';
