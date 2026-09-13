@@ -11,7 +11,8 @@ import { isUuid } from './feed-actor';
  *
  * Precedence (spec FR-19): a decision opens where it is answered; otherwise a
  * run opens its receipt; otherwise the owning task, mission or idea; then the
- * acting agent (only while it still exists); then the Work; then the skill.
+ * acting agent, or the agent a person acted on (only while it still exists);
+ * then the Work; then the skill.
  * `null` when there is nothing to open — the entry renders as plain text
  * rather than a dead link.
  */
@@ -35,10 +36,16 @@ function ownId(details: Record<string, unknown> | null | undefined, key: string)
     return isUuid(value) ? value : null;
 }
 
+/**
+ * `subjectAgentId` is the agent the record is about when a person acted on
+ * it (an export, an import, ...). Pass it only while that agent still
+ * exists; it is offered at the same rung as the acting agent.
+ */
 export function resolveFeedTarget(
     row: TargetResolvableActivity,
     actor: FeedActorDto,
     agentStillExists: boolean,
+    subjectAgentId?: string | null,
 ): FeedTargetDto | null {
     const details = row.details;
 
@@ -68,6 +75,8 @@ export function resolveFeedTarget(
     if (actor.kind === 'agent' && actor.agentId && agentStillExists) {
         return { type: 'agent', id: actor.agentId };
     }
+
+    if (isUuid(subjectAgentId)) return { type: 'agent', id: subjectAgentId };
 
     if (isUuid(row.workId)) return { type: 'work', id: row.workId };
 

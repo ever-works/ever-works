@@ -404,7 +404,8 @@ export class ActivityLogRepository {
         userId: string,
         ownershipScope: OwnershipScope,
         since: Date,
-        limit: number,
+        /** Optional cap on groups; omitted, every acting agent is counted. */
+        limit?: number,
     ): Promise<ActivityFeedActorCount[]> {
         const qb = this.repository
             .createQueryBuilder('activity')
@@ -420,11 +421,15 @@ export class ActivityLogRepository {
             qb.andWhere(ownership.clause, ownership.parameters);
         }
 
-        const raw = await qb
-            .groupBy('activity.actorAgentId')
-            .orderBy('COUNT(*)', 'DESC')
-            .limit(limit)
-            .getRawMany<{ agentId: unknown; count: string | number; lastActivityAt: unknown }>();
+        qb.groupBy('activity.actorAgentId').orderBy('COUNT(*)', 'DESC');
+        if (typeof limit === 'number' && Number.isFinite(limit)) {
+            qb.limit(Math.max(1, Math.trunc(limit)));
+        }
+        const raw = await qb.getRawMany<{
+            agentId: unknown;
+            count: string | number;
+            lastActivityAt: unknown;
+        }>();
 
         const counts: ActivityFeedActorCount[] = [];
         for (const record of raw) {

@@ -15,7 +15,14 @@ import { ActivityLogRepository } from '../database/repositories/activity-log.rep
 import { AgentRepository } from '../database/repositories/agent.repository';
 import type { OwnershipScope } from '../database/ownership-scope';
 import type { ActivityLog } from '../entities/activity-log.entity';
-import { actorAgentIdOf, isUuid, resolveFeedActor, type FeedAgentRef } from './feed-actor';
+import type { Agent } from '../entities/agent.entity';
+import {
+    actorAgentIdOf,
+    isUuid,
+    resolveFeedActor,
+    subjectAgentIdOf,
+    type FeedAgentRef,
+} from './feed-actor';
 import { buildFeedKindSets, normalizeFeedKinds, resolveFeedKind } from './feed-kind';
 import { narrate } from './feed-narration';
 import { resolveFeedTarget } from './feed-target';
@@ -55,8 +62,11 @@ const CURSOR_MAX_LENGTH = 256;
 const CURSOR_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z?$/;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
-/** Upper bound on roster rows, so one user with many agents stays one bounded read. */
-const ROSTER_LIMIT = 200;
+/**
+ * Agents read per roster query. The roster still lists EVERY scoped agent:
+ * the catalog is walked page by page, so each individual read stays bounded.
+ */
+const ROSTER_PAGE_SIZE = 200;
 
 /** The kind sets never change at runtime; build them once. */
 const KIND_SETS = buildFeedKindSets();
@@ -186,18 +196,21 @@ export class FeedService {
         const since = new Date(now.getTime() - hours * HOUR_MS);
 
         const [scoped, counts] = await Promise.all([
-            this.agents.findByUserIdScoped(userId, { limit: ROSTER_LIMIT }, ownershipScope),
-            this.activityLogs.aggregateFeedActors(userId, ownershipScope, since, ROSTER_LIMIT),
+            this.loadScopedRoster(userId, ownershipScope),
+            // Every acting agent in the window — a cap here would report a
+            // busy agent past it as having done nothing.
+            this.activityLogs.aggregateFeedActors(userId, ownershipScope, since),
         ]);
 
         const countById = new Map(counts.map((entry) => [entry.agentId, entry]));
-        const known = new Map(scoped.rows.map((agent) => [agent.id, agent]));
+        const known = new Map(scoped.map((agent) => [agent.id, agent]));
         const missing = counts.map((entry) => entry.agentId).filter((id) => !known.has(id));
-        if (missing.length > 0) {
-            // An agent with activity in this scope that the catalog query no
-            // longer lists (for example archived). Deleted agents do not come
-            // back and are left out.
-            for (const agent of await this.agents.findManyByIdsForUser(userId, missing)) {
+        // An agent with activity in this scope that the catalog query no
+        // longer lists (for example archived). Deleted agents do not come
+        // back and are left out. Looked up in bounded batches.
+        for (let start = 0; start < missing.length; start += ROSTER_PAGE_SIZE) {
+            const batch = missing.slice(start, start + ROSTER_PAGE_SIZE);
+            for (const agent of await this.agents.findManyByIdsForUser(userId, batch)) {
                 known.set(agent.id, agent);
             }
         }
@@ -233,6 +246,31 @@ export class FeedService {
         };
     }
 
+    /**
+     * Every non-archived agent in the scope, walked by keyset page until a
+     * short page, so no agent is left out however many there are.
+     */
+    private async loadScopedRoster(
+        userId: string,
+        ownershipScope: OwnershipScope,
+    ): Promise<Agent[]> {
+        const roster: Agent[] = [];
+        let afterId: string | null = null;
+        for (;;) {
+            const page = await this.agents.findRosterPage(userId, ownershipScope, {
+                afterId,
+                limit: ROSTER_PAGE_SIZE,
+            });
+            roster.push(...page);
+            const last = page[page.length - 1];
+            // A short page is the end; a page whose last id did not advance
+            // would never end, so it is treated as the end too.
+            if (page.length < ROSTER_PAGE_SIZE || !last || last.id === afterId) break;
+            afterId = last.id;
+        }
+        return roster;
+    }
+
     /** One batched lookup for every agent the page refers to. */
     private async loadAgents(
         userId: string,
@@ -242,6 +280,9 @@ export class FeedService {
         for (const row of rows) {
             const id = actorAgentIdOf(row);
             if (id) ids.add(id);
+            // The agent a person acted on, so its entry can still open it.
+            const subject = subjectAgentIdOf(row);
+            if (subject) ids.add(subject);
         }
         if (ids.size === 0) return new Map();
         const agents = await this.agents.findManyByIdsForUser(userId, [...ids]);
@@ -257,6 +298,8 @@ export class FeedService {
         const actor = resolveFeedActor(row, agents);
         const agentStillExists =
             actor.kind === 'agent' && !!actor.agentId && agents.has(actor.agentId);
+        const subjectAgentId = subjectAgentIdOf(row);
+        const subjectStillExists = !!subjectAgentId && agents.has(subjectAgentId);
         return {
             id: row.id,
             createdAt: new Date(row.createdAt).toISOString(),
@@ -265,7 +308,12 @@ export class FeedService {
             actionType: row.actionType,
             actor,
             narration: narrate(row, actor.label),
-            target: resolveFeedTarget(row, actor, agentStillExists),
+            target: resolveFeedTarget(
+                row,
+                actor,
+                agentStillExists,
+                subjectStillExists ? subjectAgentId : null,
+            ),
             workId: row.workId ?? null,
         };
     }

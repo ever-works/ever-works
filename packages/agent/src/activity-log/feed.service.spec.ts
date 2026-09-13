@@ -33,6 +33,7 @@ function build(
     const agents = {
         findManyByIdsForUser: jest.fn().mockResolvedValue([]),
         findByUserIdScoped: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
+        findRosterPage: jest.fn().mockResolvedValue([]),
     };
     const service = new FeedService(activityLogs as never, agents as never);
     return { service, activityLogs, agents };
@@ -223,6 +224,42 @@ describe('FeedService', () => {
             });
         });
 
+        it('attributes an agent export to the person who ran it, still opening the agent', async () => {
+            const rows = [
+                activity({
+                    id: ROW_1,
+                    actionType: ActivityActionType.AGENT_EXPORTED,
+                    details: { resourceType: 'agent', resourceId: IVY },
+                }),
+                activity({
+                    id: ROW_2,
+                    actionType: ActivityActionType.AGENT_IMPORTED,
+                    actorKind: 'user',
+                    details: { resourceType: 'agent', resourceId: WREN },
+                }),
+            ];
+            const { service, agents } = build({ rows });
+            agents.findManyByIdsForUser.mockResolvedValue([
+                { id: IVY, name: 'Ivy', avatarMode: 'initials' },
+            ]);
+
+            const page = await service.getPage(USER, SCOPE, {}, NOW);
+
+            // The subject agents are looked up (for the link), in one batch.
+            expect(agents.findManyByIdsForUser).toHaveBeenCalledTimes(1);
+            expect(agents.findManyByIdsForUser).toHaveBeenCalledWith(USER, [IVY, WREN]);
+            expect(page.items[0]).toMatchObject({
+                actor: { kind: 'user', label: null },
+                narration: { key: 'fallback', params: { actor: '' } },
+                target: { type: 'agent', id: IVY },
+            });
+            // Wren is gone: still the person's action, with nothing to open.
+            expect(page.items[1]).toMatchObject({
+                actor: { kind: 'user', label: null },
+                target: null,
+            });
+        });
+
         it('skips the agent lookup when no row refers to an agent', async () => {
             const { service, agents } = build({ rows: [activity()] });
             const page = await service.getPage(USER, SCOPE, {}, NOW);
@@ -234,25 +271,26 @@ describe('FeedService', () => {
     describe('getActors', () => {
         it('lists scoped agents busiest first, including agents with no activity', async () => {
             const { service, activityLogs, agents } = build();
-            agents.findByUserIdScoped.mockResolvedValue({
-                rows: [
-                    { id: IVY, name: 'Ivy', status: 'active', avatarMode: 'initials' },
-                    { id: WREN, name: 'Wren', status: 'paused', avatarMode: 'icon' },
-                ],
-                total: 2,
-            });
+            agents.findRosterPage.mockResolvedValue([
+                { id: IVY, name: 'Ivy', status: 'active', avatarMode: 'initials' },
+                { id: WREN, name: 'Wren', status: 'paused', avatarMode: 'icon' },
+            ]);
             activityLogs.aggregateFeedActors.mockResolvedValue([
                 { agentId: WREN, count: 4, lastActivityAt: '2026-09-13T11:00:00.000Z' },
             ]);
 
             const result = await service.getActors(USER, SCOPE, undefined, NOW);
 
-            expect(agents.findByUserIdScoped).toHaveBeenCalledWith(USER, { limit: 200 }, SCOPE);
+            expect(agents.findRosterPage).toHaveBeenCalledTimes(1);
+            expect(agents.findRosterPage).toHaveBeenCalledWith(USER, SCOPE, {
+                afterId: null,
+                limit: 200,
+            });
+            // Every acting agent in the window is counted — no cap.
             expect(activityLogs.aggregateFeedActors).toHaveBeenCalledWith(
                 USER,
                 SCOPE,
                 new Date('2026-09-06T12:00:00.000Z'),
-                200,
             );
             expect(result).toEqual({
                 windowHours: 168,
@@ -290,6 +328,61 @@ describe('FeedService', () => {
             const result = await service.getActors(USER, SCOPE, 24, NOW);
 
             expect(agents.findManyByIdsForUser).toHaveBeenCalledWith(USER, [IVY, WREN]);
+            expect(result.actors.map((actor) => actor.agentId)).toEqual([IVY]);
+        });
+
+        it('lists every scoped agent, however many, by walking the catalog page by page', async () => {
+            const { service, activityLogs, agents } = build();
+            const agentId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+            const catalog = Array.from({ length: 450 }, (_, n) => ({
+                id: agentId(n),
+                name: `Agent ${n}`,
+                status: n === 449 ? 'paused' : 'active',
+                avatarMode: null,
+            }));
+            agents.findRosterPage.mockImplementation(
+                async (
+                    _user: string,
+                    _scope: unknown,
+                    options: { afterId: string | null; limit: number },
+                ) => {
+                    const start = options.afterId
+                        ? catalog.findIndex((agent) => agent.id === options.afterId) + 1
+                        : 0;
+                    return catalog.slice(start, start + options.limit);
+                },
+            );
+            // The busiest agent is the oldest, least recently touched one.
+            activityLogs.aggregateFeedActors.mockResolvedValue([
+                { agentId: agentId(449), count: 9, lastActivityAt: '2026-09-13T11:00:00.000Z' },
+            ]);
+
+            const result = await service.getActors(USER, SCOPE, undefined, NOW);
+
+            expect(result.actors).toHaveLength(450);
+            expect(new Set(result.actors.map((actor) => actor.agentId)).size).toBe(450);
+            expect(result.actors[0]).toMatchObject({ agentId: agentId(449), count: 9 });
+            expect(agents.findRosterPage.mock.calls.map((call) => call[2])).toEqual([
+                { afterId: null, limit: 200 },
+                { afterId: agentId(199), limit: 200 },
+                { afterId: agentId(399), limit: 200 },
+            ]);
+            expect(agents.findManyByIdsForUser).not.toHaveBeenCalled();
+        });
+
+        it('stops walking when a page does not advance', async () => {
+            const { service, agents } = build();
+            const stuck = Array.from({ length: 200 }, () => ({
+                id: IVY,
+                name: 'Ivy',
+                status: 'active',
+                avatarMode: null,
+            }));
+            agents.findRosterPage.mockResolvedValue(stuck);
+
+            const result = await service.getActors(USER, SCOPE, undefined, NOW);
+
+            expect(agents.findRosterPage).toHaveBeenCalledTimes(2);
             expect(result.actors.map((actor) => actor.agentId)).toEqual([IVY]);
         });
 

@@ -1,8 +1,11 @@
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import {
+    ACTIVITY_ACTOR_LABEL_MAX_LENGTH,
     actorAgentIdOf,
     referencedAgentId,
     resolveFeedActor,
+    storableActorLabel,
+    subjectAgentIdOf,
     withDerivedActor,
 } from './feed-actor';
 import { resolveFeedTarget } from './feed-target';
@@ -62,6 +65,37 @@ describe('feed actor', () => {
         it('never overrides an actor the caller passed', () => {
             const payload = entry({ agentId: IVY }, { actorKind: 'user', actorLabel: 'Me' });
             expect(withDerivedActor(payload)).toBe(payload);
+        });
+
+        it('keeps the agent a person acted on as the subject, stamping the person as the actor', () => {
+            for (const actionType of [
+                ActivityActionType.AGENT_EXPORTED,
+                ActivityActionType.AGENT_IMPORTED,
+            ]) {
+                const derived = withDerivedActor(
+                    entry({ resourceType: 'agent', resourceId: IVY }, { actionType }),
+                );
+                expect(derived.actorKind).toBe('user');
+                expect(derived.actorAgentId).toBeUndefined();
+            }
+            // An agent id in details of a person's action is the subject too.
+            expect(
+                withDerivedActor(
+                    entry(
+                        { action: 'run', agentId: IVY },
+                        { actionType: ActivityActionType.TASK_TRANSITIONED },
+                    ),
+                ),
+            ).toMatchObject({ actorKind: 'user' });
+            // A caller that knows an agent acted still says so.
+            expect(
+                withDerivedActor(
+                    entry(
+                        { resourceType: 'agent', resourceId: IVY },
+                        { actionType: ActivityActionType.AGENT_IMPORTED, actorAgentId: WREN },
+                    ),
+                ),
+            ).toMatchObject({ actorKind: 'agent', actorAgentId: WREN });
         });
 
         it('fills in the kind when only the acting agent was passed', () => {
@@ -161,6 +195,37 @@ describe('feed actor', () => {
             expect(resolveFeedActor(row, agents)).toEqual({ kind: 'user', label: null });
         });
 
+        it('resolves an older export or import to the person, with the agent as its subject', () => {
+            const exported = {
+                actionType: ActivityActionType.AGENT_EXPORTED,
+                details: { resourceType: 'agent', resourceId: IVY },
+            };
+            expect(actorAgentIdOf(exported)).toBeNull();
+            expect(subjectAgentIdOf(exported)).toBe(IVY);
+            expect(resolveFeedActor(exported, agents)).toEqual({ kind: 'user', label: null });
+
+            const paused = {
+                actionType: ActivityActionType.AGENT_PAUSED,
+                details: { resourceType: 'agent', resourceId: IVY },
+            };
+            expect(actorAgentIdOf(paused)).toBe(IVY);
+            // The agent that acted is not also its own subject.
+            expect(subjectAgentIdOf(paused)).toBeNull();
+            expect(subjectAgentIdOf({ actionType: 'x' })).toBeNull();
+        });
+
+        it('keeps the name captured at write time after a rename and after a deletion', () => {
+            const row = {
+                actionType: 'agent_run_completed',
+                actorKind: 'agent' as const,
+                actorAgentId: IVY,
+                actorLabel: 'Ivy (then)',
+            };
+            const renamed = new Map([[IVY, { id: IVY, name: 'Ivy (now)' }]]);
+            expect(resolveFeedActor(row, renamed).label).toBe('Ivy (then)');
+            expect(resolveFeedActor(row, new Map()).label).toBe('Ivy (then)');
+        });
+
         it('sanitizes a stored label', () => {
             expect(
                 resolveFeedActor(
@@ -169,6 +234,19 @@ describe('feed actor', () => {
                 ),
             ).toEqual({ kind: 'external', label: 'imgHook' });
         });
+    });
+});
+
+describe('storableActorLabel', () => {
+    it('trims, cuts to the column length by characters, and drops what is unusable', () => {
+        expect(storableActorLabel('  Ivy ')).toBe('Ivy');
+        const long = '\u{1F916}'.repeat(ACTIVITY_ACTOR_LABEL_MAX_LENGTH + 5);
+        expect(Array.from(storableActorLabel(long) as string)).toHaveLength(
+            ACTIVITY_ACTOR_LABEL_MAX_LENGTH,
+        );
+        expect(storableActorLabel('   ')).toBeNull();
+        expect(storableActorLabel(null)).toBeNull();
+        expect(storableActorLabel(42)).toBeNull();
     });
 });
 
@@ -246,6 +324,24 @@ describe('feed target', () => {
                 false,
             ),
         ).toEqual({ type: 'skill', id: TASK });
+    });
+
+    it('opens the agent a person acted on while it exists, after the task and before the Work', () => {
+        expect(resolveFeedTarget({ actionType: 'x', workId: WORK }, userActor, false, IVY)).toEqual(
+            { type: 'agent', id: IVY },
+        );
+        expect(
+            resolveFeedTarget(
+                { actionType: 'x', details: { taskId: TASK } },
+                userActor,
+                false,
+                IVY,
+            ),
+        ).toEqual({ type: 'task', id: TASK });
+        expect(
+            resolveFeedTarget({ actionType: 'x', workId: WORK }, userActor, false, null),
+        ).toEqual({ type: 'work', id: WORK });
+        expect(resolveFeedTarget({ actionType: 'x' }, userActor, false, 'not-a-uuid')).toBeNull();
     });
 
     it('offers nothing to open for a deleted agent, including its runs', () => {

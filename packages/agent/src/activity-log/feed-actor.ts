@@ -19,7 +19,19 @@ import { sanitizeNarrationParam } from './feed-narration';
  *  - READ time ({@link resolveFeedActor}): rows written before the actor
  *    columns existed are resolved by a ladder — the acting agent, else the
  *    signed-in user, else the external source, else the platform.
+ *
+ * An agent reference in `details` names the ACTING agent only for action
+ * types a person does not perform. For the ones a person does (exporting or
+ * importing an agent, giving it a skill, answering its decision, dispatching
+ * it onto a task, ...) the referenced agent is what the action was ABOUT —
+ * its subject — and the actor is the signed-in user.
  */
+
+/**
+ * Longest actor name the `activity_log.actorLabel` column holds. A longer
+ * name is cut rather than letting the insert fail on Postgres.
+ */
+export const ACTIVITY_ACTOR_LABEL_MAX_LENGTH = 120;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,8 +63,10 @@ export function referencedAgentId(
 /**
  * Fill in the actor for a record about to be written. A caller-supplied
  * actor always wins; with none, an agent reference in `details` makes the
- * agent the actor. Returns the input object unchanged when there is nothing
- * to add, so callers comparing payloads see exactly what they passed.
+ * agent the actor — unless the action type is one a person performs, in
+ * which case the referenced agent is the subject and the user is stamped as
+ * the actor. Returns the input object unchanged when there is nothing to
+ * add, so callers comparing payloads see exactly what they passed.
  */
 export function withDerivedActor(entry: CreateActivityLogDto): CreateActivityLogDto {
     if (entry.actorKind) return entry;
@@ -61,7 +75,24 @@ export function withDerivedActor(entry: CreateActivityLogDto): CreateActivityLog
     }
     const agentId = referencedAgentId(entry.details);
     if (!agentId) return entry;
+    if (FEED_USER_ACTION_TYPES.has(entry.actionType)) {
+        return { ...entry, actorKind: 'user' };
+    }
     return { ...entry, actorKind: 'agent', actorAgentId: agentId };
+}
+
+/**
+ * An actor name as it may be stored: trimmed, and cut to
+ * {@link ACTIVITY_ACTOR_LABEL_MAX_LENGTH} characters (code points, which is
+ * how the varchar column counts). `null` when nothing usable is left.
+ */
+export function storableActorLabel(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const chars = Array.from(trimmed);
+    if (chars.length <= ACTIVITY_ACTOR_LABEL_MAX_LENGTH) return trimmed;
+    return chars.slice(0, ACTIVITY_ACTOR_LABEL_MAX_LENGTH).join('').trimEnd();
 }
 
 /** Action types a signed-in person performs from the product. */
@@ -190,7 +221,21 @@ export interface ActorResolvableActivity {
 export function actorAgentIdOf(row: ActorResolvableActivity): string | null {
     if (row.actorKind && row.actorKind !== 'agent') return null;
     if (isUuid(row.actorAgentId)) return row.actorAgentId;
+    // An older row of an action a person performs: the agent it references
+    // is its subject, so the ladder falls through to the user.
+    if (!row.actorKind && FEED_USER_ACTION_TYPES.has(row.actionType)) return null;
     return referencedAgentId(row.details);
+}
+
+/**
+ * The agent a record is about when that agent is NOT its actor — for
+ * example the agent a person exported. `null` when the record references no
+ * agent, or only the one that acted.
+ */
+export function subjectAgentIdOf(row: ActorResolvableActivity): string | null {
+    const referenced = referencedAgentId(row.details);
+    if (!referenced) return null;
+    return referenced === actorAgentIdOf(row) ? null : referenced;
 }
 
 function label(value: unknown): string | null {

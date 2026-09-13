@@ -3,6 +3,7 @@ import { ActivityLog } from '@src/entities/activity-log.entity';
 import { Agent, AgentScope, AgentStatus } from '@src/entities/agent.entity';
 import { ActivityActionType, ActivityStatus } from '@src/entities/activity-log.types';
 import { FeedService, decodeFeedCursor } from '@src/activity-log/feed.service';
+import { ActivityLogService } from '@src/activity-log/activity-log.service';
 import { buildFeedKindSets, resolveFeedKind } from '@src/activity-log/feed-kind';
 import { ENTITIES } from '../_entities-inventory';
 import { ActivityLogRepository } from './activity-log.repository';
@@ -81,7 +82,11 @@ describe('Live Feed over seeded activity (integration)', () => {
         );
     }
 
-    async function seedAgent(id: string, name: string): Promise<void> {
+    async function seedAgent(
+        id: string,
+        name: string,
+        overrides: Partial<Agent> = {},
+    ): Promise<void> {
         const agents = dataSource.getRepository(Agent);
         await agents.save(
             agents.create({
@@ -91,10 +96,22 @@ describe('Live Feed over seeded activity (integration)', () => {
                 organizationId: null,
                 scope: AgentScope.TENANT,
                 name,
-                slug: name.toLowerCase(),
+                slug: name.toLowerCase().replace(/\s+/g, '-'),
                 status: AgentStatus.ACTIVE,
                 permissions: {},
+                ...overrides,
             } as Partial<Agent>),
+        );
+    }
+
+    /** The real write path, with the agent lookup it captures names through. */
+    function activityLogService(): ActivityLogService {
+        return new ActivityLogService(
+            activityLogs,
+            {} as never,
+            {} as never,
+            undefined,
+            new AgentRepository(dataSource.getRepository(Agent)),
         );
     }
 
@@ -311,5 +328,80 @@ describe('Live Feed over seeded activity (integration)', () => {
             ['Ivy', 1],
         ]);
         expect(actors[0].lastActivityAt).toBe(new Date(NOW.getTime() - 5 * 60_000).toISOString());
+    });
+
+    it('lists every scoped agent in the roster, well past one query page', async () => {
+        const agentId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+        for (let n = 0; n < 205; n++) {
+            await seedAgent(agentId(n), `Agent ${n}`);
+        }
+        // Out of scope or archived: never listed.
+        await seedAgent(AGENT_IVY, 'Ivy', { organizationId: OTHER_ORG });
+        await seedAgent(AGENT_WREN, 'Wren', { status: AgentStatus.ARCHIVED });
+
+        const { actors } = await feed.getActors(USER, PERSONAL, 1, NOW);
+
+        expect(actors).toHaveLength(205);
+        expect(new Set(actors.map((actor) => actor.agentId))).toEqual(
+            new Set(Array.from({ length: 205 }, (_, n) => agentId(n))),
+        );
+    });
+
+    it("keeps the acting agent's name from when it happened after a rename and a deletion", async () => {
+        await seedAgent(AGENT_IVY, 'Ivy');
+        const written = await activityLogService().log(
+            {
+                userId: USER,
+                actionType: ActivityActionType.AGENT_PAUSED,
+                action: 'agent_paused',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Agent paused',
+                details: { resourceType: 'agent', resourceId: AGENT_IVY },
+            },
+            { createdAt: new Date(NOW.getTime() - 60_000) },
+        );
+        expect(written).toMatchObject({
+            actorKind: 'agent',
+            actorAgentId: AGENT_IVY,
+            actorLabel: 'Ivy',
+        });
+
+        await dataSource.getRepository(Agent).update(AGENT_IVY, { name: 'Ivy Renamed' });
+        const afterRename = await feed.getPage(USER, PERSONAL, {}, NOW);
+        expect(afterRename.items[0].actor).toMatchObject({ kind: 'agent', label: 'Ivy' });
+        expect(afterRename.items[0].narration.params.actor).toBe('Ivy');
+
+        await dataSource.getRepository(Agent).delete(AGENT_IVY);
+        const afterDelete = await feed.getPage(USER, PERSONAL, {}, NOW);
+        expect(afterDelete.items[0].actor).toMatchObject({ kind: 'agent', label: 'Ivy' });
+        expect(afterDelete.items[0].target).toBeNull();
+    });
+
+    it('records an agent export as the person acting, still under that agent and opening it', async () => {
+        await seedAgent(AGENT_IVY, 'Ivy');
+        const exported = await activityLogService().log(
+            {
+                userId: USER,
+                actionType: ActivityActionType.AGENT_EXPORTED,
+                action: 'agent_exported',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Agent exported',
+                details: { resourceType: 'agent', resourceId: AGENT_IVY },
+            },
+            { createdAt: new Date(NOW.getTime() - 60_000) },
+        );
+        expect(exported.actorKind).toBe('user');
+        expect(exported.actorAgentId ?? null).toBeNull();
+
+        const page = await feed.getPage(USER, PERSONAL, { agentIds: [AGENT_IVY] }, NOW);
+        expect(page.items.map((item) => item.id)).toEqual([exported.id]);
+        expect(page.items[0]).toMatchObject({
+            actor: { kind: 'user', label: null },
+            target: { type: 'agent', id: AGENT_IVY },
+        });
+
+        // An export is not the agent's own activity.
+        const { actors } = await feed.getActors(USER, PERSONAL, 1, NOW);
+        expect(actors).toEqual([expect.objectContaining({ agentId: AGENT_IVY, count: 0 })]);
     });
 });

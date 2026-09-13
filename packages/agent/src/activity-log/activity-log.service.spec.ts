@@ -294,5 +294,101 @@ describe('ActivityLogService', () => {
             expect(repo.create).toHaveBeenCalledWith(entry, undefined);
             expect(repo.create.mock.calls[0][0]).toBe(entry);
         });
+
+        const buildWithAgents = (findManyByIdsForUser: jest.Mock) => {
+            const repo = {
+                create: jest
+                    .fn()
+                    .mockImplementation((entry) => Promise.resolve({ id: 'al-1', ...entry })),
+            };
+            const agents = { findManyByIdsForUser };
+            const svc = new ActivityLogService(
+                repo as never,
+                {} as never,
+                {} as never,
+                undefined,
+                agents as never,
+            );
+            return { svc, repo, agents };
+        };
+
+        it("captures the acting agent's name as it is when the record is written", async () => {
+            const { svc, repo, agents } = buildWithAgents(
+                jest.fn().mockResolvedValue([{ id: AGENT_ID, name: 'Ivy' }]),
+            );
+            await svc.log({
+                userId: 'user-1',
+                actionType: ActivityActionType.AGENT_PAUSED,
+                action: 'agent_paused',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Agent paused',
+                details: { resourceType: 'agent', resourceId: AGENT_ID },
+            });
+            expect(agents.findManyByIdsForUser).toHaveBeenCalledWith('user-1', [AGENT_ID]);
+            expect(repo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actorKind: 'agent',
+                    actorAgentId: AGENT_ID,
+                    actorLabel: 'Ivy',
+                }),
+                undefined,
+            );
+        });
+
+        it('keeps a label the caller passed, cut to the column length, without a lookup', async () => {
+            const { svc, repo, agents } = buildWithAgents(jest.fn());
+            await svc.log({
+                userId: 'user-1',
+                actionType: ActivityActionType.AGENT_RUN_COMPLETED,
+                action: 'agent_run_completed',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Run completed',
+                actorAgentId: AGENT_ID,
+                actorLabel: 'x'.repeat(300),
+            });
+            expect(agents.findManyByIdsForUser).not.toHaveBeenCalled();
+            expect(repo.create.mock.calls[0][0].actorLabel).toBe('x'.repeat(120));
+        });
+
+        it('still writes the record when the name lookup fails', async () => {
+            const { svc, repo } = buildWithAgents(jest.fn().mockRejectedValue(new Error('down')));
+            await svc.log({
+                userId: 'user-1',
+                actionType: ActivityActionType.AGENT_PAUSED,
+                action: 'agent_paused',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Agent paused',
+                details: { resourceType: 'agent', resourceId: AGENT_ID },
+            });
+            expect(repo.create).toHaveBeenCalledTimes(1);
+            expect(repo.create.mock.calls[0][0]).toMatchObject({
+                actorKind: 'agent',
+                actorAgentId: AGENT_ID,
+            });
+            expect(repo.create.mock.calls[0][0].actorLabel).toBeUndefined();
+        });
+
+        it('records an export as the signed-in user acting on the agent', async () => {
+            const { svc, repo, agents } = buildWithAgents(jest.fn());
+            for (const actionType of [
+                ActivityActionType.AGENT_EXPORTED,
+                ActivityActionType.AGENT_IMPORTED,
+            ]) {
+                await svc.log({
+                    userId: 'user-1',
+                    actionType,
+                    action: actionType,
+                    status: ActivityStatus.COMPLETED,
+                    summary: `Agent ${AGENT_ID} — ${actionType}`,
+                    details: { resourceType: 'agent', resourceId: AGENT_ID },
+                });
+            }
+            expect(agents.findManyByIdsForUser).not.toHaveBeenCalled();
+            for (const [written] of repo.create.mock.calls) {
+                expect(written.actorKind).toBe('user');
+                expect(written.actorAgentId).toBeUndefined();
+                expect(written.details).toEqual({ resourceType: 'agent', resourceId: AGENT_ID });
+            }
+        });
     });
 });
