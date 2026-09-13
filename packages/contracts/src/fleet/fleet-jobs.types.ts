@@ -102,11 +102,26 @@ export function isFleetJobActive(status: FleetJobStatus): boolean {
  * `browser` capability tag a node advertises is backed by work the node
  * can actually perform — a capability nothing ever exercises is a lie
  * the scheduler will eventually act on.
+ *
+ * `computer-session` is the live view of an Agent's computer: an owner
+ * opened a watch on a node and the node is asked to publish what it
+ * captures OUTWARD to the platform. It is the one interactive kind, so it
+ * is always pinned to the node the owner chose (`payload.nodeId`). Its
+ * required tags are DERIVED from the channels the owner asked for — always
+ * `attended` (a node that never opted into live viewing can never lease
+ * one), plus `screen` only for the screen channel and `terminal` only for
+ * the terminal channel — so a display-less machine can still serve a
+ * terminal-only view.
  */
-export type FleetJobKind = 'acceptance-checks' | 'agent-task' | 'browser-check';
+export type FleetJobKind = 'acceptance-checks' | 'agent-task' | 'browser-check' | 'computer-session';
 
 /** Canonical job-kind list. */
-export const FLEET_JOB_KINDS: readonly FleetJobKind[] = ['acceptance-checks', 'agent-task', 'browser-check'];
+export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
+	'acceptance-checks',
+	'agent-task',
+	'browser-check',
+	'computer-session'
+];
 
 /**
  * Capability tag a node must advertise to be eligible for
@@ -117,6 +132,23 @@ export const FLEET_BROWSER_CAPABILITY = 'browser';
 
 /** Capability tag advertised when a usable GPU was detected on the node. */
 export const FLEET_GPU_CAPABILITY = 'gpu';
+
+/**
+ * Capability tag a node advertises when it can capture a picture of an
+ * Agent's own browser for a live view — backed by a capture backend on the
+ * machine, never advertised on the strength of a browser binary alone.
+ */
+export const FLEET_SCREEN_CAPABILITY = 'screen';
+
+/** Capability tag a node advertises when it can inject pointer and key input into what it captures. */
+export const FLEET_INPUT_CAPABILITY = 'input';
+
+/**
+ * Capability tag a node advertises only when its owner switched live
+ * viewing on for that machine. Required by every `computer-session` job,
+ * so an unattended machine is never asked to show its screen.
+ */
+export const FLEET_ATTENDED_CAPABILITY = 'attended';
 
 /** Type guard for a job kind arriving off the wire. */
 export function isFleetJobKind(value: unknown): value is FleetJobKind {
@@ -193,7 +225,12 @@ export function clampMaxAttempts(value: unknown): number {
 export const FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC: Readonly<Record<FleetJobKind, number>> = Object.freeze({
 	'agent-task': 24 * 60 * 60,
 	'acceptance-checks': 2 * 60 * 60,
-	'browser-check': 2 * 60 * 60
+	'browser-check': 2 * 60 * 60,
+	// A live view nobody claimed is abandoned by the session service after
+	// 40 seconds, which cancels its job there and then. The queue SLA is only
+	// the backstop behind that, so it deliberately does not undercut the
+	// shortest existing default (the fallback an unknown kind fails closed to).
+	'computer-session': 2 * 60 * 60
 });
 
 /** Floor/ceiling clamps applied to any operator-supplied queued max age. */

@@ -1,0 +1,170 @@
+/**
+ * Secret-pattern scanner — the pure half of the platform's secret-scan
+ * helper, shared by every party that must refuse to carry a credential.
+ *
+ * Moved here verbatim from `packages/agent/src/utils/secret-scan.ts` so the
+ * machines that capture on a user's behalf (the node app, which depends on
+ * this zero-dependency package but never on `@ever-works/agent`) run the
+ * IDENTICAL definition the server runs, instead of a second copy that
+ * drifts. The agent-package module re-exports every symbol below, so its
+ * import surface is unchanged, and keeps only `assertNoSecrets` — the one
+ * helper that needs NestJS.
+ *
+ * Patterns ride on the AI Conversation feature's existing regex plus the
+ * additions explicitly listed in security spec §6:
+ *
+ *   - sk-…/key-…/token-…/Bearer … (generic OpenAI-ish + JWT-style;
+ *                          also covers sk-ant-…/sk-proj-… since they
+ *                          start with the sk- prefix)
+ *   - AKIA…                (AWS access-key id)
+ *   - ghp_…                (GitHub personal access token, classic)
+ *   - gho_…                (GitHub OAuth token)
+ *   - ghs_…                (GitHub App installation token)
+ *   - github_pat_…         (GitHub fine-grained PAT — default since 2022)
+ *   - glpat-…              (GitLab personal access token)
+ *   - xoxb-… / xoxp-…      (Slack bot / user tokens)
+ *   - pat_…                (catch-all PAT prefix)
+ *   - -----BEGIN … PRIVATE KEY----- (PEM private key block)
+ *   - AIza…                (Google API key)
+ *   - sk_live_… / rk_live_… / *_test_… (Stripe secret keys — note the
+ *                          underscore means the generic sk- does NOT
+ *                          catch these)
+ *   - npm_…                (npm automation / publish token)
+ *   - hf_…                 (HuggingFace token)
+ *   - eyJ….….…             (JWT — three base64url segments)
+ *   - SK<32 hex>           (Twilio API key sid)
+ *
+ * The exact regexes are intentionally conservative (length floors) to
+ * minimize false positives on prose that happens to contain "sk-" or
+ * "token-". A real secret usually has ≥10 chars after the prefix.
+ */
+
+export interface SecretMatch {
+	pattern: string;
+	matched: string; // truncated for safe surfacing in error messages
+	index: number;
+}
+
+const PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
+	{
+		name: 'generic',
+		re: /\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/g
+	},
+	{ name: 'aws_access_key', re: /\bAKIA[A-Z0-9]{16}\b/g },
+	{ name: 'github_pat_classic', re: /\bghp_[A-Za-z0-9]{36,}\b/g },
+	{ name: 'github_oauth', re: /\bgho_[A-Za-z0-9]{36,}\b/g },
+	// Security: GitHub App installation token (ghs_) — previously unmatched.
+	{ name: 'github_app_token', re: /\bghs_[A-Za-z0-9]{36,}\b/g },
+	// Security: GitHub fine-grained PAT (github_pat_) — the default GitHub
+	// token format since 2022; the legacy ghp_ pattern above did not match it.
+	{ name: 'github_fine_grained_pat', re: /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g },
+	{ name: 'gitlab_pat', re: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },
+	{ name: 'slack_token', re: /\bxox[bp]-[A-Za-z0-9-]{10,}\b/g },
+	{ name: 'generic_pat', re: /\bpat_[A-Za-z0-9]{30,}\b/g },
+	// Security: PEM private-key block — the leak the scanner is documented to
+	// stop (header comment / spec §6). Literal marker keeps false positives ~0.
+	{
+		name: 'pem_private_key',
+		re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/g
+	},
+	// Security: Google API key (AIza…) — fixed 4-char prefix + 35 chars.
+	{ name: 'google_api_key', re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+	// Security: Stripe secret/restricted keys — the underscore form (sk_live_…)
+	// is NOT caught by the generic sk- prefix above.
+	{ name: 'stripe_secret_key', re: /\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}\b/g },
+	// Security: npm automation/publish token (npm_…) — high length floor so it
+	// does not flag prose like "npm_config" or "npm_lifecycle_event".
+	{ name: 'npm_token', re: /\bnpm_[A-Za-z0-9]{36,}\b/g },
+	// Security: HuggingFace token (hf_…) — long floor avoids common prefixes.
+	{ name: 'huggingface_token', re: /\bhf_[A-Za-z0-9]{30,}\b/g },
+	// Security: JWT (three base64url segments) — eyJ is base64 of '{"'.
+	{
+		name: 'jwt',
+		re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g
+	},
+	// Security: Twilio API key SID — SK + exactly 32 hex chars.
+	{ name: 'twilio_api_key', re: /\bSK[0-9a-fA-F]{32}\b/g }
+];
+
+/**
+ * Security: defeat encoding / zero-width / homoglyph evasion. A token
+ * split by a zero-width space (e.g. `sk-abcdef…`) or built from
+ * compatibility/full-width homoglyphs slips past the word-boundary
+ * anchored patterns above. NFKC folds compatibility homoglyphs to their
+ * canonical form and the strip removes the invisible joiners scanners
+ * are blind to. Applied to the WORKING COPY used for pattern matching
+ * only; the patterns themselves are unchanged.
+ */
+function normalizeForScan(s: string): string {
+	return s.normalize('NFKC').replace(/[\u200B\u200C\u200D\u00AD\uFEFF\u2060]/g, '');
+}
+
+/**
+ * Scan `body` for secret patterns. Returns all matches across all
+ * patterns; empty array means "clean".
+ */
+export function scanForSecrets(body: string): SecretMatch[] {
+	if (!body) return [];
+	const scanBody = normalizeForScan(body);
+	const out: SecretMatch[] = [];
+	for (const { name, re } of PATTERNS) {
+		const r = new RegExp(re.source, re.flags); // fresh state per call
+		let m: RegExpExecArray | null;
+		while ((m = r.exec(scanBody)) !== null) {
+			out.push({
+				pattern: name,
+				matched: truncateForDisplay(m[0]),
+				index: m.index
+			});
+		}
+	}
+	return out;
+}
+
+/** True if any secret pattern matches. */
+export function containsSecret(body: string): boolean {
+	return scanForSecrets(body).length > 0;
+}
+
+/**
+ * Redact helper for chat / Task description writes — replaces every
+ * matched span with `[redacted secret]`. Returns the cleaned body
+ * AND the count of redactions so the caller can flag a toast.
+ */
+export function redactSecrets(body: string): { cleaned: string; redactions: number } {
+	if (!body) return { cleaned: body, redactions: 0 };
+	// redactSecrets runs on generated/synced CONTENT (data-generator,
+	// markdown-generator, github-sync), not just logs, so it MUST NOT mutate
+	// legitimate non-secret text — NFKC folding / zero-width stripping would
+	// corrupt valid emoji ZWJ sequences, full-width CJK, and ligatures.
+	// So: redact the RAW body first (byte-for-byte preserving). Only when the
+	// normalized copy catches STRICTLY MORE secrets — i.e. a genuine
+	// zero-width / homoglyph EVASION is present — fall back to the normalized
+	// redaction (acceptable for that already-suspicious input, and never
+	// reached for evasion-free content).
+	const raw = redactWith(body);
+	const normalized = normalizeForScan(body);
+	if (normalized !== body) {
+		const norm = redactWith(normalized);
+		if (norm.redactions > raw.redactions) return norm;
+	}
+	return raw;
+}
+
+function redactWith(body: string): { cleaned: string; redactions: number } {
+	let cleaned = body;
+	let count = 0;
+	for (const { re } of PATTERNS) {
+		const r = new RegExp(re.source, re.flags);
+		cleaned = cleaned.replace(r, () => {
+			count += 1;
+			return '[redacted secret]';
+		});
+	}
+	return { cleaned, redactions: count };
+}
+
+function truncateForDisplay(s: string): string {
+	if (s.length <= 12) return s;
+	return `${s.slice(0, 6)}…${s.slice(-3)}`;
+}

@@ -91,7 +91,23 @@ export type FleetAuditAction =
 	| 'affinity.set'
 	| 'affinity.clear'
 	| 'execution-preference.set'
-	| 'execution-preference.clear';
+	| 'execution-preference.clear'
+	/** Agent computers — someone opened a live view of a node. */
+	| 'computer.session-open'
+	/** A live view ended, with its close reason. */
+	| 'computer.session-close'
+	/** Someone took control of a node. */
+	| 'computer.control-grant'
+	/** Control was given back or released automatically. */
+	| 'computer.control-release'
+	/** A take-over was refused (policy or an existing holder). */
+	| 'computer.control-refused'
+	/** A recorded demonstration started. */
+	| 'computer.teach-start'
+	/** A recorded demonstration finished. */
+	| 'computer.teach-finish'
+	/** One Agent's logins and files on one node were reset. */
+	| 'computer.profile-reset';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -115,7 +131,15 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'affinity.set',
 	'affinity.clear',
 	'execution-preference.set',
-	'execution-preference.clear'
+	'execution-preference.clear',
+	'computer.session-open',
+	'computer.session-close',
+	'computer.control-grant',
+	'computer.control-release',
+	'computer.control-refused',
+	'computer.teach-start',
+	'computer.teach-finish',
+	'computer.profile-reset'
 ];
 
 /**
