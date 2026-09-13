@@ -42,6 +42,15 @@ export type RunPluginSpend = {
     costCents: number;
 };
 
+/** Run receipt (AW-09) — one run's usage for one (capability, model) pair. */
+export type RunSpendLine = {
+    capability: string;
+    modelId: string | null;
+    calls: number;
+    units: number;
+    costCents: number;
+};
+
 /**
  * Wave 13 (Billing/Usage UI) — one grouped account-wide spend row.
  * `key` is the raw grouping value (modelId / agentId / workId); NULL
@@ -534,6 +543,48 @@ export class PluginUsageRepository {
             }
         }
         return new Map(Array.from(best.entries()).map(([runId, v]) => [runId, v.modelId]));
+    }
+
+    /**
+     * Run receipt (AW-09) — one run's metered usage grouped by
+     * `(capability, modelId)`: call count, units and cost per line. The
+     * same rows `getRunCostByPlugin` settles and the Costs dashboard
+     * aggregates, so a receipt line can never disagree with either. Uses
+     * the `(runId, occurredAt)` index; most expensive line first.
+     */
+    async getRunSpendLines(runId: string): Promise<RunSpendLine[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.capability', 'capability')
+            .addSelect('e.modelId', 'modelId')
+            .addSelect('COUNT(e.id)', 'calls')
+            .addSelect('COALESCE(SUM(e.units), 0)', 'units')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .where('e.runId = :runId', { runId })
+            .groupBy('e.capability')
+            .addGroupBy('e.modelId')
+            .getRawMany<{
+                capability: string;
+                modelId: string | null;
+                calls: string | number;
+                units: string | number;
+                costCents: string | number;
+            }>();
+
+        return rows
+            .map((row) => ({
+                capability: String(row.capability),
+                modelId: row.modelId ?? null,
+                calls: Number(row.calls ?? 0) || 0,
+                units: Number(row.units ?? 0) || 0,
+                costCents: Number(row.costCents ?? 0) || 0,
+            }))
+            .sort(
+                (a, b) =>
+                    b.costCents - a.costCents ||
+                    a.capability.localeCompare(b.capability) ||
+                    (a.modelId ?? '').localeCompare(b.modelId ?? ''),
+            );
     }
 
     /**
