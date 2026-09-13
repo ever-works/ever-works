@@ -7,31 +7,31 @@ Updated as work lands. Two independent axes per epic: **spec** and **implementat
 
 | ID | Epic | Spec | Impl | Branch / PR | Notes |
 | --- | --- | --- | --- | --- | --- |
-| AW-01 | Command palette & global search | — | — | | |
-| AW-02 | Task board | — | — | | |
-| AW-03 | My Decisions | — | — | | |
-| AW-04 | Live Feed | — | — | | |
-| AW-05 | Agent email | — | — | | |
-| AW-06 | Knowledge library | — | — | | |
-| AW-07 | Memory & context files | — | — | | |
-| AW-08 | Skills shelf | — | — | | |
-| AW-09 | Runs & receipts | — | — | | |
-| AW-10 | Schedules & calendar | — | — | | |
-| AW-11 | Agent computers | — | — | | |
-| AW-12 | Chat & channels | — | — | | |
-| AW-13 | Attention controls | — | — | | |
-| AW-14 | What's new | — | — | | |
-| AW-15 | Connections, scopes & vault | — | — | | |
-| AW-16 | Models & tokens | — | — | | |
-| AW-17 | Costs & caps | — | — | | |
-| AW-18 | Shared dashboards | — | — | | |
-| AW-19 | Home | — | — | | |
-| AW-20 | Onboarding | — | — | | |
-| AW-21 | Capability catalogue | — | — | | |
-| AW-22 | Backup & export | — | — | | |
-| AW-23 | Agent identity | — | — | | |
-| AW-24 | Safety rails | — | — | | |
-| AW-25 | Help centre | — | — | | |
+| AW-01 | Command palette & global search | Draft | — | | |
+| AW-02 | Task board | Draft | — | | |
+| AW-03 | My Decisions | Draft | — | | |
+| AW-04 | Live Feed | Draft | — | | |
+| AW-05 | Agent email | Draft | — | | |
+| AW-06 | Knowledge library | Draft | — | | |
+| AW-07 | Memory & context files | Draft | — | | |
+| AW-08 | Skills shelf | Draft | — | | |
+| AW-09 | Runs & receipts | Draft | — | | |
+| AW-10 | Schedules & calendar | Draft | — | | |
+| AW-11 | Agent computers | Draft | — | | |
+| AW-12 | Chat & channels | Draft | — | | |
+| AW-13 | Attention controls | Draft | — | | |
+| AW-14 | What's new | Draft | — | | |
+| AW-15 | Connections, scopes & vault | Draft | — | | |
+| AW-16 | Models & tokens | Draft | — | | |
+| AW-17 | Costs & caps | Draft | — | | |
+| AW-18 | Shared dashboards | Draft | — | | |
+| AW-19 | Home | Draft | — | | |
+| AW-20 | Onboarding | Draft | — | | |
+| AW-21 | Capability catalogue | Draft | — | | |
+| AW-22 | Backup & export | Draft | — | | |
+| AW-23 | Agent identity | Draft | — | | |
+| AW-24 | Safety rails | Draft | — | | |
+| AW-25 | Help centre | Draft | — | | |
 
 ## Merge order
 
