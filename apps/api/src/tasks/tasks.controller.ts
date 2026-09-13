@@ -15,6 +15,7 @@ import {
     Patch,
     Post,
     Query,
+    ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -26,9 +27,17 @@ import {
     TaskPriority,
     RUN_BATCH_MAX_TASKS,
     TaskPrStatusService,
+    TaskBoardService,
     type TaskActorType,
     type ListTasksFilter,
+    type TaskBoardInput,
 } from '@ever-works/agent/tasks-domain';
+import {
+    clampTaskBoardColumnLimit,
+    clampTaskBoardTerminalWindowDays,
+    findTaskBoardColumn,
+    isTaskBoardLayout,
+} from '@ever-works/contracts';
 // Tasks upgrades — the per-Task activity feed reads the activity rows the
 // task-domain writers stamp with details.resourceType='task'.
 import { ActivityLogService } from '@ever-works/agent/activity-log';
@@ -66,6 +75,8 @@ import {
     RunTasksBatchDto,
     ScheduleTaskDto,
     SetTaskRecurringDto,
+    TaskBoardColumnQueryDto,
+    TaskBoardQueryDto,
     TransitionTaskDto,
     UpdateTaskDto,
 } from './tasks.dto';
@@ -74,6 +85,8 @@ import {
  * Tasks feature — Phase 12.3.
  *
  *   GET    /api/tasks                          list with filters
+ *   GET    /api/tasks/board                    board read: true per-column totals (AW-02)
+ *   GET    /api/tasks/board/column             one board column, for "show more" (AW-02)
  *   POST   /api/tasks                          create
  *   GET    /api/tasks/:id                      get one
  *   PATCH  /api/tasks/:id                      partial update
@@ -143,6 +156,10 @@ export class TasksController {
         // specs keeps compiling; the endpoint degrades to an empty feed
         // when the module graph lacks it.
         @Optional() private readonly activityLog?: ActivityLogService,
+        // Task board read model (AW-02). Appended LAST + @Optional() so every
+        // existing positional construction in the specs keeps compiling; the
+        // board routes answer 503 when a reduced module graph lacks it.
+        @Optional() private readonly boardReadModel?: TaskBoardService,
     ) {}
 
     /**
@@ -317,6 +334,51 @@ export class TasksController {
         return this.service.runTasksBatch(
             auth.userId,
             body.items.map((item) => ({ taskId: item.taskId, agentId: item.agentId ?? null })),
+            this.scopeContext.getScope(),
+        );
+    }
+
+    // Task board (AW-02). Declared BEFORE every `:id` route: `board` is a
+    // single path segment, so `@Get(':id')` would otherwise shadow it and
+    // answer a ParseUUIDPipe 400. No explicit @Throttle — the board read is
+    // limited exactly like the list route it replaces on the board.
+    @Get('board')
+    @ApiOperation({
+        summary:
+            'Task board: each column with its TRUE total under the filters and its first page of cards (stalled first, then p0 → p4, then oldest update).',
+    })
+    @HttpCode(HttpStatus.OK)
+    async board(@CurrentUser() auth: AuthenticatedUser, @Query() query: TaskBoardQueryDto) {
+        return this.requireBoard().getBoard(
+            auth.userId,
+            this.toBoardInput(query),
+            this.scopeContext.getScope(),
+        );
+    }
+
+    @Get('board/column')
+    @ApiOperation({
+        summary:
+            'One Task board column from an offset — "show more" pages this column without re-reading any other.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async boardColumn(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: TaskBoardColumnQueryDto,
+    ) {
+        const input = this.toBoardInput(query);
+        const key = typeof query?.column === 'string' ? query.column.trim() : '';
+        if (!key || !findTaskBoardColumn(input.layout ?? 'status', key)) {
+            throw new BadRequestException(
+                `Unknown ${input.layout ?? 'status'} board column: ${key || '(missing)'}`,
+            );
+        }
+        const offset = Math.max(0, parseInt(query.offset ?? '0', 10) || 0);
+        return this.requireBoard().getColumn(
+            auth.userId,
+            input,
+            key,
+            offset,
             this.scopeContext.getScope(),
         );
     }
@@ -927,6 +989,42 @@ export class TasksController {
             body.kind,
             this.scopeContext.getScope(),
         );
+    }
+
+    private requireBoard(): TaskBoardService {
+        if (!this.boardReadModel) {
+            throw new ServiceUnavailableException('The Task board is not available.');
+        }
+        return this.boardReadModel;
+    }
+
+    /**
+     * Board query → service input. Total by design: an unknown layout is the
+     * status layout, junk numbers are the defaults, and only an exact `'true'`
+     * turns a toggle on. Status and priority reuse the list route's parsers,
+     * so an invalid value is the same 400 it is there.
+     */
+    private toBoardInput(query: TaskBoardQueryDto = {}): TaskBoardInput {
+        const status = this.parseStatusList(query.status);
+        return {
+            layout: isTaskBoardLayout(query.layout) ? query.layout : 'status',
+            columnLimit: clampTaskBoardColumnLimit(query.columnLimit),
+            terminalWindowDays: clampTaskBoardTerminalWindowDays(query.terminalWindowDays),
+            status: status === undefined ? undefined : Array.isArray(status) ? status : [status],
+            priority: this.parsePriorityList(query.priority),
+            label: query.label || undefined,
+            search: query.search || undefined,
+            missionId: query.missionId,
+            ideaId: query.ideaId,
+            workId: query.workId,
+            teamId: query.teamId,
+            agentId: query.agentId,
+            goalId: query.goalId,
+            includeSubtasks: query.includeSubtasks === 'true',
+            includeTemplates: query.includeTemplates === 'true',
+            includeHidden: query.includeHidden === 'true',
+            includeCancelled: query.includeCancelled === 'true',
+        };
     }
 
     private parseStatusList(value?: string): TaskStatus | TaskStatus[] | undefined {

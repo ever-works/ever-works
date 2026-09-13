@@ -595,3 +595,118 @@ export class RunTasksBatchDto {
     @Type(() => RunTaskBatchItemDto)
     items: RunTaskBatchItemDto[];
 }
+
+// ── Task board read (AW-02) ─────────────────────────────────────────
+
+/**
+ * Query for `GET /api/tasks/board`. Everything is optional and every value
+ * is read as a string, then clamped or defaulted by the controller: a junk
+ * `?columnLimit=abc` gets the default rather than a 400 or an unbounded
+ * read. Owner ids stay strict uuids, exactly like the list route.
+ */
+export class TaskBoardQueryDto {
+    @ApiPropertyOptional({
+        enum: ['status', 'focus'],
+        description:
+            "Column table. 'status' = one column per status (default); 'focus' = backlog · in flight · needs you · done.",
+    })
+    @IsOptional()
+    @IsString()
+    layout?: string;
+
+    @ApiPropertyOptional({ description: 'Cards per column (default 50, clamped 1..100)' })
+    @IsOptional()
+    @IsString()
+    columnLimit?: string;
+
+    @ApiPropertyOptional({
+        description: 'Days of done / cancelled history (default 7, clamped 1..90)',
+    })
+    @IsOptional()
+    @IsString()
+    terminalWindowDays?: string;
+
+    @ApiPropertyOptional({
+        description: 'Comma-separated TaskStatus list. Columns holding none of them read as empty.',
+    })
+    @IsOptional()
+    @IsString()
+    status?: string;
+
+    @ApiPropertyOptional({ description: 'Comma-separated TaskPriority list (p0..p4)' })
+    @IsOptional()
+    @IsString()
+    priority?: string;
+
+    @ApiPropertyOptional({ description: 'Filter by label' })
+    @IsOptional()
+    @IsString()
+    label?: string;
+
+    @ApiPropertyOptional({ description: 'Free-text search over title/slug/description' })
+    @IsOptional()
+    @IsString()
+    search?: string;
+
+    @ApiPropertyOptional({ format: 'uuid', description: 'Filter by Mission' })
+    @IsOptional()
+    @IsUUID()
+    missionId?: string;
+
+    @ApiPropertyOptional({ format: 'uuid', description: 'Filter by Idea' })
+    @IsOptional()
+    @IsUUID()
+    ideaId?: string;
+
+    @ApiPropertyOptional({ format: 'uuid', description: 'Filter by Work' })
+    @IsOptional()
+    @IsUUID()
+    workId?: string;
+
+    @ApiPropertyOptional({ format: 'uuid', description: 'Filter by Team' })
+    @IsOptional()
+    @IsUUID()
+    teamId?: string;
+
+    @ApiPropertyOptional({ format: 'uuid', description: 'Filter by Agent' })
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
+
+    @ApiPropertyOptional({ format: 'uuid', description: 'Filter by Goal' })
+    @IsOptional()
+    @IsUUID()
+    goalId?: string;
+
+    @ApiPropertyOptional({ description: "'true' flattens sub-tasks into the columns" })
+    @IsOptional()
+    @IsString()
+    includeSubtasks?: string;
+
+    @ApiPropertyOptional({ description: "'true' puts recurring templates into the columns" })
+    @IsOptional()
+    @IsString()
+    includeTemplates?: string;
+
+    @ApiPropertyOptional({ description: "'true' also shows Tasks a trigger keeps off the board" })
+    @IsOptional()
+    @IsString()
+    includeHidden?: string;
+
+    @ApiPropertyOptional({ description: "'true' adds the Cancelled column to the focus layout" })
+    @IsOptional()
+    @IsString()
+    includeCancelled?: string;
+}
+
+/** Query for `GET /api/tasks/board/column` — one column, for "show more". */
+export class TaskBoardColumnQueryDto extends TaskBoardQueryDto {
+    @ApiProperty({ description: "Column key of the chosen layout (e.g. 'todo', 'needs_you')" })
+    @IsString()
+    column: string;
+
+    @ApiPropertyOptional({ description: 'Offset within the column (default 0)' })
+    @IsOptional()
+    @IsString()
+    offset?: string;
+}
