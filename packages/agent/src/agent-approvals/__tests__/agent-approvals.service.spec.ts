@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AgentApprovalsService } from '../agent-approvals.service';
+import { AgentActionProposalDecidedEvent } from '../agent-action-proposal-decided.event';
 import type { AgentActionProposal } from '../../entities/agent-action-proposal.entity';
 
 /**
@@ -356,6 +357,92 @@ describe('AgentApprovalsService', () => {
                     where: { userId: 'u1', status: 'pending', organizationId: 'org-9' },
                 }),
             );
+        });
+    });
+    describe('approveAll — held email drafts (AW-05)', () => {
+        it('never bulk-approves an email draft, because approving one sends it', async () => {
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'spawn_agent' }),
+                makeProposal({
+                    id: 'p2',
+                    actionType: 'send_message',
+                    payload: { kind: 'email-draft', emailMessageId: 'm1' },
+                }),
+                // A send_message proposal that is NOT an email draft keeps
+                // its pre-existing bulk behaviour.
+                makeProposal({ id: 'p3', actionType: 'send_message', payload: {} }),
+            ]);
+
+            await expect(svc.approveAll('u1')).resolves.toEqual({
+                approved: 2,
+                skipped: 0,
+                excluded: 1,
+            });
+            const saved = proposals.save.mock.calls[0][0] as unknown as Array<{ id: string }>;
+            expect(saved.map((row) => row.id)).toEqual(['p1', 'p3']);
+        });
+    });
+
+    describe('decision event (AW-05)', () => {
+        let events: { emit: jest.Mock };
+
+        beforeEach(() => {
+            events = { emit: jest.fn() };
+            svc = new AgentApprovalsService(
+                proposals as any,
+                agents as any,
+                undefined,
+                events as any,
+            );
+        });
+
+        it('emits one event after a person decides, carrying the payload', async () => {
+            proposals.findOne.mockResolvedValue(
+                makeProposal({ payload: { kind: 'email-draft', emailMessageId: 'm1' } }),
+            );
+
+            await svc.decide('u1', 'p1', 'approved');
+
+            expect(events.emit).toHaveBeenCalledTimes(1);
+            const [name, event] = events.emit.mock.calls[0];
+            expect(name).toBe(AgentActionProposalDecidedEvent.EVENT_NAME);
+            expect(event).toMatchObject({
+                proposalId: 'p1',
+                userId: 'u1',
+                agentId: 'a1',
+                actionType: 'send_message',
+                status: 'approved',
+                decidedById: 'u1',
+                decidedVia: 'user',
+                payload: { kind: 'email-draft', emailMessageId: 'm1' },
+            });
+        });
+
+        it('emits nothing when the decision is refused (already decided)', async () => {
+            proposals.findOne.mockResolvedValue(makeProposal({ status: 'rejected' }));
+            await expect(svc.decide('u1', 'p1', 'approved')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(events.emit).not.toHaveBeenCalled();
+        });
+
+        it('emits once per row bulk approval decides', async () => {
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'spawn_agent' }),
+                makeProposal({ id: 'p2', actionType: 'spawn_agent' }),
+            ]);
+            await svc.approveAll('u1');
+            expect(events.emit).toHaveBeenCalledTimes(2);
+        });
+
+        it('never fails the decision when a listener throws', async () => {
+            events.emit.mockImplementation(() => {
+                throw new Error('listener exploded');
+            });
+            proposals.findOne.mockResolvedValue(makeProposal());
+            await expect(svc.decide('u1', 'p1', 'rejected')).resolves.toMatchObject({
+                status: 'rejected',
+            });
         });
     });
 });

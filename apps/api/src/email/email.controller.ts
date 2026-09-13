@@ -16,10 +16,12 @@ import {
     HttpCode,
     HttpStatus,
     Logger,
+    NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { EmailFacadeService } from '@ever-works/agent/facades';
+import { EmailDraftService } from '@ever-works/agent/email';
 import {
     AGENT_INBOUND_EMAIL_DISPATCHER,
     type AgentInboundEmailDispatcher,
@@ -84,6 +86,9 @@ export class EmailController {
         @Optional()
         @Inject(AGENT_INBOUND_EMAIL_DISPATCHER)
         private readonly inboundDispatcher?: AgentInboundEmailDispatcher,
+        // AW-05 — approve / discard a held Agent draft. @Optional() and
+        // appended LAST so existing constructions keep working.
+        @Optional() private readonly drafts?: EmailDraftService,
     ) {}
 
     // -------------------------------------------------------------
@@ -254,6 +259,34 @@ export class EmailController {
         req.socket?.on('close', cleanup);
     }
 
+    /**
+     * AW-05 — release a draft an Agent wrote while its inbox holds mail for
+     * review. The send goes through the same gate and ceilings as every
+     * other send; a refused ceiling returns the draft to `draft` (429 with
+     * the limit), and a second approver gets 409 naming who decided first.
+     * Declared BEFORE `messages/:id`, like `messages/stream`.
+     */
+    @UseGuards(AuthSessionGuard)
+    @ApiBearerAuth('JWT-auth')
+    @Post('messages/:id/approve')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Approve and send a held Agent email draft' })
+    async approveDraft(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const { message, result } = await this.requireDrafts().approve(auth.userId, id);
+        return { message: toDraftDecisionView(message), result: result ?? null };
+    }
+
+    /** AW-05 — discard a held Agent draft; nothing is sent. */
+    @UseGuards(AuthSessionGuard)
+    @ApiBearerAuth('JWT-auth')
+    @Post('messages/:id/discard')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Discard a held Agent email draft' })
+    async discardDraft(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const { message } = await this.requireDrafts().discard(auth.userId, id);
+        return { message: toDraftDecisionView(message) };
+    }
+
     @UseGuards(AuthSessionGuard)
     @ApiBearerAuth('JWT-auth')
     @Get('messages/:id')
@@ -269,7 +302,9 @@ export class EmailController {
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({ summary: 'Compose + send an email from an agent outbound address' })
     async sendMessage(@CurrentUser() auth: AuthenticatedUser, @Body() body: SendMessageInput) {
-        const result = await this.emailService.sendMessage(auth.userId, body);
+        // AW-05 — a person composing: every send ceiling applies, the
+        // Agent's approval mode does not (the person is the approver).
+        const result = await this.emailService.sendMessage(auth.userId, body, { origin: 'human' });
         return { result };
     }
 
@@ -360,4 +395,30 @@ export class EmailController {
         const recorded = await this.emailFacade.recordDeliveryEvents(pluginId, events);
         return { received: true, pluginId, events: events.length, recorded };
     }
+    private requireDrafts(): EmailDraftService {
+        if (!this.drafts) {
+            // Same response a missing message gets — the loop is not wired here.
+            throw new NotFoundException('Message not found');
+        }
+        return this.drafts;
+    }
+}
+
+/** AW-05 — the fields a draft decision reports back (never the body). */
+function toDraftDecisionView(message: {
+    id: string;
+    status?: string | null;
+    approvedById?: string | null;
+    approvedAt?: Date | null;
+    sentAt?: Date | null;
+    failureReason?: string | null;
+}) {
+    return {
+        id: message.id,
+        status: message.status ?? null,
+        approvedById: message.approvedById ?? null,
+        approvedAt: message.approvedAt ? new Date(message.approvedAt).toISOString() : null,
+        sentAt: message.sentAt ? new Date(message.sentAt).toISOString() : null,
+        failureReason: message.failureReason ?? null,
+    };
 }

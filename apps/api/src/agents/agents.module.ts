@@ -140,6 +140,13 @@ import { AgentTemplatesController } from './agent-templates.controller';
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
 
 /**
+ * AW-05 — what an Agent is told when its message is held for a person.
+ * Worded so the model does not retry or resend the same message.
+ */
+const HELD_FOR_APPROVAL_NOTE =
+    "Not sent yet: this agent's inbox holds email for review. The message is saved as a draft and will go out when a person approves it. Do not send it again.";
+
+/**
  * Agents/Skills/Tasks PR #1017 — api-side AgentsModule (Phase 3 + 15.5 + 16.10).
  *
  * Mounts the AgentsController; defers to the agent-side AgentsModule
@@ -687,16 +694,33 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     template,
                     fromAddressId,
                 }) {
-                    const result = await email.sendMessage(userId, {
-                        agentId,
-                        to: [...to],
-                        cc: cc ? [...cc] : undefined,
-                        subject,
-                        bodyText,
-                        bodyHtml,
-                        template,
-                        fromAddressId,
-                    });
+                    // AW-05 — `origin: 'agent'`: this is the Agent writing, so
+                    // its inbox's approve-before-send mode applies (a person
+                    // composing goes through the controller as `human`).
+                    const result = await email.sendMessage(
+                        userId,
+                        {
+                            agentId,
+                            to: [...to],
+                            cc: cc ? [...cc] : undefined,
+                            subject,
+                            bodyText,
+                            bodyHtml,
+                            template,
+                            fromAddressId,
+                        },
+                        { origin: 'agent' },
+                    );
+                    if (result.held) {
+                        return {
+                            providerMessageId: '',
+                            accepted: [],
+                            rejected: [],
+                            held: true,
+                            messageId: result.messageId,
+                            note: HELD_FOR_APPROVAL_NOTE,
+                        };
+                    }
                     return {
                         providerMessageId: result.providerMessageId,
                         accepted: [...result.accepted],
@@ -729,12 +753,25 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     if (!address) {
                         throw new Error('messageAgent: target inbound address not found.');
                     }
-                    const result = await email.sendMessage(userId, {
-                        agentId: fromAgentId,
-                        to: [address.address],
-                        subject,
-                        bodyText: body,
-                    });
+                    const result = await email.sendMessage(
+                        userId,
+                        {
+                            agentId: fromAgentId,
+                            to: [address.address],
+                            subject,
+                            bodyText: body,
+                        },
+                        { origin: 'agent' },
+                    );
+                    if (result.held) {
+                        return {
+                            providerMessageId: '',
+                            targetAddress: address.address,
+                            held: true,
+                            messageId: result.messageId,
+                            note: HELD_FOR_APPROVAL_NOTE,
+                        };
+                    }
                     return {
                         providerMessageId: result.providerMessageId,
                         targetAddress: address.address,

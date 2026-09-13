@@ -1,6 +1,8 @@
 // Public surface of the agent-side Agent Action Approval Queue module.
 export * from './agent-approvals.module';
 export * from './agent-approvals.service';
+// AW-05 — fired after a person decides a proposal.
+export * from './agent-action-proposal-decided.event';
 // Merge approval (self-build slice AE) — the read-back half of the queue.
 export * from './merge-approval.module';
 export * from './merge-approval.service';

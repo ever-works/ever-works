@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import {
     ArrayMaxSize,
@@ -22,6 +22,8 @@ import {
 } from '@ever-works/agent/database';
 import type { TenantEmailAddress, EmailAddressDirection } from '@ever-works/agent/entities';
 import { EmailFacadeService } from '@ever-works/agent/facades';
+import { EmailDraftService } from '@ever-works/agent/email';
+import type { EmailSendOrigin } from '@ever-works/contracts';
 
 /**
  * EW-711 #44 — how long an address-verification token stays valid after
@@ -131,6 +133,32 @@ export class SendMessageInput {
 }
 
 /**
+ * AW-05 — how a send was asked for. SERVER-SET by the caller (the compose
+ * route, the Agent tool adapter) and never part of the request body: an
+ * `agent` send is subject to the Agent's approve-before-send mode.
+ */
+export interface SendMessageOptions {
+    /** Default `human` — a person composing from the product. */
+    readonly origin?: EmailSendOrigin;
+    /** The Run that wrote the message, recorded on a held draft's approval. */
+    readonly runId?: string;
+}
+
+export interface SendMessageResult {
+    messageRef: string;
+    provider?: string;
+    providerMessageId: string;
+    accepted: readonly string[];
+    rejected: readonly { address: string; reason: string }[];
+    /** AW-05 — `true` when the message was held as a draft for a person to approve. */
+    held?: boolean;
+    /** AW-05 — the held draft's `email_messages.id`. */
+    messageId?: string;
+    /** AW-05 — the held draft's mirrored approval, when the approvals queue was reachable. */
+    approvalId?: string | null;
+}
+
+/**
  * EW-650 / EW-669 — Tenant email address CRUD + verification flow.
  * Per-user scoping enforced on every read/write.
  */
@@ -142,6 +170,11 @@ export class EmailService {
         private readonly messages: EmailMessageRepository,
         private readonly emailFacade: EmailFacadeService,
         private readonly agents: AgentRepository,
+        // AW-05 — the approve-before-send loop for Agent-originated mail.
+        // @Optional() and appended LAST: absent, an Agent send still goes
+        // through the facade's send-policy gate, which refuses a held
+        // Agent's direct send rather than letting it out.
+        @Optional() private readonly drafts?: EmailDraftService,
     ) {}
 
     async listAddresses(
@@ -240,7 +273,11 @@ export class EmailService {
      * email_messages row + records usage). Generates the idempotency
      * messageRef.
      */
-    async sendMessage(userId: string, input: SendMessageInput) {
+    async sendMessage(
+        userId: string,
+        input: SendMessageInput,
+        options: SendMessageOptions = {},
+    ): Promise<SendMessageResult> {
         // EW-711 #16 (IDOR): the caller-supplied agentId is persisted on the
         // email_messages audit row and recorded against usage, so it MUST
         // belong to the calling user. Verify ownership before any address
@@ -279,6 +316,39 @@ export class EmailService {
         }
 
         const messageRef = `compose-${input.agentId}-${Date.now()}`;
+        const origin: EmailSendOrigin = options.origin ?? 'human';
+
+        // AW-05 — an Agent's message goes through the draft loop, which
+        // either sends it (inbox sends on its own) or holds it for a person.
+        if (origin === 'agent' && this.drafts) {
+            const outcome = await this.drafts.submit({
+                userId,
+                agentId: input.agentId,
+                emailAddressId: address.id,
+                pluginId: address.pluginId,
+                from: address.address,
+                to: input.to,
+                cc: input.cc,
+                subject: input.subject,
+                bodyText,
+                bodyHtml,
+                messageRef,
+                runId: options.runId,
+            });
+            if (outcome.held === false) {
+                return { messageRef, ...outcome.result };
+            }
+            return {
+                messageRef,
+                providerMessageId: '',
+                accepted: [],
+                rejected: [],
+                held: true,
+                messageId: outcome.messageId,
+                approvalId: outcome.approvalId,
+            };
+        }
+
         const result = await this.emailFacade.send(
             {
                 from: address.address,
@@ -289,7 +359,7 @@ export class EmailService {
                 bodyHtml,
                 messageRef,
             },
-            { userId, agentId: input.agentId, addressId: address.id },
+            { userId, agentId: input.agentId, addressId: address.id, origin },
         );
         return { messageRef, ...result };
     }

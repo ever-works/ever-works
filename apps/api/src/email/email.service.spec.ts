@@ -9,6 +9,9 @@ jest.mock('@ever-works/agent/database', () => ({
 jest.mock('@ever-works/agent/facades', () => ({
     EmailFacadeService: class EmailFacadeService {},
 }));
+jest.mock('@ever-works/agent/email', () => ({
+    EmailDraftService: class EmailDraftService {},
+}));
 jest.mock('./templates/render', () => ({
     renderTemplate: jest.fn(),
     listTemplates: jest.fn(() => []),
@@ -238,5 +241,115 @@ describe('EmailService verification-token expiry', () => {
 
         await expect(service.confirmVerification('nope')).resolves.toEqual({ verified: false });
         expect(addresses.update).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * AW-05 — who asked for a send decides which path it takes. A person
+ * composing goes straight to the facade (every ceiling applies there); an
+ * Agent's message goes through the draft loop, which may hold it for a
+ * person. The origin is a server-side argument, never a body field.
+ */
+describe('EmailService.sendMessage origin (AW-05)', () => {
+    const address = { id: 'addr-1', address: 'nova@x.com', userId: 'user-1', pluginId: 'postmark' };
+    let emailFacade: { send: jest.Mock };
+    let drafts: { submit: jest.Mock };
+    let service: EmailService;
+
+    function build(withDrafts: boolean) {
+        return new EmailService(
+            { findByIdForUser: jest.fn().mockResolvedValue(address) } as never,
+            {
+                findPrimaryOutboundForAgent: jest
+                    .fn()
+                    .mockResolvedValue({ emailAddressId: 'addr-1' }),
+            } as never,
+            {} as never,
+            emailFacade as never,
+            { findByIdAndUser: jest.fn().mockResolvedValue({ id: 'agent-1' }) } as never,
+            (withDrafts ? drafts : undefined) as never,
+        );
+    }
+
+    const input = { agentId: 'agent-1', to: ['ada@x.com'], subject: 'Hi', bodyText: 'Hello' };
+
+    beforeEach(() => {
+        emailFacade = {
+            send: jest.fn().mockResolvedValue({
+                provider: 'postmark',
+                providerMessageId: 'pm-1',
+                accepted: ['ada@x.com'],
+                rejected: [],
+            }),
+        };
+        drafts = {
+            submit: jest.fn().mockResolvedValue({
+                held: true,
+                reason: 'awaiting-approval',
+                messageId: 'm-1',
+                approvalId: 'prop-1',
+            }),
+        };
+        service = build(true);
+    });
+
+    it('treats a call with no origin as a person composing (the pre-existing behaviour)', async () => {
+        await service.sendMessage('user-1', input);
+        expect(drafts.submit).not.toHaveBeenCalled();
+        expect(emailFacade.send).toHaveBeenCalledWith(
+            expect.objectContaining({ from: 'nova@x.com', to: ['ada@x.com'] }),
+            { userId: 'user-1', agentId: 'agent-1', addressId: 'addr-1', origin: 'human' },
+        );
+    });
+
+    it("routes an Agent's message through the draft loop and reports a hold without a provider call", async () => {
+        const result = await service.sendMessage('user-1', input, {
+            origin: 'agent',
+            runId: 'run-1',
+        });
+
+        expect(emailFacade.send).not.toHaveBeenCalled();
+        expect(drafts.submit).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'user-1',
+                agentId: 'agent-1',
+                emailAddressId: 'addr-1',
+                pluginId: 'postmark',
+                from: 'nova@x.com',
+                to: ['ada@x.com'],
+                runId: 'run-1',
+            }),
+        );
+        expect(result).toMatchObject({
+            held: true,
+            messageId: 'm-1',
+            approvalId: 'prop-1',
+            providerMessageId: '',
+            accepted: [],
+        });
+    });
+
+    it("returns the provider result when the Agent's inbox sends on its own", async () => {
+        drafts.submit.mockResolvedValue({
+            held: false,
+            result: {
+                provider: 'postmark',
+                providerMessageId: 'pm-9',
+                accepted: ['ada@x.com'],
+                rejected: [],
+            },
+        });
+        const result = await service.sendMessage('user-1', input, { origin: 'agent' });
+        expect(result).toMatchObject({ providerMessageId: 'pm-9', accepted: ['ada@x.com'] });
+        expect(result.held).toBeUndefined();
+    });
+
+    it('still marks the send as an Agent send when the draft loop is not wired, so the gate can refuse it', async () => {
+        service = build(false);
+        await service.sendMessage('user-1', input, { origin: 'agent' });
+        expect(emailFacade.send).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ origin: 'agent' }),
+        );
     });
 });

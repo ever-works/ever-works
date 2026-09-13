@@ -112,6 +112,7 @@ import { TenantEmailAddress } from '../entities/tenant-email-address.entity';
 import { AgentEmailAssignment } from '../entities/agent-email-assignment.entity';
 import { EmailConversation } from '../entities/email-conversation.entity';
 import { EmailMessage } from '../entities/email-message.entity';
+import { AgentInbox } from '../entities/agent-inbox.entity';
 import { NotificationChannel } from '../entities/notification-channel.entity';
 import { NotificationChannelDeliveryLog } from '../entities/notification-channel-delivery-log.entity';
 import { NotificationEventType } from '../entities/notification-event-type.entity';
@@ -300,6 +301,8 @@ export const ENTITIES = [
     AgentEmailAssignment,
     EmailConversation,
     EmailMessage,
+    // Agent email (AW-05) — per-Agent approval mode + send ceilings
+    AgentInbox,
     NotificationChannel,
     NotificationChannelDeliveryLog,
     NotificationEventType,

@@ -31,6 +31,15 @@ import {
     FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+    EMAIL_INBOX_BURST_RECIPIENTS,
+    EMAIL_INBOX_BURST_SENDS,
+    EMAIL_INBOX_DEFAULT_DAILY_CAP,
+    EMAIL_MAX_RECIPIENTS_PER_MESSAGE,
+    EMAIL_SEND_CAP_MAX_CONFIGURABLE,
+    EMAIL_WORKSPACE_DAILY_CAP,
+    EMAIL_WORKSPACE_MONTHLY_CAP,
+    type AgentInboxMode,
+    type EmailSendCapField,
 } from '@ever-works/contracts';
 import { DatabaseType } from '@src/database';
 
@@ -1886,7 +1895,81 @@ export const config = {
             );
         },
     },
+    /**
+     * Agent email (AW-05) — operator knobs for the approve-before-send gate
+     * and the send ceilings. Organizations and individual Agent inboxes can
+     * refine these from the product; these are the deployment-wide defaults
+     * underneath.
+     */
+    email: {
+        sendCaps: {
+            /**
+             * `EMAIL_SEND_CAPS_ENFORCEMENT=off` turns every send ceiling off
+             * for this deployment — sends are then only bounded the way they
+             * were before ceilings existed. Default ON; anything other than
+             * an explicit `off` / `false` / `0` keeps them on, so a typo can
+             * never silently lift them.
+             */
+            isEnforced(): boolean {
+                const raw = (process.env.EMAIL_SEND_CAPS_ENFORCEMENT || '').trim().toLowerCase();
+                return raw !== 'off' && raw !== 'false' && raw !== '0';
+            },
+            /**
+             * Platform ceilings, each replaceable by an env var. `0` = no
+             * ceiling for that limit; an unparseable or out-of-range value
+             * falls back to the documented default rather than to "none".
+             */
+            getPlatformCaps(): Record<EmailSendCapField, number> {
+                return {
+                    inboxDailySends: emailCapEnv(
+                        process.env.EMAIL_SEND_CAP_INBOX_DAILY,
+                        EMAIL_INBOX_DEFAULT_DAILY_CAP,
+                    ),
+                    inboxBurstSends: emailCapEnv(
+                        process.env.EMAIL_SEND_CAP_INBOX_PER_MINUTE,
+                        EMAIL_INBOX_BURST_SENDS,
+                    ),
+                    inboxBurstRecipients: emailCapEnv(
+                        process.env.EMAIL_SEND_CAP_INBOX_RECIPIENTS_PER_5_MINUTES,
+                        EMAIL_INBOX_BURST_RECIPIENTS,
+                    ),
+                    recipientsPerMessage: emailCapEnv(
+                        process.env.EMAIL_SEND_CAP_RECIPIENTS_PER_MESSAGE,
+                        EMAIL_MAX_RECIPIENTS_PER_MESSAGE,
+                    ),
+                    workspaceDailySends: emailCapEnv(
+                        process.env.EMAIL_SEND_CAP_WORKSPACE_DAILY,
+                        EMAIL_WORKSPACE_DAILY_CAP,
+                    ),
+                    workspaceMonthlySends: emailCapEnv(
+                        process.env.EMAIL_SEND_CAP_WORKSPACE_MONTHLY,
+                        EMAIL_WORKSPACE_MONTHLY_CAP,
+                    ),
+                };
+            },
+        },
+        /**
+         * Mode for an Agent that has no inbox settings of its own and whose
+         * organization does not set one. Default `auto-send`: Agents that
+         * could already send keep doing so. `draft-review` holds every such
+         * Agent's mail for approval deployment-wide.
+         */
+        getDefaultAgentMode(): AgentInboxMode {
+            const raw = (process.env.EMAIL_DEFAULT_AGENT_SEND_MODE || '').trim().toLowerCase();
+            return raw === 'draft-review' ? 'draft-review' : 'auto-send';
+        },
+    },
 };
+
+/** AW-05 — one send-ceiling env var: a non-negative integer, `0` = no ceiling. */
+function emailCapEnv(raw: string | undefined, fallback: number): number {
+    if (typeof raw !== 'string' || raw.trim() === '') return fallback;
+    const parsed = Number(raw.trim());
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > EMAIL_SEND_CAP_MAX_CONFIGURABLE) {
+        return fallback;
+    }
+    return parsed;
+}
 
 /** Comma-separated env list → trimmed, lowercased, blank-dropped, deduped. */
 function parseCsvList(raw: string | undefined): string[] {
