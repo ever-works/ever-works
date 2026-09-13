@@ -8,7 +8,7 @@ sidebar_label: Activity
 
 **Activity** is the record of what the platform has done for your account — every generation, deployment, import, plugin change, schedule run, and sign-in, newest first. Reach for it when you want to know what happened and when, whether something is still running, or why a Work no longer looks the way you left it.
 
-The page lives at `/activity` and holds two views: **Log** (what already happened) and **Schedules** (what is set to happen).
+The page lives at `/activity` and holds three views: **Log** (what already happened, as an audit table), **Live Feed** (the same history read as plain sentences about who did what) and **Schedules** (what is set to happen).
 
 ## Which view you want
 
@@ -17,6 +17,7 @@ The page lives at `/activity` and holds two views: **Log** (what already happene
 | See everything that happened across all your Works               | **Activity → Log**                                   |
 | See everything happening on **one** directory, visitors included | that Work's own **Activity Feed** tab                |
 | See what one Work's repos, trackers and chats have done          | that Work's **External activity** panel              |
+| Read what your agents have been doing, one line per thing        | **Activity → Live Feed**                             |
 | See what is going to run next, and when                          | **Activity → Schedules**                             |
 | Stop a generation that is running right now                      | **Activity → Log**, then **Stop** on the running row |
 | Pull the history into a spreadsheet                              | **Export CSV**, in the Log view                      |
@@ -142,6 +143,18 @@ Rotating twice inside the same 24 hours does **not** give you two live old secre
 
 **Delete** does ask for confirmation, and it kills the webhook URL for good.
 :::
+
+## The Live Feed view
+
+**Live Feed** reads the same activity records as the Log, one narrated line per entry, newest first: who did it (an agent, you, an external source or Ever Works itself), what happened, a kind label and how long ago. It adds no second record of anything — every line is an entry you could also find in the Log.
+
+- **Kinds.** Every line is one of five kinds: **work**, **decision** (something waiting on you, such as an Inbox item), **delivery** (something finished and shipped, such as a merged pull request or a completed deployment), **problem** (anything that failed, was refused or hit a limit) and **system** (settings, plugins, connections, sign-ins). A failed entry is always a **problem**, whatever it was about.
+- **Filters.** Pick agents from the chips (the busiest twelve are shown; the rest are behind **+N more**), toggle kinds, or tick **Only failed**. You can watch up to 20 agents at once; a 21st is refused with a message rather than silently dropped. Filters live in the URL (`?view=feed&agents=…&kinds=…&failed=1`), so a filtered view is a link you can share, and your last filters come back the next time you open the view without any.
+- **Opening a line.** A line opens the most specific thing it is about — the run, the task, the mission, the idea, the agent, the Work, the skill or the Inbox item. A line with nothing left to open (for example about an agent that was since deleted) is plain text.
+- **Reading back.** Older entries load as you scroll, or with **Load older**. The view reads back **90 days**; past that, or after 20 pages in one visit, it stops and points you to the Log.
+- **Refreshing.** The view checks for new entries every 10 seconds while the tab is in the foreground.
+
+Keyboard, when no text field has focus: `j` / `k` move between lines, `Enter` or `o` opens the selected line, `Esc` clears the selection, `a` opens the agent picker, `1`–`5` toggle the kinds in order, `x` toggles **Only failed**, and `Shift`+`L` loads older entries.
 
 ## Per-Work feed vs the global Log
 

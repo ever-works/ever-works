@@ -2674,7 +2674,8 @@
             "subtitle": "Track all operations across your works",
             "viewToggle": {
                 "log": "Log",
-                "schedules": "Schedules"
+                "schedules": "Schedules",
+                "feed": "Live Feed"
             },
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
@@ -2772,6 +2773,136 @@
                     "failed": "Failed",
                     "cancelled": "Cancelled"
                 }
+            }
+        },
+        "feed": {
+            "title": "Live Feed",
+            "subtitle": "Everything your agents are doing, as it happens.",
+            "refreshNote": "Refreshes every 10 seconds",
+            "listLabel": "Live Feed entries",
+            "loadOlder": "Load older",
+            "loadingOlder": "Loading older activity…",
+            "loadOlderFailed": "Couldn't load older activity.",
+            "retryOlder": "Try again",
+            "filters": {
+                "agentsLabel": "Agents:",
+                "kindsLabel": "Kinds:",
+                "allAgents": "All",
+                "moreAgents": "+{count} more",
+                "onlyFailed": "Only failed",
+                "failedInView": "{count, plural, one {# failure} other {# failures}} loaded",
+                "clearFilters": "Clear filters",
+                "agentLimit": "You can watch up to 20 agents at once. Deselect one to add another.",
+                "agentsGroup": "Filter by agent",
+                "kindsGroup": "Filter by kind"
+            },
+            "agentPicker": {
+                "title": "Watch agents",
+                "search": "Search agents",
+                "selectedCount": "{selected} of 20 selected",
+                "clearAll": "Clear all",
+                "done": "Done",
+                "noMatches": "No agents match your search.",
+                "entryCount": "{count, plural, one {# entry} other {# entries}}"
+            },
+            "kinds": {
+                "work": "work",
+                "decision": "decision",
+                "delivery": "delivery",
+                "problem": "problem",
+                "system": "system"
+            },
+            "actors": {
+                "you": "You",
+                "unknownAgent": "A deleted agent",
+                "external": "An external source",
+                "system": "Ever Works"
+            },
+            "empty": {
+                "title": "Nothing has happened yet",
+                "body": "When your agents pick up work, finish a run, publish a document or need a decision from you, it shows up here — live.",
+                "createAgent": "Create an agent",
+                "startMission": "Start a mission"
+            },
+            "emptyFiltered": {
+                "title": "No activity from the agents you picked",
+                "titleGeneric": "Nothing matches these filters",
+                "body": "Nothing matched in the last 90 days. New activity will still appear here as it happens."
+            },
+            "error": {
+                "title": "We couldn't load the feed",
+                "body": "Nothing was lost — every entry is still in your Activity log.",
+                "retry": "Try again",
+                "openActivityLog": "Open the Activity log"
+            },
+            "end": {
+                "title": "That's the last 90 days",
+                "pageCapTitle": "That's as far back as this visit goes",
+                "body": "Older records live in your Activity log.",
+                "openActivityLog": "Open the Activity log"
+            },
+            "time": {
+                "justNow": "just now",
+                "minutesAgo": "{count}m ago",
+                "hoursAgo": "{count}h ago",
+                "yesterdayAt": "Yesterday {time}",
+                "withinWeek": "{weekday} {time}",
+                "absolute": "{date}"
+            },
+            "narration": {
+                "fallback": "<b>{actor}</b> · {action}",
+                "agentRunStarted": "<b>{actor}</b> started a run",
+                "agentRunCompleted": "<b>{actor}</b> finished a run",
+                "agentRunFailed": "<b>{actor}</b> had a run fail",
+                "agentRunCancelled": "<b>{actor}</b> had a run cancelled",
+                "agentRunTriggered": "<b>{actor}</b> was asked to run now",
+                "agentHeartbeatStarted": "<b>{actor}</b> started a heartbeat run",
+                "agentHeartbeatCompleted": "<b>{actor}</b> finished a heartbeat run",
+                "agentHeartbeatFailed": "<b>{actor}</b> had a heartbeat run fail",
+                "agentCreated": "<b>{actor}</b> was created",
+                "agentPaused": "<b>{actor}</b> was paused",
+                "agentResumed": "<b>{actor}</b> was resumed",
+                "agentBudgetExceeded": "<b>{actor}</b> reached its budget limit",
+                "agentFileEdited": "<b>{actor}</b> had {hasSubject, select, yes {its file “{subject}”} other {a file}} edited",
+                "agentTaskAssigned": "<b>{actor}</b> was assigned a task",
+                "missionCreated": "<b>{actor}</b> created {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionCompleted": "<b>{actor}</b> completed {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionFailed": "<b>{actor}</b> could not run a mission",
+                "missionPaused": "<b>{actor}</b> paused {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionResumed": "<b>{actor}</b> resumed {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionTick": "<b>{actor}</b> ran a mission tick{hasCount, select, yes { and created {count, plural, =0 {no ideas} one {# idea} other {# ideas}}} other {}}",
+                "missionTickCapped": "<b>{actor}</b> held a mission tick back at its limit",
+                "taskCreated": "<b>{actor}</b> created {hasSubject, select, yes {the task “{subject}”} other {a task}}",
+                "taskAssigned": "<b>{actor}</b> assigned a task",
+                "taskTransitioned": "<b>{actor}</b> moved a task to {to, select, backlog {Backlog} todo {To do} in_progress {In progress} in_review {In review} blocked {Blocked} done {Done} cancelled {Cancelled} other {a new status}}",
+                "taskCommented": "<b>{actor}</b> commented on a task",
+                "taskCompleted": "<b>{actor}</b> completed a task",
+                "taskMerged": "<b>{actor}</b> merged {hasPrNumber, select, yes {pull request #{prNumber}} other {a pull request}} for a task",
+                "taskMergeRefused": "<b>{actor}</b> was not allowed to merge {hasPrNumber, select, yes {pull request #{prNumber}} other {a pull request}}",
+                "taskRecurrenceFired": "<b>{actor}</b> created the next instance of a recurring task",
+                "goalLoopStarted": "<b>{actor}</b> started working toward a goal",
+                "goalLoopCompleted": "<b>{actor}</b> reached a goal",
+                "goalIterationDispatched": "<b>{actor}</b> picked up {hasIteration, select, yes {iteration {iteration}} other {the next iteration}} of a goal",
+                "goalLimitTripped": "<b>{actor}</b> stopped a goal at its limit",
+                "ideaGenerated": "<b>{actor}</b> generated {hasCount, select, yes {{count, plural, =0 {no ideas} one {# idea} other {# ideas}}} other {new ideas}}",
+                "ideaAccepted": "<b>{actor}</b> accepted an idea",
+                "ideaFailed": "<b>{actor}</b> could not build an idea",
+                "skillInvoked": "<b>{actor}</b> used {hasSubject, select, yes {the skill “{subject}”} other {a skill}}",
+                "skillInstalled": "<b>{actor}</b> installed a skill",
+                "skillAttachedToAgent": "<b>{actor}</b> gave an agent a skill",
+                "inboxItemCreated": "<b>{actor}</b> needs a decision from you",
+                "inboxItemAnswered": "<b>{actor}</b> answered a decision",
+                "kbDocumentCreated": "<b>{actor}</b> added {hasSubject, select, yes {“{subject}”} other {a document}} to the knowledge base",
+                "kbDocumentUpdated": "<b>{actor}</b> updated {hasSubject, select, yes {“{subject}”} other {a document}} in the knowledge base",
+                "kbReembedCompleted": "<b>{actor}</b> refreshed the knowledge base search index",
+                "gitPushed": "<b>{actor}</b> pushed to {hasSubject, select, yes {{subject}} other {a repository}}",
+                "gitCommitted": "<b>{actor}</b> committed to {hasSubject, select, yes {{subject}} other {a repository}}",
+                "gitMerged": "<b>{actor}</b> merged a pull request in {hasSubject, select, yes {{subject}} other {a repository}}",
+                "externalEventIngested": "<b>{actor}</b> sent {hasSubject, select, yes {a “{subject}” event} other {an event}}",
+                "scheduleExecuted": "<b>{actor}</b> ran a scheduled update{hasWork, select, yes { for “{work}”} other {}}",
+                "deploymentCompleted": "<b>{actor}</b> {status, select, pending {queued a deployment of} in_progress {started deploying} failed {could not deploy} cancelled {stopped deploying} other {deployed}} {hasWork, select, yes {“{work}”} other {a Work}}",
+                "generationCompleted": "<b>{actor}</b> {status, select, pending {queued generation for} in_progress {started generating} failed {could not generate} cancelled {stopped generating} other {finished generating}} {hasWork, select, yes {“{work}”} other {a Work}}",
+                "memoryFolderSynced": "<b>{actor}</b> synced {hasSubject, select, yes {the memory folder “{subject}”} other {a memory folder}}"
             }
         },
         "works": {
