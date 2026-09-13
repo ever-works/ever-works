@@ -60,6 +60,11 @@ const JOB_EXPORTS = [
 	'clampMaxAttempts',
 	'nodeSatisfiesCapabilities',
 	'FLEET_AGENT_TASK_MAX_STEPS',
+	// Setup phase (EW-807) — the install's own ceiling, budget and log cap.
+	'FLEET_AGENT_TASK_MAX_SETUP_STEPS',
+	'FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC',
+	'FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC',
+	'FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES',
 	'isNodeBusy',
 	'FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC',
 	'FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC',
@@ -109,7 +114,10 @@ const NODE_EXPORTS = [
 	// Covered in `fleet-node.spec.ts`.
 	'FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS',
 	'FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS',
-	'FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS'
+	'FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS',
+	// Node housekeeping visibility (EW-803): the cap on a reported
+	// workspace count. Covered in `fleet-node.spec.ts`.
+	'FLEET_MAX_WORKSPACE_COUNT'
 ] as const;
 
 /** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
@@ -199,6 +207,64 @@ const QUESTION_EXPORTS = [
 	'FLEET_KILL_SWITCH_REASON_MAX_LENGTH'
 ] as const;
 
+/**
+ * Self-build slice Z (EW-796) — fleet-run-credential.types.ts.
+ *
+ * The run-scoped credential the fleet MCP bridge mints: its token prefix
+ * and api-key kinds, the lease-bound expiry helper, and the route
+ * allowlist that is the fail-closed half of the design (enforced by the
+ * API, mirrored against the MCP whitelist by an apps/mcp spec).
+ */
+const RUN_CREDENTIAL_EXPORTS = [
+	'FLEET_RUN_TOKEN_PREFIX',
+	'FLEET_RUN_TOKEN_GRACE_SEC',
+	'FLEET_RUN_API_KEY_KIND',
+	'PERSONAL_API_KEY_KIND',
+	'FLEET_RUN_MCP_SERVER_NAME',
+	'FLEET_RUN_MCP_TOOL_FAMILIES',
+	'FLEET_RUN_TOKEN_ALLOWED_PREFIXES',
+	'FLEET_RUN_TOKEN_ALLOWED_FLEET_READ_PREFIXES',
+	'isFleetRunTokenRouteAllowed',
+	'fleetRunTokenExpiryFromLease'
+] as const;
+
+/**
+ * Self-build slice AM (EW-810) — fleet-push-credential.types.ts.
+ *
+ * The scoped push credential and the attribution that rides with it: the
+ * `git-push` capability tag both ends agree on, the basic-auth username
+ * and the fixed revoke endpoint, the reserved `Ever-Works-` trailer
+ * namespace and its anti-forgery predicates, the remote/repository
+ * normalizers the node checks the credential's scope with (including the
+ * single HOST those normalizers pin the credential to), and the three
+ * stable refusal tokens a mint can answer with.
+ */
+const PUSH_CREDENTIAL_EXPORTS = [
+	'FLEET_PUSH_CAPABILITY',
+	'FLEET_PUSH_MIN_GIT_VERSION',
+	'FLEET_PUSH_CREDENTIAL_USERNAME',
+	'FLEET_PUSH_CREDENTIAL_REVOKE_URL',
+	'FLEET_PUSH_CREDENTIAL_HOST',
+	'FLEET_PUSH_TRAILER_NAMESPACE',
+	'FLEET_PUSH_TRAILER_KEYS',
+	'FLEET_PUSH_CREDENTIAL_MAX_REPOSITORIES',
+	'FLEET_PUSH_CREDENTIAL_NOT_CONFIGURED_REASON',
+	'FLEET_PUSH_CREDENTIAL_UNRESOLVED_REASON',
+	'FLEET_PUSH_CREDENTIAL_MINT_FAILED_REASON',
+	'FLEET_PUSH_CREDENTIAL_REASONS',
+	'FLEET_PUSH_DEFAULT_AUTHOR_NAME',
+	'FLEET_PUSH_DEFAULT_AUTHOR_EMAIL',
+	'describeFleetPushCredentialRefusal',
+	'isFleetPushTrailerLine',
+	'containsReservedFleetPushTrailer',
+	'normalizeFleetPushRepositoryId',
+	'fleetPushRemoteRepositoryId',
+	'sanitizeFleetPushIdentityText',
+	'fleetPushCommitIdentity',
+	'composeFleetPushCommitMessage',
+	'FleetPushAttributionError'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
@@ -208,7 +274,9 @@ const ALL_EXPORTS = [
 	...RUNNER_STATUS_EXPORTS,
 	...WORKSPACE_EXPORTS,
 	...RUN_SECRETS_EXPORTS,
-	...QUESTION_EXPORTS
+	...QUESTION_EXPORTS,
+	...RUN_CREDENTIAL_EXPORTS,
+	...PUSH_CREDENTIAL_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -247,7 +315,18 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetRunEnvGrants',
 	'parseFleetAgentTaskQuestionMarkdown',
 	'normalizeFleetAgentTaskQuestion',
-	'normalizeFleetNodeWorkerState'
+	'normalizeFleetNodeWorkerState',
+	'isFleetRunTokenRouteAllowed',
+	'fleetRunTokenExpiryFromLease',
+	'describeFleetPushCredentialRefusal',
+	'isFleetPushTrailerLine',
+	'containsReservedFleetPushTrailer',
+	'normalizeFleetPushRepositoryId',
+	'fleetPushRemoteRepositoryId',
+	'sanitizeFleetPushIdentityText',
+	'fleetPushCommitIdentity',
+	'composeFleetPushCommitMessage',
+	'FleetPushAttributionError'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -262,7 +341,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 138 runtime symbols', () => {
+	it('exposes exactly these 176 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -274,9 +353,26 @@ describe('fleet barrel', () => {
 		// overlap bounds. Both groups live in `fleet-node.types.ts`, an
 		// existing module, so the witness table below needs no new row.
 		// → 138 with run secrets (EW-781): the twelve constants and five
-		// helpers of `fleet-run-secrets.types.ts`, pinned in their own spec.
+		// helpers of `fleet-run-secrets.types.ts`.
+		// → 148 with the node MCP bridge (EW-782): the run-credential
+		// symbols, pinned in `fleet-run-credential.spec.ts`.
+		// → 148 with the node MCP bridge (EW-782): the run-credential
+		// symbols, pinned in `fleet-run-credential.spec.ts`.
+		// → 149 with node housekeeping visibility (EW-803): the cap on a
+		// reported workspace count.
+		// → 153 with acceptance checks that mean something (EW-807): the
+		// four setup-phase bounds. All three groups live in existing
+		// modules, so the witness table below needs no new row.
+		// → 175 with scoped push credentials (EW-810): the twenty-two
+		// symbols of `fleet-push-credential.types.ts` — a NEW module, so
+		// the witness table below gains a row as well.
+		// → 176 when that slice's review found the scope check never read
+		// the remote's HOST: `FLEET_PUSH_CREDENTIAL_HOST` is the one host a
+		// GitHub installation token may ever be offered to, and it is a
+		// named export precisely so the node, the plugin and this guard
+		// cannot disagree about it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(138);
+		expect(Object.keys(fleet)).toHaveLength(176);
 	});
 
 	it.each([
@@ -287,7 +383,9 @@ describe('fleet barrel', () => {
 		['fleet-panic.types.js', 'FLEET_KILL_SWITCH_ID'],
 		['fleet-run-secrets.types.js', 'FLEET_RUN_ENV_FILE_MAX_COUNT'],
 		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
-		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS']
+		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS'],
+		['fleet-run-credential.types.js', 'FLEET_RUN_TOKEN_PREFIX'],
+		['fleet-push-credential.types.js', 'FLEET_PUSH_CAPABILITY']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

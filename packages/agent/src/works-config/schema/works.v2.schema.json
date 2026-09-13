@@ -807,14 +807,78 @@
                                 "base_branch": {
                                     "type": "string"
                                 },
+                                "setup": {
+                                    "maxItems": 8,
+                                    "type": "array",
+                                    "items": {
+                                        "anyOf": [
+                                            {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 500,
+                                                "pattern": "\\S"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "command": {
+                                                        "type": "string",
+                                                        "minLength": 1,
+                                                        "maxLength": 500,
+                                                        "pattern": "\\S"
+                                                    },
+                                                    "mount": {
+                                                        "type": "string",
+                                                        "maxLength": 64
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "maxLength": 120
+                                                    }
+                                                },
+                                                "required": [
+                                                    "command"
+                                                ],
+                                                "additionalProperties": {}
+                                            }
+                                        ]
+                                    }
+                                },
                                 "checks": {
                                     "maxItems": 20,
                                     "type": "array",
                                     "items": {
-                                        "type": "string",
-                                        "minLength": 1,
-                                        "maxLength": 500,
-                                        "pattern": "\\S"
+                                        "anyOf": [
+                                            {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 500,
+                                                "pattern": "\\S"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "command": {
+                                                        "type": "string",
+                                                        "minLength": 1,
+                                                        "maxLength": 500,
+                                                        "pattern": "\\S"
+                                                    },
+                                                    "mount": {
+                                                        "type": "string",
+                                                        "maxLength": 64
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "maxLength": 120
+                                                    }
+                                                },
+                                                "required": [
+                                                    "command"
+                                                ],
+                                                "additionalProperties": {}
+                                            }
+                                        ]
                                     }
                                 }
                             },

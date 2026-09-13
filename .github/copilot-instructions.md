@@ -9,7 +9,7 @@ For the full, always up-to-date project guide, see [`CLAUDE.md`](../CLAUDE.md). 
 You're working on **Ever Works**, an open-source work builder platform with AI-powered content generation.
 
 - **Repository**: https://github.com/ever-works/ever-works
-- **Documentation**: https://github.com/ever-works/ever-works-docs/tree/develop/website/docs
+- **Documentation**: https://docs.ever.works (source: `apps/docs/` + `docs/`)
 
 ### Quick Facts
 

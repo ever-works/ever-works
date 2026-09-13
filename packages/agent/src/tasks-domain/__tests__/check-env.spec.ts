@@ -3,6 +3,7 @@ import {
     normalizePassthrough,
     CHECK_ENV_ALLOWLIST,
     MAX_ENV_PASSTHROUGH,
+    NO_CWD_IN_EXE_PATH_ENV,
 } from '../check-env';
 
 /**
@@ -215,5 +216,52 @@ describe('normalizePassthrough', () => {
     it('treats a non-array (hand-edited simple-json column) as no grant', () => {
         expect(normalizePassthrough(undefined)).toEqual([]);
         expect(normalizePassthrough('DATABASE_URL' as never)).toEqual([]);
+    });
+});
+
+describe('buildCheckEnv — the CHECKOUT must not be able to choose the program (EW-807)', () => {
+    /**
+     * A check runs with `shell: true` in the checkout, and a checkout is
+     * repository content. On win32 `cmd.exe` resolves a bare program name
+     * from the CURRENT DIRECTORY before PATH, so a `pnpm.cmd` committed at
+     * the repository root runs instead of pnpm — the repository picks the
+     * program for a command somebody else authored.
+     */
+    it('always sets the cmd.exe switch that removes the implicit current directory', () => {
+        const env = buildCheckEnv({ parentEnv: PLATFORM_ENV });
+        expect(env[NO_CWD_IN_EXE_PATH_ENV]).toBe('1');
+    });
+
+    it('cannot be spelled away by a parent value or an envPassthrough grant', () => {
+        const env = buildCheckEnv({
+            parentEnv: { ...PLATFORM_ENV, [NO_CWD_IN_EXE_PATH_ENV]: '0' },
+            passthrough: [NO_CWD_IN_EXE_PATH_ENV, 'NODEFAULTCURRENTDIRECTORYINEXEPATH'],
+        });
+        const spellings = Object.keys(env).filter(
+            (key) => key.toUpperCase() === NO_CWD_IN_EXE_PATH_ENV.toUpperCase(),
+        );
+        expect(spellings).toHaveLength(1);
+        expect(env[spellings[0]]).toBe('1');
+    });
+
+    it('strips the PATH entries that mean "here" — the POSIX half of the same hole', () => {
+        const separator = process.platform === 'win32' ? ';' : ':';
+        const env = buildCheckEnv({
+            parentEnv: {
+                ...PLATFORM_ENV,
+                PATH: ['/usr/local/bin', '', '.', '/usr/bin', './'].join(separator),
+            },
+        });
+        expect(env.PATH?.split(separator)).toEqual(['/usr/local/bin', '/usr/bin']);
+    });
+
+    it('falls back to the PATH floor when stripping leaves nothing (POSIX)', () => {
+        if (process.platform === 'win32') {
+            expect(true).toBe(true);
+            return;
+        }
+        const env = buildCheckEnv({ parentEnv: { ...PLATFORM_ENV, PATH: '.::./' } });
+        // Never the empty string, which is itself "the current directory".
+        expect(env.PATH).toBe('/usr/local/bin:/usr/bin:/bin');
     });
 });

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as policy from '../index.js';
 
 /**
- * The barrel declares nothing of its own (five `export *` lines), but it IS the
+ * The barrel declares nothing of its own (six `export *` lines), but it IS the
  * public surface every consumer reaches through `@ever-works/contracts`. A
  * dropped re-export line compiles fine here and only breaks at the call site in
  * another package, so it is pinned explicitly.
@@ -19,7 +19,12 @@ const FUNCTION_EXPORTS = [
 	'matchesAnyToolPattern',
 	'toolPatternCovers',
 	'credentialRefPattern',
-	'isCredentialKey'
+	'isCredentialKey',
+	// Merge approval (self-build slice AE, EW-805) — the subject-key
+	// derivation the merge path and the approval writer must share.
+	'mergeApprovalSubjectKey',
+	'mergeApprovalPullRequestKeyPrefix',
+	'normalizeCommitSha'
 ] as const;
 
 const VALUE_EXPORTS = [
@@ -32,7 +37,9 @@ const VALUE_EXPORTS = [
 	'AGENT_INIT_SCRIPT_MAX_BYTES',
 	'TOOL_NAME_PATTERN',
 	'TOOL_GRANT_PATTERN',
-	'CREDENTIAL_KEY_PATTERN'
+	'CREDENTIAL_KEY_PATTERN',
+	'MERGE_APPROVAL_MAX_AGE_MS',
+	'MERGE_APPROVAL_SUBJECT_KEY_MAX_LENGTH'
 ] as const;
 
 const REGEXP_EXPORTS = ['TOOL_NAME_PATTERN', 'TOOL_GRANT_PATTERN', 'CREDENTIAL_KEY_PATTERN'] as const;
@@ -50,18 +57,19 @@ describe('policy barrel', () => {
 		expect((policy as Record<string, unknown>)[name]).toBeInstanceOf(RegExp);
 	});
 
-	it('exposes exactly these 17 runtime symbols', () => {
+	it('exposes exactly these 22 runtime symbols', () => {
 		// Regression guard in BOTH directions: a re-export accidentally deleted
 		// from index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — forcing the author back to cover it.
 		expect(Object.keys(policy).sort()).toEqual([...FUNCTION_EXPORTS, ...VALUE_EXPORTS].sort());
-		expect(Object.keys(policy)).toHaveLength(17);
+		expect(Object.keys(policy)).toHaveLength(22);
 	});
 
-	it('names each of the five source modules in the barrel', () => {
+	it('names each of the six source modules in the barrel', () => {
 		// One symbol per `export *` line, so a whole missing line is unmissable.
 		expect(policy.MERGE_METHODS).toBeDefined(); // merge-policy.types.js
 		expect(policy.sanitizeMergePolicyOverride).toBeDefined(); // merge-policy.sanitize.js
+		expect(policy.mergeApprovalSubjectKey).toBeDefined(); // merge-approval.types.js
 		expect(policy.TOOL_GRANT_SCOPE_PRECEDENCE).toBeDefined(); // tool-grant.types.js
 		expect(policy.sanitizeToolGrantOverride).toBeDefined(); // tool-grant.sanitize.js
 		expect(policy.AGENT_INIT_SCRIPT_MAX_BYTES).toBeDefined(); // agent-capabilities.types.js

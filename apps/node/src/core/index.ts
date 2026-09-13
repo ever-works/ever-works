@@ -9,6 +9,7 @@
  * runner), so both shells stay thin and the whole surface is unit-testable.
  */
 
+export * from './api-base';
 export * from './browser-probe';
 export * from './auth-client';
 export * from './capabilities';
@@ -29,5 +30,10 @@ export * from './worker-safety-store';
 export * from './executors/acceptance-checks';
 export * from './executors/agent-task';
 export * from './executors/browser-check';
+// Fleet MCP bridge (self-build slice Z / EW-796) — the loopback proxy.
+export * from './executors/mcp-bridge';
+// EW-807 — resolves a command's `mountDir` to the worktree of a mount THIS
+// RUN provisioned, and proves the containment rather than assuming it.
+export * from './executors/command-roots';
 export * from './executors/model-cli';
 export * from './model-cli-probe';

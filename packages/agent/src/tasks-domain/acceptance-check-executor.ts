@@ -56,6 +56,35 @@ export function executeAcceptanceCheck(
      */
     ceilingSec?: number,
 ): Promise<TaskCheckResult> {
+    // EW-807 — `mountDir` names WHICH repository of a multi-repo run this
+    // command belongs to. This runtime provisions ONE checkout
+    // (`TaskWorkspaceService.provisionForRun` returns a single `cwd`; its
+    // own doc calls multi-mount a follow-up), so there is no repository of
+    // that name here to run it in.
+    //
+    // REFUSED, not run in `rootCwd`. Running it anyway would execute
+    // `pnpm test` in the PRIMARY repository, exit 0, and record that as the
+    // verdict for the repository the check NAMED — a green gate for a
+    // repository nothing ever tested, which is the exact defect this slice
+    // exists to delete. The fleet node refuses the same input loudly
+    // (`resolveCommandRoot` in `apps/node/.../command-roots.ts`); a check
+    // that is correct on one runtime and a lie on the other is worse than
+    // one that fails on both. 'error', not 'red': the command was never
+    // executed, so this is an infrastructure answer, not a code verdict —
+    // and a required check that is not green keeps the gate closed.
+    const mountDir = typeof check.mountDir === 'string' ? check.mountDir.trim() : '';
+    if (mountDir) {
+        return Promise.resolve({
+            id: check.id,
+            exitCode: null,
+            status: 'error' as const,
+            durationMs: 0,
+            logTail:
+                `Check '${check.id}' names repository '${mountDir}', but this runtime provisions a single ` +
+                `checkout and cannot run a command in a mounted repository. Route the Task to a fleet node, ` +
+                `or drop the repository selector so the check runs in the primary checkout.`,
+        });
+    }
     const cwd = check.cwd ? join(rootCwd, check.cwd) : rootCwd;
     const ceiling =
         typeof ceilingSec === 'number' && ceilingSec > 0

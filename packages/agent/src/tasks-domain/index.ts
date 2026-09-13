@@ -24,6 +24,9 @@ export * from './task-recurrence-dispatcher.service';
 export * from './task-graph-fanout.service';
 // THE extraRepos validator, shared by Tasks and Task Template steps.
 export * from './task-extra-repos';
+// Repository-declared commands (EW-807) — the strict reader for
+// `.works/works.yml` `spec.tasks`, and the owner allow-list that admits it.
+export * from './repo-declared-commands';
 export * from './task-notification.service';
 export * from './task-templates.service';
 export { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
@@ -58,6 +61,34 @@ export {
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
 export * from './task-review-rejection.service';
+// Merge approval (self-build slice AE, EW-805).
+export * from './task-review-approval.service';
+export * from './task-merge-gate.service';
+// CI feedback + autonomous fix loop (slice AC, EW-806) — the pure policy
+// helpers and the decision layer the GitHub check receiver calls.
+export * from './task-ci-auto-resume';
+export * from './task-ci-auto-resume.service';
+export {
+    TaskCiAutoResumeAttempt,
+    TASK_AUTO_RESUME_TRIGGERS,
+    type TaskAutoResumeTrigger,
+} from '../entities/task-ci-auto-resume-attempt.entity';
+export {
+    TaskCiAutoResumeAttemptRepository,
+    type ClaimAutoResumeAttemptInput,
+} from '../database/repositories/task-ci-auto-resume-attempt.repository';
+// Release promotion lane (self-build slice AI, EW-808) — develop -> stage
+// -> main. Opens a promotion pull request and reports the gate; merging it
+// stays on the slice-AE human-approval path.
+export * from './release-promotion.service';
+export * from './release-verification.service';
+export * from './release-promotion.module';
+export { ReleasePromotion } from '../entities/release-promotion.entity';
+export {
+    ReleasePromotionRepository,
+    type ClaimPromotionLaneInput,
+    type PromotionLaneClaim,
+} from '../database/repositories/release-promotion.repository';
 // Git activity ingestion (audit item j) — branch/PR → Task resolver.
 export * from './task-git-link.service';
 export {

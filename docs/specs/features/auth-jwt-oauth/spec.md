@@ -32,7 +32,7 @@ that should be open are opted out with the `@Public()` decorator.
 This feature deliberately does **not** include:
 
 - The GitHub-App installation flow
-  (covered by [`integrations-github-app`](../integrations-github-app/)).
+  (covered by [`integrations-github-app`](../integrations-github-app/spec.md)).
 - Plugin-scoped OAuth (Google Drive, Notion, etc.) — those live under
   `apps/api/src/plugins-capabilities/oauth/`.
 - The transactional email delivery itself
@@ -505,7 +505,7 @@ rememberMe: true}})`;
   store tokens against `Plugin` entities, not the user-level
   `AuthAccount` table.
 - **GitHub-App installation flow** (PRs, repo dispatch, webhooks).
-  See [`integrations-github-app`](../integrations-github-app/) when
+  See [`integrations-github-app`](../integrations-github-app/spec.md) when
   that spec is authored.
 - **MFA / TOTP** — not implemented yet. Better Auth supports it via
   a plugin; out of scope until the platform decides on a UX.

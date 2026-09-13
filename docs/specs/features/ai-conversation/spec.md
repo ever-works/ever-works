@@ -451,7 +451,7 @@ are upgraded to an AI-summarised title in the background.
 - Related features: [`auth-jwt-oauth`](../auth-jwt-oauth/spec.md),
   [`plugin-system`](../plugin-system/spec.md),
   [`subscriptions`](../subscriptions/spec.md).
-- Source: [`apps/api/src/ai-conversation/`](../../../../apps/api/src/ai-conversation/),
+- Source: [`apps/api/src/ai-conversation/`](https://github.com/ever-works/ever-works/tree/develop/apps/api/src/ai-conversation),
   [`packages/agent/src/database/repositories/conversation.repository.ts`](../../../../packages/agent/src/database/repositories/conversation.repository.ts),
   [`packages/agent/src/entities/conversation.entity.ts`](../../../../packages/agent/src/entities/conversation.entity.ts),
   [`packages/agent/src/entities/conversation-message.entity.ts`](../../../../packages/agent/src/entities/conversation-message.entity.ts).

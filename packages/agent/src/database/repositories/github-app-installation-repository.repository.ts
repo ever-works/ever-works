@@ -36,13 +36,36 @@ export class GitHubAppInstallationRepoRepository {
         });
     }
 
+    /**
+     * Every installation snapshot row for `owner/repo`, matched
+     * CASE-INSENSITIVELY.
+     *
+     * GitHub repository names are case-insensitive, but `fullName` is
+     * stored verbatim from GitHub's `full_name` (see
+     * `GitHubAppSyncService`), so the column holds whatever casing the
+     * repository declares — `Ever-Works/Directory-Web-Template` as readily
+     * as `ever-works/ever-works`. A plain `where: { fullName }` is an exact
+     * varchar comparison, which is case-SENSITIVE on Postgres.
+     *
+     * That mattered: the fleet's scoped push credential normalizes the
+     * repositories it wants to lower case before asking, so any repository
+     * with an upper-case character in its name resolved to ZERO rows, the
+     * scope came back `push-scope-unresolved`, and the planner refused the
+     * Task at plan time — indistinguishably from a repository no
+     * installation covers — silently removing fleet execution for an
+     * entire class of repositories the installation did in fact cover.
+     *
+     * `LOWER(...)` on both sides rather than a `citext` column or a
+     * functional index: this is a small per-installation table read once
+     * per plan, and changing the column type is a migration every
+     * deployment would have to take for no other benefit.
+     */
     async findByFullName(fullName: string): Promise<GitHubAppInstallationRepositoryEntity[]> {
-        return this.repository.find({
-            where: { fullName },
-            order: {
-                createdAt: 'DESC',
-            },
-        });
+        return this.repository
+            .createQueryBuilder('installationRepository')
+            .where('LOWER(installationRepository.fullName) = LOWER(:fullName)', { fullName })
+            .orderBy('installationRepository.createdAt', 'DESC')
+            .getMany();
     }
 
     async replaceForInstallation(

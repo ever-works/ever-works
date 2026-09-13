@@ -105,6 +105,12 @@ const sidebars: SidebarsConfig = {
 				// are listed together and before the money/ops pages.
 				'features/task-isolation',
 				'features/quality-gates',
+				// The half of the chain that runs AFTER the pull request is
+				// open: the provider's own check results come back in, and
+				// a red build resumes the run under a bounded budget. Reads
+				// between the gate that ran locally and the policy that
+				// lands the branch.
+				'features/ci-auto-resume',
 				'features/merge-policy',
 				// Not part of that chain — Agent Capabilities is Merge
 				// Policy's sibling matrix (same four-scope lattice,

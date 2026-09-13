@@ -39,6 +39,57 @@ const git = (cwd: string, ...args: string[]): string =>
 const temporaryRoot = (prefix: string): string =>
 	realpathSync.native(mkdtempSync(join(realpathSync.native(process.env.RUNNER_TEMP ?? tmpdir()), prefix)));
 
+/**
+ * Scoped push credentials (self-build slice AM, EW-810) TIGHTENED the
+ * finalize contract: a finalize that PUBLISHES must be handed a credential
+ * provider. The old contract - "push with whatever this machine's own Git
+ * credential helper answers" - is the security gap the slice closes, so
+ * every `push: true` case below satisfies the new precondition rather than
+ * bypassing it, and each goes on proving exactly what it proved before.
+ *
+ * A STUB provider rather than the real `PushCredentialSession`, and the
+ * reason is specific to this suite: it fakes HTTPS origins by rewriting
+ * them to local bare repositories with `url.<file://>.insteadOf`, and
+ * `git remote get-url` returns the REWRITTEN url. A scoped installation
+ * credential cannot cover a `file://` remote, so the real session would
+ * (correctly) refuse every case here. That refusal is asserted where it
+ * belongs, against the real session, in `push-credential.spec.ts`; what
+ * this suite is for is mount verdicts.
+ */
+const TEST_NODE_ID = '11111111-1111-4111-8111-111111111111';
+const TEST_JOB_ID = '33333333-3333-4333-8333-333333333333';
+
+const pushSession = () => ({
+	attribute: async (commitMessage: string) => ({
+		attribution: {
+			nodeId: TEST_NODE_ID,
+			nodeName: 'fleet-test',
+			agentId: null,
+			agentName: null,
+			agentEmail: null,
+			jobId: TEST_JOB_ID,
+			runId: null
+		},
+		identity: {
+			authorName: 'Ever Works Agent',
+			authorEmail: 'agent@ever.works',
+			committerName: 'Ever Works node fleet-test',
+			committerEmail: `node-${TEST_NODE_ID}@nodes.ever.works`
+		},
+		commitMessage: `${commitMessage}
+
+Ever-Works-Node: fleet-test (${TEST_NODE_ID})
+Ever-Works-Job: ${TEST_JOB_ID}`
+	}),
+	// Echoes the remote it was asked about, which is what the provider
+	// then re-reads and compares against before it uses the credential.
+	credentialFor: async (remoteUrl: string) => ({
+		username: 'x-access-token',
+		token: 'ghs_test_push_token_value',
+		remoteUrl
+	})
+});
+
 describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { timeout: 30_000 }, () => {
 	let ownedRoot: string;
 	let workspaceRoot: string;
@@ -219,7 +270,8 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 
 		const results = await provisioner.finalizeMounts('task-m3', descriptor, {
 			commitMessage: 'Task mounts-3: template change',
-			push: true
+			push: true,
+			pushCredentials: pushSession()
 		});
 
 		expect(results).toHaveLength(1);
@@ -256,6 +308,7 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		const results = await provisioner.finalizeMounts('task-m14', descriptor, {
 			commitMessage: 'Task mounts-14: must not reach the remote',
 			push: true,
+			pushCredentials: pushSession(),
 			// A minute in the past on the real clock: expired by arithmetic,
 			// with nothing to wait for.
 			publishFence: { deadlineAt: Date.now() - 60_000, marginMs: 60_000 }
@@ -278,16 +331,21 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		const untouched = await provisioner.provision('task-m4', spec('task/mounts-4'));
 		const emptyResults = await provisioner.finalizeMounts('task-m4', untouched, {
 			commitMessage: 'noop',
-			push: true
+			push: true,
+			pushCredentials: pushSession()
 		});
 		expect(emptyResults).toHaveLength(1);
 		expect(emptyResults[0]).toMatchObject({ empty: true, pushed: false });
 
 		const readOnly = await provisioner.provision('task-m5', spec('task/mounts-5', false));
 		writeFileSync(join(readOnly.mounts![0]!.linkPath, 'ignored.txt'), 'never committed\n');
-		expect(await provisioner.finalizeMounts('task-m5', readOnly, { commitMessage: 'noop', push: true })).toEqual(
-			[]
-		);
+		expect(
+			await provisioner.finalizeMounts('task-m5', readOnly, {
+				commitMessage: 'noop',
+				push: true,
+				pushCredentials: pushSession()
+			})
+		).toEqual([]);
 		expect(() => git(mountOrigin, 'rev-parse', '--verify', 'refs/heads/task/mounts-5')).toThrow();
 	});
 
@@ -545,7 +603,11 @@ describe('FleetTaskWorkspaceProvisioner — mounts and cancellation (faked Git)'
 			const provisioner = new FleetTaskWorkspaceProvisioner({
 				rootPath: root,
 				plugin,
-				inspectHead: async () => SHA
+				inspectHead: async () => SHA,
+				// Faked Git: these checkouts are bare directories, so the
+				// real `remote get-url` read the scoped push credential is
+				// checked against has nothing to answer.
+				readOriginUrl: async () => 'https://fleet-mounts.invalid/ever/template.git'
 			});
 			const worktree = (name: string) => join(root, 'repositories', 'pool', 'worktrees', name);
 			for (const name of ['primary', 'template', 'docs']) {
@@ -577,7 +639,7 @@ describe('FleetTaskWorkspaceProvisioner — mounts and cancellation (faked Git)'
 				provisioner.finalizeMounts(
 					'task-cancel',
 					descriptor,
-					{ commitMessage: 'Task cancel: mounts', push: true },
+					{ commitMessage: 'Task cancel: mounts', push: true, pushCredentials: pushSession() },
 					controller.signal
 				)
 			).rejects.toMatchObject({ code: 'cancelled' });

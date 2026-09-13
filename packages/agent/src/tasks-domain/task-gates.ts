@@ -45,8 +45,53 @@ type WorkPolicySource = Partial<Pick<Work, 'checksPolicy'>> | null | undefined;
  * Disabled entries are filtered from the result, so executors can run the
  * returned list as-is. Order is stable: Work defaults first (in declared
  * order), then Task-only additions (in declared order).
+ *
+ * SETUP entries are filtered out too (EW-807). `phase: 'setup'` is a
+ * dependency install, not an acceptance check, and every existing caller
+ * of this function — the cloud gate runner, the pre-check pass, the
+ * instruction composer — treats what it returns as "the commands whose
+ * exit codes are the gate". A setup step graded as a gate check is
+ * exactly the conflation the phase exists to remove, so it is removed
+ * here, once, rather than at each call site. Use
+ * {@link resolveSetupSteps} for the other half.
  */
 export function resolveAcceptanceChecks(
+    task: TaskChecksSource,
+    work: WorkChecksSource,
+): TaskAcceptanceCheck[] {
+    return resolveDeclaredCommands(task, work).filter((check) => check.phase !== 'setup');
+}
+
+/**
+ * The SETUP half of the same resolved, merged list (EW-807).
+ *
+ * Same inheritance and suppression rules as the checks — a Work default
+ * install is inherited by every Task, a Task entry with the same id
+ * replaces it, and `disabled: true` suppresses it — because an owner
+ * authors both in one place and should not have to learn two merge
+ * models.
+ *
+ * Empty for every Work and Task authored before the phase existed, which
+ * is why nothing about an existing run changes.
+ *
+ * EVERY CALLER OF {@link resolveAcceptanceChecks} MUST ALSO CALL THIS, and
+ * either run what it returns or refuse. A runtime that only takes the
+ * checks silently drops the install — and an owner who re-phases an
+ * existing check to `setup` silently loses a command that used to run,
+ * while still being handed a graded gate for a workspace nobody prepared.
+ * The two non-fleet consumers (`TaskGateRunnerService.runChecks`,
+ * `PullRequestGateService.evaluate`) have no setup phase, so they take
+ * this list and REFUSE with `gateStatus: 'skipped'`.
+ */
+export function resolveSetupSteps(
+    task: TaskChecksSource,
+    work: WorkChecksSource,
+): TaskAcceptanceCheck[] {
+    return resolveDeclaredCommands(task, work).filter((check) => check.phase === 'setup');
+}
+
+/** The merge, before either phase is selected out of it. */
+function resolveDeclaredCommands(
     task: TaskChecksSource,
     work: WorkChecksSource,
 ): TaskAcceptanceCheck[] {

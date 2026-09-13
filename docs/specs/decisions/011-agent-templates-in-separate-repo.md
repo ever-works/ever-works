@@ -115,4 +115,4 @@ The Mission Templates infrastructure (already on develop) has exactly this shape
 - ADR-010: [Templates stay independent](./010-templates-stay-independent-for-v1.md) — meta-decision about catalog unification.
 - [`features/UX-DESIGN-agents-skills-tasks.md §4.1`](../features/UX-DESIGN-agents-skills-tasks.md) — the create-Agent dialog flow that consumes templates.
 - [`architecture/implementation-reuse-map.md`](../architecture/implementation-reuse-map.md) — the `AgentTemplateService` row.
-- Mission Templates precedent: [`packages/agent/src/missions/mission-template.config.ts`](../../packages/agent/src/missions/mission-template.config.ts) — separate repos, fork-on-use.
+- Mission Templates precedent: [`packages/agent/src/missions/mission-template.config.ts`](../../../packages/agent/src/missions/mission-template.config.ts) — separate repos, fork-on-use.

@@ -327,7 +327,7 @@ This is a **retrospective** plan: every phase below has already shipped.
 
 - Spec: [`./spec.md`](./spec.md)
 - Tasks: [`./tasks.md`](./tasks.md)
-- Source: [`apps/api/src/plugins-capabilities/`](../../../../apps/api/src/plugins-capabilities/)
+- Source: [`apps/api/src/plugins-capabilities/`](https://github.com/ever-works/ever-works/tree/develop/apps/api/src/plugins-capabilities)
 - Module wiring: [`apps/api/src/api.module.ts`](../../../../apps/api/src/api.module.ts) (lines 18-71)
 - Related ADRs: none specific to this surface; see the constitution.
 - Coverage tracker: [`COVERAGE-TRACKER.md`](../../../internal/COVERAGE-TRACKER.md)

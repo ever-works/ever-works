@@ -213,6 +213,58 @@ export const REPO_CHECKS_MAX = 20;
 export const REPO_CHECK_MAX_LENGTH = 500;
 
 /**
+ * Bound on `spec.tasks.setup` — the dependency install a fresh Task
+ * worktree needs before any check in it can mean anything (EW-807).
+ *
+ * Deliberately much smaller than the check ceiling and equal to
+ * `FLEET_AGENT_TASK_MAX_SETUP_STEPS`: a repository needs one or two
+ * install commands, and the runner that executes them refuses more than
+ * eight, so accepting twenty here would only move the refusal later.
+ */
+export const REPO_SETUP_MAX = 8;
+
+/** Bound on the optional per-command `mount:` / `name:` labels. */
+export const REPO_COMMAND_MOUNT_MAX_LENGTH = 64;
+export const REPO_COMMAND_NAME_MAX_LENGTH = 120;
+
+/**
+ * One command a repository declares, in either of two spellings.
+ *
+ * A bare string is the whole of v1 and stays valid: `- pnpm test`.
+ *
+ * The object form exists for multi-repo Tasks (EW-807): a run can mount
+ * several repositories, and until a command could say WHICH one it runs
+ * in, every command ran in the primary worktree — so a run that edited
+ * three repositories tested one of them. `mount:` names a mount by its
+ * directory name; the runner resolves it against the mounts the run
+ * actually provisioned and refuses a name that is not among them.
+ *
+ * `required` is deliberately absent: a repository that declares a check
+ * is asking for it to be enforced, and an advisory-only declaration would
+ * mostly serve to make a run look verified when it was not.
+ */
+const repoCommandString = nonEmptyString
+    .max(REPO_CHECK_MAX_LENGTH)
+    // `nonEmptyString` trims before it counts, so "   " is rejected at
+    // runtime — but `.trim()` cannot be expressed in JSON Schema, so the
+    // emitted document carried only `minLength: 1` and an editor happily
+    // accepted a whitespace-only check that the loader then refused. The
+    // explicit pattern is what makes editor validation and
+    // `validateWorksConfig` agree.
+    .regex(/\S/, 'must contain a non-whitespace character');
+
+const repoCommandEntry = z.union([
+    repoCommandString,
+    z.looseObject({
+        command: repoCommandString,
+        /** `mountDir` of one of this Task's mounted repositories; the primary when absent. */
+        mount: z.string().trim().max(REPO_COMMAND_MOUNT_MAX_LENGTH).optional(),
+        /** Human-readable label shown in run reports. */
+        name: z.string().trim().max(REPO_COMMAND_NAME_MAX_LENGTH).optional(),
+    }),
+]);
+
+/**
  * A Repository Work (self-build slice D, EW-766) wraps an EXISTING code
  * repository — the data repository IS that repository, nothing is
  * generated. The spec therefore describes how agents should work IN the
@@ -232,33 +284,40 @@ const repoSpec = z.looseObject({
             /** Branch Task worktrees are cut from; the repo default when absent. */
             base_branch: z.string().optional(),
             /**
+             * Dependency install / environment preparation, run BEFORE the
+             * model and before any check (EW-807). A node-provisioned Task
+             * worktree is a bare `git worktree`: no `node_modules`, no
+             * `.venv`, no build cache, so without this every check below
+             * failed on its first line and the run reported a red gate that
+             * described the machine rather than the change.
+             *
+             * Same TRUST BOUNDARY as `checks` — see below. Setup commands
+             * are admitted by exactly the same allow-list.
+             */
+            setup: z.array(repoCommandEntry).max(REPO_SETUP_MAX).optional(),
+            /**
              * Commands an agent runs before opening a pull request.
              *
              * TRUST BOUNDARY — these strings are authored by whoever can land
              * a commit or a PR branch in the wrapped repository, which is a
-             * far wider set than the Work's owner. Nothing consumes the key
-             * yet; whatever does must treat it as advisory, untrusted input:
-             * run it only inside the isolated Task worktree sandbox, and
-             * match it against an operator / Work-level allowlist (or have
-             * the Work owner confirm it in Work settings) before executing.
-             * The bounds below exist so that consumer inherits a cap on how
+             * far wider set than the Work's owner, and during a run the model
+             * itself can rewrite this file. A declared command is A COMMAND
+             * THE OWNER'S MACHINE WILL RUN.
+             *
+             * The consumer (EW-807) honours that boundary as the comment
+             * always demanded: the Work owner must set
+             * `repoDeclaredCommands.mode` to `allowlist` AND list each
+             * command verbatim before any of this is read, the set is
+             * resolved once at dispatch and sealed into the immutable job
+             * payload (so a mid-run edit of this file changes nothing), and
+             * a declaration the allow-list does not admit REFUSES the run
+             * rather than being dropped. See
+             * `tasks-domain/repo-declared-commands.ts`.
+             *
+             * The bounds here exist so that consumer inherits a cap on how
              * much a repository can push at it.
              */
-            checks: z
-                .array(
-                    nonEmptyString
-                        .max(REPO_CHECK_MAX_LENGTH)
-                        // `nonEmptyString` trims before it counts, so "   "
-                        // is rejected at runtime — but `.trim()` cannot be
-                        // expressed in JSON Schema, so the emitted document
-                        // carried only `minLength: 1` and an editor happily
-                        // accepted a whitespace-only check that the loader
-                        // then refused. The explicit pattern is what makes
-                        // editor validation and `validateWorksConfig` agree.
-                        .regex(/\S/, 'must contain a non-whitespace character'),
-                )
-                .max(REPO_CHECKS_MAX)
-                .optional(),
+            checks: z.array(repoCommandEntry).max(REPO_CHECKS_MAX).optional(),
         })
         .optional(),
     branding: branding.optional(),

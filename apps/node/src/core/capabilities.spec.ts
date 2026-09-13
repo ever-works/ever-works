@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { FLEET_PUSH_CAPABILITY } from '@ever-works/contracts';
 import {
 	describePlatform,
 	describeSelf,
 	detectCapabilities,
 	detectDisplay,
+	gitSupportsScopedPush,
 	nodeMajor,
 	normalizeCapabilities,
+	probeGit,
 	readEnvironment,
 	type CapabilityEnvironment,
 	type CommandRunner
@@ -318,5 +321,157 @@ describe('describeSelf', () => {
 
 			expect('workerState' in description).toBe(false);
 		});
+	});
+
+	/**
+	 * Node housekeeping (EW-803) — the disk floor this machine enforces on
+	 * itself and what its reaper last reclaimed, joined through the same
+	 * optional-probe seam and inheriting the same contract, with one
+	 * documented exception: `minFreeDiskBytes` may legitimately travel as
+	 * `null`, because "the operator switched the floor off" has no other
+	 * way to be said.
+	 */
+	describe('housekeeping', () => {
+		it('carries the floor and the last sweep', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({
+					minFreeDiskBytes: 2 * 1024 ** 3,
+					workspaceCount: 12,
+					workspaceBytes: 40 * 1024 ** 3,
+					lastReclaimAt: '2026-09-05T09:30:00.000Z',
+					lastReclaimFreedBytes: 3 * 1024 ** 3
+				})
+			});
+
+			expect(description.minFreeDiskBytes).toBe(2 * 1024 ** 3);
+			expect(description.workspaceCount).toBe(12);
+			expect(description.workspaceBytes).toBe(40 * 1024 ** 3);
+			expect(description.lastReclaimAt).toBe('2026-09-05T09:30:00.000Z');
+			expect(description.lastReclaimFreedBytes).toBe(3 * 1024 ** 3);
+		});
+
+		it('forwards an explicit null floor, which is the one null this payload may carry', async () => {
+			// Absent means "leave the stored value alone" server-side, so an
+			// operator who turned the floor off needs the null to reach the
+			// platform or Fleet keeps showing a floor that no longer exists.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({ minFreeDiskBytes: null })
+			});
+
+			expect(description.minFreeDiskBytes).toBeNull();
+			expect('minFreeDiskBytes' in description).toBe(true);
+		});
+
+		it('omits reclaim fields the report does not carry', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({ minFreeDiskBytes: 2 * 1024 ** 3 })
+			});
+
+			expect('workspaceCount' in description).toBe(false);
+			expect('lastReclaimAt' in description).toBe(false);
+			expect('lastReclaimFreedBytes' in description).toBe(false);
+		});
+
+		it('never sends freed bytes without the instant they belong to', async () => {
+			// A figure whose meaning depends entirely on "when" must not
+			// reach the platform with the "when" missing.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => ({ lastReclaimFreedBytes: 4 * 1024 ** 3 })
+			});
+
+			expect('lastReclaimFreedBytes' in description).toBe(false);
+		});
+
+		it('omits everything when the probe returns null or throws, rather than failing the beat', async () => {
+			const none = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => null
+			});
+			expect('minFreeDiskBytes' in none).toBe(false);
+
+			const thrown = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				housekeeping: () => {
+					throw new Error('reaper is mid-cycle');
+				}
+			});
+			expect('minFreeDiskBytes' in thrown).toBe(false);
+			// One broken probe never costs the node its whole description.
+			expect(thrown.platform).toBe('linux/x64');
+		});
+
+		it('omits everything when no probe is supplied at all', async () => {
+			// A visibility-only node, and every older build of this app.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0');
+
+			expect('minFreeDiskBytes' in description).toBe(false);
+			expect('workspaceBytes' in description).toBe(false);
+		});
+	});
+});
+
+/**
+ * Scoped push credentials (self-build slice AM, EW-810) — the
+ * pre-dispatch push-capability probe.
+ *
+ * The tag is a promise the node can keep, in the sense the rest of this
+ * detector means it: the same fact the push depends on is the fact that
+ * turns it on. A machine whose Git cannot take the per-run credential
+ * through its environment would fall back to the operator's own
+ * long-lived credential helper — so the tag is withheld and the platform
+ * never hands it `agent-task` work at all.
+ */
+describe('git-push capability (scoped push credentials)', () => {
+	const gitRunner = (version: string | null): CommandRunner => ({
+		run: async (command) => {
+			if (command !== 'git') return { code: 127, stdout: '', stderr: 'not found' };
+			if (version === null) return { code: 127, stdout: '', stderr: 'not found' };
+			return { code: 0, stdout: version, stderr: '' };
+		}
+	});
+
+	it.each([
+		['git version 2.53.0.windows.1', true],
+		['git version 2.31.0', true],
+		['git version 2.31.1', true],
+		['git version 3.0.0', true],
+		['git version 2.30.2', false],
+		['git version 2.9.5', false],
+		['git version 1.9.1', false],
+		// Unparseable fails CLOSED: guessing "probably new enough" would
+		// put the tag on a machine whose push silently falls back to the
+		// ambient helper, which is the exact hole it keeps work away from.
+		['git version unknown', false],
+		['', false]
+	])('%s → scoped push %s', (output, expected) => {
+		expect(gitSupportsScopedPush(output)).toBe(expected);
+	});
+
+	it('offers git-push alongside git when the version supports it', async () => {
+		const tags = await detectCapabilities(gitRunner('git version 2.53.0.windows.1'), environment());
+		expect(tags).toContain('git');
+		expect(tags).toContain(FLEET_PUSH_CAPABILITY);
+	});
+
+	it('offers git but NOT git-push on a machine whose Git is too old', async () => {
+		const tags = await detectCapabilities(gitRunner('git version 2.20.1'), environment());
+		expect(tags).toContain('git');
+		expect(tags).not.toContain(FLEET_PUSH_CAPABILITY);
+	});
+
+	it('offers neither when git is absent, and a throwing probe is absence not a crash', async () => {
+		expect(await detectCapabilities(gitRunner(null), environment())).not.toContain(FLEET_PUSH_CAPABILITY);
+		const throwing: CommandRunner = {
+			run: async () => {
+				throw new Error('spawn git ENOENT');
+			}
+		};
+		const tags = await detectCapabilities(throwing, environment());
+		expect(tags).not.toContain('git');
+		expect(tags).not.toContain(FLEET_PUSH_CAPABILITY);
+	});
+
+	it('probeGit reports both facts from one invocation', async () => {
+		expect(await probeGit(gitRunner('git version 2.43.0'))).toEqual({ present: true, scopedPush: true });
+		expect(await probeGit(gitRunner('git version 2.17.1'))).toEqual({ present: true, scopedPush: false });
+		expect(await probeGit(gitRunner(null))).toEqual({ present: false, scopedPush: false });
 	});
 });

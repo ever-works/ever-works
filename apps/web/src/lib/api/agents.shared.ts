@@ -24,6 +24,13 @@ export type AgentGuardrailActionType =
     | 'schedule_task'
     | 'send_message'
     | 'budget_override'
+    // Merge approval (self-build slice AE, EW-805). Listed here so the
+    // guardrails card can BLOCK it, which is meaningful. Auto-approving it
+    // is not: `evaluateGuardrails` refuses to auto-approve a merge
+    // whatever this Agent's policy says, and the merge verifier requires a
+    // decision made by a person. Ticking it in the auto-approve column is
+    // therefore inert by design, not a loophole.
+    | 'merge_pull_request'
     | 'other';
 
 export const AGENT_GUARDRAIL_ACTION_TYPES: readonly AgentGuardrailActionType[] = [
@@ -31,6 +38,7 @@ export const AGENT_GUARDRAIL_ACTION_TYPES: readonly AgentGuardrailActionType[] =
     'schedule_task',
     'send_message',
     'budget_override',
+    'merge_pull_request',
     'other',
 ] as const;
 

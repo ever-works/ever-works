@@ -110,7 +110,7 @@
     - `onboardRepository` — `null` → 404; `{status:'error', message}`
       → 400.
 - [x] **T7**. `GitHubAppWebhookController` at
-      [`apps/api/src/integrations/github-app/github-app-webhook.controller.ts`](../../../../apps/api/src/integrations/github-app/github-app-webhook.controller.ts)
+      [`apps/api/src/ingest/github/github-app-webhook.controller.ts`](../../../../apps/api/src/ingest/github/github-app-webhook.controller.ts)
     - `handleWebhook` (`@Public`) — 400 on missing event header,
       400 on missing `req.rawBody`, 401 on signature mismatch.
     - Returns `{ ok: true }` on success.
@@ -134,7 +134,7 @@
 - [x] **T11**. `GitHubAppUserLink` entity at
       [`packages/agent/src/entities/github-app-user-link.entity.ts`](../../../../packages/agent/src/entities/github-app-user-link.entity.ts)
 - [x] **T12**. Repository classes for all three entities at
-      [`packages/agent/src/database/repositories/`](../../../../packages/agent/src/database/repositories/)
+      [`packages/agent/src/database/repositories/`](https://github.com/ever-works/ever-works/tree/develop/packages/agent/src/database/repositories)
     - `GitHubAppInstallationRepository.upsertFromGithub` w/
       unique-constraint retry,
       `claimOwnershipIfUnassigned` w/ `WHERE createdByUserId IS NULL`

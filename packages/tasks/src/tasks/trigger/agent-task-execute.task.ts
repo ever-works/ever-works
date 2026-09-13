@@ -24,6 +24,7 @@ import {
     resolveGateVerdict,
     resolveL0Checks,
     resolveMaxGateAttempts,
+    resolveSetupSteps,
     shouldRunGateJudge,
     shouldRunL0PreCheck,
     TaskChatService,
@@ -446,10 +447,17 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // Task or the Work defaults affect the next run, not this one.
             let gateWork: Awaited<ReturnType<WorkRepository['findById']>> = null;
             let resolvedChecks: TaskAcceptanceCheck[] = [];
+            // EW-807: the SETUP half of the same merged list. This runtime
+            // has no setup phase, and `resolveAcceptanceChecks` filters those
+            // entries out — so they are resolved HERE and handed to the gate
+            // runner, which refuses to grade a run whose declared install
+            // never happened rather than dropping the command in silence.
+            let resolvedSetup: TaskAcceptanceCheck[] = [];
             const works = appContext.get(WorkRepository);
             try {
                 gateWork = taskRow.workId ? await works.findById(taskRow.workId) : null;
                 resolvedChecks = resolveAcceptanceChecks(taskRow, gateWork);
+                resolvedSetup = resolveSetupSteps(taskRow, gateWork);
             } catch {
                 // Work lookup failed (RPC hiccup). gateWork stays null, so the
                 // policy resolves 'off' below and the run proceeds exactly as
@@ -703,6 +711,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     gateAttempts = 1;
                     gateOutcome = await gateRunner.runChecks({
                         checks: resolvedChecks,
+                        setup: resolvedSetup,
                         cwd: provisioned.cwd,
                         runId: run.id,
                         policy: gatePolicy,
@@ -844,6 +853,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         gateAttempts = nextAttempt;
                         gateOutcome = await gateRunner.runChecks({
                             checks: resolvedChecks,
+                            setup: resolvedSetup,
                             cwd: provisioned.cwd,
                             runId: run.id,
                             policy: gatePolicy,

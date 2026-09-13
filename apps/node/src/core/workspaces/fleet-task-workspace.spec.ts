@@ -12,6 +12,7 @@ import {
 	FleetTaskWorkspaceProvisioner,
 	type FleetWorkspacePlugin
 } from './fleet-task-workspace';
+import { PushCredentialSession } from './push-credential';
 
 const git = (cwd: string, ...args: string[]): string =>
 	execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }).trim();
@@ -572,6 +573,55 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 	});
 });
 
+/**
+ * Scoped push credentials (self-build slice AM, EW-810) TIGHTENED the
+ * finalize contract: a finalize that PUBLISHES must be handed a credential
+ * provider. The old contract — "push with whatever the machine's own Git
+ * credential helper answers" — was the security gap the slice closes, so
+ * the cases below satisfy the new precondition rather than bypass it, and
+ * they go on proving exactly what they proved before (the fence, the
+ * cancellation, the commit-support refusal).
+ *
+ * The REAL `PushCredentialSession` is used, driven by a fake job client,
+ * so these cases also exercise the attribution composer and the
+ * repository-scope check rather than a hand-rolled double.
+ */
+const TEST_NODE_ID = '11111111-1111-4111-8111-111111111111';
+const TEST_JOB_ID = '33333333-3333-4333-8333-333333333333';
+// `github.com`, not the RFC 2606 `.invalid` host this fixture used to
+// carry. The slice AM review found that the scope check never read
+// `url.host` at all, so ANY host with an `owner/repo` path passed — and a
+// fixture on an unreachable host was therefore indistinguishable from the
+// real one. With the host pinned (`FLEET_PUSH_CREDENTIAL_HOST`), an
+// installation token can only ever be offered to github.com, so a fixture
+// that means "the legitimate origin" has to say so. Nothing here contacts
+// it: `readOriginUrl` is stubbed and no Git command runs.
+const TEST_ORIGIN = 'https://github.com/ever/repository.git';
+
+const pushSession = (repositories: string[] = ['ever/repository']) =>
+	new PushCredentialSession({
+		jobId: TEST_JOB_ID,
+		client: {
+			mintPushCredential: async () => ({
+				attribution: {
+					nodeId: TEST_NODE_ID,
+					nodeName: 'fleet-test',
+					agentId: null,
+					agentName: null,
+					agentEmail: null,
+					jobId: TEST_JOB_ID,
+					runId: null
+				},
+				push: {
+					token: 'ghs_test_push_token_value',
+					username: 'x-access-token',
+					expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+					repositories
+				}
+			})
+		}
+	});
+
 describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent execution v2 review follow-up)', () => {
 	it('forwards the abort signal to the provider and maps an abort into a cancelled error', async () => {
 		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
@@ -586,7 +636,11 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 			throw error;
 		});
 		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
-		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		const provisioner = new FleetTaskWorkspaceProvisioner({
+			rootPath: root,
+			plugin,
+			readOriginUrl: async () => TEST_ORIGIN
+		});
 		const descriptor = {
 			path: worktree,
 			repositoryId: 'ever/repository',
@@ -601,12 +655,19 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 				provisioner.finalize(
 					'task-0001',
 					descriptor,
-					{ commitMessage: 'agent: x', push: true },
+					{ commitMessage: 'agent: x', push: true, pushCredentials: pushSession() },
 					controller.signal
 				)
 			).rejects.toMatchObject({ code: 'cancelled' });
 			expect(finalize).toHaveBeenCalledTimes(1);
-			expect(finalize.mock.calls[0][1]).toMatchObject({ commitMessage: 'agent: x', push: true });
+			// The message the provider commits is the payload's PLUS the
+			// reserved attribution trailers (slice AM). The old assertion
+			// pinned the bare payload message, which is no longer what a
+			// fleet commit carries.
+			expect(finalize.mock.calls[0][1]).toMatchObject({ push: true });
+			expect((finalize.mock.calls[0][1] as { commitMessage: string }).commitMessage).toBe(
+				`agent: x\n\nEver-Works-Node: fleet-test (${TEST_NODE_ID})\nEver-Works-Job: ${TEST_JOB_ID}`
+			);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -625,7 +686,11 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 			publishWithheld: withheld
 		}));
 		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
-		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		const provisioner = new FleetTaskWorkspaceProvisioner({
+			rootPath: root,
+			plugin,
+			readOriginUrl: async () => TEST_ORIGIN
+		});
 		const publishFence = { deadlineAt: Date.parse('2026-09-04T15:00:00.000Z'), marginMs: 60_000 };
 		try {
 			const result = await provisioner.finalize(
@@ -639,7 +704,7 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 					headSha: SHA,
 					reused: false
 				},
-				{ commitMessage: 'agent: fenced', push: true, publishFence }
+				{ commitMessage: 'agent: fenced', push: true, publishFence, pushCredentials: pushSession() }
 			);
 			expect(finalize.mock.calls[0][1]).toMatchObject({ publishFence });
 			expect(result).toEqual({
@@ -664,7 +729,11 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 			empty: false
 		}));
 		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
-		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		const provisioner = new FleetTaskWorkspaceProvisioner({
+			rootPath: root,
+			plugin,
+			readOriginUrl: async () => TEST_ORIGIN
+		});
 		try {
 			const result = await provisioner.finalize(
 				'task-0001',
@@ -677,11 +746,22 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 					headSha: SHA,
 					reused: false
 				},
-				{ commitMessage: 'agent: unfenced', push: true }
+				{ commitMessage: 'agent: unfenced', push: true, pushCredentials: pushSession() }
 			);
 			// No `publishFence` key at all, not an undefined one: the provider
 			// must take the same path a lease-free caller has always taken.
-			expect(Object.keys(finalize.mock.calls[0][1]).sort()).toEqual(['commitMessage', 'push']);
+			//
+			// `identity` and `pushCredential` joined the list in slice AM and
+			// are NOT optional decoration: a fleet publish now carries the
+			// author/committer split and the scoped write credential, and a
+			// finalize that reached the provider without them would be one
+			// that pushed with the machine's own credential helper.
+			expect(Object.keys(finalize.mock.calls[0][1]).sort()).toEqual([
+				'commitMessage',
+				'identity',
+				'push',
+				'pushCredential'
+			]);
 			expect(result).toEqual({ pushed: true, headSha: SHA, empty: false });
 		} finally {
 			rmSync(root, { recursive: true, force: true });

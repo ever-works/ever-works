@@ -436,7 +436,7 @@ backoffMultiplier=2, maxDelayMs=30000)` MUST compute
 ## 10. References
 
 - Source:
-    - [`apps/api/src/integrations/twenty-crm/`](../../../../apps/api/src/integrations/twenty-crm/)
+    - [`apps/api/src/integrations/twenty-crm/`](https://github.com/ever-works/ever-works/tree/develop/apps/api/src/integrations/twenty-crm)
     - [`apps/api/src/integrations/twenty-crm/twenty-crm.module.ts`](../../../../apps/api/src/integrations/twenty-crm/twenty-crm.module.ts)
     - [`apps/api/src/integrations/twenty-crm/services/twenty-crm.service.ts`](../../../../apps/api/src/integrations/twenty-crm/services/twenty-crm.service.ts)
     - [`apps/api/src/integrations/twenty-crm/services/client.service.ts`](../../../../apps/api/src/integrations/twenty-crm/services/client.service.ts)

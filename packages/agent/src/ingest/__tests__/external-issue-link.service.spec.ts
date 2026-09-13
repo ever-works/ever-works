@@ -152,6 +152,22 @@ describe('ExternalIssueLinkService', () => {
             const written = links.upsert.mock.calls[0][0];
             expect(written).not.toHaveProperty('lastIngestedEventId');
             expect(written).not.toHaveProperty('lastSeenAt');
+            // The regression counter is state, not a breadcrumb: an
+            // ordinary link must never reset somebody's history to 0.
+            expect(written).not.toHaveProperty('regressionCount');
+        });
+
+        it('carries the re-opening count when a regression re-points the link', async () => {
+            await build().link({
+                userId: 'user-1',
+                taskId: 'task-1',
+                source: 'github',
+                externalIssueId: 'octo/site#42',
+                regressionCount: 3,
+            });
+            expect(links.upsert).toHaveBeenCalledWith(
+                expect.objectContaining({ regressionCount: 3 }),
+            );
         });
 
         it('normalizes absent optional labels to null so an upsert clears stale values', async () => {

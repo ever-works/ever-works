@@ -144,6 +144,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'PlanEntitlement',
     'PluginUsageEvent',
     'RefreshToken',
+    // Release promotion lane (self-build slice AI, EW-808).
+    'ReleasePromotion',
     // Repository registry (Feature G) — account-level repo records.
     'RepoConnection',
     // Skills family (PR #1019) ──
@@ -159,6 +161,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskAttachment',
     'TaskBlock',
     'TaskChatMessage',
+    'TaskCiAutoResumeAttempt',
     'TaskKbMention',
     'TaskRelation',
     'TaskReviewRejection',

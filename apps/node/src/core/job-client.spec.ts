@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FleetJobView } from '@ever-works/contracts';
 import { FleetJobClient } from './job-client';
-import type { FetchLike } from './fleet-client';
+import { FleetClientError, type FetchLike } from './fleet-client';
+import { createLogger, REDACTED, type LogEntry } from './logger';
 
 const NODE_ID = '11111111-2222-4333-8444-555555555555';
 const SECRET = 'ZmFrZS1zZWNyZXQtdmFsdWUtZm9yLXVuaXQtdGVzdHM';
@@ -257,5 +258,226 @@ describe('FleetJobClient run env files', () => {
 		await expect(
 			client.fetchRunEnvFiles('job-1', [{ repoConnectionId: ROW, paths: ['.env'] }], 3)
 		).rejects.toMatchObject({ kind: 'malformed' });
+	});
+});
+
+describe('FleetJobClient MCP run credentials (self-build slice Z)', () => {
+	const TOKEN = 'ew_run_0123456789abcdef0123456789abcdef';
+
+	/** Records the request so the credential body and path can be asserted. */
+	function recording(status: number, body: unknown) {
+		const calls: Array<{ url: string; body: unknown }> = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			calls.push({ url, body: JSON.parse(init.body) });
+			return { ok: status < 400, status, text: async () => JSON.stringify(body) };
+		};
+		return { calls, fetchFn };
+	}
+
+	it('mints with the node credential and returns the token to the caller', async () => {
+		const { calls, fetchFn } = recording(200, {
+			token: TOKEN,
+			expiresAt: '2026-09-05T12:00:00.000Z',
+			serverUrl: 'https://mcp.ever.works/mcp'
+		});
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+
+		const credential = await client.mintMcpCredential('job-1');
+
+		expect(credential.token).toBe(TOKEN);
+		expect(credential.serverUrl).toBe('https://mcp.ever.works/mcp');
+		expect(calls[0]?.url).toBe('https://api.ever.works/api/fleet/jobs/job-1/mcp-credential');
+		// The node secret is the credential, exactly as on lease/complete.
+		expect(calls[0]?.body).toEqual({ nodeId: NODE_ID, secret: SECRET });
+	});
+
+	it('protects the minted token in the logger before returning it', async () => {
+		const entries: LogEntry[] = [];
+		const logger = createLogger({ sink: (entry) => entries.push(entry) });
+		const { fetchFn } = recording(200, {
+			token: TOKEN,
+			expiresAt: '2026-09-05T12:00:00.000Z',
+			serverUrl: 'https://mcp.ever.works/mcp'
+		});
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			logger,
+			timeoutMs: 0
+		});
+
+		await client.mintMcpCredential('job-1');
+		// From this instant the token cannot appear in ANY node log line,
+		// including one written by code that never knew it was a secret.
+		expect(logger.redact(`upstream said ${TOKEN}`)).toBe(`upstream said ${REDACTED}`);
+	});
+
+	it('refuses a response with no token rather than returning a hollow credential', async () => {
+		const { fetchFn } = recording(200, { expiresAt: 'x', serverUrl: 'https://mcp.ever.works/mcp' });
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+
+		await expect(client.mintMcpCredential('job-1')).rejects.toBeInstanceOf(FleetClientError);
+	});
+
+	it('surfaces a refused mint as an error, never echoing the server body', async () => {
+		const { fetchFn } = recording(401, { message: 'private detail' });
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+
+		await expect(client.mintMcpCredential('job-1')).rejects.toThrow();
+		await expect(client.mintMcpCredential('job-1')).rejects.not.toThrow(/private detail/);
+	});
+
+	it('revokes through the job-scoped route and reports how many were dropped', async () => {
+		const { calls, fetchFn } = recording(200, { ok: true, revoked: 2 });
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+
+		await expect(client.revokeMcpCredential('job-1')).resolves.toBe(2);
+		expect(calls[0]?.url).toBe('https://api.ever.works/api/fleet/jobs/job-1/mcp-credential/revoke');
+		expect(calls[0]?.body).toEqual({ nodeId: NODE_ID, secret: SECRET });
+	});
+
+	it('reads a revoke response with no count as zero rather than throwing', async () => {
+		const { fetchFn } = recording(200, { ok: true });
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+		await expect(client.revokeMcpCredential('job-1')).resolves.toBe(0);
+	});
+});
+
+/**
+ * Scoped push credentials (self-build slice AM, EW-810) —
+ * `mintPushCredential`.
+ *
+ * The request carries the credential pair and the claim generation and
+ * NOTHING else — no repository, no installation, no scope of any kind,
+ * because a caller that could name its own scope would have defeated the
+ * narrowing. The response carries the only write credential this channel
+ * ever moves, and it is handed to the redactor before the method returns.
+ */
+describe('FleetJobClient scoped push credential', () => {
+	const PUSH_TOKEN = 'ghs_0123456789abcdefghijklmnopqrstuvwxyz';
+	const JOB = 'job-1';
+
+	const answer = (overrides: Record<string, unknown> = {}) => ({
+		attribution: {
+			nodeId: NODE_ID,
+			nodeName: 'studio-win',
+			agentId: null,
+			agentName: null,
+			agentEmail: null,
+			jobId: JOB,
+			runId: null
+		},
+		push: {
+			token: PUSH_TOKEN,
+			username: 'x-access-token',
+			expiresAt: '2026-09-06T20:00:00.000Z',
+			repositories: ['ever-works/ever-works']
+		},
+		...overrides
+	});
+
+	const clientWith = (fetchFn: FetchLike, logger?: { protect: (v: string) => void }) =>
+		new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0,
+			...(logger ? { logger: logger as never } : {})
+		});
+
+	it('sends the claim and nothing that could widen the scope', async () => {
+		let sentBody = '';
+		const client = clientWith(async (_url, init) => {
+			sentBody = init.body;
+			return { ok: true, status: 200, text: async () => JSON.stringify(answer()) };
+		});
+
+		await client.mintPushCredential(JOB, 7);
+
+		expect(JSON.parse(sentBody) as Record<string, unknown>).toEqual({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			leaseGeneration: 7
+		});
+	});
+
+	it('registers the token with the redactor BEFORE returning it', async () => {
+		const protect = vi.fn();
+		const client = clientWith(response(200, answer()), { protect });
+
+		await client.mintPushCredential(JOB, 7);
+
+		expect(protect).toHaveBeenCalledWith(PUSH_TOKEN);
+	});
+
+	it('REFUSES an answer that names a different node', async () => {
+		// The node holds the claim, so it knows which machine it is.
+		// Attribution that can name a machine the run did not use is worth
+		// less than none.
+		const client = clientWith(
+			response(200, answer({ attribution: { ...answer().attribution, nodeId: 'someone-else' } }))
+		);
+
+		await expect(client.mintPushCredential(JOB, 7)).rejects.toMatchObject({ kind: 'malformed' });
+	});
+
+	it('THROWS rather than returning a credential-shaped blank', async () => {
+		const client = clientWith(response(200, answer({ push: { username: 'x-access-token' } })));
+
+		await expect(client.mintPushCredential(JOB, 7)).rejects.toMatchObject({ kind: 'malformed' });
+	});
+
+	it('accepts a commit-only run, which legitimately has no credential', async () => {
+		const client = clientWith(response(200, answer({ push: null })));
+
+		await expect(client.mintPushCredential(JOB, 7)).resolves.toMatchObject({ push: null });
+	});
+
+	it('maps 422 to a refusal that says the run failed rather than pushed another way', async () => {
+		const client = clientWith(response(422, { reason: 'push-scope-unresolved', detail: 'private' }));
+		const error = await client.mintPushCredential(JOB, 7).catch((e: unknown) => e);
+
+		expect(error).toMatchObject({ kind: 'unresolved', status: 422 });
+		expect((error as Error).message).toContain('scoped push credential');
+		expect((error as Error).message).not.toContain('private');
+	});
+
+	it('keeps 409 as stale-lease, from the STATUS alone', async () => {
+		const client = clientWith(response(409, { reason: 'stale-lease' }));
+
+		await expect(client.mintPushCredential(JOB, 7)).rejects.toMatchObject({ kind: 'stale-lease' });
 	});
 });

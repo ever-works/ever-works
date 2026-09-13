@@ -62,9 +62,38 @@ export const createGitHubOAuthHeaders = (accessToken: string) => ({
     'X-GitHub-Api-Version': '2022-11-28',
 });
 
+/**
+ * Narrowing applied to ONE installation token (self-build slice AM).
+ *
+ * Every mint in this repository before that slice sent an EMPTY body, and
+ * an empty body means "every repository in the installation, with every
+ * permission the App holds". That is fine for the read-shaped callers
+ * (analyze, list, clone) and is precisely the wrong shape for a WRITE
+ * credential handed to an unattended machine: a token minted so a node
+ * can push one Task branch could write every repository the owner ever
+ * installed the App on.
+ *
+ * Both fields are OPTIONAL and both are omitted by every pre-existing
+ * caller, so their behaviour is byte-for-byte unchanged.
+ */
+export type GitHubAppInstallationTokenScope = {
+    /**
+     * GitHub's NUMERIC repository ids. They must come from the platform's
+     * own installation snapshot (`github_app_installation_repositories`),
+     * never from a caller-supplied name: the whole point of the narrowing
+     * is that the set is decided by platform state.
+     */
+    repositoryIds?: readonly (string | number)[];
+    /** e.g. `{ contents: 'write' }`. Anything omitted is NOT granted. */
+    permissions?: Readonly<Record<string, string>>;
+};
+
 export const requestGitHubAppInstallationAccessTokenDetails = async (
     installationId: string,
     credentials: GitHubAppCredentials,
+    // Appended LAST and optional: every existing call site keeps its arity
+    // and its (unscoped) behaviour.
+    scope?: GitHubAppInstallationTokenScope,
 ): Promise<GitHubAppInstallationAccessToken> => {
     if (!/^[A-Za-z0-9_-]+$/.test(installationId)) {
         throw new Error(
@@ -72,11 +101,43 @@ export const requestGitHubAppInstallationAccessTokenDetails = async (
         );
     }
     const jwt = createGitHubAppJwt(credentials);
+    const body: Record<string, unknown> = {};
+    if (scope?.repositoryIds && scope.repositoryIds.length > 0) {
+        const repositoryIds = scope.repositoryIds.map((value) => {
+            // DIGITS ONLY, not `parseInt`: `parseInt('556677abc')` and
+            // `parseInt('1e30')` both succeed and both give a DIFFERENT
+            // repository than the caller named, which is a token scoped to
+            // the wrong thing rather than a refusal.
+            const text = String(value).trim();
+            const numeric =
+                typeof value === 'number'
+                    ? value
+                    : /^[0-9]+$/.test(text)
+                      ? Number(text)
+                      : Number.NaN;
+            if (!Number.isSafeInteger(numeric) || numeric <= 0) {
+                // REFUSE rather than drop. A silently shortened id list
+                // produces a token that is valid for fewer repositories
+                // than the caller asked for, and the failure then lands at
+                // the push of whichever one fell off the end.
+                throw new Error('Invalid GitHub repository id in installation token scope');
+            }
+            return numeric;
+        });
+        body.repository_ids = repositoryIds;
+    }
+    if (scope?.permissions && Object.keys(scope.permissions).length > 0) {
+        body.permissions = { ...scope.permissions };
+    }
+    const hasBody = Object.keys(body).length > 0;
     const response = await fetch(
         `https://api.github.com/app/installations/${installationId}/access_tokens`,
         {
             method: 'POST',
-            headers: createGitHubAppHeaders(jwt),
+            headers: hasBody
+                ? { ...createGitHubAppHeaders(jwt), 'Content-Type': 'application/json' }
+                : createGitHubAppHeaders(jwt),
+            ...(hasBody ? { body: JSON.stringify(body) } : {}),
         },
     );
 

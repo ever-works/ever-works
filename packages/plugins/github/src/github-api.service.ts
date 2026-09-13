@@ -26,7 +26,8 @@ import type {
 	GitDiffResult,
 	GitPullRequestCheck,
 	GitPullRequestStatus,
-	GitReviewDecision
+	GitReviewDecision,
+	GitWorkflowRun
 } from '@ever-works/plugin/git';
 import { capChecks, capDiffFiles, deriveCiState, resolveDiffCaps } from '@ever-works/plugin/git';
 import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
@@ -65,8 +66,78 @@ const REVIEW_DECISION_MAP: Record<string, GitReviewDecision> = {
 	REVIEW_REQUIRED: 'review_required'
 };
 
+/**
+ * How many of a commit's workflow runs to read when looking for one named
+ * workflow (release promotion lane, slice AI). A single commit in this
+ * monorepo triggers well under a dozen workflows; 100 is one page and
+ * covers every realistic repository without a second round trip.
+ */
+const WORKFLOW_RUNS_PER_PAGE = 100;
+
+/** The subset of GitHub's workflow-run payload this reads. */
+interface WorkflowRunPayload {
+	id?: number;
+	path?: string;
+	head_sha?: string;
+	status?: string | null;
+	conclusion?: string | null;
+	html_url?: string;
+	run_attempt?: number;
+	/** `pull_requests[]` on a workflow run — present for `pull_request` events. */
+	pull_requests?: Array<{ number?: number } | null> | null;
+}
+
+/** GitHub's label shape, as it appears on a pull-request payload. */
+interface LabelPayload {
+	name?: string | null;
+}
+
+/**
+ * Label NAMES off a pull-request payload.
+ *
+ * Returns `undefined` — not `[]` — when the payload carried no `labels`
+ * key at all, because `GitPullRequest.labels` is absence-ambiguous by
+ * contract: "this read did not report labels" and "this pull request has
+ * none" are different facts and must not render identically.
+ */
+function labelNames(raw: unknown): readonly string[] | undefined {
+	if (!Array.isArray(raw)) return undefined;
+	return raw
+		.map((label) => (typeof label === 'string' ? label : ((label as LabelPayload)?.name ?? null)))
+		.filter((name): name is string => typeof name === 'string' && name.length > 0);
+}
+
+/**
+ * Last path segment of a workflow reference, lowercased.
+ *
+ * Callers name the gate as `promotion-gate.yml` while GitHub reports
+ * `.github/workflows/promotion-gate.yml`; comparing file names makes both
+ * forms work and keeps a repository that moves its workflows directory
+ * from silently reading as "gate absent".
+ */
+function workflowFileName(reference: string | null | undefined): string {
+	if (typeof reference !== 'string') return '';
+	const trimmed = reference.trim().toLowerCase();
+	if (!trimmed) return '';
+	const segments = trimmed.split('/');
+	return segments[segments.length - 1] ?? '';
+}
+
 /** Pages of check-runs/statuses to read before giving up (rate budget). */
 const CHECKS_PER_PAGE = 100;
+
+/**
+ * Merge approval (slice AE) — how many pages of check-runs / commit
+ * statuses we will read for ONE commit before admitting we cannot see
+ * them all.
+ *
+ * `ciState` is an authorization input now, so "we read the first page and
+ * called it green" is not an answer. 5 × 100 covers every realistic PR
+ * (this monorepo's own matrix is dozens, not hundreds); past that the
+ * read reports `checksComplete: false` and the merge gate refuses rather
+ * than rolling up a sample.
+ */
+const CHECKS_MAX_PAGES = 5;
 
 /** GitHub file payload → the contract's provider-neutral diff row. */
 function toDiffFile(file: {
@@ -601,6 +672,7 @@ export class GitHubApiService {
 			});
 
 			const author = await this.buildPrAuthor(data.user, token, baseUrl);
+			const labels = labelNames(data.labels);
 			return {
 				number: data.number,
 				title: data.title,
@@ -611,7 +683,8 @@ export class GitHubApiService {
 				createdAt: data.created_at,
 				updatedAt: data.updated_at,
 				body: data.body ?? undefined,
-				...(author ? { author } : {})
+				...(author ? { author } : {}),
+				...(labels ? { labels } : {})
 			};
 		} catch (err) {
 			if (err instanceof RequestError && err.status === 404) {
@@ -631,13 +704,21 @@ export class GitHubApiService {
 	): Promise<MergeResult> {
 		const octokit = this.createOctokit(token, baseUrl);
 
+		// `sha` is GitHub's own optimistic-concurrency guard: the merge is
+		// refused (409 `Head branch was modified`) when the pull request's
+		// head is no longer this commit. The agent merge path pins it to
+		// the head it just verified as green and approved, so a push that
+		// lands in the gap between the check and this call cannot be
+		// merged in place of what was reviewed. Omitted when the caller
+		// does not supply one, which is the pre-existing behaviour.
 		const { data } = await octokit.rest.pulls.merge({
 			owner,
 			repo,
 			pull_number: prNumber,
 			commit_title: options?.commitTitle,
 			commit_message: options?.commitMessage,
-			merge_method: options?.mergeMethod || 'merge'
+			merge_method: options?.mergeMethod || 'merge',
+			...(options?.expectedHeadSha ? { sha: options.expectedHeadSha } : {})
 		});
 
 		return {
@@ -673,6 +754,7 @@ export class GitHubApiService {
 		const result: GitPullRequest[] = [];
 		for (const pr of data) {
 			const author = await this.buildPrAuthor(pr.user, token, baseUrl);
+			const labels = labelNames(pr.labels);
 			result.push({
 				number: pr.number,
 				title: pr.title,
@@ -683,7 +765,8 @@ export class GitHubApiService {
 				createdAt: pr.created_at,
 				updatedAt: pr.updated_at,
 				body: pr.body ?? undefined,
-				...(author ? { author } : {})
+				...(author ? { author } : {}),
+				...(labels ? { labels } : {})
 			});
 		}
 		return result;
@@ -745,7 +828,18 @@ export class GitHubApiService {
 		}
 
 		const headSha: string | null = pr.head?.sha ?? null;
-		const checks = headSha ? await this.readChecks(octokit, owner, repo, headSha) : [];
+		// Merge approval (slice AE): roll up FIRST, cap SECOND. `capped` is
+		// the display sample the pill renders; `checks` is the whole set
+		// the verdict is computed over. Deriving `ciState` from `capped`
+		// (which is what this did until the AE review) reports a red pull
+		// request green the moment the failing leg sorts past index 20 —
+		// and this repository's own CI runs far more than twenty legs,
+		// with external commit statuses appended LAST so they were always
+		// the ones dropped.
+		const read = headSha
+			? await this.readChecks(octokit, owner, repo, headSha)
+			: { checks: [] as GitPullRequestCheck[], complete: true };
+		const checks = read.checks;
 		const capped = capChecks(checks);
 
 		const merged = pr.merged === true || pr.merged_at != null;
@@ -769,59 +863,184 @@ export class GitHubApiService {
 			mergeable: typeof pr.mergeable === 'boolean' ? pr.mergeable : null,
 			headSha,
 			reviewDecision,
-			ciState: deriveCiState(capped),
+			ciState: deriveCiState(checks),
 			checks: capped,
+			checksComplete: read.complete,
 			url: pr.html_url,
 			title: pr.title
 		};
 	}
 
 	/**
+	 * Release promotion lane (slice AI) — the most recent
+	 * `promotion-gate.yml`-style workflow run for one commit.
+	 *
+	 * ONE request: `GET /repos/{owner}/{repo}/actions/runs?head_sha=…`,
+	 * then filter by workflow file. The alternative — asking
+	 * `/actions/workflows/{file}/runs` directly — 404s whenever the
+	 * workflow file is not on the repository's default branch, which is
+	 * exactly the situation a release lane is in the day the workflow is
+	 * introduced, and a 404 there is indistinguishable from "no runs".
+	 * Filtering client-side keeps "the workflow has no run for this
+	 * commit" (`null`) separate from "the lookup failed" (a throw), which
+	 * the caller renders differently.
+	 *
+	 * A 404 on the repository itself resolves to `null`; every other error
+	 * propagates, because a token without `actions:read` must surface as a
+	 * BROKEN GATE and not as a missing run.
+	 */
+	async getWorkflowRunForCommit(
+		owner: string,
+		repo: string,
+		workflowPath: string,
+		headSha: string,
+		token: string,
+		baseUrl?: string
+	): Promise<GitWorkflowRun | null> {
+		const wanted = workflowFileName(workflowPath);
+		if (!wanted || !headSha) return null;
+
+		const octokit = this.createOctokit(token, baseUrl);
+		let runs: WorkflowRunPayload[];
+		try {
+			const response = await octokit.rest.actions.listWorkflowRunsForRepo({
+				owner,
+				repo,
+				head_sha: headSha,
+				per_page: WORKFLOW_RUNS_PER_PAGE
+			});
+			runs = (response.data?.workflow_runs ?? []) as WorkflowRunPayload[];
+		} catch (err) {
+			// Only a missing REPOSITORY is an answer. A 403 (no
+			// `actions:read`) or a 5xx is a broken lookup and must throw.
+			if (err instanceof RequestError && err.status === 404) return null;
+			throw err;
+		}
+
+		const matches = runs.filter((run) => workflowFileName(run.path) === wanted);
+		if (matches.length === 0) return null;
+
+		// Newest wins: a re-run of a red gate is the verdict that counts.
+		// Ordered explicitly rather than trusting the API's default sort —
+		// run id first (a later trigger is a later run), then `run_attempt`
+		// as the tie-break, because a re-run keeps the run id and only bumps
+		// the attempt.
+		const newest = matches.reduce((best, run) => {
+			const bestId = best.id ?? 0;
+			const runId = run.id ?? 0;
+			if (runId !== bestId) return runId > bestId ? run : best;
+			return (run.run_attempt ?? 1) > (best.run_attempt ?? 1) ? run : best;
+		});
+
+		return {
+			id: newest.id ?? 0,
+			workflowPath: newest.path ?? workflowPath,
+			headSha: newest.head_sha ?? headSha,
+			status: CHECK_STATUS_MAP[newest.status ?? ''] ?? 'unknown',
+			conclusion: newest.conclusion ? (CHECK_CONCLUSION_MAP[newest.conclusion] ?? null) : null,
+			...(newest.html_url ? { url: newest.html_url } : {}),
+			...(typeof newest.run_attempt === 'number' ? { runAttempt: newest.run_attempt } : {}),
+			// Which pull request(s) this run was for. A run is keyed by
+			// COMMIT, and one commit can head two pull requests; the caller
+			// needs to be able to tell "this run is not about my pull
+			// request" from "there is no run".
+			...(Array.isArray(newest.pull_requests)
+				? {
+						pullRequestNumbers: newest.pull_requests
+							.map((pr) => pr?.number)
+							.filter((n): n is number => typeof n === 'number')
+					}
+				: {})
+		};
+	}
+
+	/**
 	 * Read check-runs AND commit-statuses for one commit and normalise
-	 * both onto the contract vocabulary. Best-effort per source: a token
-	 * missing one scope still gets the other half.
+	 * both onto the contract vocabulary.
+	 *
+	 * Best-effort per source: a token missing one scope still gets the
+	 * other half. But "best-effort" is now REPORTED rather than silently
+	 * absorbed — `complete` is false whenever a source could not be read
+	 * at all, or whenever the commit carries more checks than the page
+	 * budget will fetch. `getPullRequestStatus` passes that straight
+	 * through as `checksComplete`, and the merge gate refuses to treat an
+	 * incomplete roll-up as green (merge approval, slice AE). The board's
+	 * dot is unaffected — a mostly-right pill still beats no pill.
 	 */
 	private async readChecks(
 		octokit: Octokit,
 		owner: string,
 		repo: string,
 		ref: string
-	): Promise<GitPullRequestCheck[]> {
+	): Promise<{ checks: GitPullRequestCheck[]; complete: boolean }> {
 		const out: GitPullRequestCheck[] = [];
+		let complete = true;
 
 		try {
-			const { data } = await octokit.rest.checks.listForRef({
-				owner,
-				repo,
-				ref,
-				per_page: CHECKS_PER_PAGE
-			});
-			for (const run of data.check_runs ?? []) {
-				const check: GitPullRequestCheck = {
-					name: run.name,
-					status: CHECK_STATUS_MAP[run.status] ?? 'unknown',
-					conclusion: run.conclusion ? (CHECK_CONCLUSION_MAP[run.conclusion] ?? null) : null,
-					...(run.details_url ? { detailsUrl: run.details_url } : {})
-				};
-				out.push(check);
+			let page = 1;
+			let seen = 0;
+			for (;;) {
+				const { data } = await octokit.rest.checks.listForRef({
+					owner,
+					repo,
+					ref,
+					per_page: CHECKS_PER_PAGE,
+					page
+				});
+				const runs = data.check_runs ?? [];
+				for (const run of runs) {
+					const check: GitPullRequestCheck = {
+						name: run.name,
+						status: CHECK_STATUS_MAP[run.status] ?? 'unknown',
+						conclusion: run.conclusion ? (CHECK_CONCLUSION_MAP[run.conclusion] ?? null) : null,
+						...(run.details_url ? { detailsUrl: run.details_url } : {})
+					};
+					out.push(check);
+				}
+				seen += runs.length;
+				// `total_count` is GitHub's own count for the ref, so this
+				// is the only honest way to know whether a page-1 read saw
+				// everything. A response without it is taken at face value.
+				const total = typeof data.total_count === 'number' ? data.total_count : seen;
+				if (seen >= total || runs.length === 0) break;
+				if (page >= CHECKS_MAX_PAGES) {
+					complete = false;
+					break;
+				}
+				page += 1;
 			}
 		} catch {
 			// `checks:read` not granted, or a provider without the Checks
-			// API. Fall through to commit statuses.
+			// API. Fall through to commit statuses — but say so: a verdict
+			// rolled up without the Checks API cannot claim to have seen
+			// every Actions run on the commit.
+			complete = false;
 		}
 
 		try {
-			const { data } = await octokit.rest.repos.listCommitStatusesForRef({
-				owner,
-				repo,
-				ref,
-				per_page: CHECKS_PER_PAGE
-			});
 			// Statuses are append-only per context — keep the newest per
 			// context so a fixed re-run doesn't leave a stale red behind.
-			const newestByContext = new Map<string, (typeof data)[number]>();
-			for (const status of data) {
-				if (!newestByContext.has(status.context)) newestByContext.set(status.context, status);
+			// GitHub returns them newest-first, so the FIRST row wins.
+			const newestByContext = new Map<string, { context: string; state: string; target_url?: string | null }>();
+			let page = 1;
+			for (;;) {
+				const { data } = await octokit.rest.repos.listCommitStatusesForRef({
+					owner,
+					repo,
+					ref,
+					per_page: CHECKS_PER_PAGE,
+					page
+				});
+				for (const status of data) {
+					if (!newestByContext.has(status.context)) newestByContext.set(status.context, status);
+				}
+				// No total_count on this endpoint: a short page is the end.
+				if (data.length < CHECKS_PER_PAGE) break;
+				if (page >= CHECKS_MAX_PAGES) {
+					complete = false;
+					break;
+				}
+				page += 1;
 			}
 			for (const status of newestByContext.values()) {
 				const settled = status.state !== 'pending';
@@ -833,10 +1052,12 @@ export class GitHubApiService {
 				});
 			}
 		} catch {
-			// Same posture — an unreadable source contributes nothing.
+			// Same posture — an unreadable source contributes nothing, and
+			// is reported as a gap rather than as "there was nothing here".
+			complete = false;
 		}
 
-		return out;
+		return { checks: out, complete };
 	}
 
 	/**

@@ -113,14 +113,29 @@ export function validateGuardrails(value: unknown): string | null {
  * Decision table (first match wins):
  *   1. No guardrails (`null`/`undefined`)      → `queue` (legacy behavior).
  *   2. `blockedActionTypes` contains the type  → `block`.
- *   3. `mode === 'autonomous'` AND no risk flags AND
+ *   3. `merge_pull_request`                    → `queue`, unconditionally.
+ *   4. `mode === 'autonomous'` AND no risk flags AND
  *      (`autoApproveActionTypes` omitted OR contains the type)
  *                                              → `auto_approve`.
- *   4. Everything else                         → `queue`.
+ *   5. Everything else                         → `queue`.
  *
  * Risk flags ALWAYS force the queue — an autonomous Agent never
  * self-approves a destructive / cross-scope / budget-override /
  * high-fanout action.
+ *
+ * Rule 3 is belt AND braces (merge approval, self-build slice AE). The
+ * `RISK_SCORER` already flags every `merge_pull_request` as `destructive`,
+ * so rule 4 could never fire for one — but that is a property of a
+ * DIFFERENT file, and the thing it prevents is an Agent's own
+ * configuration authorising a merge onto a real branch. The rule is
+ * stated here too so removing it has to be deliberate, and so this
+ * function is safe to read on its own.
+ *
+ * Note that a guardrail auto-approval could not satisfy a merge anyway:
+ * `MergeApprovalService` requires `decidedVia === 'user'` with a non-null
+ * `decidedById`, and guardrail rows carry neither. Three independent
+ * layers, because "the platform approved its own merge" is the failure
+ * that cannot be walked back.
  */
 export function evaluateGuardrails(
     guardrails: AgentGuardrails | null | undefined,
@@ -132,6 +147,9 @@ export function evaluateGuardrails(
     }
     if (guardrails.blockedActionTypes?.includes(actionType)) {
         return 'block';
+    }
+    if (actionType === 'merge_pull_request') {
+        return 'queue';
     }
     if (guardrails.mode === 'autonomous' && riskFlags.length === 0) {
         const allowList = guardrails.autoApproveActionTypes;

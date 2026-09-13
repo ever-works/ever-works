@@ -206,9 +206,9 @@ Concrete metrics beat abstract ones. A few that map cleanly onto what Agents act
 | Reviewer ([community PRs](./community-pr-processing.md)) | Pull requests reviewed  | 20     | 8     | 40      | weekly  |
 | Editor ([blog Work](./creating-a-work.md))               | Posts published         | 12     | 6     | 20      | monthly |
 | Researcher ([Mission](./missions.md))                    | Ideas accepted          | 4      | 1     | 8       | monthly |
-| Maintainer ([quality gates](./quality-gates.md))         | Failing gates left open | 0      | —     | —       | weekly  |
+| Maintainer ([quality gates](./quality-gates.md))         | Required checks passing | 6      | 5     | —       | weekly  |
 
-For the last row, remember the zero-target rule: with `target: 0` the bar stays empty until `current` is strictly above `0`, so set a `floor` of `0` if you want "zero open failures" to read as _Critical_ the moment one appears.
+Note the shape of that last row. Scorecard status is higher-is-better only: a `floor` fires _Critical_ when `current` drops **below** it, so it cannot flag a lower-is-better metric like open failures — a `target: 0, floor: 0` metric reads _On track_ the moment a failure appears, not _Critical_. Restate the metric so that more is better, as above (target = the number of required checks, floor = the count below which the Agent is blocking a release), or track the failure count as a [Goal](./goals.md), which keeps history.
 
 ## Related
 

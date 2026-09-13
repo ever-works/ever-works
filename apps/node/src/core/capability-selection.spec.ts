@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { FLEET_PUSH_CAPABILITY } from '@ever-works/contracts';
 import {
 	applyCapabilitySelection,
 	describeSelf,
+	isAlwaysAdvertisedCapability,
 	isIdentityCapability,
 	selectableCapabilities,
 	type CapabilityEnvironment,
@@ -159,5 +161,43 @@ describe('config round-trip for capability selection and limits', () => {
 		expect(view.limits.maxConcurrentJobs).toBe(2);
 		expect(view.capabilitySelection).toEqual(['terminal']);
 		expect(JSON.stringify(view)).not.toContain(base.secret);
+	});
+});
+
+/**
+ * Scoped push credentials (self-build slice AM, EW-810) — `git-push` is
+ * detected but NOT offered as an operator choice.
+ *
+ * Withholding it is not a narrower offer, it is a broken one: every
+ * `agent-task` the platform dispatches requires the tag, so a node that
+ * hid it would simply stop doing the work it already does — and an
+ * operator whose capability selection predates the tag has, by
+ * definition, not opted into it.
+ */
+describe('git-push is always advertised when detected', () => {
+	it('survives an operator selection that does not mention it', () => {
+		expect(applyCapabilitySelection(['os:linux', 'terminal', 'git', FLEET_PUSH_CAPABILITY], ['terminal'])).toEqual([
+			'os:linux',
+			'terminal',
+			FLEET_PUSH_CAPABILITY
+		]);
+	});
+
+	it('is never offered as a checkbox', () => {
+		expect(selectableCapabilities(['os:linux', 'git', FLEET_PUSH_CAPABILITY, 'docker'])).toEqual(['git', 'docker']);
+	});
+
+	it('is still absent when the DETECTOR never found it', () => {
+		// The opt-in can only shrink an offer; it can never invent one.
+		expect(applyCapabilitySelection(['os:linux', 'terminal'], ['terminal', FLEET_PUSH_CAPABILITY])).toEqual([
+			'os:linux',
+			'terminal'
+		]);
+	});
+
+	it('is not classified as machine identity', () => {
+		// It is a promise about what this machine can DO, not what it IS.
+		expect(isIdentityCapability(FLEET_PUSH_CAPABILITY)).toBe(false);
+		expect(isAlwaysAdvertisedCapability(FLEET_PUSH_CAPABILITY)).toBe(true);
 	});
 });

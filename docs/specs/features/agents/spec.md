@@ -19,7 +19,7 @@
 
 > **Scope of this document:** product behavior — what users see and do, what an Agent is, the page hierarchy, the create flow, the run model, the budgets, the permission grid, the dashboards. Implementation details live in [plan.md](./plan.md); architecture context in [`architecture/agents-skills-tasks.md`](../../architecture/agents-skills-tasks.md).
 >
-> **Hard rule (additive only):** Everything currently shipping stays. The existing Work Agent (Goal/Run/Preference) is unchanged. The existing Plugins page is unchanged. The Mission tick worker is unchanged. New surfaces are added; nothing is renamed or removed. Enforced by [Workspace AGENTS.md NN #20](file:///C:/Coding/Workspace/AGENTS.md).
+> **Hard rule (additive only):** Everything currently shipping stays. The existing Work Agent (Goal/Run/Preference) is unchanged. The existing Plugins page is unchanged. The Mission tick worker is unchanged. New surfaces are added; nothing is renamed or removed. Enforced by Workspace AGENTS.md NN #20.
 >
 > **Terminology note:** "Agent" with a capital A in this spec always means the **new, user-defined, named, persistent Agent entity**. The legacy platform-managed engine (Goal → Ideas) is referred to as the "Work Agent" verbatim to avoid ambiguity.
 
@@ -434,4 +434,4 @@ This is **distinct from** the bulk account-transfer flow in [ADR-008](../../deci
 - Architecture: [`../../architecture/agents-skills-tasks.md`](../../architecture/agents-skills-tasks.md)
 - Related feature: [Skills](../skills/spec.md), [Task-tracking](../task-tracking/spec.md), [Missions / Ideas / Works](../missions-ideas-works/spec.md)
 - ADR-006: [`../../decisions/006-agents-skills-tasks-as-core-not-plugins.md`](../../decisions/006-agents-skills-tasks-as-core-not-plugins.md)
-- Constitution: [`../../../.specify/memory/constitution.md`](../../../.specify/memory/constitution.md)
+- Constitution: [`../../../.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)

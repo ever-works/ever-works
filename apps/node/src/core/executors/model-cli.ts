@@ -58,6 +58,25 @@ export interface ModelCliScratchFiles {
 	resultPath: string;
 }
 
+/**
+ * Self-build slice Z (EW-796) — how the model CLI is pointed at the
+ * node's own loopback MCP proxy.
+ *
+ * `serverUrl` is ALWAYS a `http://127.0.0.1:<port>/mcp/<nonce>` URL
+ * produced by `startMcpLoopbackProxy` in this same process. It carries
+ * no credential: the token is injected by the proxy, from memory, on the
+ * way out. `configPath` is a file in the run's SCRATCH directory (never
+ * the worktree), deleted when the model step ends.
+ */
+export interface ModelCliMcpBridge {
+	/** Absolute path of the ephemeral MCP config file in scratch. */
+	configPath: string;
+	/** MCP server name — also the `mcp__<name>` tool-permission prefix. */
+	serverName: string;
+	/** Loopback URL the CLI connects to. */
+	serverUrl: string;
+}
+
 export class ModelCliCommandError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -111,6 +130,40 @@ export function quoteShellPath(path: string, platform: NodeJS.Platform = process
 	return `"${path}"`;
 }
 
+/**
+ * Slice Z — the MCP server name goes onto a command line twice (a
+ * `mcp__<name>` tool permission and a codex config KEY), so it is held to
+ * the same "opaque identifier" bar as the model id: letters, digits,
+ * underscore and hyphen only, nothing a shell or a TOML parser could
+ * read as structure.
+ */
+function assertMcpServerName(name: string): string {
+	if (typeof name !== 'string' || !MCP_SERVER_NAME_PATTERN.test(name)) {
+		throw new ModelCliCommandError('MCP server name is not an opaque identifier');
+	}
+	return name;
+}
+
+/**
+ * Slice Z — the URL the CLI is pointed at MUST be the loopback listener
+ * this very process started.
+ *
+ * Refused, not escaped, if it is anything else: this string is
+ * interpolated into a shell command AND it decides where a session with
+ * platform tools sends its calls. A value that is not
+ * `http://127.0.0.1:<port>/…` either did not come from the proxy or
+ * came from somewhere that should not be deciding it.
+ */
+function assertLoopbackUrl(url: string): string {
+	if (typeof url !== 'string' || !MCP_LOOPBACK_URL_PATTERN.test(url)) {
+		throw new ModelCliCommandError('MCP bridge URL is not a loopback URL this node produced');
+	}
+	return url;
+}
+
+const MCP_SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const MCP_LOOPBACK_URL_PATTERN = /^http:\/\/127\.0\.0\.1:\d{1,5}\/mcp\/[a-f0-9]{8,64}$/;
+
 function assertModelId(model: string | undefined): string | null {
 	if (model === undefined) return null;
 	if (!FLEET_AGENT_EXECUTION_MODEL_PATTERN.test(model)) {
@@ -152,6 +205,12 @@ export function buildModelCliCommand(input: {
 	scratch: ModelCliScratchFiles;
 	/** Provisioned mounts of a multi-repo Task workspace, in spec order. */
 	mounts?: readonly FleetTaskWorkspaceMountDescriptor[];
+	/**
+	 * Slice Z — the loopback MCP bridge, when this run has one. Absent
+	 * (the default) produces byte-for-byte the command this step has
+	 * always built.
+	 */
+	mcp?: ModelCliMcpBridge;
 	platform?: NodeJS.Platform;
 }): string {
 	const platform = input.platform ?? process.platform;
@@ -216,6 +275,7 @@ export function buildModelCliCommand(input: {
 	// model every other Task's worktree and every cached repository on the
 	// machine.
 	const mounts = input.mounts ?? [];
+	const mcp = input.mcp;
 	const writableMounts = mounts.filter((mount) => mount.writable);
 	if (writableMounts.length > 0 && !fleetAgentExecutionProviderSupportsMountGrants(execution.provider)) {
 		throw new ModelCliCommandError(
@@ -236,6 +296,40 @@ export function buildModelCliCommand(input: {
 		if (execution.effort) args.push('--effort', execution.effort);
 		if (budget) args.push('--max-budget-usd', budget);
 		if (execution.skipPermissions === true) args.push('--dangerously-skip-permissions');
+		// ── Slice Z: the platform MCP bridge ────────────────────────────
+		//
+		// Three flags, and all three are load-bearing:
+		//
+		//   --mcp-config <file>   the ephemeral config in the run's scratch
+		//                         dir, pointing at 127.0.0.1. Variadic, so
+		//                         it must be followed by another flag —
+		//                         which it is, `--strict-mcp-config`.
+		//   --strict-mcp-config   use ONLY that file. Without it the CLI
+		//                         also loads the machine's own MCP servers,
+		//                         and a fleet run would inherit whatever the
+		//                         owner happens to have configured for
+		//                         themselves — servers the platform never
+		//                         vetted, in a session it is responsible for.
+		//   --allowedTools mcp__<server>
+		//                         in `-p` (non-interactive) mode an
+		//                         unapproved tool is a PROMPT, and a prompt
+		//                         with no terminal is a hang. Server-level
+		//                         rather than per-tool: the API's own route
+		//                         allowlist is what actually bounds the
+		//                         surface, and enumerating 100+ tool names
+		//                         here would drift the day one is added.
+		//
+		// Emitted before `--add-dir` so that flag stays last, exactly as
+		// the mount-grant block above requires.
+		if (mcp) {
+			args.push(
+				'--mcp-config',
+				quoteShellPath(mcp.configPath, platform),
+				'--strict-mcp-config',
+				'--allowedTools',
+				`mcp__${assertMcpServerName(mcp.serverName)}`
+			);
+		}
 		// `--add-dir <directories...>` is variadic — ONE flag, every granted
 		// directory after it. Emitted LAST so it can never swallow another
 		// option's value, and only when there is something to grant so a
@@ -253,6 +347,18 @@ export function buildModelCliCommand(input: {
 		// the effective permissions do not allow additional writable roots").
 		if (sandbox === 'workspace-write') {
 			for (const root of grantedRoots(writableMounts)) args.push('--add-dir', root);
+		}
+		// Slice Z: codex has no `--mcp-config`, but it takes arbitrary
+		// config overrides on the command line, and a streamable-HTTP MCP
+		// server is exactly one key: `mcp_servers.<name>.url`. The config
+		// FILE is still written (it is the record of what the run was
+		// given, and keeps both providers on one code path), but for codex
+		// the override on argv is what actually takes effect.
+		if (mcp) {
+			args.push(
+				'-c',
+				`mcp_servers.${assertMcpServerName(mcp.serverName)}.url=${assertLoopbackUrl(mcp.serverUrl)}`
+			);
 		}
 		if (model) args.push('-m', model);
 		if (execution.skipPermissions === true) args.push('--dangerously-bypass-approvals-and-sandbox');

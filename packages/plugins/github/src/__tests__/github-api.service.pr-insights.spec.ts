@@ -211,6 +211,109 @@ describe('GitHubApiService — getPullRequestStatus', () => {
 		expect(status!.ciState).toBe('failing');
 	});
 
+	// ── ciState is an AUTHORIZATION input (merge approval, slice AE) ──
+	//
+	// `checks` is a display list bounded at MAX_PR_CHECKS. `ciState` is
+	// the verdict for the whole head commit. Rolling the verdict up over
+	// the bounded list — which is what this service did until the AE
+	// review — reports a red pull request green as soon as the failing leg
+	// sorts past index 20, and the merge gate then merges it.
+
+	it('reds the dot when the ONLY failure sits past the display cap', async () => {
+		const runs = Array.from({ length: 24 }, (_unused, i) => ({
+			name: `leg-${i}`,
+			status: 'completed',
+			conclusion: i === 23 ? 'failure' : 'success',
+			details_url: null
+		}));
+		checksListForRefMock.mockResolvedValueOnce({ data: { check_runs: runs } });
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		// The failing leg is NOT in the list a human sees…
+		expect(status!.checks).toHaveLength(20);
+		expect(status!.checks.some((c) => c.conclusion === 'failure')).toBe(false);
+		// …and the verdict still says so.
+		expect(status!.ciState).toBe('failing');
+		expect(status!.checksComplete).toBe(true);
+	});
+
+	it('rolls up commit statuses even though they are appended after the cap', async () => {
+		// External CI publishes commit statuses, which readChecks appends
+		// LAST — so on a busy PR they were always the rows the cap dropped.
+		checksListForRefMock.mockResolvedValueOnce({
+			data: {
+				check_runs: Array.from({ length: 20 }, (_unused, i) => ({
+					name: `leg-${i}`,
+					status: 'completed',
+					conclusion: 'success',
+					details_url: null
+				}))
+			}
+		});
+		listCommitStatusesMock.mockResolvedValueOnce({
+			data: [{ context: 'ci/external', state: 'failure', target_url: null }]
+		});
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		expect(status!.checks).toHaveLength(20);
+		expect(status!.ciState).toBe('failing');
+	});
+
+	it('pages the check runs until GitHub says it has shown them all', async () => {
+		const page = (from: number, conclusion: string) => ({
+			data: {
+				total_count: 150,
+				check_runs: Array.from({ length: 100 }, (_unused, i) => ({
+					name: `leg-${from + i}`,
+					status: 'completed',
+					conclusion,
+					details_url: null
+				})).slice(0, from === 100 ? 50 : 100)
+			}
+		});
+		checksListForRefMock.mockResolvedValueOnce(page(0, 'success')).mockResolvedValueOnce(page(100, 'failure'));
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		expect(checksListForRefMock).toHaveBeenCalledTimes(2);
+		expect(checksListForRefMock.mock.calls[1][0].page).toBe(2);
+		expect(status!.ciState).toBe('failing');
+		expect(status!.checksComplete).toBe(true);
+	});
+
+	it('reports checksComplete:false when more checks exist than it will page through', async () => {
+		checksListForRefMock.mockResolvedValue({
+			data: {
+				total_count: 100_000,
+				check_runs: Array.from({ length: 100 }, (_unused, i) => ({
+					name: `leg-${i}`,
+					status: 'completed',
+					conclusion: 'success',
+					details_url: null
+				}))
+			}
+		});
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		// The sample it did read is all green, so the rollup says passing —
+		// but the read is flagged incomplete, and the merge gate refuses to
+		// authorize on a sample.
+		expect(status!.ciState).toBe('passing');
+		expect(status!.checksComplete).toBe(false);
+	});
+
+	it('reports checksComplete:false when a check source could not be read at all', async () => {
+		checksListForRefMock.mockRejectedValueOnce(new Error('Resource not accessible'));
+		listCommitStatusesMock.mockResolvedValueOnce({
+			data: [{ context: 'ci/external', state: 'success', target_url: null }]
+		});
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		// The board still gets a green dot from what WAS readable…
+		expect(status!.ciState).toBe('passing');
+		// …but nobody may merge on it: the Actions runs were never seen.
+		expect(status!.checksComplete).toBe(false);
+	});
+
+	it('reports checksComplete:true on an ordinary complete read', async () => {
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		expect(status!.checksComplete).toBe(true);
+	});
+
 	it('skips the checks reads entirely when the PR has no head sha', async () => {
 		pullsGetMock.mockResolvedValueOnce({
 			data: {

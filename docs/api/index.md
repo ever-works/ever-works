@@ -73,7 +73,7 @@ pipelines, the CLI, the MCP server, cron jobs — the same API also accepts long
 
 | Property       | Value                                                                                                        |
 | -------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Format**     | `ew_live_` + 64 hex characters (256 random bits) — 76 characters in total                                    |
+| **Format**     | `ew_live_` + 64 hex characters (256 random bits) — 72 characters in total                                    |
 | **Storage**    | SHA-256 hash; only the first 12 characters (`ew_live_` + 4 hex) are kept in clear as a label                 |
 | **Limit**      | 10 _active_ keys per user — expired keys do not occupy a slot, and revoking frees one at once                |
 | **Expiry**     | Optional `expiresAt`, which must be in the future at creation                                                |

@@ -1,7 +1,7 @@
 # Ever Works — Threat Model
 
 **Status:** Living document. First draft 2026-05-17, in response to the
-[2026-05-17 platform security audit](../../../../Workspace/knowledge/security/audits/2026-05-17-ever-works-platform-security-audit.md).
+2026-05-17 platform security audit (`knowledge/security/audits/2026-05-17-ever-works-platform-security-audit.md` in the operator workspace repository).
 Owner: Platform team.
 
 > The platform is unusually multi-surfaced: REST API, Next.js web app,

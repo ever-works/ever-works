@@ -99,6 +99,54 @@ describe('createNodeRuntime — disk floor', () => {
 		}
 	});
 
+	it('still reports a figure before the workspace root exists (review AO-8)', async () => {
+		// The beat used the RAW probe while both gates used
+		// `measureWorkspaceFreeBytes`, which walks to the nearest existing
+		// ancestor. `statfs` on a missing path throws, so on every freshly
+		// enrolled node — the root is not created until the first provision
+		// — the beat omitted `diskFreeBytes` entirely while reporting
+		// `minFreeDiskBytes` beside it. The drawer then showed a floor with
+		// no reading to compare it against and could never say "below", on
+		// exactly the machines whose lease gate was already enforcing
+		// against the parent volume.
+		const bodies: Record<string, unknown>[] = [];
+		const probed: string[] = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/heartbeat')) {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+		};
+		const parent = mkdtempSync(join(tmpdir(), 'ew-runtime-disk-absent-'));
+		const root = join(parent, 'fleet-workspaces');
+		try {
+			const runtime = createNodeRuntime(
+				config,
+				{
+					...io(fetchFn),
+					diskProbe: {
+						freeBytes: (path) => {
+							probed.push(path);
+							return 77 * 1024 ** 3;
+						}
+					}
+				},
+				{ workerEnabled: true, agentTaskWorkspaceRoot: root }
+			);
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			// Measured on the nearest EXISTING ancestor, exactly as the gates do.
+			expect(probed).toContain(parent);
+			expect(bodies[0]?.diskFreeBytes).toBe(77 * 1024 ** 3);
+			// So the floor beside it now has something to be compared against.
+			expect(bodies[0]?.minFreeDiskBytes).toBe(2 * 1024 ** 3);
+			await runtime.worker?.stop();
+		} finally {
+			rmSync(parent, { recursive: true, force: true });
+		}
+	});
+
 	it('gates the lease on the workspace volume and exposes the root and provisioner to the shell', async () => {
 		let leaseCalls = 0;
 		const fetchFn: FetchLike = async (url) => {
@@ -287,6 +335,181 @@ describe('createNodeRuntime — disk floor', () => {
 			expect(completions).toEqual([]);
 			expect(runtime.worker?.getState().failed).toBe(1);
 			expect(runtime.worker?.getState().lastError).toContain('floor');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+/**
+ * Housekeeping reporting wiring (EW-803).
+ *
+ * The floor and the reaper's outcome were enforced on the machine and
+ * invisible from the platform. These pin the composition root's half of
+ * the fix: the reporter exists only where there is a worker to report
+ * about, it reads the SAME effective floor the gates were built from, and
+ * what it records reaches the actual heartbeat body.
+ */
+describe('createNodeRuntime — housekeeping reporting', () => {
+	it('puts the effective floor on the heartbeat, matching the floor the gates enforce', async () => {
+		const bodies: Record<string, unknown>[] = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/heartbeat')) {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+		};
+		const root = mkdtempSync(join(tmpdir(), 'ew-runtime-hk-floor-'));
+		try {
+			const runtime = createNodeRuntime(
+				{ ...config, limits: clampResourceLimits({ maxConcurrentJobs: 1, minFreeDiskBytes: 4 * 1024 ** 3 }) },
+				{ ...io(fetchFn), diskProbe: { freeBytes: () => 9 * 1024 ** 3 } },
+				{ workerEnabled: true, agentTaskWorkspaceRoot: root }
+			);
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			// The number Fleet displays is the number this machine enforces,
+			// not a second reading of the config that could drift from it.
+			expect(bodies[0]?.minFreeDiskBytes).toBe(4 * 1024 ** 3);
+			// Nothing has swept yet, so there is no reclaim to claim.
+			expect(bodies[0]).not.toHaveProperty('lastReclaimAt');
+			await runtime.worker?.stop();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('reports a recorded sweep on the NEXT beat', async () => {
+		const bodies: Record<string, unknown>[] = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/heartbeat')) {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+		};
+		const root = mkdtempSync(join(tmpdir(), 'ew-runtime-hk-sweep-'));
+		try {
+			const runtime = createNodeRuntime(
+				config,
+				{ ...io(fetchFn), diskProbe: { freeBytes: () => 9 * 1024 ** 3 } },
+				{ workerEnabled: true, agentTaskWorkspaceRoot: root }
+			);
+			expect(runtime.housekeeping).toBeDefined();
+			// What the reaper timer hands over after a cycle.
+			runtime.housekeeping!.record({
+				dryRun: false,
+				removed: [
+					{ record: { path: '/w/gone', sizeBytes: 3 * 1024 ** 3 } as never, freedBytes: 3 * 1024 ** 3 }
+				],
+				kept: [{ record: { path: '/w/stays', sizeBytes: 1024 ** 3 } as never, reason: 'within the max age' }],
+				removedPools: [],
+				keptPools: [],
+				freedBytes: 3 * 1024 ** 3,
+				errors: []
+			});
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0]?.workspaceCount).toBe(1);
+			expect(bodies[0]?.workspaceBytes).toBe(1024 ** 3);
+			expect(bodies[0]?.lastReclaimFreedBytes).toBe(3 * 1024 ** 3);
+			expect(typeof bodies[0]?.lastReclaimAt).toBe('string');
+			await runtime.worker?.stop();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('reports NOTHING about housekeeping on a visibility-only node', async () => {
+		// No worker means no floor in force and no reaper. Reporting a
+		// floor there would claim a control that is not running.
+		const bodies: Record<string, unknown>[] = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/heartbeat')) {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+		};
+		const root = mkdtempSync(join(tmpdir(), 'ew-runtime-hk-none-'));
+		try {
+			const runtime = createNodeRuntime(
+				config,
+				{ ...io(fetchFn), diskProbe: { freeBytes: () => 9 * 1024 ** 3 } },
+				{ agentTaskWorkspaceRoot: root }
+			);
+			expect(runtime.housekeeping).toBeUndefined();
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0]).not.toHaveProperty('minFreeDiskBytes');
+			// The disk READING still travels — that half was never gated on
+			// having a worker.
+			expect(bodies[0]?.diskFreeBytes).toBe(9 * 1024 ** 3);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('reports an operator-disabled floor as an explicit null', async () => {
+		const bodies: Record<string, unknown>[] = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/heartbeat')) {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+		};
+		const root = mkdtempSync(join(tmpdir(), 'ew-runtime-hk-off-'));
+		try {
+			const runtime = createNodeRuntime(
+				{ ...config, limits: clampResourceLimits({ maxConcurrentJobs: 1, minFreeDiskBytes: null }) },
+				{ ...io(fetchFn), diskProbe: { freeBytes: () => 9 * 1024 ** 3 } },
+				{ workerEnabled: true, agentTaskWorkspaceRoot: root }
+			);
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0]).toHaveProperty('minFreeDiskBytes');
+			expect(bodies[0]?.minFreeDiskBytes).toBeNull();
+			await runtime.worker?.stop();
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('reports NO floor when no disk probe is wired, because none is enforced (review AO-9)', async () => {
+		// `diskProbe` is optional on `NodeIo`, and BOTH gates switch
+		// themselves off without it — `wantsDisk` requires one and
+		// `assertWorkspaceDiskHeadroom` returns before it measures. Reporting
+		// `2 GiB` anyway put a control on the operator's screen that was
+		// doing nothing: the drawer rendered "Above floor" for a node
+		// leasing and provisioning with no free-space check at all.
+		const bodies: Record<string, unknown>[] = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/heartbeat')) {
+				bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+		};
+		const root = mkdtempSync(join(tmpdir(), 'ew-runtime-hk-noprobe-'));
+		try {
+			const runtime = createNodeRuntime(
+				{ ...config, limits: clampResourceLimits({ maxConcurrentJobs: 1, minFreeDiskBytes: 4 * 1024 ** 3 }) },
+				io(fetchFn),
+				{ workerEnabled: true, agentTaskWorkspaceRoot: root }
+			);
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			// Null, not 4 GiB: "no floor in force" is the true statement, and
+			// `hasFleetNodeHousekeeping` deliberately does not count a null
+			// floor as a report, so the drawer says "not reported".
+			expect(bodies[0]?.minFreeDiskBytes).toBeNull();
+			// And no reading either, which is the honest pair.
+			expect(bodies[0]).not.toHaveProperty('diskFreeBytes');
+			await runtime.worker?.stop();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

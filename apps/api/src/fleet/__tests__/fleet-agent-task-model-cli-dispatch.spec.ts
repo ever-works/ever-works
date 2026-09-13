@@ -113,7 +113,10 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         expect(store.enqueue).toHaveBeenCalledTimes(1);
         const request = store.enqueue.mock.calls[0][0];
         expect(request.kind).toBe('agent-task');
-        expect(request.requiredCapabilities).toEqual(['workspace', 'claude-code']);
+        // Slice AM (EW-810) adds `git-push` to every `agent-task` tag set:
+        // the fleet's publish is no longer token-free, so a node that
+        // cannot install a per-run credential must not be offered the work.
+        expect(request.requiredCapabilities).toEqual(['workspace', 'git-push', 'claude-code']);
         expect(request.payload).toEqual({
             taskId: 'task-1',
             agentId: 'agent-1',
@@ -128,11 +131,53 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         expect(request.payload.workspacePath).toBeUndefined();
     });
 
+    // Acceptance checks that mean something (EW-807). This assignment IS
+    // the freeze: both phases are embedded in the immutable enqueued
+    // payload here, and the node reads them from nowhere else — which is
+    // what makes "a model rewriting .works/works.yml mid-run cannot widen
+    // what runs" a property of the system rather than a promise.
+    it('carries the frozen SETUP phase into the job payload, apart from the checks', async () => {
+        const planner = {
+            plan: jest.fn().mockResolvedValue({
+                ...plan,
+                setup: [
+                    {
+                        id: 'repo/setup-1',
+                        name: 'pnpm install --frozen-lockfile',
+                        kind: 'custom',
+                        command: 'pnpm install --frozen-lockfile',
+                        required: true,
+                        phase: 'setup',
+                    },
+                ],
+            }),
+        };
+        await buildDispatcher(planner).enqueue(payload());
+        const request = store.enqueue.mock.calls[0][0];
+        expect(request.payload.setup).toEqual([
+            expect.objectContaining({
+                id: 'repo/setup-1',
+                command: 'pnpm install --frozen-lockfile',
+            }),
+        ]);
+        // The install is NOT also a check: a red install must never be able
+        // to read as a red gate.
+        expect(request.payload.acceptanceChecks).toEqual(plan.acceptanceChecks);
+    });
+
+    it('omits the setup key entirely for a plan that declares no setup phase', async () => {
+        const planner = { plan: jest.fn().mockResolvedValue(plan) };
+        await buildDispatcher(planner).enqueue(payload());
+        expect('setup' in store.enqueue.mock.calls[0][0].payload).toBe(false);
+    });
+
     it('writes the exact legacy job when the planner returns null', async () => {
         const planner = { plan: jest.fn().mockResolvedValue(null) };
         await buildDispatcher(planner).enqueue(payload());
         const request = store.enqueue.mock.calls[0][0];
-        expect(request.requiredCapabilities).toEqual(['workspace']);
+        // Even the legacy (planner-returned-null) job carries `git-push`:
+        // it is a fact about the NODE, not about the plan.
+        expect(request.requiredCapabilities).toEqual(['workspace', 'git-push']);
         expect(request.payload.execution).toBeUndefined();
         expect(request.payload.workspace).toBeUndefined();
         expect(request.payload.steps).toEqual([
@@ -167,5 +212,50 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         expect(planner.plan).not.toHaveBeenCalled();
         expect(delegate.enqueue).toHaveBeenCalledTimes(1);
         expect(store.enqueue).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Self-build slice Z (EW-796) — the MCP block reaches the node the same
+     * way `execution` / `workspace` / `git` do, and ONLY when the planner
+     * put one on the plan.
+     *
+     * This matters beyond wiring: `FleetRunCredentialService.mint` re-reads
+     * `payload.mcp.enabled` on the job row before it will issue anything, so
+     * a payload without the block is a job for which no credential can ever
+     * be minted — by a node, or by anyone who has one.
+     */
+    describe('MCP bridge block (slice Z)', () => {
+        const bridge = {
+            enabled: true,
+            serverUrl: 'https://mcp.ever.works/mcp',
+            serverName: 'ever-works',
+            toolFamilies: ['Tasks', 'Inbox'],
+        };
+
+        it('carries the bridge onto the job payload when the planner enabled it', async () => {
+            const planner = { plan: jest.fn().mockResolvedValue({ ...plan, mcp: bridge }) };
+            await buildDispatcher(planner).enqueue(payload());
+
+            const request = store.enqueue.mock.calls[0][0];
+            expect(request.payload.mcp).toEqual(bridge);
+        });
+
+        it('omits the key entirely when the planner did not — no `mcp: null` on the wire', async () => {
+            const planner = { plan: jest.fn().mockResolvedValue(plan) };
+            await buildDispatcher(planner).enqueue(payload());
+
+            const request = store.enqueue.mock.calls[0][0];
+            expect('mcp' in request.payload).toBe(false);
+        });
+
+        it('never puts a credential on the payload — only where to reach the server', async () => {
+            const planner = { plan: jest.fn().mockResolvedValue({ ...plan, mcp: bridge }) };
+            await buildDispatcher(planner).enqueue(payload());
+
+            const serialized = JSON.stringify(store.enqueue.mock.calls[0][0].payload);
+            expect(serialized).not.toContain('ew_run_');
+            expect(serialized).not.toContain('ew_live_');
+            expect(serialized.toLowerCase()).not.toContain('authorization');
+        });
     });
 });

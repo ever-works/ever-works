@@ -2,12 +2,21 @@ jest.mock('@ever-works/agent/database', () => ({
     UserRepository: class UserRepository {},
 }));
 
+// Self-build slice Z (EW-796): the guard resolves `FleetRunCredentialService`
+// lazily through `moduleRef`, so only its identity matters here. Stubbing
+// the module keeps this unit spec from dragging in the agent fleet runtime
+// (TypeORM entities, the event bus) for one token-prefix branch.
+jest.mock('@ever-works/agent/fleet', () => ({
+    FleetRunCredentialService: class FleetRunCredentialService {},
+}));
+
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import type { ModuleRef, Reflector } from '@nestjs/core';
 import { AuthSessionGuard } from './auth-session.guard';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiKeyService } from '../services/api-key.service';
 import { UserRepository } from '@ever-works/agent/database';
+import { FleetRunCredentialService } from '@ever-works/agent/fleet';
 
 type ApiKeyServiceMock = jest.Mocked<Pick<ApiKeyService, 'validateKey'>>;
 type UserRepositoryMock = jest.Mocked<Pick<UserRepository, 'findById'>>;
@@ -24,18 +33,27 @@ function createContext(
     } as unknown as ExecutionContext;
 }
 
-function createGuard(opts?: { providerUser?: any; providerError?: Error }) {
+function createGuard(opts?: {
+    providerUser?: any;
+    providerError?: Error;
+    noFleetModule?: boolean;
+}) {
     const reflector: jest.Mocked<Pick<Reflector, 'getAllAndOverride'>> = {
         getAllAndOverride: jest.fn().mockReturnValue(undefined),
     } as any;
 
     const apiKeyService: ApiKeyServiceMock = { validateKey: jest.fn() } as any;
     const userRepository: UserRepositoryMock = { findById: jest.fn() } as any;
+    const runCredentials = { authenticate: jest.fn() };
 
     const moduleRef: jest.Mocked<Pick<ModuleRef, 'get'>> = {
         get: jest.fn((token: any) => {
             if (token === ApiKeyService) return apiKeyService;
             if (token === UserRepository) return userRepository;
+            if (token === FleetRunCredentialService) {
+                if (opts?.noFleetModule) throw new Error('FleetRunCredentialService is not bound');
+                return runCredentials;
+            }
             throw new Error(`Unexpected token: ${String(token)}`);
         }),
     } as any;
@@ -56,7 +74,15 @@ function createGuard(opts?: { providerUser?: any; providerError?: Error }) {
     }
 
     const guard = new AuthSessionGuard(reflector as any, moduleRef as any, authProvider as any);
-    return { guard, reflector, apiKeyService, userRepository, moduleRef, authProvider };
+    return {
+        guard,
+        reflector,
+        apiKeyService,
+        userRepository,
+        runCredentials,
+        moduleRef,
+        authProvider,
+    };
 }
 
 describe('AuthSessionGuard', () => {
@@ -323,5 +349,172 @@ describe('AuthSessionGuard', () => {
 
             await expect(guard.canActivate(createContext({ headers: {} }))).rejects.toThrow(boom);
         });
+    });
+});
+
+/**
+ * Self-build slice Z (EW-796) — the `ew_run_` fleet-run credential path.
+ *
+ * What has to hold:
+ *   - a run token authenticates as the OWNER, so every ownership check
+ *     downstream is the one it always was;
+ *   - the run binding lands on the request for `SessionScopeGuard`;
+ *   - it is validated by the RUN validator, never by `ApiKeyService`;
+ *   - every refusal is the SAME 401 as a bad personal key, so a model
+ *     holding its own token cannot map the surface it is refused from;
+ *   - a bearer that is neither prefix still falls through to the auth
+ *     provider, exactly as before this slice.
+ */
+describe('AuthSessionGuard — fleet-run credential (ew_run_)', () => {
+    const RUN_TOKEN = 'ew_run_0123456789abcdef0123456789abcdef';
+    const activeUser = {
+        id: 'owner-1',
+        email: 'owner@example.com',
+        username: 'owner',
+        registrationProvider: 'local',
+        emailVerified: true,
+        isActive: true,
+        avatar: null,
+    };
+    const binding = {
+        keyId: 'key-1',
+        userId: 'owner-1',
+        jobId: 'job-1',
+        nodeId: 'node-1',
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        organizationId: 'org-1',
+        expiresAt: new Date(Date.now() + 60_000),
+    };
+
+    function request(over: Record<string, unknown> = {}) {
+        return {
+            method: 'GET',
+            path: '/api/tasks',
+            headers: { authorization: `Bearer ${RUN_TOKEN}` },
+            ...over,
+        } as any;
+    }
+
+    it('authenticates as the owner and stashes the run binding', async () => {
+        const { guard, runCredentials, userRepository } = createGuard();
+        runCredentials.authenticate.mockResolvedValue(binding);
+        (userRepository.findById as jest.Mock).mockResolvedValue(activeUser);
+        const req = request();
+
+        await expect(guard.canActivate(createContext(req))).resolves.toBe(true);
+
+        expect(req.user).toMatchObject({ userId: 'owner-1', email: 'owner@example.com' });
+        expect(req.fleetRunCredential).toEqual({
+            jobId: 'job-1',
+            nodeId: 'node-1',
+            runId: 'run-1',
+            organizationId: 'org-1',
+        });
+    });
+
+    it('passes the method and path so the route allowlist can be applied', async () => {
+        const { guard, runCredentials, userRepository } = createGuard();
+        runCredentials.authenticate.mockResolvedValue(binding);
+        (userRepository.findById as jest.Mock).mockResolvedValue(activeUser);
+
+        await guard.canActivate(
+            createContext(request({ method: 'POST', path: '/api/tasks/t1/chat' })),
+        );
+
+        expect(runCredentials.authenticate).toHaveBeenCalledWith(RUN_TOKEN, {
+            method: 'POST',
+            path: '/api/tasks/t1/chat',
+        });
+    });
+
+    it('never asks ApiKeyService to validate a run token', async () => {
+        const { guard, runCredentials, apiKeyService, userRepository } = createGuard();
+        runCredentials.authenticate.mockResolvedValue(binding);
+        (userRepository.findById as jest.Mock).mockResolvedValue(activeUser);
+
+        await guard.canActivate(createContext(request()));
+
+        expect(apiKeyService.validateKey).not.toHaveBeenCalled();
+    });
+
+    it('accepts the token in the x-api-key slot too', async () => {
+        const { guard, runCredentials, userRepository } = createGuard();
+        runCredentials.authenticate.mockResolvedValue(binding);
+        (userRepository.findById as jest.Mock).mockResolvedValue(activeUser);
+
+        await expect(
+            guard.canActivate(createContext(request({ headers: { 'x-api-key': RUN_TOKEN } }))),
+        ).resolves.toBe(true);
+    });
+
+    it('refuses a rejected token with the SAME message a bad personal key gets', async () => {
+        const { guard, runCredentials, authProvider } = createGuard();
+        runCredentials.authenticate.mockResolvedValue(null);
+
+        await expect(guard.canActivate(createContext(request()))).rejects.toThrow(
+            new UnauthorizedException('Invalid or expired API key'),
+        );
+        // And it does NOT fall through to a session: a machine credential
+        // asks for the machine path and gets a deterministic answer.
+        expect(authProvider.authenticate).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the run resolves to an inactive owner', async () => {
+        const { guard, runCredentials, userRepository } = createGuard();
+        runCredentials.authenticate.mockResolvedValue(binding);
+        (userRepository.findById as jest.Mock).mockResolvedValue({
+            ...activeUser,
+            isActive: false,
+        });
+
+        await expect(guard.canActivate(createContext(request()))).rejects.toThrow(
+            UnauthorizedException,
+        );
+    });
+
+    it('fails closed on an install with no fleet module bound', async () => {
+        const { guard } = createGuard({ noFleetModule: true });
+
+        await expect(guard.canActivate(createContext(request()))).rejects.toThrow(
+            new UnauthorizedException('Invalid or expired API key'),
+        );
+    });
+
+    it('leaves an ordinary opaque bearer to the auth provider, exactly as before', async () => {
+        const providerUser = { userId: 'session-user' };
+        const { guard, runCredentials, apiKeyService, authProvider } = createGuard({
+            providerUser,
+        });
+
+        const req = {
+            method: 'GET',
+            path: '/api/tasks',
+            headers: { authorization: 'Bearer some-opaque-session-token' },
+        } as any;
+        await expect(guard.canActivate(createContext(req))).resolves.toBe(true);
+
+        expect(req.user).toBe(providerUser);
+        expect(req.fleetRunCredential).toBeUndefined();
+        expect(runCredentials.authenticate).not.toHaveBeenCalled();
+        expect(apiKeyService.validateKey).not.toHaveBeenCalled();
+        expect(authProvider.authenticate).toHaveBeenCalled();
+    });
+
+    it('still routes an ew_live_ key to ApiKeyService and leaves no run binding', async () => {
+        const { guard, runCredentials, apiKeyService, userRepository } = createGuard();
+        (apiKeyService.validateKey as jest.Mock).mockResolvedValue({ userId: 'owner-1' });
+        (userRepository.findById as jest.Mock).mockResolvedValue(activeUser);
+
+        const req = {
+            method: 'GET',
+            path: '/api/tasks',
+            headers: { authorization: 'Bearer ew_live_abcdef' },
+        } as any;
+        await expect(guard.canActivate(createContext(req))).resolves.toBe(true);
+
+        expect(apiKeyService.validateKey).toHaveBeenCalledWith('ew_live_abcdef');
+        expect(runCredentials.authenticate).not.toHaveBeenCalled();
+        expect(req.fleetRunCredential).toBeUndefined();
     });
 });

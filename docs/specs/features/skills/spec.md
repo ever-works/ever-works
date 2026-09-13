@@ -335,4 +335,4 @@ Implementation: reuses the existing `AiFacadeService.createChatCompletion()` pat
 - Agents feature: [`../agents/spec.md`](../agents/spec.md)
 - Task-tracking feature: [`../task-tracking/spec.md`](../task-tracking/spec.md)
 - AI Facade: [`../../architecture/ai-facade.md`](../../architecture/ai-facade.md)
-- Constitution: [`../../../.specify/memory/constitution.md`](../../../.specify/memory/constitution.md)
+- Constitution: [`.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md) (outside the docs tree, so linked on GitHub)

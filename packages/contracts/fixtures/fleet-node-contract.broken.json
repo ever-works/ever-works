@@ -1,0 +1,153 @@
+{
+	"_docblock": [
+		"DELIBERATELY BROKEN CONTRACT MATERIAL — the bite proof for the node-contract gate.",
+		"",
+		"A gate that cannot fail is not a gate. Every case below is a mutation of",
+		"fleet-node-contract.v1.json, one field at a time, in one direction at a time.",
+		"apps/api/src/fleet/__tests__/node-contract.harness.spec.ts feeds each one to the",
+		"SAME harness functions the real conformance suite uses and asserts the harness",
+		"goes red — and red for the right REASON, because 'the platform now requires",
+		"something a deployed node cannot send' and 'a deployed node sends something the",
+		"platform now forbids' need different fixes and different people paged.",
+		"",
+		"NOTHING HERE IS A CONTRACT. Do not copy a body out of this file into the",
+		"baseline. These shapes exist to be rejected."
+	],
+	"requestCases": [
+		{
+			"name": "platform-too-new — a previously-optional field became required (the EW-792 shape)",
+			"route": "jobs-heartbeat",
+			"expectDirection": "platform-too-new",
+			"expectMentions": "leaseGeneration",
+			"note": "The literal body a node built before suspend-safe leases sends. Classified by the ABSENCE of the complained-about key from the body, not by the message text.",
+			"body": {
+				"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
+				"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"leaseTtlSec": 120
+			}
+		},
+		{
+			"name": "platform-too-new — the complete verb requires a field an older node omits",
+			"route": "jobs-complete",
+			"expectDirection": "platform-too-new",
+			"expectMentions": "leaseGeneration",
+			"body": {
+				"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
+				"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"success": true
+			}
+		},
+		{
+			"name": "node-too-old — a deployed node sends a self-description field the platform does not declare",
+			"route": "heartbeat",
+			"expectDirection": "node-too-old",
+			"expectMentions": "gpuVendor",
+			"note": "forbidNonWhitelisted turns an undeclared field into a 400. This is what a node ONE release ahead of the platform looks like — and what a rollback of a self-description field does to the whole fleet at once.",
+			"body": {
+				"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
+				"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"platform": "linux/x64",
+				"gpuVendor": "nvidia"
+			}
+		},
+		{
+			"name": "node-too-old — an enroll body carrying a field a later platform removed",
+			"route": "enroll",
+			"expectDirection": "node-too-old",
+			"expectMentions": "modelIdentityV2",
+			"body": {
+				"token": "3nr0ll-t0k3n-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+				"platform": "linux/x64",
+				"modelIdentityV2": "claude-code: ops@example.com"
+			}
+		},
+		{
+			"name": "node-too-old — the lease poll gains a field the platform does not know",
+			"route": "jobs-lease",
+			"expectDirection": "node-too-old",
+			"expectMentions": "leaseAffinity",
+			"body": {
+				"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
+				"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+				"leaseAffinity": "sticky"
+			}
+		}
+	],
+	"responseCases": [
+		{
+			"name": "a response field the node dereferences disappeared (enroll.secret)",
+			"route": "enroll",
+			"expectMentions": "secret",
+			"note": "FleetClient.enroll throws `malformed` and the machine never stores a credential — it retries the one-time token forever and enrolls nothing.",
+			"response": {
+				"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
+				"node": { "id": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31" }
+			}
+		},
+		{
+			"name": "a response field changed type (node.id became a number)",
+			"route": "heartbeat",
+			"expectMentions": "node.id",
+			"note": "readNode() requires `typeof view.id === 'string'`; a numeric id is `malformed` on every beat.",
+			"response": { "ok": true, "node": { "id": 12345 } }
+		},
+		{
+			"name": "the lease job list became null instead of an empty array",
+			"route": "jobs-lease",
+			"expectMentions": "jobs",
+			"note": "job-client.ts hard-throws `malformed` on anything that is not an array. This is the shape a well-meant 'return null when there is nothing' refactor produces, and it stops every node in the fleet leasing.",
+			"response": { "jobs": null }
+		},
+		{
+			"name": "the lease view dropped leaseGeneration",
+			"route": "jobs-lease",
+			"expectMentions": "jobs[].leaseGeneration",
+			"note": "Without it leaseGenerationOf() returns undefined, job-client omits the key, and every heartbeat and complete is 400'd by the DTO that requires it. One dropped response field, whole fleet stalled.",
+			"response": {
+				"jobs": [
+					{
+						"id": "b1a2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+						"kind": "agent-task",
+						"payload": { "runId": "9c8b7a6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d" },
+						"leaseExpiresAt": "2026-09-05T09:03:00.000Z"
+					}
+				]
+			}
+		},
+		{
+			"name": "the job heartbeat stopped sending ok",
+			"route": "jobs-heartbeat",
+			"expectMentions": "ok",
+			"note": "Unlike the NODE heartbeat, the JOB heartbeat really does read `ok` — job-client.ts treats a missing one as `malformed`.",
+			"response": {
+				"job": {
+					"id": "b1a2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+					"leaseExpiresAt": "2026-09-05T09:05:00.000Z"
+				}
+			}
+		}
+	],
+	"statusCases": [
+		{
+			"name": "enroll stopped answering 201",
+			"route": "enroll",
+			"pin": "successStatus",
+			"observedStatus": 200,
+			"note": "The node only checks response.ok, so it would NOT notice — but apps/web/e2e/flow-fleet-enrollment-contract.spec.ts asserts 201, and any other client that branches on Created breaks silently. A status pin is the only thing that catches a change nobody's runtime complains about."
+		},
+		{
+			"name": "the stale-lease refusal became a 401",
+			"route": "jobs-heartbeat",
+			"pin": "staleLease",
+			"observedStatus": 401,
+			"note": "job-client maps 401 on a job heartbeat to null (lease lost, REPORT the failure) and 409 to `stale-lease` (abort, do NOT report). Swapping them makes a superseded run overwrite the state of whoever holds the job now."
+		},
+		{
+			"name": "a stopped fleet started refusing the lease instead of answering empty",
+			"route": "jobs-lease",
+			"pin": "leaseWhenStopped",
+			"observedStatus": 401,
+			"note": "Slice V's failure mode. Every node reads lease-401 as a revoked credential and goes `unauthorized`-sticky — a reversible global stop turns into a fleet-wide re-enrollment."
+		}
+	]
+}

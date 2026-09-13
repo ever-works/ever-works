@@ -26,7 +26,7 @@ ever-works/
 │   ├── agent/            # Core business logic, plugins, pipeline, AI, database
 │   ├── contracts/        # Shared TypeScript types
 │   ├── plugin/           # Plugin SDK v1.0.0 (standalone, no NestJS deps)
-│   ├── plugins/          # 39 plugins (AI, search, deploy, pipeline, prompt mgmt, etc.)
+│   ├── plugins/          # 102 plugins across 19 categories (AI, search, deploy, pipeline, connectors, etc.)
 │   ├── monitoring/       # Sentry + PostHog integration
 │   ├── tasks/            # Trigger.dev background jobs
 │   └── cli-shared/       # Shared CLI utilities

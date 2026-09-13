@@ -12,13 +12,18 @@ import {
     MaxLength,
     Min,
     MinLength,
+    Validate,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+    FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN,
     TASK_ACCEPTANCE_CHECK_KINDS,
+    TASK_CHECK_PHASES,
     type TaskAcceptanceCheck,
     type TaskAcceptanceCheckKind,
+    type TaskCheckPhase,
 } from '@ever-works/contracts';
+import { IsNotReservedMountDirConstraint } from './task-extra-repo.dto';
 import { ENV_NAME_PATTERN, MAX_ENV_PASSTHROUGH } from '../tasks-domain/check-env';
 
 /**
@@ -78,6 +83,29 @@ export class AcceptanceCheckDto implements TaskAcceptanceCheck {
     @IsString()
     @MaxLength(512)
     cwd?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Which repository of a multi-repo Task this command runs in: the mountDir of one of the Task’s extra repositories. Omitted = the primary worktree. A NAME, not a path — the runner looks it up in the repositories the run actually provisioned and refuses one it did not.',
+        pattern: FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.source,
+    })
+    @IsOptional()
+    @IsString()
+    @Matches(FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN, {
+        message:
+            'mountDir must be a single directory name (letters, digits, ".", "_" or "-"; no separators, no leading or trailing dot).',
+    })
+    @Validate(IsNotReservedMountDirConstraint)
+    mountDir?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'setup = a dependency install run BEFORE the model, with its own timeout and log cap, reported apart from the checks; check (the default) = an acceptance check whose exit code is the gate. A failed setup step is never reported as a failing check.',
+        enum: TASK_CHECK_PHASES,
+    })
+    @IsOptional()
+    @IsIn(TASK_CHECK_PHASES)
+    phase?: TaskCheckPhase;
 
     @ApiPropertyOptional({
         description: 'Wall-clock budget in seconds; exceeding it reports `timeout`, not `red`.',

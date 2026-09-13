@@ -1,4 +1,9 @@
-import type { GateStatus, MergeDecision, MergeMethod } from '@ever-works/contracts';
+import type {
+    GateStatus,
+    MergeDecision,
+    MergeMethod,
+    ResolvedMergePolicy,
+} from '@ever-works/contracts';
 
 /**
  * Merge-policy matrix (Wave 3, founder decision D4) — injection token +
@@ -36,6 +41,21 @@ export interface MergePolicyEnforcer {
      * throw for policy reasons — a refusal is `{ allowed: false, reason }`.
      */
     canAgentMerge(input: MergePolicyDecisionInput): Promise<MergeDecision>;
+    /**
+     * Merge approval (self-build slice AE) — the resolved policy WITHOUT
+     * a decision, so the enforcement site can read one field before it
+     * evaluates anything: does this scope require a human approval?
+     *
+     * The facade needs that answer earlier than `canAgentMerge` can give
+     * it, because the approval must be verified (and the head commit
+     * pinned) BEFORE the matrix runs, and because the operator
+     * kill-switch skips the matrix but must not skip the approval.
+     *
+     * Optional on the contract so a minimal test double still satisfies
+     * `MergePolicyEnforcer`. Absent, the facade assumes an approval IS
+     * required — the fail-closed reading.
+     */
+    resolve?(input: MergePolicyDecisionInput): Promise<ResolvedMergePolicy>;
 }
 
 export const MERGE_POLICY_ENFORCER = 'MERGE_POLICY_ENFORCER' as const;

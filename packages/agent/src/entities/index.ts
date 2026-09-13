@@ -73,6 +73,7 @@ export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
 export * from './task-review-rejection.entity';
+export * from './task-ci-auto-resume-attempt.entity';
 export * from './task-approver.entity';
 export * from './task-block.entity';
 export * from './task-relation.entity';
@@ -189,3 +190,6 @@ export * from './agent-plugin-package.entity';
 export * from './agent-plugin-package-allowlist.entity';
 export * from './repo-connection.entity';
 export * from './agent-repo-attachment.entity';
+// Release promotion lane (self-build slice AI, EW-808) — one row per
+// attempt to move a Work one rung along develop -> stage -> main.
+export * from './release-promotion.entity';

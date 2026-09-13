@@ -23,6 +23,7 @@ import {
     type WorkExternalRefs,
 } from '@ever-works/contracts';
 import { AcceptanceCheckDto } from './acceptance-check.dto';
+import { WorkRepoDeclaredCommandsDto } from './repo-declared-commands.dto';
 import { MergePolicyDto } from './merge-policy.dto';
 import { MarkdownReadmeConfigDto } from './create-work.dto';
 import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
@@ -141,6 +142,17 @@ export class UpdateWorkDto {
     @IsOptional()
     @IsIn(WORK_CHECKS_POLICIES)
     checksPolicy?: WorkChecksPolicy;
+
+    @ApiPropertyOptional({
+        description:
+            "Whether this Work reads the setup/check commands its OWN repository declares in .works/works.yml, and exactly which commands it will admit. Absent or `{ mode: 'off' }` — the default for every Work — means the file is not consulted for commands at all. A declared command is a command this Work's enrolled machines will run: `allow` is an exact-match list, never a prefix or a pattern. Pass `null` to clear.",
+        type: WorkRepoDeclaredCommandsDto,
+        nullable: true,
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => WorkRepoDeclaredCommandsDto)
+    repoDeclaredCommands?: WorkRepoDeclaredCommandsDto | null;
 
     @ApiPropertyOptional({
         description:

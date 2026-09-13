@@ -309,9 +309,9 @@ The API equivalent is `POST /api/works` with `kind: "repo"` and
 
 ### Git Provider
 
-All three creation methods require a **connected git provider** (GitHub, GitLab, or Bitbucket). The git provider stores the work's repositories. You select it in the sidebar before choosing a creation method, and can connect via OAuth if not already linked.
+All three creation methods require a **connected GitHub account**. GitHub is the only git provider implemented today; GitLab and Bitbucket can be added by implementing the same git-provider plugin interface (see [Git Operations](./git-operations.md)). The git provider stores the work's repositories. You select it in the sidebar before choosing a creation method, and can connect via OAuth if not already linked.
 
-If no git provider is connected, the AI and Manual methods will show an error prompting you to connect one. The Import method requires it for accessing source repositories.
+If GitHub is not connected, the AI and Manual methods will show an error prompting you to connect it. The Import method requires it for accessing source repositories.
 
 ### Deploy Provider
 

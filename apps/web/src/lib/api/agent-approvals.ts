@@ -13,6 +13,8 @@ export type AgentActionProposalActionType =
     | 'schedule_task'
     | 'send_message'
     | 'budget_override'
+    /** Merge approval (self-build slice AE, EW-805). */
+    | 'merge_pull_request'
     | 'other';
 
 export type AgentActionProposalStatus = 'pending' | 'approved' | 'rejected';
@@ -28,6 +30,13 @@ export interface AgentActionProposal {
     title: string;
     payload: Record<string, unknown>;
     riskFlags: AgentActionRiskFlag[];
+    /**
+     * Merge approval (slice AE) — `merge:<taskId>:<prNumber>:<headSha>` on a
+     * `merge_pull_request` proposal, null on every other kind. It is what
+     * distinguishes two approvals for the same pull request at different
+     * commits.
+     */
+    subjectKey: string | null;
     status: AgentActionProposalStatus;
     decidedById: string | null;
     decidedAt: string | null;
@@ -51,7 +60,17 @@ export interface ListAgentApprovalsResponse {
 
 export interface ApproveAllAgentApprovalsResult {
     approved: number;
+    /** Rows somebody had ALREADY decided before the bulk call landed. */
     skipped: number;
+    /**
+     * Merge approval (slice AE) — rows bulk approve deliberately refuses
+     * to decide, and which are therefore STILL PENDING. Distinct from
+     * `skipped` because telling a user their merge approval was "already
+     * decided" when it is still sitting in the queue is a lie about the
+     * one irreversible item in it. Optional on the wire so an older API
+     * response still parses.
+     */
+    excluded?: number;
 }
 
 function buildQuery(q: ListAgentApprovalsQuery = {}): string {

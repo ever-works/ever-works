@@ -28,7 +28,16 @@ export const DEFAULT_DIFF_MAX_FILES = 100;
 export const HARD_DIFF_MAX_BYTES = 1024 * 1024;
 export const HARD_DIFF_MAX_FILES = 300;
 
-/** Cap on checks carried on a PR status (the pill lists a handful). */
+/**
+ * Cap on checks carried on a PR status (the pill lists a handful).
+ *
+ * DISPLAY BOUND ONLY. `deriveCiState` must be given the provider's FULL
+ * check list — a roll-up computed over `capChecks(...)` reports a red
+ * pull request green as soon as the failure sits past index 20, and this
+ * repository's own CI runs far more than twenty legs. Slice AE (merge
+ * approval) made `ciState` an authorization input, so getting that
+ * ordering wrong merges red work.
+ */
 export const MAX_PR_CHECKS = 20;
 
 /**

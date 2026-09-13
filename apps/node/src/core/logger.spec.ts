@@ -55,6 +55,44 @@ describe('createLogger redaction', () => {
 		logger.protect(SECRET);
 		expect(logger.redact(`connect failed: ${SECRET}`)).toBe(`connect failed: ${REDACTED}`);
 	});
+
+	// REGRESSION — the protected set had no eviction path (slice AM review, F3).
+	//
+	// That is correct for the two credentials this process holds for its
+	// whole life, and wrong for a per-run one: the scoped push token was
+	// protected on every mint and never dropped, so a node running forty
+	// agent-tasks across a multi-day uptime accumulated forty raw
+	// `contents: write` installation tokens in a process-lifetime closure —
+	// recoverable from a heap snapshot or a crash dump, and the recent ones
+	// still live at GitHub. `unprotect()` is what lets the owner of a
+	// short-lived credential say when it stops existing.
+	it('forgets a per-run credential on unprotect, and keeps the rest', () => {
+		const { logger, text } = capture();
+		logger.protect(SECRET);
+		logger.protect(TOKEN);
+
+		logger.unprotect(TOKEN);
+
+		logger.info(`run over: token=${TOKEN} secret=${SECRET}`);
+		// The long-lived secret is still scrubbed; only the value whose
+		// owner declared it dead comes back through.
+		expect(text()).toBe(`run over: token=${TOKEN} secret=${REDACTED}`);
+	});
+
+	it('is safe to unprotect a value that was never protected, or none at all', () => {
+		const { logger, text } = capture();
+		logger.protect(SECRET);
+
+		logger.unprotect('never-registered-value');
+		logger.unprotect(null);
+		logger.unprotect(undefined);
+		// Idempotent: the second call has nothing left to remove.
+		logger.unprotect(SECRET);
+		logger.unprotect(SECRET);
+
+		logger.info(`secret=${SECRET}`);
+		expect(text()).toBe(`secret=${SECRET}`);
+	});
 });
 
 describe('createBufferedLogger', () => {

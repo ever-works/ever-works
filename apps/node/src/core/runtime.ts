@@ -1,3 +1,4 @@
+import { describeApiBase, resolveApiBase } from './api-base';
 import { PlatformAuthClient } from './auth-client';
 import {
 	describeSelf,
@@ -5,16 +6,11 @@ import {
 	type CommandRunner,
 	type SelfDescriptionTelemetry
 } from './capabilities';
-import {
-	cacheProbe,
-	detectAgentCliVersion,
-	detectDiskFreeBytes,
-	detectModelIdentity,
-	type DiskProbeIo
-} from './telemetry-probe';
+import { cacheProbe, detectAgentCliVersion, detectModelIdentity, type DiskProbeIo } from './telemetry-probe';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
+import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
@@ -23,7 +19,13 @@ import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
 import type { ModelCliPaths } from './executors/model-cli';
-import { defaultFleetTaskWorkspaceRoot, FleetTaskWorkspaceProvisioner } from './workspaces/fleet-task-workspace';
+import {
+	assertWorkspaceDiskHeadroom,
+	defaultFleetTaskWorkspaceRoot,
+	FleetTaskWorkspaceProvisioner
+} from './workspaces/fleet-task-workspace';
+import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
+import { PushCredentialSession } from './workspaces/push-credential';
 import type { Logger } from './logger';
 import {
 	clampResourceLimits,
@@ -96,7 +98,15 @@ export function buildSelfDescriptionTelemetry(io: NodeIo): SelfDescriptionTeleme
 	if (io.diskProbe) {
 		const probe = io.diskProbe;
 		const path = io.workspacePath ?? process.cwd();
-		telemetry.diskFreeBytes = () => detectDiskFreeBytes(probe, path);
+		// The SAME measurement both gates use — walking to the nearest
+		// existing ancestor — not the raw probe (review AO-8). The raw probe
+		// answers null for a workspace root that does not exist yet, which
+		// is every freshly enrolled node until its first provision: the beat
+		// then omitted `diskFreeBytes` while reporting `minFreeDiskBytes`
+		// beside it, so the drawer showed a floor with no reading to compare
+		// it against and could never say "below" — on exactly the machines
+		// whose lease gate was already enforcing against the parent volume.
+		telemetry.diskFreeBytes = () => measureWorkspaceFreeBytes(probe, path);
 	}
 	return telemetry;
 }
@@ -138,6 +148,11 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 	const { logger } = options;
 	logger.protect(options.token);
 
+	// DELIBERATELY not `resolveApiBase`. Enrollment mints a credential against
+	// a SPECIFIC platform, and the origin it was minted against is what gets
+	// stored — so the operator's `--api-url` is authoritative here and the
+	// `EVER_WORKS_NODE_API_URL` pin must not silently redirect it. Pinning
+	// applies to every LATER call (see `createNodeRuntime`), never to this one.
 	const client = new FleetClient({
 		apiUrl: options.apiUrl,
 		fetchFn: options.fetchFn,
@@ -247,6 +262,15 @@ export interface NodeRuntime {
 	 * process is using right now (belt and braces over the on-disk lease).
 	 */
 	workspaceProvisioner?: FleetWorkspaceProvisionerLike;
+	/**
+	 * Node housekeeping reporting (EW-803), present with `worker`.
+	 *
+	 * Already wired into the heartbeat's `describe` closure. Exposed so
+	 * the shell can hand each completed reaper cycle to it — the reaper
+	 * timer is started out there, after this runtime exists, so the two
+	 * meet through this object rather than through a constructor.
+	 */
+	housekeeping?: NodeHousekeepingReporter;
 }
 
 /** The provisioner surface the runtime composes over; the real one and every test double satisfy it. */
@@ -324,6 +348,14 @@ export interface CreateNodeRuntimeOptions {
 	 * how `ever-works-node pause` survives a service restart.
 	 */
 	startPaused?: boolean;
+
+	/**
+	 * Environment the control-plane pin (`EVER_WORKS_NODE_API_URL`) is read
+	 * from. Defaults to `process.env`; a parameter because both shells — the
+	 * CLI and the Electron main process — and every test need to supply
+	 * their own. See `api-base.ts`.
+	 */
+	env?: Record<string, string | undefined>;
 }
 
 /**
@@ -335,8 +367,21 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	io.logger.protect(config.secret);
 
 	const userAgent = io.userAgent ?? `ever-works-node/${io.version}`;
+	// Self-hosting safety (EW-779): an operator can pin the control plane to a
+	// stable origin so a broken `develop` cannot orphan the machine. Resolved
+	// ONCE here and shared by the heartbeat and job clients, so the two can
+	// never end up talking to different platforms.
+	const apiBase = resolveApiBase(config, options.env ?? process.env);
+	io.logger.info(`Control plane: ${describeApiBase(apiBase)}`);
+	if (apiBase.mismatch) {
+		io.logger.warn(
+			`The pinned control plane (${apiBase.url}) is not the origin this node enrolled against ` +
+				`(${apiBase.configuredUrl}). Every call will be refused with 401 until the pin is ` +
+				'corrected or the node is re-enrolled.'
+		);
+	}
 	const client = new FleetClient({
-		apiUrl: config.apiUrl,
+		apiUrl: apiBase.url,
 		fetchFn: io.fetchFn,
 		logger: io.logger,
 		userAgent
@@ -368,7 +413,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 
 	if (options.workerEnabled) {
 		const jobClient = new FleetJobClient({
-			apiUrl: config.apiUrl,
+			apiUrl: apiBase.url,
 			nodeId: config.nodeId,
 			secret: config.secret,
 			fetchFn: io.fetchFn,
@@ -415,6 +460,33 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// to report, and the platform shows "unknown" rather than a
 		// fabricated `idle`.
 		telemetry.workerHealth = () => describeWorkerHealth(worker.getState());
+		// Node housekeeping (EW-803), onto the SAME telemetry object and
+		// for the same reason. Only with a worker: a visibility-only node
+		// enforces no floor and runs no reaper, so it has nothing to say
+		// and must not claim otherwise.
+		//
+		// The floor here is `effectiveMinFreeDiskBytes(limits)` — the very
+		// value the lease gate and the provisioner were handed above — so
+		// what Fleet displays is what this machine actually enforces,
+		// rather than a second reading of the config that could drift.
+		//
+		// With one condition, and it is the whole point of the sentence
+		// above (review AO-9): BOTH gates switch themselves off when no
+		// `diskProbe` is wired — `wantsDisk` requires one, and
+		// `assertWorkspaceDiskHeadroom` returns before it measures. An
+		// embedder that builds a `NodeIo` without a probe therefore
+		// enforces nothing, and reporting a floor anyway would put a
+		// control on the operator's screen that does nothing. `null` on the
+		// wire is "no floor in force", which is exactly true here, and
+		// `hasFleetNodeHousekeeping` deliberately does not count a null
+		// floor as a report — so the drawer says "not reported" rather than
+		// "Above floor".
+		const housekeeping = new NodeHousekeepingReporter({
+			minFreeDiskBytes: io.diskProbe ? effectiveMinFreeDiskBytes(limits) : null,
+			...(io.now ? { now: io.now } : {})
+		});
+		telemetry.housekeeping = () => housekeeping.describe();
+		runtime.housekeeping = housekeeping;
 		const workspaceProvisioner: FleetWorkspaceProvisionerLike =
 			options.workspaceProvisioner ??
 			new FleetTaskWorkspaceProvisioner({
@@ -434,96 +506,167 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// either CLI: a job that asks for model execution then fails naming
 		// the missing CLI rather than pretending to have run it.
 		const modelCli = options.modelCli ?? io.environment.modelCli ?? {};
-		worker.register('agent-task', (job, signal, lease) =>
-			runAgentTaskJob(
-				job,
-				{
-					provisionWorkspace: (taskId, spec, provisionSignal) =>
-						workspaceProvisioner.provision(taskId, spec, provisionSignal),
-					...(workspaceProvisioner.finalize
-						? {
-								finalizeWorkspace: (taskId, descriptor, opts, finalizeSignal) =>
-									workspaceProvisioner.finalize!(taskId, descriptor, opts, finalizeSignal)
+		worker.register('agent-task', async (job, signal, lease) => {
+			// Scoped push credentials (self-build slice AM, EW-810). ONE
+			// session per job: a multi-repo run publishes its mounts and its
+			// primary branch seconds apart under the same claim, and the
+			// platform scopes a single token to every repository the job
+			// writes, so a second mint would only widen the number of live
+			// write credentials.
+			//
+			// It hangs off the LEASE, exactly as run secrets do: the
+			// platform proves this node still holds an active claim before
+			// it hands a machine a write credential for the owner's
+			// repositories. A caller with no lease has no session, and the
+			// provisioner then REFUSES to publish rather than falling back
+			// to this machine's own Git credential helper.
+			const pushCredentials = lease
+				? new PushCredentialSession({
+						jobId: job.id,
+						client: { mintPushCredential: () => lease.mintPushCredential() },
+						...(io.logger ? { logger: io.logger } : {})
+					})
+				: null;
+			try {
+				return await runAgentTaskJob(
+					job,
+					{
+						provisionWorkspace: (taskId, spec, provisionSignal) =>
+							workspaceProvisioner.provision(taskId, spec, provisionSignal),
+						...(workspaceProvisioner.finalize
+							? {
+									finalizeWorkspace: (taskId, descriptor, opts, finalizeSignal) =>
+										workspaceProvisioner.finalize!(
+											taskId,
+											descriptor,
+											{ ...opts, ...(pushCredentials ? { pushCredentials } : {}) },
+											finalizeSignal
+										)
+								}
+							: {}),
+						...(workspaceProvisioner.finalizeMounts
+							? {
+									finalizeMounts: (taskId, descriptor, opts, finalizeSignal) =>
+										workspaceProvisioner.finalizeMounts!(
+											taskId,
+											descriptor,
+											{ ...opts, ...(pushCredentials ? { pushCredentials } : {}) },
+											finalizeSignal
+										)
+								}
+							: {}),
+						// Drops the on-disk lease the provisioner took on the worktree
+						// (and its mounts) so the workspace reaper can tell "a job is
+						// in here" from "a job WAS in here".
+						...(workspaceProvisioner.release
+							? {
+									releaseWorkspace: (taskId, descriptor) =>
+										workspaceProvisioner.release!(taskId, descriptor)
+								}
+							: {}),
+						// Run secrets (self-build slice Y). The WRITE and the
+						// DELETE are the provisioner's — it owns the worktree, its
+						// canonical-path checks and its Git exclude rules — while
+						// the FETCH hangs off the lease below, because "may this
+						// node still be trusted with this job?" is the same
+						// question the publish fence asks and must have the same
+						// answer.
+						...(workspaceProvisioner.writeRunEnvFiles
+							? {
+									writeRunEnvFiles: (taskId, descriptor, files) =>
+										workspaceProvisioner.writeRunEnvFiles!(taskId, descriptor, files)
+								}
+							: {}),
+						...(workspaceProvisioner.removeRunEnvFiles
+							? {
+									removeRunEnvFiles: (_taskId, descriptor) =>
+										workspaceProvisioner.removeRunEnvFiles!(descriptor)
+								}
+							: {}),
+						// `agent-task` is the only kind that writes to a remote, so
+						// it is the only kind that has to know when this node stops
+						// being allowed to. Resolved through the handle, never
+						// captured: the deadline moves with every renewal, and
+						// `confirmDeadline` re-asks the platform at the moment of
+						// the write — which is the only way to see a claim that was
+						// taken away (an operator drained this node) while its
+						// deadline was still minutes in the future.
+						...(lease
+							? {
+									publishFence: async () => ({
+										deadlineAt: await lease.confirmDeadline(),
+										marginMs: lease.publishMarginMs
+									}),
+									// A withheld publish is not a verdict about the
+									// work — nothing ran to a conclusion — so the
+									// job goes back unsettled rather than terminal.
+									onPublishWithheld: (reason: string) => lease.defer(reason),
+									// A provision the node declined before writing a byte
+									// (below the disk floor, or the reaper mid-removal of
+									// that very worktree) is about this machine, not the
+									// work: hand the job back so a node with room takes it.
+									onProvisionDeclined: (reason: string) => lease.defer(reason),
+									// Run secrets: fetched THROUGH the lease, so the
+									// platform proves this node still holds an active
+									// claim on this job before a decrypted `.env`
+									// leaves it. A node with no lease (the cloud
+									// runner) has no seam here, and a job that needs
+									// env files fails naming the gap rather than
+									// running against an environment nobody set up.
+									fetchRunEnvFiles: (refs) => lease.fetchRunEnvFiles(refs)
+								}
+							: {}),
+						modelCli,
+						// Self-build slice Z (EW-796) — the platform side of the
+						// MCP bridge, wired through the SAME authenticated job
+						// client the lease protocol uses. No new endpoint, no new
+						// credential on the node: the node secret is what proves
+						// this machine holds the claim, and what it gets back is a
+						// separate, short-lived token the model step keeps in
+						// memory only.
+						logger: io.logger,
+						mcpBridge: {
+							mint: (id: string) => jobClient.mintMcpCredential(id),
+							revoke: async (id: string) => {
+								await jobClient.revokeMcpCredential(id);
 							}
-						: {}),
-					...(workspaceProvisioner.finalizeMounts
-						? {
-								finalizeMounts: (taskId, descriptor, opts, finalizeSignal) =>
-									workspaceProvisioner.finalizeMounts!(taskId, descriptor, opts, finalizeSignal)
-							}
-						: {}),
-					// Drops the on-disk lease the provisioner took on the worktree
-					// (and its mounts) so the workspace reaper can tell "a job is
-					// in here" from "a job WAS in here".
-					...(workspaceProvisioner.release
-						? {
-								releaseWorkspace: (taskId, descriptor) =>
-									workspaceProvisioner.release!(taskId, descriptor)
-							}
-						: {}),
-					// Run secrets (self-build slice Y). The WRITE and the
-					// DELETE are the provisioner's — it owns the worktree, its
-					// canonical-path checks and its Git exclude rules — while
-					// the FETCH hangs off the lease below, because "may this
-					// node still be trusted with this job?" is the same
-					// question the publish fence asks and must have the same
-					// answer.
-					...(workspaceProvisioner.writeRunEnvFiles
-						? {
-								writeRunEnvFiles: (taskId, descriptor, files) =>
-									workspaceProvisioner.writeRunEnvFiles!(taskId, descriptor, files)
-							}
-						: {}),
-					...(workspaceProvisioner.removeRunEnvFiles
-						? {
-								removeRunEnvFiles: (_taskId, descriptor) =>
-									workspaceProvisioner.removeRunEnvFiles!(descriptor)
-							}
-						: {}),
-					// `agent-task` is the only kind that writes to a remote, so
-					// it is the only kind that has to know when this node stops
-					// being allowed to. Resolved through the handle, never
-					// captured: the deadline moves with every renewal, and
-					// `confirmDeadline` re-asks the platform at the moment of
-					// the write — which is the only way to see a claim that was
-					// taken away (an operator drained this node) while its
-					// deadline was still minutes in the future.
-					...(lease
-						? {
-								publishFence: async () => ({
-									deadlineAt: await lease.confirmDeadline(),
-									marginMs: lease.publishMarginMs
-								}),
-								// A withheld publish is not a verdict about the
-								// work — nothing ran to a conclusion — so the
-								// job goes back unsettled rather than terminal.
-								onPublishWithheld: (reason: string) => lease.defer(reason),
-								// A provision the node declined before writing a byte
-								// (below the disk floor, or the reaper mid-removal of
-								// that very worktree) is about this machine, not the
-								// work: hand the job back so a node with room takes it.
-								onProvisionDeclined: (reason: string) => lease.defer(reason),
-								// Run secrets: fetched THROUGH the lease, so the
-								// platform proves this node still holds an active
-								// claim on this job before a decrypted `.env`
-								// leaves it. A node with no lease (the cloud
-								// runner) has no seam here, and a job that needs
-								// env files fails naming the gap rather than
-								// running against an environment nobody set up.
-								fetchRunEnvFiles: (refs) => lease.fetchRunEnvFiles(refs)
-							}
-						: {}),
-					modelCli,
-					...(options.agentTaskScratchRoot !== undefined
-						? { scratchRoot: options.agentTaskScratchRoot }
-						: {}),
-					...(options.agentTaskWorkspacePath !== undefined
-						? { defaultWorkspacePath: options.agentTaskWorkspacePath }
-						: {})
-				},
-				signal
-			)
-		);
+						},
+						// The disk floor on the OTHER workspace path (review
+						// AO-10). A payload that carries `workspacePath` — or
+						// neither field, which falls back to the node's own
+						// working directory — never reaches the provisioner, so
+						// neither of the slice's two gates looked at the volume
+						// it is about to run on. The lease gate had already
+						// passed, because it measures the FLEET root's volume,
+						// which in the installer's own recommended layout is a
+						// different drive. Same floor, same fail-closed rule,
+						// applied to the path the steps actually run in.
+						checkWorkspaceHeadroom: (path, signal) =>
+							assertWorkspaceDiskHeadroom(io.diskProbe, effectiveMinFreeDiskBytes(limits), path, signal),
+						...(options.agentTaskScratchRoot !== undefined
+							? { scratchRoot: options.agentTaskScratchRoot }
+							: {}),
+						...(options.agentTaskWorkspacePath !== undefined
+							? { defaultWorkspacePath: options.agentTaskWorkspacePath }
+							: {})
+					},
+					signal
+				);
+			} finally {
+				// Every exit path this process can still execute: success, a
+				// reported failure, a thrown model step, an operator cancel
+				// and a lapsed lease all arrive here. The token is cleared
+				// from memory BEFORE the revoke is awaited, so a revoke that
+				// hangs cannot leave a live reference behind, and the revoke
+				// itself tells GitHub to stop honouring it immediately.
+				//
+				// The one path this cannot cover is a hard kill (SIGKILL,
+				// power loss), and it does not have to: the credential was
+				// never written to disk, so the process dying takes it with
+				// it, and GitHub expires it within the hour regardless.
+				await pushCredentials?.dispose();
+			}
+		});
 		// `browser-check` is registered ONLY when this machine actually
 		// resolved a browser executable (audit A26). A node advertising
 		// the `browser` capability with no executor behind it would fail
@@ -557,7 +700,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 export async function pauseNode(config: NodeConfig, io: NodeIo, paused: boolean): Promise<FleetNodeView> {
 	io.logger.protect(config.secret);
 	const client = new FleetClient({
-		apiUrl: config.apiUrl,
+		apiUrl: resolveApiBase(config).url,
 		fetchFn: io.fetchFn,
 		logger: io.logger,
 		userAgent: io.userAgent ?? `ever-works-node/${io.version}`
@@ -577,7 +720,7 @@ export async function pauseNode(config: NodeConfig, io: NodeIo, paused: boolean)
 export async function unenrollNode(config: NodeConfig, io: NodeIo): Promise<void> {
 	io.logger.protect(config.secret);
 	const client = new FleetClient({
-		apiUrl: config.apiUrl,
+		apiUrl: resolveApiBase(config).url,
 		fetchFn: io.fetchFn,
 		logger: io.logger,
 		userAgent: io.userAgent ?? `ever-works-node/${io.version}`

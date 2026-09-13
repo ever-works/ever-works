@@ -21,6 +21,9 @@ import { FleetAudit } from '../entities/fleet-audit.entity';
 import { FleetKillSwitchRepository } from './fleet-kill-switch.repository';
 import { FleetKillSwitchService } from './fleet-kill-switch.service';
 import { FleetAuditService } from './fleet-audit.service';
+import { FleetRunCredentialService } from './fleet-run-credential.service';
+import { ApiKey } from '../entities/api-key.entity';
+import { ApiKeyRepository } from '../database/repositories/api-key.repository';
 
 /**
  * Fleet (Wave 12, slice 1 + Desktop PRD M4) — agent-side module owning
@@ -77,6 +80,11 @@ import { FleetAuditService } from './fleet-audit.service';
             FleetCostPolicy,
             FleetKillSwitch,
             FleetAudit,
+            // Self-build slice Z (EW-796) — run-scoped MCP credentials are
+            // `api_keys` rows with `kind = 'fleet-run'`, so the bridge
+            // reuses the ONE hash/expiry/revoke implementation the
+            // platform already has instead of growing a second one.
+            ApiKey,
         ]),
     ],
     providers: [
@@ -93,6 +101,12 @@ import { FleetAuditService } from './fleet-audit.service';
         FleetCostCeilingService,
         FleetAuditService,
         FleetKillSwitchService,
+        // `ApiKeyRepository` is also provided by the api-side
+        // `DatabaseModule`; providing it here as well keeps this module
+        // self-contained (its own `forFeature([ApiKey])` above backs it)
+        // exactly as the fleet repositories are.
+        ApiKeyRepository,
+        FleetRunCredentialService,
     ],
     exports: [
         FleetNodeRepository,
@@ -108,6 +122,9 @@ import { FleetAuditService } from './fleet-audit.service';
         FleetCostCeilingService,
         FleetAuditService,
         FleetKillSwitchService,
+        // Exported so the api-side `FleetJobsController` can mint on the
+        // node channel and the completion listener can revoke.
+        FleetRunCredentialService,
     ],
 })
 export class FleetModule {}

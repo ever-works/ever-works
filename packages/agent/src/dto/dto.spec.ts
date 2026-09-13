@@ -20,6 +20,8 @@ import {
     UpdateCollectionDto,
     UpdateTagDto,
 } from './taxonomy.dto';
+import { AcceptanceCheckDto } from './acceptance-check.dto';
+import { WorkRepoDeclaredCommandsDto } from './repo-declared-commands.dto';
 import { TaskExtraRepoDto } from './task-extra-repo.dto';
 import { UpdateSourceValidationDto } from './update-source-validation.dto';
 import { UpdateWorkDto } from './update-work.dto';
@@ -692,6 +694,176 @@ describe('agent/dto submodule', () => {
                     plainToInstance(TaskExtraRepoDto, { repoConnectionId: connectionId, mountDir }),
                 );
             }
+        });
+    });
+
+    /**
+     * The request boundary this slice added (EW-807).
+     *
+     * `AcceptanceCheckDto` backs `UpdateWorkDto.checkDefaults` AND the Task
+     * `acceptanceChecks` in `apps/api/src/tasks/tasks.dto.ts`, and its
+     * `mountDir` is the attacker-influenceable selector the runner resolves
+     * against the repositories a run provisioned. `WorkRepoDeclaredCommandsDto`
+     * is the switch that lets a repository file name commands the owner's own
+     * enrolled machines will execute. Neither had a single test, in the file
+     * that already drives the identical `mountDir` rules for
+     * `TaskExtraRepoDto` case by case — so deleting a decorator broke nothing.
+     */
+    describe('AcceptanceCheckDto (acceptance checks that mean something, EW-807)', () => {
+        const base = {
+            id: 'tests',
+            name: 'tests',
+            kind: 'custom',
+            command: 'pnpm test',
+            required: true,
+        };
+
+        it('accepts a check with no selector and no phase — every check authored before this slice', async () => {
+            await expectValid(plainToInstance(AcceptanceCheckDto, base));
+        });
+
+        it('accepts a well-formed mountDir and either phase', async () => {
+            await expectValid(
+                plainToInstance(AcceptanceCheckDto, { ...base, mountDir: 'template' }),
+            );
+            await expectValid(plainToInstance(AcceptanceCheckDto, { ...base, phase: 'setup' }));
+            await expectValid(plainToInstance(AcceptanceCheckDto, { ...base, phase: 'check' }));
+        });
+
+        it.each([
+            ['a path', 'tools/template'],
+            ['a leading dot', '.hidden'],
+            // Windows strips trailing dots: `api.` and `api` would be one directory.
+            ['a trailing dot', 'api.'],
+            ['a space', 'my template'],
+            ['a traversal', '..'],
+            ['a backslash path', 'a\\b'],
+        ])('rejects a mountDir that is %s through the shape pattern', async (_label, mountDir) => {
+            const errs = await expectValidationErrors(
+                plainToInstance(AcceptanceCheckDto, { ...base, mountDir }),
+            );
+            expect(errs).toContain('matches');
+        });
+
+        it.each([
+            ['a Windows device name', 'NUL'],
+            ['a Windows device name in another case', 'com1'],
+            ['a Windows device name with an extension', 'com1.txt'],
+            ['node_modules', 'node_modules'],
+        ])(
+            'rejects a mountDir that is %s through the reserved-name rule',
+            async (_label, mountDir) => {
+                const errs = await expectValidationErrors(
+                    plainToInstance(AcceptanceCheckDto, { ...base, mountDir }),
+                );
+                expect(errs).toContain('isNotReservedMountDir');
+                expect(errs).not.toContain('matches');
+            },
+        );
+
+        it('leaves an ordinary name alone (the reserved-name rule is not a substring blocklist)', async () => {
+            for (const mountDir of ['nul-docs', 'console', 'lpt0', 'api']) {
+                await expectValid(plainToInstance(AcceptanceCheckDto, { ...base, mountDir }));
+            }
+        });
+
+        it('rejects a phase that is not one of the two the runners know', async () => {
+            const errs = await expectValidationErrors(
+                plainToInstance(AcceptanceCheckDto, { ...base, phase: 'install' }),
+            );
+            expect(errs).toContain('isIn');
+        });
+
+        it('still rejects a non-slug id — the merge key a repository must not be able to spell', async () => {
+            const errs = await expectValidationErrors(
+                plainToInstance(AcceptanceCheckDto, { ...base, id: 'repo/check-1' }),
+            );
+            expect(errs).toContain('matches');
+        });
+    });
+
+    describe('WorkRepoDeclaredCommandsDto (EW-807)', () => {
+        /** Nested `@ValidateNested` errors surface as children, not constraints. */
+        async function nestedConstraints(instance: object): Promise<string[]> {
+            const errors = await validate(instance);
+            const flatten = (list: typeof errors): string[] =>
+                list.flatMap((err) => [
+                    ...Object.keys(err.constraints ?? {}),
+                    ...flatten(err.children ?? []),
+                ]);
+            return flatten(errors);
+        }
+
+        it('accepts the two modes and nothing else', async () => {
+            await expectValid(
+                plainToInstance(WorkRepoDeclaredCommandsDto, { mode: 'off', allow: [] }),
+            );
+            await expectValid(
+                plainToInstance(WorkRepoDeclaredCommandsDto, {
+                    mode: 'allowlist',
+                    allow: ['pnpm test'],
+                }),
+            );
+            // There is deliberately no "run whatever the repository says" mode.
+            expect(
+                await expectValidationErrors(
+                    plainToInstance(WorkRepoDeclaredCommandsDto, { mode: 'all', allow: [] }),
+                ),
+            ).toContain('isIn');
+        });
+
+        it('caps the allow-list and refuses an over-long entry', async () => {
+            const tooMany = Array.from({ length: 33 }, (_, i) => `cmd-${i}`);
+            expect(
+                await expectValidationErrors(
+                    plainToInstance(WorkRepoDeclaredCommandsDto, {
+                        mode: 'allowlist',
+                        allow: tooMany,
+                    }),
+                ),
+            ).toContain('arrayMaxSize');
+            expect(
+                await expectValidationErrors(
+                    plainToInstance(WorkRepoDeclaredCommandsDto, {
+                        mode: 'allowlist',
+                        allow: ['x'.repeat(501)],
+                    }),
+                ),
+            ).toContain('maxLength');
+        });
+
+        it('is validated as a nested policy on UpdateWorkDto, not accepted as free-form JSON', async () => {
+            await expectValid(
+                plainToInstance(UpdateWorkDto, {
+                    repoDeclaredCommands: { mode: 'allowlist', allow: ['pnpm test'] },
+                }),
+            );
+            expect(
+                await nestedConstraints(
+                    plainToInstance(UpdateWorkDto, {
+                        repoDeclaredCommands: { mode: 'trust-me', allow: [] },
+                    }),
+                ),
+            ).toContain('isIn');
+        });
+
+        it('validates a checkDefaults entry through AcceptanceCheckDto on the same path', async () => {
+            expect(
+                await nestedConstraints(
+                    plainToInstance(UpdateWorkDto, {
+                        checkDefaults: [
+                            {
+                                id: 'tests',
+                                name: 'tests',
+                                kind: 'custom',
+                                command: 'pnpm test',
+                                required: true,
+                                mountDir: 'NUL',
+                            },
+                        ],
+                    }),
+                ),
+            ).toContain('isNotReservedMountDir');
         });
     });
 

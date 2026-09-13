@@ -56,6 +56,7 @@ import { AgentPluginsApiModule } from './agent-plugins/agent-plugins.module';
 import { McpConnectionsModule } from './mcp-connections/mcp-connections.module';
 import { RepoConnectionsModule } from './repo-connections/repo-connections.module';
 import { TasksModule } from './tasks/tasks.module';
+import { ReleaseModule } from './release/release.module';
 import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
@@ -208,6 +209,13 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TasksModule,
         // Tasks upgrades — workflow Task Templates (CRUD + instantiate).
         TaskTemplatesModule,
+        // Release promotion lane (self-build slice AI, EW-808) — the
+        // operator surface for develop -> stage -> main, and the import
+        // that BINDS the @Global() PROMOTION_MERGE_GUARD /
+        // PROMOTION_LANE_WATCHER tokens `TaskMergeGateService` and
+        // `TaskPrStatusService` consume. Removing it does not open a hole:
+        // the merge gate refuses a promotion Task whose guard is unbound.
+        ReleaseModule,
         // Saved workflow graphs (judgment layer G5) — the persistence and
         // CRUD surface for graphs the executor could already run but
         // nothing could keep.

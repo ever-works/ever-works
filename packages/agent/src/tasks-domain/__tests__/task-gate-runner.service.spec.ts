@@ -373,3 +373,118 @@ describe('TaskGateRunnerService.runChecks', () => {
         });
     });
 });
+
+describe('TaskGateRunnerService — inputs this runtime cannot honour (EW-807)', () => {
+    let runs: { updateGateResults: jest.Mock };
+    let runner: TaskGateRunnerService;
+
+    beforeEach(() => {
+        runs = { updateGateResults: jest.fn().mockResolvedValue(undefined) };
+        runner = new TaskGateRunnerService(runs as never);
+        const logger = (
+            runner as never as {
+                logger: { warn: (m: string) => void; error: (m: string) => void };
+            }
+        ).logger;
+        jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+        jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    /**
+     * `mountDir` names WHICH repository of a multi-repo run a command runs
+     * in. This runtime provisions one checkout and has no mounts, so the
+     * name cannot resolve. Running the command in the primary checkout and
+     * grading THAT as the verdict for the named repository is the
+     * wrong-repository green the slice exists to delete — the fleet node
+     * refuses the same input loudly, and a check that is correct on one
+     * runtime and a lie on the other is worse than one that fails on both.
+     */
+    it('refuses a mount-scoped check instead of silently running it in the primary checkout', async () => {
+        const outcome = await runner.runChecks({
+            checks: [
+                {
+                    id: 'template-tests',
+                    name: 'template tests',
+                    kind: 'custom',
+                    // Would exit 0 in the primary checkout, and the gate would
+                    // have gone green having tested nothing in `template`.
+                    command: 'node -e "process.exit(0)"',
+                    mountDir: 'template',
+                    required: true,
+                },
+            ],
+            cwd: process.cwd(),
+            runId: 'run-mount-1',
+        });
+        expect(outcome.results[0]).toMatchObject({
+            id: 'template-tests',
+            status: 'error',
+            exitCode: null,
+        });
+        expect(outcome.results[0].logTail).toContain("names repository 'template'");
+        expect(outcome.gateStatus).toBe('red');
+    });
+
+    /**
+     * `phase: 'setup'` is a dependency install that runs BEFORE the model
+     * with its own budget and its own reporting block. Only the fleet node
+     * has that phase, and `resolveAcceptanceChecks` filters those entries
+     * out — so grading what is left would report a verdict for a workspace
+     * whose declared preparation never happened, and an owner who re-phased
+     * an EXISTING check would silently lose a command that used to run.
+     */
+    it('records a run with declared setup steps as skipped rather than grading it', async () => {
+        const outcome = await runner.runChecks({
+            checks: [
+                {
+                    id: 'tests',
+                    name: 'tests',
+                    kind: 'custom',
+                    command: 'node -e "process.exit(0)"',
+                    required: true,
+                },
+            ],
+            setup: [
+                {
+                    id: 'install',
+                    name: 'install',
+                    kind: 'custom',
+                    command: 'pnpm install --frozen-lockfile',
+                    required: true,
+                    phase: 'setup',
+                },
+            ],
+            cwd: process.cwd(),
+            runId: 'run-setup-1',
+            policy: 'required',
+        });
+        // Never 'green' and never 'none' — a gate that did not run must not
+        // pass anything, and 'none' would read as "nothing was configured".
+        expect(outcome.gateStatus).toBe('skipped');
+        expect(outcome.results).toEqual([]);
+        expect(runs.updateGateResults).toHaveBeenCalledWith(
+            'run-setup-1',
+            expect.objectContaining({ gateStatus: 'skipped' }),
+        );
+    });
+
+    it('is unchanged for the runs that declare no setup phase — which is every run before EW-807', async () => {
+        const outcome = await runner.runChecks({
+            checks: [
+                {
+                    id: 'tests',
+                    name: 'tests',
+                    kind: 'custom',
+                    command: 'node -e "process.exit(0)"',
+                    required: true,
+                },
+            ],
+            setup: [],
+            cwd: process.cwd(),
+            runId: 'run-setup-2',
+        });
+        expect(outcome.gateStatus).toBe('green');
+    });
+});

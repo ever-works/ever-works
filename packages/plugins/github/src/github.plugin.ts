@@ -37,7 +37,8 @@ import type {
 	// PR insights (kanban run cockpit M5/M6).
 	GitDiffOptions,
 	GitDiffResult,
-	GitPullRequestStatus
+	GitPullRequestStatus,
+	GitWorkflowRun
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
 // Security (SSRF): lexical guard to keep the admin-configurable `apiBaseUrl`
@@ -121,7 +122,7 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				type: 'string',
 				title: 'Webhook secret',
 				description:
-					'Shared secret used to verify GitHub webhook deliveries sent to the platform ingest receiver (POST /api/ingest/github/events). Set the same value on the GitHub webhook configuration; deliveries with a missing or mismatched X-Hub-Signature-256 are rejected. Leave blank to keep the receiver disabled for your account.',
+					'Shared secret used to verify GitHub webhook deliveries sent to the platform ingest receiver (POST /api/ingest/github/events). Set the same value on the GitHub webhook configuration; deliveries with a missing or mismatched X-Hub-Signature-256 are rejected. Subscribe the webhook to pull requests, issue comments, pull request review comments, pushes, issues, and — for the CI auto-fix loop — check runs, check suites and workflow runs. Leave blank to keep the receiver disabled for your account.',
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-widget': 'password'
@@ -341,6 +342,22 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	): Promise<GitPullRequestStatus | null> {
 		const settings = await this.getSettings();
 		return this.apiService.getPullRequestStatus(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	// Release promotion lane (self-build slice AI) — the verdict of ONE
+	// named workflow for ONE commit, which the rolled-up CI state above
+	// cannot answer (it folds a skipped or cancelled gate into `passing`,
+	// and cannot see a gate that never ran).
+
+	async getWorkflowRunForCommit(
+		owner: string,
+		repo: string,
+		workflowPath: string,
+		headSha: string,
+		token: string
+	): Promise<GitWorkflowRun | null> {
+		const settings = await this.getSettings();
+		return this.apiService.getWorkflowRunForCommit(owner, repo, workflowPath, headSha, token, settings.apiBaseUrl);
 	}
 
 	async getPullRequestDiff(

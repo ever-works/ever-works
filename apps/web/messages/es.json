@@ -623,6 +623,7 @@
                 "schedule_task": "Programar tarea",
                 "send_message": "Enviar mensaje",
                 "budget_override": "Anulación de presupuesto",
+                "merge_pull_request": "Fusionar pull request",
                 "other": "Acción"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Acción rechazada",
                 "bulkApproved": "{count} acciones aprobadas",
                 "bulkApprovedSkipped": "{approved} acciones aprobadas, {skipped} ya decididas",
+                "bulkApprovedExcluded": "Se aprobaron {approved} acciones; {excluded} necesitan una decisión individual",
                 "error": "Algo salió mal. Inténtalo de nuevo."
             }
         },
@@ -1160,6 +1162,7 @@
                     "schedule_task": "Programar tarea",
                     "send_message": "Enviar mensaje",
                     "budget_override": "Anulación de presupuesto",
+                    "merge_pull_request": "Fusionar pull request",
                     "other": "Otro"
                 },
                 "save": "Guardar salvaguardas",
@@ -3567,7 +3570,22 @@
                     "unknown": "Unknown"
                 },
                 "workerStateReason": "Reason: {reason}",
-                "workerStateSince": "Since {time}"
+                "workerStateSince": "Since {time}",
+                "housekeeping": {
+                    "title": "Disk & workspaces",
+                    "disk": {
+                        "ok": "Above floor",
+                        "below": "Below floor",
+                        "unknown": "Unknown"
+                    },
+                    "diskFigures": "{free} free, floor {floor}",
+                    "noFloor": "off",
+                    "unknownValue": "unknown",
+                    "workspaces": "{count} workspaces using {size}",
+                    "lastReclaim": "Last reclaimed {time}, freed {freed}",
+                    "neverReclaimed": "No reclaim reported yet — this node has never swept its workspaces.",
+                    "notReported": "Housekeeping not reported by this node."
+                }
             },
             "jobRuntime": {
                 "title": "Job Runtime",

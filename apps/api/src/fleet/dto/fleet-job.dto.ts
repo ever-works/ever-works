@@ -215,3 +215,28 @@ export class FleetJobEnvFilesDto extends FleetJobNodeCredentialDto {
     @Type(() => FleetJobEnvFileRefDto)
     refs: FleetJobEnvFileRefDto[];
 }
+
+/**
+ * Request body for the PUBLIC `POST /api/fleet/jobs/:id/push-credential`
+ * (self-build slice AM, EW-810).
+ *
+ * The credential pair plus `leaseGeneration`, exactly as `env-files` —
+ * and for the same reason. This route hands a machine a WRITE credential
+ * for the owner's repositories, so a node whose claim lapsed while it
+ * slept must be refused here as strictly as it is on complete.
+ *
+ * Note what the body does NOT carry: no repository, no installation, no
+ * branch, no scope of any kind. Everything the token is narrowed by is
+ * read from platform state, because a caller that could name its own
+ * scope would have defeated the narrowing.
+ */
+export class FleetJobPushCredentialDto extends FleetJobNodeCredentialDto {
+    @ApiProperty({
+        minimum: 1,
+        description:
+            'Lease generation returned with the claim. A generation that is not the current one is refused with 409 stale-lease and mints nothing.',
+    })
+    @IsInt()
+    @Min(1)
+    leaseGeneration: number;
+}

@@ -104,7 +104,7 @@ Agents and Skills do NOT get analogous reserved plugin capabilities — the oper
 
 ## Related
 
-- Constitution Principle I: [`.specify/memory/constitution.md`](../../../.specify/memory/constitution.md)
+- Constitution Principle I: [`.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)
 - Architecture: [`../architecture/agents-skills-tasks.md`](../architecture/agents-skills-tasks.md)
 - Features: [`../features/agents/spec.md`](../features/agents/spec.md), [`../features/skills/spec.md`](../features/skills/spec.md), [`../features/task-tracking/spec.md`](../features/task-tracking/spec.md)
 - Plugin SDK: [`../architecture/plugin-sdk.md`](../architecture/plugin-sdk.md)

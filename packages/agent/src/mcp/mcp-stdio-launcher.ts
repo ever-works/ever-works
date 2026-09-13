@@ -51,6 +51,21 @@ export interface McpStdioLauncher {
 const STDIO_URL_PREFIX = 'stdio:';
 
 export function stdioConnectionUrl(packageName: string, serverName: string): string {
+    // The invariant this pointer's grammar rests on, asserted rather than
+    // assumed. `parseStdioConnectionUrl` splits on the LAST `/`, so a server
+    // name containing one would parse back as a different (package, server)
+    // pair and silently resolve to nothing.
+    //
+    // Nothing can reach here with such a name today: the MCP schema does NOT
+    // constrain `mcpServers` keys, but `PackageMcpReconcilerService` refuses
+    // any server whose `toolNamespace` is null — `^[a-zA-Z0-9][a-zA-Z0-9_-]*$`
+    // — and that guard runs well before this is called, from the only
+    // production call site. The check is here so that relaxing the name gate
+    // later fails loudly at the boundary instead of quietly losing an agent's
+    // tools.
+    if (serverName.includes('/')) {
+        throw new Error(`MCP server name must not contain "/": ${serverName}`);
+    }
     return `${STDIO_URL_PREFIX}${packageName}/${serverName}`;
 }
 

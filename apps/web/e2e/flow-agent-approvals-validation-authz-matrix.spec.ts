@@ -45,7 +45,7 @@
  *     `ids` (""/{}/5) → the array/size/each cluster. A JSON-array *body*
  *     ([1,2,3]) → "property <n> should not exist"; an extra key beside a valid
  *     `ids` → "property foo should not exist". A duplicate-id array is a valid
- *     no-op → { approved: 0, skipped: 0 } (dedup is not required).
+ *     no-op → { approved: 0, skipped: 0, excluded: 0 } (dedup is not required).
  *   • Malformed Authorization (garbage bearer / empty bearer / Basic scheme /
  *     bare token) → 401 { message: "Unauthorized", statusCode: 401 }.
  *
@@ -496,7 +496,7 @@ test.describe('Agent Approvals approve-all — ids[] validation matrix', () => {
         expect(messageText(await res.json())).toContain('property foo should not exist');
     });
 
-    test('a duplicate-id array is a valid no-op → { approved: 0, skipped: 0 }; trailing slash also 200', async ({
+    test('a duplicate-id array is a valid no-op → { approved: 0, skipped: 0, excluded: 0 }; trailing slash also 200', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -508,12 +508,12 @@ test.describe('Agent Approvals approve-all — ids[] validation matrix', () => {
             data: { ids: [NIL_UUID, NIL_UUID] },
         });
         expect(dup.status()).toBe(200);
-        expect(await dup.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await dup.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
 
         // The route also matches with a trailing slash.
         const slash = await request.post(`${AQ_BASE}/approve-all/`, { headers: H, data: {} });
         expect(slash.status()).toBe(200);
-        expect(await slash.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await slash.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
     });
 });
 

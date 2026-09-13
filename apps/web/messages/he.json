@@ -623,6 +623,7 @@
                 "schedule_task": "תזמון משימה",
                 "send_message": "שליחת הודעה",
                 "budget_override": "חריגה מתקציב",
+                "merge_pull_request": "מיזוג בקשת משיכה",
                 "other": "פעולה"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "הפעולה נדחתה",
                 "bulkApproved": "אושרו {count} פעולות",
                 "bulkApprovedSkipped": "אושרו {approved} פעולות, {skipped} כבר הוכרעו",
+                "bulkApprovedExcluded": "אושרו {approved} פעולות; {excluded} דורשות החלטה נפרדת",
                 "error": "משהו השתבש. נסה שוב."
             }
         },
@@ -1160,6 +1162,7 @@
                     "schedule_task": "תזמון משימה",
                     "send_message": "שליחת הודעה",
                     "budget_override": "עקיפת תקציב",
+                    "merge_pull_request": "מיזוג בקשת משיכה",
                     "other": "אחר"
                 },
                 "save": "שמור מעקות בטיחות",
@@ -3567,7 +3570,22 @@
                     "unknown": "Unknown"
                 },
                 "workerStateReason": "Reason: {reason}",
-                "workerStateSince": "Since {time}"
+                "workerStateSince": "Since {time}",
+                "housekeeping": {
+                    "title": "Disk & workspaces",
+                    "disk": {
+                        "ok": "Above floor",
+                        "below": "Below floor",
+                        "unknown": "Unknown"
+                    },
+                    "diskFigures": "{free} free, floor {floor}",
+                    "noFloor": "off",
+                    "unknownValue": "unknown",
+                    "workspaces": "{count} workspaces using {size}",
+                    "lastReclaim": "Last reclaimed {time}, freed {freed}",
+                    "neverReclaimed": "No reclaim reported yet — this node has never swept its workspaces.",
+                    "notReported": "Housekeeping not reported by this node."
+                }
             },
             "jobRuntime": {
                 "title": "Job Runtime",

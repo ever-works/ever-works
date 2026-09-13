@@ -179,19 +179,20 @@ Self-hosting? You register your own GitHub App and wire it through environment v
     - **Payload URL**: `https://api.ever.works/api/ingest/github/events`
     - **Content type**: `application/json`
     - **Secret**: the exact value from step 2
-    - **Events**: pull requests, issue comments, pull request review comments, and pushes
+    - **Events**: pull requests, issue comments, pull request review comments, pushes, and — for the [CI auto-fix loop](../features/ci-auto-resume.md) — check runs, check suites and workflow runs
 4. Save, open a pull request, and check **Recent Deliveries** on the webhook for a `200`.
 
 Deliveries with a missing or mismatched `X-Hub-Signature-256` are rejected.
 
 ### What triggers a review, and what only gets recorded
 
-| Delivery                                                           | Result                                                                                                                         |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `pull_request` **opened** / **synchronize**                        | Ingested as `github.pr`, then reviewed. The review is keyed on the head SHA, so each pushed revision is reviewed exactly once. |
-| `@ever-works` in an issue comment or a pull-request review comment | Ingested as `github.mention`. The comment text rides along as the review instruction and the reply lands in that thread.       |
-| `push`                                                             | Ingested as `github.push` and `github.commit` — Activity only. The code has already landed, so there is nothing to review.     |
-| `pull_request` **closed** with `merged: true`                      | Ingested as `github.merge`. Also Activity only.                                                                                |
+| Delivery                                                           | Result                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pull_request` **opened** / **synchronize**                        | Ingested as `github.pr`, then reviewed. The review is keyed on the head SHA, so each pushed revision is reviewed exactly once.                                                                                                            |
+| `@ever-works` in an issue comment or a pull-request review comment | Ingested as `github.mention`. The comment text rides along as the review instruction and the reply lands in that thread.                                                                                                                  |
+| `push`                                                             | Ingested as `github.push` and `github.commit` — Activity only. The code has already landed, so there is nothing to review.                                                                                                                |
+| `pull_request` **closed** with `merged: true`                      | Ingested as `github.merge`. Also Activity only.                                                                                                                                                                                           |
+| `check_run` / `check_suite` / `workflow_run`                       | Ingested as `github.check`, and the Task's `ciHeadSha` (plus a RED `ciState`) is written from it. A completed **failure** can auto-resume the Task's run under a bounded retry budget — see [CI Auto-Fix](../features/ci-auto-resume.md). |
 
 For each review the platform matches the repository to a Work across all three repository roles, builds a byte-capped diff, adds [Knowledge Base](../features/knowledge-base.md) context and memory recall, makes one structured AI call, and posts the result. See [Community PR Processing](../features/community-pr-processing.md) for the review loop in depth.
 

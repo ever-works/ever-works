@@ -170,4 +170,38 @@ describe('evaluateGuardrails (pure)', () => {
             expect(evaluateGuardrails(autonomous, actionType, [])).toBe('auto_approve');
         }
     });
+
+    // ── merge approval (self-build slice AE, EW-805) ─────────────────
+    //
+    // `merge_pull_request` is the one action type an Agent's own
+    // configuration may never authorise. A merge onto a real branch
+    // cannot be undone by a follow-up commit, so "the platform approved
+    // its own work" is the failure that has no recovery.
+
+    it('NEVER auto-approves a merge, whatever the Agent is configured to do', () => {
+        expect(evaluateGuardrails(autonomous, 'merge_pull_request', [])).toBe('queue');
+        expect(
+            evaluateGuardrails(
+                { mode: 'autonomous', autoApproveActionTypes: ['merge_pull_request'] },
+                'merge_pull_request',
+                [],
+            ),
+        ).toBe('queue');
+    });
+
+    it('still BLOCKS a merge when the Agent forbids it — the rule only stops approval', () => {
+        expect(
+            evaluateGuardrails(
+                { mode: 'autonomous', blockedActionTypes: ['merge_pull_request'] },
+                'merge_pull_request',
+                [],
+            ),
+        ).toBe('block');
+    });
+
+    it('queues a merge under a require_approval Agent, like everything else', () => {
+        expect(evaluateGuardrails({ mode: 'require_approval' }, 'merge_pull_request', [])).toBe(
+            'queue',
+        );
+    });
 });

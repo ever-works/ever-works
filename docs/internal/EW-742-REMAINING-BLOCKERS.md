@@ -307,7 +307,7 @@ in their own DI module without us bundling it.
 - Spec: [`docs/specs/features/tenant-job-runtime-overlay/spec.md`](../specs/features/tenant-job-runtime-overlay/spec.md)
 - Plan: [`docs/specs/features/tenant-job-runtime-overlay/plan.md`](../specs/features/tenant-job-runtime-overlay/plan.md)
 - Tasks: [`docs/specs/features/tenant-job-runtime-overlay/tasks.md`](../specs/features/tenant-job-runtime-overlay/tasks.md)
-- Sibling EW-683 (instance-level pluggability): [`docs/specs/features/job-runtime-providers/`](../specs/features/job-runtime-providers/)
+- Sibling EW-683 (instance-level pluggability): [`docs/specs/features/job-runtime-providers/spec.md`](../specs/features/job-runtime-providers/spec.md)
 - Tenant runbook: [`docs/runbooks/TENANT_JOB_RUNTIME.md`](../runbooks/TENANT_JOB_RUNTIME.md)
 - Tenant migration guide: [`docs/runbooks/TENANT_JOB_RUNTIME_MIGRATION.md`](../runbooks/TENANT_JOB_RUNTIME_MIGRATION.md)
 - Operator runbook: [`docs/runbooks/OPERATOR_JOB_RUNTIME_OVERLAY.md`](../runbooks/OPERATOR_JOB_RUNTIME_OVERLAY.md)

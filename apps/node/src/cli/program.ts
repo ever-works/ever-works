@@ -53,6 +53,7 @@ import {
 	type NodeResourceLimits,
 	type NodeWorkspaceGcPolicy
 } from '../core/types';
+import { API_URL_ENV, describeApiBase, readApiUrlPin, resolveApiBase } from '../core/api-base';
 
 /**
  * `ever-works-node` CLI.
@@ -185,7 +186,7 @@ export interface EnrollCommandOptions {
 	concurrency?: string;
 	maxCpu?: string;
 	maxMemory?: string;
-	/** Disk floor in MB (`--min-free-disk`); `--no-disk-floor` sets `diskFloor: false`. */
+	/** Disk floor in MEBIbytes (`--min-free-disk`); `--no-disk-floor` sets `diskFloor: false`. */
 	minFreeDisk?: string;
 	diskFloor?: boolean;
 	/** Workspace reaper policy (`--workspace-max-age <days>`, `--workspace-max-count <n>`). */
@@ -417,17 +418,27 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		...(stored.workspaceGc ?? DEFAULT_WORKSPACE_GC_POLICY),
 		...(workspaceGcOverrides ?? {})
 	});
-	if (workspaceGcOverrides !== undefined) {
+	// `--workspace-root` is persisted for the same reason (EW-803, review
+	// AO-6): `doctor` and `gc` have no other way to learn which tree the
+	// SERVICE runs against, and both disk-refusal messages send the
+	// operator to those two commands. The Windows installer's preflight
+	// errors unless `-WorkspaceRoot` is passed, so on the shipped layout
+	// the un-persisted root was routinely the wrong one — an empty
+	// directory in the admin's own profile, reported as "nothing to
+	// reclaim" while the node refused every job for want of space on D:.
+	const rootChanged = workspaceRoot !== undefined && workspaceRoot !== stored.workspaceRoot;
+	if (workspaceGcOverrides !== undefined || rootChanged) {
 		await saveConfig(
 			deps.fs,
 			deps.configPath,
-			{ ...stored, workspaceGc },
+			{ ...stored, workspaceGc, ...(workspaceRoot !== undefined ? { workspaceRoot } : {}) },
 			{ platform: deps.platform, secrets: deps.secrets ?? null, logger: deps.io.logger }
 		);
 	}
 	const config: NodeConfig = {
 		...stored,
 		workspaceGc,
+		...(workspaceRoot !== undefined ? { workspaceRoot } : {}),
 		...(override === undefined ? {} : { heartbeatIntervalMs: override })
 	};
 
@@ -539,6 +550,12 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					logger: deps.io.logger,
 					activeBindings: () => runtime.workspaceProvisioner?.activeBindingKeys?.() ?? new Set<string>(),
 					isBusy: () => worker.getState().activeJobIds.length > 0,
+					// Node housekeeping (EW-803): every completed cycle goes
+					// to the heartbeat's reporter, so Fleet can show that this
+					// machine is reclaiming — and, more usefully, when it has
+					// stopped. Without it the reaper's outcome reached the
+					// local log file and nowhere else.
+					onResult: (result) => runtime.housekeeping?.record(result),
 					...(deps.io.scheduler ? { scheduler: deps.io.scheduler } : {}),
 					...(deps.workspaceHousekeeping ? { scan: deps.workspaceHousekeeping.scan } : {}),
 					...(deps.workspaceHousekeeping ? { reap: deps.workspaceHousekeeping.reap } : {}),
@@ -733,13 +750,77 @@ export async function runUnenroll(deps: CliDeps, options: { localOnly?: boolean 
 	deps.out(`Unenrolled node ${config.nodeId}. The registration and the local credential are both gone.`);
 }
 
+/**
+ * What every operator-facing surface says about the control plane.
+ *
+ * Never throws. `resolveApiBase` refuses a malformed `EVER_WORKS_NODE_API_URL`
+ * — which is right for the runtime (fail at startup, not at the first request)
+ * but wrong for `status` and `doctor`: the one command an operator is told to
+ * run when the fleet cannot reach the platform must still print, and must say
+ * plainly that the pin is what is broken.
+ */
+function describeControlPlane(config: Pick<NodeConfig, 'apiUrl'> | null): string {
+	if (config) {
+		try {
+			return describeApiBase(resolveApiBase(config));
+		} catch (error) {
+			return (
+				`${config.apiUrl} (from the enrolled config) — WARNING: ${API_URL_ENV} is set to an ` +
+				`invalid URL, so the node will refuse to start: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+	try {
+		const pinned = readApiUrlPin();
+		return pinned === null
+			? `not enrolled, nothing pinned (set ${API_URL_ENV} to choose a control plane up front)`
+			: `${pinned} (pinned via ${API_URL_ENV}; this machine is not enrolled yet)`;
+	} catch (error) {
+		return `INVALID ${API_URL_ENV}: ${error instanceof Error ? error.message : String(error)}`;
+	}
+}
+
+/** The same facts, for `doctor --json`. Never throws, for the same reason. */
+function controlPlaneJson(config: Pick<NodeConfig, 'apiUrl'> | null): Record<string, unknown> {
+	try {
+		if (config) {
+			const base = resolveApiBase(config);
+			return {
+				apiUrl: base.url,
+				apiUrlSource: base.source,
+				enrolledApiUrl: base.configuredUrl,
+				apiUrlPinMismatch: base.mismatch
+			};
+		}
+		const pinned = readApiUrlPin();
+		return {
+			apiUrl: pinned,
+			apiUrlSource: pinned === null ? 'none' : 'pin',
+			enrolledApiUrl: null,
+			apiUrlPinMismatch: false
+		};
+	} catch (error) {
+		return {
+			apiUrl: config ? config.apiUrl : null,
+			apiUrlSource: 'invalid-pin',
+			enrolledApiUrl: config ? config.apiUrl : null,
+			apiUrlPinMismatch: false,
+			apiUrlPinError: error instanceof Error ? error.message : String(error)
+		};
+	}
+}
+
 export async function runStatus(deps: CliDeps): Promise<void> {
 	const config = await requireConfig(deps);
 	const view = redactConfig(config);
 	deps.out(`node id      ${view.nodeId}`);
 	deps.out(`name         ${view.name ?? '(assigned by the platform)'}`);
 	deps.out(`kind         ${view.kind}`);
-	deps.out(`api          ${view.apiUrl}`);
+	// The EFFECTIVE control plane, and where it came from. Printing only the
+	// stored value made a pinned node indistinguishable from an unpinned one
+	// (EW-779) — and a pin that does not match the enrolled origin 401s every
+	// call, which is worth reading before anything else.
+	deps.out(`api          ${describeControlPlane(config)}`);
 	deps.out(`enrolled at  ${view.enrolledAt}`);
 	deps.out(`heartbeat    every ${view.heartbeatIntervalMs / 1000}s`);
 	deps.out(`capabilities ${view.capabilities.join(', ') || '(none)'}`);
@@ -781,9 +862,13 @@ export interface GcCommandOptions extends HousekeepingCommandOptions {
 	dryRun?: boolean;
 }
 
+/** Where `doctor` / `gc` got the root they are inspecting. Printed, because getting it wrong is silent. */
+export type HousekeepingRootSource = 'flag' | 'config' | 'default';
+
 interface HousekeepingReport {
 	config: NodeConfig | null;
 	workspaceRoot: string;
+	workspaceRootSource: HousekeepingRootSource;
 	floor: number | null;
 	freeBytes: number | null;
 	policy: NodeWorkspaceGcPolicy;
@@ -799,8 +884,7 @@ interface HousekeepingReport {
  */
 async function gatherHousekeeping(deps: CliDeps, options: HousekeepingCommandOptions): Promise<HousekeepingReport> {
 	// Usage errors first, before anything is read.
-	const workspaceRoot =
-		parseWorkspaceRoot(options.workspaceRoot, deps.platform) ?? defaultFleetTaskWorkspaceRoot(process.env);
+	const rootFlag = parseWorkspaceRoot(options.workspaceRoot, deps.platform);
 	const maxAgeDays = parseBounded(
 		options.maxAge,
 		'--max-age',
@@ -811,6 +895,18 @@ async function gatherHousekeeping(deps: CliDeps, options: HousekeepingCommandOpt
 	const now = deps.now ?? (() => Date.now());
 
 	const config = await loadConfig(deps.fs, deps.configPath, loadOptions(deps));
+	// Precedence: the flag the operator typed, then the root the SERVICE
+	// recorded on its last `start`, then the process default. The middle
+	// step is the one that was missing: without it these two commands
+	// inspected `homedir()` — the account running the CLI, not the service
+	// account — and answered "0 worktree(s), 0 B" about the wrong tree
+	// (review AO-6).
+	const workspaceRoot = rootFlag ?? config?.workspaceRoot ?? defaultFleetTaskWorkspaceRoot(process.env);
+	const workspaceRootSource: HousekeepingRootSource = rootFlag
+		? 'flag'
+		: config?.workspaceRoot
+			? 'config'
+			: 'default';
 	const limits = clampResourceLimits(config?.limits);
 	const floor = effectiveMinFreeDiskBytes(limits);
 	const policy = clampWorkspaceGcPolicy({
@@ -841,16 +937,50 @@ async function gatherHousekeeping(deps: CliDeps, options: HousekeepingCommandOpt
 		{ ...policyFromConfig(policy), requireUsageRecord: workerSessionActive },
 		now()
 	);
-	return { config, workspaceRoot, floor, freeBytes, policy, workerSessionActive, inventory, plan };
+	return {
+		config,
+		workspaceRoot,
+		workspaceRootSource,
+		floor,
+		freeBytes,
+		policy,
+		workerSessionActive,
+		inventory,
+		plan
+	};
 }
 
 function printHousekeepingHeader(deps: CliDeps, report: HousekeepingReport, now: number): void {
 	deps.out(`enrolled     ${report.config ? `yes (node ${report.config.nodeId})` : 'no — defaults apply'}`);
-	deps.out(`workspace    ${report.workspaceRoot}${report.inventory.exists ? '' : ' (not created yet)'}`);
+	// `doctor` printed nothing at all about the control plane before EW-779,
+	// which made "the fleet cannot reach the platform" undiagnosable from the
+	// one command an operator is told to run.
+	deps.out(`api          ${describeControlPlane(report.config)}`);
+	// The provenance, always — an operator reading "0 worktree(s), 0 B"
+	// has to be able to tell "this machine is tidy" from "I am looking at
+	// the wrong tree", and the wrong tree is the likelier of the two when
+	// the service runs as another account (review AO-6).
+	const rootSource =
+		report.workspaceRootSource === 'flag'
+			? ' (from --workspace-root)'
+			: report.workspaceRootSource === 'config'
+				? " (from this node's last `start`)"
+				: ' (default — NOT recorded by any `start`; if the service runs as another account or with' +
+					' --workspace-root, this is not its tree: pass --workspace-root)';
+	deps.out(`workspace    ${report.workspaceRoot}${report.inventory.exists ? '' : ' (not created yet)'}${rootSource}`);
 	const floorText = report.floor === null ? 'no floor' : `floor ${formatBytes(report.floor)}`;
 	if (report.freeBytes === null) {
+		// The only place `doctor` explains a node that has gone quiet with
+		// no visible disk problem. Both branches are pinned by
+		// `program.housekeeping.spec.ts` (review AO-13); they differ because
+		// a floor that was switched off refuses nothing, while a floor in
+		// force fails CLOSED on a reading it cannot take — at the lease and
+		// at provisioning alike (review AO-11), so the node throttles rather
+		// than leasing work it will only defer.
 		deps.out(
-			`disk free    unknown on the workspace volume (${floorText}) — an unreadable volume never blocks leasing`
+			report.floor === null
+				? `disk free    unknown on the workspace volume (${floorText})`
+				: `disk free    unknown on the workspace volume (${floorText}) — this node will not lease or provision until the volume can be read; \`--no-disk-floor\` switches the floor off explicitly`
 		);
 	} else if (report.floor !== null && report.freeBytes < report.floor) {
 		deps.out(
@@ -927,7 +1057,9 @@ function housekeepingJson(report: HousekeepingReport): Record<string, unknown> {
 	});
 	return {
 		enrolled: report.config !== null,
+		...controlPlaneJson(report.config),
 		workspaceRoot: report.workspaceRoot,
+		workspaceRootSource: report.workspaceRootSource,
 		workspaceRootExists: report.inventory.exists,
 		diskFreeBytes: report.freeBytes,
 		minFreeDiskBytes: report.floor,
@@ -1061,10 +1193,10 @@ export function buildProgram(deps: CliDeps): Command {
 			`Refuse new work while host memory in use is at or above this many MB (min ${MIN_MEMORY_MB})`
 		)
 		.option(
-			'--min-free-disk <mb>',
-			`Refuse new work while the workspace volume has fewer free MB than this (default ${formatBytes(
+			'--min-free-disk <mib>',
+			`Refuse new work while the workspace volume has fewer free MiB than this (default ${formatBytes(
 				effectiveMinFreeDiskBytes({}) ?? 0
-			)}, min ${MIN_MIN_FREE_DISK_BYTES / MIB})`
+			)}, min ${MIN_MIN_FREE_DISK_BYTES / MIB} MiB)`
 		)
 		.option('--no-disk-floor', 'Switch the disk floor off entirely (not recommended)')
 		.option(
@@ -1090,7 +1222,7 @@ export function buildProgram(deps: CliDeps): Command {
 		)
 		.option('--max-cpu <percent>', 'Override the stored CPU admission ceiling, in percent')
 		.option('--max-memory <mb>', 'Override the stored memory admission ceiling, in MB')
-		.option('--min-free-disk <mb>', 'Override the stored disk floor for this process, in MB')
+		.option('--min-free-disk <mib>', 'Override the stored disk floor for this process, in MiB (1 MiB = 1024 KiB)')
 		.option('--no-disk-floor', 'Switch the disk floor off for this process (not recommended)')
 		.option(
 			'--workspace-max-age <days>',

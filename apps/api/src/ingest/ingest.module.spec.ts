@@ -42,6 +42,37 @@ jest.mock('@ever-works/agent/plugins', () => ({
     PluginSettingsService: class PluginSettingsService {},
     UserPluginRepository: class UserPluginRepository {},
 }));
+// CI feedback + autonomous fix loop (slice AC): the check intake asks
+// TasksDomainModule for the evaluator and two pure helpers. Stubbing the
+// subpath keeps this shape-guard off the facades → agent-plugins chain,
+// exactly as the sibling GitHub specs do.
+jest.mock('@ever-works/agent/tasks-domain', () => ({
+    TasksDomainModule: class TasksDomainModule {},
+    TaskCiAutoResumeService: class TaskCiAutoResumeService {},
+    TaskGitLinkService: class TaskGitLinkService {},
+    TaskReviewRejectionService: class TaskReviewRejectionService {},
+    TaskChatService: class TaskChatService {},
+    TaskRepository: class TaskRepository {},
+    TasksService: class TasksService {},
+    TaskPriority: { P0: 'p0', P1: 'p1', P2: 'p2', P3: 'p3', P4: 'p4' },
+    // `triage-task-filer.service.ts` reads `TaskStatus.DONE` at MODULE SCOPE
+    // (`CLOSED_TASK_STATUSES`), so leaving it out of this mock is not a
+    // missing-value problem at call time — the file throws
+    // "Cannot read properties of undefined" while it is still being
+    // imported, and the whole suite fails to run. Mirrors the real enum in
+    // `task.entity.ts` exactly.
+    TaskStatus: {
+        BACKLOG: 'backlog',
+        TODO: 'todo',
+        IN_PROGRESS: 'in_progress',
+        IN_REVIEW: 'in_review',
+        BLOCKED: 'blocked',
+        DONE: 'done',
+        CANCELLED: 'cancelled',
+    },
+    classifyCheckResult: () => 'pending',
+    computeCiFailureKey: () => 'k',
+}));
 jest.mock('../ai-conversation/ai-conversation.module', () => ({
     AiConversationModule: class AiConversationModule {},
 }));
@@ -66,6 +97,7 @@ import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatch
 import { SlackChatBridgeService } from './slack/slack-chat-bridge.service';
 import { GitHubAppModule } from '../integrations/github-app/github-app.module';
 import { GitHubIssueIntakeService } from './github/github-issue-intake.service';
+import { GitHubCheckIntakeService } from './github/github-check-intake.service';
 import { DependabotIncidentSource } from './incidents/dependabot-incident.source';
 import { JiraEventsController } from './jira/jira-events.controller';
 import { JiraIssueBridgeService } from './jira/jira-issue-bridge.service';
@@ -176,6 +208,7 @@ describe('IngestModule (issue + incident intake wiring)', () => {
         const provided = providers();
         for (const provider of [
             GitHubIssueIntakeService,
+            GitHubCheckIntakeService,
             DependabotIncidentSource,
             JiraIssueBridgeService,
             SentryIncidentSource,
@@ -195,6 +228,27 @@ describe('IngestModule (issue + incident intake wiring)', () => {
         expect(injected).toContain(DependabotIncidentSource);
         // …and the dispatcher itself did NOT grow a constructor dependency
         // on it (the arity pin above stays at 4).
+        expect(
+            Reflect.getMetadata('design:paramtypes', GitHubWebhookDispatcherService),
+        ).toHaveLength(4);
+    });
+
+    /**
+     * CI feedback + autonomous fix loop (slice AC, EW-806, R17). The
+     * SECOND registered consumer, and the same two hazards: dropping it
+     * from `providers` means `onModuleInit` never runs and check
+     * deliveries are silently ignored (the exact defect this slice
+     * closes); registering it twice means every delivery is handled
+     * twice, which for this consumer means paying for a model run twice.
+     */
+    it('feeds the CI check intake from the SAME dispatcher, exactly once', () => {
+        expect(providers().filter((p: unknown) => p === GitHubCheckIntakeService)).toHaveLength(1);
+        const injected = Reflect.getMetadata(
+            'design:paramtypes',
+            GitHubCheckIntakeService,
+        ) as unknown[];
+        expect(injected[0]).toBe(GitHubWebhookDispatcherService);
+        // …and, again, the dispatcher did NOT grow a dependency on it.
         expect(
             Reflect.getMetadata('design:paramtypes', GitHubWebhookDispatcherService),
         ).toHaveLength(4);

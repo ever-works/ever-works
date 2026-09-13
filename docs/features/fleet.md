@@ -210,6 +210,7 @@ POST /api/fleet/rotate-all   → { queuedNodes, skippedNodes, nodes, auditFailed
 This **queues**: it marks every enrolled node of the account (those still `enrolling` are skipped — revoke their unused token instead) and mints nothing. Each machine learns of it from `rotationRequested: true` on its next heartbeat response and calls `/api/fleet/rotate-credential` itself. The field is additive, so a daemon built before it existed simply ignores it and keeps working; its owner can still re-key it the old way. One `fleet_audit` row records the decision — `rotate-all`, with the actor, the count and the node ids — and each machine's own rotation records a `node.rotate-self` row when it happens.
 
 The plaintext secret exists in exactly three places and never a fourth: in the response body (once), in the node's own storage, and as a SHA-256 in `fleet_nodes`. It is not logged, and the audit row carries only timestamps, ids and the overlap duration — the writer additionally drops the value of any field whose name mentions a secret, token, credential or hash, so a call site that passed one by accident still could not store it.
+None of these help when the break is in the protocol itself — when the platform the nodes talk to is the thing that stopped working. That case has its own runbook, written to be followed with no working fleet at all: [Fleet break-glass](../runbooks/FLEET_BREAK_GLASS.md).
 
 ## Capabilities
 
@@ -325,9 +326,11 @@ Useful flags: `-i, --heartbeat-interval <seconds>` (cadence, default 60s), `-c, 
 
 ### The tags a node reports
 
-Tags are detected at enroll and **re-detected on every heartbeat**, so installing Docker or Git on a running node shows up in Fleet without a restart: `os:<platform>`, `arch:<arch>`, `node:<major>`, `terminal`, `workspace`, plus `docker`, `git`, `display`, `browser`, `gpu` and `gpu:<vendor>` when present. They are normalized with the same rules the server applies, so what the node reports is exactly what Fleet stores.
+Tags are detected at enroll and **re-detected on every heartbeat**, so installing Docker or Git on a running node shows up in Fleet without a restart: `os:<platform>`, `arch:<arch>`, `node:<major>`, `terminal`, `workspace`, plus `docker`, `git`, `git-push`, `display`, `browser`, `gpu` and `gpu:<vendor>` when present. They are normalized with the same rules the server applies, so what the node reports is exactly what Fleet stores.
 
 Two rules govern what may appear. **A tag is a promise the node can keep** — `browser` is emitted only when a browser executable was actually resolved, the same path `browser-check` will spawn. And **detection never fails the beat** — a missing tool is a missing tag, not a missing heartbeat. `EVER_WORKS_NODE_BROWSER` pins the executable explicitly; a pinned path that does not exist disables the tag rather than falling through to some other browser.
+
+`git-push` is the one tag you cannot turn off. It means "this machine's Git can install the platform's per-run push credential" (Git 2.31 or newer), and **every** agent run requires it — a node without it would have to push with the machine's own credential helper, which is exactly the work it must not be handed. It is detected like any other tag, so a machine with no Git, or with a Git too old, simply does not offer it; it is only the operator opt-in that cannot remove it.
 
 You can also hand-edit a node's tags under **Settings → Fleet → Capability tags**. Editing them hands you ownership: the set is marked **Pinned** and the node's heartbeats stop overwriting it.
 
@@ -416,7 +419,65 @@ node apps/node/dist/cli.js start --work
 
 `start` alone only heartbeats; **`--work`** is the separate consent that lets the machine lease and execute platform jobs. `pause` / `resume` drain and undrain it, `unenroll` retires it, `status` and `capabilities` inspect it. Until the package is published, the binary is `apps/node/dist/cli.js` — the unattended-install scripts (systemd unit, Windows service, container image, in `apps/node/packaging/README.md`) expect a command named `ever-works-node` on `PATH`. The full command reference, the config-file and keychain layout, and the capability tags a node reports are in `apps/node/README.md`.
 
-A node also looks after its own disk. It refuses to lease (and to provision) while the volume holding its workspace root has less than a **disk floor** free — 2 GiB by default, `--min-free-disk <mb>` to change it — and shows up as `throttled` with the reason, so a full machine stops taking work before a job fails halfway through a fetch. With `--work` it also runs a **workspace reaper** that removes Task worktrees it can prove are safe to remove (owned, not in use, clean, fully pushed, and with a branch that is gone from the remote or merged) once they are older than `--workspace-max-age` (14 days by default); anything it cannot prove stays. `ever-works-node doctor` prints the free space against the floor and what the reaper would do, `ever-works-node gc [--dry-run]` runs it by hand. Details and the exact rules: `apps/node/README.md`, "Disk floor and workspace GC".
+A node also looks after its own disk. It refuses to lease (and to provision) while the volume holding its workspace root has less than a **disk floor** free — 2 GiB by default, `--min-free-disk <mib>` (mebibytes) to change it — and shows up as `throttled` with the reason, so a full machine stops taking work before a job fails halfway through a fetch. With `--work` it also runs a **workspace reaper** that removes Task worktrees it can prove are safe to remove (owned, not in use, clean, fully pushed, and with a branch that is gone from the remote or merged) once they are older than `--workspace-max-age` (14 days by default); anything it cannot prove stays. `ever-works-node doctor` prints the free space against the floor and what the reaper would do, `ever-works-node gc [--dry-run]` runs it by hand. Details and the exact rules: `apps/node/README.md`, "Disk floor and workspace GC".
+
+The two gates around the floor are deliberately **asymmetric**, and an operator will notice the difference:
+
+- At the **lease**, a free-space reading the node cannot take never blocks. Refusing there would idle a whole machine indefinitely because of a broken `statfs`, and nothing has been spent yet.
+- Before **provisioning** — re-checked there because minutes can pass since the lease and that is where the space is actually consumed — the floor **fails closed**: if free space cannot be measured, the node refuses. That is the last check before a clone, a fetch and a model's whole budget land on a volume nobody can size, and there is no gate after it. The refusal is a _deferral_, not a failure: the job goes back unsettled and the platform re-offers it to a machine that can answer. `ever-works-node doctor` says so explicitly when the reading is unavailable.
+
+### What the platform can see about a node's disk
+
+The heartbeat carries the node's **housekeeping** alongside its free-space reading, so the Fleet node drawer can answer questions the free-space figure alone cannot:
+
+| Field                   | What it says                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| `minFreeDiskBytes`      | the floor this machine enforces on itself; `null` = the operator switched it off |
+| `workspaceCount`        | Task worktrees it was holding when its last sweep finished                       |
+| `workspaceBytes`        | what those worktrees occupy                                                      |
+| `lastReclaimAt`         | when its last sweep completed — **the node's own clock**                         |
+| `lastReclaimFreedBytes` | what that sweep freed (`0` is a real answer: it ran and found nothing)           |
+
+The drawer shows **Above floor** / **Below floor** / **Unknown** with both figures, the workspaces retained, and the last reclaim. Two readings worth knowing how to interpret:
+
+- **Below floor** on a node that reads `online` and holds no jobs is the explanation for a machine that has gone quiet. It is derived from the two reported numbers, so it can be visible before the node's `throttled` worker state catches up.
+- **"No reclaim reported yet"** on a node that _is_ reporting workspaces means its reaper has never completed a sweep on that machine — the state that ends with a full disk. A node running without `--work` has no reaper at all and reports no housekeeping; the drawer says "not reported" once rather than showing four blanks.
+
+**Unknown is never a verdict.** A node with plenty of space but no floor reported reads _Unknown_, not _Above floor_: with the floor off, or on a daemon older than these fields, there is no line to be above, and saying otherwise would be a reassurance nobody earned. Likewise `null` and "never reported" are indistinguishable for the floor by design — both mean there is nothing to compare the free-space figure against.
+
+These figures travel **upward only**. The limit is still evaluated entirely on the machine; the platform neither sets it, routes on it, nor assumes a node respects it. There is no path for pushing a floor, a workspace budget or a reclaim policy down to a node — those are set at that keyboard, with `--min-free-disk`, `--workspace-max-age` and `--workspace-max-count`. The CPU and memory ceilings are **not** reported at all: they have no companion reading on the wire, so a ceiling on its own would be a number with nothing to compare it against.
+
+`lastReclaimAt` is the one instant on a node row the platform does not stamp itself, so it is treated as untrusted: an unparseable value, or one implausibly far in the future, is recorded as unknown rather than rejected — rejecting it would fail the heartbeat, and a failed heartbeat is a live node swept `offline`. A node that has never reported a figure shows **unknown**, never `0`: "no workspaces" and "we have never been told" are different facts, and only the first is reassuring.
+
+#### Pinning the control plane
+
+A node's API origin is fixed at `enroll` and stored in its config file, which means a bad build on
+the origin every machine points at can take the whole fleet out at once — and the fix then has to
+travel develop → stage → main before the machines can come back. `EVER_WORKS_NODE_API_URL` is the
+way out: set it, restart the node, and **every** later call (heartbeat, lease, job heartbeat,
+complete, pause, unenroll) goes to that origin instead.
+
+```bash
+EVER_WORKS_NODE_API_URL=https://apistage.ever.works   # stage
+EVER_WORKS_NODE_API_URL=https://api.ever.works        # prod
+```
+
+It is an operator override, in the same family as `EVER_WORKS_NODE_CONFIG`, and it is deliberately
+narrow:
+
+- it does **not** apply to `enroll` — that mints a credential against the origin you name with
+  `--api-url`, and silently redirecting it would store a secret as belonging to a platform that
+  never issued it;
+- it is **never written back** to the config file, so unsetting the variable is a complete undo;
+- an empty or whitespace value counts as unset, so `EVER_WORKS_NODE_API_URL=` in a unit file turns
+  the override off rather than bricking the node;
+- a malformed value stops the node at startup with a URL error instead of becoming a mystifying
+  403/404 at the first request.
+
+`ever-works-node status` and `ever-works-node doctor` both print the effective origin and where it
+came from, and say so explicitly when a pin points somewhere the node is **not** enrolled — that
+combination authenticates against a platform that has never seen this machine, so every call is
+refused with 401. Full procedure: [Fleet break-glass](../runbooks/FLEET_BREAK_GLASS.md).
 
 ### Pin an agent to a node
 
@@ -560,8 +621,8 @@ The rules that make that trade survivable:
 
 ### When the agent needs you
 
-The agent on your machine has no platform tools — it cannot message you mid-run. What it can do is
-**pause the run with a question**: when it hits a decision only you can make (an ambiguous
+Unless the MCP bridge below is switched on, the agent on your machine has no platform tools — it
+cannot message you mid-run. What it can do is **pause the run with a question**: when it hits a decision only you can make (an ambiguous
 requirement, a risky or irreversible step, a choice between materially different directions) it
 writes `.ever-works/QUESTION.md` in the repository root — the first line (or a `# ` heading) is the
 question, the rest is optional context and options — and stops. The node reports the question and
@@ -606,8 +667,152 @@ the base ref — the `# OWNER ANSWER` section tells the model when that is the c
 written somewhere other than the repository root (or a mounted repository's root) is kept out of Git
 but is not reported as a question.
 
+### Platform tools from a fleet run (MCP bridge)
+
+By default a fleet run is sealed: the model gets a Task brief, a worktree and nothing else. The
+**MCP bridge** opens a narrow, temporary channel to the platform's own tools — Tasks, Inbox, Goals,
+Missions, Works, Agents, Plugins and read-only Fleet status — so an agent can read the context it
+needs and record progress instead of guessing and reporting at the end.
+
+It is **off by default** and needs three separate yeses:
+
+1. the operator turns it on for the whole install (`FLEET_NODE_MCP_BRIDGE_ENABLED=true` plus
+   `FLEET_NODE_MCP_URL` pointing at your MCP server's `/mcp` endpoint);
+2. the Agent has **Call external tools** (Agent → Capabilities) — the same permission that gates MCP
+   tools for a cloud run, so an Agent you have not trusted with tools does not gain them by landing
+   on a fleet node;
+3. the run is not in `plan` permission mode (a read-only session must not be able to write through
+   tools).
+
+**How the credential works.** When the model step starts, the node asks the platform for a token
+scoped to that one run. The platform mints it only for the node **currently holding the lease** on
+that job, binds it to the job, the run, you, and the run's Organization, and expires it with the
+lease. The node keeps it in memory and starts a listener on `127.0.0.1` at a random port and a
+random path; the model is handed only that local URL. Every call the model makes is forwarded to the
+platform with the token attached on the way out. The token is never written to disk, never put in
+the model's environment, never logged, and never appears in the run's result. It is revoked when the
+model step ends and again when the job settles — including when the machine dies mid-run, because
+the platform revokes on the job's own completion.
+
+**What the tools can and cannot do.** They act as **you**, in the run's Organization scope, and only
+for the life of the run. They are limited to the tool surface above: a run token cannot mint another
+credential, cannot touch your API keys, cannot report a verdict on its own job, and cannot drain the
+machine it is running on or repoint another Agent's node pinning (Fleet is read-only for a run). A
+handful of routes that merely share a URL prefix with the tool surface are carved back out for the
+same reason — an Agent run's **terminal** (which mints a WebSocket credential and opens your worker
+shell), its MCP-server and repository **connection bindings**, its **collaborator** roster, and the
+Composio **OAuth** endpoints. None of them is a tool, and a run token is refused on all of them. The
+instructions also tell the model never to use the tools to approve, review or transition its own work
+past a human gate.
+
+**Operator prerequisites.** The MCP server the nodes reach must accept per-user credentials
+(`EVER_WORKS_MCP_AUTH_MODE=per-user-jwt`, or `hybrid` in development) — a node holds no shared key —
+and its `EVER_WORKS_SCOPE_SLUG` must be unset or equal to the Organization the runs belong to, since
+the token's own scope wins and a mismatch is refused.
+
+The run's result records whether the bridge was up and how many tool calls went through it. If the
+bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
+tool channel that fails never fails a Task.
+
+### How a fleet node pushes (scoped push credentials)
+
+A fleet node used to push **token-free**: `git push` ran against the plain remote and the machine's
+own Git credential helper answered. In practice that is a long-lived personal access token in the OS
+credential store with write access to **every repository that OS user can reach**. The platform
+could not scope it to one run, rotate it, revoke it when a laptop went missing, or even see that it
+had been used — and every unattended machine in the fleet held one.
+
+Now the node asks the platform for a credential, right before it commits, and pushes with that.
+
+**What the credential is.** A GitHub App **installation access token**, minted for that one job,
+narrowed to exactly the repositories the job writes (the Task's repository plus its writable mounts)
+and to the `contents: write` permission alone. GitHub expires installation tokens within the hour,
+and the node revokes it at GitHub the moment the run ends.
+
+**What it can and cannot do.** It can push branches to the repositories this run was planned for.
+It cannot touch any other repository the App is installed on, cannot open a pull request, cannot
+read a secret or an Action, cannot be used after the run, and cannot be used by a node that is not
+the recorded holder of the job's lease. It is never on the job payload, never on the job row, never
+in the run's result, never in a log line, never in a config file, never in a `git` command line and
+never in the model's environment: it exists in the node's memory for the length of one
+commit-and-push, reaches `git` through the environment of that single child process, and dies with
+it.
+
+**It only ever goes to `github.com`.** An installation token is a GitHub credential and means
+nothing anywhere else, and Git puts an `Authorization` header on its **first** request to a host —
+unprompted, before any challenge — so a remote merely _pointing_ somewhere else would be enough to
+hand that host a live write credential. Both ends therefore check the host, not just the
+`owner/repo` path: the platform refuses to scope a credential to a workspace whose clone URL is not
+an `https://github.com/owner/repo`, and the node re-derives the repository from the checkout's own
+`origin` and refuses to offer the credential if the host, the port or the scheme is anything else.
+A Task on a repository connection pointing at another forge is refused rather than pushed to with a
+GitHub token.
+
+**Nothing else on the machine can answer for the push, and nothing else can watch it.** The
+credentialed `git push` resets the credential-helper list _and_ the askpass hooks (`core.askpass`,
+`GIT_ASKPASS`, `SSH_ASKPASS`) and drops `GIT_CONFIG_PARAMETERS`, so a rejected credential **fails**
+instead of silently falling through to the machine's own long-lived one. It also runs **no Git
+hooks**: a `pre-push` hook is a child of the push and would inherit the credential, and hooks live
+in the shared pool directory rather than in the checkout, so one planted there would survive the run
+and harvest every later Task's token on that repository. The publish is refused outright if the
+repository's own config has grown a credential setting or a `url.*.insteadOf` / `pushInsteadOf`
+rewrite while the run was underway.
+
+**There is no fallback.** If the platform cannot mint — no GitHub App configured, no installation
+covering every repository the run writes to, GitHub refusing — the run **fails, and says why**. It
+does not quietly fall back to the machine's own credential helper; that fallback is the gap this
+replaces. The refusal is caught as early as it can be: when a run is planned, the platform checks
+whether it could mint at all, so a Task whose repository no installation covers is refused before it
+costs a machine twenty minutes of model time.
+
+**What an operator must configure.**
+
+1. `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` on the platform — the same GitHub App the rest of
+   the product uses. Without them, fleet runs that push are refused.
+2. The App installed on every repository your fleet Tasks write to, with **Contents: read & write**,
+   and installed by the same account that owns the Tasks — the platform will not mint against
+   somebody else's installation.
+3. All repositories of one run under a **single** installation. A run spanning two installations is
+   refused rather than half-served.
+4. Nodes upgraded to a build that advertises `git-push`. An older node stops attracting agent work
+   (see [The tags a node reports](#the-tags-a-node-reports)); depending on the tenant's execution
+   mode the work then falls back to the cloud rather than queueing.
+
+If the App's installation changes — you add a repository, or GitHub suspends the installation — the
+platform re-reads its own installation snapshot on the next run, so re-syncing the installation in
+**Settings → Integrations → GitHub** is what makes a newly added repository pushable.
+
+**The one thing this does not cover.** The _fetch_ still uses the machine's own credential helper.
+A fetch needs read access only and happens before the run's first model byte; scoping it is a
+separate change. And if a node is hard-killed mid-push (power cut, SIGKILL) it cannot run its own
+revoke — the token still expires on GitHub's clock, within the hour, scoped to that job's
+repositories.
+
+### Who a fleet commit is by
+
+Every fleet commit used to be authored `Ever Works Agent <agent@ever.works>`, on every machine, so
+Git history could not answer which machine or which agent produced a change. Now:
+
+- the **author** is the Agent (its committer name and email, or `<slug>@agents.ever.works`);
+- the **committer** is the node (`Ever Works node <node name>`, `node-<id>@nodes.ever.works`);
+- and the commit message carries a trailer block:
+
+```
+Ever-Works-Node: studio-win (0f2c…)
+Ever-Works-Agent: Refactor Bot (7a91…)
+Ever-Works-Job: 3b04…
+Ever-Works-Run: 91cd…
+```
+
+All of it comes from platform rows over the node-authenticated channel, and the node refuses an
+answer that names a machine other than itself. The `Ever-Works-` trailer namespace is **reserved**:
+a commit message that already contains one — a Task title can reach the message — fails the run
+rather than being appended to, because a trailer a reader cannot distinguish from the platform's own
+is worse than no trailer at all. If you see that failure, rename the Task.
+
 ## Related
 
 - [Desktop App](./desktop-app.md) · [Workers](./workers.md) · [Kubernetes Deployment](./k8s-deployment.md)
 - [Job Runtimes](./job-runtimes.md) · [Agents](./agents.md) · [Tasks](./tasks.md) · [Quality Gates](./quality-gates.md)
 - [Task Isolation](./task-isolation.md) · [Agent Terminals](./agent-terminals.md) · [Sessions & Steering](./sessions-and-steering.md)
+- [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down

@@ -70,7 +70,7 @@ Additional providers (Telegram bidirectional, Linear, GitHub, CRM connectors) as
 ## Dependencies
 
 - **Depends on:** plugin registry + loader (shipped); `@EncryptedJsonColumn` + secret resolution (shipped); Trigger.dev job runtime (shipped); notification-channel DTOs + SSRF guards (shipped, reused).
-- **Integrates with:** [`chat-everything`](../chat-everything/plan.md) engine (inbound routing target), [`event-subscriptions`](../event-subscriptions/plan.md) (outbound bridge), [`tenants-and-organizations`](../tenants-and-organizations/spec.md) (scope columns), Agents (`AgentPermissions`, routing target).
+- **Integrates with:** [`chat-everything`](../chat-everything/README.md) engine (inbound routing target), [`event-subscriptions`](../event-subscriptions/plan.md) (outbound bridge), [`tenants-and-organizations`](../tenants-and-organizations/spec.md) (scope columns), Agents (`AgentPermissions`, routing target).
 - **Independent of:** the existing `*-channel` notification plugins and the Composio/Make/SIM/Zapier/Activepieces aggregators — both keep shipping unchanged.
 
 ## Constitution gates

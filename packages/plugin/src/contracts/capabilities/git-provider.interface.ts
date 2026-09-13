@@ -146,6 +146,28 @@ export interface MergeOptions {
 	readonly commitTitle?: string;
 	readonly commitMessage?: string;
 	readonly mergeMethod?: 'merge' | 'squash' | 'rebase';
+	/**
+	 * OPTIMISTIC-CONCURRENCY GUARD (merge approval, self-build slice AE).
+	 *
+	 * The commit the caller believes is the pull request's head. When set,
+	 * an implementation MUST ask the provider to refuse the merge if the
+	 * head has moved since — GitHub's `PUT /pulls/{n}/merge` takes exactly
+	 * this as its `sha` parameter and answers 409.
+	 *
+	 * It exists because everything the platform decides about a pull
+	 * request — CI is green, a human approved it, the diff is what was
+	 * reviewed — is a statement about ONE commit, and between the decision
+	 * and the merge call a push can replace it. Re-reading the head and
+	 * then merging without pinning it just narrows the race; pinning
+	 * closes it, because the provider evaluates the guard atomically with
+	 * the merge.
+	 *
+	 * Optional on the contract so providers that cannot express the guard
+	 * still compile. A provider that ignores it silently downgrades the
+	 * guarantee to "recently checked", which is why the agent-side merge
+	 * path ALSO re-reads the head immediately before calling.
+	 */
+	readonly expectedHeadSha?: string;
 }
 
 export interface MergeResult {
@@ -199,6 +221,19 @@ export interface GitPullRequest {
 	readonly updatedAt: string;
 	readonly body?: string;
 	readonly author?: GitPullRequestAuthor;
+	/**
+	 * Provider-side labels on the pull request, when the read that
+	 * produced this object carried them.
+	 *
+	 * OPTIONAL and ABSENCE-AMBIGUOUS by construction: `undefined` means
+	 * "this read did not report labels", never "there are none". A caller
+	 * that treats a label as permission must therefore never infer safety
+	 * from its absence — the release promotion lane reads
+	 * `override-e2e-gate` off this to tell a human that a gate leg may
+	 * have been WAIVED rather than green, which is a warning it adds, not
+	 * a permission it grants.
+	 */
+	readonly labels?: readonly string[];
 }
 
 export interface GitRepositoryPermissions {
@@ -284,11 +319,94 @@ export interface GitPullRequestStatus {
 	readonly mergeable?: boolean | null;
 	readonly headSha?: string | null;
 	readonly reviewDecision?: GitReviewDecision | null;
+	/**
+	 * Roll-up over EVERY check the provider reports for the head commit —
+	 * never over the bounded `checks` sample below.
+	 *
+	 * Merge approval (slice AE) turned this from a display value into an
+	 * authorization input (`GitFacadeService.assertAgentMayMerge` and
+	 * `TaskMergeGateService` both refuse a merge unless it is `passing`),
+	 * so an implementation that rolled up its own truncated display list
+	 * would report a red pull request green. Roll up first, cap second.
+	 */
 	readonly ciState: GitCiState;
 	/** Bounded list — implementations cap it (see `MAX_PR_CHECKS`). */
 	readonly checks: readonly GitPullRequestCheck[];
+	/**
+	 * False when the implementation could NOT read the provider's whole
+	 * check set for this commit (a source it lacks scope for, more checks
+	 * than it is willing to page through), so `ciState` is a roll-up over
+	 * a subset and a failure may be hiding in the part it never saw.
+	 *
+	 * Undefined means "not reported", which older implementations and
+	 * simple doubles will leave as-is; only an explicit `false` is a
+	 * warning. Display surfaces may ignore it — a mostly-right dot is
+	 * still useful — but anything using `ciState` to AUTHORIZE (the merge
+	 * gate) must treat `false` as "not green".
+	 */
+	readonly checksComplete?: boolean;
 	readonly url?: string;
 	readonly title?: string;
+}
+
+// ── Workflow runs (release promotion lane, self-build slice AI) ─────
+//
+// One OPTIONAL read capability, deliberately narrow: the verdict of ONE
+// named workflow file for ONE commit.
+//
+// This is not the same question as `getPullRequestStatus`. That answers
+// "should the board's dot be green?" by rolling up every check on the
+// head commit, and that roll-up treats `skipped`, `neutral`, `stale` and
+// `cancelled` as non-blocking — correct for a dot, and unusable as a
+// release gate, where a gate that skipped itself is precisely the case
+// that must not read as a pass. It also cannot prove ABSENCE: the
+// `checks[]` it returns is a capped sample, so a named check missing from
+// it may simply have sorted past the cap.
+//
+// A provider without workflows simply omits this, and the caller treats
+// the absence as "the gate is unreadable", which is not a pass.
+
+/**
+ * One run of one workflow file against one commit.
+ *
+ * `status` / `conclusion` reuse the check vocabulary above on purpose:
+ * providers already map their own words onto it, and a second vocabulary
+ * for the same idea is a second place for a mapping to go wrong.
+ */
+export interface GitWorkflowRun {
+	/** Provider-side run id — for the operator, not for logic. */
+	readonly id: number;
+	/**
+	 * Workflow file this run belongs to, as the provider reports it
+	 * (e.g. `.github/workflows/promotion-gate.yml`). Echoed back so a
+	 * caller can assert it got the workflow it asked for.
+	 */
+	readonly workflowPath: string;
+	/** The commit the run was for. */
+	readonly headSha: string;
+	readonly status: GitCheckStatus;
+	/** `null` while the run has not completed. */
+	readonly conclusion?: GitCheckConclusion | null;
+	/** Deep link for the human who has to read the log. */
+	readonly url?: string;
+	/** Re-runs bump this; the newest attempt is the one reported. */
+	readonly runAttempt?: number;
+	/**
+	 * Pull requests this run was triggered for, by number, when the
+	 * provider reports them.
+	 *
+	 * A workflow run is keyed by COMMIT, and one commit can head more
+	 * than one pull request — `stage` can be the head of both a
+	 * `stage -> main` promotion and somebody's hotfix comparison. A run
+	 * adopted off the commit alone therefore need not be the run for the
+	 * pull request being judged, and the two can differ in exactly the
+	 * way that matters (a per-pull-request override label).
+	 *
+	 * `undefined` means the provider did not say, which is NOT a licence
+	 * to assume a match: the release promotion lane treats a run that
+	 * names pull requests NOT including its own as no run at all.
+	 */
+	readonly pullRequestNumbers?: readonly number[];
 }
 
 /** Hard caps a diff request may ask for. */
@@ -465,6 +583,29 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		opts: GitDiffOptions | undefined,
 		token: string
 	): Promise<GitDiffResult>;
+
+	/**
+	 * Release promotion lane (slice AI) — the MOST RECENT run of one
+	 * named workflow file for one commit, or `null` when that workflow has
+	 * no run for that commit.
+	 *
+	 * `null` and a throw mean different things and both matter: `null` is
+	 * a real answer ("the gate never ran on this commit"), a throw is a
+	 * broken lookup. Implementations MUST NOT collapse a failed read into
+	 * `null` — the caller renders them differently and refuses on both,
+	 * but sends the operator to different places.
+	 *
+	 * `workflowPath` may be given as a bare file name (`promotion-gate.yml`)
+	 * or a repository path (`.github/workflows/promotion-gate.yml`);
+	 * implementations match on the file name.
+	 */
+	getWorkflowRunForCommit?(
+		owner: string,
+		repo: string,
+		workflowPath: string,
+		headSha: string,
+		token: string
+	): Promise<GitWorkflowRun | null>;
 
 	/**
 	 * Same shape for a branch that has no PR yet (`base...head`). Cheap

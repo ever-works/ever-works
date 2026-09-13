@@ -24,6 +24,24 @@ export interface Logger {
 	error(message: string): void;
 	/** Register a credential that must never appear in output. No-op for short/empty values. */
 	protect(value: string | null | undefined): void;
+	/**
+	 * Forget a credential that no longer exists.
+	 *
+	 * The redactor keeps every protected value verbatim, so a `protect()`
+	 * with no matching `unprotect()` pins that credential in the node
+	 * process's heap for the rest of its uptime. That is fine for the two
+	 * credentials this process holds for its whole life (the enrollment
+	 * token and the heartbeat secret) and WRONG for a short-lived one: a
+	 * node that runs forty agent-tasks across a multi-day uptime would
+	 * otherwise accumulate forty raw `contents: write` installation tokens,
+	 * every one of them recoverable from a heap snapshot or a crash dump,
+	 * and the most recent still live at GitHub.
+	 *
+	 * So a caller that protects a per-run credential unprotects it when the
+	 * run ends — see `PushCredentialSession.dispose`. Idempotent, and a
+	 * no-op for a value that was never protected.
+	 */
+	unprotect(value: string | null | undefined): void;
 	/** Scrub every protected value out of arbitrary text. */
 	redact(text: string): string;
 }
@@ -79,6 +97,9 @@ export function createLogger(options: LoggerOptions = {}): Logger {
 			if (typeof value === 'string' && value.length >= MIN_PROTECTED_LENGTH) {
 				protectedValues.add(value);
 			}
+		},
+		unprotect: (value) => {
+			if (typeof value === 'string') protectedValues.delete(value);
 		},
 		redact
 	};

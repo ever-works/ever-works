@@ -322,6 +322,88 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             expect(tasks.create).toHaveBeenCalledTimes(2);
         });
 
+        /**
+         * The per-(trigger, event) claim above dedupes RETRIES of one row;
+         * it says nothing about a source that emits many rows for ONE
+         * subject. `{ kind: 'incident' }` — the configuration the
+         * integrations page itself recommends — therefore used to file a
+         * Task per Sentry alert AND, whenever `targetAgentId` is set with
+         * the default `autoStart: 'always'`, dispatch an agent RUN per
+         * alert. One flapping issue was a Task storm and an agent-run
+         * storm; documenting that in a warning box did not close it.
+         *
+         * The trigger already carried the knob and the event path simply
+         * never applied it: inside `replayWindowSec`, many rows about one
+         * subject are one fire.
+         */
+        describe('subject coalescing (a chatty source is not a Task storm)', () => {
+            const incident = (id: string, issueId = '4501') =>
+                makeEvent({
+                    id,
+                    source: 'sentry',
+                    kind: 'incident',
+                    subjectType: 'issue',
+                    subjectExternalId: issueId,
+                    payload: { provider: 'sentry', issueId, resource: 'event_alert' },
+                });
+
+            const INCIDENTS = {
+                sourceType: 'event' as const,
+                eventMatcher: { kind: 'incident' },
+            };
+
+            it('files ONE Task for twenty alerts about the same issue', async () => {
+                const { service, tasks } = makeService();
+                await service.create(SCOPE, { name: 'Incidents', ...INCIDENTS });
+
+                let deduped = 0;
+                for (let i = 0; i < 20; i += 1) {
+                    deduped += (await service.fireForEvent(incident(`row-${i}`))).deduped;
+                }
+
+                expect(tasks.create).toHaveBeenCalledTimes(1);
+                expect(deduped).toBe(19);
+            });
+
+            it('does not swallow a DIFFERENT issue', async () => {
+                const { service, tasks } = makeService();
+                await service.create(SCOPE, { name: 'Incidents', ...INCIDENTS });
+
+                await service.fireForEvent(incident('row-a', '4501'));
+                await service.fireForEvent(incident('row-b', '9999'));
+
+                expect(tasks.create).toHaveBeenCalledTimes(2);
+            });
+
+            it('fires the same subject again once the replay window has passed', async () => {
+                const { service, tasks, fires } = makeService();
+                await service.create(SCOPE, {
+                    name: 'Incidents',
+                    ...INCIDENTS,
+                    replayWindowSec: 10,
+                });
+
+                await service.fireForEvent(incident('row-a'));
+                // Age every ledger row past the window.
+                for (const row of fires!._rows.values()) {
+                    row.firedAt = new Date(Date.now() - 60_000);
+                }
+                await service.fireForEvent(incident('row-b'));
+
+                expect(tasks.create).toHaveBeenCalledTimes(2);
+            });
+
+            it('leaves subject-less events (a push, a chat message) firing per event', async () => {
+                const { service, tasks } = makeService();
+                await service.create(SCOPE, { name: 'Pushes', ...MATCH_ALL_GITHUB });
+
+                await service.fireForEvent(makeEvent({ id: 'event-1' }));
+                await service.fireForEvent(makeEvent({ id: 'event-2' }));
+
+                expect(tasks.create).toHaveBeenCalledTimes(2);
+            });
+        });
+
         it('skips non-matching, paused, and webhook-sourced triggers', async () => {
             const { service, tasks } = makeService();
             await service.create(SCOPE, {

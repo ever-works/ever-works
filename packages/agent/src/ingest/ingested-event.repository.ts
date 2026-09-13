@@ -23,6 +23,16 @@ export function computeDedupeKey(userId: string, source: string, sourceEventId: 
     return hash.digest('hex');
 }
 
+/**
+ * How many distinct owners one drain batch is shared between.
+ *
+ * Bounds the per-tick query count (one grouped scan plus at most this
+ * many small reads). Owners beyond the cap are not dropped — they rank
+ * by their oldest waiting row, so they enter on a later tick as the
+ * drained owners' minimums advance past theirs.
+ */
+export const MAX_DRAIN_OWNERS = 25;
+
 export interface CreateIngestedEventData {
     userId: string;
     organizationId?: string | null;
@@ -92,13 +102,84 @@ export class IngestedEventRepository {
         }
     }
 
-    /** Oldest-first batch of rows the processor has not drained yet. */
+    /**
+     * Oldest-first batch of rows the processor has not drained yet,
+     * SHARED FAIRLY between the owners that have work waiting.
+     *
+     * A plain `WHERE processedAt IS NULL ORDER BY occurredAt ASC LIMIT n`
+     * is a global FIFO with no tenant partitioning, and the drain that
+     * consumes it runs every five minutes with a batch of 50. One chatty
+     * source — a Sentry issue flapping, a connector backfill — therefore
+     * puts thousands of rows in front of every other customer on the
+     * deployment, and a newly filed GitHub issue does not become a Task
+     * for hours. That is the "input that silently swallows genuinely new
+     * work" this repository must not have.
+     *
+     * So the batch is assembled per owner instead: the owners with
+     * unprocessed rows are ranked by their OLDEST waiting row (so nobody
+     * can be starved indefinitely — a neglected owner's oldest row keeps
+     * ageing until it ranks), each of the first {@link MAX_DRAIN_OWNERS}
+     * contributes an equal share, and the merged batch is still handed
+     * back oldest-first so per-issue ordering inside one owner is
+     * unchanged.
+     *
+     * The single-owner case (every non-hosted deployment, and every
+     * hosted one at low volume) short-circuits to exactly the query it
+     * always ran.
+     */
     async findUnprocessed(limit: number): Promise<IngestedEvent[]> {
-        return this.repository.find({
-            where: { processedAt: IsNull() },
-            order: { occurredAt: 'ASC', createdAt: 'ASC' },
-            take: limit,
-        });
+        const capped = Math.max(1, Math.trunc(limit));
+        const oldestFirst = { occurredAt: 'ASC', createdAt: 'ASC' } as const;
+
+        const owners = await this.findOwnersWithUnprocessed(
+            Math.min(capped, MAX_DRAIN_OWNERS),
+        ).catch(() => null);
+
+        // No owner scan (unsupported driver shape / transient failure) or
+        // a single owner: the fair batch and the plain batch are the same
+        // rows, so take the cheaper path.
+        if (!owners || owners.length <= 1) {
+            return this.repository.find({
+                where: { processedAt: IsNull() },
+                order: oldestFirst,
+                take: capped,
+            });
+        }
+
+        const share = Math.max(1, Math.ceil(capped / owners.length));
+        const batch: IngestedEvent[] = [];
+        for (const userId of owners) {
+            const rows = await this.repository.find({
+                where: { processedAt: IsNull(), userId },
+                order: oldestFirst,
+                take: share,
+            });
+            batch.push(...rows);
+        }
+
+        return batch
+            .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime())
+            .slice(0, capped);
+    }
+
+    /**
+     * Owner ids that have unprocessed rows, the one whose oldest row has
+     * waited longest first. Ranking by `MIN(occurredAt)` — rather than by
+     * row count or arbitrarily — is what makes the share-out
+     * starvation-free: draining an owner advances their minimum, so every
+     * other owner's minimum becomes comparatively older and they rank in
+     * on a later tick.
+     */
+    private async findOwnersWithUnprocessed(limit: number): Promise<string[]> {
+        const rows = await this.repository
+            .createQueryBuilder('event')
+            .select('event.userId', 'userId')
+            .where('event.processedAt IS NULL')
+            .groupBy('event.userId')
+            .orderBy('MIN(event.occurredAt)', 'ASC')
+            .limit(limit)
+            .getRawMany<{ userId: string }>();
+        return rows.map((row) => row.userId).filter((userId): userId is string => Boolean(userId));
     }
 
     async markProcessed(id: string, processedAt: Date = new Date()): Promise<void> {

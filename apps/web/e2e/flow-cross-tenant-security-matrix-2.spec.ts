@@ -608,7 +608,7 @@ test.describe('Cross-tenant — Agent Approval Queue', () => {
             data: { ids: [UNKNOWN_UUID] },
         });
         expect(bulk.status()).toBe(200);
-        expect(await bulk.json()).toEqual({ approved: 0, skipped: 0 });
+        expect(await bulk.json()).toEqual({ approved: 0, skipped: 0, excluded: 0 });
     });
 });
 

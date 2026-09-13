@@ -17,7 +17,12 @@
  *   • shapes observed live: `{ mode }`, `{ mode, autoApproveActionTypes[] }`,
  *     `{ mode, blockedActionTypes[] }`, all three together. Modes come from
  *     AGENT_GUARDRAIL_MODES = ['require_approval','autonomous']; action types
- *     from ['spawn_agent','schedule_task','send_message','budget_override','other'].
+ *     from AGENT_ACTION_PROPOSAL_ACTION_TYPES —
+ *     ['spawn_agent','schedule_task','send_message','budget_override',
+ *      'merge_pull_request','other'] (six; `merge_pull_request` joined in
+ *     slice AE / EW-805). The "blocking all six known action types" test
+ *     below enumerates the same set and must stay in step with it — this
+ *     list is a reader's aid, that one is the coverage.
  *   • clearing: `{"guardrails":null}` OR an empty `{}` body → guardrails null.
  *   • DTO validation (400, message is a string[]): bad/missing/non-string mode;
  *     unknown action type in either list; a non-array list; an unknown key
@@ -183,12 +188,23 @@ test.describe('Agent Dispatch Guardrails — persistence + PUT semantics', () =>
         });
     });
 
-    test('blocking all five known action types is accepted', async ({ request }) => {
+    test('blocking all six known action types is accepted', async ({ request }) => {
         const user = await registerUserViaAPI(request);
         const agent = await createAgentViaAPI(request, user.access_token, {
             name: `GR block-all ${stamp()}`,
         });
-        const all = ['spawn_agent', 'schedule_task', 'send_message', 'budget_override', 'other'];
+        // Kept exhaustive on purpose: a new action type added to
+        // AGENT_ACTION_PROPOSAL_ACTION_TYPES without being listed here is a
+        // type the guardrails DTO would accept and this test would not
+        // cover. `merge_pull_request` joined the set in slice AE (EW-805).
+        const all = [
+            'spawn_agent',
+            'schedule_task',
+            'send_message',
+            'budget_override',
+            'merge_pull_request',
+            'other',
+        ];
 
         const res = await putGuardrails(request, user.access_token, agent.id, {
             guardrails: { mode: 'require_approval', blockedActionTypes: all },

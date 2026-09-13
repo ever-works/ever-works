@@ -1,6 +1,6 @@
 # Feature Specification: Item Markdown Editor
 
-> Behaviour-first spec per [Constitution Principle IX](../../../../.specify/memory/constitution.md#ix-specs-are-behaviour-first).
+> Behaviour-first spec per [Constitution Principle IX](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md#ix-specs-are-behaviour-first).
 
 **Feature ID**: `item-markdown-editor`
 **Branch**: `feat/ew-item-markdown-editor`

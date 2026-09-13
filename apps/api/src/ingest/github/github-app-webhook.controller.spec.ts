@@ -21,6 +21,7 @@ jest.mock('../../auth/decorators/public.decorator', () => ({
 }));
 
 import { GitHubAppWebhookController } from './github-app-webhook.controller';
+import { GitHubEventsController } from './github-events.controller';
 import { GitHubWebhookDispatcherService } from './github-webhook-dispatcher.service';
 import { computeGitHubSignature } from './github-signature.util';
 
@@ -66,7 +67,12 @@ describe('GitHubAppWebhookController (POST /api/github-app/webhooks — legacy r
             { findByInstallationId: jest.fn().mockResolvedValue(installation) } as never,
             { findByGithubUserId: jest.fn().mockResolvedValue(null) } as never,
         );
-        return { controller: new GitHubAppWebhookController(dispatcher), bridge, appSync };
+        return {
+            controller: new GitHubAppWebhookController(dispatcher),
+            dispatcher,
+            bridge,
+            appSync,
+        };
     }
 
     function signedRequest(bodyObj: unknown, secret = APP_SECRET) {
@@ -149,13 +155,82 @@ describe('GitHubAppWebhookController (POST /api/github-app/webhooks — legacy r
         );
     });
 
-    it('never 500s this route for an ingest/review failure (new consumer, logged not thrown)', async () => {
+    it('never 500s this route for an AI-review failure (best-effort leg, logged not thrown)', async () => {
         const { controller, bridge } = createController();
-        bridge.handleEvent.mockRejectedValue(new Error('ingest exploded'));
+        bridge.handleEvent.mockRejectedValue(new Error('review exploded'));
         const { req, signature } = signedRequest(INSTALL_BODY);
 
         await expect(
             controller.handleWebhook(req as never, signature, 'installation'),
         ).resolves.toEqual({ ok: true });
+    });
+
+    /**
+     * This URL is the DEFAULT one a GitHub App install delivers to, so it
+     * is the route the founder's "file an issue, the fleet picks it up"
+     * path actually arrives on. A swallowed intake failure here answers
+     * GitHub 200, GitHub never redelivers, and the issue silently never
+     * becomes work.
+     */
+    describe('the issue-intake leg', () => {
+        const ISSUE_BODY = {
+            action: 'opened',
+            installation: { id: 4242 },
+            repository: { full_name: 'octo/site', owner: { login: 'octo' } },
+            issue: { number: 42, title: 'Login button does nothing', updated_at: '2026-09-05' },
+        };
+
+        it('reaches a registered intake consumer with the app-install binding', async () => {
+            const { controller, dispatcher } = createController();
+            const consumer = {
+                events: ['issues'],
+                handle: jest.fn().mockResolvedValue({ ingested: null }),
+            };
+            dispatcher.registerConsumer(consumer);
+            const { req, signature } = signedRequest(ISSUE_BODY);
+
+            await expect(
+                controller.handleWebhook(req as never, signature, 'issues'),
+            ).resolves.toEqual({ ok: true });
+            expect(consumer.handle).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 'user-app', matchedBy: 'app-install' }),
+                'issues',
+                ISSUE_BODY,
+            );
+        });
+
+        it('rethrows an intake failure so GitHub redelivers the issue', async () => {
+            const { controller, dispatcher } = createController();
+            dispatcher.registerConsumer({
+                events: ['issues'],
+                handle: jest.fn().mockRejectedValue(new Error('ingest exploded')),
+            });
+            const { req, signature } = signedRequest(ISSUE_BODY);
+
+            await expect(
+                controller.handleWebhook(req as never, signature, 'issues'),
+            ).rejects.toThrow('ingest exploded');
+        });
+    });
+
+    /**
+     * Both public GitHub URLs reach the SAME dispatcher and the same
+     * downstream work, so an uncapped one is simply the door a flood
+     * chooses. This route carried no `@Throttle` at all while the
+     * canonical `/api/ingest/github/events` was capped at 300/minute.
+     */
+    it('carries the same throttle as the canonical receiver', () => {
+        // @nestjs/throttler v6 stamps `THROTTLER:<FIELD><name>` per named tier.
+        const limitOf = (handler: unknown) =>
+            Reflect.getMetadata('THROTTLER:LIMITlong', handler as object);
+        const ttlOf = (handler: unknown) =>
+            Reflect.getMetadata('THROTTLER:TTLlong', handler as object);
+
+        const legacy = GitHubAppWebhookController.prototype.handleWebhook;
+        const canonical = GitHubEventsController.prototype.receiveEvents;
+
+        expect(limitOf(legacy)).toBeDefined();
+        expect(limitOf(legacy)).toBe(limitOf(canonical));
+        expect(ttlOf(legacy)).toBe(ttlOf(canonical));
     });
 });

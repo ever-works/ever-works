@@ -28,16 +28,16 @@ The registry lives at **Settings → Connections** (`/settings/connections`). Th
 
 ## What a connection holds
 
-| Field             | Notes                                                                                                                            |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `name`            | Slug-safe and unique per account: lowercase letters, digits and hyphens, 1–80 chars. It becomes the `mcp__<name>__` prefix.      |
-| `url`             | The server endpoint, up to 2048 chars. `http(s)` to a **public** host only.                                                      |
-| `transport`       | `streamable-http` (**Streamable HTTP**, the default) or `sse` (**SSE (legacy)**).                                                |
-| `authHeaders`     | Up to 10 `{header: value}` pairs, encrypted at rest, injected at connect time. **Write-only** — see below.                       |
-| `enabled`         | The workspace-wide master switch. Disabled contributes no tools to any Agent, whatever the bindings say.                         |
-| `source`          | `manual` for everything you add here. (`package` is reserved — see [the standard](#relationship-to-the-agent-plugins-standard).) |
-| `lastConnectedAt` | Stamped on every successful connect, from a **Test** or from a run.                                                              |
-| `lastError`       | The classified message from the last failure, shown on the row.                                                                  |
+| Field             | Notes                                                                                                                                               |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`            | Slug-safe and unique per account: lowercase letters, digits and hyphens, 1–80 chars. It becomes the `mcp__<name>__` prefix.                         |
+| `url`             | The server endpoint, up to 2048 chars. `http(s)` to a **public** host only.                                                                         |
+| `transport`       | `streamable-http` (**Streamable HTTP**, the default) or `sse` (**SSE (legacy)**).                                                                   |
+| `authHeaders`     | Up to 10 `{header: value}` pairs, encrypted at rest, injected at connect time. **Write-only** — see below.                                          |
+| `enabled`         | The workspace-wide master switch. Disabled contributes no tools to any Agent, whatever the bindings say.                                            |
+| `source`          | `manual` for everything you add here. Rows created by an installed Agent Plugins package carry `package` — see [Agent Plugins](./agent-plugins.md). |
+| `lastConnectedAt` | Stamped on every successful connect, from a **Test** or from a run.                                                                                 |
+| `lastError`       | The classified message from the last failure, shown on the row.                                                                                     |
 
 Two constraints are worth knowing before you type:
 
@@ -46,7 +46,7 @@ Two constraints are worth knowing before you type:
 
 ### Transports, and what is not here
 
-`streamable-http` and `sse` are network clients, and both are available wherever your outbound network policy allows. **`stdio` is deliberately not offered**: a stdio server means spawning a subprocess, which is gated behind an execution decision the platform has not shipped. Manual connections are network-only.
+`streamable-http` and `sse` are network clients, and both are available wherever your outbound network policy allows. **`stdio` is deliberately not offered here**: a stdio server means spawning a subprocess, which is an execution decision an operator must opt into for packages (`AGENT_PLUGINS_STDIO`, off by default and off on the hosted service) and one manual connections never get. Manual connections are network-only.
 
 ## How to add a connection
 
@@ -169,19 +169,19 @@ curl -X POST https://api.ever.works/api/mcp-connections \
 
 ## Relationship to the Agent Plugins standard
 
-Ever Works is building toward the **Agent Plugins v1.0.0** interop standard, where a package can ship both Skills and MCP server definitions. What is on this page is the **MCP slice of that work, shipped ahead of the package format** — and the boundary matters, so here it is plainly:
+Ever Works is building toward the **Agent Plugins v1.0.0** interop standard, where a package can ship both Skills and MCP server definitions. What is on this page is the **MCP slice of that work, usable without the package format** — and the boundary matters, so here it is plainly:
 
-| Capability                                                             | Status                                                                                                                |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Manually registered MCP servers (`source: manual`)                     | **Shipped** — this page.                                                                                              |
-| `streamable-http` and `sse` transports                                 | **Shipped**.                                                                                                          |
-| Per-Agent bindings with workspace inheritance                          | **Shipped** — the `tenant` and `agent` binding targets.                                                               |
-| Credentials as client-generated headers, encrypted, never in a package | **Shipped** — the standard's rule that packages must not embed credentials is why the header lives on the connection. |
-| MCP servers arriving from an installed package (`source: package`)     | **Not shipped.** The column reserves the value so the package work lands without a schema change.                     |
-| `stdio` transport                                                      | **Not shipped here** — manual connections are network-only, because a stdio server means spawning a subprocess.       |
-| Work-scoped bindings                                                   | **Not shipped.** The binding table's shape already allows a `work` target, so it can arrive without a migration.      |
+| Capability                                                             | Status                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manually registered MCP servers (`source: manual`)                     | **Shipped** — this page.                                                                                                                                                                                                                                                                             |
+| `streamable-http` and `sse` transports                                 | **Shipped**.                                                                                                                                                                                                                                                                                         |
+| Per-Agent bindings with workspace inheritance                          | **Shipped** — the `tenant` and `agent` binding targets.                                                                                                                                                                                                                                              |
+| Credentials as client-generated headers, encrypted, never in a package | **Shipped** — the standard's rule that packages must not embed credentials is why the header lives on the connection.                                                                                                                                                                                |
+| MCP servers arriving from an installed package (`source: package`)     | **Shipped behind a flag** — an installed package's MCP declarations are reconciled into connection rows, which arrive **disabled and unbound** (declaring a server never grants reach). The whole path requires `FEATURE_AGENT_PLUGINS=true`, which is off by default and off on the hosted service. |
+| `stdio` transport                                                      | **Not offered for manual connections** — the manual-create DTO refuses it, so a connection you register is always network-only. A `stdio` row can only be minted by an installed package, and only executes when an operator also sets `AGENT_PLUGINS_STDIO=true` (off by default, off on hosted).   |
+| Work-scoped bindings                                                   | **Not shipped.** The binding table's shape already allows a `work` target, so it can arrive without a migration.                                                                                                                                                                                     |
 
-The wider interop specification — package loading from local directories, git and npm, and exporting Ever Works Skills and our own MCP server as conformant packages — is specified but not yet shipped. Treat anything on this page that is not in the **Shipped** rows above as a direction, not a promise.
+The wider interop work — package loading from local directories, git and npm, and exporting Ever Works Skills as conformant packages — is shipped behind `FEATURE_AGENT_PLUGINS`, off by default; see [Agent Plugins](./agent-plugins.md). Treat anything on this page that is not in the **Shipped** rows above as a direction, not a promise.
 
 ## Troubleshooting
 
@@ -203,6 +203,7 @@ The wider interop specification — package loading from local directories, git 
 - [Agent Capabilities](./agent-capabilities.md) — the tool-grant matrix these tools flow through, and the second view of the same bindings.
 - [Agents (Your AI Employees)](./agents.md) — permissions, scopes, and where `canCallExternalTools` lives.
 - [MCP Server](./mcp-server.md) — the other direction: Ever Works exposed as MCP tools to your own client.
+- [Agent Plugins](./agent-plugins.md) — installable packages that can declare MCP servers of their own, and the `FEATURE_AGENT_PLUGINS` / `AGENT_PLUGINS_STDIO` switches above.
 - [Plugins](./plugins.md) — the native plugin system, a separate mechanism from external MCP servers.
 - [Integrations](./integrations.md) — connectors that bring outside activity in as events.
 - [API Keys](./api-keys.md) — authenticating the endpoints above.

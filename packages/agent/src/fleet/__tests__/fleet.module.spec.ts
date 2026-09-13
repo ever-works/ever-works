@@ -98,6 +98,8 @@ import { FleetCostCeilingService } from '../fleet-cost-ceiling.service';
 import { FleetKillSwitchRepository } from '../fleet-kill-switch.repository';
 import { FleetKillSwitchService } from '../fleet-kill-switch.service';
 import { FleetAuditService } from '../fleet-audit.service';
+import { FleetRunCredentialService } from '../fleet-run-credential.service';
+import { ApiKeyRepository } from '../../database/repositories/api-key.repository';
 
 describe('FleetModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, FleetModule) ?? [];
@@ -105,8 +107,12 @@ describe('FleetModule', () => {
     // Fleet cost accounting (EW-777) appended the cost-policy repository and
     // the daily-ceiling service to both lists; panic controls (EW-778) then
     // appended the kill-switch repository, the audit service and the
-    // kill-switch service. The pin below grew with both so the shape stays
-    // exact — a provider added without updating it fails here.
+    // kill-switch service; the MCP bridge (self-build slice Z / EW-796)
+    // appended `ApiKeyRepository` (run credentials are `api_keys` rows, so
+    // the module carries its own `forFeature([ApiKey])` and the repository
+    // that reads it) and `FleetRunCredentialService`. The pin below grew
+    // with all three so the shape stays exact — a provider added without
+    // updating it fails here.
     it('provides the registry, the job-runtime halves, the routing preference, the cost ceilings and the panic controls', () => {
         expect(meta('providers')).toEqual([
             FleetNodeRepository,
@@ -122,6 +128,8 @@ describe('FleetModule', () => {
             FleetCostCeilingService,
             FleetAuditService,
             FleetKillSwitchService,
+            ApiKeyRepository,
+            FleetRunCredentialService,
         ]);
     });
 
@@ -140,7 +148,25 @@ describe('FleetModule', () => {
             FleetCostCeilingService,
             FleetAuditService,
             FleetKillSwitchService,
+            FleetRunCredentialService,
         ]);
+    });
+
+    /**
+     * Self-build slice Z (EW-796) — the api-side `FleetJobsController`
+     * injects this to mint on the node channel and
+     * `FleetMcpCredentialListener` injects it to revoke when a job settles.
+     * Both resolve through this module's exports; an unexported service
+     * would fail Nest's DI at boot rather than degrade, but the pin makes
+     * the reason legible.
+     *
+     * `ApiKeyRepository` is deliberately NOT exported: the api side gets it
+     * from `DatabaseModule`, and exporting a second binding of the same
+     * class from here would make which one wins depend on import order.
+     */
+    it('exports the run-credential service so the API can mint and revoke', () => {
+        expect(meta('exports')).toContain(FleetRunCredentialService);
+        expect(meta('exports')).not.toContain(ApiKeyRepository);
     });
 
     // EW-778 — the api-side AgentsModule binds RUN_KILL_SWITCH to this
@@ -176,6 +202,7 @@ describe('fleet barrel', () => {
         expect(barrel.FleetKillSwitchService).toBe(FleetKillSwitchService);
         expect(barrel.FleetKillSwitchRepository).toBe(FleetKillSwitchRepository);
         expect(barrel.FleetAuditService).toBe(FleetAuditService);
+        expect(barrel.FleetRunCredentialService).toBe(FleetRunCredentialService);
         expect(typeof barrel.buildFleetTools).toBe('function');
     });
 

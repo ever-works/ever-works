@@ -218,3 +218,97 @@ describe('PullRequestGateService', () => {
         });
     });
 });
+
+describe('PullRequestGateService — a declared setup phase it cannot run (EW-807)', () => {
+    let gate: PullRequestGateService;
+
+    beforeEach(() => {
+        gate = new PullRequestGateService();
+        const logger = (gate as unknown as { logger: Record<string, jest.Mock> }).logger;
+        jest.spyOn(logger, 'log').mockImplementation(() => undefined);
+        jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
+        jest.spyOn(logger, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    /**
+     * `resolveAcceptanceChecks` filters `phase: 'setup'` out, and this
+     * service has no setup phase to run those entries in. Grading only what
+     * is left would report a verdict for a checkout whose declared
+     * preparation never happened — and an owner who RE-PHASED an existing
+     * check would silently stop running a command that used to run, while
+     * still being handed a gate result.
+     */
+    it('is skipped, not green, when the Work declares a setup step', async () => {
+        const decision = await gate.evaluate({
+            work: {
+                id: 'w-setup',
+                checksPolicy: 'warn',
+                checkDefaults: [
+                    check({ id: 'install', command: GREEN, phase: 'setup' }),
+                    check({ id: 'tests', command: GREEN }),
+                ],
+            },
+            cwd: process.cwd(),
+        });
+        expect(decision.gateStatus).toBe('skipped');
+        expect(decision.results).toEqual([]);
+        // `warn` still does not block — that is the whole meaning of warn.
+        expect(decision.allowed).toBe(true);
+    });
+
+    it('refuses the pull request under `required` rather than passing an unprepared checkout', async () => {
+        const decision = await gate.evaluate({
+            work: {
+                id: 'w-setup-required',
+                checksPolicy: 'required',
+                checkDefaults: [
+                    check({ id: 'install', command: GREEN, phase: 'setup' }),
+                    check({ id: 'tests', command: GREEN }),
+                ],
+            },
+            cwd: process.cwd(),
+        });
+        expect(decision.allowed).toBe(false);
+        expect(decision.gateStatus).toBe('skipped');
+        // The refusal says WHICH thing could not run, so an owner is not
+        // left reading "skipped" and guessing.
+        expect(decision.reason).toContain('setup step');
+    });
+
+    /**
+     * The other half of the same defect, on this call site: a check that
+     * names a mounted repository would otherwise have run in the PRIMARY
+     * checkout and exited 0, and the gate would have opened a pull request
+     * reporting that repository verified when nothing in it ran.
+     */
+    it('refuses a mount-scoped check instead of grading the primary checkout as that repository', async () => {
+        const decision = await gate.evaluate({
+            work: {
+                id: 'w-mount',
+                checksPolicy: 'required',
+                checkDefaults: [
+                    check({ id: 'template-tests', command: GREEN, mountDir: 'template' }),
+                ],
+            },
+            cwd: process.cwd(),
+        });
+        expect(decision.results[0]).toMatchObject({ status: 'error', exitCode: null });
+        expect(decision.gateStatus).toBe('red');
+        expect(decision.allowed).toBe(false);
+    });
+
+    it('still runs an ordinary check set — nothing changes for a Work with no setup phase', async () => {
+        const decision = await gate.evaluate({
+            work: {
+                id: 'w-plain',
+                checksPolicy: 'required',
+                checkDefaults: [check({ id: 'tests' })],
+            },
+            cwd: process.cwd(),
+        });
+        expect(decision.gateStatus).toBe('green');
+        expect(decision.allowed).toBe(true);
+    });
+});

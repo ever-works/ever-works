@@ -59,3 +59,25 @@ export interface TokenResponse {
         anonymousExpiresAt?: string | null;
     };
 }
+
+/**
+ * Self-build slice Z (EW-796) — what `AuthSessionGuard` stashes on the
+ * request when a fleet-run MCP credential (`ew_run_…`) authenticated it.
+ *
+ * `request.user` still describes the OWNER, exactly as an `ew_live_` key
+ * would: the run acts as the person whose Task it is, and every
+ * ownership check downstream keeps working unchanged. This block is the
+ * extra fact those checks do not carry — that the caller is one specific
+ * fleet run, and which Organization it is pinned to.
+ *
+ * `SessionScopeGuard` is the consumer: it seeds the scope from
+ * `organizationId` here and refuses any `X-Scope-Slug` that resolves
+ * elsewhere, so the token's scope wins over the header and must equal it.
+ */
+export interface FleetRunCredentialBinding {
+    jobId: string;
+    nodeId: string;
+    runId: string | null;
+    /** Organization the token is pinned to; `null` = the owner's personal scope. */
+    organizationId: string | null;
+}

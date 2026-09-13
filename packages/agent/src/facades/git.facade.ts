@@ -33,6 +33,8 @@ import type {
     GitDiffOptions,
     GitDiffResult,
     GitPullRequestStatus,
+    // Release promotion lane (self-build slice AI, EW-808).
+    GitWorkflowRun,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -44,6 +46,8 @@ import {
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
 import { MERGE_POLICY_ENFORCER, type MergePolicyEnforcer } from '../policy/merge-policy.enforcer';
+import { MERGE_APPROVAL_VERIFIER, type MergeApprovalVerifier } from '../policy/merge-approval.port';
+import { normalizeCommitSha } from '@ever-works/contracts';
 import type { AuthAccount } from '../entities/auth-account.entity';
 import { FacadeError } from './base.facade';
 import { config } from '@src/config';
@@ -189,12 +193,14 @@ export type GitFacadeOptions = GitFacadeTokenAuth | GitFacadeUserAuth;
  * Merge-policy matrix (Wave 3, founder decision D4) — the "who is asking"
  * for {@link GitFacadeService.mergePullRequest}.
  *
- * PRESENT  ⇒ the merge is AGENT-DRIVEN and is routed through the single
- *            decision point (`MergePolicyService.canAgentMerge`) before
- *            the provider is called at all.
- * ABSENT   ⇒ the merge is human-driven; behaviour is exactly as it was
- *            before this feature landed. Human merges are governed by the
- *            git provider's own branch protection, not by this matrix.
+ * REQUIRED since merge approval (self-build slice AE, EW-805). It used to
+ * be optional, and its absence meant "human-driven merge, skip the
+ * matrix". That made the gate OPT-IN: any caller that forgot the sixth
+ * argument merged with no policy at all, and the compiler said nothing.
+ * There was exactly one production caller and it did pass an actor, so
+ * making the parameter required cost nothing and closed the door for
+ * good. A future human-driven merge path must construct an actor that
+ * says who the human is, rather than being exempted by omission.
  */
 export interface AgentMergeActor {
     /** The Agent asking to merge. Required — it is what makes this agent-driven. */
@@ -205,15 +211,49 @@ export interface AgentMergeActor {
     tenantId?: string | null;
     /** Latest quality-gate verdict for the run behind this pull request. */
     gateStatus?: GateStatus | null;
-    /** Whether a human approval is on record for this merge. */
-    humanApproved?: boolean;
+    /**
+     * Merge approval (slice AE) — the Task this pull request belongs to.
+     * It is WHAT an approval is looked up by, together with the pull
+     * request number and the live head commit.
+     *
+     * Note what is NOT on this interface any more: `humanApproved`. A
+     * caller cannot assert that a human approved; it can only say which
+     * merge this is, and the facade asks the record. The previous shape
+     * let the asker answer the question, and the one production caller
+     * hardcoded `false` — the gap this slice closes.
+     */
+    taskId?: string | null;
     /**
      * Base branch of the pull request. Optional: when omitted the facade
      * looks it up through the provider. If it still cannot be determined
      * and the policy protects any branch, the merge is REFUSED rather than
      * performed blind.
+     *
+     * MUST be the branch this pull request actually merges into. Passing
+     * a Work-level default here (the caller's usual base) makes the
+     * protected-branch rule evaluate a branch that is not being merged
+     * into — see the release promotion lane, whose pull requests are the
+     * first on this platform whose base is not `taskIsolationBaseBranch`.
      */
     targetBranch?: string | null;
+    /**
+     * Release promotion lane (self-build slice AI, EW-808) — a caller-side
+     * RAISE of the approval requirement.
+     *
+     * One direction only, enforced at the read: `true` forces the approval
+     * gate on even where the resolved policy sets `requireHumanApproval:
+     * false`; `false` / omitted changes nothing. A caller can therefore
+     * never lower the bar, only insist on a higher one.
+     *
+     * It exists because "an operator turned approvals off for this scope"
+     * must not extend to a release promotion. A promotion moves a whole
+     * batch onto `stage` or into production off a build lane measured at
+     * 215-243 minutes, and this slice's whole premise is that a human
+     * reads the gate verdict and decides. `TaskMergeGateService` sets it
+     * for promotions, and it is asserted HERE too so the property does not
+     * depend on one caller remembering.
+     */
+    requireHumanApproval?: boolean;
 }
 
 export type { GitProviderInfo };
@@ -278,6 +318,17 @@ export class GitFacadeService implements IGitFacade {
         @Optional()
         @Inject(MERGE_POLICY_ENFORCER)
         private readonly mergePolicy?: MergePolicyEnforcer,
+        // Merge approval (self-build slice AE, EW-805) — bound to
+        // MergeApprovalService by MergeApprovalModule (imported by
+        // FacadesModule). Appended LAST + @Optional() per the
+        // positional-spec arity rule, but note the SEMANTICS differ from
+        // every other optional dependency in this class: unbound is NOT
+        // "degrade gracefully", it is "no approval can be produced", and
+        // a policy that requires one therefore refuses. See
+        // `assertAgentMayMerge`.
+        @Optional()
+        @Inject(MERGE_APPROVAL_VERIFIER)
+        private readonly mergeApprovals?: MergeApprovalVerifier,
     ) {}
 
     private getRequiredOAuthScopes(providerId: string): readonly string[] {
@@ -790,15 +841,19 @@ export class GitFacadeService implements IGitFacade {
     }
 
     /**
-     * Land a pull request.
+     * Land a pull request. THE one place a merge can happen.
      *
-     * Merge-policy matrix (Wave 3, founder decision D4): when `agentActor`
-     * is supplied the merge is AGENT-DRIVEN and is routed through the
-     * single decision point before the provider is touched. A refusal
-     * throws {@link MergePolicyRefusedError} carrying the reason — the
-     * provider call never happens, so a policy violation cannot land even
-     * partially. Without `agentActor` (human-driven merges) nothing
-     * changes.
+     * `agentActor` is REQUIRED (merge approval, self-build slice AE): the
+     * gate below runs for every caller, so there is no "forgot the last
+     * argument" path to an unchecked merge. A refusal throws
+     * {@link MergePolicyRefusedError} carrying the reason — the provider
+     * call never happens, so a policy violation cannot land even
+     * partially.
+     *
+     * The merge is additionally PINNED to the head commit the gate just
+     * verified (`expectedHeadSha` → GitHub's `sha` parameter), so a push
+     * that lands between the check and this call is refused by the
+     * provider instead of being merged in place of what was approved.
      */
     async mergePullRequest(
         owner: string,
@@ -806,32 +861,60 @@ export class GitFacadeService implements IGitFacade {
         prNumber: number,
         mergeOptions: MergeOptions | undefined,
         options: GitFacadeOptions,
-        agentActor?: AgentMergeActor,
+        agentActor: AgentMergeActor,
     ): Promise<MergeResult> {
-        if (agentActor?.agentId) {
-            await this.assertAgentMayMerge(
-                owner,
-                repo,
-                prNumber,
-                mergeOptions,
-                options,
-                agentActor,
-            );
-        }
+        const { expectedHeadSha } = await this.assertAgentMayMerge(
+            owner,
+            repo,
+            prNumber,
+            mergeOptions,
+            options,
+            agentActor,
+        );
         const { plugin, token } = await this.resolvePluginAndToken(options);
-        return plugin.mergePullRequest(owner, repo, prNumber, mergeOptions, token);
+        const pinned = expectedHeadSha
+            ? { ...(mergeOptions ?? {}), expectedHeadSha }
+            : mergeOptions;
+        return plugin.mergePullRequest(owner, repo, prNumber, pinned, token);
     }
 
     /**
-     * The enforcement half of the merge-policy matrix. Throws
-     * {@link MergePolicyRefusedError} when the effective policy refuses.
+     * The enforcement half of the merge-policy matrix + the merge-approval
+     * gate. Throws {@link MergePolicyRefusedError} when either refuses.
+     * Returns the head commit the merge must be pinned to, when one could
+     * be established.
      *
-     * Fail-CLOSED by design (the opposite posture from the concurrency
+     * Order, and why:
+     *
+     *  1. **Resolve the policy** (not a decision — just the fields), so we
+     *     know whether an approval is required before we do anything else.
+     *     An unbound enforcer, or one too minimal to resolve, is read as
+     *     "approval required": an unevaluated policy is never a satisfied
+     *     policy.
+     *  2. **Read the pull request LIVE, for every policy** — its state,
+     *     its head commit and its CI verdict, from the provider, right
+     *     now. Not `tasks.ciState`, which is a cache the PR-status sweep
+     *     refreshes every couple of minutes. "It was green when the human
+     *     approved" is exactly the thing that must not be trusted. This
+     *     step used to be inside the "an approval is required" branch, so
+     *     an operator who set `requireHumanApproval: false` got no state
+     *     check and no CI check whatsoever; they opted out of a human, not
+     *     out of CI.
+     *  3. **Verify the approval** against that live head, WHEN the policy
+     *     requires one. Missing, stale (given for an earlier commit),
+     *     expired, non-human or unentitled all refuse, each with its own
+     *     code.
+     *  4. **The operator kill-switch** (`AGENT_MERGE_POLICY_ENFORCEMENT=
+     *     off`) skips the policy MATRIX below — and only that. It no
+     *     longer skips the approval gate. See the note at the check.
+     *  5. **The matrix** (`canAgentMerge`), with `humanApproved` supplied
+     *     by step 3 rather than by the caller.
+     *
+     * Fail-CLOSED throughout (the opposite posture from the concurrency
      * valve in `RunDispatchGateService`, and deliberately so): a merge is
-     * irreversible, so an unavailable enforcer or an undeterminable target
-     * branch refuses instead of proceeding. The only bypass is the
-     * operator kill-switch `AGENT_MERGE_POLICY_ENFORCEMENT=off`, which
-     * restores the pre-feature behaviour wholesale.
+     * irreversible, so an unavailable enforcer, an unreadable pull
+     * request or an undeterminable target branch refuses instead of
+     * proceeding.
      */
     private async assertAgentMayMerge(
         owner: string,
@@ -840,15 +923,7 @@ export class GitFacadeService implements IGitFacade {
         mergeOptions: MergeOptions | undefined,
         options: GitFacadeOptions,
         agentActor: AgentMergeActor,
-    ): Promise<void> {
-        if (!config.agents.isMergePolicyEnforcementEnabled()) {
-            this.logger.warn(
-                `Merge-policy enforcement is DISABLED (AGENT_MERGE_POLICY_ENFORCEMENT=off) — ` +
-                    `agent ${agentActor.agentId} merging ${owner}/${repo}#${prNumber} unchecked.`,
-            );
-            return;
-        }
-
+    ): Promise<{ expectedHeadSha: string | null }> {
         if (!this.mergePolicy) {
             throw new MergePolicyRefusedError(
                 {
@@ -860,6 +935,202 @@ export class GitFacadeService implements IGitFacade {
                 },
                 options.providerId,
             );
+        }
+
+        const scope = {
+            agentId: agentActor.agentId,
+            workId: agentActor.workId ?? options.workId ?? null,
+            organizationId: agentActor.organizationId ?? null,
+            tenantId: agentActor.tenantId ?? null,
+        };
+
+        // (1) Does this scope require a human approval? Resolve-only, no
+        // decision. An enforcer without `resolve` (a minimal double, an
+        // older binding) is read as "yes" — fail closed.
+        let requiresApproval = true;
+        let policySource: MergePolicySource | undefined;
+        if (typeof this.mergePolicy.resolve === 'function') {
+            try {
+                const resolved = await this.mergePolicy.resolve(scope);
+                // OR, never assignment: `agentActor.requireHumanApproval`
+                // can only RAISE the bar (release promotion lane, slice
+                // AI). A caller that could clear it would be able to
+                // answer the question the gate exists to ask.
+                requiresApproval =
+                    resolved.policy.requireHumanApproval ||
+                    agentActor.requireHumanApproval === true;
+                policySource = resolved.source;
+            } catch (error) {
+                this.logger.warn(
+                    `Merge policy: could not resolve the approval requirement for ` +
+                        `${owner}/${repo}#${prNumber}; assuming an approval is required: ` +
+                        `${error instanceof Error ? error.message : String(error)}`,
+                );
+                requiresApproval = true;
+            }
+        }
+
+        // (2) The LIVE read, for EVERY policy. It used to sit inside the
+        // `if (requiresApproval)` branch, which meant an operator who set
+        // `requireHumanApproval: false` got no state check and no CI check
+        // at all — the facade merged whatever was there, seconds after the
+        // pull request was opened and before a single check run existed.
+        // That is not what "no approval required" buys: the operator opted
+        // out of a HUMAN, not out of CI, and `TaskMergeGateService` (the
+        // other side of the same policy) always waited for green. The two
+        // paths now agree, and this is the enforcement point, so it is
+        // stated here rather than left to whichever caller got there.
+        const live = await this.readLivePullRequest(owner, repo, prNumber, options);
+        if (!live) {
+            throw new MergePolicyRefusedError(
+                {
+                    allowed: false,
+                    code: 'head-sha-unknown',
+                    reason:
+                        `The pull request ${owner}/${repo}#${prNumber} could not be read from the provider, ` +
+                        'so neither its head commit nor its CI verdict can be confirmed at merge time.',
+                    source: policySource,
+                },
+                options.providerId,
+            );
+        }
+        if (live.state !== 'open') {
+            throw new MergePolicyRefusedError(
+                {
+                    allowed: false,
+                    code: 'pull-request-not-open',
+                    reason: `Pull request #${prNumber} is '${live.state}', not open — nothing to merge.`,
+                    source: policySource,
+                },
+                options.providerId,
+            );
+        }
+        // Green is re-checked HERE, at merge time, against the provider. A
+        // pull request that was green when the human approved it and is
+        // red now must not merge, and the Task's cached `ciState` is up to
+        // two minutes behind.
+        //
+        // `checksComplete === false` is treated as not-green on purpose:
+        // it means the provider read could not see the commit's whole
+        // check set (a source it lacks scope for, or more checks than the
+        // page budget), so the roll-up is over a SAMPLE and a failure may
+        // be hiding in the part nobody read. An authorization input may
+        // not be a sample.
+        if (live.ciState !== 'passing' || live.checksComplete === false) {
+            throw new MergePolicyRefusedError(
+                {
+                    allowed: false,
+                    code: 'pull-request-not-green',
+                    reason:
+                        live.checksComplete === false
+                            ? `Provider CI for pull request #${prNumber} could not be read in full, so its ` +
+                              "verdict is a sample rather than a roll-up. A merge needs the whole commit's checks."
+                            : `Provider CI for pull request #${prNumber} is '${live.ciState}' at merge time. ` +
+                              'An approval covers a green pull request; this one is not green now.',
+                    source: policySource,
+                },
+                options.providerId,
+            );
+        }
+        const expectedHeadSha = normalizeCommitSha(live.headSha);
+        if (!expectedHeadSha) {
+            throw new MergePolicyRefusedError(
+                {
+                    allowed: false,
+                    code: 'head-sha-unknown',
+                    reason:
+                        `The provider did not report a head commit for pull request #${prNumber}, so the ` +
+                        'merge cannot be pinned to what was checked.',
+                    source: policySource,
+                },
+                options.providerId,
+            );
+        }
+
+        // (3) The approval gate, which IS skipped when the effective policy
+        // does not require one — that operator chose "agents land their own
+        // green work", and this method must not quietly re-impose a gate
+        // they turned off.
+        let approval: { approvedById?: string; approvalId?: string } | null = null;
+        if (requiresApproval) {
+            const headSha = expectedHeadSha;
+            if (!this.mergeApprovals) {
+                throw new MergePolicyRefusedError(
+                    {
+                        allowed: false,
+                        code: 'approval-missing',
+                        reason:
+                            'The effective merge policy requires a human approval, and this runtime has no ' +
+                            'approval verifier bound — so no approval can exist to satisfy it.',
+                        source: policySource,
+                    },
+                    options.providerId,
+                );
+            }
+
+            const verdict = await this.mergeApprovals
+                .verifyMergeApproval({
+                    taskId: agentActor.taskId ?? '',
+                    prNumber,
+                    headSha,
+                })
+                .catch((error: unknown) => {
+                    // A verifier that threw did not approve anything.
+                    this.logger.warn(
+                        `Merge approval verification threw for ${owner}/${repo}#${prNumber} (refusing): ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                    return {
+                        approved: false as const,
+                        code: 'approval-missing' as const,
+                        reason: 'The approval record could not be verified, so this merge is refused.',
+                    };
+                });
+
+            if (!verdict.approved) {
+                this.logger.log(
+                    `Merge approval REFUSED agent ${agentActor.agentId} on ${owner}/${repo}#${prNumber} ` +
+                        `(${verdict.code ?? 'approval-missing'}).`,
+                );
+                throw new MergePolicyRefusedError(
+                    {
+                        allowed: false,
+                        code: verdict.code ?? 'approval-missing',
+                        reason:
+                            verdict.reason ??
+                            'No usable human approval is on record for this merge.',
+                        source: policySource,
+                    },
+                    options.providerId,
+                );
+            }
+            approval = { approvedById: verdict.approvedById, approvalId: verdict.approvalId };
+        }
+        // No `else`. The head pin, the open check and the green check are
+        // above and apply to both policies; the only thing an operator's
+        // `requireHumanApproval: false` skips is the approval lookup.
+
+        // (4) The operator kill-switch. It restores the pre-feature
+        // behaviour of the POLICY MATRIX and nothing else.
+        //
+        // It deliberately no longer covers the approval gate above. The
+        // switch was added to un-break a deployment the matrix refused —
+        // an escape hatch for branch/method/gate rules. Letting it also
+        // waive "a human said yes to this commit" would make one env var
+        // the difference between a reviewed merge and an unreviewed one,
+        // which is precisely the failure this slice exists to prevent.
+        // An operator who genuinely wants agents to land green work
+        // without a human sets `requireHumanApproval: false` on the merge
+        // policy: same outcome, but scoped, auditable, and visible in the
+        // resolved-policy UI rather than in a pod's environment.
+        if (!config.agents.isMergePolicyEnforcementEnabled()) {
+            this.logger.warn(
+                `Merge-policy MATRIX is disabled (AGENT_MERGE_POLICY_ENFORCEMENT=off) — ` +
+                    `agent ${agentActor.agentId} merging ${owner}/${repo}#${prNumber} without the ` +
+                    `branch / method / gate rules. The approval requirement still applied.`,
+            );
+            return { expectedHeadSha };
         }
 
         // Resolve the base branch when the caller did not supply it — the
@@ -878,13 +1149,19 @@ export class GitFacadeService implements IGitFacade {
             }
         }
 
+        // (5) The matrix. `humanApproved` now comes from the RECORD, never
+        // from the caller.
+        //
+        // Note it is `approval !== null`, NOT "true when no approval was
+        // required". `canAgentMerge` resolves the policy a second time, and
+        // if an operator flipped `requireHumanApproval` on in the
+        // milliseconds between the two reads, claiming approval here would
+        // merge under the OLD policy. Reporting what we actually verified
+        // makes that race refuse instead.
         const decision = await this.mergePolicy.canAgentMerge({
-            agentId: agentActor.agentId,
-            workId: agentActor.workId ?? options.workId ?? null,
-            organizationId: agentActor.organizationId ?? null,
-            tenantId: agentActor.tenantId ?? null,
+            ...scope,
             gateStatus: agentActor.gateStatus ?? null,
-            humanApproved: agentActor.humanApproved ?? false,
+            humanApproved: approval !== null,
             targetBranch,
             mergeMethod: mergeOptions?.mergeMethod ?? null,
         });
@@ -899,8 +1176,35 @@ export class GitFacadeService implements IGitFacade {
 
         this.logger.log(
             `Merge policy ALLOWED agent ${agentActor.agentId} on ${owner}/${repo}#${prNumber} ` +
-                `(policy source: ${decision.source ?? 'default'}).`,
+                `(policy source: ${decision.source ?? 'default'}` +
+                `${approval?.approvedById ? `, approved by user ${approval.approvedById}` : ''}` +
+                `${expectedHeadSha ? `, pinned to ${expectedHeadSha.slice(0, 12)}` : ''}).`,
         );
+        return { expectedHeadSha };
+    }
+
+    /**
+     * Live provider read of a pull request's state, head commit and CI
+     * verdict — never a cache. `null` when the provider cannot answer
+     * (the capability is unsupported, the PR is gone, the token lacks
+     * scope), which every caller treats as a refusal.
+     */
+    private async readLivePullRequest(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequestStatus | null> {
+        try {
+            return await this.getPullRequestStatus(owner, repo, prNumber, options);
+        } catch (error) {
+            this.logger.warn(
+                `Merge gate: live status read failed for ${owner}/${repo}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
     }
 
     async listPullRequests(
@@ -974,6 +1278,46 @@ export class GitFacadeService implements IGitFacade {
             throw new GitOperationNotSupportedError('getPullRequestDiff', plugin.id);
         }
         return impl.call(plugin, owner, repo, prNumber, diffOptions, token);
+    }
+
+    // ── Release promotion lane (self-build slice AI, EW-808) ──────────
+
+    /**
+     * The verdict of ONE named workflow file for ONE commit.
+     *
+     * Separate from `getPullRequestStatus` on purpose. That read rolls up
+     * every check on the head commit and treats `skipped` / `cancelled` /
+     * `neutral` / `stale` as non-blocking, which is right for the board's
+     * dot and wrong for a release gate — `promotion-gate.yml` SKIPS its
+     * e2e job by design on any head that is not `stage`, and a skipped job
+     * renders green. It also cannot answer "did the gate run at all?",
+     * because the `checks[]` it returns is a capped sample.
+     *
+     * Three outcomes, all distinct and all meaningful to the caller:
+     *   - a run          → the caller maps its status/conclusion to a verdict;
+     *   - `null`         → the workflow has no run for this commit;
+     *   - a THROW        → the lookup is broken (no capability, no scope,
+     *                      provider down). Never collapsed into `null`.
+     *
+     * The promotion lane refuses on all three except an explicit success,
+     * but it tells the operator a different story for each.
+     */
+    async getWorkflowRunForCommit(
+        owner: string,
+        repo: string,
+        workflowPath: string,
+        headSha: string,
+        options: GitFacadeOptions,
+    ): Promise<GitWorkflowRun | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        // The lazy-plugin proxy over-reports optional methods, so the
+        // method is materialised off the resolved plugin before it is
+        // called (same rule as the PR-insights reads above).
+        const impl = plugin.getWorkflowRunForCommit;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getWorkflowRunForCommit', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, workflowPath, headSha, token);
     }
 
     /** Same, for a pushed branch that has not opened a PR yet. */

@@ -40,6 +40,23 @@ export interface RunChecksInput {
      * behavior) when the caller doesn't iterate.
      */
     attempt?: number;
+    /**
+     * The SETUP half of the same resolved list (EW-807) —
+     * `resolveSetupSteps(task, work)`, whatever the caller resolved the
+     * checks from.
+     *
+     * Passed so this runner can REFUSE rather than grade a run whose
+     * declared install never happened: this runtime has no setup phase (no
+     * pre-model hook, no separate budget, no separate reporting block), and
+     * `resolveAcceptanceChecks` filters `phase: 'setup'` out. Without this
+     * field an owner who re-phases an existing check to `setup` silently
+     * loses the command AND still gets a graded gate — a verdict on a
+     * workspace nobody prepared. See {@link runChecks}.
+     *
+     * Omitted = no setup declared, which is every Task and Work authored
+     * before the phase existed.
+     */
+    setup?: readonly TaskAcceptanceCheck[];
 }
 
 export interface RunChecksOutcome {
@@ -127,6 +144,34 @@ export class TaskGateRunnerService {
 
     async runChecks(input: RunChecksInput): Promise<RunChecksOutcome> {
         const checks = Array.isArray(input.checks) ? input.checks : [];
+
+        // EW-807 — a declared setup phase this runtime cannot run.
+        //
+        // `phase: 'setup'` means "install the dependencies BEFORE the model,
+        // with its own budget, reported apart from the checks". Only the
+        // fleet node has that phase. Here the entries were filtered out of
+        // `checks` by `resolveAcceptanceChecks`, so grading what is left
+        // would report a verdict for a workspace whose declared preparation
+        // never happened — and, for an owner who re-phased an EXISTING
+        // check, would silently stop running a command that used to run.
+        //
+        // 'skipped', never 'green' and never 'none': the same mapping a
+        // zero-check gate under `required` takes, and for the same reason —
+        // a gate that did not run must not pass anything.
+        const setup = Array.isArray(input.setup) ? input.setup : [];
+        if (setup.length > 0) {
+            const named = setup
+                .slice(0, 3)
+                .map((step) => step?.id ?? '(unnamed)')
+                .join(', ');
+            this.logger.error(
+                `Run ${input.runId}: ${setup.length} setup step(s) (${named}) are declared but this runtime has ` +
+                    `no setup phase — the gate is recorded as 'skipped' rather than grading an unprepared ` +
+                    `workspace. Route the Task to a fleet node, or fold the install into the check command.`,
+            );
+            await this.persist(input.runId, [], 'skipped');
+            return { gateStatus: 'skipped', results: [] };
+        }
 
         if (checks.length === 0) {
             const gateStatus: GateStatus = input.policy === 'required' ? 'skipped' : 'none';

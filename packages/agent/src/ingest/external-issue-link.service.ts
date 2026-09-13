@@ -36,6 +36,21 @@ export interface LinkExternalIssueInput {
      */
     lastIngestedEventId?: string | null;
     lastSeenAt?: Date | null;
+    /**
+     * Times this external issue has RE-OPENED work (a regression
+     * superseding a closed Task). Omitted = left untouched, which is
+     * every ordinary file / refresh.
+     */
+    regressionCount?: number;
+    /**
+     * Insert-only. When a link already exists for
+     * `(userId, source, externalIssueId)` it is returned UNCHANGED
+     * instead of being re-pointed at `taskId` — see
+     * `UpsertExternalIssueLinkData.onlyIfAbsent`. A caller that filed a
+     * Task must compare `taskId` on the returned row: a different id
+     * means it lost the race and its own Task is an orphan.
+     */
+    onlyIfAbsent?: boolean;
 }
 
 /**
@@ -111,6 +126,10 @@ export class ExternalIssueLinkService {
                 ? { lastIngestedEventId: input.lastIngestedEventId }
                 : {}),
             ...(input.lastSeenAt !== undefined ? { lastSeenAt: input.lastSeenAt } : {}),
+            ...(input.regressionCount !== undefined
+                ? { regressionCount: input.regressionCount }
+                : {}),
+            ...(input.onlyIfAbsent ? { onlyIfAbsent: true } : {}),
         });
     }
 

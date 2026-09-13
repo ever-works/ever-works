@@ -26,6 +26,8 @@ import type {
     SourceRepository as ContractSourceRepository,
     WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
+// Release promotion lane (self-build slice AI, EW-808).
+import type { ReleaseLadder, ReleaseVerificationTargets } from '@ever-works/contracts';
 import type { PRUpdate } from '@src/generators/data-generator';
 import { WorkGenerationHistory } from './work-generation-history.entity';
 import { TimestampColumn } from './_types';
@@ -68,6 +70,7 @@ import {
     type UserSelectableWorkKind,
     type WorkChecksPolicy,
     type WorkExternalRefs,
+    type WorkRepoDeclaredCommandPolicy,
     type WorkKind,
 } from '@ever-works/contracts';
 
@@ -428,6 +431,57 @@ export class Work {
     @Column({ type: 'varchar', length: 16, default: 'on-merge' })
     taskBranchCleanup: string;
 
+    // ── Release promotion lane (self-build slice AI, EW-808) ─────────
+
+    /**
+     * The `integration → staging → production` branch ladder this Work's
+     * releases move along, as PLATFORM STATE.
+     *
+     * NULL — the default, and the value on every existing Work — means
+     * this Work has no release lane and `POST /promotions` refuses. That
+     * is deliberate: a Work whose ladder nobody has declared has no
+     * business opening a pull request into a branch the platform guessed.
+     * `taskIsolationBaseBranch` above is a DIFFERENT thing (where Task
+     * branches fork from and merge back to) and is not a substitute — it
+     * names one branch and a ladder needs three.
+     *
+     * Read through `sanitizeReleaseLadder` on every use, never raw: the
+     * column is `simple-json` and therefore holds whatever was written to
+     * it, and the branch names end up in a pull request's `head`/`base`.
+     */
+    @Column('simple-json', { nullable: true })
+    releaseLadder?: ReleaseLadder | null;
+
+    /**
+     * Where this Work's deployed environments can be OBSERVED from
+     * outside, per environment (self-build slice AJ, EW-809).
+     *
+     * The other half of the release lane's platform state. The ladder says
+     * which branches a promotion may touch; this says which URLs a
+     * post-deploy verification may load, and it is read for the
+     * environment the promoted rung DEPLOYS (its base branch) — merging
+     * `develop -> stage` is verified against staging, never production.
+     *
+     * NULL — the default, and the value on every existing Work — means a
+     * merged promotion for this Work is recorded `unsupported` and
+     * reported to the owner as NOT VERIFIED. It is never treated as a
+     * pass: "nobody configured a URL" and "the deployment is healthy" must
+     * not be the same reading.
+     *
+     * NEVER accepted on a promotion or verification request. A caller that
+     * could name the URL a verification loads could point a green verdict
+     * at a page it controls, and that verdict is the only thing standing
+     * between a bad release and a human being told everything is fine.
+     *
+     * Read through `sanitizeReleaseVerificationTargets` on every use,
+     * never raw: the column is `simple-json` and therefore holds whatever
+     * was written to it, and these URLs are loaded by a real browser on an
+     * enrolled fleet node — somebody's actual PC, inside their actual
+     * network.
+     */
+    @Column('simple-json', { nullable: true })
+    releaseVerification?: ReleaseVerificationTargets | null;
+
     // ── Memory recall (memory upgrades M3) ───────────────────────────
 
     /**
@@ -465,6 +519,31 @@ export class Work {
      */
     @Column({ type: 'int', default: 2 })
     maxGateAttempts: number;
+
+    /**
+     * Whether this Work reads the commands its own repository declares in
+     * `.works/works.yml` (`spec.tasks.setup` / `spec.tasks.checks`), and
+     * which commands it will admit (EW-807).
+     *
+     * NULL — the value every existing row has and every new Work starts
+     * with — means `{ mode: 'off' }`: the file is not consulted for
+     * commands at all and runs are graded exactly as they were before this
+     * column existed.
+     *
+     * WHY IT IS A COLUMN AND NOT A FLAG. A declared command is a command
+     * one of the owner's enrolled machines will run, with their shell,
+     * their credential helper and (during a run) decrypted `.env` files on
+     * disk. The author of `.works/works.yml` is anyone who can land a
+     * commit or a PR branch in the repository — a far wider set than the
+     * Work's members — and during a run it is also the model, which has
+     * write access to the whole checkout. So the owner does not merely
+     * switch the feature on: they write down each command, verbatim, and
+     * the platform admits nothing else. Never read this column directly;
+     * pass it through `normalizeWorkRepoDeclaredCommandPolicy`, which
+     * fails closed on anything it does not recognise.
+     */
+    @Column('simple-json', { nullable: true })
+    repoDeclaredCommands?: WorkRepoDeclaredCommandPolicy | null;
 
     // ── Merge policy (Wave 3, founder decision D4) ───────────────────
 

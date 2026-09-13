@@ -298,7 +298,9 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             expect(jobs.resolveAgentTaskTarget).toHaveBeenCalledWith('user-1', 'agent-1');
             expect(runners.availability).toHaveBeenCalledWith('user-1', {
                 targetNodeId: NODE_B,
-                requiredCapabilities: [],
+                // Slice AM (EW-810): with no operator tags configured, the
+                // set is exactly the one tag every `agent-task` now needs.
+                requiredCapabilities: ['git-push'],
             });
         });
 
@@ -390,9 +392,14 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             runners.availability.mockClear();
             planner = undefined;
             await buildDispatcher().enqueue(payload());
+            // Scoped push credentials (self-build slice AM, EW-810):
+            // `agentTaskRequiredCapabilities` now always adds `git-push`,
+            // so the planner-free path counts the operator's config tags
+            // PLUS it. The old expectation was right for a fleet whose
+            // push was token-free.
             expect(runners.availability).toHaveBeenCalledWith('user-1', {
                 targetNodeId: null,
-                requiredCapabilities: ['workspace'],
+                requiredCapabilities: ['workspace', 'git-push'],
             });
         });
 
@@ -424,9 +431,11 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             const result = await buildDispatcher().enqueue(payload());
 
             expect(result).toEqual({ runId: 'fleet-job-1' });
+            // Degraded means "the operator's config tags", which since
+            // slice AM includes the always-required `git-push`.
             expect(runners.availability).toHaveBeenCalledWith('user-1', {
                 targetNodeId: null,
-                requiredCapabilities: ['workspace'],
+                requiredCapabilities: ['workspace', 'git-push'],
             });
         });
 
@@ -449,7 +458,10 @@ describe('fleet run routing (local-runner preference matrix)', () => {
 
             const counted = runners.availability.mock.calls[0][1].requiredCapabilities;
             expect(store.enqueue.mock.calls[0][0].requiredCapabilities).toEqual(counted);
-            expect(counted).toEqual(['workspace']);
+            // The literal matters more than the equality above: it is what
+            // catches a tag being added to ONE of the two callers. Slice AM
+            // added `git-push` to the shared definition, so both moved.
+            expect(counted).toEqual(['workspace', 'git-push']);
         });
     });
 });

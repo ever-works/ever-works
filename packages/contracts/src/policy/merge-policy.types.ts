@@ -143,7 +143,31 @@ export type MergeRefusalCode =
 	| 'target-branch-unknown'
 	| 'merge-method-not-allowed'
 	| 'gate-not-green'
-	| 'human-approval-required';
+	| 'human-approval-required'
+	// ── Merge approval (self-build slice AE, EW-805) ──────────────────
+	// `human-approval-required` above is the POLICY refusal: the policy
+	// wants an approval and the merge path could not produce one. The
+	// codes below are the APPROVAL refusals — the merge path looked, and
+	// says precisely what it found instead. They are separate values on
+	// purpose: "nobody approved this" and "somebody approved a commit
+	// that is no longer the head" are the same policy outcome and
+	// completely different things for the human reading the refusal.
+	/** No recorded approval names this pull request at all. */
+	| 'approval-missing'
+	/** An approval exists for this pull request, but for an EARLIER head commit. */
+	| 'approval-stale'
+	/** A matching approval exists but is older than `MERGE_APPROVAL_MAX_AGE_MS`. */
+	| 'approval-expired'
+	/** The recorded decision was not made by a human (guardrail / no decider). */
+	| 'approval-not-human'
+	/** The approver is not entitled to approve for this Task's scope. */
+	| 'approver-not-entitled'
+	/** The pull request is draft/closed/merged at merge time. */
+	| 'pull-request-not-open'
+	/** Provider CI is not green at merge time (it may have been at approval time). */
+	| 'pull-request-not-green'
+	/** The live head commit could not be read, so nothing can be pinned to it. */
+	| 'head-sha-unknown';
 
 /** Outcome of the single decision point (`canAgentMerge`). */
 export interface MergeDecision {

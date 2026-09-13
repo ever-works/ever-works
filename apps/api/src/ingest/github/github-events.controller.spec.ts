@@ -21,7 +21,10 @@ jest.mock('../../auth/decorators/public.decorator', () => ({
 }));
 
 import { GitHubEventsController } from './github-events.controller';
-import { GitHubWebhookDispatcherService } from './github-webhook-dispatcher.service';
+import {
+    GitHubWebhookDispatcherService,
+    INVALID_GITHUB_SIGNATURE,
+} from './github-webhook-dispatcher.service';
 import { computeGitHubSignature } from './github-signature.util';
 
 const SECRET = 'test-webhook-secret';
@@ -104,8 +107,13 @@ describe('GitHubEventsController (POST /api/ingest/github/events)', () => {
         await expect(controller.receiveEvents(req as never, signature, 'ping')).rejects.toThrow(
             UnauthorizedException,
         );
+        // Same uniform 401 body as the dispatcher — see the CONTRACT REVERSAL
+        // note there. Asserting a distinct 'not configured' message was
+        // asserting a configuration oracle: it told an unauthenticated prober
+        // whether a secret exists. Fails closed either way, which is what the
+        // assertion above pins.
         await expect(controller.receiveEvents(req as never, signature, 'ping')).rejects.toThrow(
-            'not configured',
+            INVALID_GITHUB_SIGNATURE,
         );
         expect(bridge.handleEvent).not.toHaveBeenCalled();
     });

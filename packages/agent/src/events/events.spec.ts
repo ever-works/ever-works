@@ -298,6 +298,12 @@ describe('agent/events submodule', () => {
                     // Agent execution v2 (slice B) — fleet job lifecycle.
                     'FleetJobCompletedEvent',
                     'FleetJobLeasedEvent',
+                    // Node MCP bridge (slice Z, EW-782) — the run-scoped
+                    // credential's mint and revoke, so the audit trail and the
+                    // reconciler can both observe a bridge without either one
+                    // reaching into the other's module.
+                    'FleetJobMcpCredentialMintedEvent',
+                    'FleetJobMcpCredentialRevokedEvent',
                     'WorkCreatedEvent',
                     'WorkStatusChangedEvent',
                     'WorkGenerationCompletedEvent',

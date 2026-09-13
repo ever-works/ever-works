@@ -9,7 +9,11 @@ import {
     computeGateStatus,
     executeAcceptanceChecks,
 } from '../tasks-domain/acceptance-check-executor';
-import { resolveAcceptanceChecks, resolveChecksPolicy } from '../tasks-domain/task-gates';
+import {
+    resolveAcceptanceChecks,
+    resolveChecksPolicy,
+    resolveSetupSteps,
+} from '../tasks-domain/task-gates';
 
 /**
  * The Work columns this decision reads. Deliberately a structural shape,
@@ -131,6 +135,31 @@ export class PullRequestGateService {
 
         const checks = resolveAcceptanceChecks(null, input.work);
         const label = input.context ? `${input.context}: ` : '';
+
+        // EW-807 — a declared SETUP phase this service cannot run.
+        //
+        // `phase: 'setup'` is a dependency install that must happen BEFORE
+        // the model, with its own budget and its own reporting block; only
+        // the fleet node has that phase, and `resolveAcceptanceChecks`
+        // filters those entries out. Grading only what is left would report
+        // a verdict for a checkout whose declared preparation never
+        // happened — and an owner who re-phased an existing check would
+        // silently lose a command that used to run. Same posture as "no
+        // checkout": 'skipped', which `required` refuses.
+        const setup = resolveSetupSteps(null, input.work);
+        if (setup.length > 0) {
+            return this.decide({
+                allowed: policy !== 'required',
+                policy,
+                gateStatus: 'skipped',
+                results: [],
+                reason:
+                    `This Work declares ${setup.length} setup step(s), but a pull-request gate has no setup ` +
+                    'phase to run them in — the checks would grade a workspace nobody prepared. Route the ' +
+                    'work to a fleet node, or fold the install into the check command.',
+                label,
+            });
+        }
 
         if (checks.length === 0) {
             // Zero checks under `required` is 'skipped', never 'green' —

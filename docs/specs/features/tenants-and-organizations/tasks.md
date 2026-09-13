@@ -297,4 +297,4 @@ JIRA Epic and per-phase Stories live in the `EW` project at <https://evertech.at
     - Phase 9 — CreateOrganizationModal + upgrade-vs-new dialog: [EW-661](https://evertech.atlassian.net/browse/EW-661)
     - Phase 10 — Company chip + Work→Org wire-up: [EW-662](https://evertech.atlassian.net/browse/EW-662)
 
-(See [JIRA_ATLASSIAN_MCP.md](../../../../../../Workspace/knowledge/runbooks/JIRA_ATLASSIAN_MCP.md) for ticket-management commands.)
+(See `knowledge/runbooks/JIRA_ATLASSIAN_MCP.md` in the operator workspace repository for ticket-management commands.)

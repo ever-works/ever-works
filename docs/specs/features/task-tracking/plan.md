@@ -207,7 +207,7 @@ export class TaskAttachment {
 ### 3.2 Additive changes to existing entities
 
 - `plugin_usage_events` gains `taskId uuid NULL` + `(taskId, occurredAt)` index.
-- `ActivityActionType` enum strings gain the values listed in architecture §10. Confirmed location: [`packages/agent/src/entities/activity-log.types.ts`](../../../packages/agent/src/entities/activity-log.types.ts) — a TypeScript enum; extend in place.
+- `ActivityActionType` enum strings gain the values listed in architecture §10. Confirmed location: [`packages/agent/src/entities/activity-log.types.ts`](../../../../packages/agent/src/entities/activity-log.types.ts) — a TypeScript enum; extend in place.
 
 ### 3.3 Additional new entities (deepened in round 2)
 
@@ -352,7 +352,7 @@ Both live in `packages/tasks/src/tasks/trigger/`. Both pre-allocate an `agent_ru
 
 ## 8.1 Notification wiring
 
-Reuse the existing `Notification` entity ([`packages/agent/src/entities/notification.entity.ts`](../../../packages/agent/src/entities/notification.entity.ts)) which already supports `type` (INFO/WARNING/ERROR/SUCCESS), `category` (extend with `TASK`), `actionUrl`, `actionLabel`, `metadata`, `isPersistent`, `expiresAt`, `deduplicationKey`.
+Reuse the existing `Notification` entity ([`packages/agent/src/entities/notification.entity.ts`](../../../../packages/agent/src/entities/notification.entity.ts)) which already supports `type` (INFO/WARNING/ERROR/SUCCESS), `category` (extend with `TASK`), `actionUrl`, `actionLabel`, `metadata`, `isPersistent`, `expiresAt`, `deduplicationKey`.
 
 New service `TaskNotificationService.emit(event, context)` is a thin wrapper:
 

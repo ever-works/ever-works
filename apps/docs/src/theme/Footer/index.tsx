@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import { translate } from '@docusaurus/Translate';
 import { useThemeConfig } from '@docusaurus/theme-common';
 
 import { SocialLinks } from './SocialLinks';
@@ -37,6 +38,19 @@ function Footer(): ReactNode {
 	const footerData = siteConfig.customFields?.footerData as FooterData | undefined;
 	const links = footer.links || [];
 
+	// EW-266 — the copyright line comes from `customFields.footerData.companyInfo`
+	// (docusaurus.config.ts), which Docusaurus does not translate on its own because
+	// it is plain site config rather than theme config. Route it through `translate()`
+	// so a locale can override it in `i18n/<locale>/code.json`; the configured English
+	// string stays the default when no translation exists.
+	const copyright = footerData?.companyInfo?.copyright
+		? translate({
+				id: 'footer.companyInfo.copyright',
+				message: footerData.companyInfo.copyright,
+				description: 'The copyright line rendered at the bottom of the site footer'
+			})
+		: null;
+
 	return (
 		<footer className="border-t border-gray-200 dark:border-gray-800/50 flex relative z-50 flex-col items-center pt-5 mt-auto bg-white dark:bg-black">
 			<div className="flex flex-col w-full">
@@ -72,7 +86,7 @@ function Footer(): ReactNode {
 						<div className="flex flex-col col-span-2 text-zinc-600 dark:text-zinc-400 md:col-start-2 md:row-start-1">
 							<div className="flex flex-wrap gap-4 justify-center md:items-center xl:flex-nowrap md:justify-between">
 								<span className="text-[11px] sm:text-xs lg:text-nowrap lg:whitespace-nowrap text-[#231645]/50 dark:text-[#9CA3AF]">
-									{footerData.companyInfo.copyright}
+									{copyright}
 								</span>
 								<div className="flex flex-wrap gap-2 items-center lg:flex-nowrap sm:gap-3 md:gap-4">
 									{footerData.companyInfo.legalLinks?.map((link, index) => (

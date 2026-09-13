@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
 import type { Scheduler } from '../heartbeat';
 import { FleetTaskWorkspaceProvisioner, readWorkspaceLease } from './fleet-task-workspace';
 import {
@@ -61,6 +62,8 @@ function record(overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord {
 		intentPending: false,
 		lease: null,
 		mountLinks: [],
+		mountsDir: 'absent',
+		excludedOutput: false,
 		...overrides
 	};
 }
@@ -235,12 +238,14 @@ describe('planWorkspaceReap — pools', () => {
 		['it was used recently', { lastUsedAt: NOW - DAY }, 'within the max age'],
 		['its last use is unknown', { lastUsedAt: null }, 'last use unknown'],
 		['ownership is unproven', { owned: false, ownershipNote: 'no HEAD' }, 'no HEAD'],
-		// `git worktree remove` leaves the branch in the pool: an emptied pool
-		// can still hold the only copy of a commit.
+		// `git worktree remove` leaves the branch in the pool, and the
+		// provider's `worktree add -B` force-resets one into its reflog: an
+		// emptied pool can still hold the only copy of a commit. Counted
+		// with `--all --reflog`, hence "refs" rather than "branches".
 		[
-			'a local branch carries commits not on any remote',
+			'a local ref carries commits not on any remote',
 			{ unpushedCount: 2 },
-			'2 commit(s) on local branches not on any remote'
+			'2 commit(s) on local refs not on any remote'
 		],
 		['the local branch state is unknown', { unpushedCount: 'unknown' }, 'local branch state unknown'],
 		['the remote was not consulted', { remoteRefreshed: false }, 'remote state unknown']
@@ -374,6 +379,88 @@ describe('startWorkspaceReaperTimer', () => {
 		timer.stop();
 	});
 
+	it('hands every completed cycle to onResult, so the heartbeat can report it', async () => {
+		// Node housekeeping (EW-803). Without this the reaper's outcome
+		// reached the local log file and nowhere else, and Fleet could not
+		// tell a machine whose reaper is keeping up from one where it has
+		// not run in months.
+		const scheduler = controllableScheduler();
+		const seen: WorkspaceReapResult[] = [];
+		const result = { ...emptyResult(), freedBytes: 4_096 };
+		const timer = startWorkspaceReaperTimer({
+			rootPath: '/root',
+			policy,
+			scheduler,
+			scan: vi.fn(async () => inventory([])),
+			reap: vi.fn(async () => result),
+			onResult: (value) => seen.push(value)
+		});
+
+		await timer.runNow();
+
+		expect(seen).toEqual([result]);
+		timer.stop();
+	});
+
+	it('does not call onResult for a cycle that was skipped or that threw', async () => {
+		// A cycle that produced no result must not be reported as one: a
+		// stamp moved by a failed sweep would say "reclaimed just now" about
+		// a reaper that is broken.
+		const busy = controllableScheduler();
+		const skipped: WorkspaceReapResult[] = [];
+		const busyTimer = startWorkspaceReaperTimer({
+			rootPath: '/root',
+			policy,
+			scheduler: busy,
+			scan: vi.fn(async () => inventory([])),
+			reap: vi.fn(async () => emptyResult()),
+			isBusy: () => true,
+			onResult: (value) => skipped.push(value)
+		});
+		await busyTimer.runNow();
+		expect(skipped).toEqual([]);
+		busyTimer.stop();
+
+		const failing = controllableScheduler();
+		const thrown: WorkspaceReapResult[] = [];
+		const failingTimer = startWorkspaceReaperTimer({
+			rootPath: '/root',
+			policy,
+			scheduler: failing,
+			scan: vi.fn(async () => {
+				throw new Error('root vanished mid-scan');
+			}),
+			reap: vi.fn(async () => emptyResult()),
+			onResult: (value) => thrown.push(value)
+		});
+		expect(await failingTimer.runNow()).toBeNull();
+		expect(thrown).toEqual([]);
+		failingTimer.stop();
+	});
+
+	it('keeps reclaiming when the reporting hook throws', async () => {
+		// Reporting is a courtesy; reclaiming disk is the job. A reporter
+		// that throws must not stop the only thing that frees space.
+		const scheduler = controllableScheduler();
+		const reap = vi.fn(async () => emptyResult());
+		const timer = startWorkspaceReaperTimer({
+			rootPath: '/root',
+			policy,
+			scheduler,
+			scan: vi.fn(async () => inventory([])),
+			reap,
+			onResult: () => {
+				throw new Error('reporter is gone');
+			}
+		});
+
+		await expect(timer.runNow()).resolves.not.toBeNull();
+		// And the cycle still re-arms rather than dying here.
+		await timer.runNow();
+		expect(reap).toHaveBeenCalledTimes(2);
+		timer.stop();
+	});
+
 	it('stop() clears the pending timer, and runNow() runs a cycle on demand', async () => {
 		const scheduler = controllableScheduler();
 		const reap = vi.fn(async () => emptyResult());
@@ -495,6 +582,36 @@ describe.sequential('workspace reaper — real Git worktrees and a real remote',
 		expect(result.removedPools).toHaveLength(1);
 		expect(existsSync(scanned.repositories[0].pools[0].path)).toBe(false);
 		expect(existsSync(scanned.repositories[0].repositoryRoot)).toBe(false);
+	});
+
+	it('removes through teardown ONLY, never through the mtime-based gc on the same provider', async () => {
+		// REGRESSION GUARD on the most dangerous code path adjacent to this
+		// one. `LocalWorkspacePlugin.gc()` is a method on the very object
+		// `runWorkspaceReap` constructs by default, and it deletes any
+		// `worktrees/*` entry whose MTIME alone is past a cutoff, with a raw
+		// recursive delete: no ownership proof, no lease check, no test for
+		// unpushed commits. Pointed at a fleet root it would destroy a
+		// Task's only copy of work nobody has pushed.
+		//
+		// Removal must therefore go exclusively through `teardown`, which
+		// re-proves ownership and refuses if the path survives. Asserted
+		// rather than assumed, because the two are one autocomplete apart
+		// and the mistake is irreversible.
+		const rootPath = freshRoot();
+		const descriptor = await provisionAt(rootPath, 'task-gc', 'ever/repo-gc', 'task/gc', OLD);
+		const { plan } = await scanAndPlan(rootPath);
+		expect(plan.remove).toHaveLength(1);
+
+		const provider = new LocalWorkspacePlugin();
+		const gc = vi.spyOn(provider, 'gc');
+		const teardown = vi.spyOn(provider, 'teardown');
+
+		const result = await runWorkspaceReap(plan, { plugin: provider, now: () => NOW });
+
+		expect(result.errors).toEqual([]);
+		expect(teardown).toHaveBeenCalledOnce();
+		expect(gc).not.toHaveBeenCalled();
+		expect(existsSync(descriptor.path)).toBe(false);
 	});
 
 	it('keeps a worktree with a commit that is not on any remote', async () => {
@@ -641,7 +758,7 @@ describe.sequential('workspace reaper — real Git worktrees and a real remote',
 			unpushedCount: 1
 		});
 		expect(plan.removePools).toHaveLength(0);
-		expect(plan.keepPools[0].reason).toContain('1 commit(s) on local branches not on any remote');
+		expect(plan.keepPools[0].reason).toContain('1 commit(s) on local refs not on any remote');
 		const result = await runWorkspaceReap(plan, { now: () => NOW });
 		expect(result.removedPools).toHaveLength(0);
 		expect(existsSync(poolPath)).toBe(true);
