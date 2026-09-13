@@ -298,18 +298,25 @@ test.describe('Task board — true totals and the view address (seeded UI)', () 
             title: `${label} normal`,
             status: 'todo',
             priority: 'p3',
+            labels: [label],
         });
         await createTask(request, token, {
             title: `${label} urgent`,
             status: 'todo',
             priority: 'p0',
+            labels: [label],
         });
         await createTask(request, token, {
             title: `${label} medium`,
             status: 'todo',
             priority: 'p2',
+            labels: [label],
         });
-        await createTask(request, token, { title: `${label} review`, status: 'blocked' });
+        await createTask(request, token, {
+            title: `${label} review`,
+            status: 'blocked',
+            labels: [label],
+        });
 
         await page.goto(`/en/tasks?view=board&label=${encodeURIComponent(label)}`, {
             waitUntil: 'domcontentloaded',
