@@ -276,12 +276,111 @@ function buildQuery(q: ListTasksQuery = {}): string {
     return s ? `?${s}` : '';
 }
 
+/** Task board column table. `status` = one column per status; `focus` = grouped. */
+export type TaskBoardLayout = 'status' | 'focus';
+
+/**
+ * Query for the Task board read (`GET /api/tasks/board`). Every field is
+ * optional; the API clamps the bounds and defaults the rest.
+ */
+export interface TaskBoardQuery {
+    layout?: TaskBoardLayout;
+    /** Cards per column (API default 50, clamped 1..100). */
+    columnLimit?: number;
+    /** Days of done / cancelled history (API default 7, clamped 1..90). */
+    terminalWindowDays?: number;
+    /** Restrict the board to these statuses; other columns read as empty. */
+    status?: TaskStatus | TaskStatus[];
+    priority?: TaskPriority | TaskPriority[];
+    label?: string;
+    search?: string;
+    missionId?: string;
+    ideaId?: string;
+    workId?: string;
+    teamId?: string;
+    agentId?: string;
+    goalId?: string;
+    includeSubtasks?: boolean;
+    includeTemplates?: boolean;
+    includeHidden?: boolean;
+    includeCancelled?: boolean;
+}
+
+/** One board column: its TRUE total under the filters, and a page of its cards. */
+export interface TaskBoardColumn {
+    key: string;
+    statuses: TaskStatus[];
+    total: number;
+    cards: Task[];
+    offset: number;
+    limit: number;
+    /** True when this column's read failed; the rest of the board still rendered. */
+    failed: boolean;
+}
+
+export interface TaskBoardResult {
+    layout: TaskBoardLayout;
+    columns: TaskBoardColumn[];
+    columnLimit: number;
+    terminalWindowDays: number;
+}
+
+function buildBoardQuery(q: TaskBoardQuery = {}, extra: Record<string, string> = {}): string {
+    const params = new URLSearchParams();
+    if (q.layout) params.set('layout', q.layout);
+    if (q.columnLimit !== undefined) params.set('columnLimit', String(q.columnLimit));
+    if (q.terminalWindowDays !== undefined)
+        params.set('terminalWindowDays', String(q.terminalWindowDays));
+    if (q.status) params.set('status', Array.isArray(q.status) ? q.status.join(',') : q.status);
+    if (q.priority)
+        params.set('priority', Array.isArray(q.priority) ? q.priority.join(',') : q.priority);
+    for (const key of [
+        'label',
+        'search',
+        'missionId',
+        'ideaId',
+        'workId',
+        'teamId',
+        'agentId',
+        'goalId',
+    ] as const) {
+        const value = q[key];
+        if (value) params.set(key, value);
+    }
+    for (const key of [
+        'includeSubtasks',
+        'includeTemplates',
+        'includeHidden',
+        'includeCancelled',
+    ] as const) {
+        if (q[key]) params.set(key, 'true');
+    }
+    for (const [key, value] of Object.entries(extra)) params.set(key, value);
+    const s = params.toString();
+    return s ? `?${s}` : '';
+}
+
 export const tasksAPI = {
     async list(query: ListTasksQuery = {}) {
         return serverFetch<{
             data: Task[];
             meta: { total: number; limit: number; offset: number };
         }>(`/tasks${buildQuery(query)}`, { method: 'GET' });
+    },
+
+    /** Task board read — every column with its true total and first page of cards. */
+    async board(query: TaskBoardQuery = {}) {
+        return serverFetch<TaskBoardResult>(`/tasks/board${buildBoardQuery(query)}`, {
+            method: 'GET',
+        });
+    },
+
+    /** One Task board column from an offset — "show more" for that column only. */
+    async boardColumn(query: TaskBoardQuery, column: string, offset: number) {
+        return serverFetch<TaskBoardColumn>(
+            `/tasks/board/column${buildBoardQuery(query, { column, offset: String(Math.max(0, offset)) })}`,
+            { method: 'GET' },
+        );
     },
 
     async get(id: string) {

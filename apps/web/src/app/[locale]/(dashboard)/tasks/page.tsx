@@ -1,9 +1,18 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { getTranslations } from 'next-intl/server';
 import { ListChecks, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
-import { tasksAPI, type TaskPriority, type TaskStatus } from '@/lib/api/tasks';
+import {
+    tasksAPI,
+    type Task,
+    type TaskBoardQuery,
+    type TaskBoardResult,
+    type TaskPriority,
+    type TaskStatus,
+} from '@/lib/api/tasks';
+import { resolveTasksView, TASKS_VIEW_COOKIE, type TasksView } from '@/lib/tasks-view';
 import { TasksFilterSelects } from '@/components/tasks/TasksFilterSelects';
 import { TasksList } from '@/components/tasks/TasksList';
 import { TasksTabsNav } from '@/components/tasks/TasksTabsNav';
@@ -16,9 +25,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * Agents/Skills/Tasks PR #1017 — Phase 12.6. Real `/tasks` list
- * page. Server-fetches the user's Tasks; client component handles
- * view toggle + filter UI. Kanban + per-target tabs land in Phase 14.
+ * `/tasks` — every Task the user owns, as Cards, a Table or the Task board.
+ *
+ * The view comes from `?view=`, then the browser's remembered choice, then
+ * the default (`resolveTasksView`). Each view reads what it needs:
+ *
+ *  - Cards / Table read one offset-paged page of the list, as they always have.
+ *  - The board reads each status column on its own (`tasksAPI.board`), so a
+ *    column header is that column's TRUE total under the filters and a column
+ *    pages without re-reading the others.
+ *
+ * The filter form below drives every view; it carries the view through a
+ * hidden field, so applying a filter never drops the user out of the board.
  */
 const TASK_STATUSES: TaskStatus[] = [
     'backlog',
@@ -38,6 +56,7 @@ type TasksSearchParams = Promise<{
     search?: string;
     label?: string;
     offset?: string;
+    view?: string;
 }>;
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -50,6 +69,7 @@ function buildTasksHref(input: {
     search?: string;
     label?: string;
     offset?: number;
+    view?: TasksView;
 }): string {
     const params = new URLSearchParams();
     if (input.status) params.set('status', input.status);
@@ -57,6 +77,7 @@ function buildTasksHref(input: {
     if (input.search) params.set('search', input.search);
     if (input.label) params.set('label', input.label);
     if (input.offset && input.offset > 0) params.set('offset', String(input.offset));
+    if (input.view) params.set('view', input.view);
     const qs = params.toString();
     return qs ? `${ROUTES.DASHBOARD_TASKS}?${qs}` : ROUTES.DASHBOARD_TASKS;
 }
@@ -64,6 +85,11 @@ function buildTasksHref(input: {
 export default async function TasksPage({ searchParams }: { searchParams: TasksSearchParams }) {
     const t = await getTranslations('dashboard.tasksPage');
     const params = await searchParams;
+    const cookieStore = await cookies();
+    const view = resolveTasksView({
+        url: firstParam(params.view),
+        cookie: cookieStore.get(TASKS_VIEW_COOKIE)?.value,
+    });
     const status = firstParam(params.status);
     const priority = firstParam(params.priority);
     const search = firstParam(params.search)?.trim();
@@ -83,15 +109,45 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
         // the board chips render on first paint (polling takes over after).
         includeRun: true,
     };
-    const result = await tasksAPI.list(query);
-    const nextOffset = result.meta.offset + result.meta.limit;
-    const prevOffset = Math.max(0, result.meta.offset - result.meta.limit);
     const baseHrefInput = {
         status: query.status,
         priority: query.priority,
         search: query.search,
         label: query.label,
     };
+    const filtersActive = Boolean(query.status || query.priority || query.search || query.label);
+
+    // The board: true per-column totals. It carries sub-tasks and recurring
+    // templates, exactly as the board always has, until the board grows the
+    // toggles that let a user put them back.
+    let boardResult: TaskBoardResult | null = null;
+    const boardQuery: TaskBoardQuery = {
+        status: query.status ? [query.status] : undefined,
+        priority: query.priority,
+        search: query.search,
+        label: query.label,
+        includeSubtasks: true,
+        includeTemplates: true,
+    };
+    // The list views: one offset-paged page, unchanged.
+    let listResult: {
+        data: Task[];
+        meta: { total: number; limit: number; offset: number };
+    } | null = null;
+
+    if (view === 'board') {
+        try {
+            boardResult = await tasksAPI.board(boardQuery);
+        } catch {
+            // Rendered as the board's error panel, under a still-usable page.
+            boardResult = null;
+        }
+    } else {
+        listResult = await tasksAPI.list(query);
+    }
+
+    const nextOffset = listResult ? listResult.meta.offset + listResult.meta.limit : 0;
+    const prevOffset = listResult ? Math.max(0, listResult.meta.offset - listResult.meta.limit) : 0;
 
     return (
         <div className="w-full">
@@ -126,6 +182,8 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
             />
             <TasksTabsNav active="tasks" />
             <form className="mb-4 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
+                {/* Applying a filter keeps the view the user is looking at. */}
+                <input type="hidden" name="view" value={view} />
                 <label className="flex-1 min-w-0">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
                         {t('list.filter.search')}
@@ -165,31 +223,53 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                     </Button>
                 </div>
             </form>
-            <TasksList tasks={result.data} enableStatusFilter={!query.status} />
-            {result.meta.total > result.meta.limit && (
+            <TasksList
+                tasks={listResult?.data ?? []}
+                enableStatusFilter={!query.status}
+                view={view}
+                board={
+                    view === 'board'
+                        ? {
+                              result: boardResult,
+                              query: boardQuery,
+                              filtersActive,
+                              tableHref: buildTasksHref({ ...baseHrefInput, view: 'table' }),
+                          }
+                        : undefined
+                }
+            />
+            {listResult && listResult.meta.total > listResult.meta.limit && (
                 <nav className="mt-5 flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
                     <span>
                         {t('list.pagination.showing', {
-                            from: result.meta.offset + 1,
+                            from: listResult.meta.offset + 1,
                             to: Math.min(
-                                result.meta.offset + result.data.length,
-                                result.meta.total,
+                                listResult.meta.offset + listResult.data.length,
+                                listResult.meta.total,
                             ),
-                            total: result.meta.total,
+                            total: listResult.meta.total,
                         })}
                     </span>
                     <div className="flex items-center gap-2">
-                        {result.meta.offset > 0 && (
+                        {listResult.meta.offset > 0 && (
                             <Link
-                                href={buildTasksHref({ ...baseHrefInput, offset: prevOffset })}
+                                href={buildTasksHref({
+                                    ...baseHrefInput,
+                                    offset: prevOffset,
+                                    view,
+                                })}
                                 className="rounded-md border border-border/60 dark:border-border-dark/60 px-3 py-1.5 text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
                             >
                                 {t('list.pagination.previous')}
                             </Link>
                         )}
-                        {nextOffset < result.meta.total && (
+                        {nextOffset < listResult.meta.total && (
                             <Link
-                                href={buildTasksHref({ ...baseHrefInput, offset: nextOffset })}
+                                href={buildTasksHref({
+                                    ...baseHrefInput,
+                                    offset: nextOffset,
+                                    view,
+                                })}
                                 className="rounded-md border border-border/60 dark:border-border-dark/60 px-3 py-1.5 text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
                             >
                                 {t('list.pagination.next')}
