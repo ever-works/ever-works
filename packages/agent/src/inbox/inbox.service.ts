@@ -39,6 +39,7 @@ import type {
     InboxProposalPendingInput,
     InboxQuestionRaisedInput,
 } from './inbox-producer.port';
+import { decodeInboxDecisionCursor, encodeInboxDecisionCursor } from './inbox-decision-cursor';
 import {
     toInboxDecisionDto,
     toInboxItemDto,
@@ -64,6 +65,12 @@ export interface AskHumanInput {
 export interface AskHumanSource {
     agentId: string;
     agentRunId?: string | null;
+}
+
+/** My Decisions list input: the repository filters, paged by an opaque cursor. */
+export interface ListInboxDecisionsQuery extends Omit<ListInboxDecisionsOptions, 'after'> {
+    /** The previous page's `nextCursor`; the page starts right after that row. */
+    cursor?: string;
 }
 
 export interface ListInboxOptions {
@@ -164,17 +171,37 @@ export class InboxService implements InboxProducer {
      * that ask the human to decide (questions, approvals, escalations),
      * ranked blocking-first, with the context each one links to, plus the
      * header counts. Owner-scoped inside the repository like every read.
+     *
+     * `nextCursor` continues right after the last row of this page (null
+     * when nothing ranks after it). Paging with it instead of `offset`
+     * cannot skip or repeat a decision when the live queue changes between
+     * two reads — see `inbox-decision-cursor.ts`.
      */
     async listDecisions(
         userId: string,
-        options: ListInboxDecisionsOptions = {},
-    ): Promise<{ items: InboxDecisionDto[]; total: number; counts: InboxDecisionCounts }> {
-        const [{ rows, total }, counts] = await Promise.all([
-            this.items.listDecisionsForUser(userId, options),
+        options: ListInboxDecisionsQuery = {},
+    ): Promise<{
+        items: InboxDecisionDto[];
+        total: number;
+        counts: InboxDecisionCounts;
+        nextCursor: string | null;
+    }> {
+        const { cursor, ...filters } = options;
+        const status = filters.status ?? 'open';
+        // Decoded BEFORE any read: a malformed cursor is the caller's 400.
+        const after = cursor ? decodeInboxDecisionCursor(cursor, status) : undefined;
+        const [{ rows, total, hasMore }, counts] = await Promise.all([
+            this.items.listDecisionsForUser(userId, after ? { ...filters, after } : filters),
             this.decisionCounts(userId),
         ]);
         const now = new Date();
-        return { items: rows.map((row) => toInboxDecisionDto(row, now)), total, counts };
+        const last = rows.length > 0 ? rows[rows.length - 1] : null;
+        return {
+            items: rows.map((row) => toInboxDecisionDto(row, now)),
+            total,
+            counts,
+            nextCursor: hasMore && last ? encodeInboxDecisionCursor(last, status) : null,
+        };
     }
 
     /** My Decisions header / sidebar badge: open, blocking, and the latest raise. */
@@ -557,6 +584,10 @@ export class InboxService implements InboxProducer {
             optionId: null,
         });
         if (!claimed) return;
+        // Deciding through another door is still a human looking at it:
+        // same first-view rule as `reply`, so an answered mirror never
+        // reads as "never seen" in the raised → seen → answered timings.
+        await this.stampFirstViewed(row.id, row.userId);
 
         const handOff = await this.tryResumeLinkedRun(row, row.userId, note);
         const fresh = await this.items.findOwned(row.id, row.userId);
@@ -585,6 +616,8 @@ export class InboxService implements InboxProducer {
             optionId,
         });
         if (!claimed) return;
+        // Same first-view rule as `reply` and `escalationResolved`.
+        await this.stampFirstViewed(row.id, row.userId);
 
         const label =
             (Array.isArray(row.options)

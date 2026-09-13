@@ -85,6 +85,11 @@ export interface InboxDecisionListResult {
         openCount: number;
         blockingCount: number;
         lastRaisedAt: string | null;
+        /**
+         * Continues right after the last row of this page; `null` when
+         * nothing ranks after it. Optional: an API that predates it omits it.
+         */
+        nextCursor?: string | null;
     };
 }
 
@@ -92,6 +97,12 @@ export interface ListInboxDecisionsInput extends Partial<InboxDecisionFilters> {
     /** The API refuses above 100 and defaults to 25. */
     limit?: number;
     offset?: number;
+    /**
+     * The previous page's `meta.nextCursor`. Prefer it to `offset` for
+     * "Load more": a live queue re-ranks between reads, and an offset into
+     * it skips or repeats decisions.
+     */
+    cursor?: string;
 }
 
 function buildDecisionsEndpoint(input?: ListInboxDecisionsInput): string {
@@ -104,6 +115,7 @@ function buildDecisionsEndpoint(input?: ListInboxDecisionsInput): string {
     if (input?.q) params.set('q', input.q);
     if (input?.limit) params.set('limit', String(input.limit));
     if (input?.offset && input.offset > 0) params.set('offset', String(input.offset));
+    if (input?.cursor) params.set('cursor', input.cursor);
     const qs = params.toString();
     return qs ? `/inbox/decisions?${qs}` : '/inbox/decisions';
 }

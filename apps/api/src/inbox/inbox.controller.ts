@@ -114,11 +114,13 @@ export class InboxController {
             openCount: number;
             blockingCount: number;
             lastRaisedAt: string | null;
+            /** Pass back as `?cursor=` for the next page; null when nothing ranks after this one. */
+            nextCursor: string | null;
         };
     }> {
         const limit = query.limit ?? INBOX_DECISION_PAGE_SIZE;
         const offset = query.offset ?? 0;
-        const { items, total, counts } = await this.inbox.listDecisions(auth.userId, {
+        const { items, total, counts, nextCursor } = await this.inbox.listDecisions(auth.userId, {
             status: query.status ?? 'open',
             limit,
             offset,
@@ -127,6 +129,7 @@ export class InboxController {
             ...(query.taskId ? { taskId: query.taskId } : {}),
             ...(query.missionId ? { missionId: query.missionId } : {}),
             ...(query.q?.trim() ? { search: query.q.trim() } : {}),
+            ...(query.cursor ? { cursor: query.cursor } : {}),
         });
         return {
             data: items,
@@ -137,6 +140,7 @@ export class InboxController {
                 openCount: counts.open,
                 blockingCount: counts.blocking,
                 lastRaisedAt: counts.lastRaisedAt,
+                nextCursor: nextCursor ?? null,
             },
         };
     }

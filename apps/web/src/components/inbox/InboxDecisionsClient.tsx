@@ -38,6 +38,12 @@ interface InboxDecisionsClientProps {
     total: number;
     /** Header counts; `null` when they could not be read (never shown as 0). */
     counts: InboxDecisionCounts | null;
+    /**
+     * Where "Load more" continues: right after the last row of `decisions`,
+     * `null` when nothing ranks after it. `undefined` = the API did not
+     * report a cursor, and "Load more" falls back to an offset.
+     */
+    nextCursor?: string | null;
     filters: InboxDecisionFilters;
     /** From `?id=` — the deep link the Inbox, Home and the Task page carry. */
     selectedId?: string;
@@ -93,11 +99,22 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * The counts refresh every 30 s while the tab is visible and not at all
  * while it is hidden; the list itself refreshes when the page revalidates
  * after an answer.
+ *
+ * "Load more" pages by cursor (the position of the last row held), never
+ * by how many rows are held: the queue is live, and an offset into a
+ * re-ranked queue skips a decision whenever one ahead of it is answered
+ * elsewhere. A page that arrives after the list was re-read from the
+ * server is dropped rather than stitched onto rows it does not follow.
+ *
+ * Whichever decision is on screen counts as opened (the first one, a
+ * deep-linked one, or one walked to), so its unread mark clears and its
+ * first view is recorded without needing a click.
  */
 export function InboxDecisionsClient({
     decisions,
     total,
     counts,
+    nextCursor,
     filters,
     selectedId,
     loadError,
@@ -108,6 +125,7 @@ export function InboxDecisionsClient({
 
     const [rows, setRows] = useState<InboxDecision[]>(decisions);
     const [rowTotal, setRowTotal] = useState(total);
+    const [cursor, setCursor] = useState<string | null | undefined>(nextCursor);
     const [headerCounts, setHeaderCounts] = useState<InboxDecisionCounts | null>(counts);
     const [activeId, setActiveId] = useState<string | null>(
         selectedId && decisions.some((row) => row.id === selectedId)
@@ -124,10 +142,17 @@ export function InboxDecisionsClient({
     const [lastKnownOpen, setLastKnownOpen] = useState<number | null>(null);
     const sendingRef = useRef(false);
     const listRef = useRef<HTMLUListElement>(null);
+    // Bumped whenever the server hands down a fresh first page, so a "Load
+    // more" page requested against the previous list is recognised as stale.
+    const listGenerationRef = useRef(0);
+    // The on-screen decision the read flip was last sent for.
+    const markedReadRef = useRef<string | null>(null);
 
     useEffect(() => {
+        listGenerationRef.current += 1;
         setRows(decisions);
         setRowTotal(total);
+        setCursor(nextCursor);
         setActiveId((current) => {
             if (current && (decisions.some((row) => row.id === current) || answered[current])) {
                 return current;
@@ -138,7 +163,7 @@ export function InboxDecisionsClient({
         // `answered` is read, not tracked: a re-sync must not be re-run by
         // the answer that caused it.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [decisions, total, selectedId]);
+    }, [decisions, total, nextCursor, selectedId]);
 
     useEffect(() => {
         setHeaderCounts(counts);
@@ -185,6 +210,26 @@ export function InboxDecisionsClient({
         [rows, activeId, answered],
     );
     const activeIndex = rows.findIndex((row) => row.id === activeId);
+    const activeUnreadId = active?.unread ? active.id : null;
+
+    // Opening is looking, whatever put the decision on screen: the first
+    // row, a deep link, the walker or a click. The read flip also records
+    // the first view server-side. It is sent once each time a decision
+    // comes on screen, never again while it stays there.
+    useEffect(() => {
+        if (activeId !== markedReadRef.current) markedReadRef.current = null;
+    }, [activeId]);
+
+    useEffect(() => {
+        if (!activeUnreadId || markedReadRef.current === activeUnreadId) return;
+        markedReadRef.current = activeUnreadId;
+        setRows((prev) =>
+            prev.map((candidate) =>
+                candidate.id === activeUnreadId ? { ...candidate, unread: false } : candidate,
+            ),
+        );
+        void setInboxItemReadAction(activeUnreadId, false).catch(() => undefined);
+    }, [activeUnreadId]);
 
     const navigate = useCallback(
         (next: Partial<InboxDecisionFilters>) => {
@@ -203,15 +248,7 @@ export function InboxDecisionsClient({
         } catch {
             // A URL the browser will not rewrite is not worth failing a click.
         }
-        if (row.unread) {
-            setRows((prev) =>
-                prev.map((candidate) =>
-                    candidate.id === row.id ? { ...candidate, unread: false } : candidate,
-                ),
-            );
-            // Opening is looking: the read flip also records the first view.
-            void setInboxItemReadAction(row.id, false).catch(() => undefined);
-        }
+        // The read flip follows from the selection (the effect above).
     }, []);
 
     const moveBy = useCallback(
@@ -278,24 +315,34 @@ export function InboxDecisionsClient({
 
     const handleLoadMore = useCallback(async () => {
         if (isLoadingMore) return;
+        const generation = listGenerationRef.current;
         setIsLoadingMore(true);
         try {
-            const page = await listInboxDecisionsAction({
-                ...filters,
-                limit: INBOX_DECISION_PAGE_SIZE,
-                offset: rows.length,
-            });
+            const page = await listInboxDecisionsAction(
+                cursor === undefined
+                    ? { ...filters, limit: INBOX_DECISION_PAGE_SIZE, offset: rows.length }
+                    : {
+                          ...filters,
+                          limit: INBOX_DECISION_PAGE_SIZE,
+                          ...(cursor ? { cursor } : {}),
+                      },
+            );
+            // The server re-read the list while this page was on its way:
+            // the page continues a list that is no longer on screen, and
+            // appending it would leave a gap between the two.
+            if (generation !== listGenerationRef.current) return;
             setRows((prev) => {
                 const seen = new Set(prev.map((row) => row.id));
                 return [...prev, ...page.data.filter((row) => !seen.has(row.id))];
             });
             setRowTotal(page.meta.total);
+            if (cursor !== undefined) setCursor(page.meta.nextCursor ?? null);
         } catch {
             toast.error(t('loadMoreError'));
         } finally {
             setIsLoadingMore(false);
         }
-    }, [filters, isLoadingMore, rows.length, t]);
+    }, [cursor, filters, isLoadingMore, rows.length, t]);
 
     const handleSearch = useCallback(
         (event: FormEvent<HTMLFormElement>) => {
@@ -308,6 +355,9 @@ export function InboxDecisionsClient({
 
     const filtered = hasDecisionFilters(filters);
     const remaining = Math.max(0, rowTotal - rows.length);
+    // With a cursor the server says whether more follows; the count only
+    // labels the button (it can lag the live queue by a row or two).
+    const canLoadMore = cursor === undefined ? remaining > 0 : cursor !== null;
 
     return (
         <div className="p-4 sm:p-6 lg:p-8" data-testid="inbox-page">
@@ -467,7 +517,7 @@ export function InboxDecisionsClient({
                                 </li>
                             ))}
                         </ul>
-                        {remaining > 0 && (
+                        {canLoadMore && (
                             <Button
                                 variant="secondary"
                                 size="sm"
@@ -478,7 +528,10 @@ export function InboxDecisionsClient({
                             >
                                 {isLoadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {t('loadMore', {
-                                    count: Math.min(INBOX_DECISION_PAGE_SIZE, remaining),
+                                    count: Math.min(
+                                        INBOX_DECISION_PAGE_SIZE,
+                                        Math.max(1, remaining),
+                                    ),
                                 })}
                             </Button>
                         )}

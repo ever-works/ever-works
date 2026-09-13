@@ -6,7 +6,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *
  *   GET  /api/inbox/decisions          the questions, approvals and escalations
  *                                      waiting on me (?status ?kind ?agentId ?taskId
- *                                      ?missionId ?q ?limit ?offset) + header counts
+ *                                      ?missionId ?q ?limit ?offset ?cursor) + header counts
  *   GET  /api/inbox/decisions/counts   open / blocking / latest raise
  *   POST /api/inbox/:id/reply          `requireReason` opts into the answer rule
  *   /inbox?view=decisions              the view itself
@@ -53,6 +53,7 @@ test.describe('My Decisions — API contract', () => {
                 openCount: 0,
                 blockingCount: 0,
                 lastRaisedAt: null,
+                nextCursor: null,
             },
         });
 
@@ -91,6 +92,11 @@ test.describe('My Decisions — API contract', () => {
             '?agentId=123',
             '?missionId=nope',
             `?q=${'x'.repeat(201)}`,
+            // The cursor: shape-checked at the edge, and one that does not
+            // decode for the tab is a 400, never a silent restart.
+            '?cursor=not%20a%20cursor',
+            `?cursor=${'x'.repeat(513)}`,
+            '?cursor=bm90IGpzb24',
         ]) {
             const res = await request.get(`${DECISIONS}${query}`, { headers });
             expect(res.status(), `query ${query}`).toBe(400);

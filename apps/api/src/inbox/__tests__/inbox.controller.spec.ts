@@ -157,7 +157,27 @@ describe('InboxController', () => {
                 openCount: 4,
                 blockingCount: 2,
                 lastRaisedAt: '2026-08-01T00:00:00.000Z',
+                nextCursor: null,
             });
+        });
+
+        it('forwards the cursor and hands back the next one', async () => {
+            service.listDecisions.mockResolvedValueOnce({
+                items: [],
+                total: 7,
+                counts: { open: 4, blocking: 2, lastRaisedAt: null },
+                nextCursor: 'bmV4dA',
+            } as never);
+
+            const result = await controller.listDecisions(auth, { cursor: 'cHJldg' });
+
+            expect(service.listDecisions).toHaveBeenCalledWith('u1', {
+                status: 'open',
+                limit: 25,
+                offset: 0,
+                cursor: 'cHJldg',
+            });
+            expect(result.meta.nextCursor).toBe('bmV4dA');
         });
 
         it('forwards every filter, trimming the search term', async () => {
@@ -333,6 +353,17 @@ describe('inbox DTO validation', () => {
             'missionId',
         ]);
         expect(await errorsFor(ListInboxDecisionsQueryDto, { q: 'x'.repeat(201) })).toEqual(['q']);
+    });
+
+    it('accepts a URL-safe cursor and rejects anything else at the edge', async () => {
+        expect(
+            await errorsFor(ListInboxDecisionsQueryDto, { cursor: 'eyJ2IjoxfQ', limit: '25' }),
+        ).toEqual([]);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { cursor: 'a b' })).toEqual(['cursor']);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { cursor: 'abc=' })).toEqual(['cursor']);
+        expect(await errorsFor(ListInboxDecisionsQueryDto, { cursor: 'x'.repeat(513) })).toEqual([
+            'cursor',
+        ]);
     });
 
     it('accepts a boolean reason opt-in and rejects anything else', async () => {

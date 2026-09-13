@@ -17,8 +17,11 @@ import type {
  *     queue;
  *   - an empty open queue picks the honest empty state (never had one /
  *     quiet for two weeks / filtered);
- *   - the position walker and `j` / `k` walk the queue, opening an unread
- *     decision records that it was seen;
+ *   - the position walker and `j` / `k` walk the queue; whichever decision
+ *     is on screen (first row, deep link, walked to) records that it was
+ *     seen;
+ *   - "Load more" follows the server's cursor, never a row count, and
+ *     drops a page that no longer continues the list on screen;
  *   - answering says what happened to the work and announces it politely.
  */
 
@@ -118,22 +121,57 @@ function renderClient(
         decisions: InboxDecision[];
         total: number;
         counts: InboxDecisionCounts | null;
+        nextCursor: string | null;
+        filters: InboxDecisionFilters;
+        selectedId: string;
+        loadError: string | null;
+    }> = {},
+) {
+    const view = render(clientElement(props));
+    return {
+        ...view,
+        rerenderClient: (next: Parameters<typeof clientElement>[0]) =>
+            view.rerender(clientElement(next)),
+    };
+}
+
+function clientElement(
+    props: Partial<{
+        decisions: InboxDecision[];
+        total: number;
+        counts: InboxDecisionCounts | null;
+        nextCursor: string | null;
         filters: InboxDecisionFilters;
         selectedId: string;
         loadError: string | null;
     }> = {},
 ) {
     const decisions = props.decisions ?? [];
-    return render(
+    return (
         <InboxDecisionsClient
             decisions={decisions}
             total={props.total ?? decisions.length}
             counts={props.counts === undefined ? null : props.counts}
+            {...('nextCursor' in props ? { nextCursor: props.nextCursor } : {})}
             filters={props.filters ?? OPEN}
             selectedId={props.selectedId}
             loadError={props.loadError ?? null}
-        />,
+        />
     );
+}
+
+function listPage(data: InboxDecision[], meta: { total: number; nextCursor?: string | null }) {
+    return {
+        data,
+        meta: {
+            limit: 25,
+            offset: 0,
+            openCount: meta.total,
+            blockingCount: 0,
+            lastRaisedAt: null,
+            ...meta,
+        },
+    };
 }
 
 beforeEach(() => {
@@ -257,6 +295,91 @@ describe('InboxDecisionsClient — the queue', () => {
         expect(actions.list).toHaveBeenCalledWith({ tab: 'open', limit: 25, offset: 1 });
         expect(screen.queryByTestId('decisions-load-more')).toBeNull();
     });
+
+    it('pages by cursor, so a decision answered elsewhere never drops the next one out of reach', async () => {
+        // A and B are on screen out of five; B is then answered elsewhere, so
+        // the live total is four when "Load more" is pressed.
+        actions.list
+            .mockResolvedValueOnce(
+                listPage([decision('c'), decision('d')], { total: 4, nextCursor: 'after-d' }),
+            )
+            .mockResolvedValueOnce(listPage([decision('e')], { total: 4, nextCursor: null }));
+        renderClient({
+            decisions: [decision('a'), decision('b')],
+            total: 5,
+            nextCursor: 'after-b',
+        });
+
+        fireEvent.click(screen.getByTestId('decisions-load-more'));
+        await waitFor(() => expect(screen.getAllByTestId('decision-row')).toHaveLength(4));
+        expect(actions.list).toHaveBeenLastCalledWith({
+            tab: 'open',
+            limit: 25,
+            cursor: 'after-b',
+        });
+
+        // Four rows held against a total of four, yet E is still waiting:
+        // the server's cursor, not the count, decides whether more follows.
+        fireEvent.click(screen.getByTestId('decisions-load-more'));
+        await waitFor(() => expect(screen.getAllByTestId('decision-row')).toHaveLength(5));
+        expect(actions.list).toHaveBeenLastCalledWith({
+            tab: 'open',
+            limit: 25,
+            cursor: 'after-d',
+        });
+        expect(screen.queryByTestId('decisions-load-more')).toBeNull();
+    });
+
+    it('offers no "Load more" once the server says nothing follows, whatever the count says', () => {
+        renderClient({ decisions: [decision('a')], total: 3, nextCursor: null });
+        expect(screen.queryByTestId('decisions-load-more')).toBeNull();
+    });
+
+    it('drops a page that arrives after the list was re-read, and continues from the fresh list', async () => {
+        let resolvePage: (value: unknown) => void = () => undefined;
+        actions.list.mockReturnValueOnce(
+            new Promise((resolve) => {
+                resolvePage = resolve;
+            }),
+        );
+        const { rerenderClient } = renderClient({
+            decisions: [decision('a')],
+            total: 3,
+            nextCursor: 'after-a',
+        });
+
+        fireEvent.click(screen.getByTestId('decisions-load-more'));
+        // An answer re-reads the first page from the server meanwhile.
+        rerenderClient({
+            decisions: [decision('x'), decision('a')],
+            total: 3,
+            nextCursor: 'after-a-fresh',
+        });
+        await act(async () => {
+            resolvePage(listPage([decision('b'), decision('c')], { total: 3, nextCursor: null }));
+        });
+
+        expect(screen.getAllByTestId('decision-row').map((row) => row.textContent)).toEqual([
+            expect.stringContaining('Decision x'),
+            expect.stringContaining('Decision a'),
+        ]);
+
+        actions.list.mockResolvedValueOnce(
+            listPage([decision('b')], { total: 3, nextCursor: null }),
+        );
+        await waitFor(() =>
+            expect((screen.getByTestId('decisions-load-more') as HTMLButtonElement).disabled).toBe(
+                false,
+            ),
+        );
+        fireEvent.click(screen.getByTestId('decisions-load-more'));
+        await waitFor(() => expect(screen.getAllByTestId('decision-row')).toHaveLength(3));
+        expect(actions.list).toHaveBeenLastCalledWith({
+            tab: 'open',
+            limit: 25,
+            cursor: 'after-a-fresh',
+        });
+    });
 });
 
 describe('InboxDecisionsClient — walking and answering', () => {
@@ -279,6 +402,40 @@ describe('InboxDecisionsClient — walking and answering', () => {
     it('selects the deep-linked decision', () => {
         renderClient({ decisions: [decision('a'), decision('b')], selectedId: 'b' });
         expect(screen.getByTestId('decision-detail').textContent).toContain('Decision b');
+    });
+
+    it('records the first view of the decision on screen without a click: first row or deep link', () => {
+        const unreadPair = () => [decision('a', { unread: true }), decision('b', { unread: true })];
+        const first = renderClient({ decisions: unreadPair() });
+
+        expect(actions.setRead).toHaveBeenCalledTimes(1);
+        expect(actions.setRead).toHaveBeenCalledWith('a', false);
+        const [rowA, rowB] = screen.getAllByTestId('decision-row');
+        expect(rowA.querySelector('[aria-label="dashboard.inbox.unreadDot"]')).toBeNull();
+        expect(rowB.querySelector('[aria-label="dashboard.inbox.unreadDot"]')).not.toBeNull();
+        first.unmount();
+
+        actions.setRead.mockClear();
+        renderClient({ decisions: unreadPair(), selectedId: 'b' });
+        expect(actions.setRead).toHaveBeenCalledTimes(1);
+        expect(actions.setRead).toHaveBeenCalledWith('b', false);
+    });
+
+    it('sends the read flip once while a decision stays on screen, and again when it comes back', () => {
+        const { rerenderClient } = renderClient({
+            decisions: [decision('a', { unread: true }), decision('b')],
+        });
+        expect(actions.setRead).toHaveBeenCalledTimes(1);
+
+        // A re-read that still carries the old unread flag changes nothing.
+        rerenderClient({ decisions: [decision('a', { unread: true }), decision('b')] });
+        expect(actions.setRead).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByTestId('decision-next'));
+        expect(actions.setRead).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByTestId('decision-previous'));
+        expect(actions.setRead).toHaveBeenCalledTimes(2);
+        expect(actions.setRead).toHaveBeenLastCalledWith('a', false);
     });
 
     it('says the work picked back up, announces it, and keeps the answered decision in view', async () => {

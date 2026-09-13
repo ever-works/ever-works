@@ -132,7 +132,7 @@ Filter by kind, search the title and message, or narrow to one **Agent**, **Task
 /inbox?view=decisions&tab=open&kind=approval&taskId=<task-id>&id=<item-id>
 ```
 
-The queue loads 25 decisions at a time; **Load more** fetches the next page only when you ask. Press **j** / **k** to move between decisions. Other surfaces link in rather than re-implementing it: every question, approval and escalation in **Active** has **Open in My Decisions**, the approvals block on Home has **See all decisions**, and a Task whose run is waiting on a question links to its own filtered queue.
+The queue loads 25 decisions at a time; **Load more** fetches the next page only when you ask, and continues right after the last decision on screen, so a decision answered elsewhere or raised meanwhile never makes it skip or repeat one. Whichever decision is on screen counts as opened, including the first one and a deep-linked one. Press **j** / **k** to move between decisions. Other surfaces link in rather than re-implementing it: every question, approval and escalation in **Active** has **Open in My Decisions**, the approvals block on Home has **See all decisions**, and a Task whose run is waiting on a question links to its own filtered queue.
 
 ### Answering, with a reason
 
@@ -196,20 +196,20 @@ Each write also files an activity row (`INBOX_ITEM_CREATED`, and `INBOX_ITEM_ANS
 
 Everything the page does is available over the REST API. All routes are owner-scoped: a message belonging to someone else and a message that does not exist return the same `404`.
 
-| Method   | Route                         | Purpose                                                                                                                                                                      |
-| -------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/inbox`                  | List your messages, newest first. `?status=open\|answered\|archived`, `?limit=` (1–100, default 50), `?offset=`. Omitting `status` returns the Active view.                  |
-| `GET`    | `/api/inbox/unread-count`     | `{ count }` — what the sidebar badge polls.                                                                                                                                  |
-| `GET`    | `/api/inbox/decisions`        | My Decisions. `?status=` (default `open`), `?kind=question\|approval\|escalation`, `?agentId=`, `?taskId=`, `?missionId=`, `?q=`, `?limit=` (1–100, default 25), `?offset=`. |
-| `GET`    | `/api/inbox/decisions/counts` | `{ open, blocking, lastRaisedAt }` — the My Decisions header.                                                                                                                |
-| `GET`    | `/api/inbox/:id`              | One message.                                                                                                                                                                 |
-| `POST`   | `/api/inbox/:id/reply`        | `{ text?, optionId?, requireReason? }` — answer it. Throttled to 30 replies per minute.                                                                                      |
-| `PATCH`  | `/api/inbox/:id/read`         | Mark read. `{ "unread": true }` flips it back.                                                                                                                               |
-| `POST`   | `/api/inbox/:id/archive`      | Archive.                                                                                                                                                                     |
-| `POST`   | `/api/inbox/:id/unarchive`    | Restore to Active.                                                                                                                                                           |
-| `DELETE` | `/api/inbox/:id`              | Delete the message. The mirrored records survive.                                                                                                                            |
+| Method   | Route                         | Purpose                                                                                                                                                                                  |
+| -------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/inbox`                  | List your messages, newest first. `?status=open\|answered\|archived`, `?limit=` (1–100, default 50), `?offset=`. Omitting `status` returns the Active view.                              |
+| `GET`    | `/api/inbox/unread-count`     | `{ count }` — what the sidebar badge polls.                                                                                                                                              |
+| `GET`    | `/api/inbox/decisions`        | My Decisions. `?status=` (default `open`), `?kind=question\|approval\|escalation`, `?agentId=`, `?taskId=`, `?missionId=`, `?q=`, `?limit=` (1–100, default 25), `?offset=`, `?cursor=`. |
+| `GET`    | `/api/inbox/decisions/counts` | `{ open, blocking, lastRaisedAt }` — the My Decisions header.                                                                                                                            |
+| `GET`    | `/api/inbox/:id`              | One message.                                                                                                                                                                             |
+| `POST`   | `/api/inbox/:id/reply`        | `{ text?, optionId?, requireReason? }` — answer it. Throttled to 30 replies per minute.                                                                                                  |
+| `PATCH`  | `/api/inbox/:id/read`         | Mark read. `{ "unread": true }` flips it back.                                                                                                                                           |
+| `POST`   | `/api/inbox/:id/archive`      | Archive.                                                                                                                                                                                 |
+| `POST`   | `/api/inbox/:id/unarchive`    | Restore to Active.                                                                                                                                                                       |
+| `DELETE` | `/api/inbox/:id`              | Delete the message. The mirrored records survive.                                                                                                                                        |
 
-The list response is `{ data, meta: { total, limit, offset, unreadCount } }`. A reply responds `{ item, routed, runId?, restart? }`, where `routed` is one of the outcomes in the table above, `runId` names the run that was steered or newly dispatched, and `restart` (`injected`, `resumed`, `queued`, `failed` or `none`) says what happened to the work behind it. The decision list responds `{ data, meta: { total, limit, offset, openCount, blockingCount, lastRaisedAt } }`, where each row is an Inbox message plus a `decision` object carrying the blocking reason, confidence, what was tried, risk flags, the Agent, Task and Mission, and the dormant flag.
+The list response is `{ data, meta: { total, limit, offset, unreadCount } }`. A reply responds `{ item, routed, runId?, restart? }`, where `routed` is one of the outcomes in the table above, `runId` names the run that was steered or newly dispatched, and `restart` (`injected`, `resumed`, `queued`, `failed` or `none`) says what happened to the work behind it. The decision list responds `{ data, meta: { total, limit, offset, openCount, blockingCount, lastRaisedAt, nextCursor } }`. Pass `nextCursor` back as `?cursor=` for the next page: it names the position of the last row, so the page does not drift when the live queue changes between reads; it is `null` when nothing follows. Each row is an Inbox message plus a `decision` object carrying the blocking reason, confidence, what was tried, risk flags, the Agent, Task and Mission, and the dormant flag.
 
 ```bash
 # What is waiting on me right now?

@@ -72,6 +72,7 @@ export default async function InboxPage({ searchParams }: { searchParams: InboxS
         let decisions: InboxDecision[] = [];
         let total = 0;
         let counts: InboxDecisionCounts | null = null;
+        let nextCursor: string | null | undefined;
         let decisionsError: string | null = null;
         try {
             const result = await inboxAPI.listDecisions({
@@ -80,6 +81,7 @@ export default async function InboxPage({ searchParams }: { searchParams: InboxS
             });
             decisions = result?.data ?? [];
             total = result?.meta?.total ?? decisions.length;
+            nextCursor = result?.meta?.nextCursor;
             if (result?.meta) {
                 counts = {
                     open: result.meta.openCount,
@@ -95,6 +97,7 @@ export default async function InboxPage({ searchParams }: { searchParams: InboxS
                 decisions={decisions}
                 total={total}
                 counts={counts}
+                nextCursor={nextCursor}
                 filters={filters}
                 selectedId={selectedId}
                 loadError={decisionsError}

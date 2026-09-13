@@ -7,7 +7,7 @@ import { Task, TaskStatus } from '../../entities/task.entity';
 import { AgentEscalation } from '../../entities/agent-escalation.entity';
 import { AgentActionProposal } from '../../entities/agent-action-proposal.entity';
 import { InboxItem } from '../../entities/inbox-item.entity';
-import { InboxItemRepository } from './inbox-item.repository';
+import { InboxItemRepository, type InboxDecisionRow } from './inbox-item.repository';
 
 /**
  * My Decisions — the decision view of the Inbox, against a real SQL engine.
@@ -254,7 +254,7 @@ describe('InboxItemRepository — decision view (integration)', () => {
         expect(byKind.rows.map((row) => row.item.title)).toEqual(['Merge PR']);
 
         const notice = await repository.listDecisionsForUser(userId, { kind: 'notice' });
-        expect(notice).toEqual({ rows: [], total: 0 });
+        expect(notice).toEqual({ rows: [], total: 0, hasMore: false });
 
         const bySearch = await repository.listDecisionsForUser(userId, { search: 'budget' });
         expect(bySearch.rows.map((row) => row.item.title)).toEqual(['Budget stop']);
@@ -302,6 +302,221 @@ describe('InboxItemRepository — decision view (integration)', () => {
 
         const clamped = await repository.listDecisionsForUser(userId, { limit: 0 });
         expect(clamped.rows).toHaveLength(1);
+    });
+
+    describe('keyset paging (`after`) over a queue that changes between reads', () => {
+        /** The `after` position of a row exactly as a caller read it. */
+        function positionOf(row: InboxDecisionRow, sortAt: Date = row.item.createdAt) {
+            return {
+                id: row.item.id,
+                blockingRank: row.blockingRank,
+                confidenceRank: row.confidenceRank,
+                sortAt,
+            };
+        }
+
+        const titles = (rows: InboxDecisionRow[]) => rows.map((row) => row.item.title);
+
+        it('never skips the next decision when a loaded one is answered elsewhere', async () => {
+            for (const title of ['A', 'B', 'C', 'D', 'E']) await seedItem({ title });
+
+            const first = await repository.listDecisionsForUser(userId, { limit: 2 });
+            expect(titles(first.rows)).toEqual(['A', 'B']);
+            expect(first.hasMore).toBe(true);
+
+            // B is answered through another door before "Load more".
+            await items.update({ id: first.rows[1].item.id }, { status: 'answered' });
+
+            const offsetPage = await repository.listDecisionsForUser(userId, {
+                limit: 2,
+                offset: 2,
+            });
+            // What an offset does: C slid to position 2 and is skipped.
+            expect(titles(offsetPage.rows)).toEqual(['D', 'E']);
+
+            const next = await repository.listDecisionsForUser(userId, {
+                limit: 2,
+                after: positionOf(first.rows[1]),
+            });
+            expect(titles(next.rows)).toEqual(['C', 'D']);
+            expect(next.hasMore).toBe(true);
+            // The count still reports the whole (filtered) queue.
+            expect(next.total).toBe(4);
+
+            const last = await repository.listDecisionsForUser(userId, {
+                limit: 2,
+                after: positionOf(next.rows[1]),
+            });
+            expect(titles(last.rows)).toEqual(['E']);
+            expect(last.hasMore).toBe(false);
+        });
+
+        it('neither repeats nor skips when a higher-ranked decision arrives between pages', async () => {
+            for (const title of ['A', 'B', 'C', 'D']) await seedItem({ title });
+            const first = await repository.listDecisionsForUser(userId, { limit: 2 });
+
+            // A run parks on a brand-new question: it ranks above everything.
+            await seedItem({ title: 'urgent', agentRunId: parkedRunId });
+
+            const next = await repository.listDecisionsForUser(userId, {
+                limit: 2,
+                after: positionOf(first.rows[1]),
+            });
+            expect(titles(next.rows)).toEqual(['C', 'D']);
+            expect(next.hasMore).toBe(false);
+        });
+
+        it('keeps its place when the last loaded row stops blocking', async () => {
+            const runs = dataSource.getRepository(AgentRun);
+            const ownRun = await runs.save(
+                runs.create({
+                    userId,
+                    agentId,
+                    triggerKind: 'task',
+                    status: 'completed',
+                    gateAttempts: 0,
+                    persistent: false,
+                    awaitingInput: true,
+                    interruptRequested: false,
+                } as Partial<AgentRun>),
+            );
+            await seedItem({ title: 'blocking-1', agentRunId: ownRun.id });
+            await seedItem({ title: 'blocking-2', agentRunId: parkedRunId });
+            await seedItem({ title: 'plain' });
+
+            const first = await repository.listDecisionsForUser(userId, { limit: 1 });
+            expect(titles(first.rows)).toEqual(['blocking-1']);
+            expect(first.rows[0].blockingRank).toBe(1);
+
+            // The run behind the loaded row resumes: that row now ranks last.
+            await runs.update({ id: ownRun.id }, { awaitingInput: false });
+
+            const next = await repository.listDecisionsForUser(userId, {
+                limit: 5,
+                after: positionOf(first.rows[0]),
+            });
+            // The position is where the row WAS: blocking-2 is not skipped;
+            // the moved row may repeat, and callers de-duplicate by id.
+            expect(titles(next.rows)).toEqual(['blocking-2', 'blocking-1', 'plain']);
+        });
+
+        it('walks rows that share a timestamp one at a time without a gap', async () => {
+            const same = new Date('2026-08-20T10:00:00.000Z');
+            for (const title of ['t1', 't2', 't3', 't4']) {
+                await seedItem({ title, createdAt: same });
+            }
+            const expected = titles((await repository.listDecisionsForUser(userId)).rows);
+
+            const walked: string[] = [];
+            let after: ReturnType<typeof positionOf> | undefined;
+            for (let guard = 0; guard < 10; guard += 1) {
+                const page = await repository.listDecisionsForUser(userId, { limit: 1, after });
+                walked.push(...titles(page.rows));
+                if (!page.hasMore) break;
+                after = positionOf(page.rows[0]);
+            }
+            expect(walked).toEqual(expected);
+            expect([...walked].sort()).toEqual(['t1', 't2', 't3', 't4']);
+        });
+
+        it('walks mixed confidence bands row by row in ranked order', async () => {
+            const escalations = dataSource.getRepository(AgentEscalation);
+            const scored = async (title: string, confidence: number) => {
+                const escalation = await escalations.save(
+                    escalations.create({
+                        userId,
+                        reasonCode: 'gate-exhausted',
+                        status: 'open',
+                        summary: title,
+                        decisionNeeded: 'd',
+                        confidence,
+                        confidenceSource: 'heuristic',
+                    } as Partial<AgentEscalation>),
+                );
+                await seedItem({ kind: 'escalation', title, escalationId: escalation.id });
+            };
+            await scored('s-0.73-old', 0.73);
+            await seedItem({ title: 'unscored' });
+            await scored('s-0.1', 0.1);
+            await scored('s-0.73-new', 0.73);
+            const expected = titles((await repository.listDecisionsForUser(userId)).rows);
+            expect(expected).toEqual(['s-0.73-old', 's-0.73-new', 'unscored', 's-0.1']);
+
+            const walked: string[] = [];
+            let after: ReturnType<typeof positionOf> | undefined;
+            for (let guard = 0; guard < 10; guard += 1) {
+                const page = await repository.listDecisionsForUser(userId, { limit: 1, after });
+                walked.push(...titles(page.rows));
+                if (!page.hasMore) break;
+                after = positionOf(page.rows[0]);
+            }
+            expect(walked).toEqual(expected);
+        });
+
+        it('falls back to the carried timestamp when the last loaded row was deleted', async () => {
+            for (const title of ['A', 'B', 'C', 'D']) await seedItem({ title });
+            const first = await repository.listDecisionsForUser(userId, { limit: 2 });
+
+            await repository.deleteOwned(first.rows[1].item.id, userId);
+
+            const next = await repository.listDecisionsForUser(userId, {
+                limit: 5,
+                after: positionOf(first.rows[1]),
+            });
+            expect(titles(next.rows)).toEqual(['C', 'D']);
+        });
+
+        it('pages the answered tab without a gap when many answers share a millisecond', async () => {
+            const answeredAt = new Date('2026-08-21T09:00:00.000Z');
+            for (const title of ['x1', 'x2', 'x3', 'x4', 'x5']) {
+                await seedItem({ title, status: 'answered', answeredAt });
+            }
+            const expected = titles(
+                (await repository.listDecisionsForUser(userId, { status: 'answered' })).rows,
+            );
+
+            const first = await repository.listDecisionsForUser(userId, {
+                status: 'answered',
+                limit: 2,
+            });
+            // One of the loaded answers is archived before "Load more".
+            await items.update({ id: first.rows[0].item.id }, { status: 'archived' });
+            const rest = await repository.listDecisionsForUser(userId, {
+                status: 'answered',
+                limit: 5,
+                after: positionOf(first.rows[1], answeredAt),
+            });
+
+            expect([...titles(first.rows), ...titles(rest.rows)]).toEqual(expected);
+            expect(rest.hasMore).toBe(false);
+        });
+
+        it('pages the archived tab and only repeats, never skips, when the cursor row is touched', async () => {
+            for (const title of ['r1', 'r2', 'r3', 'r4']) {
+                await seedItem({ title, status: 'archived' });
+            }
+            const all = (await repository.listDecisionsForUser(userId, { status: 'archived' }))
+                .rows;
+            const ordered = titles(all);
+
+            const first = await repository.listDecisionsForUser(userId, {
+                status: 'archived',
+                limit: 2,
+            });
+            expect(titles(first.rows)).toEqual(ordered.slice(0, 2));
+            const cursorRow = first.rows[1];
+
+            // The cursor row is touched (re-stamped to now) before "Load more".
+            await items.update({ id: cursorRow.item.id }, { unread: false });
+
+            const rest = await repository.listDecisionsForUser(userId, {
+                status: 'archived',
+                limit: 10,
+                after: positionOf(cursorRow, cursorRow.item.updatedAt),
+            });
+            const seen = new Set([...titles(first.rows), ...titles(rest.rows)]);
+            expect([...seen].sort()).toEqual(['r1', 'r2', 'r3', 'r4']);
+        });
     });
 
     it('lists the answered tab newest answer first', async () => {

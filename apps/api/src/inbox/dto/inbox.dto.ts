@@ -6,11 +6,13 @@ import {
     IsOptional,
     IsString,
     IsUUID,
+    Matches,
     Max,
     MaxLength,
     Min,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { INBOX_DECISION_CURSOR_MAX_CHARS } from '@ever-works/agent/inbox';
 import {
     INBOX_DECISION_KINDS,
     INBOX_DECISION_MAX_LIMIT,
@@ -195,6 +197,24 @@ export class ListInboxDecisionsQueryDto {
     @IsInt()
     @Min(0)
     offset?: number;
+
+    /**
+     * The previous page's `meta.nextCursor`. Unlike `offset`, it cannot
+     * skip or repeat a decision when the live queue changes between two
+     * reads. Shape-checked here (a URL-safe token of bounded length); the
+     * service rejects one that does not decode for this tab with a 400.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: INBOX_DECISION_CURSOR_MAX_CHARS,
+        description:
+            'Opaque cursor from the previous page (`meta.nextCursor`): the page starts right after that row, so decisions answered or raised meanwhile never shift it. When `offset` is also given it counts from the cursor.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(INBOX_DECISION_CURSOR_MAX_CHARS)
+    @Matches(/^[A-Za-z0-9_-]+$/)
+    cursor?: string;
 }
 
 export class SetInboxReadStateDto {

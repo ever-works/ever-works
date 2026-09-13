@@ -1347,6 +1347,78 @@ describe('InboxService — My Decisions', () => {
             expect(items[0].decision.confidenceSource).toBeNull();
             expect(counts.lastRaisedAt).toBeNull();
         });
+
+        it('hands back a cursor after the last row only while more follows, and pages from it', async () => {
+            const lastCreated = new Date('2026-08-05T00:00:00.000Z');
+            const pageRows = [
+                {
+                    ...emptyContext,
+                    blockingRank: 1,
+                    confidenceRank: 0.5,
+                    item: makeRow({ id: '11111111-1111-4111-8111-111111111111' }),
+                },
+                {
+                    ...emptyContext,
+                    blockingRank: 0,
+                    confidenceRank: 0.8,
+                    item: makeRow({
+                        id: '22222222-2222-4222-8222-222222222222',
+                        createdAt: lastCreated,
+                    }),
+                },
+            ];
+            const store = {
+                ...makeStore(),
+                listDecisionsForUser: jest
+                    .fn()
+                    .mockResolvedValueOnce({ rows: pageRows, total: 5, hasMore: true })
+                    .mockResolvedValueOnce({
+                        rows: pageRows.slice(0, 1),
+                        total: 5,
+                        hasMore: false,
+                    }),
+                countDecisionsForUser: jest.fn(async () => ({
+                    open: 5,
+                    blocking: 1,
+                    lastRaisedAt: null,
+                })),
+            };
+            const { service } = build({ store: store as never });
+
+            const first = await service.listDecisions('u1', { limit: 2 });
+            expect(first.nextCursor).toEqual(expect.any(String));
+
+            const second = await service.listDecisions('u1', {
+                limit: 2,
+                cursor: first.nextCursor!,
+            });
+            expect(store.listDecisionsForUser).toHaveBeenLastCalledWith('u1', {
+                limit: 2,
+                after: {
+                    id: '22222222-2222-4222-8222-222222222222',
+                    blockingRank: 0,
+                    confidenceRank: 0.8,
+                    sortAt: lastCreated,
+                },
+            });
+            // Nothing ranks after the last page: no cursor to follow.
+            expect(second.nextCursor).toBeNull();
+        });
+
+        it('refuses a cursor that does not decode for the tab, before reading anything', async () => {
+            const store = {
+                ...makeStore(),
+                listDecisionsForUser: jest.fn(),
+                countDecisionsForUser: jest.fn(),
+            };
+            const { service } = build({ store: store as never });
+
+            await expect(
+                service.listDecisions('u1', { cursor: 'bm90IGpzb24' }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(store.listDecisionsForUser).not.toHaveBeenCalled();
+            expect(store.countDecisionsForUser).not.toHaveBeenCalled();
+        });
     });
 
     describe('first view', () => {
@@ -1681,6 +1753,75 @@ describe('InboxService — My Decisions', () => {
             expect(row.answerOptionId).toBe('reject');
             expect(steering.steer).not.toHaveBeenCalled();
             expect(steering.resume).not.toHaveBeenCalled();
+        });
+
+        it('records the first view when a decision is made through another door', async () => {
+            const store = makeStore([
+                makeRow({ id: 'esc-item', kind: 'escalation', escalationId: 'e1' }),
+                makeRow({
+                    id: 'approval-item',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const { service } = build({ store });
+
+            await service.escalationResolved({ escalationId: 'e1', resolvedByUserId: 'u1' });
+            await service.proposalDecided({
+                proposalId: 'p1',
+                decision: 'approved',
+                decidedByUserId: 'u1',
+            });
+
+            for (const id of ['esc-item', 'approval-item']) {
+                const row = store.rows.get(id)!;
+                expect(row.status).toBe('answered');
+                expect(row.answeredAt).not.toBeNull();
+                expect(row.firstViewedAt).toEqual(new Date('2026-08-01T12:00:00.000Z'));
+            }
+            expect(store.stampFirstViewed).toHaveBeenCalledWith('esc-item', 'u1');
+            expect(store.stampFirstViewed).toHaveBeenCalledWith('approval-item', 'u1');
+        });
+
+        it('keeps a view recorded earlier, stamps nothing on a lost claim, and never fails on a stamp error', async () => {
+            const earlier = new Date('2026-07-30T08:00:00.000Z');
+            const store = makeStore([
+                makeRow({
+                    id: 'seen',
+                    kind: 'escalation',
+                    escalationId: 'e1',
+                    firstViewedAt: earlier,
+                }),
+                makeRow({ id: 'gone', kind: 'escalation', escalationId: 'e2' }),
+                makeRow({
+                    id: 'flaky',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    options: APPROVAL_OPTIONS,
+                }),
+            ]);
+            const { service } = build({ store });
+            silenceWarnings(service);
+
+            await service.escalationResolved({ escalationId: 'e1', resolvedByUserId: 'u1' });
+            expect(store.rows.get('seen')!.firstViewedAt).toEqual(earlier);
+
+            // Another door claimed it between the read and the claim.
+            store.markAnswered.mockResolvedValueOnce(false);
+            store.stampFirstViewed.mockClear();
+            await service.escalationResolved({ escalationId: 'e2', resolvedByUserId: 'u1' });
+            expect(store.stampFirstViewed).not.toHaveBeenCalled();
+
+            store.stampFirstViewed.mockRejectedValueOnce(new Error('db hiccup'));
+            await expect(
+                service.proposalDecided({
+                    proposalId: 'p1',
+                    decision: 'rejected',
+                    decidedByUserId: 'u1',
+                }),
+            ).resolves.toBeUndefined();
+            expect(store.rows.get('flaky')!.answerOptionId).toBe('reject');
         });
 
         it('leaves an archived mirror archived', async () => {
