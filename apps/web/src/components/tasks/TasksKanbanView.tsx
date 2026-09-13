@@ -20,6 +20,14 @@ import {
     transitionTaskBoardAction,
 } from '@/app/actions/tasks';
 import { useTaskRunPolling } from '@/lib/hooks/use-task-run-polling';
+import {
+    createTaskBoardSyncQueue,
+    recordTaskBoardMove,
+    recordTaskBoardPage,
+    seedTaskBoardPaging,
+    taskBoardNextOffset,
+    type TaskBoardPaging,
+} from '@/lib/task-board-paging';
 import { TaskBranchChip } from './TaskBranchChip';
 import { TaskRunChip } from './TaskRunChip';
 import { GateChip } from './GateChip';
@@ -451,10 +459,12 @@ function TaskKanbanColumn({
     /** Cards one server page returns — what "show N more" can promise. */
     pageSize?: number;
     /**
-     * Fetch the next page of THIS column. Resolves `false` when the read
-     * failed. Omitted = no column read; "show more" reveals locally.
+     * Fetch the next page of THIS column. The board decides the offset from
+     * its own record of what the server has returned (never from the number
+     * of cards shown, which optimistic moves change). Resolves `false` when
+     * the read failed. Omitted = no column read; "show more" reveals locally.
      */
-    onLoadMore?: (offset: number) => Promise<boolean>;
+    onLoadMore?: () => Promise<boolean>;
     errors: Record<string, string | null>;
     draggingTaskId: string | null;
     dropTargetStatus: TaskStatus | null;
@@ -519,7 +529,7 @@ function TaskKanbanColumn({
         setLoadingMore(true);
         setLoadMoreFailed(false);
         try {
-            const ok = await onLoadMore(tasks.length);
+            const ok = await onLoadMore();
             if (!ok) setLoadMoreFailed(true);
         } finally {
             setLoadingMore(false);
@@ -781,6 +791,15 @@ export function TasksKanbanView({
     // The instant the stall rule is measured from, fixed per mount so the
     // order does not reshuffle between renders.
     const [orderedAt] = useState(() => new Date());
+    // Where each column's next server page starts, kept apart from the cards
+    // a column shows (see `task-board-paging`). Re-seeded with every board
+    // read; only consulted when the board pages columns on the server.
+    const pagingRef = useRef<TaskBoardPaging | null>(null);
+    const currentPaging = () =>
+        (pagingRef.current ??= seedTaskBoardPaging(initialTasks, initialTotals));
+    // Moves and column pages reach the server one at a time, so a page is
+    // never read at an offset a still-landing move is about to shift.
+    const [runSynced] = useState(() => createTaskBoardSyncQueue());
 
     // `useState(initialTasks)` only seeds on the first render, so any later
     // change to the `tasks` prop (filter swap, parent refetch) would never
@@ -791,6 +810,9 @@ export function TasksKanbanView({
     useEffect(() => {
         setTotals(initialTotals);
     }, [initialTotals]);
+    useEffect(() => {
+        pagingRef.current = seedTaskBoardPaging(initialTasks, initialTotals);
+    }, [initialTasks, initialTotals]);
 
     // Kanban run cockpit (Wave 2) — while any visible card carries a
     // queued/running run, poll for fresh run telemetry every 10s and merge
@@ -856,7 +878,29 @@ export function TasksKanbanView({
         shiftTotals(from, to);
         setErrors((e) => ({ ...e, [taskId]: null }));
         void (async () => {
-            const result = await transitionTaskBoardAction(taskId, to).catch(() => null);
+            const result = await runSynced(async () => {
+                // The ledger in force when the move reaches the server. A
+                // board re-read while it lands replaces the ledger with one
+                // that already reflects the move, so it is recorded only on
+                // the ledger it was made against.
+                const paging = currentPaging();
+                const settled = await transitionTaskBoardAction(taskId, to).catch(() => null);
+                if (settled?.ok) {
+                    recordTaskBoardMove(
+                        paging,
+                        {
+                            ...before,
+                            status: settled.task.status,
+                            updatedAt: settled.task.updatedAt ?? before.updatedAt,
+                        },
+                        from,
+                        settled.task.status,
+                        orderedAt,
+                        sort,
+                    );
+                }
+                return settled;
+            });
             if (!result || !result.ok) {
                 setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: from } : t)));
                 shiftTotals(to, from);
@@ -869,7 +913,17 @@ export function TasksKanbanView({
                 return;
             }
             setTasks((prev) =>
-                prev.map((t) => (t.id === taskId ? { ...t, status: result.task.status } : t)),
+                prev.map((t) =>
+                    t.id === taskId
+                        ? {
+                              ...t,
+                              status: result.task.status,
+                              // The server stamped the move; the card sits
+                              // where that stamp puts it, as a re-read would.
+                              updatedAt: result.task.updatedAt ?? t.updatedAt,
+                          }
+                        : t,
+                ),
             );
             // Board dispatch (kanban M3) — a drag into In Progress
             // fans out to the Task's AGENT ASSIGNEES. With none, the
@@ -938,16 +992,22 @@ export function TasksKanbanView({
     };
 
     const handleLoadMore = loadColumn
-        ? async (status: TaskStatus, offset: number): Promise<boolean> => {
-              const page = await loadColumn(status, offset).catch(() => null);
-              if (!page) return false;
-              setTasks((prev) => {
-                  const known = new Set(prev.map((task) => task.id));
-                  return [...prev, ...page.cards.filter((card) => !known.has(card.id))];
-              });
-              setTotals((prev) => ({ ...(prev ?? {}), [status]: page.total }));
-              return true;
-          }
+        ? (status: TaskStatus): Promise<boolean> =>
+              runSynced(async () => {
+                  const paging = currentPaging();
+                  // The server's position, not `cards shown`: an optimistic
+                  // move changes the latter without moving the former.
+                  const offset = taskBoardNextOffset(paging, status);
+                  const page = await loadColumn(status, offset).catch(() => null);
+                  if (!page) return false;
+                  recordTaskBoardPage(paging, status, offset, page.cards, page.total);
+                  setTasks((prev) => {
+                      const known = new Set(prev.map((task) => task.id));
+                      return [...prev, ...page.cards.filter((card) => !known.has(card.id))];
+                  });
+                  setTotals((prev) => ({ ...(prev ?? {}), [status]: page.total }));
+                  return true;
+              })
         : undefined;
 
     return (
@@ -965,11 +1025,7 @@ export function TasksKanbanView({
                             terminalWindowDays={terminalWindowDays}
                             sort={sort}
                             pageSize={pageSize}
-                            onLoadMore={
-                                handleLoadMore
-                                    ? (offset) => handleLoadMore(col.key, offset)
-                                    : undefined
-                            }
+                            onLoadMore={handleLoadMore ? () => handleLoadMore(col.key) : undefined}
                             errors={errors}
                             draggingTaskId={draggingTaskId}
                             dropTargetStatus={dropTargetStatus}

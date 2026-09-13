@@ -278,6 +278,100 @@ describe('TasksKanbanView', () => {
                 'Task cannot transition to blocked — has 2 open blocker(s).',
             );
         });
+
+        const moveCard = (status: TaskStatus, title: string, to: string) => {
+            const card = cardsIn(status).find((element) => within(element).queryByText(title))!;
+            fireEvent.click(within(card).getByRole('button', { name: 'Move →' }));
+            fireEvent.click(within(card).getByRole('button', { name: to }));
+        };
+
+        it('reads the next page from the server’s position, not from the cards shown, after a card is moved in', async () => {
+            const moved = task({ status: 'backlog', title: 'Moved in' });
+            transitionTaskBoardAction.mockResolvedValue({
+                ok: true,
+                // The move stamps the Task: under priority order it now sits
+                // after both To do cards read so far, beyond the first page.
+                task: { ...moved, status: 'todo', updatedAt: '2026-09-10T12:00:00.000Z' },
+            });
+            const loadColumn = vi.fn().mockResolvedValue({
+                total: 6,
+                cards: [task({ title: 'Todo C' }), task({ title: 'Todo D' })],
+            });
+            renderBoard({
+                tasks: [task({ title: 'Todo A' }), task({ title: 'Todo B' }), moved],
+                totals: { todo: 5, backlog: 1 },
+                pageSize: 2,
+                loadColumn,
+            });
+
+            moveCard('backlog', 'Moved in', 'To do');
+            await waitFor(() => expect(transitionTaskBoardAction).toHaveBeenCalledTimes(1));
+            await waitFor(() => expect(countOf('todo')).toBe('6'));
+            expect(cardsIn('todo')).toHaveLength(3);
+
+            fireEvent.click(within(column('todo')).getByTestId('task-board-show-more'));
+            await waitFor(() => expect(cardsIn('todo')).toHaveLength(5));
+            // Offset 3 (the cards shown) would have skipped the server's row 2.
+            expect(loadColumn).toHaveBeenCalledWith('todo', 2);
+            expect(within(column('todo')).getByText('Todo C')).toBeTruthy();
+        });
+
+        it('holds a column page until a move still landing has settled, then reads past it', async () => {
+            let settle: (value: unknown) => void = () => undefined;
+            transitionTaskBoardAction.mockImplementation(
+                () => new Promise((resolve) => (settle = resolve)),
+            );
+            const moved = task({ status: 'backlog', title: 'Moved in' });
+            const loadColumn = vi.fn().mockResolvedValue({ total: 6, cards: [] });
+            renderBoard({
+                tasks: [task({ title: 'Todo A' }), task({ title: 'Todo B' }), moved],
+                totals: { todo: 5, backlog: 1 },
+                pageSize: 2,
+                sort: 'updated',
+                loadColumn,
+            });
+
+            moveCard('backlog', 'Moved in', 'To do');
+            await waitFor(() => expect(cardsIn('todo')).toHaveLength(3));
+            fireEvent.click(within(column('todo')).getByTestId('task-board-show-more'));
+            await act(async () => undefined);
+            expect(loadColumn).not.toHaveBeenCalled();
+
+            await act(async () => {
+                // Newest update: under 'updated' it is the column's first row,
+                // inside the rows already read.
+                settle({
+                    ok: true,
+                    task: { ...moved, status: 'todo', updatedAt: '2026-09-10T12:00:00.000Z' },
+                });
+            });
+            await waitFor(() => expect(loadColumn).toHaveBeenCalledTimes(1));
+            expect(loadColumn).toHaveBeenCalledWith('todo', 3);
+        });
+
+        it('reads a column from one row earlier after a card read from it is moved out', async () => {
+            const leaving = task({ title: 'Leaving' });
+            transitionTaskBoardAction.mockResolvedValue({
+                ok: true,
+                task: { ...leaving, status: 'blocked', updatedAt: '2026-09-10T12:00:00.000Z' },
+            });
+            const loadColumn = vi.fn().mockResolvedValue({ total: 4, cards: [] });
+            renderBoard({
+                tasks: [leaving, task({ title: 'Staying A' }), task({ title: 'Staying B' })],
+                totals: { todo: 5 },
+                pageSize: 3,
+                loadColumn,
+            });
+
+            moveCard('todo', 'Leaving', 'Blocked');
+            await waitFor(() => expect(transitionTaskBoardAction).toHaveBeenCalledTimes(1));
+            await waitFor(() => expect(cardsIn('blocked')).toHaveLength(1));
+            await act(async () => undefined);
+
+            fireEvent.click(within(column('todo')).getByTestId('task-board-show-more'));
+            await waitFor(() => expect(loadColumn).toHaveBeenCalledTimes(1));
+            expect(loadColumn).toHaveBeenCalledWith('todo', 2);
+        });
     });
 
     describe('handed a plain list (scoped Task lists)', () => {
