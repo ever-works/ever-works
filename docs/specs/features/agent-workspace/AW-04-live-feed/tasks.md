@@ -177,16 +177,12 @@
       pattern at `activity-client.tsx:111-123`).
     - **Done**: first paint renders real rows server-side, not a skeleton.
 
-- [ ] **T14 · P1.** Feed components.
-    - Create under `apps/web/src/components/feed/`: `FeedList.tsx`, `FeedRow.tsx`,
+- [ ] **T14 · P1.** Feed components. - Create under `apps/web/src/components/feed/`: `FeedList.tsx`, `FeedRow.tsx`,
       `FeedKindPill.tsx`, `FeedFilters.tsx`, `FeedAgentPicker.tsx`, `FeedEmptyState.tsx`,
-      `FeedErrorState.tsx`, `FeedEndCard.tsx`, `FeedSkeleton.tsx`.
-    - Copy comes only from `useTranslations('dashboard.feed')`. `FeedKindPill` always renders a text
+      `FeedErrorState.tsx`, `FeedEndCard.tsx`, `FeedSkeleton.tsx`. - Copy comes only from `useTranslations('dashboard.feed')`. `FeedKindPill` always renders a text
       label alongside its colour. `FeedSkeleton` rows are the same height as `FeedRow` so nothing
-      shifts on hydration.
-    - `FeedRow` renders `t(\`narration.${entry.narration.key}\`, entry.narration.params)` and falls
-      back to `narration.fallback` if the key is missing.
-    - **Done**: wireframes and copy in [spec §6.2, §6.5, §6.6, §6.7, §6.8, §6.9](./spec.md#6-ux)
+      shifts on hydration. - `FeedRow` renders `t(\`narration.${entry.narration.key}\`, entry.narration.params)`and falls
+back to`narration.fallback` if the key is missing. - **Done**: wireframes and copy in [spec §6.2, §6.5, §6.6, §6.7, §6.8, §6.9](./spec.md#6-ux)
       are reproduced exactly.
 
 - [ ] **T15 · P1.** Paging hook and the floors.
@@ -269,10 +265,8 @@
     - **Test**: `apps/api/src/activity-log/feed-stream.registry.spec.ts` — subscribe/unsubscribe,
       the 4th-connection refusal, dedupe, the cap, filter matching.
 
-- [ ] **T25 · P2.** Stream listener.
-    - Create `apps/api/src/activity-log/feed-stream.listener.ts` — `@OnEvent('activity.logged',
-      { async: true, suppressErrors: true })`, narrates and pushes to matching subscribers.
-    - **Test**: `apps/api/src/activity-log/feed-stream.listener.spec.ts` — only matching subscribers
+- [ ] **T25 · P2.** Stream listener. - Create `apps/api/src/activity-log/feed-stream.listener.ts` — `@OnEvent('activity.logged',
+{ async: true, suppressErrors: true })`, narrates and pushes to matching subscribers. - **Test**: `apps/api/src/activity-log/feed-stream.listener.spec.ts` — only matching subscribers
       receive; a listener error is suppressed and never surfaces to the writer.
 
 - [ ] **T26 · P2.** SSE endpoint.

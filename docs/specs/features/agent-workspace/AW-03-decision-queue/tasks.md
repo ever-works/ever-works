@@ -54,34 +54,23 @@
     - **Done when**: `pnpm --filter @ever-works/agent type-check` is clean and every
       exported constant carries a one-line comment saying which spec FR it encodes.
 
-- [ ] **T2. Write the pure ask/answer rules.**
-    - Create `packages/agent/src/decisions/decision-ask.ts` exporting:
-        - `ASK_KIND_TO_QUESTION_KINDS: Record<DecisionAskKind, readonly HitlQuestionKind[]>`
-          — the mapping table in [`plan.md`](./plan.md) §2.3.
-        - `isQuestionKindAllowed(askKind, questionKind): boolean`
-        - `requiresRationale(question: HitlQuestion, answer: HitlAnswer): boolean` —
-          true for a rejected approval, a `confirm` answered `false`, and a `choice`
-          whose `optionId !== question.defaultOptionId` when a default exists.
-        - `validateRationale(value: string | null | undefined, required: boolean):
-          { ok: true; value: string | null } | { ok: false; code: 'missing' | 'too-long' }`
-        - `capAsks<T>(asks: readonly T[]): { kept: T[]; dropped: number }` — keeps
-          the first `DECISION_MAX_ASKS`.
-        - `composeAnswerMessage(asks: DecisionAskDto[]): string` — the single message
-          delivered to the agent, one block per answered ask (`prompt`, the human-
-          readable answer via `describeHitlQuestion` plus the answer value, and the
-          rationale when present).
-        - `rankDecisions(a, b)` — blocking desc, confidence desc with `null` treated
-          as `DECISION_UNSCORED_RANK`, `createdAt` asc.
-        - `isDormant(decision, now)` — open, no live linked work, older than
-          `DECISION_DORMANT_AFTER_DAYS`.
-      Pure functions only: no TypeORM, no NestJS, no repository.
-    - **Test**: `packages/agent/src/decisions/__tests__/decision-ask.spec.ts` —
+- [ ] **T2. Write the pure ask/answer rules.** - Create `packages/agent/src/decisions/decision-ask.ts` exporting: - `ASK_KIND_TO_QUESTION_KINDS: Record<DecisionAskKind, readonly HitlQuestionKind[]>`
+      — the mapping table in [`plan.md`](./plan.md) §2.3. - `isQuestionKindAllowed(askKind, questionKind): boolean` - `requiresRationale(question: HitlQuestion, answer: HitlAnswer): boolean` —
+      true for a rejected approval, a `confirm` answered `false`, and a `choice`
+      whose `optionId !== question.defaultOptionId` when a default exists. - `validateRationale(value: string | null | undefined, required: boolean):
+{ ok: true; value: string | null } | { ok: false; code: 'missing' | 'too-long' }` - `capAsks<T>(asks: readonly T[]): { kept: T[]; dropped: number }` — keeps
+      the first `DECISION_MAX_ASKS`. - `composeAnswerMessage(asks: DecisionAskDto[]): string` — the single message
+      delivered to the agent, one block per answered ask (`prompt`, the human-
+      readable answer via `describeHitlQuestion` plus the answer value, and the
+      rationale when present). - `rankDecisions(a, b)` — blocking desc, confidence desc with `null` treated
+      as `DECISION_UNSCORED_RANK`, `createdAt` asc. - `isDormant(decision, now)` — open, no live linked work, older than
+      `DECISION_DORMANT_AFTER_DAYS`.
+      Pure functions only: no TypeORM, no NestJS, no repository. - **Test**: `packages/agent/src/decisions/__tests__/decision-ask.spec.ts` —
       the full mapping table; `requiresRationale` at every branch including a choice
       with no default; the rationale validator at 0, 1, 1000 and 1001 characters;
       `capAsks` at 9, 10, 11 and 14; `composeAnswerMessage` ordering and its
       omission of unanswered asks; `rankDecisions` proving an unscored decision
-      sorts above `0.4` and below `0.6`.
-    - **Done when**: the spec covers every branch and passes.
+      sorts above `0.4` and below `0.6`. - **Done when**: the spec covers every branch and passes.
 
 ## P1.B — Schema
 
@@ -95,24 +84,20 @@
     - **Done when**: the file builds and every column has a doc comment naming its
       writer.
 
-- [ ] **T4. Add the additive columns to the two backing entities.**
-    - Modify `packages/agent/src/entities/agent-escalation.entity.ts`: add
+- [ ] **T4. Add the additive columns to the two backing entities.** - Modify `packages/agent/src/entities/agent-escalation.entity.ts`: add
       `missionId`, `archivedAt`, `archivedByUserId`, `archivedReason`,
       `firstViewedAt`; add `@Index('idx_agent_escalation_mission_status',
-      ['missionId', 'status'])`.
-    - Modify `packages/agent/src/entities/agent-action-proposal.entity.ts`: the same
+['missionId', 'status'])`. - Modify `packages/agent/src/entities/agent-action-proposal.entity.ts`: the same
       five columns **plus `taskId`** — this table has none today, and both the Task
       filter (spec FR-5) and the "what is this blocking" line (FR-11) need it, while
       `agent_escalations` already carries one. Add
       `@Index('idx_agent_action_proposals_task_status', ['taskId', 'status'])` and
       `@Index('idx_agent_action_proposals_mission_status',
-      ['missionId', 'status'])`; append `'archived'` to
-      `AgentActionProposalStatus` and to `AGENT_ACTION_PROPOSAL_STATUSES`.
-    - Modify `packages/contracts/src/agents/escalation.types.ts`: append
+['missionId', 'status'])`; append `'archived'` to
+      `AgentActionProposalStatus` and to `AGENT_ACTION_PROPOSAL_STATUSES`. - Modify `packages/contracts/src/agents/escalation.types.ts`: append
       `'archived'` to `AgentEscalationStatus` and to `AGENT_ESCALATION_STATUSES`;
       update the type's docstring, which currently says an escalation has "exactly
-      two states".
-    - **Done when**: `pnpm --filter @ever-works/contracts build` and
+      two states". - **Done when**: `pnpm --filter @ever-works/contracts build` and
       `pnpm --filter @ever-works/agent build` are clean, and no existing read path
       that filters `status='open'` needed a change.
 
@@ -145,7 +130,7 @@
       those two tables. **No** `DROP`, no `ALTER … TYPE`, no `NOT NULL`
       without a default. `down` drops only what `up` added, in reverse.
     - **Done when**: `pnpm typeorm migration:run -d typeorm.config.ts` applies on a
-      fresh database *and* on a seeded one, a re-generate produces an empty diff,
+      fresh database _and_ on a seeded one, a re-generate produces an empty diff,
       and the backfill leaves zero open decisions with zero asks.
 
 ## P1.C — Repository and domain services
@@ -177,7 +162,7 @@
           `decisionNeeded` is empty or unparseable;
         - proposal → one `kind: 'approval'` ask with `question.kind = 'approval'`,
           `prompt` / `action` = `title`, `risks` = `riskFlags`.
-      Each derived ask gets `dedupKey = \`${decisionType}:${decisionId}:derived\``.
+          Each derived ask gets `dedupKey = \`${decisionType}:${decisionId}:derived\``.
     - **Test**: `packages/agent/src/decisions/__tests__/decision-ask-materialiser.spec.ts`
       — one case per reason code and per action type, plus the empty/garbage
       `decisionNeeded` fallback.
@@ -228,7 +213,7 @@
       `resolve({ userId, decisionId, source, note, scope })`.
     - `answerAsk`: validate the answer against the ask's question with
       `validateHitlAnswer`; apply `requiresRationale` + `validateRationale`;
-      CAS-write the answer; then, if no *required* ask remains open, call
+      CAS-write the answer; then, if no _required_ ask remains open, call
       `resolve`.
     - `resolve` performs, in order, exactly the six steps in
       [`plan.md`](./plan.md) §2.2, and returns `DecisionResolutionOutcome`.
@@ -241,7 +226,7 @@
       appended last, per this package's positional-arity convention.
     - **Test**: `packages/agent/src/decisions/__tests__/decision-resolution.service.spec.ts`
       — the delivery matrix (live/parked/neither/throwing); resolution gated on the
-      last *required* ask while an optional ask stays open; an invalid answer shape
+      last _required_ ask while an optional ask stays open; an invalid answer shape
       rejected without a write; a missing required rationale rejected without a
       write; a second answer to the same ask returning a conflict with the recorded
       answer and author; `taskUnblocked: false` with `remainingBlockers: 1`; and an
@@ -268,17 +253,13 @@
       deliver the answer, unblock the Task" in the repository — grep for
       `tryResumeLinkedRun` returns nothing.
 
-- [ ] **T13. Wire the agent-side module.**
-    - Create `packages/agent/src/decisions/decisions.module.ts` registering
+- [ ] **T13. Wire the agent-side module.** - Create `packages/agent/src/decisions/decisions.module.ts` registering
       `TypeOrmModule.forFeature([DecisionAsk, AgentEscalation, AgentActionProposal,
-      AgentRun, Task])`, providing and exporting `DecisionAskRepository`,
-      `DecisionAskService`, `DecisionQueueService`, `DecisionResolutionService`.
-    - Create `packages/agent/src/decisions/index.ts` re-exporting the module,
-      services, constants, types and pure helpers.
-    - Add `"./decisions"` to the `exports` map in
+AgentRun, Task])`, providing and exporting `DecisionAskRepository`,
+      `DecisionAskService`, `DecisionQueueService`, `DecisionResolutionService`. - Create `packages/agent/src/decisions/index.ts` re-exporting the module,
+      services, constants, types and pure helpers. - Add `"./decisions"` to the `exports` map in
       `packages/agent/package.json`, following the shape of the existing
-      `"./agent-approvals"` entry.
-    - **Done when**: `import { DecisionQueueService } from '@ever-works/agent/decisions'`
+      `"./agent-approvals"` entry. - **Done when**: `import { DecisionQueueService } from '@ever-works/agent/decisions'`
       resolves from `apps/api` after `pnpm build`.
 
 ## P1.D — API
@@ -393,17 +374,13 @@
 
 ## P1.F — i18n, tests, docs
 
-- [ ] **T22. Add the `dashboard.decisions` namespace.**
-    - Add the full key tree from [`plan.md`](./plan.md) §8 to
+- [ ] **T22. Add the `dashboard.decisions` namespace.** - Add the full key tree from [`plan.md`](./plan.md) §8 to
       `apps/web/messages/en.json`, plus
       `dashboard.sidebar.navigation.decisions`, `dashboard.approvals.seeAll` and
-      `metadata.pages.decisions`.
-    - Mirror the **structure** into the 20 sibling locale files in
+      `metadata.pages.decisions`. - Mirror the **structure** into the 20 sibling locale files in
       `apps/web/messages/` (`ar, bg, de, es, fr, he, hi, id, it, ja, ko, nl, pl,
-      pt, ru, th, tr, uk, vi, zh`). English values are acceptable placeholders.
-    - **Verify**: no leaf key contains a literal `.`; every leaf name is camelCase;
-      all 21 files have identical key sets.
-    - **Done when**: a structural diff across the 21 files is empty and the
+pt, ru, th, tr, uk, vi, zh`). English values are acceptable placeholders. - **Verify**: no leaf key contains a literal `.`; every leaf name is camelCase;
+      all 21 files have identical key sets. - **Done when**: a structural diff across the 21 files is empty and the
       hydration e2e spec is green.
 
 - [ ] **T23. Add the P1 end-to-end specs.**
@@ -451,17 +428,14 @@
 
 ## P2.B — Agent-side authoring
 
-- [ ] **T26. Add `DecisionAskService.fileDecision`.**
-    - Create `packages/agent/src/decisions/decision-ask.service.ts` (if T9 created a
+- [ ] **T26. Add `DecisionAskService.fileDecision`.** - Create `packages/agent/src/decisions/decision-ask.service.ts` (if T9 created a
       thin version, extend it) with `fileDecision({ userId, source, sourceId,
-      asks })`: validates each ask's kind↔question pairing, applies `capAsks`,
+asks })`: validates each ask's kind↔question pairing, applies `capAsks`,
       records the dropped count on the backing record, rejects an `access` question
       with an empty `capability`, and rejects any `connectionHint` matching the
-      existing secret-scan patterns (Constitution VII).
-    - **Test**: extend `packages/agent/src/decisions/__tests__/decision-ask.spec.ts`
+      existing secret-scan patterns (Constitution VII). - **Test**: extend `packages/agent/src/decisions/__tests__/decision-ask.spec.ts`
       — 14 asks keep 10 and report 4; an illegal kind pairing is rejected; a
-      secret-shaped hint is rejected.
-    - **Done when**: the over-limit note is readable from the decision DTO.
+      secret-shaped hint is rejected. - **Done when**: the over-limit note is readable from the decision DTO.
 
 - [ ] **T27. Add the agent chat tools.**
     - Create `packages/agent/src/decisions/decision-tools.ts` exporting

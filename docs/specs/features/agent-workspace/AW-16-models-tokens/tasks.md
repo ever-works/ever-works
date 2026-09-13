@@ -71,13 +71,10 @@ it does today.
       proves apply-on-empty, apply-twice-is-a-no-op, and revert. Ships in the **same PR** as
       T2 and T3 (Constitution V).
 
-- [ ] **T5. Migration — routing record on runs.**
-    - Create `apps/api/src/migrations/1791160100000-AddAgentRunModelRouting.ts` adding a
-      nullable `modelRouting` json column to `agent_runs`. No default, no backfill.
-    - Add the matching `@Column({ type: 'simple-json', nullable: true }) modelRouting?:
-      AgentRunModelRouting | null;` to `packages/agent/src/entities/agent-run.entity.ts`,
-      beside the existing `costCents` / `totalTokens` block.
-    - **Done**: `apps/api/src/migrations/__tests__/AddAgentRunModelRouting.spec.ts` green; an
+- [ ] **T5. Migration — routing record on runs.** - Create `apps/api/src/migrations/1791160100000-AddAgentRunModelRouting.ts` adding a
+      nullable `modelRouting` json column to `agent_runs`. No default, no backfill. - Add the matching `@Column({ type: 'simple-json', nullable: true }) modelRouting?:
+AgentRunModelRouting | null;` to `packages/agent/src/entities/agent-run.entity.ts`,
+      beside the existing `costCents` / `totalTokens` block. - **Done**: `apps/api/src/migrations/__tests__/AddAgentRunModelRouting.spec.ts` green; an
       existing run row still reads back with `modelRouting === null`.
 
 - [ ] **T6. Activity-log action types.**
@@ -103,17 +100,13 @@ it does today.
       both limits, renumbering, duplicate labels, the reorder conflict, and pause/resume
       preserving position (spec FR-1..12).
 
-- [ ] **T8. `ModelPolicyService` + `ModelPolicyResolver`.**
-    - Create `packages/agent/src/model-routing/model-policy.service.ts` (CRUD per scope) and
+- [ ] **T8. `ModelPolicyService` + `ModelPolicyResolver`.** - Create `packages/agent/src/model-routing/model-policy.service.ts` (CRUD per scope) and
       `packages/agent/src/model-routing/model-policy.resolver.ts` (`resolve({ userId,
-      organizationId, agentId?, scheduleOwnerId?, scheduleVariant? })` → `ResolvedModelPolicy`
-      with a `source` per field).
-    - Resolution is **per field**, narrowest wins: schedule → agent → workspace → plugin
-      default. A Schedule setting only the model still inherits effort and timeout.
-    - Legacy read: when no `model_policies` row exists for an Agent that has
+organizationId, agentId?, scheduleOwnerId?, scheduleVariant? })` → `ResolvedModelPolicy`
+      with a `source` per field). - Resolution is **per field**, narrowest wins: schedule → agent → workspace → plugin
+      default. A Schedule setting only the model still inherits effort and timeout. - Legacy read: when no `model_policies` row exists for an Agent that has
       `aiProviderId`/`modelId` set (`packages/agent/src/entities/agent.entity.ts:273-277`),
-      read those two columns as a policy of one.
-    - **Done**: `packages/agent/src/facades/__tests__/model-policy-resolver.spec.ts` covers
+      read those two columns as a policy of one. - **Done**: `packages/agent/src/facades/__tests__/model-policy-resolver.spec.ts` covers
       every ladder combination, the legacy path, and per-field independence (FR-25..36).
 
 - [ ] **T9. `ModelAttemptPlanner` — single-attempt form.**
@@ -305,11 +298,9 @@ it does today.
 Goal: chains that actually move. An empty fallback list must produce exactly the P1 attempt
 list, so P2 is a no-op for anyone who does not configure it.
 
-- [ ] **T25. Failure classifier.**
-    - Create `packages/agent/src/facades/model-failure-classifier.ts` — a pure function
+- [ ] **T25. Failure classifier.** - Create `packages/agent/src/facades/model-failure-classifier.ts` — a pure function
       mapping a provider error to `rate_limited | credential | transient | context_too_large |
-      fatal`, per [`plan.md`](./plan.md) §2.2.
-    - **Done**: `packages/agent/src/facades/__tests__/model-failure-classifier.spec.ts` covers
+fatal`, per [`plan.md`](./plan.md) §2.2. - **Done**: `packages/agent/src/facades/__tests__/model-failure-classifier.spec.ts` covers
       every row, including that 400/404/422 is `fatal` and that a `Retry-After` header is
       parsed into a cooldown.
 
@@ -489,10 +480,8 @@ not. A workspace with no enrolled computers must see nothing new at all.
     - **Done**: `apps/node/src/core/model-bundle-apply.spec.ts` proves keychain-first storage,
       no value in any log line, the unchanged-hash no-op, and the report-on-next-beat.
 
-- [ ] **T44. Bundle status API.**
-    - Create `apps/api/src/model-routing/model-bundle.controller.ts` with `GET
-      /api/model-bundle/status` (member) and `POST /api/model-bundle/send` (admin, `202`).
-    - **Done**: `apps/api/src/model-routing/__tests__/model-bundle.controller.spec.ts` covers
+- [ ] **T44. Bundle status API.** - Create `apps/api/src/model-routing/model-bundle.controller.ts` with `GET
+/api/model-bundle/status` (member) and `POST /api/model-bundle/send` (admin, `202`). - **Done**: `apps/api/src/model-routing/__tests__/model-bundle.controller.spec.ts` covers
       the counts and the auth split.
 
 - [ ] **T45. Sync banner.**

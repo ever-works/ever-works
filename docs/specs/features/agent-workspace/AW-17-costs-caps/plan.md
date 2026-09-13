@@ -19,35 +19,35 @@ Every path below was opened before it was written down.
 
 ### 1.1 The metering path — one choke point, no meter
 
-| Concern | Where it lives today |
-| --- | --- |
-| The usage record | `packages/agent/src/entities/plugin-usage-event.entity.ts` — `capability` (`ai`, `mcp`, `search`, `screenshot`, `extractor`, `email`, `notification_channel`, `metrics`), `units`, `costCents`, `currency`, `modelId`, `metadata`, and attribution columns `agentId` / `taskId` / `runId` / `ownerType` + `ownerId`. |
-| The single write path | `packages/agent/src/usage/plugin-usage.service.ts` — `record()`. Every facade calls it; nothing else writes the table. |
-| Reads and aggregations | `packages/agent/src/database/repositories/plugin-usage.repository.ts` — 25 query methods including `getRunCostByPlugin`, `getSpendByModelForUser`, `getSpendByAgentForUser`, `getSpendByWorkForUser`, `getDailySpendByAgentForUser`, `findPageForUserExport`. |
-| The callers | `packages/agent/src/facades/{ai,search,screenshot,content-extractor,email,notification-channel,metrics}.facade.ts` — each resolves a plugin, calls `budgetGuard.checkBudget(...)`, makes the call, then `pluginUsageService.record({...})` with `pricing?.costPerCallCents`. |
-| Plugin-declared prices | `getPricing?(): PluginPricing` on every capability interface in `packages/plugin/src/contracts/capabilities/` (search, screenshot, content-extractor, email-provider, notification-channel, metrics-provider, connector). |
-| Model cost metadata | `packages/agent/src/facades/model-catalog.ts` — `ModelCatalogEntry` with `inputCostPer1k` / `outputCostPer1k`. |
+| Concern                | Where it lives today                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The usage record       | `packages/agent/src/entities/plugin-usage-event.entity.ts` — `capability` (`ai`, `mcp`, `search`, `screenshot`, `extractor`, `email`, `notification_channel`, `metrics`), `units`, `costCents`, `currency`, `modelId`, `metadata`, and attribution columns `agentId` / `taskId` / `runId` / `ownerType` + `ownerId`. |
+| The single write path  | `packages/agent/src/usage/plugin-usage.service.ts` — `record()`. Every facade calls it; nothing else writes the table.                                                                                                                                                                                               |
+| Reads and aggregations | `packages/agent/src/database/repositories/plugin-usage.repository.ts` — 25 query methods including `getRunCostByPlugin`, `getSpendByModelForUser`, `getSpendByAgentForUser`, `getSpendByWorkForUser`, `getDailySpendByAgentForUser`, `findPageForUserExport`.                                                        |
+| The callers            | `packages/agent/src/facades/{ai,search,screenshot,content-extractor,email,notification-channel,metrics}.facade.ts` — each resolves a plugin, calls `budgetGuard.checkBudget(...)`, makes the call, then `pluginUsageService.record({...})` with `pricing?.costPerCallCents`.                                         |
+| Plugin-declared prices | `getPricing?(): PluginPricing` on every capability interface in `packages/plugin/src/contracts/capabilities/` (search, screenshot, content-extractor, email-provider, notification-channel, metrics-provider, connector).                                                                                            |
+| Model cost metadata    | `packages/agent/src/facades/model-catalog.ts` — `ModelCatalogEntry` with `inputCostPer1k` / `outputCostPer1k`.                                                                                                                                                                                                       |
 
 **The gap.** `PluginUsageEvent` has no meter, no outcome, no credits figure and no price-list
 version, and nothing on it reaches the Mission behind the work: it carries `taskId`, but no read
-path joins from there to `tasks.missionId`. `record()` stores what a call *cost the platform*,
-never what it *costs the owner* or *who paid the provider*.
+path joins from there to `tasks.missionId`. `record()` stores what a call _cost the platform_,
+never what it _costs the owner_ or _who paid the provider_.
 
 ### 1.2 Credits — one blended balance, priced after the fact
 
-| Concern | Where it lives today |
-| --- | --- |
-| The ledger | `packages/agent/src/entities/credit-ledger-entry.entity.ts` — append-only, `kind` ∈ `purchase` / `grant` / `daily-free` / `consumption` / `adjustment` / `expiry`, bucket accounting with `remainingCredits` + nullable `expiresAt`, unique `idempotencyKey`, `refType` / `refId`. |
-| Ledger writes | `packages/agent/src/subscriptions/credits/credit-ledger.service.ts` |
-| Settlement | `packages/agent/src/subscriptions/credits/run-cost-settlement.service.ts` — sums a Run's usage rows at terminal, stamps `agent_runs.costCents`, converts the *billable share* into one `consumption` row keyed `run:{runId}`. |
-| The own-key exemption | The same file. Provenance is re-resolved **at settlement** through `PluginSettingsService.getResolvedSettings`; the class constant `BYOK_EXEMPTION_UNRESOLVED_BILLS_FULL = true` documents that unresolvable provenance is billed at the platform rate. |
-| The margin | `packages/agent/src/config/index.ts` → `billing.credits.getMarginPercent()` (env `CREDITS_MARGIN_PERCENT`, else the catalog value) and `getCreditsPerDollar()` (default 100). |
-| Packs | `packages/agent/src/subscriptions/billing/credit-packs.ts` — server-authored table: `credits-1000` $10, `credits-5500` $50, `credits-25000` $200. |
-| Pricing view | `packages/agent/src/subscriptions/billing/credits-pricing.ts` — `creditsPerDollar`, `marginPercent`, `dailyFreeCredits`, packs, pay-as-you-go tiers. |
-| Monthly allowance | `packages/agent/src/subscriptions/credits/plan-credit-grant.service.ts` — one grant per **allowance month** anchored to the subscription, `expiresAt` = end of that month, ref type `plan-allowance`. |
-| Daily allowance + expiry sweep | `packages/agent/src/subscriptions/credits/credits-sweep.service.ts`, driven by `packages/tasks/src/tasks/trigger/credits-daily-grant.task.ts` (`5 0 * * *`). |
-| Overflow metering | `packages/agent/src/subscriptions/billing/payg.service.ts` + `packages/agent/src/entities/credit-meter-event.entity.ts`, flushed by `packages/tasks/src/tasks/trigger/credits-meter-flush.task.ts` (`*/5 * * * *`). Has a monthly cap in credits (`PAYG_MIN_MONTHLY_CAP_CREDITS = 500`, ceiling from `PAYG_MAX_MONTHLY_CAP_CREDITS`). |
-| Auto-recharge | `packages/agent/src/subscriptions/billing/auto-recharge.service.ts` + the `autoRecharge*` columns on `packages/agent/src/entities/billing-profile.entity.ts`: enabled, threshold, pack id, single-flight key, failure count. **No monthly maximum anywhere.** |
+| Concern                        | Where it lives today                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The ledger                     | `packages/agent/src/entities/credit-ledger-entry.entity.ts` — append-only, `kind` ∈ `purchase` / `grant` / `daily-free` / `consumption` / `adjustment` / `expiry`, bucket accounting with `remainingCredits` + nullable `expiresAt`, unique `idempotencyKey`, `refType` / `refId`.                                                    |
+| Ledger writes                  | `packages/agent/src/subscriptions/credits/credit-ledger.service.ts`                                                                                                                                                                                                                                                                   |
+| Settlement                     | `packages/agent/src/subscriptions/credits/run-cost-settlement.service.ts` — sums a Run's usage rows at terminal, stamps `agent_runs.costCents`, converts the _billable share_ into one `consumption` row keyed `run:{runId}`.                                                                                                         |
+| The own-key exemption          | The same file. Provenance is re-resolved **at settlement** through `PluginSettingsService.getResolvedSettings`; the class constant `BYOK_EXEMPTION_UNRESOLVED_BILLS_FULL = true` documents that unresolvable provenance is billed at the platform rate.                                                                               |
+| The margin                     | `packages/agent/src/config/index.ts` → `billing.credits.getMarginPercent()` (env `CREDITS_MARGIN_PERCENT`, else the catalog value) and `getCreditsPerDollar()` (default 100).                                                                                                                                                         |
+| Packs                          | `packages/agent/src/subscriptions/billing/credit-packs.ts` — server-authored table: `credits-1000` $10, `credits-5500` $50, `credits-25000` $200.                                                                                                                                                                                     |
+| Pricing view                   | `packages/agent/src/subscriptions/billing/credits-pricing.ts` — `creditsPerDollar`, `marginPercent`, `dailyFreeCredits`, packs, pay-as-you-go tiers.                                                                                                                                                                                  |
+| Monthly allowance              | `packages/agent/src/subscriptions/credits/plan-credit-grant.service.ts` — one grant per **allowance month** anchored to the subscription, `expiresAt` = end of that month, ref type `plan-allowance`.                                                                                                                                 |
+| Daily allowance + expiry sweep | `packages/agent/src/subscriptions/credits/credits-sweep.service.ts`, driven by `packages/tasks/src/tasks/trigger/credits-daily-grant.task.ts` (`5 0 * * *`).                                                                                                                                                                          |
+| Overflow metering              | `packages/agent/src/subscriptions/billing/payg.service.ts` + `packages/agent/src/entities/credit-meter-event.entity.ts`, flushed by `packages/tasks/src/tasks/trigger/credits-meter-flush.task.ts` (`*/5 * * * *`). Has a monthly cap in credits (`PAYG_MIN_MONTHLY_CAP_CREDITS = 500`, ceiling from `PAYG_MAX_MONTHLY_CAP_CREDITS`). |
+| Auto-recharge                  | `packages/agent/src/subscriptions/billing/auto-recharge.service.ts` + the `autoRecharge*` columns on `packages/agent/src/entities/billing-profile.entity.ts`: enabled, threshold, pack id, single-flight key, failure count. **No monthly maximum anywhere.**                                                                         |
 
 **The gap.** One `consumption` row per Run, blended across every capability, priced as
 `costCents × (1 + margin)`. Nothing records what kind of call the credits paid for; nothing
@@ -56,50 +56,50 @@ one.
 
 ### 1.3 Caps — three mechanisms, one of them inert
 
-| Concern | Where it lives today |
-| --- | --- |
-| Per-Work / Mission / Idea budget | `packages/agent/src/entities/work-budget.entity.ts` — `scope` (`global` / `plugin`), `monthlyCapCents`, `allowOverage`, polymorphic `ownerType` (`work` / `idea` / `mission` / `agent`, from `packages/agent/src/entities/_types.ts`) + `ownerId`. CRUD at `apps/api/src/budgets/budgets.controller.ts` (`api/works/:workId/budgets`). |
-| Per-Agent budget | `packages/agent/src/entities/agent-budget.entity.ts` — `intervalUnit` (`hour`/`day`/`week`/`month`/`unlimited`), `intervalAnchor`, `capCents`, `allowOverage`, unique per `agentId`. **No controller anywhere calls its repository's `upsert()`.** |
-| Enforcement | `packages/agent/src/budgets/budget-guard.service.ts` — `checkBudget(workId, userId, capability, pluginId)` called from each facade; period arithmetic in `packages/agent/src/budgets/budget.service.ts`; refusal via `packages/agent/src/budgets/budget-exceeded.exception.ts`. |
-| Alerting | `packages/agent/src/budgets/budget-threshold-crossed.event.ts` → `apps/api/src/budgets/budget-alert.handler.ts`; thresholds `75` / `90` / `100` / `overage` from `packages/agent/src/entities/work-budget-alert-state.entity.ts`, one row per (budget, threshold, period). |
-| Dispatch-time credit gate | `packages/agent/src/agents/run-dispatch-gate.service.ts` + `packages/agent/src/agents/run-credits-precheck.ts`, gated by `config.billing.credits.isEnforcementEnabled()`. |
-| Per-Node daily model ceiling | `fleet_nodes.dailyCostCeilingCents` / `dailyCostTrippedOn`, added by `apps/api/src/migrations/1788300000000-AddFleetCostAccounting.ts`; editor at `apps/web/src/components/settings/FleetCostCeiling.tsx` with helpers in `apps/web/src/components/settings/fleet-cost-ceiling.shared.ts` and the contract constant `FLEET_MAX_DAILY_COST_CEILING_CENTS` in `packages/contracts/src/fleet/fleet-node.types.ts`. |
-| The Agent read surface | `apps/api/src/agents/agents.controller.ts` → `GET /api/agents/:id/budget` returns `capCents: null` unconditionally; the page at `apps/web/src/app/[locale]/(dashboard)/agents/[id]/budgets/page.tsx` therefore always shows "no cap configured". |
+| Concern                          | Where it lives today                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Per-Work / Mission / Idea budget | `packages/agent/src/entities/work-budget.entity.ts` — `scope` (`global` / `plugin`), `monthlyCapCents`, `allowOverage`, polymorphic `ownerType` (`work` / `idea` / `mission` / `agent`, from `packages/agent/src/entities/_types.ts`) + `ownerId`. CRUD at `apps/api/src/budgets/budgets.controller.ts` (`api/works/:workId/budgets`).                                                                          |
+| Per-Agent budget                 | `packages/agent/src/entities/agent-budget.entity.ts` — `intervalUnit` (`hour`/`day`/`week`/`month`/`unlimited`), `intervalAnchor`, `capCents`, `allowOverage`, unique per `agentId`. **No controller anywhere calls its repository's `upsert()`.**                                                                                                                                                              |
+| Enforcement                      | `packages/agent/src/budgets/budget-guard.service.ts` — `checkBudget(workId, userId, capability, pluginId)` called from each facade; period arithmetic in `packages/agent/src/budgets/budget.service.ts`; refusal via `packages/agent/src/budgets/budget-exceeded.exception.ts`.                                                                                                                                 |
+| Alerting                         | `packages/agent/src/budgets/budget-threshold-crossed.event.ts` → `apps/api/src/budgets/budget-alert.handler.ts`; thresholds `75` / `90` / `100` / `overage` from `packages/agent/src/entities/work-budget-alert-state.entity.ts`, one row per (budget, threshold, period).                                                                                                                                      |
+| Dispatch-time credit gate        | `packages/agent/src/agents/run-dispatch-gate.service.ts` + `packages/agent/src/agents/run-credits-precheck.ts`, gated by `config.billing.credits.isEnforcementEnabled()`.                                                                                                                                                                                                                                       |
+| Per-Node daily model ceiling     | `fleet_nodes.dailyCostCeilingCents` / `dailyCostTrippedOn`, added by `apps/api/src/migrations/1788300000000-AddFleetCostAccounting.ts`; editor at `apps/web/src/components/settings/FleetCostCeiling.tsx` with helpers in `apps/web/src/components/settings/fleet-cost-ceiling.shared.ts` and the contract constant `FLEET_MAX_DAILY_COST_CEILING_CENTS` in `packages/contracts/src/fleet/fleet-node.types.ts`. |
+| The Agent read surface           | `apps/api/src/agents/agents.controller.ts` → `GET /api/agents/:id/budget` returns `capCents: null` unconditionally; the page at `apps/web/src/app/[locale]/(dashboard)/agents/[id]/budgets/page.tsx` therefore always shows "no cap configured".                                                                                                                                                                |
 
 **The gap.** No Workspace scope. No meter on any cap. The per-Agent cap cannot be set and reads
 zero spend. Auto-recharge has no ceiling. The Fleet ceiling is invisible from Billing.
 
 ### 1.4 The money surfaces
 
-| Surface | File |
-| --- | --- |
-| Billing page | `apps/web/src/app/[locale]/(dashboard)/settings/billing/page.tsx` → `apps/web/src/components/settings/BillingSettings.tsx` |
-| Payment method | `apps/web/src/app/[locale]/(dashboard)/settings/billing/payment-method/page.tsx` → `apps/web/src/components/settings/PaymentMethodSettings.tsx` |
+| Surface             | File                                                                                                                                                                                                                                                                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Billing page        | `apps/web/src/app/[locale]/(dashboard)/settings/billing/page.tsx` → `apps/web/src/components/settings/BillingSettings.tsx`                                                                                                                                                                                                                   |
+| Payment method      | `apps/web/src/app/[locale]/(dashboard)/settings/billing/payment-method/page.tsx` → `apps/web/src/components/settings/PaymentMethodSettings.tsx`                                                                                                                                                                                              |
 | Usage page (2 tabs) | `apps/web/src/app/[locale]/(dashboard)/settings/usage/page.tsx`, tab switch in `apps/web/src/components/settings/usage/UsageTabs.tsx`, Overview in `apps/web/src/components/settings/UsageCreditsSettings.tsx`, Costs in `apps/web/src/components/settings/costs/CostsSettings.tsx` (+ `CostsByModelList.tsx`, `CostsDailyStackedChart.tsx`) |
-| Settings nav | `apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx` |
-| Credits API | `apps/api/src/subscriptions/credits.controller.ts` (`api/credits`: `balance`, `pricing`, `ledger`, `usage-summary`, `usage/export`) |
-| Costs API | `apps/api/src/subscriptions/costs.controller.ts` (`api/usage/costs`: `summary`, `daily`, `by-agent`, `by-model`, `top-runs`) |
-| Billing API | `apps/api/src/billing/billing.controller.ts`, `payg.controller.ts`, `payment-method.controller.ts`, `plan-checkout.controller.ts`, `seats.controller.ts`, `billing-webhook.controller.ts` |
-| Account-wide usage | `apps/api/src/budgets/account-usage.controller.ts` (`api/me/usage/account-wide` — drives the dashboard "Month Spend" tile) |
-| Web proxies | `apps/web/src/app/api/credits/{ledger,usage-summary,usage/export}/route.ts` and `apps/web/src/app/api/usage/costs/[section]/route.ts` — each allowlists forwarded query params and matches `[section]` against a closed list |
-| Retention | `apps/api/src/budgets/plugin-usage-cleanup.service.ts` — prunes usage rows older than 12 months under a distributed lock |
-| Approvals surface | `apps/web/src/components/approvals/ApprovalsQueue.tsx`, backed by `apps/api/src/agent-approvals/agent-approvals.controller.ts` |
-| Escalation record | `packages/agent/src/entities/agent-escalation.entity.ts` with reason codes in `packages/contracts/src/agents/escalation.types.ts` (already carries `budget-stop`) |
+| Settings nav        | `apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx`                                                                                                                                                                                                                                                                  |
+| Credits API         | `apps/api/src/subscriptions/credits.controller.ts` (`api/credits`: `balance`, `pricing`, `ledger`, `usage-summary`, `usage/export`)                                                                                                                                                                                                          |
+| Costs API           | `apps/api/src/subscriptions/costs.controller.ts` (`api/usage/costs`: `summary`, `daily`, `by-agent`, `by-model`, `top-runs`)                                                                                                                                                                                                                 |
+| Billing API         | `apps/api/src/billing/billing.controller.ts`, `payg.controller.ts`, `payment-method.controller.ts`, `plan-checkout.controller.ts`, `seats.controller.ts`, `billing-webhook.controller.ts`                                                                                                                                                    |
+| Account-wide usage  | `apps/api/src/budgets/account-usage.controller.ts` (`api/me/usage/account-wide` — drives the dashboard "Month Spend" tile)                                                                                                                                                                                                                   |
+| Web proxies         | `apps/web/src/app/api/credits/{ledger,usage-summary,usage/export}/route.ts` and `apps/web/src/app/api/usage/costs/[section]/route.ts` — each allowlists forwarded query params and matches `[section]` against a closed list                                                                                                                 |
+| Retention           | `apps/api/src/budgets/plugin-usage-cleanup.service.ts` — prunes usage rows older than 12 months under a distributed lock                                                                                                                                                                                                                     |
+| Approvals surface   | `apps/web/src/components/approvals/ApprovalsQueue.tsx`, backed by `apps/api/src/agent-approvals/agent-approvals.controller.ts`                                                                                                                                                                                                               |
+| Escalation record   | `packages/agent/src/entities/agent-escalation.entity.ts` with reason codes in `packages/contracts/src/agents/escalation.types.ts` (already carries `budget-stop`)                                                                                                                                                                            |
 
 ### 1.5 Summary of the delta
 
-| # | Today | After this epic |
-| --- | --- | --- |
-| 1 | One blended balance | Three meters, classified at capture, stored on the row |
-| 2 | Price derived from provider cost × margin | Published, versioned price list keyed on capability + operation |
-| 3 | Own-key exemption guessed at settlement | Paying account class stamped at the call |
-| 4 | Cached and failed calls priced like successes | Outcome on the row; both zero-rated |
-| 5 | No Mission axis | `missionId` on the usage row, copied from `tasks.missionId`; a third breakdown |
-| 6 | Per-Agent cap unsettable, spend hard-coded `0` | Full CRUD, real aggregation, real refusal |
-| 7 | No Workspace ceiling | `workspace_spend_caps`, per meter, no overage switch |
-| 8 | Auto-recharge unbounded per month | Monthly maximum, hard refusal, one decision per month |
-| 9 | Provisioned units unbilled and unexplained | `account_addons`, pro-rated, never touching credits |
-| 10 | Money only in Settings | Home line, Billing breakdowns, receipt itemisation |
+| #   | Today                                          | After this epic                                                                |
+| --- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| 1   | One blended balance                            | Three meters, classified at capture, stored on the row                         |
+| 2   | Price derived from provider cost × margin      | Published, versioned price list keyed on capability + operation                |
+| 3   | Own-key exemption guessed at settlement        | Paying account class stamped at the call                                       |
+| 4   | Cached and failed calls priced like successes  | Outcome on the row; both zero-rated                                            |
+| 5   | No Mission axis                                | `missionId` on the usage row, copied from `tasks.missionId`; a third breakdown |
+| 6   | Per-Agent cap unsettable, spend hard-coded `0` | Full CRUD, real aggregation, real refusal                                      |
+| 7   | No Workspace ceiling                           | `workspace_spend_caps`, per meter, no overage switch                           |
+| 8   | Auto-recharge unbounded per month              | Monthly maximum, hard refusal, one decision per month                          |
+| 9   | Provisioned units unbilled and unexplained     | `account_addons`, pro-rated, never touching credits                            |
+| 10  | Money only in Settings                         | Home line, Billing breakdowns, receipt itemisation                             |
 
 ---
 
@@ -216,18 +216,33 @@ New leaf types in `packages/agent/src/entities/_types.ts` (same cycle-break rati
 `BudgetOwnerType`), re-exported from `packages/contracts/src/billing/meter.types.ts`:
 
 ```ts
-export enum UsageMeter   { MODEL = 'model', CREDITS = 'credits', ADDON = 'addon' }
-export enum UsagePayer   { WORKSPACE = 'workspace', PLATFORM = 'platform', UNCONFIRMED = 'unconfirmed' }
-export enum UsageOutcome { OK = 'ok', CACHED = 'cached', FAILED = 'failed' }
+export enum UsageMeter {
+	MODEL = 'model',
+	CREDITS = 'credits',
+	ADDON = 'addon'
+}
+export enum UsagePayer {
+	WORKSPACE = 'workspace',
+	PLATFORM = 'platform',
+	UNCONFIRMED = 'unconfirmed'
+}
+export enum UsageOutcome {
+	OK = 'ok',
+	CACHED = 'cached',
+	FAILED = 'failed'
+}
 ```
 
 **`packages/agent/src/entities/_types.ts`** — one new `BudgetOwnerType` member:
 
 ```ts
 export enum BudgetOwnerType {
-    WORK = 'work', IDEA = 'idea', MISSION = 'mission', AGENT = 'agent',
-    /** AW-17 — the Workspace-wide ceiling. Owner = users.id (or organizations.id when scoped). */
-    WORKSPACE = 'workspace',
+	WORK = 'work',
+	IDEA = 'idea',
+	MISSION = 'mission',
+	AGENT = 'agent',
+	/** AW-17 — the Workspace-wide ceiling. Owner = users.id (or organizations.id when scoped). */
+	WORKSPACE = 'workspace'
 }
 ```
 
@@ -237,18 +252,19 @@ export enum BudgetOwnerType {
 @Entity({ name: 'workspace_spend_caps' })
 @Index('uq_workspace_spend_caps_owner_meter', ['userId', 'organizationId', 'meter'], { unique: true })
 export class WorkspaceSpendCap {
-    id: string;                       // uuid pk
-    userId: string;                   // uuid, owner
-    organizationId?: string | null;   // uuid, null = personal Workspace scope
-    tenantId?: string | null;         // uuid, Tier-C denorm, stamped by the scope subscriber
-    meter: UsageMeter | 'all';        // varchar(16)
-    capCents: number;                 // int, >= 100
-    currency: string;                 // varchar(3), default 'usd'
-    periodUnit: 'month';              // varchar(8) — calendar month in v1, room to grow
-    state: 'ok' | 'warning' | 'stopped' | 'exceeded';  // varchar(12), materialised by the evaluator
-    stoppedAt?: Date | null;          // PortableDateColumn
-    version: number;                  // int, default 1 — optimistic concurrency for FR-20 / S20
-    createdAt: Date; updatedAt: Date;
+	id: string; // uuid pk
+	userId: string; // uuid, owner
+	organizationId?: string | null; // uuid, null = personal Workspace scope
+	tenantId?: string | null; // uuid, Tier-C denorm, stamped by the scope subscriber
+	meter: UsageMeter | 'all'; // varchar(16)
+	capCents: number; // int, >= 100
+	currency: string; // varchar(3), default 'usd'
+	periodUnit: 'month'; // varchar(8) — calendar month in v1, room to grow
+	state: 'ok' | 'warning' | 'stopped' | 'exceeded'; // varchar(12), materialised by the evaluator
+	stoppedAt?: Date | null; // PortableDateColumn
+	version: number; // int, default 1 — optimistic concurrency for FR-20 / S20
+	createdAt: Date;
+	updatedAt: Date;
 }
 ```
 
@@ -288,21 +304,22 @@ autoRechargeMonthSpentCents: number;
 @Index('idx_account_addons_user_status', ['userId', 'status'])
 @Index('uq_account_addons_ref', ['addonCode', 'refType', 'refId'], { unique: true })
 export class AccountAddon {
-    id: string;
-    userId: string;
-    organizationId?: string | null;
-    tenantId?: string | null;
-    addonCode: string;                // varchar(64): 'agent-inbox' | 'fleet-node' | 'seat'
-    refType?: string | null;          // varchar(32): 'tenant-email-address' | 'fleet-node' | null
-    refId?: string | null;            // varchar(128) — not uuid: refs are not all uuids
-    quantity: number;                 // int, default 1
-    unitPriceCents: number;           // int, snapshot at activation — never re-read from a catalog
-    currency: string;                 // varchar(3), default 'usd'
-    status: 'pending' | 'active' | 'removed' | 'failed' | 'orphan';  // varchar(12)
-    providerSubscriptionItemRef?: string | null;  // varchar(128), opaque
-    activatedAt?: Date | null;
-    removedAt?: Date | null;
-    createdAt: Date; updatedAt: Date;
+	id: string;
+	userId: string;
+	organizationId?: string | null;
+	tenantId?: string | null;
+	addonCode: string; // varchar(64): 'agent-inbox' | 'fleet-node' | 'seat'
+	refType?: string | null; // varchar(32): 'tenant-email-address' | 'fleet-node' | null
+	refId?: string | null; // varchar(128) — not uuid: refs are not all uuids
+	quantity: number; // int, default 1
+	unitPriceCents: number; // int, snapshot at activation — never re-read from a catalog
+	currency: string; // varchar(3), default 'usd'
+	status: 'pending' | 'active' | 'removed' | 'failed' | 'orphan'; // varchar(12)
+	providerSubscriptionItemRef?: string | null; // varchar(128), opaque
+	activatedAt?: Date | null;
+	removedAt?: Date | null;
+	createdAt: Date;
+	updatedAt: Date;
 }
 ```
 
@@ -312,14 +329,16 @@ env-configurable, ships with a test):
 
 ```ts
 export interface CreditPrice {
-    readonly key: string;        // 'search.query' — capability.operation, NEVER a plugin id
-    readonly group: 'research' | 'data' | 'analysis' | 'models';
-    readonly credits: number;    // per unit
-    readonly unit: string;       // 'query' | 'page' | 'capture' | 'lookup' | '1k-tokens'
+	readonly key: string; // 'search.query' — capability.operation, NEVER a plugin id
+	readonly group: 'research' | 'data' | 'analysis' | 'models';
+	readonly credits: number; // per unit
+	readonly unit: string; // 'query' | 'page' | 'capture' | 'lookup' | '1k-tokens'
 }
 export const CREDIT_PRICEBOOK_VERSION = 4;
 export const CREDIT_PRICEBOOK_EFFECTIVE_FROM = '2026-09-12';
-export const CREDIT_PRICEBOOK: readonly CreditPrice[] = [ /* spec §6.4, verbatim */ ];
+export const CREDIT_PRICEBOOK: readonly CreditPrice[] = [
+	/* spec §6.4, verbatim */
+];
 ```
 
 Historical versions are kept in the same file as a frozen map
@@ -334,8 +353,9 @@ re-stamp before merge if `develop` has moved past them.
 
 **`apps/api/src/migrations/1791170000000-AddUsageMeterClassification.ts`** (P1)
 `up()`:
+
 1. `ALTER TABLE plugin_usage_events ADD COLUMN meter varchar(16) NULL`, then `payer varchar(16)
-   NULL`, `outcome varchar(12) NULL`, `creditsCharged int NOT NULL DEFAULT 0`,
+NULL`, `outcome varchar(12) NULL`, `creditsCharged int NOT NULL DEFAULT 0`,
    `priceKey varchar(64) NULL`, `priceVersion int NULL`, `missionId uuid NULL` — each guarded by
    a `hasColumn` check so a partially applied database converges.
 2. Create the three indexes named in §3.1, each guarded by `hasIndex`.
@@ -344,12 +364,13 @@ re-stamp before merge if `develop` has moved past them.
    would be exactly the guess the spec forbids.
 4. Backfill `missionId` for rows that have a `taskId`, in batches of 5,000:
    `UPDATE plugin_usage_events pue SET "missionId" = t."missionId" FROM tasks t
-    WHERE t.id = pue."taskId" AND pue."missionId" IS NULL AND t."missionId" IS NOT NULL`
+WHERE t.id = pue."taskId" AND pue."missionId" IS NULL AND t."missionId" IS NOT NULL`
    — additive, re-runnable, and safe to interrupt.
-`down()`: drop the three indexes and the seven columns. No data is destroyed that existed before.
+   `down()`: drop the three indexes and the seven columns. No data is destroyed that existed before.
 
 **`apps/api/src/migrations/1791170100000-AddSpendCapsAndMeterScopedBudgets.ts`** (P2)
 `up()`:
+
 1. `CREATE TABLE workspace_spend_caps` with the unique index
    `uq_workspace_spend_caps_owner_meter` — declared **in the migration**, not as a decorator
    `@Index`, because it is partial (`WHERE "organizationId" IS NULL` and its complement) for the
@@ -361,7 +382,7 @@ re-stamp before merge if `develop` has moved past them.
 4. Backfill: for every `billing_profiles` row with `autoRechargeEnabled = true` and no ceiling,
    set `autoRechargeMonthlyCapCents = 10000` ($100, the shipped default) so no existing
    auto-recharge is silently left unbounded and none is silently switched off.
-`down()`: drop the table and the five columns.
+   `down()`: drop the table and the five columns.
 
 **`apps/api/src/migrations/1791170200000-AddAccountAddons.ts`** (P3)
 `up()`: `CREATE TABLE account_addons` with both indexes; backfill one `active` row per existing
@@ -392,19 +413,19 @@ export type SpendCapState = 'ok' | 'warning' | 'stopped' | 'exceeded';
 export type AddonCode = 'agent-inbox' | 'fleet-node' | 'seat';
 export type AddonStatus = 'pending' | 'active' | 'removed' | 'failed' | 'orphan';
 
-export const SPEND_CAP_MIN_CENTS = 100;                 // $1.00
+export const SPEND_CAP_MIN_CENTS = 100; // $1.00
 export const SPEND_CAP_THRESHOLDS = [75, 90, 100] as const;
-export const SPEND_CAP_PROPAGATION_MS = 30_000;         // FR-47
-export const AUTO_RECHARGE_MONTHLY_CAP_DEFAULT_CENTS = 10_000;   // $100
-export const AUTO_RECHARGE_MONTHLY_CAP_MIN_CENTS = 1_000;        // $10
-export const AUTO_RECHARGE_MONTHLY_CAP_MAX_CENTS = 200_000;      // $2,000
+export const SPEND_CAP_PROPAGATION_MS = 30_000; // FR-47
+export const AUTO_RECHARGE_MONTHLY_CAP_DEFAULT_CENTS = 10_000; // $100
+export const AUTO_RECHARGE_MONTHLY_CAP_MIN_CENTS = 1_000; // $10
+export const AUTO_RECHARGE_MONTHLY_CAP_MAX_CENTS = 200_000; // $2,000
 export const AUTO_RECHARGE_MAX_CONSECUTIVE_FAILURES = 3;
 export const ADDON_MAX_UNITS_PER_KIND = 25;
 export const USAGE_CACHE_FRESHNESS_HOURS = 24;
 export const USAGE_EXPORT_MAX_ROWS = 50_000;
 export const USAGE_EXPORT_MAX_DAYS = 92;
 export const BREAKDOWN_TOP_N = 10;
-export const UNCONFIRMED_PAYER_ALERT_RATIO = 0.001;              // FR-7
+export const UNCONFIRMED_PAYER_ALERT_RATIO = 0.001; // FR-7
 ```
 
 One additive member on `packages/contracts/src/agents/escalation.types.ts` — the file's own
@@ -426,38 +447,47 @@ selector from the caller (spec FR-75). Money-moving routes keep the existing fai
 
 ### 4.1 New — `apps/api/src/billing/meters.controller.ts` → `@Controller('api/billing/meters')`
 
-| Method | Path | Response | Notes |
-| --- | --- | --- | --- |
-| GET | `/api/billing/meters` | `MetersSummaryDto` | `?period=this-month\|last-month\|7d\|30d\|90d` (default `this-month`). Three cards + the pre-cutover residual. |
+| Method | Path                  | Response           | Notes                                                                                                          |
+| ------ | --------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/billing/meters` | `MetersSummaryDto` | `?period=this-month\|last-month\|7d\|30d\|90d` (default `this-month`). Three cards + the pre-cutover residual. |
 
 ```ts
 interface MetersSummaryDto {
-    period: { id: string; startsAt: string; endsAt: string; timezone: string };
-    currency: string;
-    model:   { costCents: number | null; accounts: { label: string; costCents: number | null }[];
-               tokens: { input: number; output: number; cachedRead: number } };
-    credits: { used: number; allowanceUsed: number; allowanceTotal: number;
-               packBalance: number; allowanceExpiresAt: string | null;
-               capCents: number | null; capUsedPercent: number | null };
-    addons:  { monthlyCents: number; lines: { code: AddonCode; label: string; quantity: number }[] };
-    preMeterResidual: { credits: number; sinceLabel: string } | null;
+	period: { id: string; startsAt: string; endsAt: string; timezone: string };
+	currency: string;
+	model: {
+		costCents: number | null;
+		accounts: { label: string; costCents: number | null }[];
+		tokens: { input: number; output: number; cachedRead: number };
+	};
+	credits: {
+		used: number;
+		allowanceUsed: number;
+		allowanceTotal: number;
+		packBalance: number;
+		allowanceExpiresAt: string | null;
+		capCents: number | null;
+		capUsedPercent: number | null;
+	};
+	addons: { monthlyCents: number; lines: { code: AddonCode; label: string; quantity: number }[] };
+	preMeterResidual: { credits: number; sinceLabel: string } | null;
 }
 ```
 
 ### 4.2 New — `apps/api/src/billing/price-list.controller.ts` → `@Controller('api/billing/price-list')`
 
-| Method | Path | Auth | Notes |
-| --- | --- | --- | --- |
-| GET | `/api/billing/price-list` | session | Returns the current version, its effective date, the grouped entries and `creditsPerDollar`. `?version=3` returns a historical version from `CREDIT_PRICEBOOK_HISTORY`. Readable with no payment provider configured (spec FR-23). |
+| Method | Path                      | Auth    | Notes                                                                                                                                                                                                                              |
+| ------ | ------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/billing/price-list` | session | Returns the current version, its effective date, the grouped entries and `creditsPerDollar`. `?version=3` returns a historical version from `CREDIT_PRICEBOOK_HISTORY`. Readable with no payment provider configured (spec FR-23). |
 
 ### 4.3 New — `apps/api/src/budgets/spend-caps.controller.ts` → `@Controller('api/spend-caps')`
 
-| Method | Path | Body / query | Notes |
-| --- | --- | --- | --- |
-| GET | `/api/spend-caps` | — | One list across all five scopes: `workspace_spend_caps`, `work_budgets` (Work / Mission / Idea rows), `agent_budgets`, and the read-only Fleet node ceilings. Each row carries `scope`, `targetId`, `targetLabel`, `targetArchived`, `meter`, `period`, `capCents`, `spentCents`, `percent`, `state`, `editable`, `allowOverage`, `version`. |
-| POST | `/api/spend-caps` | `CreateSpendCapDto` | `{ scope, targetId?, meter, periodUnit, capCents }`. `409` when a cap already exists for that (scope, target, meter). Routes to the right table by `scope`. |
-| PATCH | `/api/spend-caps/:id` | `UpdateSpendCapDto` + `If-Match: <version>` | `409 CAP_VERSION_CONFLICT` with the current value in the body when the version is stale (spec S20). |
-| DELETE | `/api/spend-caps/:id` | — | Idempotent. |
+| Method | Path                  | Body / query                                | Notes                                                                                                                                                                                                                                                                                                                                        |
+| ------ | --------------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/spend-caps`     | —                                           | One list across all five scopes: `workspace_spend_caps`, `work_budgets` (Work / Mission / Idea rows), `agent_budgets`, and the read-only Fleet node ceilings. Each row carries `scope`, `targetId`, `targetLabel`, `targetArchived`, `meter`, `period`, `capCents`, `spentCents`, `percent`, `state`, `editable`, `allowOverage`, `version`. |
+| POST   | `/api/spend-caps`     | `CreateSpendCapDto`                         | `{ scope, targetId?, meter, periodUnit, capCents }`. `409` when a cap already exists for that (scope, target, meter). Routes to the right table by `scope`.                                                                                                                                                                                  |
+| PATCH  | `/api/spend-caps/:id` | `UpdateSpendCapDto` + `If-Match: <version>` | `409 CAP_VERSION_CONFLICT` with the current value in the body when the version is stale (spec S20).                                                                                                                                                                                                                                          |
+| DELETE | `/api/spend-caps/:id` | —                                           | Idempotent.                                                                                                                                                                                                                                                                                                                                  |
 
 `scope = 'node'` rows are `editable: false`; `POST`/`PATCH`/`DELETE` against one returns `400`
 with `NODE_CEILING_READ_ONLY` and the Fleet route to use (spec FR-56).
@@ -466,11 +496,11 @@ Write routes require billing permission; read requires Workspace read.
 
 ### 4.4 New — `apps/api/src/agents/agent-budget.controller.ts` → `@Controller('api/agents/:agentId/budget')`
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/api/agents/:agentId/budget` | Real `capCents`, real `spentCents` for the current period, `meter`, `intervalUnit`, `allowOverage`, `state`. |
-| PUT | `/api/agents/:agentId/budget` | Upsert — finally calls the repository `upsert()` that has existed unused. |
-| DELETE | `/api/agents/:agentId/budget` | Remove the cap. |
+| Method | Path                          | Notes                                                                                                        |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| GET    | `/api/agents/:agentId/budget` | Real `capCents`, real `spentCents` for the current period, `meter`, `intervalUnit`, `allowOverage`, `state`. |
+| PUT    | `/api/agents/:agentId/budget` | Upsert — finally calls the repository `upsert()` that has existed unused.                                    |
+| DELETE | `/api/agents/:agentId/budget` | Remove the cap.                                                                                              |
 
 `apps/api/src/agents/agents.controller.ts`'s existing `GET /api/agents/:id/budget` is **kept**
 (Constitution X) and changed to delegate to the same service, so it stops returning
@@ -478,22 +508,22 @@ Write routes require billing permission; read requires Workspace read.
 
 ### 4.5 New — `apps/api/src/billing/addons.controller.ts` → `@Controller('api/billing/addons')`
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/api/billing/addons` | Active, pending, removed and orphan lines + the monthly total. |
-| GET | `/api/billing/addons/preview` | `?code=&quantity=` → `{ proratedCents, fullMonthlyCents, periodEndsAt }` (spec FR-37). |
-| POST | `/api/billing/addons` | `{ code, refType?, refId?, quantity }`. `409` on the unique ref. `400 ADDON_LIMIT_REACHED` above 25 per kind. |
-| DELETE | `/api/billing/addons/:id` | Pro-rated credit + provider quantity update. `seat` rows return `400 SEAT_MANAGED_ELSEWHERE`. |
+| Method | Path                          | Notes                                                                                                         |
+| ------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/billing/addons`         | Active, pending, removed and orphan lines + the monthly total.                                                |
+| GET    | `/api/billing/addons/preview` | `?code=&quantity=` → `{ proratedCents, fullMonthlyCents, periodEndsAt }` (spec FR-37).                        |
+| POST   | `/api/billing/addons`         | `{ code, refType?, refId?, quantity }`. `409` on the unique ref. `400 ADDON_LIMIT_REACHED` above 25 per kind. |
+| DELETE | `/api/billing/addons/:id`     | Pro-rated credit + provider quantity update. `seat` rows return `400 SEAT_MANAGED_ELSEWHERE`.                 |
 
 ### 4.6 Extended — existing controllers
 
-| File | Change |
-| --- | --- |
-| `apps/api/src/budgets/account-usage.controller.ts` | New `GET /api/me/usage/this-week` — the Home line. Returns the three figures plus `stoppedBy: { capId, label } \| null`. Cached 60 s per user. |
-| `apps/api/src/subscriptions/costs.controller.ts` | Three new sections on the existing `api/usage/costs` prefix: `by-tool`, `by-mission`, `by-meter`. Same shape as `by-agent`. |
-| `apps/api/src/subscriptions/credits.controller.ts` | `GET /api/credits/usage/export` gains the columns `meter`, `priceKey`, `outcome`, `creditsCharged`, `priceVersion`, `missionId`; refuses above 50,000 rows / 92 days **before** streaming (spec FR-80). `GET /api/credits/pricing` gains `pricebookVersion`. |
-| `apps/api/src/billing/billing.controller.ts` | `GET/PUT /api/billing/auto-recharge` gain `monthlyCapCents` and read-only `monthlyUsedCents`. `PUT` with `enabled: true` and no `monthlyCapCents` → `400 AUTO_RECHARGE_CAP_REQUIRED` (spec FR-60). |
-| `apps/api/src/billing/billing-webhook.controller.ts` | On a confirmed auto-recharge purchase, increments `autoRechargeMonthSpentCents` inside the same transaction that credits the ledger. Remains the sole writer of provider-confirmed state. |
+| File                                                 | Change                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/budgets/account-usage.controller.ts`   | New `GET /api/me/usage/this-week` — the Home line. Returns the three figures plus `stoppedBy: { capId, label } \| null`. Cached 60 s per user.                                                                                                               |
+| `apps/api/src/subscriptions/costs.controller.ts`     | Three new sections on the existing `api/usage/costs` prefix: `by-tool`, `by-mission`, `by-meter`. Same shape as `by-agent`.                                                                                                                                  |
+| `apps/api/src/subscriptions/credits.controller.ts`   | `GET /api/credits/usage/export` gains the columns `meter`, `priceKey`, `outcome`, `creditsCharged`, `priceVersion`, `missionId`; refuses above 50,000 rows / 92 days **before** streaming (spec FR-80). `GET /api/credits/pricing` gains `pricebookVersion`. |
+| `apps/api/src/billing/billing.controller.ts`         | `GET/PUT /api/billing/auto-recharge` gain `monthlyCapCents` and read-only `monthlyUsedCents`. `PUT` with `enabled: true` and no `monthlyCapCents` → `400 AUTO_RECHARGE_CAP_REQUIRED` (spec FR-60).                                                           |
+| `apps/api/src/billing/billing-webhook.controller.ts` | On a confirmed auto-recharge purchase, increments `autoRechargeMonthSpentCents` inside the same transaction that credits the ledger. Remains the sole writer of provider-confirmed state.                                                                    |
 
 ### 4.7 Next.js proxies
 
@@ -510,13 +540,13 @@ Write routes require billing permission; read requires Workspace read.
 
 ### 5.1 Routes
 
-| Route | File | New? |
-| --- | --- | --- |
-| `/settings/billing` | `apps/web/src/app/[locale]/(dashboard)/settings/billing/page.tsx` | modified — three meter cards and the breakdown block mount above the existing sections, which are untouched |
-| `/settings/billing/caps` | `apps/web/src/app/[locale]/(dashboard)/settings/billing/caps/page.tsx` | **new** |
-| `/settings/billing/price-list` | `apps/web/src/app/[locale]/(dashboard)/settings/billing/price-list/page.tsx` | **new** |
-| `/settings/billing/addons` | `apps/web/src/app/[locale]/(dashboard)/settings/billing/addons/page.tsx` | **new** |
-| `/settings/usage?tab=breakdown` | `apps/web/src/components/settings/usage/UsageTabs.tsx` + `usage-tabs.shared.ts` | modified — a third tab beside Overview and Costs |
+| Route                           | File                                                                            | New?                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `/settings/billing`             | `apps/web/src/app/[locale]/(dashboard)/settings/billing/page.tsx`               | modified — three meter cards and the breakdown block mount above the existing sections, which are untouched |
+| `/settings/billing/caps`        | `apps/web/src/app/[locale]/(dashboard)/settings/billing/caps/page.tsx`          | **new**                                                                                                     |
+| `/settings/billing/price-list`  | `apps/web/src/app/[locale]/(dashboard)/settings/billing/price-list/page.tsx`    | **new**                                                                                                     |
+| `/settings/billing/addons`      | `apps/web/src/app/[locale]/(dashboard)/settings/billing/addons/page.tsx`        | **new**                                                                                                     |
+| `/settings/usage?tab=breakdown` | `apps/web/src/components/settings/usage/UsageTabs.tsx` + `usage-tabs.shared.ts` | modified — a third tab beside Overview and Costs                                                            |
 
 Sub-routes of `/settings/billing` are reached from the Billing page itself, so
 `apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx` gains **no** new
@@ -524,17 +554,17 @@ top-level tabs — the settings tree is already 18 items deep and this epic does
 
 ### 5.2 Components
 
-| Component | File | Notes |
-| --- | --- | --- |
-| `MeterCards` | `apps/web/src/components/settings/billing/MeterCards.tsx` | Server component. Three cards, spec §6.2. Renders zero-states as sentences, never blank boxes. |
-| `SpendBreakdown` | `apps/web/src/components/settings/billing/SpendBreakdown.tsx` | Client. Three panels fetched independently (`Promise.allSettled`) so one failing never blanks the others (spec S27). |
-| `CreditPriceList` | `apps/web/src/components/settings/billing/CreditPriceList.tsx` | Server. Pure render of the price-list payload; grouped, with the version footer. |
-| `SpendCapsTable` | `apps/web/src/components/settings/billing/SpendCapsTable.tsx` | Client. Rows for all five scopes; `editable: false` rows link out instead of opening the dialog. |
-| `SpendCapDialog` | `apps/web/src/components/settings/billing/SpendCapDialog.tsx` | Client. Spec §6.6. Focus-trapped, `Esc` closes, `Enter` submits, sends `If-Match`. |
-| `AddonsList` | `apps/web/src/components/settings/billing/AddonsList.tsx` | Client. Pro-ration preview before confirm; removal confirmation quotes the credit. |
-| `WeekSpendCard` | `apps/web/src/components/spend/WeekSpendCard.tsx` | Client, **self-contained**. Mounted by Home (AW-19) and, until AW-19 lands, at the top of `BillingSettings.tsx`. Polls at 60 s, pauses on `document.hidden`. |
-| `RunCostMeters` | `apps/web/src/components/runs/RunCostMeters.tsx` | Client. Fills AW-09's receipt Cost block with the three-meter itemisation of spec §6.8. |
-| shared helpers | `apps/web/src/components/settings/billing/spend-format.shared.ts` | Pure cents/credits formatters, unit-tested without React — same pattern as `fleet-cost-ceiling.shared.ts`. |
+| Component         | File                                                              | Notes                                                                                                                                                        |
+| ----------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MeterCards`      | `apps/web/src/components/settings/billing/MeterCards.tsx`         | Server component. Three cards, spec §6.2. Renders zero-states as sentences, never blank boxes.                                                               |
+| `SpendBreakdown`  | `apps/web/src/components/settings/billing/SpendBreakdown.tsx`     | Client. Three panels fetched independently (`Promise.allSettled`) so one failing never blanks the others (spec S27).                                         |
+| `CreditPriceList` | `apps/web/src/components/settings/billing/CreditPriceList.tsx`    | Server. Pure render of the price-list payload; grouped, with the version footer.                                                                             |
+| `SpendCapsTable`  | `apps/web/src/components/settings/billing/SpendCapsTable.tsx`     | Client. Rows for all five scopes; `editable: false` rows link out instead of opening the dialog.                                                             |
+| `SpendCapDialog`  | `apps/web/src/components/settings/billing/SpendCapDialog.tsx`     | Client. Spec §6.6. Focus-trapped, `Esc` closes, `Enter` submits, sends `If-Match`.                                                                           |
+| `AddonsList`      | `apps/web/src/components/settings/billing/AddonsList.tsx`         | Client. Pro-ration preview before confirm; removal confirmation quotes the credit.                                                                           |
+| `WeekSpendCard`   | `apps/web/src/components/spend/WeekSpendCard.tsx`                 | Client, **self-contained**. Mounted by Home (AW-19) and, until AW-19 lands, at the top of `BillingSettings.tsx`. Polls at 60 s, pauses on `document.hidden`. |
+| `RunCostMeters`   | `apps/web/src/components/runs/RunCostMeters.tsx`                  | Client. Fills AW-09's receipt Cost block with the three-meter itemisation of spec §6.8.                                                                      |
+| shared helpers    | `apps/web/src/components/settings/billing/spend-format.shared.ts` | Pure cents/credits formatters, unit-tested without React — same pattern as `fleet-cost-ceiling.shared.ts`.                                                   |
 
 ### 5.3 State and data fetching
 
@@ -558,14 +588,14 @@ top-level tabs — the settings tree is already 18 items deep and this epic does
 Constitution IV: every job is registered through the configured job-runtime provider and
 dispatched through a `*_DISPATCHER` DI symbol. No call site imports a third-party SDK directly.
 
-| Job | Kind | Cadence | File | What it does |
-| --- | --- | --- | --- | --- |
-| `spend-cap-evaluate` | `schedules.task` | `*/10 * * * *` | `packages/tasks/src/tasks/trigger/spend-cap-evaluate.task.ts` | Recomputes current-period spend for every cap, materialises `state`, fires `BudgetThresholdCrossedEvent` for newly crossed 75 / 90 / 100, raises the decision on entering `stopped`, and rolls `workspace_spend_caps.state` back to `ok` when a period turns over. Idempotent through the existing per-(budget, threshold, period) alert-state rows. |
-| `usage-mission-backfill` | one-shot fan-out | manual | `packages/tasks/src/tasks/trigger/usage-mission-backfill.task.ts` | Finishes the batched `missionId` backfill outside the migration for very large tables. Re-runnable; a completed batch is a no-op. |
-| `addon-reconcile` | `schedules.task` | `17 3 * * *` | `packages/tasks/src/tasks/trigger/addon-reconcile.task.ts` | Reconciles `account_addons` against the provider subscription and against the provisioned units; flips vanished units to `orphan` (spec FR-40) and stops billing them. |
-| `credits-daily-grant` | existing | `5 0 * * *` | `packages/tasks/src/tasks/trigger/credits-daily-grant.task.ts` | Unchanged. Also resets `autoRechargeMonthSpentCents` when `autoRechargeMonthKey` is stale. |
-| `credits-meter-flush` | existing | `*/5 * * * *` | `packages/tasks/src/tasks/trigger/credits-meter-flush.task.ts` | Unchanged. |
-| `PluginUsageCleanupService.pruneOldEvents` | existing Nest cron | `EVERY_DAY_AT_4AM` | `apps/api/src/budgets/plugin-usage-cleanup.service.ts` | Unchanged; the 12-month retention window is what spec FR-81 and S24 describe. |
+| Job                                        | Kind               | Cadence            | File                                                              | What it does                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------ | ------------------ | ------------------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spend-cap-evaluate`                       | `schedules.task`   | `*/10 * * * *`     | `packages/tasks/src/tasks/trigger/spend-cap-evaluate.task.ts`     | Recomputes current-period spend for every cap, materialises `state`, fires `BudgetThresholdCrossedEvent` for newly crossed 75 / 90 / 100, raises the decision on entering `stopped`, and rolls `workspace_spend_caps.state` back to `ok` when a period turns over. Idempotent through the existing per-(budget, threshold, period) alert-state rows. |
+| `usage-mission-backfill`                   | one-shot fan-out   | manual             | `packages/tasks/src/tasks/trigger/usage-mission-backfill.task.ts` | Finishes the batched `missionId` backfill outside the migration for very large tables. Re-runnable; a completed batch is a no-op.                                                                                                                                                                                                                    |
+| `addon-reconcile`                          | `schedules.task`   | `17 3 * * *`       | `packages/tasks/src/tasks/trigger/addon-reconcile.task.ts`        | Reconciles `account_addons` against the provider subscription and against the provisioned units; flips vanished units to `orphan` (spec FR-40) and stops billing them.                                                                                                                                                                               |
+| `credits-daily-grant`                      | existing           | `5 0 * * *`        | `packages/tasks/src/tasks/trigger/credits-daily-grant.task.ts`    | Unchanged. Also resets `autoRechargeMonthSpentCents` when `autoRechargeMonthKey` is stale.                                                                                                                                                                                                                                                           |
+| `credits-meter-flush`                      | existing           | `*/5 * * * *`      | `packages/tasks/src/tasks/trigger/credits-meter-flush.task.ts`    | Unchanged.                                                                                                                                                                                                                                                                                                                                           |
+| `PluginUsageCleanupService.pruneOldEvents` | existing Nest cron | `EVERY_DAY_AT_4AM` | `apps/api/src/budgets/plugin-usage-cleanup.service.ts`            | Unchanged; the 12-month retention window is what spec FR-81 and S24 describe.                                                                                                                                                                                                                                                                        |
 
 New dispatcher symbols in `packages/agent/src/tasks/_tasks-symbols.ts`, bound in
 `packages/agent/src/tasks/job-runtime.providers.ts`:
@@ -750,27 +780,27 @@ errors.billing.exportTooLarge       "That is more than {max} rows. Narrow the pe
 
 ### 9.1 Analytics (PostHog, through `packages/monitoring/`)
 
-| Event | Properties | Why |
-| --- | --- | --- |
-| `spend_meter_viewed` | `period`, `meter` | Does anyone actually read the cards? |
-| `price_list_viewed` | `version`, `entry_clicked` | Is a published price changing behaviour? |
-| `spend_cap_created` | `scope`, `meter`, `period`, `cap_cents` | Which scope people reach for first |
-| `spend_cap_stopped` | `scope`, `meter`, `cap_cents`, `overshoot_cents` | How often a cap actually bites |
-| `spend_cap_raised_from_decision` | `scope`, `from_cents`, `to_cents` | Is the decision the right place to fix it? |
-| `auto_recharge_ceiling_hit` | `cap_cents`, `month_spent_cents` | The runaway case we are protecting against |
-| `addon_added` / `addon_removed` | `code`, `prorated_cents` | Add-on churn |
-| `usage_export_refused` | `reason`, `rows`, `days` | Is the 50,000 / 92-day bound wrong? |
+| Event                            | Properties                                       | Why                                        |
+| -------------------------------- | ------------------------------------------------ | ------------------------------------------ |
+| `spend_meter_viewed`             | `period`, `meter`                                | Does anyone actually read the cards?       |
+| `price_list_viewed`              | `version`, `entry_clicked`                       | Is a published price changing behaviour?   |
+| `spend_cap_created`              | `scope`, `meter`, `period`, `cap_cents`          | Which scope people reach for first         |
+| `spend_cap_stopped`              | `scope`, `meter`, `cap_cents`, `overshoot_cents` | How often a cap actually bites             |
+| `spend_cap_raised_from_decision` | `scope`, `from_cents`, `to_cents`                | Is the decision the right place to fix it? |
+| `auto_recharge_ceiling_hit`      | `cap_cents`, `month_spent_cents`                 | The runaway case we are protecting against |
+| `addon_added` / `addon_removed`  | `code`, `prorated_cents`                         | Add-on churn                               |
+| `usage_export_refused`           | `reason`, `rows`, `days`                         | Is the 50,000 / 92-day bound wrong?        |
 
 ### 9.2 Operational counters and alerts
 
-| Counter | Alert |
-| --- | --- |
-| `usage.payer.unconfirmed_ratio` | Page when it exceeds **0.1%** of metered calls over a rolling 24 h (spec FR-7). |
-| `usage.pricebook.miss` | Page on any occurrence — a priced kind of call with no entry means the platform gave something away (spec FR-4). |
-| `usage.record.write_failed` | Warn above 10 in 5 minutes. Never fails a Run (spec FR-84). |
-| `spend_cap.check_latency_p95` | Warn above 15 ms (spec FR-87). |
-| `spend_cap.double_stop` | Page on any occurrence — the concurrency guard leaked (spec FR-50). |
-| `addon.orphan_count` | Warn above 0 for more than 24 h. |
+| Counter                         | Alert                                                                                                            |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `usage.payer.unconfirmed_ratio` | Page when it exceeds **0.1%** of metered calls over a rolling 24 h (spec FR-7).                                  |
+| `usage.pricebook.miss`          | Page on any occurrence — a priced kind of call with no entry means the platform gave something away (spec FR-4). |
+| `usage.record.write_failed`     | Warn above 10 in 5 minutes. Never fails a Run (spec FR-84).                                                      |
+| `spend_cap.check_latency_p95`   | Warn above 15 ms (spec FR-87).                                                                                   |
+| `spend_cap.double_stop`         | Page on any occurrence — the concurrency guard leaked (spec FR-50).                                              |
+| `addon.orphan_count`            | Warn above 0 for more than 24 h.                                                                                 |
 
 ### 9.3 Activity log
 
@@ -781,17 +811,17 @@ and new values: `spend_cap_created`, `spend_cap_updated`, `spend_cap_deleted`,
 
 ### 9.4 Failure modes
 
-| Failure | Handling |
-| --- | --- |
-| The classifier throws | Record the row with `payer = 'unconfirmed'`, `meter = 'credits'`, price it, increment the counter. Never drop the row, never fail the call. |
-| The pricebook has no entry | `creditsCharged = 0`, `priceKey` stored anyway, page the operator. The call still happens. |
-| `record()` fails entirely | Log, increment `usage.record.write_failed`, return `null` exactly as today. The Run is unaffected. |
-| The cap evaluator is down | Caps still refuse: `checkBudget` computes spend live on the hot path; the evaluator only *materialises* state and fires threshold events. A stale `state` chip is a display lag, never a missed refusal. |
-| The credit ledger is unreachable at settlement | Unchanged from today: best-effort, the Run is never failed, an `AI_CREDITS` notification fires. |
-| The payment provider is unreachable | `BillingProviderNotConfiguredError` → `503`; the meters, breakdowns, caps and price list all still render (spec S13). |
-| Two concurrent cap crossings | The alert-state row's unique (cap, threshold, period) key makes the second a no-op; the decision writer uses the escalation `dedupKey` (`budget-stop:{capId}:{period}`) for the same reason. |
-| A cap references an archived Agent | The row renders with `targetArchived: true` and only `Remove cap` (spec S21). Historical spend still resolves because usage rows carry no FK to `agents`. |
-| An add-on's unit is deleted without the hook firing | `addon-reconcile` flips it to `orphan` within 24 h and stops billing it. |
+| Failure                                             | Handling                                                                                                                                                                                                 |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The classifier throws                               | Record the row with `payer = 'unconfirmed'`, `meter = 'credits'`, price it, increment the counter. Never drop the row, never fail the call.                                                              |
+| The pricebook has no entry                          | `creditsCharged = 0`, `priceKey` stored anyway, page the operator. The call still happens.                                                                                                               |
+| `record()` fails entirely                           | Log, increment `usage.record.write_failed`, return `null` exactly as today. The Run is unaffected.                                                                                                       |
+| The cap evaluator is down                           | Caps still refuse: `checkBudget` computes spend live on the hot path; the evaluator only _materialises_ state and fires threshold events. A stale `state` chip is a display lag, never a missed refusal. |
+| The credit ledger is unreachable at settlement      | Unchanged from today: best-effort, the Run is never failed, an `AI_CREDITS` notification fires.                                                                                                          |
+| The payment provider is unreachable                 | `BillingProviderNotConfiguredError` → `503`; the meters, breakdowns, caps and price list all still render (spec S13).                                                                                    |
+| Two concurrent cap crossings                        | The alert-state row's unique (cap, threshold, period) key makes the second a no-op; the decision writer uses the escalation `dedupKey` (`budget-stop:{capId}:{period}`) for the same reason.             |
+| A cap references an archived Agent                  | The row renders with `targetArchived: true` and only `Remove cap` (spec S21). Historical spend still resolves because usage rows carry no FK to `agents`.                                                |
+| An add-on's unit is deleted without the hook firing | `addon-reconcile` flips it to `orphan` within 24 h and stops billing it.                                                                                                                                 |
 
 ---
 
@@ -799,32 +829,32 @@ and new values: `spend_cap_created`, `spend_cap_updated`, `spend_cap_deleted`,
 
 ### 10.1 Unit — agent package (Jest)
 
-| File | Asserts |
-| --- | --- |
-| `packages/agent/src/subscriptions/billing/credit-pricebook.spec.ts` | Every entry has a positive credit price and a unit; **no price key equals any registered plugin id** (Constitution II); the historical map is frozen and contains every version ever shipped; `priceFor` returns 0 for `cached` and `failed`. |
-| `packages/agent/src/usage/usage-meter-classifier.spec.ts` | The classification function is total: every (capability, payer, kind) triple maps to exactly one meter; workspace-owned → `model`; platform → `credits`; unresolvable → `credits` + `unconfirmed`; a provisioned unit never reaches the classifier. |
-| `packages/agent/src/usage/plugin-usage.service.spec.ts` | `record()` stamps meter, payer, outcome, credits, price key, version and `missionId`; `missionId` is the one the caller passed from the run's Task, is `null` when the run had no Task, and is never read from the Agent; a classifier throw still writes a row; a repository throw returns `null` and does not rethrow. |
-| `packages/agent/src/subscriptions/credits/run-cost-settlement.service.spec.ts` | Settlement sums **only** `meter = 'credits'` rows; a Run made entirely on workspace-owned credentials produces no ledger row; the `run:{runId}` idempotency key still holds; the old provenance re-resolution path is gone. |
-| `packages/agent/src/budgets/budget-guard.service.spec.ts` | Workspace owner type resolves; the meter filter narrows correctly; the strictest of several caps wins and is named; a 100% cap refuses; `allowOverage` still permits on the legacy budgets and is absent on Workspace caps. |
-| `packages/agent/src/budgets/spend-cap.service.spec.ts` | Period arithmetic for `month` and the Agent rolling units; state transitions `ok → warning → stopped`; lowering below spend goes straight to `exceeded`; version conflict throws. |
-| `packages/agent/src/subscriptions/billing/auto-recharge.service.spec.ts` | A recharge crossing the monthly maximum places **no** provider call; the month counter rolls on a new `YYYY-MM`; the single-flight guard still holds; 3 consecutive failures disable. |
-| `packages/agent/src/subscriptions/billing/addon.service.spec.ts` | Pro-ration maths on add and remove for a 28-, 30- and 31-day period; the 25-per-kind limit; a `seat` code is refused; an orphan is never billed. |
-| `packages/agent/src/entities/__tests__/workspace-spend-cap.entity.spec.ts` | No `allowOverage` column exists; every date column is portable; both scope columns exist so `apps/api/src/scope/scope-stamping.subscriber.ts` will stamp them. |
-| `packages/agent/src/entities/__tests__/account-addon.entity.spec.ts` | Same shape checks plus the unique ref index name. |
+| File                                                                           | Asserts                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/subscriptions/billing/credit-pricebook.spec.ts`            | Every entry has a positive credit price and a unit; **no price key equals any registered plugin id** (Constitution II); the historical map is frozen and contains every version ever shipped; `priceFor` returns 0 for `cached` and `failed`.                                                                            |
+| `packages/agent/src/usage/usage-meter-classifier.spec.ts`                      | The classification function is total: every (capability, payer, kind) triple maps to exactly one meter; workspace-owned → `model`; platform → `credits`; unresolvable → `credits` + `unconfirmed`; a provisioned unit never reaches the classifier.                                                                      |
+| `packages/agent/src/usage/plugin-usage.service.spec.ts`                        | `record()` stamps meter, payer, outcome, credits, price key, version and `missionId`; `missionId` is the one the caller passed from the run's Task, is `null` when the run had no Task, and is never read from the Agent; a classifier throw still writes a row; a repository throw returns `null` and does not rethrow. |
+| `packages/agent/src/subscriptions/credits/run-cost-settlement.service.spec.ts` | Settlement sums **only** `meter = 'credits'` rows; a Run made entirely on workspace-owned credentials produces no ledger row; the `run:{runId}` idempotency key still holds; the old provenance re-resolution path is gone.                                                                                              |
+| `packages/agent/src/budgets/budget-guard.service.spec.ts`                      | Workspace owner type resolves; the meter filter narrows correctly; the strictest of several caps wins and is named; a 100% cap refuses; `allowOverage` still permits on the legacy budgets and is absent on Workspace caps.                                                                                              |
+| `packages/agent/src/budgets/spend-cap.service.spec.ts`                         | Period arithmetic for `month` and the Agent rolling units; state transitions `ok → warning → stopped`; lowering below spend goes straight to `exceeded`; version conflict throws.                                                                                                                                        |
+| `packages/agent/src/subscriptions/billing/auto-recharge.service.spec.ts`       | A recharge crossing the monthly maximum places **no** provider call; the month counter rolls on a new `YYYY-MM`; the single-flight guard still holds; 3 consecutive failures disable.                                                                                                                                    |
+| `packages/agent/src/subscriptions/billing/addon.service.spec.ts`               | Pro-ration maths on add and remove for a 28-, 30- and 31-day period; the 25-per-kind limit; a `seat` code is refused; an orphan is never billed.                                                                                                                                                                         |
+| `packages/agent/src/entities/__tests__/workspace-spend-cap.entity.spec.ts`     | No `allowOverage` column exists; every date column is portable; both scope columns exist so `apps/api/src/scope/scope-stamping.subscriber.ts` will stamp them.                                                                                                                                                           |
+| `packages/agent/src/entities/__tests__/account-addon.entity.spec.ts`           | Same shape checks plus the unique ref index name.                                                                                                                                                                                                                                                                        |
 
 ### 10.2 Controller specs — API (Jest, beside the controller)
 
-| File | Asserts |
-| --- | --- |
-| `apps/api/src/billing/meters.controller.spec.ts` | Three cards for each of the five periods; the pre-cutover residual is separate and never folded in; owner scoping; a 503 from the provider does not blank usage. |
-| `apps/api/src/billing/price-list.controller.spec.ts` | Readable with no provider configured; `?version=3` returns the frozen historical list; an unknown version 404s. |
-| `apps/api/src/budgets/spend-caps.controller.spec.ts` | Create / list / patch / delete across all five scopes; `409` on duplicate; `409 CAP_VERSION_CONFLICT` with the current value; `400 NODE_CEILING_READ_ONLY`; cross-user id is indistinguishable from missing; write requires billing permission. |
-| `apps/api/src/agents/agent-budget.controller.spec.ts` | `PUT` then `GET` returns the cap and a **non-zero** current spend from seeded usage rows; `DELETE` clears it; the legacy `GET /api/agents/:id/budget` returns the same numbers. |
-| `apps/api/src/billing/addons.controller.spec.ts` | Preview maths; `409` on the unique ref; `400 ADDON_LIMIT_REACHED` at 26; `400 SEAT_MANAGED_ELSEWHERE`. |
-| `apps/api/src/billing/billing.controller.spec.ts` (extended) | `PUT auto-recharge` with `enabled: true` and no `monthlyCapCents` → `400`; below $10 or above $2,000 → `400`; `monthlyUsedCents` is read-only. |
-| `apps/api/src/subscriptions/costs.controller.spec.ts` (extended) | `by-tool`, `by-mission`, `by-meter` return ranked rows capped at 10 plus `Everything else`; an unknown section 404s. |
-| `apps/api/src/subscriptions/credits.controller.spec.ts` (extended) | Export refuses above 50,000 rows and above 92 days **before** streaming; the new columns are present; the query allowlist rejects an unknown param. |
-| `apps/api/src/budgets/account-usage.controller.spec.ts` (**new** — the controller ships without one today) | `this-week` returns the three figures in the caller's timezone and `stoppedBy` when a cap is stopped. |
+| File                                                                                                       | Asserts                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/billing/meters.controller.spec.ts`                                                           | Three cards for each of the five periods; the pre-cutover residual is separate and never folded in; owner scoping; a 503 from the provider does not blank usage.                                                                                |
+| `apps/api/src/billing/price-list.controller.spec.ts`                                                       | Readable with no provider configured; `?version=3` returns the frozen historical list; an unknown version 404s.                                                                                                                                 |
+| `apps/api/src/budgets/spend-caps.controller.spec.ts`                                                       | Create / list / patch / delete across all five scopes; `409` on duplicate; `409 CAP_VERSION_CONFLICT` with the current value; `400 NODE_CEILING_READ_ONLY`; cross-user id is indistinguishable from missing; write requires billing permission. |
+| `apps/api/src/agents/agent-budget.controller.spec.ts`                                                      | `PUT` then `GET` returns the cap and a **non-zero** current spend from seeded usage rows; `DELETE` clears it; the legacy `GET /api/agents/:id/budget` returns the same numbers.                                                                 |
+| `apps/api/src/billing/addons.controller.spec.ts`                                                           | Preview maths; `409` on the unique ref; `400 ADDON_LIMIT_REACHED` at 26; `400 SEAT_MANAGED_ELSEWHERE`.                                                                                                                                          |
+| `apps/api/src/billing/billing.controller.spec.ts` (extended)                                               | `PUT auto-recharge` with `enabled: true` and no `monthlyCapCents` → `400`; below $10 or above $2,000 → `400`; `monthlyUsedCents` is read-only.                                                                                                  |
+| `apps/api/src/subscriptions/costs.controller.spec.ts` (extended)                                           | `by-tool`, `by-mission`, `by-meter` return ranked rows capped at 10 plus `Everything else`; an unknown section 404s.                                                                                                                            |
+| `apps/api/src/subscriptions/credits.controller.spec.ts` (extended)                                         | Export refuses above 50,000 rows and above 92 days **before** streaming; the new columns are present; the query allowlist rejects an unknown param.                                                                                             |
+| `apps/api/src/budgets/account-usage.controller.spec.ts` (**new** — the controller ships without one today) | `this-week` returns the three figures in the caller's timezone and `stoppedBy` when a cap is stopped.                                                                                                                                           |
 
 ### 10.3 Web unit (Vitest, beside the component)
 
@@ -843,17 +873,17 @@ and new values: `spend_cap_created`, `spend_cap_updated`, `spend_cap_deleted`,
 
 ### 10.4 End-to-end (Playwright, `apps/web/e2e/`)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/e2e/billing-three-meters.spec.ts` | S1, S3, S29, S13 — the cards, the breakdowns, the zero states, the payments-off deployment. |
-| `apps/web/e2e/billing-price-list.spec.ts` | S2, S28 — the list renders without payments, a historical version is reachable, nothing is re-priced. |
-| `apps/web/e2e/spend-caps-crud.spec.ts` | S6, S19, S20, S21 — create, lower below spend, version conflict, archived target. |
-| `apps/web/e2e/spend-cap-stops-a-run.spec.ts` | S7, S12 — a cap refuses, the Run stops with the reason, the decision appears, raising it from the decision lifts the stop. |
-| `apps/web/e2e/auto-recharge-ceiling.spec.ts` | S8 — the ceiling refuses, no card is contacted, one decision per month. |
-| `apps/web/e2e/addons-lifecycle.spec.ts` | S9, S10 — pro-rated add, pro-rated remove, credits untouched. |
-| `apps/web/e2e/run-receipt-cost-meters.spec.ts` | S4, S5, S15, S16, S17, S24 — itemisation, own-account labelling, cached and failed at zero, forced fresh, aged out. |
-| `apps/web/e2e/spend-permissions.spec.ts` | S25, S26 — read-only teammate, cross-account id. |
-| `apps/web/e2e/home-week-spend.spec.ts` | S1, S11 — the Home line, the stopped state, the links. |
+| File                                           | Covers                                                                                                                     |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/e2e/billing-three-meters.spec.ts`    | S1, S3, S29, S13 — the cards, the breakdowns, the zero states, the payments-off deployment.                                |
+| `apps/web/e2e/billing-price-list.spec.ts`      | S2, S28 — the list renders without payments, a historical version is reachable, nothing is re-priced.                      |
+| `apps/web/e2e/spend-caps-crud.spec.ts`         | S6, S19, S20, S21 — create, lower below spend, version conflict, archived target.                                          |
+| `apps/web/e2e/spend-cap-stops-a-run.spec.ts`   | S7, S12 — a cap refuses, the Run stops with the reason, the decision appears, raising it from the decision lifts the stop. |
+| `apps/web/e2e/auto-recharge-ceiling.spec.ts`   | S8 — the ceiling refuses, no card is contacted, one decision per month.                                                    |
+| `apps/web/e2e/addons-lifecycle.spec.ts`        | S9, S10 — pro-rated add, pro-rated remove, credits untouched.                                                              |
+| `apps/web/e2e/run-receipt-cost-meters.spec.ts` | S4, S5, S15, S16, S17, S24 — itemisation, own-account labelling, cached and failed at zero, forced fresh, aged out.        |
+| `apps/web/e2e/spend-permissions.spec.ts`       | S25, S26 — read-only teammate, cross-account id.                                                                           |
+| `apps/web/e2e/home-week-spend.spec.ts`         | S1, S11 — the Home line, the stopped state, the links.                                                                     |
 
 Every e2e follows the existing house conventions in `apps/web/e2e/COVERAGE.md` and prefers
 `getByTestId` over `getByRole` on these dense tables — `*ByRole` is the usual flake source in this
@@ -867,7 +897,7 @@ Each phase is independently shippable and leaves `develop` green and deployable.
 
 ### P1 — Separate the meters (migration `1791170000000`)
 
-*Delivers spec FR-1…FR-34, FR-65…FR-74, FR-79…FR-88.*
+_Delivers spec FR-1…FR-34, FR-65…FR-74, FR-79…FR-88._
 
 1. Contracts: `packages/contracts/src/billing/meter.types.ts` + the constants.
 2. Entity columns + indexes on `plugin-usage-event.entity.ts`, migration, `missionId` backfill.
@@ -888,7 +918,7 @@ exactly as before for credits-meter spend.
 
 ### P2 — Caps that stop (migration `1791170100000`)
 
-*Delivers spec FR-42…FR-64.*
+_Delivers spec FR-42…FR-64._
 
 1. `BudgetOwnerType.WORKSPACE`, `workspace_spend_caps`, `meter` on both existing budget tables,
    auto-recharge ceiling columns, migration with the $100 backfill.
@@ -903,7 +933,7 @@ exactly as before for credits-meter spend.
 
 ### P3 — Add-ons (migration `1791170200000`)
 
-*Delivers spec FR-35…FR-41.*
+_Delivers spec FR-35…FR-41._
 
 1. `account_addons` + migration with the `pending` backfill.
 2. `AddonService` — pro-ration, provider quantity updates through the existing

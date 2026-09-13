@@ -14,10 +14,11 @@ green.
 `cd apps/api && pnpm typeorm migration:run -d typeorm.config.ts`.
 
 **Two standing rules for this epic.**
+
 1. Nothing existing is deleted, renamed or reordered. If a task looks like it
    needs to, stop and re-read [plan.md §12](./plan.md#12-constitution-compliance).
 2. Every i18n leaf name is camelCase and contains **no literal dot**. A missing
-   *parent* key collapses a whole locale subtree.
+   _parent_ key collapses a whole locale subtree.
 
 ---
 
@@ -122,6 +123,7 @@ plus the pure functions `selectBlueprint`, `laneCapForTeamSize` and
 `proposeRoster`.
 
 Rules to encode:
+
 - `lanes[0].isCoordinator === true` in every blueprint (FR-8).
 - `selectBlueprint` counts votes, breaks ties on `ROSTER_BLUEPRINT_SLUGS` order,
   and returns `general` for an empty or unrecognised role list (FR-3, FR-4).
@@ -178,6 +180,7 @@ loosened.
 
 **Phase:** P1
 **Modify:**
+
 - `packages/agent/src/entities/agent.entity.ts` — add
   `@Column({ type: 'varchar', length: 32, nullable: true }) lane?: string | null;`
   with a doc comment stating it is a label, carries no authorization weight
@@ -203,6 +206,7 @@ created without a lane still round-trips.
 **Create:** `apps/api/src/migrations/1791200000000-AddAgentLane.ts`
 
 Class `AddAgentLane1791200000000`. `up()`:
+
 1. `if (!(await queryRunner.hasColumn('agents', 'lane')))` → `addColumn` nullable
    `varchar(32)`.
 2. Create the partial unique index
@@ -237,15 +241,15 @@ its result to the caller and persists nothing.
 
 1. `queued → creating`. For each lane **in blueprint order, sequentially**
    (FR-12 — copy the rationale comment from `role-seeding.service.ts`):
-   - if an agent of this user already holds `lane`, record `reused` and continue
-     (FR-15);
-   - else `createFromTemplate(userId, templateSlug, { name, lane })`;
-   - on `ConflictException`, retry with ` 2` … ` 9` appended; all taken →
-     `failed: nameUnavailable` for that lane only (FR-18);
-   - on `SeatLimitExceededError` → this lane and **every remaining lane**
-     `skippedNoSeat`, break the loop (FR-19);
-   - each attempt is abandoned after **20 s**, retried at most twice with a
-     **5 s** gap (FR-13).
+    - if an agent of this user already holds `lane`, record `reused` and continue
+      (FR-15);
+    - else `createFromTemplate(userId, templateSlug, { name, lane })`;
+    - on `ConflictException`, retry with ` 2` … ` 9` appended; all taken →
+      `failed: nameUnavailable` for that lane only (FR-18);
+    - on `SeatLimitExceededError` → this lane and **every remaining lane**
+      `skippedNoSeat`, break the loop (FR-19);
+    - each attempt is abandoned after **20 s**, retried at most twice with a
+      **5 s** gap (FR-13).
 2. `creating → binding`. For each created agent: attach the template's
    `suggestedSkills` (a failure appends to `skillWarnings` and never fails the
    lane — FR-23); set `reportsToAgentId` to the coordinator on every
@@ -288,6 +292,7 @@ lane already held being reused rather than duplicated.
 
 **Phase:** P1
 **Create:**
+
 - `packages/agent/src/tasks/roster-provision.types.ts` —
   `RosterProvisionPayload { userId; organizationId: string | null; runId; blueprintSlug; lanes }`
 - `packages/agent/src/tasks/roster-provision-dispatcher.ts` —
@@ -306,6 +311,7 @@ exactly — one types file, one dispatcher file, no imports beyond the payload t
 
 **Phase:** P1
 **Modify:**
+
 - `packages/agent/src/tasks/index.ts` — two export lines.
 - `packages/agent/src/tasks/_tasks-symbols.ts` — add
   `'ROSTER_PROVISION_DISPATCHER'` in **alphabetical** position, with a one-line
@@ -316,6 +322,7 @@ exactly — one types file, one dispatcher file, no imports beyond the payload t
   and the `BuildJobRuntimeProvidersOptions.symbols` note.
 
 **Modify (tests):**
+
 - `packages/agent/src/tasks/__tests__/job-runtime.providers.spec.ts` — arity pin
   `11 → 12`, plus an assertion that `ROSTER_PROVISION_DISPATCHER` resolves to the
   active provider's dispatchers view.
@@ -336,11 +343,12 @@ symbol binds automatically through `...buildJobRuntimeProviders()`.
 `task({ id: 'roster-provision', maxDuration: 180 })`, booting the transient Nest
 context the sibling tasks in this folder use, resolving `RosterProvisioningService`
 and calling `execute(payload.runId, payload)`. Log with the Trigger SDK logger
-(this file *does* run inside a task — see the note in
+(this file _does_ run inside a task — see the note in
 `packages/tasks/src/dispatchers/workflow-run.dispatcher.ts` about which logger is
 correct where).
 
 **Modify:**
+
 - `packages/tasks/src/tasks/trigger/index.ts` — one export line.
 - `packages/tasks/src/trigger/trigger.service.ts` — add
   `dispatchRosterProvision(payload)` following `dispatchWorkGeneration` (line 413)
@@ -397,6 +405,7 @@ Refuse provisioning with `403` before any write when the caller cannot create
 agents (FR-63).
 
 **Modify:**
+
 - `apps/api/src/onboarding/onboarding.module.ts` — register the controller and the
   new provider bindings. `AgentsModule` from `@ever-works/agent/agents` is already
   imported (see its comment at lines 17–20); do not import it twice.
@@ -431,6 +440,7 @@ dispatcher result records `failed` rather than pretending success.
 
 **Phase:** P1
 **Modify:**
+
 - `apps/web/src/components/onboarding/useOnboardingFlow.ts` — add `'roster'` to
   `WizardStepKind` and push `{ kind: 'roster', id: 'roster' }` in
   `computeStepList` **between** the `profile` push and the `communication` push.
@@ -477,6 +487,7 @@ posture.
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/src/components/onboarding/steps/RosterStep.tsx`
 - `apps/web/src/components/onboarding/steps/RosterStep.unit.spec.tsx`
 
@@ -502,6 +513,7 @@ through `useTranslations('onboarding.rosterStep')`.
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/src/components/get-started/RosterProvisionProgress.tsx`
 - `apps/web/src/components/get-started/RosterProvisionProgress.unit.spec.tsx`
 - `apps/web/src/components/get-started/RosterIntroduction.tsx`
@@ -543,6 +555,7 @@ console-error check) is green.
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/e2e/onboarding-roster-provisioning.spec.ts` — the golden path: the
   step appears in the wizard, provisioning runs, every lane reports a terminal
   outcome, the introduction lists every agent with its lane and reporting line,
@@ -593,6 +606,7 @@ semantics, the same dodge `Agent.scopeTargetId` uses) so a later reader does not
 
 **Phase:** P2
 **Modify:**
+
 - `packages/agent/src/entities/index.ts` — barrel export
 - `packages/agent/src/database/_entity-names.ts` — `'OnboardingChecklist'` in
   alphabetical position
@@ -646,6 +660,7 @@ run, and `down()` leaves no orphan index.
 
 **Phase:** P2
 **Create:**
+
 - `apps/api/src/onboarding/dto/onboarding-checklist.dto.ts` —
   `SkipMilestoneDto` (`@IsIn(ONBOARDING_MILESTONES)`), `StarterTaskDto`
   (`briefId?`, `customBrief?` with `@MaxLength(10_000)`, `laneKey`),
@@ -712,6 +727,7 @@ controller and the service.
 
 **Phase:** P2
 **Create:**
+
 - `apps/api/src/onboarding/onboarding-checklist.controller.spec.ts` — lazy row
   creation on first read; skip/unskip changing the denominator; hide/show/dismiss
   transitions; `private, no-store`; the starter-task handler creating exactly one
@@ -752,6 +768,7 @@ absent from the tuple.
 
 **Phase:** P2
 **Modify:**
+
 - `apps/web/src/lib/constants.ts` — `DASHBOARD_GET_STARTED: '/get-started'` in the
   `ROUTES` block with a one-line comment naming the epic, matching the file's
   existing commenting style.
@@ -785,6 +802,7 @@ checklist read leaves every other block on the dashboard untouched.
 
 **Phase:** P2
 **Create:**
+
 - `apps/web/src/components/get-started/SetupChecklistCard.tsx`
 - `apps/web/src/components/get-started/MilestoneRow.tsx`
 - `apps/web/src/components/get-started/SetupChecklistCard.unit.spec.tsx`
@@ -807,6 +825,7 @@ completed state, and that the card renders nothing when hidden or dismissed.
 
 **Phase:** P2
 **Create:**
+
 - `apps/web/src/app/[locale]/(dashboard)/get-started/page.tsx`
 - `apps/web/src/app/[locale]/(dashboard)/get-started/get-started-client.tsx`
 - `apps/web/src/components/get-started/SetupChecklistPanel.tsx`
@@ -859,6 +878,7 @@ under 280 characters in English.
 
 **Phase:** P2
 **Create:**
+
 - `apps/web/e2e/onboarding-first-hour-checklist.spec.ts` — the card renders on
   Home with the right count; skip and undo; hide and reopen from Help; the
   `/get-started` page renders every section.
@@ -880,6 +900,7 @@ first hour on an existing workspace.
 
 **Phase:** P3
 **Modify:**
+
 - `packages/agent/src/agents/roster-provisioning.service.ts` — accept an optional
   `laneKeys` filter so a repair run attempts only the named lanes.
 - `apps/api/src/onboarding/dto/onboarding-roster.dto.ts` — `ProvisionRosterDto`
@@ -942,6 +963,7 @@ completed checklist.
 
 **Phase:** P3
 **Modify:**
+
 - `docs/specs/features/agent-workspace/TRACKER.md` — mark AW-20 spec/plan/tasks
   complete and record the implementation status per phase, including the capabilities
   this epic delivers.
@@ -955,52 +977,52 @@ completed checklist.
 
 ## Task index
 
-| # | Task | Phase | Kind |
-| --- | --- | --- | --- |
-| T-01 | Contracts: roster vocabulary | P1 | create |
-| T-02 | Contracts: first-hour vocabulary | P1 | create |
-| T-03 | Contracts: barrel exports | P1 | modify |
-| T-04 | The coordinator agent template | P1 | modify |
-| T-05 | The blueprint catalogue | P1 | create |
-| T-06 | Blueprint catalogue spec | P1 | test |
-| T-07 | Extend the agent-template integrity suite | P1 | test |
-| T-08 | `lane` on the Agent entity and DTOs | P1 | modify |
-| T-09 | Migration — `agents.lane` | P1 | migration |
-| T-10 | The provisioning service | P1 | create |
-| T-11 | Provisioning service spec | P1 | test |
-| T-12 | Dispatcher symbol and payload | P1 | create |
-| T-13 | Register the dispatcher (three pin lists) | P1 | modify |
-| T-14 | The background task and its dispatch method | P1 | create |
-| T-15 | Roster DTOs | P1 | create |
-| T-16 | The roster controller | P1 | create |
-| T-17 | Roster controller spec | P1 | test |
-| T-18 | Wizard step registration | P1 | modify |
-| T-19 | Server actions and API client for the roster | P1 | create |
-| T-20 | The roster step component | P1 | create |
-| T-21 | Progress panel and introduction | P1 | create |
-| T-22 | i18n — P1 keys | P1 | i18n |
-| T-23 | P1 end-to-end | P1 | test |
-| T-24 | Entity — `OnboardingChecklist` | P2 | create |
-| T-25 | Entity registration (four files) | P2 | modify |
-| T-26 | Repository | P2 | create |
-| T-27 | Migration — `onboarding_checklists` | P2 | migration |
-| T-28 | Checklist DTOs and the starter catalogues | P2 | create |
-| T-29 | The checklist service | P2 | create |
-| T-30 | The checklist controller | P2 | create |
-| T-31 | Checklist specs | P2 | test |
-| T-32 | Telemetry allow-list — the checklist events | P2 | modify |
-| T-33 | Route constant and layout wiring | P2 | modify |
-| T-34 | Server actions and API client for the checklist | P2 | create |
-| T-35 | The Home card | P2 | create |
-| T-36 | The `/get-started` page | P2 | create |
-| T-37 | The standalone roster dialog | P2 | create |
-| T-38 | i18n — P2 keys | P2 | i18n |
-| T-39 | P2 end-to-end | P2 | test |
-| T-40 | Per-lane repair | P3 | modify |
-| T-41 | Blueprint switching (add-only) | P3 | modify |
-| T-42 | Second-person checklist | P3 | modify |
-| T-43 | Completion funnel | P3 | modify |
-| T-44 | Documentation | P3 | docs |
+| #    | Task                                            | Phase | Kind      |
+| ---- | ----------------------------------------------- | ----- | --------- |
+| T-01 | Contracts: roster vocabulary                    | P1    | create    |
+| T-02 | Contracts: first-hour vocabulary                | P1    | create    |
+| T-03 | Contracts: barrel exports                       | P1    | modify    |
+| T-04 | The coordinator agent template                  | P1    | modify    |
+| T-05 | The blueprint catalogue                         | P1    | create    |
+| T-06 | Blueprint catalogue spec                        | P1    | test      |
+| T-07 | Extend the agent-template integrity suite       | P1    | test      |
+| T-08 | `lane` on the Agent entity and DTOs             | P1    | modify    |
+| T-09 | Migration — `agents.lane`                       | P1    | migration |
+| T-10 | The provisioning service                        | P1    | create    |
+| T-11 | Provisioning service spec                       | P1    | test      |
+| T-12 | Dispatcher symbol and payload                   | P1    | create    |
+| T-13 | Register the dispatcher (three pin lists)       | P1    | modify    |
+| T-14 | The background task and its dispatch method     | P1    | create    |
+| T-15 | Roster DTOs                                     | P1    | create    |
+| T-16 | The roster controller                           | P1    | create    |
+| T-17 | Roster controller spec                          | P1    | test      |
+| T-18 | Wizard step registration                        | P1    | modify    |
+| T-19 | Server actions and API client for the roster    | P1    | create    |
+| T-20 | The roster step component                       | P1    | create    |
+| T-21 | Progress panel and introduction                 | P1    | create    |
+| T-22 | i18n — P1 keys                                  | P1    | i18n      |
+| T-23 | P1 end-to-end                                   | P1    | test      |
+| T-24 | Entity — `OnboardingChecklist`                  | P2    | create    |
+| T-25 | Entity registration (four files)                | P2    | modify    |
+| T-26 | Repository                                      | P2    | create    |
+| T-27 | Migration — `onboarding_checklists`             | P2    | migration |
+| T-28 | Checklist DTOs and the starter catalogues       | P2    | create    |
+| T-29 | The checklist service                           | P2    | create    |
+| T-30 | The checklist controller                        | P2    | create    |
+| T-31 | Checklist specs                                 | P2    | test      |
+| T-32 | Telemetry allow-list — the checklist events     | P2    | modify    |
+| T-33 | Route constant and layout wiring                | P2    | modify    |
+| T-34 | Server actions and API client for the checklist | P2    | create    |
+| T-35 | The Home card                                   | P2    | create    |
+| T-36 | The `/get-started` page                         | P2    | create    |
+| T-37 | The standalone roster dialog                    | P2    | create    |
+| T-38 | i18n — P2 keys                                  | P2    | i18n      |
+| T-39 | P2 end-to-end                                   | P2    | test      |
+| T-40 | Per-lane repair                                 | P3    | modify    |
+| T-41 | Blueprint switching (add-only)                  | P3    | modify    |
+| T-42 | Second-person checklist                         | P3    | modify    |
+| T-43 | Completion funnel                               | P3    | modify    |
+| T-44 | Documentation                                   | P3    | docs      |
 
 **44 tasks · P1 = T-01…T-23 · P2 = T-24…T-39 · P3 = T-40…T-44.**
 </content>

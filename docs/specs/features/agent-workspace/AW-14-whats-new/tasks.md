@@ -83,6 +83,7 @@ in the doc comment so a later scope sweep does not "fix" them.
 
 **Phase:** P1
 **Modify:**
+
 - `packages/agent/src/entities/index.ts` — add `export * from './product-changelog-read.entity';`
 - `packages/agent/src/database/_entity-names.ts` — add `'ProductChangelogRead'` to
   `AGENT_ENTITY_NAMES` in alphabetical position
@@ -202,13 +203,13 @@ uppercase letter or a `/`.
 `@Header('Cache-Control', 'private, no-store')` on every handler. Routes and throttles exactly
 as [plan.md §4](./plan.md#4-api-surface):
 
-| Handler | Route | Throttle |
-| --- | --- | --- |
-| `list` | `GET /` | `{ long: { limit: 120, ttl: 60_000 } }` |
+| Handler       | Route               | Throttle                                |
+| ------------- | ------------------- | --------------------------------------- |
+| `list`        | `GET /`             | `{ long: { limit: 120, ttl: 60_000 } }` |
 | `unreadCount` | `GET /unread-count` | `{ long: { limit: 120, ttl: 60_000 } }` |
-| `getOne` | `GET /:slug` | `{ long: { limit: 120, ttl: 60_000 } }` |
-| `markRead` | `POST /read` | `{ long: { limit: 60, ttl: 60_000 } }` |
-| `markAllRead` | `POST /read-all` | `{ long: { limit: 10, ttl: 60_000 } }` |
+| `getOne`      | `GET /:slug`        | `{ long: { limit: 120, ttl: 60_000 } }` |
+| `markRead`    | `POST /read`        | `{ long: { limit: 60, ttl: 60_000 } }`  |
+| `markAllRead` | `POST /read-all`    | `{ long: { limit: 10, ttl: 60_000 } }`  |
 
 `GET /unread-count` **must** be declared before `GET /:slug`. `getOne` returns `404` with an
 identical body for absent and scheduled entries. Full `@ApiOperation` / `@ApiQuery` /
@@ -384,6 +385,7 @@ and surfaces nothing to the reader (spec FR-48). Calls back with the server's fr
 
 **Phase:** P1
 **Modify:**
+
 - `apps/web/src/app/[locale]/(dashboard)/layout.tsx` — add
   `changelogAPI.unreadCount().catch(() => null)` as an 8th entry in the existing `Promise.all`
   and pass `changelogUnreadCount` down
@@ -490,7 +492,7 @@ Run `pnpm lint`, `pnpm type-check`, `cd packages/agent && pnpm test`,
 `cd apps/api && pnpm test`, `cd apps/web && pnpm test`, and the two new Playwright specs.
 
 **Done when:** all green, and a manual pass confirms the [spec.md §8](./spec.md#8-acceptance-criteria)
-checklist items under *Count and read state* and *Failure and degradation*.
+checklist items under _Count and read state_ and _Failure and degradation_.
 
 ---
 
@@ -661,7 +663,7 @@ Add `/whats-new` to the swept route list, and add an assertion pass over the ope
 **Phase:** P2
 
 Full command sweep as T-30, plus a manual pass over the [spec.md §8](./spec.md#8-acceptance-criteria)
-checklist items under *Catalogue and publishing*, *Surfaces* and *Filters*.
+checklist items under _Catalogue and publishing_, _Surfaces_ and _Filters_.
 
 ---
 
@@ -712,8 +714,8 @@ understands; when to set a CTA and when not to; how to schedule an entry with a 
 `publishedAt`; and the fact that `changelog.catalog.spec.ts` will fail the build before a
 reviewer has to.
 
-The PR template gains one line: *"Does this change need a What's-new entry? (see
-`apps/api/src/changelog/README.md`)"*.
+The PR template gains one line: _"Does this change need a What's-new entry? (see
+`apps/api/src/changelog/README.md`)"_.
 
 **Done when:** a contributor who has never seen this epic can add a correct entry using the
 README alone.
@@ -751,52 +753,53 @@ control).
 
 ## Task index
 
-| # | Task | Phase |
-| --- | --- | --- |
-| T-01 | Contracts: category and kind enums | P1 |
-| T-02 | Contracts: wire DTOs | P1 |
-| T-03 | Contracts: barrel exports | P1 |
-| T-04 | Entity: `ProductChangelogRead` | P1 |
-| T-05 | Entity registration (4 files) | P1 |
-| T-06 | Repository + inventory + barrel | P1 |
-| T-07 | Migration `1791140000000-CreateProductChangelogReads.ts` | P1 |
-| T-08 | The catalogue | P1 |
-| T-09 | Changelog service | P1 |
-| T-10 | `MarkChangelogReadDto` | P1 |
-| T-11 | Controller | P1 |
-| T-12 | Module registration | P1 |
-| T-13 | Service spec | P1 |
-| T-14 | Controller spec | P1 |
-| T-15 | Web API client | P1 |
-| T-16 | Server actions | P1 |
-| T-17 | Top-bar control | P1 |
-| T-18 | Panel shell | P1 |
-| T-19 | Entry card | P1 |
-| T-20 | Shared list body | P1 |
-| T-21 | Read tracker hook | P1 |
-| T-22 | Shell wiring | P1 |
-| T-23 | i18n — English | P1 |
-| T-24 | i18n — 20 locales | P1 |
-| T-25 | Unit spec — control | P1 |
-| T-26 | Unit spec — panel | P1 |
-| T-27 | Unit spec — read tracker | P1 |
-| T-28 | E2E — golden path | P1 |
-| T-29 | E2E — degradation | P1 |
-| T-30 | Phase 1 gate | P1 |
-| T-31 | Safe in-app path helper | P2 |
-| T-32 | Catalogue spec — CI authoring gate | P2 |
-| T-33 | Pinning | P2 |
-| T-34 | Filter chips | P2 |
-| T-35 | Call-to-action rendering | P2 |
-| T-36 | Route constant + page metadata | P2 |
-| T-37 | Full page | P2 |
-| T-38 | Discovery links | P2 |
-| T-39 | E2E — the page | P2 |
-| T-40 | Accessibility sweep | P2 |
-| T-41 | Phase 2 gate | P2 |
-| T-42 | Telemetry | P3 |
-| T-43 | Focus-refresh of the count | P3 |
-| T-44 | Authoring guide + PR-template line | P3 |
-| T-45 | Orphan-read prune (conditional) | P3 |
-| T-46 | Phase 3 gate and close-out | P3 |
+| #    | Task                                                     | Phase |
+| ---- | -------------------------------------------------------- | ----- |
+| T-01 | Contracts: category and kind enums                       | P1    |
+| T-02 | Contracts: wire DTOs                                     | P1    |
+| T-03 | Contracts: barrel exports                                | P1    |
+| T-04 | Entity: `ProductChangelogRead`                           | P1    |
+| T-05 | Entity registration (4 files)                            | P1    |
+| T-06 | Repository + inventory + barrel                          | P1    |
+| T-07 | Migration `1791140000000-CreateProductChangelogReads.ts` | P1    |
+| T-08 | The catalogue                                            | P1    |
+| T-09 | Changelog service                                        | P1    |
+| T-10 | `MarkChangelogReadDto`                                   | P1    |
+| T-11 | Controller                                               | P1    |
+| T-12 | Module registration                                      | P1    |
+| T-13 | Service spec                                             | P1    |
+| T-14 | Controller spec                                          | P1    |
+| T-15 | Web API client                                           | P1    |
+| T-16 | Server actions                                           | P1    |
+| T-17 | Top-bar control                                          | P1    |
+| T-18 | Panel shell                                              | P1    |
+| T-19 | Entry card                                               | P1    |
+| T-20 | Shared list body                                         | P1    |
+| T-21 | Read tracker hook                                        | P1    |
+| T-22 | Shell wiring                                             | P1    |
+| T-23 | i18n — English                                           | P1    |
+| T-24 | i18n — 20 locales                                        | P1    |
+| T-25 | Unit spec — control                                      | P1    |
+| T-26 | Unit spec — panel                                        | P1    |
+| T-27 | Unit spec — read tracker                                 | P1    |
+| T-28 | E2E — golden path                                        | P1    |
+| T-29 | E2E — degradation                                        | P1    |
+| T-30 | Phase 1 gate                                             | P1    |
+| T-31 | Safe in-app path helper                                  | P2    |
+| T-32 | Catalogue spec — CI authoring gate                       | P2    |
+| T-33 | Pinning                                                  | P2    |
+| T-34 | Filter chips                                             | P2    |
+| T-35 | Call-to-action rendering                                 | P2    |
+| T-36 | Route constant + page metadata                           | P2    |
+| T-37 | Full page                                                | P2    |
+| T-38 | Discovery links                                          | P2    |
+| T-39 | E2E — the page                                           | P2    |
+| T-40 | Accessibility sweep                                      | P2    |
+| T-41 | Phase 2 gate                                             | P2    |
+| T-42 | Telemetry                                                | P3    |
+| T-43 | Focus-refresh of the count                               | P3    |
+| T-44 | Authoring guide + PR-template line                       | P3    |
+| T-45 | Orphan-read prune (conditional)                          | P3    |
+| T-46 | Phase 3 gate and close-out                               | P3    |
+
 </content>

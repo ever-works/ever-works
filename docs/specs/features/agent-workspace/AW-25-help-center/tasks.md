@@ -59,6 +59,7 @@ to the API barrel, following the existing one-line comment style naming the epic
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/src/content/help/README.md`
 - `apps/web/src/content/help/{start-here,running-the-loop,your-agents,setup-and-connections,money-and-limits,when-something-goes-wrong}/.gitkeep`
 
@@ -189,6 +190,7 @@ and the panel opens there, with no navigation.
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/src/components/help/HelpArticleBlocks.tsx`
 - `apps/web/src/components/help/HelpOnThisPage.tsx`
 - `apps/web/src/components/help/HelpRelated.tsx`
@@ -240,6 +242,7 @@ disabled screen action announces its reason to screen readers.
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/src/components/help/HelpBrowse.tsx`
 - `apps/web/src/components/help/HelpSearchInput.tsx`
 - `apps/web/src/components/help/HelpSearchResults.tsx`
@@ -303,6 +306,7 @@ chat panel, sidebar persistence and toast behaviour are unchanged.
 
 **Phase:** P1
 **Modify:**
+
 - `apps/web/src/components/dashboard/DashboardHeader.tsx` — the Help button tooltip uses
   `dashboard.helpCenter.openTooltip` (`Help — press ?`).
 - `apps/web/src/components/dashboard/DashboardSidebar.tsx` — `profileMenu.helpDocs` opens the
@@ -319,6 +323,7 @@ the drawer on its Shortcuts tab, and no existing entry changed target except `he
 **Modify:** `apps/web/src/lib/constants.ts` — add `DASHBOARD_HELP = '/help'` and
 `DASHBOARD_HELP_ARTICLE = (slug: string) => '/help/' + slug` to `ROUTES`.
 **Create:**
+
 - `apps/web/src/app/[locale]/(dashboard)/help/page.tsx`
 - `apps/web/src/app/[locale]/(dashboard)/help/[slug]/page.tsx`
 - `apps/web/src/components/help/HelpArticleNotInBuild.tsx`
@@ -355,6 +360,7 @@ place without a navigation event.
 
 **Phase:** P1
 **Modify:**
+
 - `apps/web/src/components/common/EmptyState.tsx` — add an optional `helpTarget?: HelpTarget` prop
   that renders `<HelpLink variant="emptyState"/>` after the existing action. Existing call sites
   must be unaffected.
@@ -370,6 +376,7 @@ title, description or primary action changed.
 
 **Phase:** P1
 **Modify:**
+
 - `apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx` — one
   `<HelpLink variant="error"/>` in the existing action row.
 - `apps/web/src/components/dashboard/AttentionSection.tsx` — one `<HelpLink variant="error"/>` per
@@ -407,14 +414,14 @@ covering the 12 most-visited dashboard screens (spec FR-9).
 
 Suggested opening set, one file each:
 
-| Section | Articles |
-| --- | --- |
-| `start-here` | what this product does for you · your first hour · how to brief an agent so it lands |
-| `running-the-loop` | missions · tasks · my decisions · the live feed |
-| `your-agents` | agents · skills · memory and the knowledge base · runs and what they cost · schedules and triggers |
-| `setup-and-connections` | connecting accounts and what an agent may touch · organizations, workspaces and teams · notifications |
-| `money-and-limits` | what it costs and how to cap it · credits, plans and invoices |
-| `when-something-goes-wrong` | when an agent is stuck · when background work isn't running · reading a failure |
+| Section                     | Articles                                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `start-here`                | what this product does for you · your first hour · how to brief an agent so it lands                  |
+| `running-the-loop`          | missions · tasks · my decisions · the live feed                                                       |
+| `your-agents`               | agents · skills · memory and the knowledge base · runs and what they cost · schedules and triggers    |
+| `setup-and-connections`     | connecting accounts and what an agent may touch · organizations, workspaces and teams · notifications |
+| `money-and-limits`          | what it costs and how to cap it · credits, plans and invoices                                         |
+| `when-something-goes-wrong` | when an agent is stuck · when background work isn't running · reading a failure                       |
 
 Every article must document only screens that exist in this build (spec FR-6) and set a
 `reviewedAt` of the day it was written.
@@ -428,6 +435,7 @@ and every `helpTarget` used in T-19 and T-20 resolves.
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/src/lib/help/help-catalog.unit.spec.ts`
 - `apps/web/src/lib/help/help-target.unit.spec.ts`
 - `apps/web/src/lib/help/help-search.unit.spec.ts`
@@ -458,6 +466,7 @@ the suite with a message naming the article.
 
 **Phase:** P1
 **Create:**
+
 - `apps/web/e2e/help-center.spec.ts` — `?` from four screens and ignored inside a text field; header
   control; sidebar entry; browse → article → `Esc`; the build stamp matches the footer's version;
   `/help` and `/help/[slug]` render inside the shell and require a session.
@@ -561,6 +570,7 @@ event (spec FR-19).
 
 **Phase:** P2
 **Create:**
+
 - `apps/web/src/lib/help/help-recents.ts`
 - `apps/web/src/components/help/hooks/use-help-recents.ts`
 
@@ -607,6 +617,7 @@ network disabled, and AW-01's existing `Open Help` command still works.
 
 **Phase:** P2
 **Create:**
+
 - `apps/web/src/lib/help/help-recents.unit.spec.ts`
 - `apps/web/src/components/help/hooks/use-help-content.unit.spec.ts`
 - `apps/web/e2e/help-search.spec.ts`
@@ -647,6 +658,7 @@ the note that `articleId = NULL` rows are deliberately not collapsed by the uniq
 
 **Phase:** P3
 **Modify:**
+
 - `packages/agent/src/entities/index.ts` — `export * from './help-article-feedback.entity';`
 - `packages/agent/src/database/_entity-names.ts` — add `'HelpArticleFeedback'` in alphabetical
   position
@@ -695,13 +707,14 @@ removes only this table.
 
 **Phase:** P3
 **Create:**
+
 - `apps/api/src/help/help.module.ts`
 - `apps/api/src/help/help.controller.ts`
 - `apps/api/src/help/help-feedback.service.ts`
 - `apps/api/src/help/credential-shape.ts`
 - `apps/api/src/help/dto/help-feedback.dto.ts`
-**Modify:** `apps/api/src/api.module.ts` — register `HelpModule` alongside the other feature
-modules.
+  **Modify:** `apps/api/src/api.module.ts` — register `HelpModule` alongside the other feature
+  modules.
 
 Follow `apps/api/src/agent-approvals/agent-approvals.controller.ts` for shape: `@ApiTags('help')`,
 `@Controller('api/help')`, `@CurrentUser()`, a header comment listing the routes, and `@Throttle` on
@@ -732,10 +745,11 @@ upstream `422` and `429` onto the two copy keys without leaking the upstream bod
 
 **Phase:** P3
 **Create:**
+
 - `apps/web/src/components/help/HelpFeedback.tsx`
 - `apps/web/src/components/help/hooks/use-help-feedback.ts`
-**Modify:** `apps/web/src/components/help/HelpArticleReader.tsx` — render it beneath the related
-list.
+  **Modify:** `apps/web/src/components/help/HelpArticleReader.tsx` — render it beneath the related
+  list.
 
 All six states in spec §6.10. The note field appears only after **No** and caps at 500 characters.
 Disabled while in flight. Never retries and never queues. Sends `buildRef` and `locale`.
@@ -763,6 +777,7 @@ and dismissing the control records nothing.
 
 **Phase:** P3
 **Create:**
+
 - `packages/agent/src/help/help-content-health.service.ts`
 - `packages/agent/src/help/index.ts`
 
@@ -825,6 +840,7 @@ on every one.
 
 **Phase:** P3
 **Create:**
+
 - `apps/api/src/help/help.controller.spec.ts`
 - `apps/api/src/help/help-feedback.service.spec.ts`
 - `apps/api/src/help/credential-shape.spec.ts`
@@ -832,7 +848,7 @@ on every one.
 - `apps/web/src/components/help/HelpFeedback.unit.spec.tsx`
 - `apps/web/src/app/api/help/feedback/route.unit.spec.ts`
 - `apps/web/e2e/help-feedback.spec.ts`
-**Modify:** `apps/web/e2e/COVERAGE.md`
+  **Modify:** `apps/web/e2e/COVERAGE.md`
 
 Cover exactly the rows in [plan.md §10.2–10.4](./plan.md#102-unit--api-jest-appsapijestconfigjs-rootdir-src-spects). The
 boundary cases are load-bearing: 9 responses must not flag, exactly 40% negative must flag, exactly

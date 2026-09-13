@@ -46,7 +46,7 @@ This epic makes **Connection** a first-class, countable thing:
         └────────────────────────────────────────────────────────────────┘
 ```
 
-Plus a **Vault**: write-only, masked credential entries an Agent can *use* through the existing
+Plus a **Vault**: write-only, masked credential entries an Agent can _use_ through the existing
 `{{cred.key}}` mechanism but that nobody — no user, no Agent, no API response — can ever read
 back.
 
@@ -62,7 +62,7 @@ enforcement + last-used; **P3** vault + MCP paste/sign-in flow.
 ## 1. Overview
 
 An owner can connect **several accounts to the same provider**, name each one, mark one as the
-primary, and choose for each a plain-English **scope preset** — *Read only* or *Read and write*
+primary, and choose for each a plain-English **scope preset** — _Read only_ or _Read and write_
 — instead of a list of raw provider scope strings. Every connected account shows a **health**
 state that the platform refreshes on its own, with a one-click **Reconnect** when a credential
 expires, and a **Last used** link that opens exactly the Runs that touched that account. From
@@ -78,14 +78,14 @@ sign-in page, and settles the card on its own when the approval lands.
 
 ### 2.1 The questions an owner asks that Ever Works cannot answer today
 
-| The owner's question | What they do today | What is missing |
-| --- | --- | --- |
-| "Connect my GitHub *and* my client's GitHub." | Impossible. | The platform stores at most one account per person per provider. There is no second slot. |
-| "This Agent should only *read* my issue tracker." | Turn the plugin off for everyone, or accept full access. | There is no access level on a connection at all; a connection is a boolean. |
-| "Block just the research Agent from the CRM." | Not expressible. Tool grants are name-pattern based and cannot name *which account*. | Nothing binds an Agent to a specific connected account with a narrower level. |
-| "Which of these is still working?" | Open each settings row one at a time and press *Test*. | Health is pull-only. Nothing probes on a schedule; nothing tells you a token died. |
-| "What has it been doing with my calendar?" | Read the whole activity log and filter by eye. | Runs are not attributed to the connection that served them. |
-| "I need to give it a key for a service you don't support." | Put it in an environment variable on the server, or paste it into a chat. | Agents can already reference a named secret, but a workspace owner has nowhere to store one. |
+| The owner's question                                       | What they do today                                                                                                                             | What is missing                                                                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| "Connect my GitHub _and_ my client's GitHub."              | Impossible.                                                                                                                                    | The platform stores at most one account per person per provider. There is no second slot.            |
+| "This Agent should only _read_ my issue tracker."          | Turn the plugin off for everyone, or accept full access.                                                                                       | There is no access level on a connection at all; a connection is a boolean.                          |
+| "Block just the research Agent from the CRM."              | Not expressible. Tool grants are name-pattern based and cannot name _which account_.                                                           | Nothing binds an Agent to a specific connected account with a narrower level.                        |
+| "Which of these is still working?"                         | Open each settings row one at a time and press _Test_.                                                                                         | Health is pull-only. Nothing probes on a schedule; nothing tells you a token died.                   |
+| "What has it been doing with my calendar?"                 | Read the whole activity log and filter by eye.                                                                                                 | Runs are not attributed to the connection that served them.                                          |
+| "I need to give it a key for a service you don't support." | Put it in an environment variable on the server, or paste it into a chat.                                                                      | Agents can already reference a named secret, but a workspace owner has nowhere to store one.         |
 | "Add this MCP server — here's the config from their docs." | Hand-translate the snippet into name / URL / header-name / header-value fields, and give up if the server wants a sign-in instead of a header. | The manual form accepts only a URL plus static headers; interactive sign-in is not supported at all. |
 
 ### 2.2 The three concrete gaps in the code we own
@@ -105,8 +105,8 @@ sign-in page, and settles the card on its own when the approval lands.
 
 ### 2.3 Why this is one epic and not three
 
-Presets, per-agent grants and the vault are the same decision seen from three angles: *what may
-this credential be used for, by whom, and can anyone read it back*. Splitting them produces
+Presets, per-agent grants and the vault are the same decision seen from three angles: _what may
+this credential be used for, by whom, and can anyone read it back_. Splitting them produces
 three access models that disagree. Doing them together produces one: **a Connection carries a
 ceiling, a grant may only narrow it, and the secret behind it is never readable.**
 
@@ -116,14 +116,14 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 
 - **S1 — second account on the same provider.**
   **Given** an owner already has a GitHub connection labelled "Company GitHub",
-  **when** they open Settings → Connections → *Add account* on GitHub, sign in with a second
-  identity, and choose *Read only*,
+  **when** they open Settings → Connections → _Add account_ on GitHub, sign in with a second
+  identity, and choose _Read only_,
   **then** both accounts appear as separate rows under GitHub, "Company GitHub" keeps its
-  ★ primary badge, and the new row shows "Read only" and health *Healthy*.
+  ★ primary badge, and the new row shows "Read only" and health _Healthy_.
 
 - **S2 — rename and re-primary.**
   **Given** two GitHub connections,
-  **when** the owner renames the second to "Client GitHub" and presses *Make primary*,
+  **when** the owner renames the second to "Client GitHub" and presses _Make primary_,
   **then** the ★ moves to "Client GitHub", the change is written to the activity log naming
   both labels, and every Agent that did not name a specific account now uses "Client GitHub"
   on its next tool call.
@@ -131,27 +131,27 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 - **S3 — connect at the narrow preset by default.**
   **Given** an owner connecting a new provider,
   **when** the connect dialog opens,
-  **then** *Read only* is preselected with the copy "Start narrow. You can widen this later
-  without reconnecting.", and the owner must actively choose *Read and write* to widen it.
+  **then** _Read only_ is preselected with the copy "Start narrow. You can widen this later
+  without reconnecting.", and the owner must actively choose _Read and write_ to widen it.
 
 - **S4 — widen a preset without reconnecting.**
-  **Given** a connection at *Read only* whose plugin declares that the write preset needs
+  **Given** a connection at _Read only_ whose plugin declares that the write preset needs
   additional provider scopes,
-  **when** the owner switches it to *Read and write*,
+  **when** the owner switches it to _Read and write_,
   **then** either the change applies immediately (the granted provider scopes already cover
   the write preset), or the dialog says exactly which additional approval is needed and offers
-  *Re-approve* — and if the owner cancels, the connection stays at *Read only* and nothing
+  _Re-approve_ — and if the owner cancels, the connection stays at _Read only_ and nothing
   changes.
 
 - **S5 — narrow one Agent.**
-  **Given** a *Read and write* CRM connection used by four Agents,
-  **when** the owner opens *Manage → Agent access* and sets the research Agent to *Read only*,
+  **Given** a _Read and write_ CRM connection used by four Agents,
+  **when** the owner opens _Manage → Agent access_ and sets the research Agent to _Read only_,
   **then** the research Agent's write tools disappear from its next tool call, the other three
   Agents are untouched, and the row reads "Read only · narrowed from the connection default".
 
 - **S6 — block one Agent mid-Run.**
   **Given** an Agent is mid-Run and about to call a tool on a connection,
-  **when** the owner sets that Agent to *Blocked* on that connection,
+  **when** the owner sets that Agent to _Blocked_ on that connection,
   **then** the Agent's very next call on that connection is refused **before any outbound
   request is made**, within 5 seconds of the save, with the Run log line "Blocked by connection
   access — <connection label>", and no Agent, worker or Run is restarted.
@@ -159,13 +159,13 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 - **S7 — health goes bad on its own.**
   **Given** a connection whose credential has been revoked at the provider,
   **when** the scheduled health check next probes it,
-  **then** its row flips to *Expired*, a banner appears at the top of Settings → Connections
-  reading "1 connection needs attention", and the row grows a *Reconnect* button.
+  **then** its row flips to _Expired_, a banner appears at the top of Settings → Connections
+  reading "1 connection needs attention", and the row grows a _Reconnect_ button.
 
 - **S8 — reconnect carries everything forward.**
-  **Given** an *Expired* connection with a label, a preset, and three per-agent grants,
-  **when** the owner presses *Reconnect* and completes the provider's sign-in,
-  **then** the same connection row returns to *Healthy* keeping its label, its preset, its
+  **Given** an _Expired_ connection with a label, a preset, and three per-agent grants,
+  **when** the owner presses _Reconnect_ and completes the provider's sign-in,
+  **then** the same connection row returns to _Healthy_ keeping its label, its preset, its
   primary flag and all three grants — no second row is created and no setting is re-asked.
 
 - **S9 — last used opens the receipts.**
@@ -186,24 +186,24 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 - **S11 — add an MCP server from its published config.**
   **Given** a server's docs publish a `"docs-server": { "url": "https://…", "headers": { … } }`
   snippet,
-  **when** the owner pastes that snippet whole — trailing comma and all — into *Add MCP
-  server*,
+  **when** the owner pastes that snippet whole — trailing comma and all — into _Add MCP
+  server_,
   **then** the form fills itself in (name, URL, header name), the header **value** goes
-  straight into the Vault write-only, and after *Connect* the card lists the tools it found
+  straight into the Vault write-only, and after _Connect_ the card lists the tools it found
   within 120 seconds.
 
 - **S12 — an MCP server that wants a sign-in, not a key.**
   **Given** the owner pastes only an https URL for a server that authenticates interactively,
-  **when** they press *Connect*,
-  **then** the card detects it from the server's own response, shows *Open sign-in page*,
-  and — after the owner approves in that tab — settles to *Connected* on its own with the tool
+  **when** they press _Connect_,
+  **then** the card detects it from the server's own response, shows _Open sign-in page_,
+  and — after the owner approves in that tab — settles to _Connected_ on its own with the tool
   count, with no code to copy back.
 
 ### 3.2 Edge cases and failures
 
 - **S13 — provider limit reached.**
   **Given** a provider already has 10 connections,
-  **when** the owner presses *Add account*,
+  **when** the owner presses _Add account_,
   **then** the button is disabled with the copy "10 of 10 accounts connected. Remove one to
   add another." and the API refuses a direct call with `409 connection_limit_reached`.
 
@@ -230,33 +230,33 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
   **Given** an MCP connection already points at `https://a.example.com/mcp`,
   **when** the owner pastes the identical URL again,
   **then** the wizard says "You are already connected to this server as 'docs-server'." and
-  offers *Open it* rather than creating a duplicate.
+  offers _Open it_ rather than creating a duplicate.
 
 - **S18 — unparseable paste.**
   **Given** the owner pastes something that is neither a URL nor a recognisable config,
-  **when** they press *Connect*,
+  **when** they press _Connect_,
   **then** the wizard says "That doesn't look like a server URL or a config snippet. Paste the
   https URL, or the `\"name\": { … }` block from the server's docs." and keeps what they typed.
 
 - **S19 — a grant that tries to widen.**
-  **Given** a connection at *Read only*,
-  **when** an owner (or an API client) sets an Agent grant to *Read and write*,
-  **then** the effective access stays *Read only*, the row shows "Read and write · clamped to
+  **Given** a connection at _Read only_,
+  **when** an owner (or an API client) sets an Agent grant to _Read and write_,
+  **then** the effective access stays _Read only_, the row shows "Read and write · clamped to
   the connection's Read only", and the API returns the clamped effective value rather than an
   error. Widening the connection later un-clamps it automatically.
 
 - **S20 — health check cannot reach the server.**
   **Given** an MCP server that times out,
   **when** the scheduled probe runs three consecutive times without success,
-  **then** the row flips to *Unreachable* (not *Expired* — no credential was rejected), the
-  copy reads "Couldn't reach this server. Last tried 4 minutes ago.", and *Reconnect* is **not**
+  **then** the row flips to _Unreachable_ (not _Expired_ — no credential was rejected), the
+  copy reads "Couldn't reach this server. Last tried 4 minutes ago.", and _Reconnect_ is **not**
   offered because reconnecting fixes nothing.
 
 - **S21 — the health sweeper itself fails.**
   **Given** the scheduled health check errors,
   **when** an owner opens Settings → Connections,
   **then** every row still renders with its last known health and a "Checked 2 hours ago"
-  timestamp. A stale probe never blanks a row, never flips a healthy row to *Expired*, and
+  timestamp. A stale probe never blanks a row, never flips a healthy row to _Expired_, and
   never blocks a call.
 
 - **S22 — a blocked Agent asks anyway.**
@@ -271,7 +271,7 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
   **when** any client calls any endpoint that could return it — list, get, export, the settings
   form, an Agent tool that echoes its own arguments,
   **then** the value is `●●●●●●●●`. There is no endpoint, no role, no flag and no admin
-  override that returns the plaintext. The only operations are *replace* and *delete*.
+  override that returns the plaintext. The only operations are _replace_ and _delete_.
 
 - **S24 — vault full.**
   **Given** 200 Vault entries,
@@ -282,7 +282,7 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 - **S25 — deleting the primary.**
   **Given** three connections on a provider, the first marked primary,
   **when** the owner deletes it,
-  **then** the oldest remaining *Healthy* connection is promoted to primary automatically, the
+  **then** the oldest remaining _Healthy_ connection is promoted to primary automatically, the
   promotion is written to the activity log, and the owner sees "Client GitHub is now the
   primary GitHub account."
 
@@ -303,8 +303,8 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
   **Given** a workspace with nothing connected,
   **when** the owner opens Settings → Connections,
   **then** they see the empty state: "Nothing connected yet. Connect an account and every
-  Agent can use it — at exactly the level you pick." with *Browse providers* and *Add MCP
-  server*.
+  Agent can use it — at exactly the level you pick." with _Browse providers_ and _Add MCP
+  server_.
 
 ## 4. Functional requirements
 
@@ -358,7 +358,7 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
   between the Connection's preset and the per-Agent grant, so an owner can set a narrower
   default for every Agent at once.
 - **FR-18** Resolution MUST be **narrow-only**: `effective = min(connection preset, workspace
-  grant, agent grant)` over the ordering `blocked < read < write`. A grant MUST NEVER widen
+grant, agent grant)` over the ordering `blocked < read < write`. A grant MUST NEVER widen
   access above the Connection's preset.
 - **FR-19** A grant that names a wider mode than its ceiling MUST be **stored as written but
   reported as clamped** — the API returns both `requested` and `effective`, and the UI says
@@ -393,13 +393,13 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 - **FR-28** The scheduled sweep MUST run every **15 minutes**, MUST probe at most **200
   Connections per tick**, MUST time out a single probe at **8 seconds**, and MUST never probe the
   same Connection twice inside its interval.
-- **FR-29** A manual *Check now* MUST be available per Connection, rate-limited to **6 checks per
+- **FR-29** A manual _Check now_ MUST be available per Connection, rate-limited to **6 checks per
   minute per Connection**.
 - **FR-30** A probe MUST NEVER read, log or return a credential value, and its stored error MUST
   be a classified message (code + short text), never a raw provider response body.
 - **FR-31** A failed or unavailable health sweep MUST leave every Connection's last known health
   and last-checked timestamp intact and MUST NOT block any tool call.
-- **FR-32** *Reconnect* MUST be offered **only** for `expired` Connections, MUST re-use the same
+- **FR-32** _Reconnect_ MUST be offered **only** for `expired` Connections, MUST re-use the same
   Connection row, and MUST preserve label, preset, primary flag, grants, last-used data and
   creation time.
 - **FR-33** When at least one Connection is `expired` or `unreachable`, the Connections page MUST
@@ -452,7 +452,7 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 
 ### 4.7 Adding an MCP server
 
-- **FR-48** *Add MCP server* MUST accept **either** an `https` URL **or** a pasted JSON config
+- **FR-48** _Add MCP server_ MUST accept **either** an `https` URL **or** a pasted JSON config
   snippet, in one field, and MUST decide which it was given without asking the user.
 - **FR-49** Config parsing MUST tolerate the shapes servers actually publish: a bare
   `"name": { … }` fragment, a `{ "mcpServers": { … } }` wrapper, a bare `{ … }` object,
@@ -464,13 +464,13 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
   echoed back into the form, stored in the Connection row in plaintext, or returned by any
   subsequent read.
 - **FR-52** The system MUST **detect from the server itself** whether it authenticates
-  interactively, and if so MUST show *Open sign-in page* rather than asking for a header.
+  interactively, and if so MUST show _Open sign-in page_ rather than asking for a header.
 - **FR-53** The interactive sign-in MUST complete **without the user pasting anything back**:
   the card polls at **3-second** intervals for up to **10 minutes** and settles itself to
-  *Connected*, or to *Sign-in timed out* with a *Try again* action.
+  _Connected_, or to _Sign-in timed out_ with a _Try again_ action.
 - **FR-54** Credentials obtained interactively MUST be refreshed automatically when they expire
   and MUST NOT require re-approval under normal operation. When the server revokes access the
-  Connection MUST show `expired` and *Reconnect* MUST be the identical flow as first-time setup.
+  Connection MUST show `expired` and _Reconnect_ MUST be the identical flow as first-time setup.
 - **FR-55** A new MCP Connection name MUST NOT collide with an installed plugin id or an
   existing Connection label in the workspace; a collision MUST be refused with a rename prompt,
   and any pasted secret MUST be discarded rather than stored.
@@ -513,26 +513,26 @@ ceiling, a grant may only narrow it, and the secret behind it is never readable.
 
 ## 6. Key entities and domain concepts
 
-| Entity / concept | New? | Description | States → transitions |
-| --- | --- | --- | --- |
-| **Plugin** | existing | An installed package that can serve a provider. Unchanged. | install lifecycle unchanged |
-| **Connection** | **new row, existing noun** | One account on one provider. The program vocabulary already calls this a Connection; today there is no single row for it. This epic gives it one, pointing at whichever existing record actually holds the credential. | `health`: `unknown → healthy ⇄ degraded → expired \| unreachable`; `expired --reconnect→ healthy` |
-| **Scope preset** | **new** | A named, two-value access level on a Connection: `read` or `write`. Declared per provider **by its plugin**, chosen per Connection by the owner. Not a row of its own — a value on the Connection plus a declaration in the plugin. | `read ⇄ write` (widening may require re-approval; narrowing never does) |
-| **Connection grant** | **new** | A narrow-only override of a Connection's preset for one target (the whole workspace, or one Agent). | `inherit \| read \| write \| blocked`; absence means `inherit` |
-| **Vault credential** | **new** | A grouped, named, write-only secret usable by Agents through `{{cred.key}}` and readable by no one. | `set → replaced* → deleted` |
-| **Agent** | existing | Unchanged. Gains a per-Connection grant surface. | — |
-| **Run** | existing | Unchanged. Gains Connection attribution so "last used" can point at it. | — |
-| **Tool grant** | existing | The tenant → organization → Work → Agent tool-name matrix. Unchanged, and still evaluated first; the Connection grant is a second, account-aware gate that runs after it. | — |
-| **MCP server connection** | existing | Stays exactly as it is and becomes the backing record for MCP-kind Connections. | — |
-| **Repository connection** | existing | Stays exactly as it is and becomes the backing record for repo-kind Connections. | — |
-| **Notification channel** | existing | Carries the health-change notification. Unchanged. | — |
+| Entity / concept          | New?                       | Description                                                                                                                                                                                                                         | States → transitions                                                                              |
+| ------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Plugin**                | existing                   | An installed package that can serve a provider. Unchanged.                                                                                                                                                                          | install lifecycle unchanged                                                                       |
+| **Connection**            | **new row, existing noun** | One account on one provider. The program vocabulary already calls this a Connection; today there is no single row for it. This epic gives it one, pointing at whichever existing record actually holds the credential.              | `health`: `unknown → healthy ⇄ degraded → expired \| unreachable`; `expired --reconnect→ healthy` |
+| **Scope preset**          | **new**                    | A named, two-value access level on a Connection: `read` or `write`. Declared per provider **by its plugin**, chosen per Connection by the owner. Not a row of its own — a value on the Connection plus a declaration in the plugin. | `read ⇄ write` (widening may require re-approval; narrowing never does)                           |
+| **Connection grant**      | **new**                    | A narrow-only override of a Connection's preset for one target (the whole workspace, or one Agent).                                                                                                                                 | `inherit \| read \| write \| blocked`; absence means `inherit`                                    |
+| **Vault credential**      | **new**                    | A grouped, named, write-only secret usable by Agents through `{{cred.key}}` and readable by no one.                                                                                                                                 | `set → replaced* → deleted`                                                                       |
+| **Agent**                 | existing                   | Unchanged. Gains a per-Connection grant surface.                                                                                                                                                                                    | —                                                                                                 |
+| **Run**                   | existing                   | Unchanged. Gains Connection attribution so "last used" can point at it.                                                                                                                                                             | —                                                                                                 |
+| **Tool grant**            | existing                   | The tenant → organization → Work → Agent tool-name matrix. Unchanged, and still evaluated first; the Connection grant is a second, account-aware gate that runs after it.                                                           | —                                                                                                 |
+| **MCP server connection** | existing                   | Stays exactly as it is and becomes the backing record for MCP-kind Connections.                                                                                                                                                     | —                                                                                                 |
+| **Repository connection** | existing                   | Stays exactly as it is and becomes the backing record for repo-kind Connections.                                                                                                                                                    | —                                                                                                 |
+| **Notification channel**  | existing                   | Carries the health-change notification. Unchanged.                                                                                                                                                                                  | —                                                                                                 |
 
-> **Why three new concepts and not zero.** *Connection* is already this program's word for "an
+> **Why three new concepts and not zero.** _Connection_ is already this program's word for "an
 > account" ([program README §1](../README.md)); it has simply never been a countable thing, which
-> is precisely why a second account per provider is impossible today. *Scope preset* cannot be
+> is precisely why a second account per provider is impossible today. _Scope preset_ cannot be
 > folded into the existing tool-grant matrix because tool names carry no account identity —
-> "read on the client's repo, write on ours" is inexpressible with patterns alone. *Vault
-> credential* is not a new idea either: an Agent can already reference a named secret as
+> "read on the client's repo, write on ours" is inexpressible with patterns alone. _Vault
+> credential_ is not a new idea either: an Agent can already reference a named secret as
 > `{{cred.key}}` inside a tool argument, and the rule that an unresolvable one refuses the call
 > is already settled behaviour; the only place such a secret can live today is an operator's
 > environment. This epic gives the workspace its own place to put one. No existing noun is
@@ -603,8 +603,8 @@ clamped, and takes effect the moment the ceiling rises.
 ```
 
 `[+ Add ▾]` opens a two-item menu: **Connect a provider** · **Add MCP server**.
-Keyboard: `↑`/`↓` move between rows, `Enter` opens *Manage*, `r` renames the focused row,
-`p` makes it primary, `c` runs *Check now*, `/` focuses the filter, `Esc` closes any drawer.
+Keyboard: `↑`/`↓` move between rows, `Enter` opens _Manage_, `r` renames the focused row,
+`p` makes it primary, `c` runs _Check now_, `/` focuses the filter, `Esc` closes any drawer.
 
 ### 7.2 Loading, empty, error and over-limit
 
@@ -677,7 +677,7 @@ ERROR (list failed)                          OVER LIMIT (provider full)
 
 Keyboard: `Tab` walks the sections in order; the agent list is a listbox where `↑`/`↓` move and
 `Space` opens the mode menu; `Esc` closes the drawer and discards nothing already saved (every
-control saves on change, with an inline "Saved" flash and an *Undo* for 5 seconds).
+control saves on change, with an inline "Saved" flash and an _Undo_ for 5 seconds).
 
 ### 7.4 Widening needs approval
 
@@ -692,7 +692,8 @@ control saves on change, with an inline "Saved" flash and an *Undo* for 5 second
 │                              [ Cancel ]  [ Re-approve → ]    │
 └──────────────────────────────────────────────────────────────┘
 ```
-Cancel leaves the radio on *Read only* — the UI never optimistically shows the wider level.
+
+Cancel leaves the radio on _Read only_ — the UI never optimistically shows the wider level.
 
 ### 7.5 Add MCP server — the one field
 
@@ -816,44 +817,44 @@ ADD / REPLACE                               EMPTY                    FULL
 
 ### 7.9 Exact user-visible copy (the strings that carry meaning)
 
-| Where | Copy |
-| --- | --- |
-| Page subtitle | "Accounts your agents can use, and exactly what each one may do." |
-| Attention banner | "{count, plural, one {# connection needs attention.} other {# connections need attention.}}" |
-| Preset `read` | "Read only — Look things up. Never changes anything." |
-| Preset `write` | "Read and write — Look things up and make changes." |
-| Preset hint | "Start narrow. You can widen this later without reconnecting." |
-| No presets declared | "Standard access" |
-| Grant applies | "Changes apply on each agent's next call. Nothing restarts." |
-| Clamped grant | "Clamped to the connection's {ceiling}." |
-| Blocked grant | "Refused before it reaches {provider}." |
-| Health `healthy` | "Healthy · checked {relativeTime}" |
-| Health `degraded` | "Having trouble · checked {relativeTime}" |
-| Health `expired` | "Expired — {provider} rejected this credential." |
-| Health `expired`, credential missing | "Missing credential {key}. Add it to the Vault or reconnect." |
-| Health `unreachable` | "Couldn't reach this server. Last tried {relativeTime}." |
-| Health `unknown` | "Not checked yet" |
-| Last used | "Last used {relativeTime}" / "Never used" |
-| Runs link | "See the {count} runs that used this connection" |
-| Disconnect | "Agents lose this account immediately. Runs keep their history. Vault secrets are not deleted." |
-| Provider full | "{max} of {max} accounts connected. Remove one to add another." |
-| Label taken | "You already have a connection called '{label}'. Pick another name." |
-| Vault subtitle | "Keys your agents can use and nobody can read — not you, not us, not them." |
-| Vault value help | "Write-only. Saving replaces the old value; there is no way to read either back." |
-| Vault unused | "Not used by any connection" |
-| Vault full | "{max} of {max} secrets stored. Delete one to add another." |
-| MCP paste help | "Paste the server's https URL, or the config block from its docs." |
-| MCP secret help | "Trailing commas are fine. Keys go straight to the Vault — they're never shown again, here or anywhere." |
-| MCP unparseable | "That doesn't look like a server URL or a config snippet. Paste the https URL, or the \"name\": { … } block from the server's docs." |
-| MCP sign-in detected | "This server signs you in instead of using a key." |
-| MCP waiting | "Waiting for you to approve… Approve in the tab that opened. Times out in {remaining}." |
-| MCP connected | "Connected — {count} tools available to your agents." |
-| MCP timed out | "Sign-in timed out. Nothing was saved." |
-| MCP name taken | "A connection called '{name}' already exists. Rename this one." |
-| MCP duplicate url | "You're already connected to this server as '{label}'." |
-| Address refused | "That address isn't reachable from Ever Works. Use a public https address." |
-| Empty registry | "Nothing connected yet. Connect an account and every agent can use it — at exactly the level you pick." |
-| List error | "Couldn't load your connections. Your agents are unaffected." |
+| Where                                | Copy                                                                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Page subtitle                        | "Accounts your agents can use, and exactly what each one may do."                                                                    |
+| Attention banner                     | "{count, plural, one {# connection needs attention.} other {# connections need attention.}}"                                         |
+| Preset `read`                        | "Read only — Look things up. Never changes anything."                                                                                |
+| Preset `write`                       | "Read and write — Look things up and make changes."                                                                                  |
+| Preset hint                          | "Start narrow. You can widen this later without reconnecting."                                                                       |
+| No presets declared                  | "Standard access"                                                                                                                    |
+| Grant applies                        | "Changes apply on each agent's next call. Nothing restarts."                                                                         |
+| Clamped grant                        | "Clamped to the connection's {ceiling}."                                                                                             |
+| Blocked grant                        | "Refused before it reaches {provider}."                                                                                              |
+| Health `healthy`                     | "Healthy · checked {relativeTime}"                                                                                                   |
+| Health `degraded`                    | "Having trouble · checked {relativeTime}"                                                                                            |
+| Health `expired`                     | "Expired — {provider} rejected this credential."                                                                                     |
+| Health `expired`, credential missing | "Missing credential {key}. Add it to the Vault or reconnect."                                                                        |
+| Health `unreachable`                 | "Couldn't reach this server. Last tried {relativeTime}."                                                                             |
+| Health `unknown`                     | "Not checked yet"                                                                                                                    |
+| Last used                            | "Last used {relativeTime}" / "Never used"                                                                                            |
+| Runs link                            | "See the {count} runs that used this connection"                                                                                     |
+| Disconnect                           | "Agents lose this account immediately. Runs keep their history. Vault secrets are not deleted."                                      |
+| Provider full                        | "{max} of {max} accounts connected. Remove one to add another."                                                                      |
+| Label taken                          | "You already have a connection called '{label}'. Pick another name."                                                                 |
+| Vault subtitle                       | "Keys your agents can use and nobody can read — not you, not us, not them."                                                          |
+| Vault value help                     | "Write-only. Saving replaces the old value; there is no way to read either back."                                                    |
+| Vault unused                         | "Not used by any connection"                                                                                                         |
+| Vault full                           | "{max} of {max} secrets stored. Delete one to add another."                                                                          |
+| MCP paste help                       | "Paste the server's https URL, or the config block from its docs."                                                                   |
+| MCP secret help                      | "Trailing commas are fine. Keys go straight to the Vault — they're never shown again, here or anywhere."                             |
+| MCP unparseable                      | "That doesn't look like a server URL or a config snippet. Paste the https URL, or the \"name\": { … } block from the server's docs." |
+| MCP sign-in detected                 | "This server signs you in instead of using a key."                                                                                   |
+| MCP waiting                          | "Waiting for you to approve… Approve in the tab that opened. Times out in {remaining}."                                              |
+| MCP connected                        | "Connected — {count} tools available to your agents."                                                                                |
+| MCP timed out                        | "Sign-in timed out. Nothing was saved."                                                                                              |
+| MCP name taken                       | "A connection called '{name}' already exists. Rename this one."                                                                      |
+| MCP duplicate url                    | "You're already connected to this server as '{label}'."                                                                              |
+| Address refused                      | "That address isn't reachable from Ever Works. Use a public https address."                                                          |
+| Empty registry                       | "Nothing connected yet. Connect an account and every agent can use it — at exactly the level you pick."                              |
+| List error                           | "Couldn't load your connections. Your agents are unaffected."                                                                        |
 
 ## 8. Out of scope
 
@@ -862,8 +863,8 @@ ADD / REPLACE                               EMPTY                    FULL
   a later epic — not a scope-string editor in the UI.
 - **Model provider accounts, priority order and fallback chains.** That is [AW-16](../README.md)
   and shares nothing but the word "account".
-- **Spend, caps and credit meters** — [AW-17](../README.md). This epic shows *last used*, not
-  *what it cost*; the Runs it links to carry the cost.
+- **Spend, caps and credit meters** — [AW-17](../README.md). This epic shows _last used_, not
+  _what it cost_; the Runs it links to carry the cost.
 - **A curated third-party catalogue with partner links.** Providers here are exactly the plugins
   a deployment has installed.
 - **Reading a secret back for any reason.** Not a permissions question, not an admin escape
@@ -876,7 +877,7 @@ ADD / REPLACE                               EMPTY                    FULL
   epic can bridge them.
 - **Changing the tool-grant matrix.** It keeps its semantics and runs first; this epic adds a
   second, account-aware gate after it.
-- **Approvals for outward-facing actions.** [AW-03](../README.md) owns that; a *Read and write*
+- **Approvals for outward-facing actions.** [AW-03](../README.md) owns that; a _Read and write_
   Connection still routes an outward action through the decision queue when policy says so.
 
 ## 9. Acceptance criteria
@@ -884,25 +885,25 @@ ADD / REPLACE                               EMPTY                    FULL
 - [ ] Two Connections can exist on one provider; both work; one and only one is primary.
 - [ ] Deleting the primary promotes the oldest remaining healthy Connection and says so.
 - [ ] A Connection can be renamed; the label is unique per provider, case-insensitively.
-- [ ] Connecting defaults to *Read only*; the connect flow never shows a raw provider scope.
+- [ ] Connecting defaults to _Read only_; the connect flow never shows a raw provider scope.
 - [ ] A provider whose plugin declares no presets shows "Standard access" and no chooser.
 - [ ] Widening a preset that needs re-approval asks first and leaves the old preset on cancel.
 - [ ] Narrowing a preset never asks for re-approval and binds within 5 seconds.
-- [ ] An Agent grant of *Read only* under a *Read and write* Connection removes exactly that
+- [ ] An Agent grant of _Read only_ under a _Read and write_ Connection removes exactly that
       Agent's write tools and leaves the other Agents' tools intact.
-- [ ] An Agent grant of *Read and write* under a *Read only* Connection resolves to *Read only*
+- [ ] An Agent grant of _Read and write_ under a _Read only_ Connection resolves to _Read only_
       and the API reports both `requested` and `effective`.
-- [ ] Setting an Agent to *Blocked* refuses its next call on that Connection within 5 seconds,
+- [ ] Setting an Agent to _Blocked_ refuses its next call on that Connection within 5 seconds,
       before any outbound request, with no restart of anything, and the Run continues.
 - [ ] A refused call appears exactly once in the Run log, naming the Connection and the reason,
       and never contains a credential.
 - [ ] With grant resolution deliberately failing, an Agent falls back to the Connection's preset
-      — never to *Read and write*.
-- [ ] The scheduled sweep flips a revoked credential to *Expired* without any user action, and
+      — never to _Read and write_.
+- [ ] The scheduled sweep flips a revoked credential to _Expired_ without any user action, and
       the page banner counts it.
-- [ ] *Reconnect* returns the same row to *Healthy* keeping label, preset, primary flag and all
+- [ ] _Reconnect_ returns the same row to _Healthy_ keeping label, preset, primary flag and all
       grants; no second row appears.
-- [ ] An unreachable server becomes *Unreachable*, not *Expired*, and is offered no *Reconnect*.
+- [ ] An unreachable server becomes _Unreachable_, not _Expired_, and is offered no _Reconnect_.
 - [ ] Killing the health sweeper leaves every row rendering its last known state and blocks no
       call.
 - [ ] "Last used" links to a Runs list containing exactly the Runs that used that Connection.
@@ -913,15 +914,15 @@ ADD / REPLACE                               EMPTY                    FULL
 - [ ] A tool whose credential cannot be resolved is refused with a message naming the key.
 - [ ] An MCP server added with a pasted header connects with the Vault value while its stored
       header still reads `{{cred.key}}`; after that Vault entry is deleted, the next connection
-      attempt fails naming the key, sends no request, and the row shows *Missing credential*.
+      attempt fails naming the key, sends no request, and the row shows _Missing credential_.
 - [ ] No log line, monitoring event, stored error or API response produced by an MCP connection
       attempt contains a resolved header value.
 - [ ] The 201st Vault entry and the 11th Connection on a provider are both refused with their
       own error codes and the exact copy in §7.9.
 - [ ] Pasting a `"name": { … }` block with a trailing comma parses; the header value lands in
       the Vault and is not echoed.
-- [ ] Pasting a URL for a server that signs in interactively shows *Open sign-in page* and
-      settles to *Connected* without the user pasting anything back.
+- [ ] Pasting a URL for a server that signs in interactively shows _Open sign-in page_ and
+      settles to _Connected_ without the user pasting anything back.
 - [ ] A name that collides with an installed plugin id is refused and the pasted secret is not
       stored.
 - [ ] Two different URLs produce two Connections; the same URL twice offers to open the first.
@@ -934,22 +935,22 @@ ADD / REPLACE                               EMPTY                    FULL
 ## 10. Open questions
 
 - `[NEEDS CLARIFICATION: should the workspace-level grant (FR-17) be exposed in P2 or held to
-  P3? It is one extra row and one extra select, but it is also a third place to look when
-  debugging "why can't this agent…". Recommendation: ship it in P2 but collapse it by default.]`
+P3? It is one extra row and one extra select, but it is also a third place to look when
+debugging "why can't this agent…". Recommendation: ship it in P2 but collapse it by default.]`
 - `[NEEDS CLARIFICATION: when a Connection is deleted, should its Run attribution keep the label
-  as a frozen string, or resolve to "(disconnected)"? The spec assumes frozen label (FR-38);
-  confirm with Design.]`
+as a frozen string, or resolve to "(disconnected)"? The spec assumes frozen label (FR-38);
+confirm with Design.]`
 - `[NEEDS CLARIFICATION: 5 seconds is the stated worst-case grant propagation (FR-21). Confirm
-  that a 5-second in-process cache is acceptable to Security, or whether an explicit
-  invalidation signal is required for the blocked→ transition specifically.]`
+that a 5-second in-process cache is acceptable to Security, or whether an explicit
+invalidation signal is required for the blocked→ transition specifically.]`
 - `[NEEDS CLARIFICATION: should a health transition to `expired` raise an item in My Decisions
-  (AW-03) as well as a notification? It is a decision only the owner can make, which argues yes,
-  but it is also not a mission blocker, which argues no.]`
+(AW-03) as well as a notification? It is a decision only the owner can make, which argues yes,
+but it is also not a mission blocker, which argues no.]`
 - `[NEEDS CLARIFICATION: the per-provider cap is 10 (FR-2). Is that right for the agency use
-  case, or should it be per-plan?]`
+case, or should it be per-plan?]`
 - `[NEEDS CLARIFICATION: which existing plugins get scope-preset declarations in P1? The spec
-  assumes the git provider and the connector-category plugins; confirm the P1 list with
-  Product.]`
+assumes the git provider and the connector-category plugins; confirm the P1 list with
+Product.]`
 
 ## 11. Constitution gates
 

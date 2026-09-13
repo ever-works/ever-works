@@ -23,7 +23,7 @@
 
 # Phase 1 — The ledger
 
-*No migration. Reads only what `agent_runs` and `agent_run_logs` already hold.*
+_No migration. Reads only what `agent_runs` and `agent_run_logs` already hold._
 
 ## P1.A — Contracts
 
@@ -49,14 +49,11 @@
 
 ## P1.B — Read model (agent package)
 
-- [ ] **T3.** Window resolution helper.
-    - CREATE `packages/agent/src/agents/run-window.ts` — `resolveWindow({ granularity, anchorDate,
-      timezone })` returning `RunLedgerWindow`; Monday week start; month = calendar month in the
-      given timezone; clamp to `now − 12 months` … `now + 7 days` and set `clamped`.
-    - CREATE `packages/agent/src/agents/__tests__/run-window.spec.ts` — Day/Week/Month boundaries,
+- [ ] **T3.** Window resolution helper. - CREATE `packages/agent/src/agents/run-window.ts` — `resolveWindow({ granularity, anchorDate,
+timezone })` returning `RunLedgerWindow`; Monday week start; month = calendar month in the
+      given timezone; clamp to `now − 12 months` … `now + 7 days` and set `clamped`. - CREATE `packages/agent/src/agents/__tests__/run-window.spec.ts` — Day/Week/Month boundaries,
       a DST transition in a non-UTC zone, the clamp at both ends, an invalid timezone falling back
-      to UTC.
-    - **Done when**: the spec passes and `resolveWindow` has no dependency on TypeORM or Nest.
+      to UTC. - **Done when**: the spec passes and `resolveWindow` has no dependency on TypeORM or Nest.
 
 - [ ] **T4.** Ledger repository reads.
     - MODIFY `packages/agent/src/database/repositories/agent-run.repository.ts` — add
@@ -237,7 +234,7 @@
       `/runs/<runId>`.
     - MODIFY `apps/web/src/components/agents/AgentActivityClient.tsx` — **"See this agent in
       Runs"**.
-    - MODIFY `apps/web/src/components/settings/costs/CostsSettings.tsx` — link each *Top runs* row to
+    - MODIFY `apps/web/src/components/settings/costs/CostsSettings.tsx` — link each _Top runs_ row to
       `/runs/<runId>`; keep `CostsSettings.unit.spec.tsx` green.
     - **Done when**: every existing spec for those four components still passes.
 
@@ -258,14 +255,14 @@
       root and confirm green.
     - MODIFY `docs/specs/features/agent-workspace/TRACKER.md` — set AW-09 spec `Draft`, impl
       `In progress`, note "P1 merged".
-    - **Done when**: the acceptance groups *Ledger*, *Navigation*, *Filters and rail* and the
+    - **Done when**: the acceptance groups _Ledger_, _Navigation_, _Filters and rail_ and the
       non-cost receipt criteria in [spec.md §8](./spec.md#8-acceptance-criteria) all pass.
 
 ---
 
 # Phase 2 — The cost breakdown
 
-*Migration A. Makes the token split, the Skills a run loaded, and per-model cost durable.*
+_Migration A. Makes the token split, the Skills a run loaded, and per-model cost durable._
 
 - [ ] **T23.** Extend the token tracker with cache figures.
     - MODIFY `packages/plugin/src/ai/token-usage.tracker.ts` — widen `TokenUsage` with optional
@@ -393,8 +390,8 @@
 
 # Phase 3 — Upcoming and remediation
 
-*Migration B. Adds failure classification, the per-Agent time limit, the Upcoming panel and the
-repeat-failure banner.*
+_Migration B. Adds failure classification, the per-Agent time limit, the Upcoming panel and the
+repeat-failure banner._
 
 - [ ] **T34.** Entity columns + Migration B (same PR).
     - MODIFY `packages/agent/src/entities/agent-run.entity.ts` — add `failureCode` and
@@ -405,13 +402,10 @@ repeat-failure banner.*
     - **Done when**: additive-only SQL, `down()` drops only the three new columns, and boot applies
       it cleanly twice.
 
-- [ ] **T35.** Failure classifier.
-    - CREATE `packages/agent/src/agents/run-failure-classifier.ts` — pure
+- [ ] **T35.** Failure classifier. - CREATE `packages/agent/src/agents/run-failure-classifier.ts` — pure
       `classifyFailure({ errorMessage, errorName, elapsedMs, effectiveTimeoutSeconds, cancelledBy,
-      guardrailRefused, budgetStopped, creditsExhausted })` → `RunFailureCode`.
-    - CREATE `packages/agent/src/agents/__tests__/run-failure-classifier.spec.ts` — every branch;
-      `timeout` **only** when elapsed ≥ the effective limit; `unknown` as the honest fallback.
-    - **Done when**: the classifier has no repository or Nest dependency.
+guardrailRefused, budgetStopped, creditsExhausted })` → `RunFailureCode`. - CREATE `packages/agent/src/agents/__tests__/run-failure-classifier.spec.ts` — every branch;
+      `timeout` **only** when elapsed ≥ the effective limit; `unknown` as the honest fallback. - **Done when**: the classifier has no repository or Nest dependency.
 
 - [ ] **T36.** Resolve and stamp the effective time limit.
     - MODIFY `packages/agent/src/config/index.ts` — add

@@ -75,7 +75,7 @@ first-party skill catalogue.
 Create `packages/plugins/everworks-playbooks/src/everworks-playbooks.plugin.ts` implementing
 `IPlaybookProviderPlugin` over `BUILTIN_PLAYBOOKS`, with an optional remote manifest source
 (1 h TTL, in-memory cache, stale-serve ≤ 24 h) that is **off unless configured** and always merged
-*under* the built-ins. Every remote string is HTML-stripped and length-capped per T002; an entry
+_under_ the built-ins. Every remote string is HTML-stripped and length-capped per T002; an entry
 failing validation is dropped with a warn, never thrown.
 **Done:** built-ins are returned when the remote source is unset, unreachable, or malformed.
 
@@ -419,7 +419,7 @@ summed `agent_runs.costCents` rendered to 2 decimals. `No runs yet · first run 
 **Done:** the rollup is one scoped aggregate query, not a per-run fetch.
 
 **T049 [P3] — Reverse attribution**
-Add a "created by the *&lt;playbook&gt;* playbook" line to the Agent detail surface, resolved via
+Add a "created by the _&lt;playbook&gt;_ playbook" line to the Agent detail surface, resolved via
 `idx_playbook_artifacts_target`.
 **Done:** an Agent created outside a playbook renders nothing extra.
 

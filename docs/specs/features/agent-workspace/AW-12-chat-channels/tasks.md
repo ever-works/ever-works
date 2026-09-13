@@ -518,7 +518,7 @@
 
 - [ ] **T58 · Migration — SAME PR as T57**
       Create `apps/api/src/migrations/1791120200000-AddConversationChannelReach.ts`: `ADD COLUMN
-      reach`, `CREATE UNIQUE INDEX … WHERE kind = 'organization_channel'`.
+reach`, `CREATE UNIQUE INDEX … WHERE kind = 'organization_channel'`.
       **Done:** additive only; the index creation is guarded so an existing duplicate (impossible by
       construction, but checked) fails loudly at migration time rather than silently.
 
@@ -633,5 +633,5 @@
       Run `pnpm lint`, `pnpm type-check`, `pnpm test` and `pnpm build` from the repo root, plus the
       full `apps/web/e2e/` suite.
       **Done:** green, with no pre-existing chat or conversation spec modified to make it pass.
-</content>
-</invoke>
+      </content>
+      </invoke>

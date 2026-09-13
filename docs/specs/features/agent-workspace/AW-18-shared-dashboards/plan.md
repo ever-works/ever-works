@@ -19,13 +19,13 @@ Everything below was read in this repository. Paths are relative to the monorepo
 
 ### 1.1 Organizations, Tenants and who "the owner" is
 
-| What exists | Where | What it means for this epic |
-| --- | --- | --- |
-| `Tenant` entity, `ownerUserId` unique 1:1 with `User` | [`packages/agent/src/entities/tenant.entity.ts`](../../../../../packages/agent/src/entities/tenant.entity.ts) | This is the only unambiguous "owner" the platform has. Every owner-only check in this epic resolves `organization.tenantId → tenant.ownerUserId === currentUser.id`. |
-| `Organization` entity | [`packages/agent/src/entities/organization.entity.ts`](../../../../../packages/agent/src/entities/organization.entity.ts) | The Workspace a Shared view hangs off. |
-| `OrganizationMember` — roster only, `role` persisted but explicitly **not** an authorization input | [`packages/agent/src/entities/organization-member.entity.ts`](../../../../../packages/agent/src/entities/organization-member.entity.ts) | Why we cannot express "only admins may publish" today, and why we resolve the Tenant owner instead of inventing a role. |
-| `OrganizationOwnershipGuard` (member-level; `@OrgAdmin()` currently identical to member) | [`apps/api/src/organizations/guards/organization-ownership.guard.ts`](../../../../../apps/api/src/organizations/guards/organization-ownership.guard.ts), [`apps/api/src/organizations/organization-membership.service.ts`](../../../../../apps/api/src/organizations/organization-membership.service.ts) | Reused unchanged for membership. A **new, narrower** owner guard sits on top of it for the write routes. |
-| Scope resolution (`ScopeContext`, `X-Scope-Slug`) | [`apps/api/src/scope/`](../../../../../apps/api/src/scope/) | The owner-facing endpoints resolve the active Organization exactly as every other Tier-A read does. |
+| What exists                                                                                        | Where                                                                                                                                                                                                                                                                                                    | What it means for this epic                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Tenant` entity, `ownerUserId` unique 1:1 with `User`                                              | [`packages/agent/src/entities/tenant.entity.ts`](../../../../../packages/agent/src/entities/tenant.entity.ts)                                                                                                                                                                                            | This is the only unambiguous "owner" the platform has. Every owner-only check in this epic resolves `organization.tenantId → tenant.ownerUserId === currentUser.id`. |
+| `Organization` entity                                                                              | [`packages/agent/src/entities/organization.entity.ts`](../../../../../packages/agent/src/entities/organization.entity.ts)                                                                                                                                                                                | The Workspace a Shared view hangs off.                                                                                                                               |
+| `OrganizationMember` — roster only, `role` persisted but explicitly **not** an authorization input | [`packages/agent/src/entities/organization-member.entity.ts`](../../../../../packages/agent/src/entities/organization-member.entity.ts)                                                                                                                                                                  | Why we cannot express "only admins may publish" today, and why we resolve the Tenant owner instead of inventing a role.                                              |
+| `OrganizationOwnershipGuard` (member-level; `@OrgAdmin()` currently identical to member)           | [`apps/api/src/organizations/guards/organization-ownership.guard.ts`](../../../../../apps/api/src/organizations/guards/organization-ownership.guard.ts), [`apps/api/src/organizations/organization-membership.service.ts`](../../../../../apps/api/src/organizations/organization-membership.service.ts) | Reused unchanged for membership. A **new, narrower** owner guard sits on top of it for the write routes.                                                             |
+| Scope resolution (`ScopeContext`, `X-Scope-Slug`)                                                  | [`apps/api/src/scope/`](../../../../../apps/api/src/scope/)                                                                                                                                                                                                                                              | The owner-facing endpoints resolve the active Organization exactly as every other Tier-A read does.                                                                  |
 
 ### 1.2 The token/hash pattern this epic copies
 
@@ -35,7 +35,7 @@ token never stored, and the consumption side split into a `@Public()` preview pl
 authenticated accept
 ([`apps/api/src/onboarding/org-invite.controller.ts`](../../../../../apps/api/src/onboarding/org-invite.controller.ts)).
 The one deliberate divergence here: a **share link must be re-copyable**, so the token
-is *also* stored envelope-encrypted using the existing
+is _also_ stored envelope-encrypted using the existing
 [`EncryptedJsonColumn`](../../../../../packages/agent/src/entities/_secret-json-column.ts)
 helper (AES-256-GCM, `enc::v1::` prefix — the same mechanism
 `notification_channels.targetConfig` uses). Lookup is still by hash; decryption happens
@@ -101,8 +101,8 @@ Slack delivery ─► apps/api/src/ingest/slack/slack-events.controller.ts     (
 - [`apps/api/src/notification-channels/notification-channels.controller.ts`](../../../../../apps/api/src/notification-channels/notification-channels.controller.ts)
   — full CRUD + test-send, already throttled (20/min on create, 30/min on update).
 - [`apps/web/src/components/settings/NotificationChannelsSettings.tsx`](../../../../../apps/web/src/components/settings/NotificationChannelsSettings.tsx)
-  + [`apps/web/src/app/actions/notification-channels.ts`](../../../../../apps/web/src/app/actions/notification-channels.ts)
-  — a fully wired add-channel wizard. The allowlist panel mounts inside this page.
+    - [`apps/web/src/app/actions/notification-channels.ts`](../../../../../apps/web/src/app/actions/notification-channels.ts)
+      — a fully wired add-channel wizard. The allowlist panel mounts inside this page.
 - [`packages/plugin/src/contracts/capabilities/connector.interface.ts`](../../../../../packages/plugin/src/contracts/capabilities/connector.interface.ts)
   already defines `ConnectorInboundEvent`, `ConnectorPairingAuthorizer` and
   `ConnectorAuthorizationDecision` as **contract-only** types. The admission gate
@@ -112,11 +112,11 @@ Slack delivery ─► apps/api/src/ingest/slack/slack-events.controller.ts     (
 ### 1.6 Decisions
 
 - Approvals: [`packages/agent/src/entities/agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts)
-  + [`apps/api/src/agent-approvals/agent-approvals.controller.ts`](../../../../../apps/api/src/agent-approvals/agent-approvals.controller.ts)
-  — owner-scoped by `userId`, idempotent decide (409 on re-decide).
+    - [`apps/api/src/agent-approvals/agent-approvals.controller.ts`](../../../../../apps/api/src/agent-approvals/agent-approvals.controller.ts)
+      — owner-scoped by `userId`, idempotent decide (409 on re-decide).
 - Escalations: [`packages/agent/src/entities/agent-escalation.entity.ts`](../../../../../packages/agent/src/entities/agent-escalation.entity.ts)
-  + [`apps/api/src/escalations/escalations.controller.ts`](../../../../../apps/api/src/escalations/escalations.controller.ts)
-  — `open`/`resolved`, CAS on `status='open' AND userId=:me`.
+    - [`apps/api/src/escalations/escalations.controller.ts`](../../../../../apps/api/src/escalations/escalations.controller.ts)
+      — `open`/`resolved`, CAS on `status='open' AND userId=:me`.
 - Both are already single-user-scoped. This epic makes that an **explicit routing rule**
   plus an attribution column, not a new queue.
 
@@ -274,25 +274,25 @@ place that changes.
 
 `packages/agent/src/entities/shared-view.entity.ts`, table `shared_views`.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `organizationId` | uuid, **unique**, FK → `organizations` `ON DELETE CASCADE` | FR-1 (one per Workspace), FR-5 (cascade) |
-| `tenantId` | uuid, indexed | Tier-A scope column, copied at creation |
-| `ownerUserId` | uuid, FK → `users` | Denormalised for the public read path so it never joins to `tenants` |
-| `tokenHash` | varchar(64), **unique index** | `sha256(token)`, the public lookup key |
-| `tokenEncrypted` | text, `EncryptedJsonColumn()` | The re-copyable token, owner-read only (FR-7) |
-| `status` | varchar(16), default `'active'` | `active` \| `paused` (FR-10) |
-| `sections` | jsonb, default `{"board":true,"knowledge":false}` | FR-13, FR-25 |
-| `knowledgeClasses` | jsonb `string[]`, default `[]` | FR-26, FR-27 — empty fails closed |
-| `searchIndexable` | boolean, default `false` | FR-34 |
-| `viewCount` | integer, default `0` | FR-44 |
-| `lastViewedAt` | timestamptz, nullable | FR-44 |
-| `firstViewNotifiedAt` | timestamptz, nullable | FR-46 — reset to `NULL` on regenerate |
-| `tokenRotatedAt` | timestamptz, nullable | FR-48 |
-| `rotationCount` | integer, default `0` | FR-48 |
-| `createdById` | uuid FK → `users` | audit |
-| `createdAt` / `updatedAt` | timestamptz | |
+| Column                    | Type                                                       | Notes                                                                |
+| ------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| `id`                      | uuid PK                                                    |                                                                      |
+| `organizationId`          | uuid, **unique**, FK → `organizations` `ON DELETE CASCADE` | FR-1 (one per Workspace), FR-5 (cascade)                             |
+| `tenantId`                | uuid, indexed                                              | Tier-A scope column, copied at creation                              |
+| `ownerUserId`             | uuid, FK → `users`                                         | Denormalised for the public read path so it never joins to `tenants` |
+| `tokenHash`               | varchar(64), **unique index**                              | `sha256(token)`, the public lookup key                               |
+| `tokenEncrypted`          | text, `EncryptedJsonColumn()`                              | The re-copyable token, owner-read only (FR-7)                        |
+| `status`                  | varchar(16), default `'active'`                            | `active` \| `paused` (FR-10)                                         |
+| `sections`                | jsonb, default `{"board":true,"knowledge":false}`          | FR-13, FR-25                                                         |
+| `knowledgeClasses`        | jsonb `string[]`, default `[]`                             | FR-26, FR-27 — empty fails closed                                    |
+| `searchIndexable`         | boolean, default `false`                                   | FR-34                                                                |
+| `viewCount`               | integer, default `0`                                       | FR-44                                                                |
+| `lastViewedAt`            | timestamptz, nullable                                      | FR-44                                                                |
+| `firstViewNotifiedAt`     | timestamptz, nullable                                      | FR-46 — reset to `NULL` on regenerate                                |
+| `tokenRotatedAt`          | timestamptz, nullable                                      | FR-48                                                                |
+| `rotationCount`           | integer, default `0`                                       | FR-48                                                                |
+| `createdById`             | uuid FK → `users`                                          | audit                                                                |
+| `createdAt` / `updatedAt` | timestamptz                                                |                                                                      |
 
 Indexes: `UNIQUE(organizationId)`, `UNIQUE(tokenHash)`, `INDEX(tenantId)`.
 
@@ -306,23 +306,23 @@ Indexes: `UNIQUE(organizationId)`, `UNIQUE(tokenHash)`, `INDEX(tenantId)`.
 
 `packages/agent/src/entities/channel-guest.entity.ts`, table `channel_guests`.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `bindingId` | uuid, FK → `ingest_install_bindings` `ON DELETE CASCADE` | The proven-ownership record the allowlist hangs off (FR-51) |
-| `ownerUserId` | uuid, FK → `users`, indexed | Denormalised from the binding for the gate's single-row lookup |
-| `tenantId` / `organizationId` | uuid, nullable, indexed | Tier-C scope columns |
-| `externalUserId` | varchar(128) | Exact identifier on the external service |
-| `externalUserHandle` | varchar(128), nullable | Captured from the first admitted delivery, display only |
-| `displayName` | varchar(64) | Owner-typed (FR-54) |
-| `note` | varchar(200), nullable | |
-| `status` | varchar(16), default `'active'` | `active` \| `revoked` |
-| `admittedAt` | timestamptz | |
-| `lastSeenAt` | timestamptz, nullable | |
-| `requestCount` | integer, default `0` | |
-| `revokedAt` | timestamptz, nullable | |
-| `createdById` | uuid FK → `users` | |
-| `createdAt` / `updatedAt` | timestamptz | |
+| Column                        | Type                                                     | Notes                                                          |
+| ----------------------------- | -------------------------------------------------------- | -------------------------------------------------------------- |
+| `id`                          | uuid PK                                                  |                                                                |
+| `bindingId`                   | uuid, FK → `ingest_install_bindings` `ON DELETE CASCADE` | The proven-ownership record the allowlist hangs off (FR-51)    |
+| `ownerUserId`                 | uuid, FK → `users`, indexed                              | Denormalised from the binding for the gate's single-row lookup |
+| `tenantId` / `organizationId` | uuid, nullable, indexed                                  | Tier-C scope columns                                           |
+| `externalUserId`              | varchar(128)                                             | Exact identifier on the external service                       |
+| `externalUserHandle`          | varchar(128), nullable                                   | Captured from the first admitted delivery, display only        |
+| `displayName`                 | varchar(64)                                              | Owner-typed (FR-54)                                            |
+| `note`                        | varchar(200), nullable                                   |                                                                |
+| `status`                      | varchar(16), default `'active'`                          | `active` \| `revoked`                                          |
+| `admittedAt`                  | timestamptz                                              |                                                                |
+| `lastSeenAt`                  | timestamptz, nullable                                    |                                                                |
+| `requestCount`                | integer, default `0`                                     |                                                                |
+| `revokedAt`                   | timestamptz, nullable                                    |                                                                |
+| `createdById`                 | uuid FK → `users`                                        |                                                                |
+| `createdAt` / `updatedAt`     | timestamptz                                              |                                                                |
 
 Indexes: `UNIQUE(bindingId, externalUserId)` (FR-58 — the same identity may exist on
 another binding), `INDEX(ownerUserId, status)`,
@@ -332,19 +332,19 @@ another binding), `INDEX(ownerUserId, status)`,
 
 All nullable, all safe on rollback (Constitution X).
 
-| Table | Column | Type | Why |
-| --- | --- | --- | --- |
-| `tasks` | `requestedByGuestId` | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 — the primary case: a guest's request produces Tasks |
-| `tasks` | `requestedByLabel` | varchar(160), nullable | FR-67, FR-73 — retained verbatim after revoke |
-| `missions` | `requestedByGuestId` | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 — only for the case where the Run sets up a standing initiative at the guest's request |
-| `missions` | `requestedByLabel` | varchar(160), nullable | FR-68, FR-73 |
-| `agent_action_proposals` | `requestedByGuestId` | uuid, nullable, FK `SET NULL` | FR-69 |
-| `agent_action_proposals` | `requestedByLabel` | varchar(160), nullable | FR-69 |
-| `agent_escalations` | `requestedByGuestId` | uuid, nullable, FK `SET NULL` | FR-69 |
-| `agent_escalations` | `requestedByLabel` | varchar(160), nullable | FR-69 |
-| `agent_escalations` | `originConversationRef` | varchar(256), nullable | Where to post the outcome back (FR-78) |
-| `agent_action_proposals` | `originConversationRef` | varchar(256), nullable | Same |
-| `work_knowledge_documents` | `sharedViewExcluded` | boolean, default `false` | FR-28, **P3 only** |
+| Table                      | Column                  | Type                                                       | Why                                                                                          |
+| -------------------------- | ----------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `tasks`                    | `requestedByGuestId`    | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 — the primary case: a guest's request produces Tasks                                   |
+| `tasks`                    | `requestedByLabel`      | varchar(160), nullable                                     | FR-67, FR-73 — retained verbatim after revoke                                                |
+| `missions`                 | `requestedByGuestId`    | uuid, nullable, FK → `channel_guests` `ON DELETE SET NULL` | FR-68 — only for the case where the Run sets up a standing initiative at the guest's request |
+| `missions`                 | `requestedByLabel`      | varchar(160), nullable                                     | FR-68, FR-73                                                                                 |
+| `agent_action_proposals`   | `requestedByGuestId`    | uuid, nullable, FK `SET NULL`                              | FR-69                                                                                        |
+| `agent_action_proposals`   | `requestedByLabel`      | varchar(160), nullable                                     | FR-69                                                                                        |
+| `agent_escalations`        | `requestedByGuestId`    | uuid, nullable, FK `SET NULL`                              | FR-69                                                                                        |
+| `agent_escalations`        | `requestedByLabel`      | varchar(160), nullable                                     | FR-69                                                                                        |
+| `agent_escalations`        | `originConversationRef` | varchar(256), nullable                                     | Where to post the outcome back (FR-78)                                                       |
+| `agent_action_proposals`   | `originConversationRef` | varchar(256), nullable                                     | Same                                                                                         |
+| `work_knowledge_documents` | `sharedViewExcluded`    | boolean, default `false`                                   | FR-28, **P3 only**                                                                           |
 
 > `requestedByLabel` is denormalised on purpose. FR-73 requires historical attribution to
 > survive a revoke and a rename; a join to `channel_guests` would rewrite history.
@@ -378,12 +378,12 @@ flood the feed. Views are a counter on the row (FR-44).
 Timestamps are AW-18's slots of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)),
 in apply order; re-stamp before merge if `develop` has moved past them.
 
-| File (in `apps/api/src/migrations/`) | Contents | Phase |
-| --- | --- | --- |
-| `1791180000000-CreateSharedViews.ts` | `CREATE TABLE shared_views` + 3 indexes | P1 |
-| `1791180100000-CreateChannelGuests.ts` | `CREATE TABLE channel_guests` + 3 indexes | P2 |
-| `1791180200000-AddRequesterAttribution.ts` | 10 nullable columns across `tasks`, `missions`, `agent_action_proposals`, `agent_escalations` + FKs `ON DELETE SET NULL` | P2 |
-| `1791180300000-AddKbSharedViewExcluded.ts` | `work_knowledge_documents.shared_view_excluded boolean NOT NULL DEFAULT false` | P3 |
+| File (in `apps/api/src/migrations/`)       | Contents                                                                                                                 | Phase |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ----- |
+| `1791180000000-CreateSharedViews.ts`       | `CREATE TABLE shared_views` + 3 indexes                                                                                  | P1    |
+| `1791180100000-CreateChannelGuests.ts`     | `CREATE TABLE channel_guests` + 3 indexes                                                                                | P2    |
+| `1791180200000-AddRequesterAttribution.ts` | 10 nullable columns across `tasks`, `missions`, `agent_action_proposals`, `agent_escalations` + FKs `ON DELETE SET NULL` | P2    |
+| `1791180300000-AddKbSharedViewExcluded.ts` | `work_knowledge_documents.shared_view_excluded boolean NOT NULL DEFAULT false`                                           | P3    |
 
 Every `down()` is a plain `DROP`/`DROP COLUMN` of only what its `up()` added. No
 existing column is altered, renamed or dropped anywhere in this epic.
@@ -398,7 +398,7 @@ New DTOs under `packages/contracts/src/api/shared-view/`, exported from that fol
   owner read)
 - `SharedViewSectionsDto`, `SharedViewIndexingMode`
 - `PublishedBoardDto` — `{ workspaceName, columns: PublishedColumnDto[], agents:
-  PublishedAgentDto[], recent: PublishedActivityLineDto[], generatedAt }`
+PublishedAgentDto[], recent: PublishedActivityLineDto[], generatedAt }`
 - `PublishedTaskCardDto`, `PublishedAgentDto`, `PublishedActivityLineDto`
 - `PublishedDocumentSummaryDto`, `PublishedDocumentDto`
 - `ChannelGuestDto`, `CreateChannelGuestDto`, `UpdateChannelGuestDto`
@@ -417,15 +417,15 @@ escape hatch (§2.2).
 `AuthSessionGuard` + `OrganizationOwnershipGuard` (class level) + `SharedViewOwnerGuard`
 (on every write and on the token-bearing read).
 
-| Method | Path | Body / query | Auth | Notes |
-| --- | --- | --- | --- | --- |
-| `GET` | `/` | — | member | Settings + counters. `link` present **only** for the Tenant owner (FR-4). |
-| `POST` | `/` | — | owner | Create + activate. `201` with the link. Idempotent: re-POST on an existing row returns the current row, `200`. Throttle 10/min. |
-| `POST` | `/regenerate` | — | owner | New token, `firstViewNotifiedAt := NULL`, `rotationCount += 1`. Throttle 10/min (FR-9). |
-| `PATCH` | `/` | `{ status?, sections?, knowledgeClasses?, searchIndexable? }` | owner | One write per changed facet → one activity row each (FR-47). Throttle 30/min. |
-| `DELETE` | `/` | — | owner | Hard-deletes the row; the link dies. Distinct from `PATCH {status:'paused'}`. |
-| `GET` | `/preview` | `?section=board\|knowledge` | owner | Runs the **public** projection under the owner's session (FR-45 — no counter). |
-| `GET` | `/knowledge-classes` | — | owner | Per-class publishable document counts for the confirm dialog (FR-33). |
+| Method   | Path                 | Body / query                                                  | Auth   | Notes                                                                                                                           |
+| -------- | -------------------- | ------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/`                  | —                                                             | member | Settings + counters. `link` present **only** for the Tenant owner (FR-4).                                                       |
+| `POST`   | `/`                  | —                                                             | owner  | Create + activate. `201` with the link. Idempotent: re-POST on an existing row returns the current row, `200`. Throttle 10/min. |
+| `POST`   | `/regenerate`        | —                                                             | owner  | New token, `firstViewNotifiedAt := NULL`, `rotationCount += 1`. Throttle 10/min (FR-9).                                         |
+| `PATCH`  | `/`                  | `{ status?, sections?, knowledgeClasses?, searchIndexable? }` | owner  | One write per changed facet → one activity row each (FR-47). Throttle 30/min.                                                   |
+| `DELETE` | `/`                  | —                                                             | owner  | Hard-deletes the row; the link dies. Distinct from `PATCH {status:'paused'}`.                                                   |
+| `GET`    | `/preview`           | `?section=board\|knowledge`                                   | owner  | Runs the **public** projection under the owner's session (FR-45 — no counter).                                                  |
+| `GET`    | `/knowledge-classes` | —                                                             | owner  | Per-class publishable document counts for the confirm dialog (FR-33).                                                           |
 
 ### 4.2 Public — `apps/api/src/shared-views/shared-view-public.controller.ts`
 
@@ -433,12 +433,12 @@ escape hatch (§2.2).
 takes the token in its path or query string** (spec FR-7a). The token is exchanged once, in a
 body, for a short-lived **view session**; every read presents only that.
 
-| Method | Path | Body / header | Notes |
-| --- | --- | --- | --- |
-| `POST` | `/sessions` | body `{ token }` | Resolves the token by hash; `200 { viewSession, expiresAt }`. Unknown / rotated / paused → the identical "no longer active" `404` (FR-11). Throttle 60/min per token hash + 600/hour per client (FR-42). A `POST` for the reason `OrgInviteController.preview` gives (§1.2). |
-| `GET` | `/board` | `Authorization: Bearer <viewSession>` | `PublishedBoardDto`. Throttle 60/min per Shared view (FR-42). |
-| `GET` | `/knowledge` | `Authorization: Bearer <viewSession>`; `?q=&cursor=` | `PublishedDocumentSummaryDto[]`; `q` min 2 chars, page 50, cap 200 (FR-30). |
-| `GET` | `/knowledge/:docId` | `Authorization: Bearer <viewSession>` | `PublishedDocumentDto`; 404 if class deselected (FR-32) or excluded. |
+| Method | Path                | Body / header                                        | Notes                                                                                                                                                                                                                                                                        |
+| ------ | ------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/sessions`         | body `{ token }`                                     | Resolves the token by hash; `200 { viewSession, expiresAt }`. Unknown / rotated / paused → the identical "no longer active" `404` (FR-11). Throttle 60/min per token hash + 600/hour per client (FR-42). A `POST` for the reason `OrgInviteController.preview` gives (§1.2). |
+| `GET`  | `/board`            | `Authorization: Bearer <viewSession>`                | `PublishedBoardDto`. Throttle 60/min per Shared view (FR-42).                                                                                                                                                                                                                |
+| `GET`  | `/knowledge`        | `Authorization: Bearer <viewSession>`; `?q=&cursor=` | `PublishedDocumentSummaryDto[]`; `q` min 2 chars, page 50, cap 200 (FR-30).                                                                                                                                                                                                  |
+| `GET`  | `/knowledge/:docId` | `Authorization: Bearer <viewSession>`                | `PublishedDocumentDto`; 404 if class deselected (FR-32) or excluded.                                                                                                                                                                                                         |
 
 **The view session** — `apps/api/src/shared-views/shared-view-session.service.ts`, modelled on
 [`TerminalAttachService`](../../../../../apps/api/src/terminal/terminal-attach.service.ts)'s
@@ -483,7 +483,7 @@ applied at every recorder, not left to downstream filters:
   `$referrer` in case a share URL is ever captured from another page.
 
 **What still carries the token, and why that is acceptable.** The visitor-facing page
-address `/share/<token>` *is* the link, as the invitation link is for `/org-invite/[token]`.
+address `/share/<token>` _is_ the link, as the invitation link is for `/org-invite/[token]`.
 That request line reaches the web app, which does not log request lines; the page sets
 `Referrer-Policy: no-referrer` (FR-39) and loads no analytics (above). The edge access log
 in front of the web host is outside the application: T14b's Done-when requires confirming
@@ -508,12 +508,12 @@ the client (600/hour) — and runs **before** the projection query (NFR "Through
 `ConnectionOwnerGuard` (resolves the Connection → its binding → the Tenant owner).
 404-never-403 throughout.
 
-| Method | Path | Body | Notes |
-| --- | --- | --- | --- |
-| `GET` | `/` | — | List + `{ used, max }` counters. Returns `{ bindingReady: false }` when no verified binding exists yet (S-20). |
-| `POST` | `/` | `{ externalUserId, displayName, note? }` | `409` on duplicate, `422` over the 25/100 caps. Throttle 20/min. |
-| `PATCH` | `/:guestId` | `{ displayName?, note?, status? }` | Rename or revoke. Throttle 30/min. |
-| `DELETE` | `/:guestId` | — | Hard delete; historical labels survive (§3.3). |
+| Method   | Path        | Body                                     | Notes                                                                                                          |
+| -------- | ----------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/`         | —                                        | List + `{ used, max }` counters. Returns `{ bindingReady: false }` when no verified binding exists yet (S-20). |
+| `POST`   | `/`         | `{ externalUserId, displayName, note? }` | `409` on duplicate, `422` over the 25/100 caps. Throttle 20/min.                                               |
+| `PATCH`  | `/:guestId` | `{ displayName?, note?, status? }`       | Rename or revoke. Throttle 30/min.                                                                             |
+| `DELETE` | `/:guestId` | —                                        | Hard delete; historical labels survive (§3.3).                                                                 |
 
 ### 4.4 Web BFF proxies
 
@@ -531,19 +531,19 @@ builds an API URL from the token.
 
 ### 5.1 New routes and files
 
-| Path | Kind | Notes |
-| --- | --- | --- |
-| `apps/web/src/app/[locale]/share/[token]/page.tsx` | Server component | The published page. Sibling of `org-invite/`, so the static `share` segment wins over `[slug]`. Exchanges the token for a view session in a request body (§4.2, §4.4) and renders board + knowledge tabs with it; **no** client JS required for first paint (FR-85). |
-| `apps/web/src/app/[locale]/share/[token]/not-active.tsx` | Server component | The identical "no longer active" body used by every failure (FR-11). |
-| `apps/web/src/components/share/PublishedBoard.tsx` | Client | Columns, cards, roster, strip; 20 s poll with visibility + idle handling (FR-43). |
-| `apps/web/src/components/share/PublishedKnowledge.tsx` | Client | Two-pane list/reader with debounced search. |
-| `apps/web/src/components/share/PublishedShell.tsx` | Client | Tabs, footer, live region, keyboard map (§6.12 of the spec). |
-| `apps/web/src/app/robots.ts` | Metadata route | New. `Disallow: /share/` unless the request resolves an indexable Shared view (FR-35). |
-| `apps/web/src/app/[locale]/(dashboard)/settings/sharing/page.tsx` | Server component | **Settings → Sharing**. |
-| `apps/web/src/components/settings/SharingSettings.tsx` | Client | Link card, section toggles, class picker, indexing radio, confirm dialogs. |
-| `apps/web/src/components/settings/ChannelGuestsPanel.tsx` | Client | Mounts inside `NotificationChannelsSettings.tsx` per channel. |
-| `apps/web/src/app/actions/shared-view.ts` | Server actions | `getSharedView`, `createSharedView`, `regenerateSharedViewLink`, `updateSharedView`, `deleteSharedView`, `getKnowledgeClassCounts`. |
-| `apps/web/src/app/actions/channel-guests.ts` | Server actions | `listChannelGuests`, `addChannelGuest`, `updateChannelGuest`, `deleteChannelGuest`. |
+| Path                                                              | Kind             | Notes                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/app/[locale]/share/[token]/page.tsx`                | Server component | The published page. Sibling of `org-invite/`, so the static `share` segment wins over `[slug]`. Exchanges the token for a view session in a request body (§4.2, §4.4) and renders board + knowledge tabs with it; **no** client JS required for first paint (FR-85).                                                       |
+| `apps/web/src/app/[locale]/share/[token]/not-active.tsx`          | Server component | The identical "no longer active" body used by every failure (FR-11).                                                                                                                                                                                                                                                       |
+| `apps/web/src/components/share/PublishedBoard.tsx`                | Client           | Columns, cards, roster, strip; 20 s poll with visibility + idle handling (FR-43).                                                                                                                                                                                                                                          |
+| `apps/web/src/components/share/PublishedKnowledge.tsx`            | Client           | Two-pane list/reader with debounced search.                                                                                                                                                                                                                                                                                |
+| `apps/web/src/components/share/PublishedShell.tsx`                | Client           | Tabs, footer, live region, keyboard map (§6.12 of the spec).                                                                                                                                                                                                                                                               |
+| `apps/web/src/app/robots.ts`                                      | Metadata route   | **Unchanged by this epic.** `/robots.txt` is site-wide and cannot vary per Shared view, so it must not depend on `searchIndexable` nor `Disallow: /share/` (a disallowed URL is never fetched, so its `noindex` header would never be read). The per-view directive is `X-Robots-Tag` plus the page `robots` meta (FR-35). |
+| `apps/web/src/app/[locale]/(dashboard)/settings/sharing/page.tsx` | Server component | **Settings → Sharing**.                                                                                                                                                                                                                                                                                                    |
+| `apps/web/src/components/settings/SharingSettings.tsx`            | Client           | Link card, section toggles, class picker, indexing radio, confirm dialogs.                                                                                                                                                                                                                                                 |
+| `apps/web/src/components/settings/ChannelGuestsPanel.tsx`         | Client           | Mounts inside `NotificationChannelsSettings.tsx` per channel.                                                                                                                                                                                                                                                              |
+| `apps/web/src/app/actions/shared-view.ts`                         | Server actions   | `getSharedView`, `createSharedView`, `regenerateSharedViewLink`, `updateSharedView`, `deleteSharedView`, `getKnowledgeClassCounts`.                                                                                                                                                                                        |
+| `apps/web/src/app/actions/channel-guests.ts`                      | Server actions   | `listChannelGuests`, `addChannelGuest`, `updateChannelGuest`, `deleteChannelGuest`.                                                                                                                                                                                                                                        |
 
 ### 5.2 Wiring into the existing shell
 
@@ -552,7 +552,7 @@ builds an API URL from the token.
   [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts).
 - Add `ROUTES.SHARE_VIEW` to `PUBLIC_ROUTES` **in the same commit** — omitting it makes
   [`apps/web/src/proxy.ts`](../../../../../apps/web/src/proxy.ts) bounce the visitor
-  *and clear the session cookie*. Extend
+  _and clear the session cookie_. Extend
   [`apps/web/src/lib/__tests__/public-routes.unit.spec.ts`](../../../../../apps/web/src/lib/__tests__/public-routes.unit.spec.ts)
   to pin it.
 - Add the `Sharing` nav entry to
@@ -567,12 +567,12 @@ builds an API URL from the token.
 
 ### 5.3 State and data fetching
 
-| Surface | Fetch | Cadence |
-| --- | --- | --- |
-| Published board | Server component does the first render; a client poll replaces the payload | 20 s; paused on `document.hidden`; stopped after 30 min idle |
-| Published knowledge list | Server component; client search re-queries | 300 ms debounce |
-| Sharing settings | Server component + server actions with `revalidatePath` | on action |
-| Guests panel | Server action list + optimistic add/revoke, reconciled on response | on action |
+| Surface                  | Fetch                                                                      | Cadence                                                      |
+| ------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Published board          | Server component does the first render; a client poll replaces the payload | 20 s; paused on `document.hidden`; stopped after 30 min idle |
+| Published knowledge list | Server component; client search re-queries                                 | 300 ms debounce                                              |
+| Sharing settings         | Server component + server actions with `revalidatePath`                    | on action                                                    |
+| Guests panel             | Server action list + optimistic add/revoke, reconciled on response         | on action                                                    |
 
 The poll is a plain `fetch` against the public endpoint with `cache: 'no-store'`; on a
 `429` the client backs off to 60 s and surfaces the throttled copy; on a network error
@@ -595,10 +595,10 @@ and its spec under
 [`packages/tasks/src/__tests__/`](../../../../../packages/tasks/src/__tests__/), which is
 where every existing task spec in that package lives.
 
-| Symbol | Task file | Trigger | What it does |
-| --- | --- | --- | --- |
+| Symbol                                 | Task file                                                            | Trigger                                                                             | What it does                                                                                                                                                                                                                                                          |
+| -------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DECISION_OUTCOME_POSTBACK_DISPATCHER` | `packages/tasks/src/tasks/trigger/decision-outcome-postback.task.ts` | Enqueued when an Approval or Escalation carrying `originConversationRef` is settled | Posts the outcome back into the originating conversation through the connector/channel facade within 60 s (FR-78). Retries 30 s → 2 m → 8 m, max 4 attempts; on final failure records the failure so the settled item can show "Couldn't reply in {channel}" (FR-79). |
-| `SHARED_VIEW_COUNTER_FLUSH_DISPATCHER` | `packages/tasks/src/tasks/trigger/shared-view-counter-flush.task.ts` | Cron, every 5 minutes | Flushes buffered view counts from the cache into `shared_views.viewCount` / `lastViewedAt`, so a public read never writes to Postgres on the request path (NFR "Latency"). Idempotent: the buffer key is cleared inside the same operation that applies the delta. |
+| `SHARED_VIEW_COUNTER_FLUSH_DISPATCHER` | `packages/tasks/src/tasks/trigger/shared-view-counter-flush.task.ts` | Cron, every 5 minutes                                                               | Flushes buffered view counts from the cache into `shared_views.viewCount` / `lastViewedAt`, so a public read never writes to Postgres on the request path (NFR "Latency"). Idempotent: the buffer key is cleared inside the same operation that applies the delta.    |
 
 The **first-view notification** (FR-46) is raised inline by the flush task, not on the
 request path, via a new `notifySharedViewFirstView()` producer on
@@ -624,7 +624,7 @@ whether to spend money) and the projection (must be live).
   [`packages/plugin/src/contracts/capabilities/connector.interface.ts`](../../../../../packages/plugin/src/contracts/capabilities/connector.interface.ts),
   so the connector inbound runtime binds to it rather than growing a rival gate.
 - **The service-name string shown in the add-guest form** (`"Their ID is on their profile
-  in {service}"`) is resolved from the plugin's own manifest display name via the
+in {service}"`) is resolved from the plugin's own manifest display name via the
   registry — never a switch statement over ids in `apps/web`.
 
 ---
@@ -714,14 +714,14 @@ in every file.
 
 ### 9.1 Telemetry
 
-| Event | Where | Properties (never the token, never a message body) |
-| --- | --- | --- |
-| `shared_view.enabled` / `.disabled` / `.regenerated` | Owner controller | `organizationId`, `sections`, `searchIndexable`, `rotationCount` |
-| `shared_view.viewed` | Counter flush task, aggregated | `organizationId`, `views` in window, `section` |
-| `shared_view.throttled` | Public throttle guard | `bucket` (`token` \| `client`) |
-| `channel_guest.added` / `.revoked` | Guests controller | `connectionId`, `provider`, `guestCount` |
-| `channel_guest.gate` | Admission service | `outcome` (`admitted` \| `denied` \| `throttled`), `provider` |
-| `decision.postback` | Post-back task | `outcome`, `attempt`, `succeeded` |
+| Event                                                | Where                          | Properties (never the token, never a message body)               |
+| ---------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------- |
+| `shared_view.enabled` / `.disabled` / `.regenerated` | Owner controller               | `organizationId`, `sections`, `searchIndexable`, `rotationCount` |
+| `shared_view.viewed`                                 | Counter flush task, aggregated | `organizationId`, `views` in window, `section`                   |
+| `shared_view.throttled`                              | Public throttle guard          | `bucket` (`token` \| `client`)                                   |
+| `channel_guest.added` / `.revoked`                   | Guests controller              | `connectionId`, `provider`, `guestCount`                         |
+| `channel_guest.gate`                                 | Admission service              | `outcome` (`admitted` \| `denied` \| `throttled`), `provider`    |
+| `decision.postback`                                  | Post-back task                 | `outcome`, `attempt`, `succeeded`                                |
 
 Redaction: the share token, the view session, the external user id and every message body
 are excluded at the emit site, not filtered downstream. The generic request recorders
@@ -730,19 +730,19 @@ are excluded at the emit site, not filtered downstream. The generic request reco
 
 ### 9.2 Failure modes and the chosen behaviour
 
-| Failure | Behaviour | Why |
-| --- | --- | --- |
-| Token decrypt fails (key rotation gap) | Owner read returns the settings with `link: null` and a "Couldn't read your link — regenerate it" line. The public path is unaffected (it matches on hash). | The public contract must never depend on the encryption key being present. |
-| Projection query times out | Public page serves the last successful render from the client's own memory plus "couldn't refresh"; a cold load returns `503` with the same chrome | Never blank a page a visitor is watching. |
-| Activity strip contains an unclassified action type | The line is dropped and a warning is logged; CI has already failed on the classification spec | Fail closed (FR-20). |
-| Counter flush task fails | Counts stay buffered and are applied on the next tick; the buffer has a 24 h TTL so a long outage loses counts rather than growing unbounded | A view counter is not worth durable queueing. |
-| Post-back task exhausts retries | The settled decision records the failure; the owner sees "Couldn't reply in {channel}" | FR-79. |
-| Binding disappears (connection deleted) mid-conversation | Guests cascade-delete with the binding; the gate denies; the post-back task short-circuits | One ownership record, one cascade. |
-| Two tabs regenerate simultaneously | The write is an atomic `UPDATE … WHERE rotationCount = :seen`; the loser gets `409` and re-reads | S-10. |
-| Guest revoked mid-run | The reply suppression check runs at post time, not at dispatch time | S-17. |
-| A `429` on the public path | Never counted as a view, never logged per-request (aggregated only) | FR-45 and log-volume sanity. |
-| View session expires or its link is regenerated mid-poll | The next read returns the FR-11 response; the client re-exchanges once with the token in a body; if that also fails, the page shows *no longer active* | FR-7a, FR-8. |
-| No session secret configured | `POST /sessions` returns `503` and every read is refused | Fail closed, as the terminal attach token does. |
+| Failure                                                  | Behaviour                                                                                                                                                   | Why                                                                        |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Token decrypt fails (key rotation gap)                   | Owner read returns the settings with `link: null` and a "Couldn't read your link — regenerate it" line. The public path is unaffected (it matches on hash). | The public contract must never depend on the encryption key being present. |
+| Projection query times out                               | Public page serves the last successful render from the client's own memory plus "couldn't refresh"; a cold load returns `503` with the same chrome          | Never blank a page a visitor is watching.                                  |
+| Activity strip contains an unclassified action type      | The line is dropped and a warning is logged; CI has already failed on the classification spec                                                               | Fail closed (FR-20).                                                       |
+| Counter flush task fails                                 | Counts stay buffered and are applied on the next tick; the buffer has a 24 h TTL so a long outage loses counts rather than growing unbounded                | A view counter is not worth durable queueing.                              |
+| Post-back task exhausts retries                          | The settled decision records the failure; the owner sees "Couldn't reply in {channel}"                                                                      | FR-79.                                                                     |
+| Binding disappears (connection deleted) mid-conversation | Guests cascade-delete with the binding; the gate denies; the post-back task short-circuits                                                                  | One ownership record, one cascade.                                         |
+| Two tabs regenerate simultaneously                       | The write is an atomic `UPDATE … WHERE rotationCount = :seen`; the loser gets `409` and re-reads                                                            | S-10.                                                                      |
+| Guest revoked mid-run                                    | The reply suppression check runs at post time, not at dispatch time                                                                                         | S-17.                                                                      |
+| A `429` on the public path                               | Never counted as a view, never logged per-request (aggregated only)                                                                                         | FR-45 and log-volume sanity.                                               |
+| View session expires or its link is regenerated mid-poll | The next read returns the FR-11 response; the client re-exchanges once with the token in a body; if that also fails, the page shows _no longer active_      | FR-7a, FR-8.                                                               |
+| No session secret configured                             | `POST /sessions` returns `503` and every read is refused                                                                                                    | Fail closed, as the terminal attach token does.                            |
 
 ---
 
@@ -750,47 +750,47 @@ are excluded at the emit site, not filtered downstream. The generic request reco
 
 ### 10.1 Unit — `packages/agent` (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/entities/__tests__/shared-view.entity.spec.ts` | Column defaults; `sections` default shape; `knowledgeClasses` defaults to `[]` |
-| `packages/agent/src/entities/__tests__/channel-guest.entity.spec.ts` | Defaults, status enum |
-| `packages/agent/src/shared-views/__tests__/shared-view-token.spec.ts` | 256-bit generation, hash stability, encrypt/decrypt round trip, token never in `toJSON()` |
-| `packages/agent/src/shared-views/__tests__/publish-filter.spec.ts` | **Exact key-set assertions** on every published DTO; a Task carrying cost/budget/comment fields and a `missionId` yields a card without any of them |
-| `packages/agent/src/shared-views/__tests__/publishable-activity.spec.ts` | Every `ActivityActionType` member is on the publish allowlist **or** the never-publish list — fails CI on an unclassified addition |
-| `packages/agent/src/shared-views/__tests__/shared-view-projection.service.spec.ts` | Column order and membership match the private Focus-layout fixture; cancelled Tasks, recurring templates and board-hidden Tasks absent and uncounted; `+N more` overflow arithmetic |
-| `packages/agent/src/shared-views/__tests__/knowledge-publish-predicate.spec.ts` | Draft / archived / proposed / deselected-class / excluded → not published; empty class list → zero documents |
-| `packages/agent/src/shared-views/__tests__/shared-view.service.spec.ts` | Create idempotency; regenerate resets `firstViewNotifiedAt`; pause keeps the token; optimistic-concurrency `409` |
-| `packages/agent/src/channel-guests/__tests__/channel-guest-admission.service.spec.ts` | Gate order; owner always admitted; revoked denied; caps; the 24 h single-refusal ceiling; zero facade calls on deny |
-| `packages/agent/src/channel-guests/__tests__/requester-attribution.service.spec.ts` | Label format; label stamped on task/approval/escalation, and on a mission only when the Run sets one up; owner work has no label; revoked suffix |
-| `packages/agent/src/channel-guests/__tests__/guest-text-fence.spec.ts` | Forged boundary markers neutralised; control markers stripped; truncation at 4,000 chars |
+| File                                                                                  | Covers                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/entities/__tests__/shared-view.entity.spec.ts`                    | Column defaults; `sections` default shape; `knowledgeClasses` defaults to `[]`                                                                                                      |
+| `packages/agent/src/entities/__tests__/channel-guest.entity.spec.ts`                  | Defaults, status enum                                                                                                                                                               |
+| `packages/agent/src/shared-views/__tests__/shared-view-token.spec.ts`                 | 256-bit generation, hash stability, encrypt/decrypt round trip, token never in `toJSON()`                                                                                           |
+| `packages/agent/src/shared-views/__tests__/publish-filter.spec.ts`                    | **Exact key-set assertions** on every published DTO; a Task carrying cost/budget/comment fields and a `missionId` yields a card without any of them                                 |
+| `packages/agent/src/shared-views/__tests__/publishable-activity.spec.ts`              | Every `ActivityActionType` member is on the publish allowlist **or** the never-publish list — fails CI on an unclassified addition                                                  |
+| `packages/agent/src/shared-views/__tests__/shared-view-projection.service.spec.ts`    | Column order and membership match the private Focus-layout fixture; cancelled Tasks, recurring templates and board-hidden Tasks absent and uncounted; `+N more` overflow arithmetic |
+| `packages/agent/src/shared-views/__tests__/knowledge-publish-predicate.spec.ts`       | Draft / archived / proposed / deselected-class / excluded → not published; empty class list → zero documents                                                                        |
+| `packages/agent/src/shared-views/__tests__/shared-view.service.spec.ts`               | Create idempotency; regenerate resets `firstViewNotifiedAt`; pause keeps the token; optimistic-concurrency `409`                                                                    |
+| `packages/agent/src/channel-guests/__tests__/channel-guest-admission.service.spec.ts` | Gate order; owner always admitted; revoked denied; caps; the 24 h single-refusal ceiling; zero facade calls on deny                                                                 |
+| `packages/agent/src/channel-guests/__tests__/requester-attribution.service.spec.ts`   | Label format; label stamped on task/approval/escalation, and on a mission only when the Run sets one up; owner work has no label; revoked suffix                                    |
+| `packages/agent/src/channel-guests/__tests__/guest-text-fence.spec.ts`                | Forged boundary markers neutralised; control markers stripped; truncation at 4,000 chars                                                                                            |
 
 ### 10.2 Controller specs — `apps/api` (Jest)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/shared-views/shared-views.controller.spec.ts` | Owner-only writes; non-owner member gets settings without the link; non-member `404`; throttle decorators present |
-| `apps/api/src/shared-views/shared-view-public.controller.spec.ts` | Unknown / rotated / paused tokens return byte-identical bodies; every security header present; `X-Robots-Tag` omitted only when `searchIndexable`; `429` carries `Retry-After`; **no route declares a path or query parameter named or shaped like a token** (reflective check over the controller's route metadata) |
-| `apps/api/src/shared-views/shared-view-session.service.spec.ts` | Mint/verify round trip; tampered MAC, expired `exp`, wrong `rot` and paused view all refused identically; no secret → mint `503`, verify refuses; claims contain no token or token hash |
-| `apps/api/src/logging.interceptor.spec.ts` (extend) | A request to `/share/<token>` and a failing request carrying a token both log `[redacted]`, never the token |
-| `packages/monitoring/src/redaction/__tests__/secret-url.spec.ts` | `redactSecretUrl` / `redactSecretValue` over share paths with and without locale prefix, query strings, `Bearer` sessions, JSON bodies; a non-secret path is unchanged |
-| `packages/monitoring/src/interceptors/__tests__/sentry.interceptor.spec.ts`, `posthog.interceptor.spec.ts`, `packages/monitoring/src/sentry/__tests__/sentry.config.spec.ts` (extend) | URL, tags, `endpoint`, transaction name and breadcrumbs are redacted |
-| `apps/api/src/shared-views/shared-view-owner.guard.spec.ts` | Resolves the Tenant owner; throws `NotFoundException`, never `ForbiddenException` |
-| `apps/api/src/channel-guests/channel-guests.controller.spec.ts` | CRUD; `bindingReady:false` shape; duplicate `409`; caps `422`; non-owner `404` |
-| `apps/api/src/ingest/slack/slack-chat-bridge.service.spec.ts` (extend the existing spec) | The gate is called after signature verification and before `OpenAiCompatService`; a denial short-circuits |
+| File                                                                                                                                                                                  | Covers                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/shared-views/shared-views.controller.spec.ts`                                                                                                                           | Owner-only writes; non-owner member gets settings without the link; non-member `404`; throttle decorators present                                                                                                                                                                                                    |
+| `apps/api/src/shared-views/shared-view-public.controller.spec.ts`                                                                                                                     | Unknown / rotated / paused tokens return byte-identical bodies; every security header present; `X-Robots-Tag` omitted only when `searchIndexable`; `429` carries `Retry-After`; **no route declares a path or query parameter named or shaped like a token** (reflective check over the controller's route metadata) |
+| `apps/api/src/shared-views/shared-view-session.service.spec.ts`                                                                                                                       | Mint/verify round trip; tampered MAC, expired `exp`, wrong `rot` and paused view all refused identically; no secret → mint `503`, verify refuses; claims contain no token or token hash                                                                                                                              |
+| `apps/api/src/logging.interceptor.spec.ts` (extend)                                                                                                                                   | A request to `/share/<token>` and a failing request carrying a token both log `[redacted]`, never the token                                                                                                                                                                                                          |
+| `packages/monitoring/src/redaction/__tests__/secret-url.spec.ts`                                                                                                                      | `redactSecretUrl` / `redactSecretValue` over share paths with and without locale prefix, query strings, `Bearer` sessions, JSON bodies; a non-secret path is unchanged                                                                                                                                               |
+| `packages/monitoring/src/interceptors/__tests__/sentry.interceptor.spec.ts`, `posthog.interceptor.spec.ts`, `packages/monitoring/src/sentry/__tests__/sentry.config.spec.ts` (extend) | URL, tags, `endpoint`, transaction name and breadcrumbs are redacted                                                                                                                                                                                                                                                 |
+| `apps/api/src/shared-views/shared-view-owner.guard.spec.ts`                                                                                                                           | Resolves the Tenant owner; throws `NotFoundException`, never `ForbiddenException`                                                                                                                                                                                                                                    |
+| `apps/api/src/channel-guests/channel-guests.controller.spec.ts`                                                                                                                       | CRUD; `bindingReady:false` shape; duplicate `409`; caps `422`; non-owner `404`                                                                                                                                                                                                                                       |
+| `apps/api/src/ingest/slack/slack-chat-bridge.service.spec.ts` (extend the existing spec)                                                                                              | The gate is called after signature verification and before `OpenAiCompatService`; a denial short-circuits                                                                                                                                                                                                            |
 
 ### 10.3 End-to-end
 
-| File | Covers |
-| --- | --- |
-| `apps/api/test/shared-view.e2e-spec.ts` | Full publish → exchange → read → regenerate → old-token-dead **and old-view-session-dead** cycle against a real HTTP stack |
+| File                                                | Covers                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/test/shared-view.e2e-spec.ts`             | Full publish → exchange → read → regenerate → old-token-dead **and old-view-session-dead** cycle against a real HTTP stack                                                                                                                                                                                                                                              |
 | `apps/api/test/shared-view-log-hygiene.e2e-spec.ts` | Captures every line emitted by the Nest `Logger`, every `Sentry` capture/context/breadcrumb call and every PostHog `trackEvent` call while running an exchange, a board read, a knowledge read, an unknown-token exchange, a regenerated-away read, a throttled read and a forced `500`; asserts neither the token nor the view session appears as a substring anywhere |
-| `apps/web/e2e/shared-view-token-transport.spec.ts` | Records every network request the published page makes over three poll cycles; asserts no request URL contains the token, no PostHog request is issued, and the token appears only in `POST /sessions` bodies |
-| `apps/web/e2e/shared-view-publish.spec.ts` | Owner turns sharing on, copies the link, previews as a visitor |
-| `apps/web/e2e/shared-view-public-page.spec.ts` | Visit in a **fresh context with no storage state**; board renders; no cookie is set; no sign-in prompt; footer updates |
-| `apps/web/e2e/shared-view-revoke.spec.ts` | Regenerate in one context, assert the other context's open page shows "no longer active" within 20 s |
-| `apps/web/e2e/shared-view-noindex.spec.ts` | Robots headers/meta/crawler file present when blocked, absent when allowed |
-| `apps/web/e2e/shared-view-a11y.spec.ts` | Axe pass on the public page in light and dark; keyboard traversal; 360 px layout |
-| `apps/web/e2e/channel-guests.spec.ts` | Add, rename, revoke; caps; the not-ready state; non-owner sees nothing |
+| `apps/web/e2e/shared-view-token-transport.spec.ts`  | Records every network request the published page makes over three poll cycles; asserts no request URL contains the token, no PostHog request is issued, and the token appears only in `POST /sessions` bodies                                                                                                                                                           |
+| `apps/web/e2e/shared-view-publish.spec.ts`          | Owner turns sharing on, copies the link, previews as a visitor                                                                                                                                                                                                                                                                                                          |
+| `apps/web/e2e/shared-view-public-page.spec.ts`      | Visit in a **fresh context with no storage state**; board renders; no cookie is set; no sign-in prompt; footer updates                                                                                                                                                                                                                                                  |
+| `apps/web/e2e/shared-view-revoke.spec.ts`           | Regenerate in one context, assert the other context's open page shows "no longer active" within 20 s                                                                                                                                                                                                                                                                    |
+| `apps/web/e2e/shared-view-noindex.spec.ts`          | Robots headers/meta/crawler file present when blocked, absent when allowed                                                                                                                                                                                                                                                                                              |
+| `apps/web/e2e/shared-view-a11y.spec.ts`             | Axe pass on the public page in light and dark; keyboard traversal; 360 px layout                                                                                                                                                                                                                                                                                        |
+| `apps/web/e2e/channel-guests.spec.ts`               | Add, rename, revoke; caps; the not-ready state; non-owner sees nothing                                                                                                                                                                                                                                                                                                  |
 
 Every e2e that visits `/share/:token` must use a browser context with **no** storage
 state, or it proves nothing about anonymous access.
@@ -809,7 +809,7 @@ Each phase is independently shippable and leaves `develop` green.
 4. Owner controller + owner guard + Settings → Sharing page.
 5. Public controller (token exchange + view-session guard) + security-header interceptor +
    throttle buckets + the request-recorder redaction and its log-hygiene e2e.
-6. `/share/[token]` page, `PUBLIC_ROUTES` entry, `robots.ts`.
+6. `/share/[token]` page (with the per-view `robots` meta), `PUBLIC_ROUTES` entry.
 7. Counter-flush task + first-view notification + event-type registration.
 8. i18n (`dashboard.sharing`, `share`) + the tests in §10.
 
@@ -845,18 +845,18 @@ soon" behind the existing `soon` copy pattern), guests, attribution.
 
 ## 12. Constitution compliance
 
-| Principle | ✓ | Justification |
-| --- | --- | --- |
-| **I — Plugin-first architecture** | ✓ | No external integration is added. Outbound replies go through the existing notification-channel facade; inbound rides the existing signature-verified receiver. |
-| **II — Capability-driven resolution** | ✓ | The allowlist keys on a Connection and a binding; the provider name is read as data. The add-guest form's service label comes from the plugin manifest via the registry, not a switch in `apps/web`. |
-| **III — Source-of-truth repositories** | ✓ | The Knowledge section publishes a projection of documents whose bodies stay in the user's own git repository. Nothing is copied into our database to publish it. |
-| **IV — Job runtime via `*_DISPATCHER`** | ✓ | Both background jobs (§6) are enqueued through DI symbols registered in `_tasks-symbols.ts`; no call site imports a job-runtime SDK directly. |
-| **V — Forward-only migrations, same PR** | ✓ | Four migrations in `apps/api/src/migrations/` (§3.5), each shipping with the entity change that needs it. Every `down()` drops only what its `up()` added. |
-| **VI — Tests are a prerequisite** | ✓ | §10: 10 unit files, 5 controller specs, 7 end-to-end specs, including the key-set assertions that make an accidental field leak a CI failure. |
-| **VII — Secret hygiene** | ✓ | The token is stored with `EncryptedJsonColumn`, returned only to the Tenant owner, excluded at every telemetry emit site, and never written to an activity-log row. It never appears in an API URL — it is exchanged in a body for a short-lived, revocable view session (§4.2) — and every request recorder redacts it before writing. Visitor IPs are never persisted. |
-| **VIII — Single source of truth for plugin lists** | n/a | No plugin is added, removed or re-categorised. |
-| **IX — Behaviour-first spec** | ✓ | `spec.md` names no class, no path and no code; every implementation detail lives here. |
-| **X — Forward-looking backwards compatibility** | ✓ | Every new column is nullable or defaulted; every endpoint is new; no existing DTO field is renamed or removed; `ActivityActionType` members are appended, never reordered. |
-| **Program rule #1 — additive only** | ✓ | Nothing is removed or renamed. The private dashboard, the member roster, the invitation flow and the inbound receiver behave exactly as before for anyone who does not opt in. |
-| **Program rule #2 — no duplicate nouns** | ✓ | Two new nouns, both justified in `spec.md` §5.3 and both to be added to the program vocabulary table in the same PR. |
-| **Program rule #9 — every surface answers "what did it cost?"** | ✓ | A denied inbound message provably costs zero (the gate runs before any facade call, asserted in §10.1). Admitted guest work produces Runs whose receipts are the existing ones — this epic adds a requester label to them, not a parallel accounting path. |
+| Principle                                                       | ✓   | Justification                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **I — Plugin-first architecture**                               | ✓   | No external integration is added. Outbound replies go through the existing notification-channel facade; inbound rides the existing signature-verified receiver.                                                                                                                                                                                                          |
+| **II — Capability-driven resolution**                           | ✓   | The allowlist keys on a Connection and a binding; the provider name is read as data. The add-guest form's service label comes from the plugin manifest via the registry, not a switch in `apps/web`.                                                                                                                                                                     |
+| **III — Source-of-truth repositories**                          | ✓   | The Knowledge section publishes a projection of documents whose bodies stay in the user's own git repository. Nothing is copied into our database to publish it.                                                                                                                                                                                                         |
+| **IV — Job runtime via `*_DISPATCHER`**                         | ✓   | Both background jobs (§6) are enqueued through DI symbols registered in `_tasks-symbols.ts`; no call site imports a job-runtime SDK directly.                                                                                                                                                                                                                            |
+| **V — Forward-only migrations, same PR**                        | ✓   | Four migrations in `apps/api/src/migrations/` (§3.5), each shipping with the entity change that needs it. Every `down()` drops only what its `up()` added.                                                                                                                                                                                                               |
+| **VI — Tests are a prerequisite**                               | ✓   | §10: 10 unit files, 5 controller specs, 7 end-to-end specs, including the key-set assertions that make an accidental field leak a CI failure.                                                                                                                                                                                                                            |
+| **VII — Secret hygiene**                                        | ✓   | The token is stored with `EncryptedJsonColumn`, returned only to the Tenant owner, excluded at every telemetry emit site, and never written to an activity-log row. It never appears in an API URL — it is exchanged in a body for a short-lived, revocable view session (§4.2) — and every request recorder redacts it before writing. Visitor IPs are never persisted. |
+| **VIII — Single source of truth for plugin lists**              | n/a | No plugin is added, removed or re-categorised.                                                                                                                                                                                                                                                                                                                           |
+| **IX — Behaviour-first spec**                                   | ✓   | `spec.md` names no class, no path and no code; every implementation detail lives here.                                                                                                                                                                                                                                                                                   |
+| **X — Forward-looking backwards compatibility**                 | ✓   | Every new column is nullable or defaulted; every endpoint is new; no existing DTO field is renamed or removed; `ActivityActionType` members are appended, never reordered.                                                                                                                                                                                               |
+| **Program rule #1 — additive only**                             | ✓   | Nothing is removed or renamed. The private dashboard, the member roster, the invitation flow and the inbound receiver behave exactly as before for anyone who does not opt in.                                                                                                                                                                                           |
+| **Program rule #2 — no duplicate nouns**                        | ✓   | Two new nouns, both justified in `spec.md` §5.3 and both to be added to the program vocabulary table in the same PR.                                                                                                                                                                                                                                                     |
+| **Program rule #9 — every surface answers "what did it cost?"** | ✓   | A denied inbound message provably costs zero (the gate runs before any facade call, asserted in §10.1). Admitted guest work produces Runs whose receipts are the existing ones — this epic adds a requester label to them, not a parallel accounting path.                                                                                                               |

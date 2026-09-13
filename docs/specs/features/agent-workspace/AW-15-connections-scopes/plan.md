@@ -15,12 +15,12 @@
 
 ### 1.1 Four unrelated connection models, no registry
 
-| # | What it is | Entity | Table | API | Web |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Plugin settings + secrets, three tiers (admin → user → Work) | `PluginEntity` / `UserPluginEntity` / `WorkPluginEntity` under `packages/agent/src/plugins/entities/` | `plugins`, `user_plugins`, `work_plugins` | [`apps/api/src/plugins/plugins.controller.ts`](../../../../../apps/api/src/plugins/plugins.controller.ts) | [`apps/web/src/app/[locale]/(dashboard)/plugins/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/plugins/page.tsx>) |
-| 2 | OAuth accounts, shared with platform login | [`packages/agent/src/entities/auth-account.entity.ts`](../../../../../packages/agent/src/entities/auth-account.entity.ts) | `account` | [`apps/api/src/plugins-capabilities/oauth/oauth.controller.ts`](../../../../../apps/api/src/plugins-capabilities/oauth/oauth.controller.ts) | `apps/web/src/components/settings/PluginOAuthConnection.tsx` |
-| 3 | External MCP servers | [`packages/agent/src/entities/mcp-server-connection.entity.ts`](../../../../../packages/agent/src/entities/mcp-server-connection.entity.ts) + [`agent-mcp-server-binding.entity.ts`](../../../../../packages/agent/src/entities/agent-mcp-server-binding.entity.ts) | `mcp_server_connections`, `agent_mcp_server_bindings` | [`apps/api/src/mcp-connections/mcp-connections.controller.ts`](../../../../../apps/api/src/mcp-connections/mcp-connections.controller.ts), [`agent-mcp-servers.controller.ts`](../../../../../apps/api/src/mcp-connections/agent-mcp-servers.controller.ts) | [`apps/web/src/components/settings/McpConnectionsClient.tsx`](../../../../../apps/web/src/components/settings/McpConnectionsClient.tsx), [`AgentMcpServersClient.tsx`](../../../../../apps/web/src/components/agents/AgentMcpServersClient.tsx) |
-| 4 | Repositories | [`packages/agent/src/entities/repo-connection.entity.ts`](../../../../../packages/agent/src/entities/repo-connection.entity.ts) | `repo_connections`, `agent_repo_attachments` | [`apps/api/src/repo-connections/repo-connections.controller.ts`](../../../../../apps/api/src/repo-connections/repo-connections.controller.ts) | `apps/web/src/components/settings/RepositoriesSettings.tsx` |
+| #   | What it is                                                   | Entity                                                                                                                                                                                                                                                              | Table                                                 | API                                                                                                                                                                                                                                                         | Web                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Plugin settings + secrets, three tiers (admin → user → Work) | `PluginEntity` / `UserPluginEntity` / `WorkPluginEntity` under `packages/agent/src/plugins/entities/`                                                                                                                                                               | `plugins`, `user_plugins`, `work_plugins`             | [`apps/api/src/plugins/plugins.controller.ts`](../../../../../apps/api/src/plugins/plugins.controller.ts)                                                                                                                                                   | [`apps/web/src/app/[locale]/(dashboard)/plugins/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/plugins/page.tsx>)                                                                                                             |
+| 2   | OAuth accounts, shared with platform login                   | [`packages/agent/src/entities/auth-account.entity.ts`](../../../../../packages/agent/src/entities/auth-account.entity.ts)                                                                                                                                           | `account`                                             | [`apps/api/src/plugins-capabilities/oauth/oauth.controller.ts`](../../../../../apps/api/src/plugins-capabilities/oauth/oauth.controller.ts)                                                                                                                 | `apps/web/src/components/settings/PluginOAuthConnection.tsx`                                                                                                                                                                                    |
+| 3   | External MCP servers                                         | [`packages/agent/src/entities/mcp-server-connection.entity.ts`](../../../../../packages/agent/src/entities/mcp-server-connection.entity.ts) + [`agent-mcp-server-binding.entity.ts`](../../../../../packages/agent/src/entities/agent-mcp-server-binding.entity.ts) | `mcp_server_connections`, `agent_mcp_server_bindings` | [`apps/api/src/mcp-connections/mcp-connections.controller.ts`](../../../../../apps/api/src/mcp-connections/mcp-connections.controller.ts), [`agent-mcp-servers.controller.ts`](../../../../../apps/api/src/mcp-connections/agent-mcp-servers.controller.ts) | [`apps/web/src/components/settings/McpConnectionsClient.tsx`](../../../../../apps/web/src/components/settings/McpConnectionsClient.tsx), [`AgentMcpServersClient.tsx`](../../../../../apps/web/src/components/agents/AgentMcpServersClient.tsx) |
+| 4   | Repositories                                                 | [`packages/agent/src/entities/repo-connection.entity.ts`](../../../../../packages/agent/src/entities/repo-connection.entity.ts)                                                                                                                                     | `repo_connections`, `agent_repo_attachments`          | [`apps/api/src/repo-connections/repo-connections.controller.ts`](../../../../../apps/api/src/repo-connections/repo-connections.controller.ts)                                                                                                               | `apps/web/src/components/settings/RepositoriesSettings.tsx`                                                                                                                                                                                     |
 
 Nothing joins them. There is no row that means "an account", so there is nowhere to hang a
 label, a preset, a health state or a last-used timestamp.
@@ -39,7 +39,7 @@ label, a preset, a health state or a last-used timestamp.
   mid-Run therefore does not bind until the next Run.
 - **Tool grants cannot name an account.**
   [`packages/agent/src/policy/tool-grant.ts`](../../../../../packages/agent/src/policy/tool-grant.ts)
-  matches glob patterns over tool *names*; tool names carry no account identity, so
+  matches glob patterns over tool _names_; tool names carry no account identity, so
   "read on the client's repo, write on ours" is inexpressible.
 - **Health is pull-only.** `POST /api/mcp-connections/:id/test`
   ([controller](../../../../../apps/api/src/mcp-connections/mcp-connections.controller.ts))
@@ -146,9 +146,9 @@ flowchart TB
 
 ### 2.3 The two enforcement seams
 
-| Seam | File | What is added |
-| --- | --- | --- |
-| **Run assembly** (FR-23) | [`packages/agent/src/agents/agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts) `resolveGrantedTools`, after the existing tool-grant partition | drop every descriptor whose Connection resolves to `blocked`, and every descriptor whose tool name is not covered by the effective preset's patterns |
+| Seam                             | File                                                                                                                                                                                                              | What is added                                                                                                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Run assembly** (FR-23)         | [`packages/agent/src/agents/agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts) `resolveGrantedTools`, after the existing tool-grant partition                                | drop every descriptor whose Connection resolves to `blocked`, and every descriptor whose tool name is not covered by the effective preset's patterns                   |
 | **Per invocation** (FR-20/21/22) | [`packages/agent/src/agents/agent-run.service.ts`](../../../../../packages/agent/src/agents/agent-run.service.ts) `invokeTool`, between the `descriptorByName.get(call.name)` lookup and `descriptor.invoke(...)` | `await this.connectionAccess?.decide(agent, call.name)`; a refusal returns `{ error: … }` exactly like the existing "not in the allow-list" branch — the Run continues |
 
 Both consume `CONNECTION_ACCESS_ENFORCER` through `@Optional() @Inject(...)`, so any runtime
@@ -203,11 +203,7 @@ V** each entity change ships its migration **in the same PR**.
 
 ```ts
 export type ConnectionKind = 'oauth' | 'api_key' | 'mcp' | 'repo';
-export type ConnectionBackingKind =
-    | 'auth_account'
-    | 'mcp_server_connection'
-    | 'repo_connection'
-    | 'plugin_settings';
+export type ConnectionBackingKind = 'auth_account' | 'mcp_server_connection' | 'repo_connection' | 'plugin_settings';
 export type ConnectionScopePreset = 'read' | 'write';
 export type ConnectionHealth = 'unknown' | 'healthy' | 'degraded' | 'expired' | 'unreachable';
 
@@ -222,39 +218,39 @@ export const CONNECTIONS_PER_WORKSPACE_MAX = 100;
 @Index('idx_connections_health_sweep', ['health', 'healthCheckedAt'])
 @Index('idx_connections_backing', ['backingKind', 'backingId'])
 export class Connection {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column({ type: 'uuid' }) userId: string;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column({ type: 'uuid' }) userId: string;
 
-    /** Plugin id, or the literal 'mcp' for MCP-kind rows. Never hardcoded in core. */
-    @Column({ type: 'varchar', length: 128 }) providerId: string;
-    @Column({ type: 'varchar', length: 16 }) kind: ConnectionKind;
-    @Column({ type: 'varchar', length: 24 }) backingKind: ConnectionBackingKind;
-    /** varchar, not uuid: `account.id` is varchar. Null for plugin_settings. */
-    @Column({ type: 'varchar', length: 255, nullable: true }) backingId?: string | null;
+	/** Plugin id, or the literal 'mcp' for MCP-kind rows. Never hardcoded in core. */
+	@Column({ type: 'varchar', length: 128 }) providerId: string;
+	@Column({ type: 'varchar', length: 16 }) kind: ConnectionKind;
+	@Column({ type: 'varchar', length: 24 }) backingKind: ConnectionBackingKind;
+	/** varchar, not uuid: `account.id` is varchar. Null for plugin_settings. */
+	@Column({ type: 'varchar', length: 255, nullable: true }) backingId?: string | null;
 
-    @Column({ type: 'varchar', length: 60 }) label: string;
-    /** lower(label) — the case-insensitive uniqueness key (FR-3). */
-    @Column({ type: 'varchar', length: 60 }) labelNormalized: string;
-    @Column({ type: 'boolean', default: false }) isPrimary: boolean;
-    @Column({ type: 'varchar', length: 8, default: 'read' }) scopePreset: ConnectionScopePreset;
+	@Column({ type: 'varchar', length: 60 }) label: string;
+	/** lower(label) — the case-insensitive uniqueness key (FR-3). */
+	@Column({ type: 'varchar', length: 60 }) labelNormalized: string;
+	@Column({ type: 'boolean', default: false }) isPrimary: boolean;
+	@Column({ type: 'varchar', length: 8, default: 'read' }) scopePreset: ConnectionScopePreset;
 
-    @Column({ type: 'varchar', length: 16, default: 'unknown' }) health: ConnectionHealth;
-    @PortableDateColumn({ nullable: true }) healthCheckedAt?: Date | null;
-    @PortableDateColumn({ nullable: true }) healthCheckInFlightAt?: Date | null;
-    @Column({ type: 'int', default: 0 }) healthFailureCount: number;
-    /** Classified code, never a provider response body. */
-    @Column({ type: 'varchar', length: 48, nullable: true }) lastErrorCode?: string | null;
-    @Column({ type: 'text', nullable: true }) lastErrorMessage?: string | null;
+	@Column({ type: 'varchar', length: 16, default: 'unknown' }) health: ConnectionHealth;
+	@PortableDateColumn({ nullable: true }) healthCheckedAt?: Date | null;
+	@PortableDateColumn({ nullable: true }) healthCheckInFlightAt?: Date | null;
+	@Column({ type: 'int', default: 0 }) healthFailureCount: number;
+	/** Classified code, never a provider response body. */
+	@Column({ type: 'varchar', length: 48, nullable: true }) lastErrorCode?: string | null;
+	@Column({ type: 'text', nullable: true }) lastErrorMessage?: string | null;
 
-    @PortableDateColumn({ nullable: true }) lastUsedAt?: Date | null;
-    @Column({ type: 'uuid', nullable: true }) lastUsedRunId?: string | null;
-    /** MCP only — tools discovered at the last successful connect. */
-    @Column({ type: 'int', nullable: true }) toolCount?: number | null;
+	@PortableDateColumn({ nullable: true }) lastUsedAt?: Date | null;
+	@Column({ type: 'uuid', nullable: true }) lastUsedRunId?: string | null;
+	/** MCP only — tools discovered at the last successful connect. */
+	@Column({ type: 'int', nullable: true }) toolCount?: number | null;
 
-    @Column({ type: 'uuid', nullable: true }) tenantId?: string | null;
-    @Column({ type: 'uuid', nullable: true }) organizationId?: string | null;
-    @CreateDateColumn() createdAt: Date;
-    @UpdateDateColumn() updatedAt: Date;
+	@Column({ type: 'uuid', nullable: true }) tenantId?: string | null;
+	@Column({ type: 'uuid', nullable: true }) organizationId?: string | null;
+	@CreateDateColumn() createdAt: Date;
+	@UpdateDateColumn() updatedAt: Date;
 }
 ```
 
@@ -262,7 +258,7 @@ export class Connection {
 > emits dialect-specific SQL, and the e2e stack + CI run better-sqlite3 (see the
 > `PortableDateColumn` boot guard referenced in `mcp-server-connection.entity.ts`). Single-primary
 > is instead enforced inside one transaction: `UPDATE connections SET "isPrimary" = false WHERE
-> "userId" = $1 AND "providerId" = $2` immediately followed by the `true` write on the target row.
+"userId" = $1 AND "providerId" = $2` immediately followed by the `true` write on the target row.
 > Two concurrent promotions serialise on the same rows and the last one wins, which is the
 > correct outcome — there is never a window with two primaries visible to a committed read.
 
@@ -277,23 +273,23 @@ export type ConnectionGrantMode = 'read' | 'write' | 'blocked'; // `inherit` = n
 @Index('idx_connection_grants_user', ['userId'])
 @Index('idx_connection_grants_target', ['targetType', 'targetId'])
 export class ConnectionGrant {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column({ type: 'uuid' }) userId: string;
-    @Column({ type: 'uuid' }) connectionId: string;
-    @Column({ type: 'varchar', length: 16 }) targetType: ConnectionGrantTarget;
-    /**
-     * Agent id for 'agent'; the owning userId for 'workspace'. Non-null on
-     * both so the unique index has no nullable member — SQL treats NULLs as
-     * DISTINCT, which would let a concurrent create burst all succeed. Same
-     * reasoning as `tool_grants.scopeId`.
-     */
-    @Column({ type: 'uuid' }) targetId: string;
-    @Column({ type: 'varchar', length: 8 }) mode: ConnectionGrantMode;
-    @Column({ type: 'text', nullable: true }) note?: string | null;
-    @Column({ type: 'uuid', nullable: true }) tenantId?: string | null;
-    @Column({ type: 'uuid', nullable: true }) organizationId?: string | null;
-    @CreateDateColumn() createdAt: Date;
-    @UpdateDateColumn() updatedAt: Date;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column({ type: 'uuid' }) userId: string;
+	@Column({ type: 'uuid' }) connectionId: string;
+	@Column({ type: 'varchar', length: 16 }) targetType: ConnectionGrantTarget;
+	/**
+	 * Agent id for 'agent'; the owning userId for 'workspace'. Non-null on
+	 * both so the unique index has no nullable member — SQL treats NULLs as
+	 * DISTINCT, which would let a concurrent create burst all succeed. Same
+	 * reasoning as `tool_grants.scopeId`.
+	 */
+	@Column({ type: 'uuid' }) targetId: string;
+	@Column({ type: 'varchar', length: 8 }) mode: ConnectionGrantMode;
+	@Column({ type: 'text', nullable: true }) note?: string | null;
+	@Column({ type: 'uuid', nullable: true }) tenantId?: string | null;
+	@Column({ type: 'uuid', nullable: true }) organizationId?: string | null;
+	@CreateDateColumn() createdAt: Date;
+	@UpdateDateColumn() updatedAt: Date;
 }
 ```
 
@@ -308,15 +304,15 @@ FK `connectionId → connections(id) ON DELETE CASCADE` is created by the migrat
 @Index('uq_connection_run_usage', ['connectionId', 'runId'], { unique: true })
 @Index('idx_connection_run_usage_conn_last', ['connectionId', 'lastUsedAt'])
 export class ConnectionRunUsage {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column({ type: 'uuid' }) connectionId: string;
-    @Column({ type: 'uuid' }) runId: string;
-    @Column({ type: 'uuid', nullable: true }) agentId?: string | null;
-    /** Label at the time of use — Runs keep their history when a Connection goes (FR-38). */
-    @Column({ type: 'varchar', length: 60 }) connectionLabel: string;
-    @Column({ type: 'int', default: 0 }) callCount: number;
-    @PortableDateColumn() firstUsedAt: Date;
-    @PortableDateColumn() lastUsedAt: Date;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column({ type: 'uuid' }) connectionId: string;
+	@Column({ type: 'uuid' }) runId: string;
+	@Column({ type: 'uuid', nullable: true }) agentId?: string | null;
+	/** Label at the time of use — Runs keep their history when a Connection goes (FR-38). */
+	@Column({ type: 'varchar', length: 60 }) connectionLabel: string;
+	@Column({ type: 'int', default: 0 }) callCount: number;
+	@PortableDateColumn() firstUsedAt: Date;
+	@PortableDateColumn() lastUsedAt: Date;
 }
 ```
 
@@ -336,20 +332,20 @@ export const VAULT_VALUE_MAX_BYTES = 8 * 1024;
 @Index('uq_vault_secrets_owner_key', ['userId', 'key'], { unique: true })
 @Index('idx_vault_secrets_owner_group', ['userId', 'groupName'])
 export class VaultSecret {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column({ type: 'uuid' }) userId: string;
-    @Column({ type: 'varchar', length: 40 }) groupName: string;
-    @Column({ type: 'varchar', length: 64 }) key: string;
-    @Column({ type: 'varchar', length: 80, nullable: true }) label?: string | null;
-    /** AES-256-GCM envelope, same column helper as mcp authHeaders. WRITE-ONLY. */
-    @EncryptedJsonColumn() secret: { v: string };
-    @Column({ type: 'uuid' }) createdByUserId: string;
-    @PortableDateColumn({ nullable: true }) lastUsedAt?: Date | null;
-    @Column({ type: 'int', default: 0 }) referenceCount: number;
-    @Column({ type: 'uuid', nullable: true }) tenantId?: string | null;
-    @Column({ type: 'uuid', nullable: true }) organizationId?: string | null;
-    @CreateDateColumn() createdAt: Date;
-    @UpdateDateColumn() updatedAt: Date;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column({ type: 'uuid' }) userId: string;
+	@Column({ type: 'varchar', length: 40 }) groupName: string;
+	@Column({ type: 'varchar', length: 64 }) key: string;
+	@Column({ type: 'varchar', length: 80, nullable: true }) label?: string | null;
+	/** AES-256-GCM envelope, same column helper as mcp authHeaders. WRITE-ONLY. */
+	@EncryptedJsonColumn() secret: { v: string };
+	@Column({ type: 'uuid' }) createdByUserId: string;
+	@PortableDateColumn({ nullable: true }) lastUsedAt?: Date | null;
+	@Column({ type: 'int', default: 0 }) referenceCount: number;
+	@Column({ type: 'uuid', nullable: true }) tenantId?: string | null;
+	@Column({ type: 'uuid', nullable: true }) organizationId?: string | null;
+	@CreateDateColumn() createdAt: Date;
+	@UpdateDateColumn() updatedAt: Date;
 }
 ```
 
@@ -360,23 +356,23 @@ that asserts no exported DTO type has a field assignable from `VaultSecret['secr
 
 ### 3.5 Additive columns on existing tables
 
-| Table | Column | Phase | Why |
-| --- | --- | --- | --- |
-| `mcp_server_connections` | `authMode varchar(16) NOT NULL DEFAULT 'header'` (`header \| interactive`) | P3 | distinguishes header-auth from interactive-sign-in servers |
-| `mcp_server_connections` | `oauthTokens` (`EncryptedJsonColumn`, nullable) | P3 | access/refresh pair for interactive servers, envelope-encrypted like `authHeaders` |
-| `mcp_server_connections` | `oauthMetadata simple-json NULL` | P3 | issuer, authorization/token endpoints, registered client id, granted scopes — **non-secret** |
-| `plugin_usage_events` | `connectionId uuid NULL` + `idx_plugin_usage_connection (connectionId, createdAt)` | P2 | lets AW-17 group spend by Connection with no further schema work |
+| Table                    | Column                                                                             | Phase | Why                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------- |
+| `mcp_server_connections` | `authMode varchar(16) NOT NULL DEFAULT 'header'` (`header \| interactive`)         | P3    | distinguishes header-auth from interactive-sign-in servers                                   |
+| `mcp_server_connections` | `oauthTokens` (`EncryptedJsonColumn`, nullable)                                    | P3    | access/refresh pair for interactive servers, envelope-encrypted like `authHeaders`           |
+| `mcp_server_connections` | `oauthMetadata simple-json NULL`                                                   | P3    | issuer, authorization/token endpoints, registered client id, granted scopes — **non-secret** |
+| `plugin_usage_events`    | `connectionId uuid NULL` + `idx_plugin_usage_connection (connectionId, createdAt)` | P2    | lets AW-17 group spend by Connection with no further schema work                             |
 
 ### 3.6 Migrations (forward-only, one per phase, shipped with its entities)
 
 Timestamps are AW-15 slots 00–02 of the program's reserved migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow));
 re-stamp before merge if `develop` has moved past them.
 
-| File | Phase | Contents |
-| --- | --- | --- |
-| `apps/api/src/migrations/1791150000000-AddConnectionRegistry.ts` | P1 | `CREATE TABLE connections` + its five indexes + backfill (§3.7) |
-| `apps/api/src/migrations/1791150100000-AddConnectionGrantsAndUsage.ts` | P2 | `CREATE TABLE connection_grants` (+ FK cascade), `CREATE TABLE connection_run_usage`, `ALTER TABLE plugin_usage_events ADD COLUMN connectionId` + index |
-| `apps/api/src/migrations/1791150200000-AddVaultAndMcpInteractiveAuth.ts` | P3 | `CREATE TABLE vault_secrets`, `ALTER TABLE mcp_server_connections ADD authMode/oauthTokens/oauthMetadata` |
+| File                                                                     | Phase | Contents                                                                                                                                                |
+| ------------------------------------------------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/migrations/1791150000000-AddConnectionRegistry.ts`         | P1    | `CREATE TABLE connections` + its five indexes + backfill (§3.7)                                                                                         |
+| `apps/api/src/migrations/1791150100000-AddConnectionGrantsAndUsage.ts`   | P2    | `CREATE TABLE connection_grants` (+ FK cascade), `CREATE TABLE connection_run_usage`, `ALTER TABLE plugin_usage_events ADD COLUMN connectionId` + index |
+| `apps/api/src/migrations/1791150200000-AddVaultAndMcpInteractiveAuth.ts` | P3    | `CREATE TABLE vault_secrets`, `ALTER TABLE mcp_server_connections ADD authMode/oauthTokens/oauthMetadata`                                               |
 
 Every `ALTER` is `ADD COLUMN … NULL` or `ADD COLUMN … NOT NULL DEFAULT`; no `DROP`, no rename,
 no type change. `down()` drops only what `up()` created.
@@ -421,36 +417,54 @@ export type ConnectionGrantMode = 'inherit' | 'read' | 'write' | 'blocked';
 export const CONNECTION_ACCESS_ORDER = ['blocked', 'read', 'write'] as const;
 
 export interface ConnectionDto {
-  id: string; providerId: string; providerName: string; kind: ConnectionKind;
-  label: string; isPrimary: boolean;
-  scopePreset: ConnectionScopePresetId | null;   // null ⇒ provider declares no presets
-  presetsAvailable: ConnectionScopePresetId[];   // [] ⇒ render "Standard access"
-  health: ConnectionHealth; healthCheckedAt: string | null;
-  lastErrorCode: string | null; lastErrorMessage: string | null;
-  lastUsedAt: string | null; lastUsedRunId: string | null; runCount: number;
-  toolCount: number | null; createdAt: string;
+	id: string;
+	providerId: string;
+	providerName: string;
+	kind: ConnectionKind;
+	label: string;
+	isPrimary: boolean;
+	scopePreset: ConnectionScopePresetId | null; // null ⇒ provider declares no presets
+	presetsAvailable: ConnectionScopePresetId[]; // [] ⇒ render "Standard access"
+	health: ConnectionHealth;
+	healthCheckedAt: string | null;
+	lastErrorCode: string | null;
+	lastErrorMessage: string | null;
+	lastUsedAt: string | null;
+	lastUsedRunId: string | null;
+	runCount: number;
+	toolCount: number | null;
+	createdAt: string;
 }
 
 export interface ConnectionGrantDto {
-  targetType: 'workspace' | 'agent'; targetId: string; targetLabel: string;
-  requested: ConnectionGrantMode;      // what is stored ('inherit' when no row)
-  effective: Exclude<ConnectionGrantMode, 'inherit'>;
-  clampedBy: 'connection' | 'workspace' | null;   // FR-19
+	targetType: 'workspace' | 'agent';
+	targetId: string;
+	targetLabel: string;
+	requested: ConnectionGrantMode; // what is stored ('inherit' when no row)
+	effective: Exclude<ConnectionGrantMode, 'inherit'>;
+	clampedBy: 'connection' | 'workspace' | null; // FR-19
 }
 
 export interface VaultSecretDto {
-  id: string; groupName: string; key: string; label: string | null;
-  value: '●●●●●●●●';                  // literal type — the compiler forbids a real value
-  createdAt: string; createdByName: string;
-  lastUsedAt: string | null; referenceCount: number;
+	id: string;
+	groupName: string;
+	key: string;
+	label: string | null;
+	value: '●●●●●●●●'; // literal type — the compiler forbids a real value
+	createdAt: string;
+	createdByName: string;
+	lastUsedAt: string | null;
+	referenceCount: number;
 }
 
 export interface ParsedMcpServerDto {
-  name: string; url: string; transport: 'streamable-http' | 'sse';
-  headerNames: string[];               // names only, never values
-  secretsDetected: number;
-  authMode: 'header' | 'interactive' | 'unknown';
-  warnings: string[];
+	name: string;
+	url: string;
+	transport: 'streamable-http' | 'sse';
+	headerNames: string[]; // names only, never values
+	secretsDetected: number;
+	authMode: 'header' | 'interactive' | 'unknown';
+	warnings: string[];
 }
 ```
 
@@ -465,17 +479,17 @@ returns `404` (never `403`) for a row owned by someone else.
 
 ### 4.1 Registry — `apps/api/src/connections/connections.controller.ts` (`@Controller('api/connections')`)
 
-| Method | Path | Body / query | Response | Throttle |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/connections` | `?providerId&kind&health` | `{ groups: Array<{ providerId, providerName, max, connections: ConnectionDto[] }> }` | default |
-| `GET` | `/api/connections/providers` | — | `{ providers: Array<{ id, name, kind, presets: ConnectionScopePresetId[], connected: number, max: 10 }> }` | default |
-| `GET` | `/api/connections/:id` | — | `ConnectionDto` | default |
-| `PATCH` | `/api/connections/:id` | `UpdateConnectionDto { label?, scopePreset?, isPrimary? }` | `ConnectionDto` | 60/min |
-| `DELETE` | `/api/connections/:id` | — | `{ deleted: true, promotedPrimaryId?: string }` | 30/min |
-| `POST` | `/api/connections/:id/check` | — | `{ health, checkedAt, errorCode?, errorMessage? }` | **6/min** |
-| `GET` | `/api/connections/:id/reconnect-url` | `?redirectUri` | `{ url, state }` — `409 reconnect_not_applicable` unless `health='expired'` and `kind='oauth'` | 20/min |
-| `GET` | `/api/connections/:id/runs` | `?cursor&limit(≤50)` | `{ runs: RunSummaryDto[], nextCursor }` | default |
-| `POST` | `/api/connections/providers/:providerId/connect-url` | `{ redirectUri, scopePreset }` | `{ url, state, connectionId }` — pre-creates a pending Connection so the callback can bind | 30/min |
+| Method   | Path                                                 | Body / query                                               | Response                                                                                                   | Throttle  |
+| -------- | ---------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------- |
+| `GET`    | `/api/connections`                                   | `?providerId&kind&health`                                  | `{ groups: Array<{ providerId, providerName, max, connections: ConnectionDto[] }> }`                       | default   |
+| `GET`    | `/api/connections/providers`                         | —                                                          | `{ providers: Array<{ id, name, kind, presets: ConnectionScopePresetId[], connected: number, max: 10 }> }` | default   |
+| `GET`    | `/api/connections/:id`                               | —                                                          | `ConnectionDto`                                                                                            | default   |
+| `PATCH`  | `/api/connections/:id`                               | `UpdateConnectionDto { label?, scopePreset?, isPrimary? }` | `ConnectionDto`                                                                                            | 60/min    |
+| `DELETE` | `/api/connections/:id`                               | —                                                          | `{ deleted: true, promotedPrimaryId?: string }`                                                            | 30/min    |
+| `POST`   | `/api/connections/:id/check`                         | —                                                          | `{ health, checkedAt, errorCode?, errorMessage? }`                                                         | **6/min** |
+| `GET`    | `/api/connections/:id/reconnect-url`                 | `?redirectUri`                                             | `{ url, state }` — `409 reconnect_not_applicable` unless `health='expired'` and `kind='oauth'`             | 20/min    |
+| `GET`    | `/api/connections/:id/runs`                          | `?cursor&limit(≤50)`                                       | `{ runs: RunSummaryDto[], nextCursor }`                                                                    | default   |
+| `POST`   | `/api/connections/providers/:providerId/connect-url` | `{ redirectUri, scopePreset }`                             | `{ url, state, connectionId }` — pre-creates a pending Connection so the callback can bind                 | 30/min    |
 
 `UpdateConnectionDto` (class-validator): `@IsOptional() @IsString() @Length(1,60) label`,
 `@IsOptional() @IsIn(['read','write']) scopePreset`, `@IsOptional() @IsBoolean() isPrimary`.
@@ -486,12 +500,12 @@ carries `{ reapprovalUrl }`), `connection_not_found` (404).
 
 ### 4.2 Grants — `apps/api/src/connections/connection-grants.controller.ts`
 
-| Method | Path | Body | Response |
-| --- | --- | --- | --- |
-| `GET` | `/api/connections/:id/grants` | — | `{ ceiling, workspace: ConnectionGrantDto, agents: ConnectionGrantDto[] }` |
-| `PUT` | `/api/connections/:id/grants/:targetType/:targetId` | `SetConnectionGrantDto { mode, note? }` | `ConnectionGrantDto` (with `effective` + `clampedBy`) |
-| `DELETE` | `/api/connections/:id/grants/:targetType/:targetId` | — | `{ reverted: true }` (back to `inherit`) |
-| `GET` | `/api/agents/:agentId/connections` | — | `{ connections: Array<ConnectionDto & { grant: ConnectionGrantDto }> }` |
+| Method   | Path                                                | Body                                    | Response                                                                   |
+| -------- | --------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| `GET`    | `/api/connections/:id/grants`                       | —                                       | `{ ceiling, workspace: ConnectionGrantDto, agents: ConnectionGrantDto[] }` |
+| `PUT`    | `/api/connections/:id/grants/:targetType/:targetId` | `SetConnectionGrantDto { mode, note? }` | `ConnectionGrantDto` (with `effective` + `clampedBy`)                      |
+| `DELETE` | `/api/connections/:id/grants/:targetType/:targetId` | —                                       | `{ reverted: true }` (back to `inherit`)                                   |
+| `GET`    | `/api/agents/:agentId/connections`                  | —                                       | `{ connections: Array<ConnectionDto & { grant: ConnectionGrantDto }> }`    |
 
 `PUT` is 120/min. `mode` is `@IsIn(['read','write','blocked'])`; `inherit` is expressed by
 `DELETE`, never by `PUT`, so "no row means inherit" stays true at the storage layer.
@@ -500,13 +514,13 @@ agents path, mirroring how `agent-mcp-servers.controller.ts` already does it.
 
 ### 4.3 MCP onboarding — `apps/api/src/connections/mcp-onboarding.controller.ts`
 
-| Method | Path | Body | Response | Throttle |
-| --- | --- | --- | --- | --- |
-| `POST` | `/api/connections/mcp/parse` | `ParseMcpConfigDto { text: string }` (≤ 16 KB) | `{ servers: ParsedMcpServerDto[], errors: string[] }` — **nothing persisted** | 30/min |
-| `POST` | `/api/connections/mcp` | `CreateMcpConnectionFromParseDto { servers: [{ name, url, transport, headers?: Record<string,string> }] }` (≤ 10) | `{ connections: ConnectionDto[] }` | 20/min |
-| `POST` | `/api/connections/mcp/:id/authorize` | — | `{ authorizeUrl, pollToken, expiresAt }` | 20/min |
-| `GET` | `/api/connections/mcp/:id/authorize/status` | `?pollToken` | `{ state: 'pending' \| 'connected' \| 'failed' \| 'timeout', toolCount?, toolNames? }` | 60/min |
-| `GET` | `/api/connections/mcp/callback` | `?code&state` | `302` to a "you can close this tab" page | 60/min |
+| Method | Path                                        | Body                                                                                                              | Response                                                                               | Throttle |
+| ------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | -------- |
+| `POST` | `/api/connections/mcp/parse`                | `ParseMcpConfigDto { text: string }` (≤ 16 KB)                                                                    | `{ servers: ParsedMcpServerDto[], errors: string[] }` — **nothing persisted**          | 30/min   |
+| `POST` | `/api/connections/mcp`                      | `CreateMcpConnectionFromParseDto { servers: [{ name, url, transport, headers?: Record<string,string> }] }` (≤ 10) | `{ connections: ConnectionDto[] }`                                                     | 20/min   |
+| `POST` | `/api/connections/mcp/:id/authorize`        | —                                                                                                                 | `{ authorizeUrl, pollToken, expiresAt }`                                               | 20/min   |
+| `GET`  | `/api/connections/mcp/:id/authorize/status` | `?pollToken`                                                                                                      | `{ state: 'pending' \| 'connected' \| 'failed' \| 'timeout', toolCount?, toolNames? }` | 60/min   |
+| `GET`  | `/api/connections/mcp/callback`             | `?code&state`                                                                                                     | `302` to a "you can close this tab" page                                               | 60/min   |
 
 - `parse` is a **pure function over the pasted text** plus one HEAD/probe of the URL for
   `authMode` detection. It never writes a row and never stores a secret, which is what makes
@@ -550,7 +564,7 @@ the factory is called:
    `McpHeaderCredentialMissingError { keys }` **before** `factory.connect` — no request leaves the
    platform. `classifyError` maps it to the stored message ``Missing credential `<key>` `` (keys
    only), `listTools` / `callTool` / the health probe surface that message, and the health
-   classifier maps it to `expired` (spec FR-26, FR-47a) so *Reconnect* — which re-enters the
+   classifier maps it to `expired` (spec FR-26, FR-47a) so _Reconnect_ — which re-enters the
    header value into the Vault — is the offered fix.
 5. **Redact what was actually sent.** `redactHeaderValues` scrubs the values of
    `connection.authHeaders`, which are now references rather than secrets. It gains the resolved
@@ -564,12 +578,12 @@ unit test; `McpClientService` only wires the resolver and the error.
 
 ### 4.4 Vault — `apps/api/src/vault/vault.controller.ts` (`@Controller('api/vault')`)
 
-| Method | Path | Body | Response | Throttle |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/vault` | `?group` | `{ groups: Array<{ groupName, secrets: VaultSecretDto[] }>, used, max: 200 }` | default |
-| `POST` | `/api/vault` | `CreateVaultSecretDto { groupName, key, label?, value }` | `VaultSecretDto` | 30/min |
-| `PATCH` | `/api/vault/:id` | `UpdateVaultSecretDto { groupName?, label?, value? }` | `VaultSecretDto` | 30/min |
-| `DELETE` | `/api/vault/:id` | — | `{ deleted: true }` | 30/min |
+| Method   | Path             | Body                                                     | Response                                                                      | Throttle |
+| -------- | ---------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- | -------- |
+| `GET`    | `/api/vault`     | `?group`                                                 | `{ groups: Array<{ groupName, secrets: VaultSecretDto[] }>, used, max: 200 }` | default  |
+| `POST`   | `/api/vault`     | `CreateVaultSecretDto { groupName, key, label?, value }` | `VaultSecretDto`                                                              | 30/min   |
+| `PATCH`  | `/api/vault/:id` | `UpdateVaultSecretDto { groupName?, label?, value? }`    | `VaultSecretDto`                                                              | 30/min   |
+| `DELETE` | `/api/vault/:id` | —                                                        | `{ deleted: true }`                                                           | 30/min   |
 
 There is **no** `GET /api/vault/:id/value`, no `?reveal=true`, no export route, and no
 admin-scoped variant. `CreateVaultSecretDto.value` is `@IsString() @MaxLength(8192)` and is
@@ -583,12 +597,12 @@ All new components hang off the **existing** settings shell
 and the existing agent detail layout
 (`apps/web/src/app/[locale]/(dashboard)/agents/[id]/layout.tsx`). **No route is removed.**
 
-| Route | Status | What changes |
-| --- | --- | --- |
-| `/settings/connections` | **exists** ([page.tsx](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/connections/page.tsx>)) | becomes the registry with a four-tab client; the **MCP servers** tab renders today's `McpConnectionsClient` **verbatim** so nothing regresses |
-| `/settings/connections?tab=vault` | new (query param, no new route) | the Vault |
-| `/agents/[id]/connections` | **new page** | per-agent grants across all Connections |
-| `/agents/[id]/mcp-servers` | **exists**, unchanged | keeps working; gains a link "See all connections for this agent →" |
+| Route                             | Status                                                                                                        | What changes                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/settings/connections`           | **exists** ([page.tsx](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/connections/page.tsx>)) | becomes the registry with a four-tab client; the **MCP servers** tab renders today's `McpConnectionsClient` **verbatim** so nothing regresses |
+| `/settings/connections?tab=vault` | new (query param, no new route)                                                                               | the Vault                                                                                                                                     |
+| `/agents/[id]/connections`        | **new page**                                                                                                  | per-agent grants across all Connections                                                                                                       |
+| `/agents/[id]/mcp-servers`        | **exists**, unchanged                                                                                         | keeps working; gains a link "See all connections for this agent →"                                                                            |
 
 ### 5.1 Components
 
@@ -633,12 +647,12 @@ Per **Constitution IV**, nothing here calls a queue directly. The health sweep u
 provider's native cron through a `schedules.task`, and per-Connection probes fan out through a
 `*_DISPATCHER` DI symbol.
 
-| File | Kind | Cadence | What it does |
-| --- | --- | --- | --- |
-| `packages/agent/src/connections/connection-health-dispatcher.ts` | port | — | exports `CONNECTION_HEALTH_DISPATCHER` + `ConnectionHealthDispatchPayload { connectionId, userId, tenantId?, organizationId? }` (type-only leaf file, same shape as `packages/agent/src/tasks-domain/task-dispatcher.ts`) |
-| `packages/agent/src/connections/connection-health-dispatcher.service.ts` | service | called by the cron task | selects due rows, claims them, enqueues one probe each via the dispatcher |
-| `packages/tasks/src/tasks/trigger/connection-health-dispatcher.task.ts` | `schedules.task` | `*/15 * * * *` | boots `TriggerInternalModule`, calls `dispatchDue()` — copied from [`agent-heartbeat-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat-dispatcher.task.ts) |
-| `packages/tasks/src/tasks/trigger/connection-health-probe.task.ts` | `task` | on demand | probes one Connection with an **8 s** timeout, writes health, returns `{ok:false,error}` rather than throwing so retries stay deterministic |
+| File                                                                     | Kind             | Cadence                 | What it does                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------ | ---------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/connections/connection-health-dispatcher.ts`         | port             | —                       | exports `CONNECTION_HEALTH_DISPATCHER` + `ConnectionHealthDispatchPayload { connectionId, userId, tenantId?, organizationId? }` (type-only leaf file, same shape as `packages/agent/src/tasks-domain/task-dispatcher.ts`) |
+| `packages/agent/src/connections/connection-health-dispatcher.service.ts` | service          | called by the cron task | selects due rows, claims them, enqueues one probe each via the dispatcher                                                                                                                                                 |
+| `packages/tasks/src/tasks/trigger/connection-health-dispatcher.task.ts`  | `schedules.task` | `*/15 * * * *`          | boots `TriggerInternalModule`, calls `dispatchDue()` — copied from [`agent-heartbeat-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat-dispatcher.task.ts)                             |
+| `packages/tasks/src/tasks/trigger/connection-health-probe.task.ts`       | `task`           | on demand               | probes one Connection with an **8 s** timeout, writes health, returns `{ok:false,error}` rather than throwing so retries stay deterministic                                                                               |
 
 Both are registered in
 [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts).
@@ -663,12 +677,12 @@ means two overlapping ticks never probe the same row.
 
 **Probe implementations — no new provider knowledge:**
 
-| Kind | Probe |
-| --- | --- |
-| `oauth` | `OAuthFacadeService.getAuthenticatedUser(providerId, token)` — the same round-trip `OAuthService.checkConnection` already makes |
-| `mcp` | `McpConnectionsService.test(userId, backingId)` — existing connect + `listTools`, already stamps `lastConnectedAt`/`lastError` |
-| `api_key` | the plugin's existing `validate-connection` path via `PluginValidationService` |
-| `repo` | the existing repo credential check in `repo-connections` |
+| Kind      | Probe                                                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `oauth`   | `OAuthFacadeService.getAuthenticatedUser(providerId, token)` — the same round-trip `OAuthService.checkConnection` already makes |
+| `mcp`     | `McpConnectionsService.test(userId, backingId)` — existing connect + `listTools`, already stamps `lastConnectedAt`/`lastError`  |
+| `api_key` | the plugin's existing `validate-connection` path via `PluginValidationService`                                                  |
+| `repo`    | the existing repo credential check in `repo-connections`                                                                        |
 
 **Classification** lives in a pure `packages/agent/src/connections/connection-health.ts`:
 a credential rejection (`401`/`403`-class, or a provider error the facade maps to
@@ -859,37 +873,37 @@ reason }`.
 
 ### 9.3 Failure modes and the chosen degradation
 
-| Failure | Degrades to | Why that direction |
-| --- | --- | --- |
-| `CONNECTION_ACCESS_ENFORCER` unbound | no connection gate (tool grants + permissions still apply) | a DI mistake must not take the product down; matches the `TOOL_GRANT_ENFORCER` posture |
-| Grant lookup throws | the **Connection's own preset**, warn-logged | fails toward the ceiling the owner explicitly set, never to `write` (FR-24) |
-| Health sweep down | rows keep last known health + "checked N ago" | a stale probe must never flip a working row to `expired` or block a call (FR-31) |
-| `VaultCredentialResolver` cannot resolve a key | the tool call is **refused**, naming the key | a half-authenticated outbound call is worse than a clear refusal — the existing `assertToolCredentialsAvailable` contract, unchanged |
-| An MCP header references a Vault key that cannot be resolved | the connection attempt fails **before any request is sent**, naming the key; health `expired` | sending the literal `{{cred.key}}` would look like a server-side auth failure and hide the real cause; §4.3.1 |
-| `PLUGIN_SECRET_ENCRYPTION_KEY` unset | vault **writes are rejected** with a clear error | the existing plaintext-passthrough fallback is acceptable for plugin settings in dev; for a write-only vault it is not, so this path opts out of the fallback explicitly |
-| Interactive sign-in never completes | `timeout` after 10 min, nothing persisted | no half-created Connection, no orphan state row |
-| Config parse fails | `400` with the field-level message, nothing persisted | the parse endpoint writes nothing by construction |
+| Failure                                                      | Degrades to                                                                                   | Why that direction                                                                                                                                                       |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CONNECTION_ACCESS_ENFORCER` unbound                         | no connection gate (tool grants + permissions still apply)                                    | a DI mistake must not take the product down; matches the `TOOL_GRANT_ENFORCER` posture                                                                                   |
+| Grant lookup throws                                          | the **Connection's own preset**, warn-logged                                                  | fails toward the ceiling the owner explicitly set, never to `write` (FR-24)                                                                                              |
+| Health sweep down                                            | rows keep last known health + "checked N ago"                                                 | a stale probe must never flip a working row to `expired` or block a call (FR-31)                                                                                         |
+| `VaultCredentialResolver` cannot resolve a key               | the tool call is **refused**, naming the key                                                  | a half-authenticated outbound call is worse than a clear refusal — the existing `assertToolCredentialsAvailable` contract, unchanged                                     |
+| An MCP header references a Vault key that cannot be resolved | the connection attempt fails **before any request is sent**, naming the key; health `expired` | sending the literal `{{cred.key}}` would look like a server-side auth failure and hide the real cause; §4.3.1                                                            |
+| `PLUGIN_SECRET_ENCRYPTION_KEY` unset                         | vault **writes are rejected** with a clear error                                              | the existing plaintext-passthrough fallback is acceptable for plugin settings in dev; for a write-only vault it is not, so this path opts out of the fallback explicitly |
+| Interactive sign-in never completes                          | `timeout` after 10 min, nothing persisted                                                     | no half-created Connection, no orphan state row                                                                                                                          |
+| Config parse fails                                           | `400` with the field-level message, nothing persisted                                         | the parse endpoint writes nothing by construction                                                                                                                        |
 
 ## 10. Test plan
 
 ### 10.1 Unit (Jest, `packages/agent`)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/connections/__tests__/connection-access.spec.ts` | the ladder: min over `blocked < read < write`, clamping (FR-19), never-widen (FR-18/60), `inherit` = no row, cache max-age = 5 s, eviction on write |
-| `packages/agent/src/connections/__tests__/connection-registry.service.spec.ts` | label uniqueness case-insensitive, per-provider cap 10, workspace cap 100, single-primary transaction, primary promotion on delete (FR-5), `404` cross-workspace |
-| `packages/agent/src/connections/__tests__/connection-health.spec.ts` | classifier: credential rejection → `expired` at once; 1–2 failures → `degraded`; ≥3 → `unreachable`; success resets; error catalogue never carries a raw body |
-| `packages/agent/src/connections/__tests__/connection-health-dispatcher.service.spec.ts` | due predicate per kind, 200 cap, in-flight claim, two concurrent ticks probe disjoint sets |
-| `packages/agent/src/connections/__tests__/mcp-config-parser.spec.ts` | trailing commas, fences, comments, bare fragment, `mcpServers` wrapper, bare URL, > 10 servers, > 16 KB, non-https, bad name, secret classification |
-| `packages/agent/src/connections/__tests__/mcp-auth-detect.spec.ts` | challenge → `interactive`; no challenge → `header`; malformed metadata → `unknown` + warning |
-| `packages/agent/src/connections/__tests__/connection-usage-buffer.spec.ts` | flush at 10 s / 100 calls / run teardown; one upsert per `(connection, run)` |
-| `packages/agent/src/vault/__tests__/vault.service.spec.ts` | key pattern, 200 cap, 8 KB cap, replace-only semantics, `referenceCount` maintenance, delete does not cascade from a Connection delete (FR-46) |
-| `packages/agent/src/vault/__tests__/vault-credential-resolver.spec.ts` | resolves declared keys, **omits** unknown ones (never empty string), never logs a value, stamps `lastUsedAt` |
-| `packages/agent/src/mcp/__tests__/mcp-header-credentials.spec.ts` | a header with no reference passes through byte-identical; a whole-value and an embedded reference (`Bearer {{cred.k}}`) both substitute; the input object is never mutated; a missing key is reported by name and the output keeps no partial substitution |
-| `packages/agent/src/mcp/__tests__/mcp-client.service.spec.ts` (extend) | the factory receives resolved headers while the entity still holds the reference; a missing key throws before the factory is called and stamps ``Missing credential `<key>` ``; an unbound resolver fails closed; an SDK error echoing the resolved value is redacted; a spy logger and the stamped error never contain the resolved value |
-| `packages/agent/src/vault/__tests__/vault-no-read-path.spec.ts` | reflective guard: no exported DTO type or controller method can return `VaultSecret['secret']` |
-| `packages/agent/src/facades/__tests__/connection-scopes.facade.spec.ts` | preset lookup against a mock plugin, `[]` when undeclared, `coversTool` pattern identity with the tool-grant matcher |
-| `packages/agent/src/agents/__tests__/agent-tool.connection-gate.spec.ts` | blocked Connection's tools absent from the descriptor list; preset filters write tools; enforcer unbound = today's list |
+| File                                                                                    | Covers                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/connections/__tests__/connection-access.spec.ts`                    | the ladder: min over `blocked < read < write`, clamping (FR-19), never-widen (FR-18/60), `inherit` = no row, cache max-age = 5 s, eviction on write                                                                                                                                                                                        |
+| `packages/agent/src/connections/__tests__/connection-registry.service.spec.ts`          | label uniqueness case-insensitive, per-provider cap 10, workspace cap 100, single-primary transaction, primary promotion on delete (FR-5), `404` cross-workspace                                                                                                                                                                           |
+| `packages/agent/src/connections/__tests__/connection-health.spec.ts`                    | classifier: credential rejection → `expired` at once; 1–2 failures → `degraded`; ≥3 → `unreachable`; success resets; error catalogue never carries a raw body                                                                                                                                                                              |
+| `packages/agent/src/connections/__tests__/connection-health-dispatcher.service.spec.ts` | due predicate per kind, 200 cap, in-flight claim, two concurrent ticks probe disjoint sets                                                                                                                                                                                                                                                 |
+| `packages/agent/src/connections/__tests__/mcp-config-parser.spec.ts`                    | trailing commas, fences, comments, bare fragment, `mcpServers` wrapper, bare URL, > 10 servers, > 16 KB, non-https, bad name, secret classification                                                                                                                                                                                        |
+| `packages/agent/src/connections/__tests__/mcp-auth-detect.spec.ts`                      | challenge → `interactive`; no challenge → `header`; malformed metadata → `unknown` + warning                                                                                                                                                                                                                                               |
+| `packages/agent/src/connections/__tests__/connection-usage-buffer.spec.ts`              | flush at 10 s / 100 calls / run teardown; one upsert per `(connection, run)`                                                                                                                                                                                                                                                               |
+| `packages/agent/src/vault/__tests__/vault.service.spec.ts`                              | key pattern, 200 cap, 8 KB cap, replace-only semantics, `referenceCount` maintenance, delete does not cascade from a Connection delete (FR-46)                                                                                                                                                                                             |
+| `packages/agent/src/vault/__tests__/vault-credential-resolver.spec.ts`                  | resolves declared keys, **omits** unknown ones (never empty string), never logs a value, stamps `lastUsedAt`                                                                                                                                                                                                                               |
+| `packages/agent/src/mcp/__tests__/mcp-header-credentials.spec.ts`                       | a header with no reference passes through byte-identical; a whole-value and an embedded reference (`Bearer {{cred.k}}`) both substitute; the input object is never mutated; a missing key is reported by name and the output keeps no partial substitution                                                                                 |
+| `packages/agent/src/mcp/__tests__/mcp-client.service.spec.ts` (extend)                  | the factory receives resolved headers while the entity still holds the reference; a missing key throws before the factory is called and stamps ``Missing credential `<key>` ``; an unbound resolver fails closed; an SDK error echoing the resolved value is redacted; a spy logger and the stamped error never contain the resolved value |
+| `packages/agent/src/vault/__tests__/vault-no-read-path.spec.ts`                         | reflective guard: no exported DTO type or controller method can return `VaultSecret['secret']`                                                                                                                                                                                                                                             |
+| `packages/agent/src/facades/__tests__/connection-scopes.facade.spec.ts`                 | preset lookup against a mock plugin, `[]` when undeclared, `coversTool` pattern identity with the tool-grant matcher                                                                                                                                                                                                                       |
+| `packages/agent/src/agents/__tests__/agent-tool.connection-gate.spec.ts`                | blocked Connection's tools absent from the descriptor list; preset filters write tools; enforcer unbound = today's list                                                                                                                                                                                                                    |
 
 ### 10.2 Controller specs (Jest, `apps/api`)
 
@@ -903,16 +917,16 @@ rejects, and **no response body contains a credential value**.
 
 ### 10.3 E2E (Playwright, `apps/web/e2e/`)
 
-| File | Golden path |
-| --- | --- |
-| `flow-connections-registry.spec.ts` | connect a second account, rename, re-primary, delete the primary → promotion message, provider-full disabled state, empty state |
-| `flow-connection-presets.spec.ts` | default `read` at connect; widen needing re-approval → cancel leaves `read`; narrow needs nothing |
-| `flow-connection-agent-grants.spec.ts` | set an Agent to `read`, another to `blocked`, a third to a clamped `write`; assert the copy and the effective values |
-| `flow-connection-health-reconnect.spec.ts` | force `expired`, banner counts it, `Reconnect` returns the same row with label/preset/grants intact; `unreachable` offers no reconnect |
-| `flow-connection-last-used-runs.spec.ts` | "Last used" opens the Runs list filtered to that Connection |
-| `flow-vault-write-only.spec.ts` | add, list is masked, replace, delete, 200-cap copy; assert **no** network response body in the trace contains the plaintext |
-| `flow-mcp-add-server.spec.ts` | paste a config with a trailing comma → parse preview → connect → tools listed; name collision; duplicate URL; unparseable; private address refused |
-| `flow-mcp-interactive-signin.spec.ts` | paste URL → detected → *Open sign-in page* → card settles to Connected on its own; timeout path |
+| File                                       | Golden path                                                                                                                                        |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow-connections-registry.spec.ts`        | connect a second account, rename, re-primary, delete the primary → promotion message, provider-full disabled state, empty state                    |
+| `flow-connection-presets.spec.ts`          | default `read` at connect; widen needing re-approval → cancel leaves `read`; narrow needs nothing                                                  |
+| `flow-connection-agent-grants.spec.ts`     | set an Agent to `read`, another to `blocked`, a third to a clamped `write`; assert the copy and the effective values                               |
+| `flow-connection-health-reconnect.spec.ts` | force `expired`, banner counts it, `Reconnect` returns the same row with label/preset/grants intact; `unreachable` offers no reconnect             |
+| `flow-connection-last-used-runs.spec.ts`   | "Last used" opens the Runs list filtered to that Connection                                                                                        |
+| `flow-vault-write-only.spec.ts`            | add, list is masked, replace, delete, 200-cap copy; assert **no** network response body in the trace contains the plaintext                        |
+| `flow-mcp-add-server.spec.ts`              | paste a config with a trailing comma → parse preview → connect → tools listed; name collision; duplicate URL; unparseable; private address refused |
+| `flow-mcp-interactive-signin.spec.ts`      | paste URL → detected → _Open sign-in page_ → card settles to Connected on its own; timeout path                                                    |
 
 `apps/web/src/components/settings/connections/ConnectionsClient.unit.spec.tsx` and
 `.../vault/VaultClient.unit.spec.tsx` cover loading / empty / error / over-limit rendering,
@@ -928,20 +942,20 @@ Connections table + backfill, labels, primary, presets, health sweep, reconnect,
 Settings → Connections page with today's MCP list preserved verbatim as a tab, and the
 `connection-scopes` capability with one declaring plugin.
 
-*Ships:* migration `1791150000000`, `apps/api/src/connections/` (registry controller only),
+_Ships:_ migration `1791150000000`, `apps/api/src/connections/` (registry controller only),
 `packages/agent/src/connections/`, the health tasks, the facade, the web registry.
-*User-visible value on its own:* two accounts per provider, plain-English levels, and a page
+_User-visible value on its own:_ two accounts per provider, plain-English levels, and a page
 that tells you what is broken before a Run does.
-*Green on develop because:* nothing consumes the enforcer yet; the run loop is untouched.
+_Green on develop because:_ nothing consumes the enforcer yet; the run loop is untouched.
 
 ### P2 — Grants and per-call enforcement (FR-16…FR-25, FR-35…FR-38)
 
 Grant table, the resolution ladder, both enforcement seams, the Manage drawer's agent list, the
 per-agent Connections tab, last-used attribution and the Runs link.
 
-*Ships:* migration `1791150100000`, grants controller, `ConnectionAccessService` +
+_Ships:_ migration `1791150100000`, grants controller, `ConnectionAccessService` +
 `CONNECTION_ACCESS_ENFORCER`, the two seam edits, `ConnectionUsageBuffer`.
-*Green on develop because:* the enforcer is `@Optional()`; with no grant rows the ladder returns
+_Green on develop because:_ the enforcer is `@Optional()`; with no grant rows the ladder returns
 the Connection's preset, and with no Connections it returns "allow", i.e. today's behaviour.
 
 ### P3 — Vault and MCP onboarding (FR-39…FR-58)
@@ -949,36 +963,36 @@ the Connection's preset, and with no Connections it returns "allow", i.e. today'
 Vault table + controller + `VaultCredentialResolver` bound to `CREDENTIAL_RESOLVER`, the paste
 parser, interactive sign-in detection and handshake, presets on the connector plugins.
 
-*Ships:* migration `1791150200000`, `apps/api/src/vault/`, `packages/agent/src/vault/`,
+_Ships:_ migration `1791150200000`, `apps/api/src/vault/`, `packages/agent/src/vault/`,
 `mcp-config-parser.ts`, `mcp-auth-detect.ts`, `mcp-authorize.service.ts`, the wizard.
-*Green on develop because:* `EnvCredentialResolver` remains the bound implementation until the
+_Green on develop because:_ `EnvCredentialResolver` remains the bound implementation until the
 vault module is imported; the existing manual MCP form keeps working beside the wizard.
 
 ## 12. Constitution compliance
 
-| Principle | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | Presets are declared by plugins through a new optional capability; the MCP handshake is a protocol implementation that names no service; no external client is added to core. |
-| **II — Capability-driven** | ✅ | `ConnectionScopeFacadeService` resolves presets by `providerId`; the only literal provider string in core is `'mcp'`, which is a **kind**, not a plugin id. |
-| **III — Source-of-truth repos** | ✅ (n/a) | No content moves; `repo_connections` is referenced, never rewritten. |
-| **IV — Job runtime** | ✅ | The sweep is a `schedules.task`; per-Connection probes fan out through `CONNECTION_HEALTH_DISPATCHER`. No call site imports `@trigger.dev/sdk`. |
-| **V — Forward-only migrations** | ✅ | Three additive migrations, one per phase, each in the PR with its entities. No `DROP`, no rename, no type change; backfill is `INSERT … WHERE NOT EXISTS`. |
-| **VI — Tests** | ✅ | 12 unit suites, 4 controller specs, 8 e2e specs, all named in §10. |
-| **VII — Secret hygiene** | ✅ | Vault values are write-only and envelope-encrypted; DTO types make a plaintext return a compile error; probe errors are catalogue strings; activity-log details name fields only; no Sentry breadcrumb where a decrypted value is in scope. |
-| **VIII — Plugin counts** | ✅ (n/a) | No plugin is added or removed; `docs/plugin-system/built-in-plugins.md` is untouched. |
-| **IX — Behaviour-first spec** | ✅ | `spec.md` names no class, file or endpoint; every one of those lives here. |
-| **X — Backwards compatible** | ✅ | `account` is not altered at all (§2.5); every existing endpoint, table, route and component keeps its shape; new columns are nullable or defaulted. |
+| Principle                       | Status   | Justification                                                                                                                                                                                                                               |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**            | ✅       | Presets are declared by plugins through a new optional capability; the MCP handshake is a protocol implementation that names no service; no external client is added to core.                                                               |
+| **II — Capability-driven**      | ✅       | `ConnectionScopeFacadeService` resolves presets by `providerId`; the only literal provider string in core is `'mcp'`, which is a **kind**, not a plugin id.                                                                                 |
+| **III — Source-of-truth repos** | ✅ (n/a) | No content moves; `repo_connections` is referenced, never rewritten.                                                                                                                                                                        |
+| **IV — Job runtime**            | ✅       | The sweep is a `schedules.task`; per-Connection probes fan out through `CONNECTION_HEALTH_DISPATCHER`. No call site imports `@trigger.dev/sdk`.                                                                                             |
+| **V — Forward-only migrations** | ✅       | Three additive migrations, one per phase, each in the PR with its entities. No `DROP`, no rename, no type change; backfill is `INSERT … WHERE NOT EXISTS`.                                                                                  |
+| **VI — Tests**                  | ✅       | 12 unit suites, 4 controller specs, 8 e2e specs, all named in §10.                                                                                                                                                                          |
+| **VII — Secret hygiene**        | ✅       | Vault values are write-only and envelope-encrypted; DTO types make a plaintext return a compile error; probe errors are catalogue strings; activity-log details name fields only; no Sentry breadcrumb where a decrypted value is in scope. |
+| **VIII — Plugin counts**        | ✅ (n/a) | No plugin is added or removed; `docs/plugin-system/built-in-plugins.md` is untouched.                                                                                                                                                       |
+| **IX — Behaviour-first spec**   | ✅       | `spec.md` names no class, file or endpoint; every one of those lives here.                                                                                                                                                                  |
+| **X — Backwards compatible**    | ✅       | `account` is not altered at all (§2.5); every existing endpoint, table, route and component keeps its shape; new columns are nullable or defaulted.                                                                                         |
 
 ## 13. Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-| --- | --- | --- | --- |
-| Backfill mislabels or mis-primaries a busy workspace | med | med | deterministic ordering by `createdAt`; suffix on collision; `health='unknown'` so nothing is asserted; re-runnable |
-| The per-call gate adds latency to every tool call | low | high | process-local map, 5 s max age, no I/O on the hot path; a benchmark test asserts ≤ 2 ms P95 |
-| Health sweep hammers providers | med | med | per-kind intervals, 200/tick cap, 8 s timeout, `SKIP LOCKED` claim, failures back off through `healthFailureCount` |
-| The interactive MCP handshake works against one server and not the next | high | med | ship it behind the *detected* state only, fall back to the header form with a clear message, and log the metadata shape (non-secret) on failure |
-| Two access matrices (tool grants + connection grants) confuse debugging | med | med | one combined explain endpoint response (`GET /api/connections/:id/grants` returns the ceiling and every layer) and one refusal reason vocabulary shared by both |
-| A vault secret is orphaned when a Connection is deleted | high | low | deliberate — surfaced as "Not used by any connection" rather than deleted (FR-46) |
+| Risk                                                                    | Likelihood | Impact | Mitigation                                                                                                                                                      |
+| ----------------------------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backfill mislabels or mis-primaries a busy workspace                    | med        | med    | deterministic ordering by `createdAt`; suffix on collision; `health='unknown'` so nothing is asserted; re-runnable                                              |
+| The per-call gate adds latency to every tool call                       | low        | high   | process-local map, 5 s max age, no I/O on the hot path; a benchmark test asserts ≤ 2 ms P95                                                                     |
+| Health sweep hammers providers                                          | med        | med    | per-kind intervals, 200/tick cap, 8 s timeout, `SKIP LOCKED` claim, failures back off through `healthFailureCount`                                              |
+| The interactive MCP handshake works against one server and not the next | high       | med    | ship it behind the _detected_ state only, fall back to the header form with a clear message, and log the metadata shape (non-secret) on failure                 |
+| Two access matrices (tool grants + connection grants) confuse debugging | med        | med    | one combined explain endpoint response (`GET /api/connections/:id/grants` returns the ceiling and every layer) and one refusal reason vocabulary shared by both |
+| A vault secret is orphaned when a Connection is deleted                 | high       | low    | deliberate — surfaced as "Not used by any connection" rather than deleted (FR-46)                                                                               |
 
 ## 14. References
 

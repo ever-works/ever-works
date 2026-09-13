@@ -332,12 +332,20 @@ Ships FR-1…FR-24 and FR-34…FR-49. The Knowledge toggle renders disabled unti
     - **Test**: `apps/web/src/components/share/__tests__/PublishedBoard.unit.spec.tsx`
       for the poll state machine.
 
-- [ ] **T19**. Add the crawler-directive route.
-    - Create `apps/web/src/app/robots.ts` (new file; `manifest.ts` is its sibling
-      precedent). `Disallow: /share/` by default; allow only when the resolved Shared view
-      is indexable.
-    - **Done when**: requesting the file with sharing blocked contains the disallow entry,
-      and with indexing allowed it does not.
+- [ ] **T19**. Apply the per-view crawler directive where it can actually vary.
+    - `/robots.txt` is a single site-wide file with no knowledge of which `/share/[token]` a
+      crawler will fetch, so it cannot express a per-view choice. Do **not** make it depend on
+      `searchIndexable`.
+    - The per-view directive is carried by the resolved response itself: the page and the public
+      API send `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet` and render
+      `<meta name="robots" content="noindex, nofollow">` **unless** the resolved view has
+      `searchIndexable === true` (T14/T18 already emit the header; this task owns the page meta and
+      the tests).
+    - If a site-wide `robots.ts` is added for other reasons, it stays independent of Shared views and
+      must not `Disallow: /share/`, because a disallowed URL is never fetched and so its
+      `noindex` header is never seen.
+    - **Done when**: a blocked view returns the header and meta; an indexable view returns
+      neither; and `/robots.txt` is byte-identical whatever any Shared view's setting is.
 
 - [ ] **T20**. Build Settings → Sharing.
     - Create `apps/web/src/app/[locale]/(dashboard)/settings/sharing/page.tsx`,
@@ -400,21 +408,17 @@ Ships FR-50…FR-79.
     - Create `apps/api/src/migrations/1791180100000-CreateChannelGuests.ts`.
     - **Done when**: additive only; `down()` drops just the table and its indexes.
 
-- [ ] **T25**. Write the attribution-columns migration.
-    - Create `apps/api/src/migrations/1791180200000-AddRequesterAttribution.ts` adding
+- [ ] **T25**. Write the attribution-columns migration. - Create `apps/api/src/migrations/1791180200000-AddRequesterAttribution.ts` adding
       `requestedByGuestId` (FK → `channel_guests`, `ON DELETE SET NULL`) and
       `requestedByLabel varchar(160)` to `tasks`, `missions`,
       `agent_action_proposals`, `agent_escalations`, plus `originConversationRef
-      varchar(256)` to `agent_action_proposals` and `agent_escalations`.
-    - `tasks` is the primary case (a guest's request produces Tasks); `missions` carries
+varchar(256)` to `agent_action_proposals` and `agent_escalations`. - `tasks` is the primary case (a guest's request produces Tasks); `missions` carries
       the same pair only for the case where the Run sets up a standing initiative at the
-      guest's request (FR-68).
-    - Add the matching nullable columns to
+      guest's request (FR-68). - Add the matching nullable columns to
       `packages/agent/src/entities/task.entity.ts`,
       `packages/agent/src/entities/mission.entity.ts`,
       `packages/agent/src/entities/agent-action-proposal.entity.ts`,
-      `packages/agent/src/entities/agent-escalation.entity.ts` **in the same PR**.
-    - **Done when**: every column is nullable, no existing column is touched, and the
+      `packages/agent/src/entities/agent-escalation.entity.ts` **in the same PR**. - **Done when**: every column is nullable, no existing column is touched, and the
       existing specs for all four entities still pass.
 
 ### The gate
@@ -501,7 +505,7 @@ Ships FR-50…FR-79.
       the post when the guest has been revoked; on final failure, record the failure so
       the settled item shows "Couldn't reply in {channel}".
     - **Test**: `packages/tasks/src/__tests__/decision-outcome-postback.task.spec.ts`
-      + the runtime-symbol pin in `packages/agent/src/tasks/tasks.spec.ts`.
+        - the runtime-symbol pin in `packages/agent/src/tasks/tasks.spec.ts`.
 
 ### API and web
 

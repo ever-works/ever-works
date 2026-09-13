@@ -43,25 +43,25 @@ and the draft lands on the shelf marked for review, never live until a human acc
 
 ### 2.1 The user's question
 
-> *"What can my agents actually do — and which of the things I set up are quietly not
-> working?"*
+> _"What can my agents actually do — and which of the things I set up are quietly not
+> working?"_
 
 and, ten seconds after a run goes well:
 
-> *"That worked. How do I make sure it happens the same way next time without me explaining
-> it again?"*
+> _"That worked. How do I make sure it happens the same way next time without me explaining
+> it again?"_
 
 ### 2.2 What they do today instead
 
-| The need | What Ever Works offers today | What the user actually does |
-| --- | --- | --- |
-| Browse what the agents can do | The Skills block on the Agents page lists installed Skills as cards showing title, description, owner type, version, slug and `/invocation` — and nothing about whether they work. | Opens each Skill in turn and guesses. |
-| Filter by tag | Catalogue entries carry `tags`, and the first-party Skill definitions document those tags as the thing that "drives the Skills page filters". **No tag filter exists on any surface.** Tags are stored inside a Skill's frontmatter blob, so nothing can even query them. | Uses free-text search and hopes the tag word appears in the title. |
-| Switch one Skill off | There is no off switch on a Skill. The closest thing is a per-binding "inject into agent" flag, buried on the Skill detail page, one row per binding. Turning a Skill off across a workspace means editing every binding it has. | Deletes the Skill, then reinstalls it later. |
-| Know a Skill is reaching an agent | Nothing. A Skill created from `/skills/new` has **zero bindings** the moment it is created, so it is resolved by nothing, injected into nothing, and looks completely healthy on the shelf. | Discovers it months later, if ever. |
-| Know a Skill is being suppressed | A Skill that declares tools the workspace's access rules refuse is dropped from the run at assembly time and a `WARN` line is written into that run's log. No surface reads it. | Nothing — the Skill silently stops working and nobody is told. |
-| Know a Skill's dependencies are unmet | Nothing. Credential requirements are resolved at the moment a tool is invoked, mid-run, and a missing one becomes a refusal inside an autonomous run that has already spent tokens and may already have made half a change. | Reads the run transcript afterwards. |
-| Turn a good run into a reusable capability | Write the Skill by hand: `/skills/new` → title → a Markdown textarea → then create a binding on the detail page in a second, separate step. | Doesn't. Re-explains the same procedure in the next task description. |
+| The need                                   | What Ever Works offers today                                                                                                                                                                                                                                              | What the user actually does                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Browse what the agents can do              | The Skills block on the Agents page lists installed Skills as cards showing title, description, owner type, version, slug and `/invocation` — and nothing about whether they work.                                                                                        | Opens each Skill in turn and guesses.                                 |
+| Filter by tag                              | Catalogue entries carry `tags`, and the first-party Skill definitions document those tags as the thing that "drives the Skills page filters". **No tag filter exists on any surface.** Tags are stored inside a Skill's frontmatter blob, so nothing can even query them. | Uses free-text search and hopes the tag word appears in the title.    |
+| Switch one Skill off                       | There is no off switch on a Skill. The closest thing is a per-binding "inject into agent" flag, buried on the Skill detail page, one row per binding. Turning a Skill off across a workspace means editing every binding it has.                                          | Deletes the Skill, then reinstalls it later.                          |
+| Know a Skill is reaching an agent          | Nothing. A Skill created from `/skills/new` has **zero bindings** the moment it is created, so it is resolved by nothing, injected into nothing, and looks completely healthy on the shelf.                                                                               | Discovers it months later, if ever.                                   |
+| Know a Skill is being suppressed           | A Skill that declares tools the workspace's access rules refuse is dropped from the run at assembly time and a `WARN` line is written into that run's log. No surface reads it.                                                                                           | Nothing — the Skill silently stops working and nobody is told.        |
+| Know a Skill's dependencies are unmet      | Nothing. Credential requirements are resolved at the moment a tool is invoked, mid-run, and a missing one becomes a refusal inside an autonomous run that has already spent tokens and may already have made half a change.                                               | Reads the run transcript afterwards.                                  |
+| Turn a good run into a reusable capability | Write the Skill by hand: `/skills/new` → title → a Markdown textarea → then create a binding on the detail page in a second, separate step.                                                                                                                               | Doesn't. Re-explains the same procedure in the next task description. |
 
 ### 2.3 The three gaps, all of them ours
 
@@ -72,7 +72,7 @@ and, ten seconds after a run goes well:
    log, which is the one place a person browsing capabilities will never look.
 
 2. **Dependency failure is discovered at the worst possible moment.** Our own credential port
-   is deliberately built to report *which keys it could not supply* rather than returning
+   is deliberately built to report _which keys it could not supply_ rather than returning
    blanks — the information needed to say "this needs an API key nobody has set" exists, in the
    right shape, and is currently only consulted after a run has started and a tool is being
    called. Moving that check left, onto a card, converts a mid-run failure into a setup chore.
@@ -285,7 +285,7 @@ and, ten seconds after a run goes well:
 - **S23 — Capture races a second capture.**
   **Given** a drafting job already running for a run,
   **when** the owner clicks **Save this as a Skill** again for the same run,
-  **then** the second request returns the *same* draft id rather than starting a second job,
+  **then** the second request returns the _same_ draft id rather than starting a second job,
   and the button reads **Drafting…** and is disabled while the first job runs.
 
 ---
@@ -357,7 +357,7 @@ acceptance criteria.
 - **FR-21.** Every Skill carries exactly one readiness state, from this closed set:
   | State | Card badge | Meaning |
   | --- | --- | --- |
-  | `ready` | *(no badge)* | It will be picked up on the next matching run. |
+  | `ready` | _(no badge)_ | It will be picked up on the next matching run. |
   | `needs_setup` | **Not reaching any agent** | It has no binding, or every binding it has is muted. |
   | `missing_requirements` | **Missing {n} requirement(s)** | It declares a tool or credential whose backing is not connected/set. |
   | `blocked_by_access` | **Blocked by your access rules** | Every tool it declares is refused by the workspace's access rules. Nothing is missing; permission is withheld. |
@@ -442,7 +442,7 @@ acceptance criteria.
 - **FR-43.** The request returns within 2 seconds with a draft id and a `drafting` state. The
   drafting itself runs in the background with a budget of **90 seconds**.
 - **FR-44.** The drafting agent is instructed to produce, at minimum: a **title**, a
-  **"use this when…"** description phrased as a *situation* rather than a capability, **numbered
+  **"use this when…"** description phrased as a _situation_ rather than a capability, **numbered
   steps**, a separate **Edge cases** section covering what went wrong in the run and how it was
   handled, and **up to 6 tags**.
 - **FR-45.** A drafted Skill is created with the **Needs your review** state. It is **not**
@@ -505,20 +505,20 @@ acceptance criteria.
 
 ### 5.1 Already in Ever Works — extended here
 
-| Entity | Today | This epic adds |
-| --- | --- | --- |
-| **Skill** | A titled Markdown capability with a description, a definition body, a version, an owner scope, an optional slash invocation, and provenance fields recording which catalogue it came from. | An **off switch**, a **cached readiness verdict** with its enumerated detail and the time it was checked, a **review state** for drafts, and a link to the **Run** a captured Skill came from. |
-| **Skill binding** | The row that attaches a Skill to an Agent, Work, Mission, Idea or the workspace, with a priority and per-target injection flags. | Nothing changes. The off switch sits *above* bindings; it does not touch them. |
-| **Skill companion file** | A script, reference, asset or config file indexed against a Skill. | Nothing changes; the detail view lists them alongside the new panels. |
-| **Agent** | A person-shaped worker. | Becomes the assignee of a repair Task and the author of a captured Skill. |
-| **Task** | A step of delegated work with an assignee. | A repair is expressed as an ordinary Task — no new work-item concept is introduced. |
-| **Run** | One agent execution, with structured step records. | Becomes the *source* a Skill can be captured from, and the place a suppression is recorded. |
-| **Connection / Plugin** | An installed integration and the account behind it. | Read (never written) by the readiness check to decide whether a declared tool's backing exists. |
+| Entity                   | Today                                                                                                                                                                                      | This epic adds                                                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Skill**                | A titled Markdown capability with a description, a definition body, a version, an owner scope, an optional slash invocation, and provenance fields recording which catalogue it came from. | An **off switch**, a **cached readiness verdict** with its enumerated detail and the time it was checked, a **review state** for drafts, and a link to the **Run** a captured Skill came from. |
+| **Skill binding**        | The row that attaches a Skill to an Agent, Work, Mission, Idea or the workspace, with a priority and per-target injection flags.                                                           | Nothing changes. The off switch sits _above_ bindings; it does not touch them.                                                                                                                 |
+| **Skill companion file** | A script, reference, asset or config file indexed against a Skill.                                                                                                                         | Nothing changes; the detail view lists them alongside the new panels.                                                                                                                          |
+| **Agent**                | A person-shaped worker.                                                                                                                                                                    | Becomes the assignee of a repair Task and the author of a captured Skill.                                                                                                                      |
+| **Task**                 | A step of delegated work with an assignee.                                                                                                                                                 | A repair is expressed as an ordinary Task — no new work-item concept is introduced.                                                                                                            |
+| **Run**                  | One agent execution, with structured step records.                                                                                                                                         | Becomes the _source_ a Skill can be captured from, and the place a suppression is recorded.                                                                                                    |
+| **Connection / Plugin**  | An installed integration and the account behind it.                                                                                                                                        | Read (never written) by the readiness check to decide whether a declared tool's backing exists.                                                                                                |
 
 ### 5.2 New
 
-| Entity | Why it must exist | Shape |
-| --- | --- | --- |
+| Entity        | Why it must exist                                                                                                                                                                                                                     | Shape                                                                                                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Skill tag** | Tags today live inside a Skill's definition blob. Nothing can filter on them, count them, or list them, which is why the tag filter the first-party Skills were written for has never existed. A tag needs to be a row to be a facet. | One row per (Skill, tag). Derived automatically from the Skill's definition on every write; never edited independently. Not a user-managed taxonomy — there is no "create tag" action, no tag rename, no colour. |
 
 > **No other new noun.** Readiness is an attribute of a Skill, not an entity. A repair is a
@@ -613,19 +613,19 @@ All copy below is final English copy, ready to be keyed for translation.
 
 Exact copy on this surface:
 
-| Element | Copy |
-| --- | --- |
-| Search placeholder | `Search skills by title, tag or description` |
-| Sort label / options | `Sort` · `Recently updated` · `Name (A–Z)` · `Needs attention first` |
-| Tag row label | `Tags:` |
-| Tag overflow | `+{count} more` |
-| Attention summary (n > 0) | `{count} of {total} Skills need you.` |
-| Attention summary (n = 0) | `All {total} Skills are ready.` |
-| Attention filter button | `Show only these` / when active: `Show all` |
-| Toggle, on | `On` — announced as `Skill is on` |
-| Toggle, off | `Off` — announced as `Skill is off` |
-| Reach line | `Reaching {count, plural, =0 {no agents} =1 {1 agent} other {# agents}}` |
-| Pagination | `Showing {start}–{end} of {total}` · `Previous` · `Next` |
+| Element                   | Copy                                                                     |
+| ------------------------- | ------------------------------------------------------------------------ |
+| Search placeholder        | `Search skills by title, tag or description`                             |
+| Sort label / options      | `Sort` · `Recently updated` · `Name (A–Z)` · `Needs attention first`     |
+| Tag row label             | `Tags:`                                                                  |
+| Tag overflow              | `+{count} more`                                                          |
+| Attention summary (n > 0) | `{count} of {total} Skills need you.`                                    |
+| Attention summary (n = 0) | `All {total} Skills are ready.`                                          |
+| Attention filter button   | `Show only these` / when active: `Show all`                              |
+| Toggle, on                | `On` — announced as `Skill is on`                                        |
+| Toggle, off               | `Off` — announced as `Skill is off`                                      |
+| Reach line                | `Reaching {count, plural, =0 {no agents} =1 {1 agent} other {# agents}}` |
+| Pagination                | `Showing {start}–{end} of {total}` · `Previous` · `Next`                 |
 
 ### 6.2 Badges — every state, exact copy
 
@@ -822,18 +822,18 @@ DISCARD CONFIRMATION
 
 ### 6.8 Keyboard affordances
 
-| Where | Key | Action |
-| --- | --- | --- |
-| Shelf | `/` | Focus the search box (does not fire when a text field already has focus). |
-| Shelf | `Esc` in search | Clear the query and blur. |
-| Tag chip row | `←` `→` | Move between chips. `Space` / `Enter` toggles the focused chip. |
-| Tag chip row | `Backspace` on a selected chip | Deselect it. |
-| Card grid | `Tab` | Card → toggle → primary repair action → next card. Cards are in DOM order = visual order. |
-| Card | `Enter` | Open the Skill. |
-| Card toggle | `Space` | Flip it. State change is announced, not just recoloured. |
-| Any dialog | `Esc` | Close without acting. Focus returns to the control that opened it. |
-| Any dialog | `Enter` | Fire the primary action, unless focus is in a multi-line field. |
-| Readiness panel | `R` | Re-check (only while the panel has focus). |
+| Where           | Key                            | Action                                                                                    |
+| --------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
+| Shelf           | `/`                            | Focus the search box (does not fire when a text field already has focus).                 |
+| Shelf           | `Esc` in search                | Clear the query and blur.                                                                 |
+| Tag chip row    | `←` `→`                        | Move between chips. `Space` / `Enter` toggles the focused chip.                           |
+| Tag chip row    | `Backspace` on a selected chip | Deselect it.                                                                              |
+| Card grid       | `Tab`                          | Card → toggle → primary repair action → next card. Cards are in DOM order = visual order. |
+| Card            | `Enter`                        | Open the Skill.                                                                           |
+| Card toggle     | `Space`                        | Flip it. State change is announced, not just recoloured.                                  |
+| Any dialog      | `Esc`                          | Close without acting. Focus returns to the control that opened it.                        |
+| Any dialog      | `Enter`                        | Fire the primary action, unless focus is in a multi-line field.                           |
+| Readiness panel | `R`                            | Re-check (only while the panel has focus).                                                |
 
 Every badge is text plus an icon; colour is never the only carrier of meaning. Toggle state,
 readiness state and requirement met/unmet state each expose a text label to assistive
@@ -845,8 +845,8 @@ technology.
 
 - **Skill versioning, history, diff and rollback.** A Skill has a version string today and
   keeps it. Revision history is not built here.
-- **Editing a Skill by conversation.** Asking an agent to *rewrite* an existing Skill is a chat
-  concern (AW-12); this epic only asks an agent to *repair* readiness and to *draft* from a run.
+- **Editing a Skill by conversation.** Asking an agent to _rewrite_ an existing Skill is a chat
+  concern (AW-12); this epic only asks an agent to _repair_ readiness and to _draft_ from a run.
 - **A tag taxonomy.** No tag creation, renaming, merging, colouring or hierarchy. Tags are
   derived from Skill definitions, full stop.
 - **Automatic capture.** Nothing is ever drafted without a person asking for it. There is no
@@ -863,7 +863,7 @@ technology.
   already exist.
 - **Bulk operations.** No multi-select, no "disable all", no bulk attach.
 - **The catalogue's own browse experience** beyond what exists — the `Available` section keeps
-  its current behaviour; the shelf work is about what is *installed*.
+  its current behaviour; the shelf work is about what is _installed_.
 
 ---
 

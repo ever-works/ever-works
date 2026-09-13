@@ -93,16 +93,16 @@ this cost and on what" is answerable from the receipt rather than from a log.
 
 ### 2.1 The questions an owner asks that Ever Works cannot answer today
 
-| The owner's question | What they do today | What is missing |
-| --- | --- | --- |
-| "Use my company key first and my personal key when it runs out." | Impossible. | A provider's credential is a single field on a single plugin settings record. There is no second account and nowhere to put an order. |
-| "Everything stopped at 2am — why?" | Open Runs, open the failed one, read the error, guess. | Nothing watches credential expiry, nothing warns before it, and nothing tells the owner a key is the reason. |
-| "Don't stall when the provider rate-limits me." | Nothing. The call fails and the Run fails. | There is no cross-provider fallback anywhere in the platform. The only automatic retry moves to a *more expensive tier of the same provider* on the *same* credential. |
-| "Run my nightly digest on the cheap model." | Set the Agent's model — and every Run of that Agent changes, including the ones you wanted on the good model. | Overrides exist per Agent only. A Schedule cannot carry a model. |
-| "Make it think harder on the research job." | Nothing. | There is no reasoning-effort setting at any level. The only reasoning behaviour that ships is an automatic, per-model-name rule that *suppresses* extended thinking; it is not configurable and not visible. |
-| "Kill a run that has been stuck for an hour." | Wait for a platform-wide sweeper, or cancel by hand if you happen to look. | There is no per-workspace or per-schedule run deadline, and no per-call deadline at all. |
-| "Which model actually answered this run?" | Cross-reference the run against the usage ledger by timestamp. | The Run record stores total tokens and a cost, but not the model, the provider or the account that produced them. |
-| "Did my new key reach the machines?" | Log into each machine and check by hand. | Provider credentials on a computer an agent controls are placed there by hand, out of band, with nothing on either side reporting whether they match what the workspace holds. |
+| The owner's question                                             | What they do today                                                                                            | What is missing                                                                                                                                                                                              |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| "Use my company key first and my personal key when it runs out." | Impossible.                                                                                                   | A provider's credential is a single field on a single plugin settings record. There is no second account and nowhere to put an order.                                                                        |
+| "Everything stopped at 2am — why?"                               | Open Runs, open the failed one, read the error, guess.                                                        | Nothing watches credential expiry, nothing warns before it, and nothing tells the owner a key is the reason.                                                                                                 |
+| "Don't stall when the provider rate-limits me."                  | Nothing. The call fails and the Run fails.                                                                    | There is no cross-provider fallback anywhere in the platform. The only automatic retry moves to a _more expensive tier of the same provider_ on the _same_ credential.                                       |
+| "Run my nightly digest on the cheap model."                      | Set the Agent's model — and every Run of that Agent changes, including the ones you wanted on the good model. | Overrides exist per Agent only. A Schedule cannot carry a model.                                                                                                                                             |
+| "Make it think harder on the research job."                      | Nothing.                                                                                                      | There is no reasoning-effort setting at any level. The only reasoning behaviour that ships is an automatic, per-model-name rule that _suppresses_ extended thinking; it is not configurable and not visible. |
+| "Kill a run that has been stuck for an hour."                    | Wait for a platform-wide sweeper, or cancel by hand if you happen to look.                                    | There is no per-workspace or per-schedule run deadline, and no per-call deadline at all.                                                                                                                     |
+| "Which model actually answered this run?"                        | Cross-reference the run against the usage ledger by timestamp.                                                | The Run record stores total tokens and a cost, but not the model, the provider or the account that produced them.                                                                                            |
+| "Did my new key reach the machines?"                             | Log into each machine and check by hand.                                                                      | Provider credentials on a computer an agent controls are placed there by hand, out of band, with nothing on either side reporting whether they match what the workspace holds.                               |
 
 ### 2.2 The four concrete gaps in the code we own
 
@@ -144,14 +144,14 @@ for the same reason: an account is only real once the thing that uses it has it.
 
 - **S1 — a second account on the same provider.**
   **Given** an owner with one account on a provider, labelled "Company key",
-  **when** they open Settings → Models → *Add account* on that provider, paste a second
+  **when** they open Settings → Models → _Add account_ on that provider, paste a second
   credential and name it "Overflow key",
   **then** both appear as numbered rows under that provider — "Company key" at **#1**,
   "Overflow key" at **#2** — and the panel says "Agents use them in this order."
 
 - **S2 — the order is the fallback order, and reordering takes three actions.**
   **Given** two accounts on one provider,
-  **when** the owner presses *Move up* on "Overflow key" and *Save*,
+  **when** the owner presses _Move up_ on "Overflow key" and _Save_,
   **then** the numbers swap, a toast reads "Order saved. Agents pick it up on their next
   call.", and the next Agent call that reaches that provider tries "Overflow key" first —
   with no restart of any Agent, Run, worker or process.
@@ -170,7 +170,7 @@ for the same reason: an account is only real once the thing that uses it has it.
   chain answers, the Run completes, and the receipt reads "after 1 earlier attempt".
 
 - **S5 — the workspace picks the default model.**
-  **Given** an owner in Settings → Models → *Model defaults*,
+  **Given** an owner in Settings → Models → _Model defaults_,
   **when** they choose a default model from the picker,
   **then** every Agent and every Schedule that has not overridden it uses that model on their
   next Run, and each override control elsewhere shows "Workspace default ({model})" as its
@@ -178,21 +178,21 @@ for the same reason: an account is only real once the thing that uses it has it.
 
 - **S6 — an Agent overrides the workspace.**
   **Given** a workspace default of a large model,
-  **when** the owner opens an Agent → Settings → *Model* and selects a fast model,
+  **when** the owner opens an Agent → Settings → _Model_ and selects a fast model,
   **then** that Agent's Runs use the fast model, every other Agent is untouched, and the
-  Agent's panel shows "Overriding the workspace default" with a *Reset to workspace default*
+  Agent's panel shows "Overriding the workspace default" with a _Reset to workspace default_
   link.
 
 - **S7 — a Schedule overrides the Agent.**
   **Given** an Agent set to a large model with an hourly schedule attached,
-  **when** the owner opens that schedule's *Model for this schedule* drawer and picks a fast
+  **when** the owner opens that schedule's _Model for this schedule_ drawer and picks a fast
   model,
   **then** the hourly Runs use the fast model, a manual Run of the same Agent uses the large
   model, and both receipts say which one ran.
 
 - **S8 — the fallback list refuses to offer the primary.**
   **Given** a policy whose primary model is `M`,
-  **when** the owner opens *Add a fallback*,
+  **when** the owner opens _Add a fallback_,
   **then** `M` is absent from the list — not greyed, absent — and the helper text reads "Your
   default model is never offered as its own fallback."
 
@@ -210,8 +210,8 @@ for the same reason: an account is only real once the thing that uses it has it.
 
 - **S11 — reconnect keeps everything.**
   **Given** an expired account at position #2 with a name and a usage history,
-  **when** the owner presses *Reconnect* and supplies a fresh credential,
-  **then** the same row returns to *Working*, keeping its position, its name, its history, and
+  **when** the owner presses _Reconnect_ and supplies a fresh credential,
+  **then** the same row returns to _Working_, keeping its position, its name, its history, and
   every policy that referenced it — no second row is created and no order is re-asked.
 
 - **S12 — a stuck run ends instead of hanging.**
@@ -221,8 +221,8 @@ for the same reason: an account is only real once the thing that uses it has it.
   records the routing that was in flight, and the next scheduled Run starts normally.
 
 - **S13 — reasoning effort is a choice with consequences shown.**
-  **Given** the workspace effort default of *Medium*,
-  **when** the owner sets a research Agent to *High*,
+  **Given** the workspace effort default of _Medium_,
+  **when** the owner sets a research Agent to _High_,
   **then** that Agent's calls request the provider's high reasoning setting where the chosen
   model supports one, the Agent panel shows "High — costs more and takes longer", and Runs of
   that Agent record `effort: high`.
@@ -232,7 +232,7 @@ for the same reason: an account is only real once the thing that uses it has it.
   ago,
   **when** the owner loads Settings → Models,
   **then** a banner reads "3 computers don't have your latest provider accounts yet. Send now
-  →", and pressing *Send now* marks them and each computer applies the change on its next
+  →", and pressing _Send now_ marks them and each computer applies the change on its next
   check-in, with the banner clearing on its own once all three report the current version.
 
 ### 3.2 Edge cases and failures
@@ -260,7 +260,7 @@ for the same reason: an account is only real once the thing that uses it has it.
 
 - **S18 — removing the last working account for a model in active use.**
   **Given** a provider with one account, referenced by the workspace default model,
-  **when** the owner presses *Remove*,
+  **when** the owner presses _Remove_,
   **then** the confirm dialog names the consequence — "'{label}' is the only account for
   {provider}, and 4 agents route to a {provider} model. Removing it makes those runs fall back
   to {nextModel}." — and if there is no fallback at all it instead reads "…those runs will
@@ -332,14 +332,14 @@ for the same reason: an account is only real once the thing that uses it has it.
   **when** the owner opens Settings → Models,
   **then** the page renders its shell with a single error panel reading "Couldn't load your
   model settings. Your agents are unaffected — they're using the settings they already have."
-  and a *Try again* button. It never renders an empty state that implies nothing is
+  and a _Try again_ button. It never renders an empty state that implies nothing is
   configured.
 
 - **S29 — a Run in flight when the policy changes.**
   **Given** a Run that is mid-execution,
   **when** the owner changes the workspace default model,
   **then** the in-flight Run keeps the routing it resolved at its start — the receipt shows
-  the model that actually ran — and the *next* Run picks up the new default.
+  the model that actually ran — and the _next_ Run picks up the new default.
 
 - **S30 — the run timeout is set below what a schedule needs.**
   **Given** a workspace run timeout of 5 minutes and a schedule whose Runs historically take
@@ -573,52 +573,52 @@ The consolidated table is §4.11.
 
 ### 4.11 Every number in this spec
 
-| Thing | Value |
-| --- | --- |
-| Accounts per provider per workspace | max **8** |
-| Provider accounts per workspace | max **32** |
-| Account name length | **1–60** characters |
-| Fallback entries per policy | max **3** |
-| Attempts per call | max **6** |
-| Per-attempt deadline | default **120 s**, range **15–600 s** |
-| Run timeout | default **900 s**, range **60–7200 s** |
-| Reasoning effort | `minimal` \| `low` \| `medium` \| `high`, default **medium** |
-| Health probe cadence | every **6 hours** |
-| Expiry: warn from | **14 days** before |
-| Expiry: banner from | **3 days** before |
-| Cooldown after credential failure | **15 minutes** |
-| Cooldown after rate limit | stated delay, else **60 s**, capped **30 min** |
-| Cooldown after transient failure | **60 s**; **5 min** after **3** in **5 min** |
-| Policy change takes effect | next call, within **5 s** |
-| Bundle reaches a computer | within **2 min** at p95 |
-| Computer considered unreachable after | **10 minutes** without check-in |
-| Settings page first paint | within **1.5 s** at p95 |
+| Thing                                 | Value                                                        |
+| ------------------------------------- | ------------------------------------------------------------ |
+| Accounts per provider per workspace   | max **8**                                                    |
+| Provider accounts per workspace       | max **32**                                                   |
+| Account name length                   | **1–60** characters                                          |
+| Fallback entries per policy           | max **3**                                                    |
+| Attempts per call                     | max **6**                                                    |
+| Per-attempt deadline                  | default **120 s**, range **15–600 s**                        |
+| Run timeout                           | default **900 s**, range **60–7200 s**                       |
+| Reasoning effort                      | `minimal` \| `low` \| `medium` \| `high`, default **medium** |
+| Health probe cadence                  | every **6 hours**                                            |
+| Expiry: warn from                     | **14 days** before                                           |
+| Expiry: banner from                   | **3 days** before                                            |
+| Cooldown after credential failure     | **15 minutes**                                               |
+| Cooldown after rate limit             | stated delay, else **60 s**, capped **30 min**               |
+| Cooldown after transient failure      | **60 s**; **5 min** after **3** in **5 min**                 |
+| Policy change takes effect            | next call, within **5 s**                                    |
+| Bundle reaches a computer             | within **2 min** at p95                                      |
+| Computer considered unreachable after | **10 minutes** without check-in                              |
+| Settings page first paint             | within **1.5 s** at p95                                      |
 
 ## 5. Key entities
 
-| Entity | New? | What it is |
-| --- | --- | --- |
-| **Model Account** | **New** | One set of credentials for one AI provider, held by a workspace, carrying a name, a position, a health state and a last-used time. Several may exist for the same provider; the position is the failover order. |
-| **Model Policy** | **New** | The routing decision at one scope: a primary model, an ordered fallback list, a reasoning effort and a run timeout. Exists at workspace, Agent and Schedule scope; the narrowest one that sets a field wins that field. |
-| **Model Bundle version** | **New** (a counter, not a noun users name) | A single increasing number per workspace that says "the model configuration changed". Computers report the version they have applied; a mismatch is the sync signal. |
-| **Run routing record** | **New** (part of an existing entity) | What actually answered a Run: provider, model, account name, effort, and every earlier attempt with its reason. Lives on the Run. |
-| Agent | Existing | Gains an optional Model Policy at Agent scope. Its existing single provider/model fields keep working and are read as a policy of one. |
-| Schedule | Existing | Gains an optional Model Policy at Schedule scope, and an optional run-timeout override. |
-| Run | Existing | Gains the routing record above. |
-| Plugin | Existing | Providers are exactly the installed plugins that declare the AI-provider capability. This epic adds no provider list of its own. |
-| Node / Fleet | Existing | A computer an agent controls. Reports its applied bundle version; receives sent bundles. Called "computer" in UI copy only. |
-| Organization / Workspace | Existing | The scope every Model Account and workspace-level Model Policy belongs to. |
+| Entity                   | New?                                       | What it is                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Model Account**        | **New**                                    | One set of credentials for one AI provider, held by a workspace, carrying a name, a position, a health state and a last-used time. Several may exist for the same provider; the position is the failover order.         |
+| **Model Policy**         | **New**                                    | The routing decision at one scope: a primary model, an ordered fallback list, a reasoning effort and a run timeout. Exists at workspace, Agent and Schedule scope; the narrowest one that sets a field wins that field. |
+| **Model Bundle version** | **New** (a counter, not a noun users name) | A single increasing number per workspace that says "the model configuration changed". Computers report the version they have applied; a mismatch is the sync signal.                                                    |
+| **Run routing record**   | **New** (part of an existing entity)       | What actually answered a Run: provider, model, account name, effort, and every earlier attempt with its reason. Lives on the Run.                                                                                       |
+| Agent                    | Existing                                   | Gains an optional Model Policy at Agent scope. Its existing single provider/model fields keep working and are read as a policy of one.                                                                                  |
+| Schedule                 | Existing                                   | Gains an optional Model Policy at Schedule scope, and an optional run-timeout override.                                                                                                                                 |
+| Run                      | Existing                                   | Gains the routing record above.                                                                                                                                                                                         |
+| Plugin                   | Existing                                   | Providers are exactly the installed plugins that declare the AI-provider capability. This epic adds no provider list of its own.                                                                                        |
+| Node / Fleet             | Existing                                   | A computer an agent controls. Reports its applied bundle version; receives sent bundles. Called "computer" in UI copy only.                                                                                             |
+| Organization / Workspace | Existing                                   | The scope every Model Account and workspace-level Model Policy belongs to.                                                                                                                                              |
 
 ### 5.1 Two new nouns, and why each is not a synonym of something we have
 
 **Model Account** is not the same thing as a Connection. A Connection (AW-15) is an account a
-*tool* calls, gated by a scope preset and per-agent grants, and asked "may this Agent use you
-for this tool". A Model Account is an account the *model resolver* calls, gated by nothing but
+_tool_ calls, gated by a scope preset and per-agent grants, and asked "may this Agent use you
+for this tool". A Model Account is an account the _model resolver_ calls, gated by nothing but
 its position in a chain, and asked "can you answer right now, and if not, who's next". They
 share the English word "account" and nothing else: different consumer, different lifecycle,
 different failure semantics, different UI. Merging them would put a failover position on a
 calendar connection and a scope preset on a model key. If both epics ship, the Connections
-registry may *list* Model Accounts read-only for discoverability — see §9.
+registry may _list_ Model Accounts read-only for discoverability — see §9.
 
 **Model Policy** is not a synonym of settings. It is the one place three levels of override
 resolve, so that the workspace, an Agent and a Schedule cannot express contradictory routing.
@@ -807,7 +807,7 @@ READ-ONLY (not an admin)                 ┌────────────
 ```
 
 The credential field is write-only. After a successful save the dialog closes and the field
-is never re-rendered with any value; the row's menu offers *Replace key*, never *Show key*.
+is never re-rendered with any value; the row's menu offers _Replace key_, never _Show key_.
 
 ### 6.4 The fallback picker — the primary is absent
 
@@ -942,47 +942,47 @@ ended.` · `Stopped after 6 attempts.` · `No model call was made.`
 
 ### 6.9 Exact user-visible copy that carries meaning
 
-| Situation | Copy |
-| --- | --- |
-| Accounts panel help | "Agents use them in this order. Number 1 first, and the next one whenever the one above can't answer." |
-| Order saved | "Order saved. Agents pick it up on their next call." |
-| Fallback help | "Tried in order when the model above is rate-limited, unreachable, or has no working account. Your default model is never offered as its own fallback." |
-| Primary removed from chain | "Removed {model} from the fallbacks — it's your default now." |
-| Effort help | "How hard models think before answering. Higher costs more and takes longer." |
-| Effort not supported | "This model doesn't take a thinking setting. Your choice is recorded and ignored for it." |
-| Timeout help | "A run still going after this ends instead of hanging. Between 1 minute and 2 hours." |
-| Timeout warning | "{n} schedules have runs that usually take longer than this. They'll start timing out." |
-| Credential secrecy | "Stored encrypted. Nobody — not you, not an agent, not an export — can read it back out." |
-| No markup | "Billing goes to your own account with {provider}. Ever Works adds nothing on top and never buys credit for you." |
-| Remove, with fallback | "'{label}' is the only account for {provider}, and {n} agents route to a {provider} model. Removing it makes those runs fall back to {model}." |
-| Remove, no fallback | "'{label}' is the only account for {provider}, and {n} agents route to a {provider} model. Removing it makes those runs stop until you add an account or pick a different model." |
-| Conflict | "Someone changed this while you were editing. We reloaded the order — check it and save again." |
-| Unverified model id | "Not in the catalogue we can see. Double-check the spelling." |
-| Catalogue unavailable | "Couldn't load this provider's models. You can still type a model id." |
-| Chain exhausted (run log) | "No model could answer: tried {n} of {n}. Last error: {reason}." |
-| Budget stop | "Stopped by your budget cap, not by a model. Fallbacks were not tried." |
-| Paused row | "Paused — agents skip this one." |
-| No-account fallback badge | "No account — this step will be skipped." |
-| Read-only tooltip | "Only workspace admins can change model settings" |
-| Load error | "Couldn't load your model settings. Your agents are unaffected — they're using the settings they already have." |
-| Diagnostic hint (empty Runs, unhealthy account) | "One of your provider accounts needs reconnecting. That's usually why agents stop." |
+| Situation                                       | Copy                                                                                                                                                                              |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accounts panel help                             | "Agents use them in this order. Number 1 first, and the next one whenever the one above can't answer."                                                                            |
+| Order saved                                     | "Order saved. Agents pick it up on their next call."                                                                                                                              |
+| Fallback help                                   | "Tried in order when the model above is rate-limited, unreachable, or has no working account. Your default model is never offered as its own fallback."                           |
+| Primary removed from chain                      | "Removed {model} from the fallbacks — it's your default now."                                                                                                                     |
+| Effort help                                     | "How hard models think before answering. Higher costs more and takes longer."                                                                                                     |
+| Effort not supported                            | "This model doesn't take a thinking setting. Your choice is recorded and ignored for it."                                                                                         |
+| Timeout help                                    | "A run still going after this ends instead of hanging. Between 1 minute and 2 hours."                                                                                             |
+| Timeout warning                                 | "{n} schedules have runs that usually take longer than this. They'll start timing out."                                                                                           |
+| Credential secrecy                              | "Stored encrypted. Nobody — not you, not an agent, not an export — can read it back out."                                                                                         |
+| No markup                                       | "Billing goes to your own account with {provider}. Ever Works adds nothing on top and never buys credit for you."                                                                 |
+| Remove, with fallback                           | "'{label}' is the only account for {provider}, and {n} agents route to a {provider} model. Removing it makes those runs fall back to {model}."                                    |
+| Remove, no fallback                             | "'{label}' is the only account for {provider}, and {n} agents route to a {provider} model. Removing it makes those runs stop until you add an account or pick a different model." |
+| Conflict                                        | "Someone changed this while you were editing. We reloaded the order — check it and save again."                                                                                   |
+| Unverified model id                             | "Not in the catalogue we can see. Double-check the spelling."                                                                                                                     |
+| Catalogue unavailable                           | "Couldn't load this provider's models. You can still type a model id."                                                                                                            |
+| Chain exhausted (run log)                       | "No model could answer: tried {n} of {n}. Last error: {reason}."                                                                                                                  |
+| Budget stop                                     | "Stopped by your budget cap, not by a model. Fallbacks were not tried."                                                                                                           |
+| Paused row                                      | "Paused — agents skip this one."                                                                                                                                                  |
+| No-account fallback badge                       | "No account — this step will be skipped."                                                                                                                                         |
+| Read-only tooltip                               | "Only workspace admins can change model settings"                                                                                                                                 |
+| Load error                                      | "Couldn't load your model settings. Your agents are unaffected — they're using the settings they already have."                                                                   |
+| Diagnostic hint (empty Runs, unhealthy account) | "One of your provider accounts needs reconnecting. That's usually why agents stop."                                                                                               |
 
 ### 6.10 Keyboard
 
-| Surface | Keys |
-| --- | --- |
-| Account list | Roving tab stop, one per row. `Alt+↑` / `Alt+↓` move the focused row and announce "Company key, position 2 of 4" politely. `Enter` opens the row menu. `Delete` opens the remove dialog. `Space` toggles keyboard-reorder mode for pointer-free dragging. |
-| Fallback chain | Same roving pattern. `Alt+↑`/`Alt+↓` reorder, `Backspace` removes the focused entry and announces "Removed. 1 fallback left." |
-| Model picker | Opens focused on the search box; any printable key filters; `↑`/`↓` move; `Enter` selects; `Esc` closes and restores the previous value. |
-| Effort radios | Native radio-group arrow behaviour; the helper line is the group's description. |
-| Both panels | `Cmd/Ctrl+S` saves the panel containing focus. `Esc` on a dirty panel asks "Discard your changes?" before reverting. |
-| Banners | Reachable in tab order before the page heading; the dismiss control is a real button labelled "Dismiss". |
-| Everything | Focus is never trapped; each dialog returns focus to the control that opened it; every state change that matters is announced once, politely, never assertively. |
+| Surface        | Keys                                                                                                                                                                                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Account list   | Roving tab stop, one per row. `Alt+↑` / `Alt+↓` move the focused row and announce "Company key, position 2 of 4" politely. `Enter` opens the row menu. `Delete` opens the remove dialog. `Space` toggles keyboard-reorder mode for pointer-free dragging. |
+| Fallback chain | Same roving pattern. `Alt+↑`/`Alt+↓` reorder, `Backspace` removes the focused entry and announces "Removed. 1 fallback left."                                                                                                                             |
+| Model picker   | Opens focused on the search box; any printable key filters; `↑`/`↓` move; `Enter` selects; `Esc` closes and restores the previous value.                                                                                                                  |
+| Effort radios  | Native radio-group arrow behaviour; the helper line is the group's description.                                                                                                                                                                           |
+| Both panels    | `Cmd/Ctrl+S` saves the panel containing focus. `Esc` on a dirty panel asks "Discard your changes?" before reverting.                                                                                                                                      |
+| Banners        | Reachable in tab order before the page heading; the dismiss control is a real button labelled "Dismiss".                                                                                                                                                  |
+| Everything     | Focus is never trapped; each dialog returns focus to the control that opened it; every state change that matters is announced once, politely, never assertively.                                                                                          |
 
 ## 7. Out of scope
 
 - **What things cost, caps, credits and meters.** [AW-17](../README.md) owns spend. This epic
-  records *what ran*; AW-17 prices it.
+  records _what ran_; AW-17 prices it.
 - **The Run receipt surface itself.** [AW-09](../README.md) owns the page; this epic supplies
   the routing record and its copy.
 - **The Schedules list and calendar.** [AW-10](../README.md) owns them; this epic contributes
@@ -1039,33 +1039,33 @@ ended.` · `Stopped after 6 attempts.` · `No model call was made.`
 ## 9. Open questions
 
 - `[NEEDS CLARIFICATION: should the Connections registry (AW-15) list Model Accounts read-only
-  so "everything I've connected" is one page, while all mutation stays in Settings → Models?
-  It helps discoverability and risks implying the two share a scope model, which they do not.]`
+so "everything I've connected" is one page, while all mutation stays in Settings → Models?
+It helps discoverability and risks implying the two share a scope model, which they do not.]`
 - `[NEEDS CLARIFICATION: is 8 accounts per provider the right ceiling? It is chosen to keep the
-  attempt ceiling meaningful, not from observed demand. If real workspaces want more, the
-  attempt ceiling — not the account count — is the thing to revisit.]`
+attempt ceiling meaningful, not from observed demand. If real workspaces want more, the
+attempt ceiling — not the account count — is the thing to revisit.]`
 - `[NEEDS CLARIFICATION: should a provider account be shareable across Organizations within one
-  tenant, or is workspace-scoped correct forever? Shared accounts make an agency's life easier
-  and make "who spent this" harder.]`
+tenant, or is workspace-scoped correct forever? Shared accounts make an agency's life easier
+and make "who spent this" harder.]`
 - `[NEEDS CLARIFICATION: for providers whose credential has no discoverable expiry, should we
-  offer the owner a manual "expires on" date so they get the same warning, or is a silent
-  `unknown` honest and sufficient?]`
+offer the owner a manual "expires on" date so they get the same warning, or is a silent
+`unknown` honest and sufficient?]`
 - `[NEEDS CLARIFICATION: what happens to an operator-level configuration value that names an
-  ordered fallback provider list and is currently read by nothing? This epic deliberately does
-  not read it. Deprecate it, or repurpose it as the instance-wide default chain for workspaces
-  that set none?]`
+ordered fallback provider list and is currently read by nothing? This epic deliberately does
+not read it. Deprecate it, or repurpose it as the instance-wide default chain for workspaces
+that set none?]`
 - `[NEEDS CLARIFICATION: should the run timeout also be overridable per Agent, not just per
-  workspace and per Schedule? Per-schedule covers the stated need; per-agent is one more level
-  to explain.]`
+workspace and per Schedule? Per-schedule covers the stated need; per-agent is one more level
+to explain.]`
 - `[NEEDS CLARIFICATION: should a computer that is out of sync be excluded from taking work, or
-  allowed to run with the credentials it already holds? Excluding is safer and can idle a
-  fleet; allowing is available and can run on a revoked key.]`
+allowed to run with the credentials it already holds? Excluding is safer and can idle a
+fleet; allowing is available and can run on a revoked key.]`
 
 ## 10. Constitution gates
 
 - [x] **I — Plugin-first.** No provider client is added. Providers are exactly the installed
       plugins declaring the AI-provider capability; this epic adds accounts and ordering
-      *around* them.
+      _around_ them.
 - [x] **II — Capability-driven.** No provider id appears in core code, in the UI, or in any
       copy string; the provider list, its credential fields and its model catalogue all come
       from the plugin.

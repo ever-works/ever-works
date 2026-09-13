@@ -25,15 +25,15 @@ Every path below was read before it was cited.
 [`packages/agent/src/entities/agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts)
 (484 lines). Relevant today:
 
-| Concern | Columns | Notes |
-| --- | --- | --- |
-| Lifecycle | `status: AgentStatus` (`varchar(16)`, default `draft`) | Enum at line 49: `draft \| active \| running \| paused \| error \| archived`. The docblock above it lists the legal transitions. |
-| Identity | `name`, `slug`, `title`, `capabilities` (free text), `reportsToAgentId` | `title` is free text; `reportsToAgentId` is the org chart and explicitly carries **no** authz weight. |
-| Permissions | `permissions: AgentPermissions` (`simple-json`) | Eight booleans (`canCreateAgents`, `canAssignTasks`, `canEditSkills`, `canEditAgentFiles`, `canSpend`, `canCommitToRepo`, `canOpenPullRequests`, `canCallExternalTools`), all default `false`. `canOpenPullRequests` implies `canCommitToRepo`, enforced in `AgentsService.update`. |
-| Approval posture | `guardrails: AgentGuardrails \| null` | `null` = "queue every proposal". |
-| Failure handling | `errorCount`, `pauseAfterFailures` (default `3`), `lastRunAt`, `lastRunStatus` | No column records *why* the agent stopped. |
-| Files | `soulMd`, `agentsMd`, `heartbeatMd`, `toolsMd`, `agentYml`, `contentHash` | Workspace-scope agents store bodies here; Mission/Idea/Work-scope agents store them in their scope's git repo. |
-| Scope | `tenantId`, `organizationId` (Tier A), `scope`, `scopeTargetId` | |
+| Concern          | Columns                                                                        | Notes                                                                                                                                                                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lifecycle        | `status: AgentStatus` (`varchar(16)`, default `draft`)                         | Enum at line 49: `draft \| active \| running \| paused \| error \| archived`. The docblock above it lists the legal transitions.                                                                                                                                                    |
+| Identity         | `name`, `slug`, `title`, `capabilities` (free text), `reportsToAgentId`        | `title` is free text; `reportsToAgentId` is the org chart and explicitly carries **no** authz weight.                                                                                                                                                                               |
+| Permissions      | `permissions: AgentPermissions` (`simple-json`)                                | Eight booleans (`canCreateAgents`, `canAssignTasks`, `canEditSkills`, `canEditAgentFiles`, `canSpend`, `canCommitToRepo`, `canOpenPullRequests`, `canCallExternalTools`), all default `false`. `canOpenPullRequests` implies `canCommitToRepo`, enforced in `AgentsService.update`. |
+| Approval posture | `guardrails: AgentGuardrails \| null`                                          | `null` = "queue every proposal".                                                                                                                                                                                                                                                    |
+| Failure handling | `errorCount`, `pauseAfterFailures` (default `3`), `lastRunAt`, `lastRunStatus` | No column records _why_ the agent stopped.                                                                                                                                                                                                                                          |
+| Files            | `soulMd`, `agentsMd`, `heartbeatMd`, `toolsMd`, `agentYml`, `contentHash`      | Workspace-scope agents store bodies here; Mission/Idea/Work-scope agents store them in their scope's git repo.                                                                                                                                                                      |
+| Scope            | `tenantId`, `organizationId` (Tier A), `scope`, `scopeTargetId`                |                                                                                                                                                                                                                                                                                     |
 
 Indexes at lines 204–207 include `idx_agents_user_status` on `(userId, status)` and
 `idx_agents_next_heartbeat` on `(status, nextHeartbeatAt)`.
@@ -55,14 +55,14 @@ The **only** consumer of `status = 'paused'` on the dispatch side is the heartbe
 
 Every other path ignores status entirely:
 
-| Path | Entry point | Status check today |
-| --- | --- | --- |
-| Task assignment | [`apps/api/src/agents/agents.controller.ts`](../../../../../apps/api/src/agents/agents.controller.ts) `assignTask`, line 1482 | **None.** It checks the agent exists, the task exists, a dispatcher is bound, dedups an in-flight run, and calls the concurrency gate. A paused agent runs. |
-| Chat reply | [`packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts) | **None.** Only run-level status is inspected. |
-| Task execution | [`packages/tasks/src/tasks/trigger/agent-task-execute.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-task-execute.task.ts) | **None.** |
-| Delegation | [`apps/api/src/agents/sub-agent-delegation.runner.ts`](../../../../../apps/api/src/agents/sub-agent-delegation.runner.ts) line 136 | Refuses only `ARCHIVED`. A paused child runs. |
-| Inbound email | `AgentEmailAssignment` handling | **None.** |
-| Run now | `agents.controller.ts` `POST :id/run-now` | Goes through `claimForHeartbeat`, so it happens to be blocked — but with an opaque failure, not a stated refusal. |
+| Path            | Entry point                                                                                                                                 | Status check today                                                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Task assignment | [`apps/api/src/agents/agents.controller.ts`](../../../../../apps/api/src/agents/agents.controller.ts) `assignTask`, line 1482               | **None.** It checks the agent exists, the task exists, a dispatcher is bound, dedups an in-flight run, and calls the concurrency gate. A paused agent runs. |
+| Chat reply      | [`packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts)     | **None.** Only run-level status is inspected.                                                                                                               |
+| Task execution  | [`packages/tasks/src/tasks/trigger/agent-task-execute.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-task-execute.task.ts) | **None.**                                                                                                                                                   |
+| Delegation      | [`apps/api/src/agents/sub-agent-delegation.runner.ts`](../../../../../apps/api/src/agents/sub-agent-delegation.runner.ts) line 136          | Refuses only `ARCHIVED`. A paused child runs.                                                                                                               |
+| Inbound email   | `AgentEmailAssignment` handling                                                                                                             | **None.**                                                                                                                                                   |
+| Run now         | `agents.controller.ts` `POST :id/run-now`                                                                                                   | Goes through `claimForHeartbeat`, so it happens to be blocked — but with an opaque failure, not a stated refusal.                                           |
 
 ### 1.3 The single admission point that already exists
 
@@ -129,17 +129,17 @@ Spec of record: [`docs/specs/architecture/agent-prompt-assembly.md`](../../../ar
 
 ### 1.7 The web surfaces
 
-| Surface | File | State today |
-| --- | --- | --- |
-| Agent detail shell | [`apps/web/src/app/[locale]/(dashboard)/agents/[id]/layout.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/layout.tsx>) | `notFound()` when the agent is missing; renders `AgentDetailTabs`. |
-| Dashboard tab (the hero) | [`apps/web/src/app/[locale]/(dashboard)/agents/[id]/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/page.tsx>) | `STATUS_TONE` map at line 15; the hero prints **`{agent.status}` raw and untranslated** at line ~97. `IDLE_LABEL` at line 24 is keyed on `propose \| sleep \| self-improve`. |
-| Tab strip | [`apps/web/src/components/agents/AgentDetailTabs.tsx`](../../../../../apps/web/src/components/agents/AgentDetailTabs.tsx) | Ten tabs. **No new tab is added by this epic.** |
-| Agent card in lists | [`apps/web/src/components/agents/AgentCard.tsx`](../../../../../apps/web/src/components/agents/AgentCard.tsx) | `statusLabel` (line 31) and `statusToneClass` (line 39); a coloured chip with no reason. |
-| Instructions editor | [`apps/web/src/components/agents/AgentInstructionsEditor.tsx`](../../../../../apps/web/src/components/agents/AgentInstructionsEditor.tsx) | Five pills, plain `textarea`, 800 ms autosave, `expectedHash` conflict banner. |
-| API client | [`apps/web/src/lib/api/agents.ts`](../../../../../apps/web/src/lib/api/agents.ts) | `pause()` line 461, `resume()` line 470. **`AgentIdleBehavior` is declared `propose \| sleep \| self-improve`** — drift against the backend enum `propose \| noop \| observe`, which makes `IDLE_LABEL[agent.idleBehavior]` render `undefined` for a real agent. |
-| Server actions | [`apps/web/src/app/actions/agents.ts`](../../../../../apps/web/src/app/actions/agents.ts) | `pauseAgentAction` line 75, `resumeAgentAction` line 83. |
-| Routes | [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) lines 180–206 | `DASHBOARD_AGENT_*` helpers. No new route is added. |
-| Polling precedent | [`apps/web/src/lib/hooks/use-kill-switch-polling.ts`](../../../../../apps/web/src/lib/hooks/use-kill-switch-polling.ts) | Interval constant, in-flight guard, last-known-state-on-error, server-rendered first paint. Copy this shape exactly. |
+| Surface                  | File                                                                                                                                            | State today                                                                                                                                                                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent detail shell       | [`apps/web/src/app/[locale]/(dashboard)/agents/[id]/layout.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/layout.tsx>) | `notFound()` when the agent is missing; renders `AgentDetailTabs`.                                                                                                                                                                                               |
+| Dashboard tab (the hero) | [`apps/web/src/app/[locale]/(dashboard)/agents/[id]/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/page.tsx>)     | `STATUS_TONE` map at line 15; the hero prints **`{agent.status}` raw and untranslated** at line ~97. `IDLE_LABEL` at line 24 is keyed on `propose \| sleep \| self-improve`.                                                                                     |
+| Tab strip                | [`apps/web/src/components/agents/AgentDetailTabs.tsx`](../../../../../apps/web/src/components/agents/AgentDetailTabs.tsx)                       | Ten tabs. **No new tab is added by this epic.**                                                                                                                                                                                                                  |
+| Agent card in lists      | [`apps/web/src/components/agents/AgentCard.tsx`](../../../../../apps/web/src/components/agents/AgentCard.tsx)                                   | `statusLabel` (line 31) and `statusToneClass` (line 39); a coloured chip with no reason.                                                                                                                                                                         |
+| Instructions editor      | [`apps/web/src/components/agents/AgentInstructionsEditor.tsx`](../../../../../apps/web/src/components/agents/AgentInstructionsEditor.tsx)       | Five pills, plain `textarea`, 800 ms autosave, `expectedHash` conflict banner.                                                                                                                                                                                   |
+| API client               | [`apps/web/src/lib/api/agents.ts`](../../../../../apps/web/src/lib/api/agents.ts)                                                               | `pause()` line 461, `resume()` line 470. **`AgentIdleBehavior` is declared `propose \| sleep \| self-improve`** — drift against the backend enum `propose \| noop \| observe`, which makes `IDLE_LABEL[agent.idleBehavior]` render `undefined` for a real agent. |
+| Server actions           | [`apps/web/src/app/actions/agents.ts`](../../../../../apps/web/src/app/actions/agents.ts)                                                       | `pauseAgentAction` line 75, `resumeAgentAction` line 83.                                                                                                                                                                                                         |
+| Routes                   | [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) lines 180–206                                                   | `DASHBOARD_AGENT_*` helpers. No new route is added.                                                                                                                                                                                                              |
+| Polling precedent        | [`apps/web/src/lib/hooks/use-kill-switch-polling.ts`](../../../../../apps/web/src/lib/hooks/use-kill-switch-polling.ts)                         | Interval constant, in-flight guard, last-known-state-on-error, server-rendered first paint. Copy this shape exactly.                                                                                                                                             |
 
 ### 1.8 Decisions, escalations and activity
 
@@ -211,7 +211,7 @@ card.
 site.** Adding `agentId?: string | null` to `RunAdmissionInput` and one middleware to
 `DEFAULT_RUN_ADMISSION_CHAIN` means every present and future dispatch path that already
 crosses `RunDispatchGateService.admit()` inherits the brake with no edit. The only call
-sites that need touching are the ones that must now *pass* `agentId` (they all already
+sites that need touching are the ones that must now _pass_ `agentId` (they all already
 have it in scope) and the two that do not currently go through the gate at all
 (delegation and `run-now`), which get an explicit refusal instead.
 
@@ -221,11 +221,11 @@ is a fourth `queuedReason` in a system built for exactly that.
 
 ### 2.2 Fail directions are deliberately opposite
 
-| Component | Direction | Why |
-| --- | --- | --- |
-| `agentBrake` middleware | **fail-closed** — an unreadable agent parks the run | The control's promise is "it is stopped". A brake that fails open is not a brake. Matches the kill switch. |
-| `AgentStatusReasonResolver` read path | **fail-soft** — keep the last known state | A failed poll must never repaint a working agent as idle. Matches `use-kill-switch-polling`. |
-| Unbound brake port (unit tests, trimmed installs) | pass-through | Same posture as `RUN_KILL_SWITCH`; the port is optional so the gate stays constructible without the agent repository. |
+| Component                                         | Direction                                           | Why                                                                                                                   |
+| ------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `agentBrake` middleware                           | **fail-closed** — an unreadable agent parks the run | The control's promise is "it is stopped". A brake that fails open is not a brake. Matches the kill switch.            |
+| `AgentStatusReasonResolver` read path             | **fail-soft** — keep the last known state           | A failed poll must never repaint a working agent as idle. Matches `use-kill-switch-polling`.                          |
+| Unbound brake port (unit tests, trimmed installs) | pass-through                                        | Same posture as `RUN_KILL_SWITCH`; the port is optional so the gate stays constructible without the agent repository. |
 
 ### 2.3 The status reason is derived, never stored
 
@@ -271,7 +271,7 @@ structurally true rather than a promise.
 
 `personality` is inserted into `PROMPT_SEGMENTS` **after `role` and before
 `capabilities`** — late enough that identity and role are established first, early enough
-that it colours everything that follows, and always *before* `tools`, `skills` and the
+that it colours everything that follows, and always _before_ `tools`, `skills` and the
 output contract so it can never displace a capability instruction under the total
 backstop. Its cap is `600`, so unlike `identity`/`role` it is a capped segment and is
 never the one truncated by the whole-message backstop.
@@ -317,43 +317,43 @@ Placement: `level*` beside `title`; `haltReason*` in the `── Lifecycle ─�
 ```ts
 /** Declared autonomy tier (AW-23). NULL = never set; existing rows stay NULL. */
 export enum AgentLevel {
-    TRAINEE = 'trainee',
-    ASSISTANT = 'assistant',
-    SPECIALIST = 'specialist',
-    LEAD = 'lead'
+	TRAINEE = 'trainee',
+	ASSISTANT = 'assistant',
+	SPECIALIST = 'specialist',
+	LEAD = 'lead'
 }
 
 /** Why an Agent is not working. NULL = it is not halted. */
 export enum AgentHaltReason {
-    USER = 'user',
-    CREDENTIAL = 'credential',
-    FAILURES = 'failures',
-    CAP = 'cap',
-    PLATFORM = 'platform'
+	USER = 'user',
+	CREDENTIAL = 'credential',
+	FAILURES = 'failures',
+	CAP = 'cap',
+	PLATFORM = 'platform'
 }
 
 /** Non-secret descriptor of what refused the Agent. Display names only. */
 export interface AgentHaltDetail {
-    /** Human display name resolved through a facade — never a plugin id. */
-    subjectLabel?: string;
-    /** 'model-provider' | 'tool' | 'repository' | 'other' — what kind of thing it was. */
-    subjectKind?: string;
+	/** Human display name resolved through a facade — never a plugin id. */
+	subjectLabel?: string;
+	/** 'model-provider' | 'tool' | 'repository' | 'other' — what kind of thing it was. */
+	subjectKind?: string;
 }
 ```
 
-| Column | Type | Null | Default | Meaning |
-| --- | --- | --- | --- | --- |
-| `level` | `varchar(16)` | yes | `null` | `AgentLevel` or NULL for "not set". |
-| `levelSetAt` | `PortableDateColumn` | yes | `null` | When the level was last written. |
-| `levelSetByUserId` | `uuid` | yes | `null` | Who wrote it. No FK — matches `reportsToAgentId`'s raw-column posture. |
-| `haltReason` | `varchar(16)` | yes | `null` | `AgentHaltReason`. |
-| `haltNote` | `varchar(200)` | yes | `null` | The optional human note from the pause dialog. Secret-scanned. |
-| `haltedAt` | `PortableDateColumn` | yes | `null` | When the halt was written. |
-| `haltedByUserId` | `uuid` | yes | `null` | Set only for `haltReason = 'user'`. |
-| `haltedRunId` | `uuid` | yes | `null` | The run that caused an automatic halt. |
-| `haltDetail` | `simple-json` | yes | `null` | `AgentHaltDetail`. **Never a credential, never a fragment of one.** |
-| `haltRepeatCount` | `int` | no | `0` | Consecutive halts with the same reason; reset to 0 on clear. Drives FR-33. |
-| `personalityMd` | `text` | yes | `null` | The Personality body for workspace-scope agents. Scoped agents store it in their scope's repo, exactly as the other files do. |
+| Column             | Type                 | Null | Default | Meaning                                                                                                                       |
+| ------------------ | -------------------- | ---- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `level`            | `varchar(16)`        | yes  | `null`  | `AgentLevel` or NULL for "not set".                                                                                           |
+| `levelSetAt`       | `PortableDateColumn` | yes  | `null`  | When the level was last written.                                                                                              |
+| `levelSetByUserId` | `uuid`               | yes  | `null`  | Who wrote it. No FK — matches `reportsToAgentId`'s raw-column posture.                                                        |
+| `haltReason`       | `varchar(16)`        | yes  | `null`  | `AgentHaltReason`.                                                                                                            |
+| `haltNote`         | `varchar(200)`       | yes  | `null`  | The optional human note from the pause dialog. Secret-scanned.                                                                |
+| `haltedAt`         | `PortableDateColumn` | yes  | `null`  | When the halt was written.                                                                                                    |
+| `haltedByUserId`   | `uuid`               | yes  | `null`  | Set only for `haltReason = 'user'`.                                                                                           |
+| `haltedRunId`      | `uuid`               | yes  | `null`  | The run that caused an automatic halt.                                                                                        |
+| `haltDetail`       | `simple-json`        | yes  | `null`  | `AgentHaltDetail`. **Never a credential, never a fragment of one.**                                                           |
+| `haltRepeatCount`  | `int`                | no   | `0`     | Consecutive halts with the same reason; reset to 0 on clear. Drives FR-33.                                                    |
+| `personalityMd`    | `text`               | yes  | `null`  | The Personality body for workspace-scope agents. Scoped agents store it in their scope's repo, exactly as the other files do. |
 
 `PortableDateColumn` (from `packages/agent/src/entities/_types`) is required rather than
 `type: 'timestamp'` — the integration specs boot on better-sqlite3 while production runs
@@ -384,10 +384,10 @@ personalityHash?: string | null;
 - `hashOf` (line 262) appends `+ 'YML/PERSONALITY' + merged.PERSONALITY` at the **end** of
   the concatenation.
 
-> **Why the ETag does not break.** `contentHash` is *stored*, and `read()` returns the
+> **Why the ETag does not break.** `contentHash` is _stored_, and `read()` returns the
 > stored value. An existing row keeps its stored hash until its next write, at which point
 > the hash is recomputed with the new formula — and the caller's `expectedHash`, read
-> moments earlier, still matches the *old stored* value. No backfill, no 409 storm. This
+> moments earlier, still matches the _old stored_ value. No backfill, no 409 storm. This
 > is the same argument AW-07 makes for `NOTES.md`; both are covered by one regression
 > spec asserting a write with a pre-change hash still succeeds.
 >
@@ -402,11 +402,11 @@ personalityHash?: string | null;
 export const QUEUED_REASON_AGENT_PAUSED = 'agent-paused' as const;
 
 export interface RunAdmissionInput {
-    userId: string;
-    workId?: string | null;
-    organizationId?: string | null;
-    /** AW-23 — the Agent the run belongs to, so the brake middleware can see it. */
-    agentId?: string | null;
+	userId: string;
+	workId?: string | null;
+	organizationId?: string | null;
+	/** AW-23 — the Agent the run belongs to, so the brake middleware can see it. */
+	agentId?: string | null;
 }
 ```
 
@@ -421,14 +421,14 @@ New file `packages/agent/src/agents/run-agent-brake.ts`, zero imports, same shap
 
 ```ts
 export interface AgentBrakeVerdict {
-    halted: boolean;
-    /** 'user' | 'credential' | 'failures' | 'cap' | 'platform' — for the log line only. */
-    reason?: string;
+	halted: boolean;
+	/** 'user' | 'credential' | 'failures' | 'cap' | 'platform' — for the log line only. */
+	reason?: string;
 }
 
 export interface RunAgentBrake {
-    /** Fail-CLOSED at the consumer: a throw parks the run. */
-    shouldHaltForAgent(agentId: string): Promise<AgentBrakeVerdict>;
+	/** Fail-CLOSED at the consumer: a throw parks the run. */
+	shouldHaltForAgent(agentId: string): Promise<AgentBrakeVerdict>;
 }
 
 export const RUN_AGENT_BRAKE = 'RUN_AGENT_BRAKE' as const;
@@ -478,11 +478,11 @@ Timestamps are AW-23 slots 00–02 of the program's reserved migration blocks ([
 numbered in apply order (P1 halt, P2 level, P3 personality); re-stamp before merge if `develop`
 has moved past them.
 
-| File | Contents |
-| --- | --- |
-| `1791230000000-AddAgentHaltReason.ts` | `agents.haltReason varchar(16) NULL`, `agents.haltNote varchar(200) NULL`, `agents.haltedAt timestamp NULL`, `agents.haltedByUserId uuid NULL`, `agents.haltedRunId uuid NULL`, `agents.haltDetail text NULL`, `agents.haltRepeatCount int NOT NULL DEFAULT 0`. Existing paused agents read as *"Paused by you"* with no time and no note, which is the truthful rendering of what we know about them. |
-| `1791230100000-AddAgentLevel.ts` | `agents.level varchar(16) NULL`, `agents.levelSetAt timestamp NULL`, `agents.levelSetByUserId uuid NULL`. No backfill: every existing agent stays "not set" (FR-35). |
-| `1791230200000-AddAgentPersonality.ts` | `agents.personalityMd text NULL`, `agent_runs.personalityHash varchar(64) NULL`. |
+| File                                   | Contents                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `1791230000000-AddAgentHaltReason.ts`  | `agents.haltReason varchar(16) NULL`, `agents.haltNote varchar(200) NULL`, `agents.haltedAt timestamp NULL`, `agents.haltedByUserId uuid NULL`, `agents.haltedRunId uuid NULL`, `agents.haltDetail text NULL`, `agents.haltRepeatCount int NOT NULL DEFAULT 0`. Existing paused agents read as _"Paused by you"_ with no time and no note, which is the truthful rendering of what we know about them. |
+| `1791230100000-AddAgentLevel.ts`       | `agents.level varchar(16) NULL`, `agents.levelSetAt timestamp NULL`, `agents.levelSetByUserId uuid NULL`. No backfill: every existing agent stays "not set" (FR-35).                                                                                                                                                                                                                                   |
+| `1791230200000-AddAgentPersonality.ts` | `agents.personalityMd text NULL`, `agent_runs.personalityHash varchar(64) NULL`.                                                                                                                                                                                                                                                                                                                       |
 
 Every `down()` drops in reverse order with `findColumnByName` guards, re-reading the table
 between drops (sqlite rebuilds the table on `dropColumn`, which staleness the fan-out
@@ -592,15 +592,15 @@ the module's existing `@Throttle({ long: { … } })` convention.
 
 ### 4.1 New endpoints
 
-| Method | Path | Body / query | Returns | Throttle |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/agents/:id/identity` | — | `AgentIdentityDto` | `120/min` |
-| `GET` | `/api/agents/status` | `?ids=a,b,c` (≤ 100, 400 above) | `{ statuses: AgentStatusDto[] }` | `120/min` |
-| `GET` | `/api/agents/levels` | — | `{ levels: [{ value, defaults }] }` — static catalogue so the web never hardcodes the table | `120/min` |
-| `GET` | `/api/agents/:id/level` | — | `{ level, diff: LevelDiffEntry[], readiness }` | `120/min` |
-| `POST` | `/api/agents/:id/level/preview` | `{ level }` | `LevelPreview` (includes `baseHash`) | `30/min` |
-| `PUT` | `/api/agents/:id/level` | `{ level, applyDefaults: boolean, baseHash?: string }` | `AgentDto` + `{ applied: LevelDiffEntry[] }`; **409** when `applyDefaults` is true and `baseHash` is stale, carrying a fresh `LevelPreview` | `30/min` |
-| `GET` | `/api/agents/:id/held` | `?limit=20` | `{ total, items: [{ runId, kind, title, heldAt }] }` | `120/min` |
+| Method | Path                            | Body / query                                           | Returns                                                                                                                                     | Throttle  |
+| ------ | ------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| `GET`  | `/api/agents/:id/identity`      | —                                                      | `AgentIdentityDto`                                                                                                                          | `120/min` |
+| `GET`  | `/api/agents/status`            | `?ids=a,b,c` (≤ 100, 400 above)                        | `{ statuses: AgentStatusDto[] }`                                                                                                            | `120/min` |
+| `GET`  | `/api/agents/levels`            | —                                                      | `{ levels: [{ value, defaults }] }` — static catalogue so the web never hardcodes the table                                                 | `120/min` |
+| `GET`  | `/api/agents/:id/level`         | —                                                      | `{ level, diff: LevelDiffEntry[], readiness }`                                                                                              | `120/min` |
+| `POST` | `/api/agents/:id/level/preview` | `{ level }`                                            | `LevelPreview` (includes `baseHash`)                                                                                                        | `30/min`  |
+| `PUT`  | `/api/agents/:id/level`         | `{ level, applyDefaults: boolean, baseHash?: string }` | `AgentDto` + `{ applied: LevelDiffEntry[] }`; **409** when `applyDefaults` is true and `baseHash` is stale, carrying a fresh `LevelPreview` | `30/min`  |
+| `GET`  | `/api/agents/:id/held`          | `?limit=20`                                            | `{ total, items: [{ runId, kind, title, heldAt }] }`                                                                                        | `120/min` |
 
 > `GET /api/agents/status` and `GET /api/agents/levels` are **static segments** and must be
 > declared **before** `@Get(':id')` in the controller, the same ordering constraint the
@@ -608,16 +608,16 @@ the module's existing `@Throttle({ long: { … } })` convention.
 
 ### 4.2 Extended endpoints
 
-| Endpoint | Change | Backwards compatibility |
-| --- | --- | --- |
-| `POST /api/agents/:id/pause` | Accepts an **optional** body `{ note?: string (≤200), stopInFlight?: boolean }`. Response gains `{ heldCount, inFlightCount }`. | Body was previously absent; an empty body behaves exactly as today. Response is additive. |
-| `POST /api/agents/:id/resume` | Clears the halt, then calls `promoteParkedForAgent`. Response gains `{ releasedCount }`. | Additive. |
-| `POST /api/agents/:id/run-now` | Returns **409 `AgentPausedError`** with `{ message: 'agentPaused' }` when the agent is paused, before creating any run row. | Today it fails opaquely inside `claimForHeartbeat`; the new refusal is earlier and named. |
-| `POST /api/agents/:id/assign-task` | Passes `agentId` into `dispatchGate.admit(...)`. A paused agent yields `{ runId, queued: true, queuedReason: 'agent-paused' }` — the same shape the concurrency valve already returns. | The response field already exists; only a new value appears in it. |
-| `GET|PUT /api/agents/:id/files/:name` | `PERSONALITY.md` is now a valid `:name`. | Additive; unknown names still 400. |
-| `PATCH /api/agents/:id` | **Rejects** `level` — level is written only through `PUT :id/level` so a level change can never bypass the preview. | New 400 on a field that was never accepted. |
-| `GET /api/agents` and `GET /api/agents/:id` | `AgentDto` gains `level`, `haltReason`, `haltNote`, `haltedAt`, `personalityMd` (workspace scope only, same as the other file columns). | Additive fields on an existing DTO (Constitution X). |
-| `GET /api/agents/:id/export` / `POST /api/agents/import` | Envelope carries `level` and `PERSONALITY.md`. An import that carries a level applies the **label only**, never the defaults. | Additive; older envelopes import unchanged. |
+| Endpoint                                                 | Change                                                                                                                                                                                 | Backwards compatibility                                                                   |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------- |
+| `POST /api/agents/:id/pause`                             | Accepts an **optional** body `{ note?: string (≤200), stopInFlight?: boolean }`. Response gains `{ heldCount, inFlightCount }`.                                                        | Body was previously absent; an empty body behaves exactly as today. Response is additive. |
+| `POST /api/agents/:id/resume`                            | Clears the halt, then calls `promoteParkedForAgent`. Response gains `{ releasedCount }`.                                                                                               | Additive.                                                                                 |
+| `POST /api/agents/:id/run-now`                           | Returns **409 `AgentPausedError`** with `{ message: 'agentPaused' }` when the agent is paused, before creating any run row.                                                            | Today it fails opaquely inside `claimForHeartbeat`; the new refusal is earlier and named. |
+| `POST /api/agents/:id/assign-task`                       | Passes `agentId` into `dispatchGate.admit(...)`. A paused agent yields `{ runId, queued: true, queuedReason: 'agent-paused' }` — the same shape the concurrency valve already returns. | The response field already exists; only a new value appears in it.                        |
+| `GET                                                     | PUT /api/agents/:id/files/:name`                                                                                                                                                       | `PERSONALITY.md` is now a valid `:name`.                                                  | Additive; unknown names still 400. |
+| `PATCH /api/agents/:id`                                  | **Rejects** `level` — level is written only through `PUT :id/level` so a level change can never bypass the preview.                                                                    | New 400 on a field that was never accepted.                                               |
+| `GET /api/agents` and `GET /api/agents/:id`              | `AgentDto` gains `level`, `haltReason`, `haltNote`, `haltedAt`, `personalityMd` (workspace scope only, same as the other file columns).                                                | Additive fields on an existing DTO (Constitution X).                                      |
+| `GET /api/agents/:id/export` / `POST /api/agents/import` | Envelope carries `level` and `PERSONALITY.md`. An import that carries a level applies the **label only**, never the defaults.                                                          | Additive; older envelopes import unchanged.                                               |
 
 ### 4.3 DTOs
 
@@ -626,18 +626,18 @@ New file `apps/api/src/agents/dto/agent-identity.dto.ts`, and additions to
 
 ```ts
 export class PauseAgentDto {
-    @IsOptional() @IsString() @MaxLength(AGENT_HALT_NOTE_MAX) note?: string;
-    @IsOptional() @IsBoolean() stopInFlight?: boolean;
+	@IsOptional() @IsString() @MaxLength(AGENT_HALT_NOTE_MAX) note?: string;
+	@IsOptional() @IsBoolean() stopInFlight?: boolean;
 }
 
 export class SetAgentLevelDto {
-    @IsIn(AGENT_LEVELS) level: AgentLevelValue;
-    @IsBoolean() applyDefaults: boolean;
-    @IsOptional() @IsString() @Length(64, 64) baseHash?: string;
+	@IsIn(AGENT_LEVELS) level: AgentLevelValue;
+	@IsBoolean() applyDefaults: boolean;
+	@IsOptional() @IsString() @Length(64, 64) baseHash?: string;
 }
 
 export class AgentStatusQueryDto {
-    @IsString() ids: string; // comma-separated; parsed + capped at AGENT_STATUS_BATCH_MAX
+	@IsString() ids: string; // comma-separated; parsed + capped at AGENT_STATUS_BATCH_MAX
 }
 ```
 
@@ -681,20 +681,20 @@ is a one-line-each correctness fix inside files this epic already edits.
 
 ### 5.1 New components (`apps/web/src/components/agents/`)
 
-| File | Role |
-| --- | --- |
-| `AgentIdentityCard.tsx` | The full card (spec §6.1–6.5). Server component for the first paint; wraps the client status region. |
-| `AgentIdentityCard.unit.spec.tsx` | Every state: working, paused, blocked, errored, never-run, archived, level-not-set, drift, readiness. |
-| `AgentStatusDot.tsx` | Dot + reason headline + sub-line + action link. The single renderer for status, used by the card, the compact card, the list and the hero. |
-| `AgentStatusDot.unit.spec.tsx` | One case per `AgentStatusReasonCode`, plus the "colour is never alone" assertion. |
-| `AgentCompactIdentity.tsx` | Avatar + name + dot + reason headline + level chip, for lists. |
-| `AgentLevelBadge.tsx` | The chip, including the "not set" and drift variants. |
-| `AgentLevelDialog.tsx` | Radio list, defaults checkbox, live preview, reduce-autonomy relabelling, stale-preview recovery. |
-| `AgentLevelDialog.unit.spec.tsx` | Preview rendering, the reduce path, the defaults-cleared path, the 409 path. |
-| `AgentLevelDriftList.tsx` | The difference list (spec §6.8). |
-| `AgentPauseDialog.tsx` | Note field with a 200-char counter, in-flight line, confirm. |
-| `AgentPauseDialog.unit.spec.tsx` | Counter, disable-at-limit, `Cmd/Ctrl+Enter`, secret-refusal surfacing. |
-| `AgentHeldWorkPanel.tsx` | The held list (spec §6.11). |
+| File                              | Role                                                                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AgentIdentityCard.tsx`           | The full card (spec §6.1–6.5). Server component for the first paint; wraps the client status region.                                       |
+| `AgentIdentityCard.unit.spec.tsx` | Every state: working, paused, blocked, errored, never-run, archived, level-not-set, drift, readiness.                                      |
+| `AgentStatusDot.tsx`              | Dot + reason headline + sub-line + action link. The single renderer for status, used by the card, the compact card, the list and the hero. |
+| `AgentStatusDot.unit.spec.tsx`    | One case per `AgentStatusReasonCode`, plus the "colour is never alone" assertion.                                                          |
+| `AgentCompactIdentity.tsx`        | Avatar + name + dot + reason headline + level chip, for lists.                                                                             |
+| `AgentLevelBadge.tsx`             | The chip, including the "not set" and drift variants.                                                                                      |
+| `AgentLevelDialog.tsx`            | Radio list, defaults checkbox, live preview, reduce-autonomy relabelling, stale-preview recovery.                                          |
+| `AgentLevelDialog.unit.spec.tsx`  | Preview rendering, the reduce path, the defaults-cleared path, the 409 path.                                                               |
+| `AgentLevelDriftList.tsx`         | The difference list (spec §6.8).                                                                                                           |
+| `AgentPauseDialog.tsx`            | Note field with a 200-char counter, in-flight line, confirm.                                                                               |
+| `AgentPauseDialog.unit.spec.tsx`  | Counter, disable-at-limit, `Cmd/Ctrl+Enter`, secret-refusal surfacing.                                                                     |
+| `AgentHeldWorkPanel.tsx`          | The held list (spec §6.11).                                                                                                                |
 
 Add every one to
 [`apps/web/src/components/agents/index.ts`](../../../../../apps/web/src/components/agents/index.ts).
@@ -719,14 +719,14 @@ keep-last-state-on-error rule and the batching.
 
 ### 5.3 Changed surfaces
 
-| File | Change |
-| --- | --- |
-| [`agents/[id]/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/page.tsx>) | Replace the hero `<section>` with `<AgentIdentityCard/>`, server-fetching `agentsAPI.getIdentity(id)` alongside the existing `agentsAPI.get(id)`. Keep the stat tiles, `AgentGuardrailsCard` and `AgentAttachmentsPanel` untouched below it. Fix `IDLE_LABEL`. |
-| [`AgentCard.tsx`](../../../../../apps/web/src/components/agents/AgentCard.tsx) | Swap the bare status chip for `<AgentStatusDot compact/>`; keep `statusLabel`/`statusToneClass` exports so nothing else breaks. |
-| [`AgentsList.tsx`](../../../../../apps/web/src/components/agents/AgentsList.tsx) | Mount `useAgentStatusPolling` once for the visible page of agents and thread the result down. |
-| [`AgentInstructionsEditor.tsx`](../../../../../apps/web/src/components/agents/AgentInstructionsEditor.tsx) | Seven pills instead of five: Identity, Role, **Notes** (AW-07), **Personality**, Operating loop, Tools, Manifest. The pill labels become i18n keys; the file names stay. Personality's pane adds the permanent notice (FR-54), the load meter (reused from AW-07) and the "takes effect on the next run" line. |
-| [`agents/[id]/instructions/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/instructions/page.tsx>) | Fetch seven files instead of five. |
-| [`agents/[id]/settings/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/settings/page.tsx>) | A read-only level row that links to the dialog. Settings does **not** get a second way to write a level. |
+| File                                                                                                                            | Change                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`agents/[id]/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/page.tsx>)                           | Replace the hero `<section>` with `<AgentIdentityCard/>`, server-fetching `agentsAPI.getIdentity(id)` alongside the existing `agentsAPI.get(id)`. Keep the stat tiles, `AgentGuardrailsCard` and `AgentAttachmentsPanel` untouched below it. Fix `IDLE_LABEL`.                                                 |
+| [`AgentCard.tsx`](../../../../../apps/web/src/components/agents/AgentCard.tsx)                                                  | Swap the bare status chip for `<AgentStatusDot compact/>`; keep `statusLabel`/`statusToneClass` exports so nothing else breaks.                                                                                                                                                                                |
+| [`AgentsList.tsx`](../../../../../apps/web/src/components/agents/AgentsList.tsx)                                                | Mount `useAgentStatusPolling` once for the visible page of agents and thread the result down.                                                                                                                                                                                                                  |
+| [`AgentInstructionsEditor.tsx`](../../../../../apps/web/src/components/agents/AgentInstructionsEditor.tsx)                      | Seven pills instead of five: Identity, Role, **Notes** (AW-07), **Personality**, Operating loop, Tools, Manifest. The pill labels become i18n keys; the file names stay. Personality's pane adds the permanent notice (FR-54), the load meter (reused from AW-07) and the "takes effect on the next run" line. |
+| [`agents/[id]/instructions/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/instructions/page.tsx>) | Fetch seven files instead of five.                                                                                                                                                                                                                                                                             |
+| [`agents/[id]/settings/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/settings/page.tsx>)         | A read-only level row that links to the dialog. Settings does **not** get a second way to write a level.                                                                                                                                                                                                       |
 
 No route is added; `apps/web/src/lib/constants.ts` is not touched.
 
@@ -784,7 +784,7 @@ a third-party SDK or touches a queue.
   whose cause is an authentication rejection maps to `haltReason = 'credential'`. Where it
   has not, `AgentHaltClassifier` in `packages/agent/src/agents/agent-halt-classifier.ts`
   applies a narrow, pure predicate over the run's `errorMessage` and status code
-  (`401`/`403`, and a small closed list of provider-agnostic phrases), defaulting to *not*
+  (`401`/`403`, and a small closed list of provider-agnostic phrases), defaulting to _not_
   a credential fault. It is deliberately conservative: a false negative costs the user the
   old three-failure path, a false positive halts a healthy agent.
 - **When [AW-15](../AW-15-connections-scopes/plan.md) lands**, its connection-health
@@ -964,12 +964,12 @@ Four new members appended to `ActivityActionType` in
 TypeScript-side constraint only, exactly as the Schedules spec establishes for its own
 additions.
 
-| Member | Written when | Details |
-| --- | --- | --- |
-| `AGENT_LEVEL_CHANGED = 'agent_level_changed'` | `PUT :id/level` succeeds | `{ from, to, appliedDefaults, changedFields: string[] }` |
+| Member                                                        | Written when                             | Details                                                         |
+| ------------------------------------------------------------- | ---------------------------------------- | --------------------------------------------------------------- |
+| `AGENT_LEVEL_CHANGED = 'agent_level_changed'`                 | `PUT :id/level` succeeds                 | `{ from, to, appliedDefaults, changedFields: string[] }`        |
 | `AGENT_BLOCKED_ON_CREDENTIAL = 'agent_blocked_on_credential'` | `AgentHaltService.halt(_, 'credential')` | `{ runId, subjectLabel, subjectKind }` — **never a credential** |
-| `AGENT_RUN_HELD = 'agent_run_held'` | The brake parks a run | `{ runId, agentId, reason }` |
-| `AGENT_RUNS_RELEASED = 'agent_runs_released'` | Resume drains | `{ releasedCount, remaining }` |
+| `AGENT_RUN_HELD = 'agent_run_held'`                           | The brake parks a run                    | `{ runId, agentId, reason }`                                    |
+| `AGENT_RUNS_RELEASED = 'agent_runs_released'`                 | Resume drains                            | `{ releasedCount, remaining }`                                  |
 
 Existing `AGENT_PAUSED` gains `{ note, stopInFlight, heldCount }` in its details;
 `AGENT_RESUMED` gains `{ releasedCount }`. Both are additive JSON, no shape change.
@@ -992,17 +992,17 @@ Through the existing `packages/monitoring` surface:
 
 ### 9.4 Failure modes
 
-| Failure | Behaviour | Rationale |
-| --- | --- | --- |
-| Brake port unbound | Pass-through | Unit tests and trimmed installs must still construct the gate. Matches `RUN_KILL_SWITCH`. |
-| Brake read throws | **Park the run** | FR-30. The brake fails closed. |
-| Halt write fails after a successful status transition | The agent is paused with no reason; the card shows *"Paused by you"* with no time. Logged as a warning. | A missing reason is a degraded label. A failed pause would be a lie. |
-| `promoteParkedForAgent` throws | Swallowed and logged; the agent is resumed, held runs stay held until the next terminal transition drains them | Never fail a resume because the drain hiccuped. Matches `promoteParked`. |
-| Identity read fails | The page falls back to today's hero rendering with the raw status chip | The detail page must never 500 because a new panel could not compose. |
-| Status poll fails | Last known state + *"last checked"* line | FR-20. |
-| Level catalogue read fails | Dialog shows *"Levels are unavailable right now"*; nothing is written | FR-44's corollary: the level is never guessed client-side. |
-| Personality secret scan trips | 422 naming the field; body not stored; editor keeps the text | Constitution VII. |
-| `PERSONALITY.md` present but AW-07's `NOTES.md` is not | The editor renders six pills instead of seven | The two files are independent; neither blocks the other. |
+| Failure                                                | Behaviour                                                                                                      | Rationale                                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Brake port unbound                                     | Pass-through                                                                                                   | Unit tests and trimmed installs must still construct the gate. Matches `RUN_KILL_SWITCH`. |
+| Brake read throws                                      | **Park the run**                                                                                               | FR-30. The brake fails closed.                                                            |
+| Halt write fails after a successful status transition  | The agent is paused with no reason; the card shows _"Paused by you"_ with no time. Logged as a warning.        | A missing reason is a degraded label. A failed pause would be a lie.                      |
+| `promoteParkedForAgent` throws                         | Swallowed and logged; the agent is resumed, held runs stay held until the next terminal transition drains them | Never fail a resume because the drain hiccuped. Matches `promoteParked`.                  |
+| Identity read fails                                    | The page falls back to today's hero rendering with the raw status chip                                         | The detail page must never 500 because a new panel could not compose.                     |
+| Status poll fails                                      | Last known state + _"last checked"_ line                                                                       | FR-20.                                                                                    |
+| Level catalogue read fails                             | Dialog shows _"Levels are unavailable right now"_; nothing is written                                          | FR-44's corollary: the level is never guessed client-side.                                |
+| Personality secret scan trips                          | 422 naming the field; body not stored; editor keeps the text                                                   | Constitution VII.                                                                         |
+| `PERSONALITY.md` present but AW-07's `NOTES.md` is not | The editor renders six pills instead of seven                                                                  | The two files are independent; neither blocks the other.                                  |
 
 ---
 
@@ -1010,39 +1010,39 @@ Through the existing `packages/monitoring` surface:
 
 ### 10.1 Unit — `packages/agent` (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/agents/__tests__/agent-status-reason.spec.ts` | Every branch of the precedence ladder in §2.3, in order; the `archived`-beats-everything rule; `working` beating `waitingOnYou`; `notStarted` only when never run. |
-| `packages/agent/src/agents/__tests__/agent-level.spec.ts` | `defaultsFor` for all four levels against the FR-38 table, field by field; `diff` on a matching agent returns `[]`; `preview` sets `reducesAutonomy` only when at least one field loses a permission; `send_message` and `budget_override` never appear in any level's `autoApproveActionTypes`. |
-| `packages/agent/src/agents/__tests__/agent-level-readiness.spec.ts` | The exact thresholds (20 / 0 / 1 / 30 days); `null` at Lead; `null` one run short; the numbers are echoed back. |
-| `packages/agent/src/agents/__tests__/run-admission-agent-brake.spec.ts` | Paused agent parks with `agent-paused`; active agent passes; unbound port passes; a throwing port **parks**; the middleware sits before the Work valve so a paused agent never consumes a count. |
-| `packages/agent/src/agents/__tests__/agent-halt-classifier.spec.ts` | 401/403 and the closed phrase list map to `credential`; everything else does not; a message containing a token-shaped string never reaches the halt detail. |
-| `packages/agent/src/agents/__tests__/agent-halt.service.spec.ts` | Halt writes reason/time/author/run; a second halt with the same reason increments `haltRepeatCount`; a different reason resets it; clear zeroes everything. |
-| `packages/agent/src/agents/__tests__/prompt-assembler.personality.spec.ts` | The `personality` segment is emitted after `role` and before `capabilities`; capped at 600; a forged fence token is broken; an absent personality emits nothing (not an empty heading). |
-| `packages/agent/src/agents/__tests__/agent-file.personality.spec.ts` | `PERSONALITY.md` reads and writes; an unknown name still throws; **a write with a hash computed before the name list changed still succeeds** (the ETag regression). |
-| `packages/agent/src/database/repositories/agent-run.parked-for-agent.spec.ts` | `findOldestQueuedForAgent` ordering, the reason predicate, cross-agent isolation. |
-| `packages/agent/src/agents/__tests__/agent-run-sweeper.paused-exemption.spec.ts` | A run parked `agent-paused` survives a sweep at both the SQL and the service layer. |
+| File                                                                             | Covers                                                                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/agents/__tests__/agent-status-reason.spec.ts`                | Every branch of the precedence ladder in §2.3, in order; the `archived`-beats-everything rule; `working` beating `waitingOnYou`; `notStarted` only when never run.                                                                                                                               |
+| `packages/agent/src/agents/__tests__/agent-level.spec.ts`                        | `defaultsFor` for all four levels against the FR-38 table, field by field; `diff` on a matching agent returns `[]`; `preview` sets `reducesAutonomy` only when at least one field loses a permission; `send_message` and `budget_override` never appear in any level's `autoApproveActionTypes`. |
+| `packages/agent/src/agents/__tests__/agent-level-readiness.spec.ts`              | The exact thresholds (20 / 0 / 1 / 30 days); `null` at Lead; `null` one run short; the numbers are echoed back.                                                                                                                                                                                  |
+| `packages/agent/src/agents/__tests__/run-admission-agent-brake.spec.ts`          | Paused agent parks with `agent-paused`; active agent passes; unbound port passes; a throwing port **parks**; the middleware sits before the Work valve so a paused agent never consumes a count.                                                                                                 |
+| `packages/agent/src/agents/__tests__/agent-halt-classifier.spec.ts`              | 401/403 and the closed phrase list map to `credential`; everything else does not; a message containing a token-shaped string never reaches the halt detail.                                                                                                                                      |
+| `packages/agent/src/agents/__tests__/agent-halt.service.spec.ts`                 | Halt writes reason/time/author/run; a second halt with the same reason increments `haltRepeatCount`; a different reason resets it; clear zeroes everything.                                                                                                                                      |
+| `packages/agent/src/agents/__tests__/prompt-assembler.personality.spec.ts`       | The `personality` segment is emitted after `role` and before `capabilities`; capped at 600; a forged fence token is broken; an absent personality emits nothing (not an empty heading).                                                                                                          |
+| `packages/agent/src/agents/__tests__/agent-file.personality.spec.ts`             | `PERSONALITY.md` reads and writes; an unknown name still throws; **a write with a hash computed before the name list changed still succeeds** (the ETag regression).                                                                                                                             |
+| `packages/agent/src/database/repositories/agent-run.parked-for-agent.spec.ts`    | `findOldestQueuedForAgent` ordering, the reason predicate, cross-agent isolation.                                                                                                                                                                                                                |
+| `packages/agent/src/agents/__tests__/agent-run-sweeper.paused-exemption.spec.ts` | A run parked `agent-paused` survives a sweep at both the SQL and the service layer.                                                                                                                                                                                                              |
 
 ### 10.2 Controller specs — `apps/api` (Jest)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/agents/agents.controller.identity.spec.ts` | `GET :id/identity` shape and cross-user 404; the fallback when the composer throws; **route ordering** — `GET /status` and `GET /levels` resolve before `GET /:id`. |
-| `apps/api/src/agents/agents.controller.level.spec.ts` | Preview, apply, label-only, the 409 on a stale `baseHash` carrying a fresh preview, `PATCH :id` rejecting `level`, the activity write. |
-| `apps/api/src/agents/agents.controller.pause.spec.ts` | Empty body behaves as today; a 201-char note is rejected; a second pause is a no-op preserving note/time/author and writes no second activity row; `run-now` on a paused agent 409s and creates no run; `assign-task` on a paused agent returns `queued: true, queuedReason: 'agent-paused'`; resume reports `releasedCount`. |
-| `apps/api/src/agents/agents.controller.status-batch.spec.ts` | 100 ids succeed, 101 is a 400, another user's ids are filtered out rather than 404-ing the batch. |
-| `apps/api/src/agents/sub-agent-delegation.runner.spec.ts` (extend) | Delegation to a paused child is refused with the named reason and creates no run. |
-| `apps/api/test/agents.e2e-spec.ts` (extend) | Pause → assign-task → resume, end to end against the real gate, asserting the run is parked and then dispatched. |
+| File                                                               | Covers                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/agents/agents.controller.identity.spec.ts`           | `GET :id/identity` shape and cross-user 404; the fallback when the composer throws; **route ordering** — `GET /status` and `GET /levels` resolve before `GET /:id`.                                                                                                                                                           |
+| `apps/api/src/agents/agents.controller.level.spec.ts`              | Preview, apply, label-only, the 409 on a stale `baseHash` carrying a fresh preview, `PATCH :id` rejecting `level`, the activity write.                                                                                                                                                                                        |
+| `apps/api/src/agents/agents.controller.pause.spec.ts`              | Empty body behaves as today; a 201-char note is rejected; a second pause is a no-op preserving note/time/author and writes no second activity row; `run-now` on a paused agent 409s and creates no run; `assign-task` on a paused agent returns `queued: true, queuedReason: 'agent-paused'`; resume reports `releasedCount`. |
+| `apps/api/src/agents/agents.controller.status-batch.spec.ts`       | 100 ids succeed, 101 is a 400, another user's ids are filtered out rather than 404-ing the batch.                                                                                                                                                                                                                             |
+| `apps/api/src/agents/sub-agent-delegation.runner.spec.ts` (extend) | Delegation to a paused child is refused with the named reason and creates no run.                                                                                                                                                                                                                                             |
+| `apps/api/test/agents.e2e-spec.ts` (extend)                        | Pause → assign-task → resume, end to end against the real gate, asserting the run is parked and then dispatched.                                                                                                                                                                                                              |
 
 ### 10.3 End-to-end — `apps/web/e2e` (Playwright)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/e2e/agent-identity-card.spec.ts` | All six card states render a dot **and** a sentence; archived is read-only; never-run offers Activate; no `undefined` anywhere in the card. |
-| `apps/web/e2e/agent-pause-brake.spec.ts` | Pause with a note → the card shows it → assign a task → the held panel shows one item → Run now is refused with the exact copy → Resume → the toast reports one released. |
-| `apps/web/e2e/agent-level.spec.ts` | Set Specialist with defaults → the preview lists four changes → confirm → the card shows Specialist with no drift; then clear a permission by hand → the drift line reads 1; then step down to Assistant → the heading and button relabel. |
-| `apps/web/e2e/agent-personality.spec.ts` | Write a personality → the save line says next run → the meter reads under budget → paste 9 KB → the size error → paste a key-shaped string → the secret refusal with the text preserved. |
-| `apps/web/e2e/agent-lifecycle-status.spec.ts` (extend) | The existing lifecycle spec gains an assertion that the status chip is now accompanied by its reason. |
+| File                                                   | Covers                                                                                                                                                                                                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/web/e2e/agent-identity-card.spec.ts`             | All six card states render a dot **and** a sentence; archived is read-only; never-run offers Activate; no `undefined` anywhere in the card.                                                                                                |
+| `apps/web/e2e/agent-pause-brake.spec.ts`               | Pause with a note → the card shows it → assign a task → the held panel shows one item → Run now is refused with the exact copy → Resume → the toast reports one released.                                                                  |
+| `apps/web/e2e/agent-level.spec.ts`                     | Set Specialist with defaults → the preview lists four changes → confirm → the card shows Specialist with no drift; then clear a permission by hand → the drift line reads 1; then step down to Assistant → the heading and button relabel. |
+| `apps/web/e2e/agent-personality.spec.ts`               | Write a personality → the save line says next run → the meter reads under budget → paste 9 KB → the size error → paste a key-shaped string → the secret refusal with the text preserved.                                                   |
+| `apps/web/e2e/agent-lifecycle-status.spec.ts` (extend) | The existing lifecycle spec gains an assertion that the status chip is now accompanied by its reason.                                                                                                                                      |
 
 Follow the repo's Playwright conventions; prefer role-based locators sparingly on this
 surface — `*ByRole` is the recurring flake source in `apps/web` — and pin the status
@@ -1118,32 +1118,32 @@ back it.
 
 ## 12. Constitution compliance
 
-| Principle | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | No external service is contacted; no plugin package is added or bypassed. |
-| **II — Capability-driven** | ✅ | The halt detail stores a facade-resolved display name; no plugin id is branched on outside a plugin. |
-| **III — Source-of-truth repositories** | ✅ | `PERSONALITY.md` follows the existing split exactly: database column for workspace-scope agents, the scope's git repo for scoped agents. No content is relocated. |
-| **IV — Job runtime** | ✅ | No new job. The resume drain reuses `drainForWork`, which enqueues through the existing `*_DISPATCHER` DI symbols. No call site imports a third-party SDK. |
-| **V — Forward-only migrations** | ✅ | Three additive migrations, all nullable except one `int` with a default, all with guarded `down()`. No rename, no drop, no backfill. |
-| **VI — Tests** | ✅ | 10 unit specs, 6 controller/e2e API specs, 5 Playwright specs, 5 component specs, named in §10. |
-| **VII — Secrets** | ✅ | `haltDetail` carries a display name and a coarse kind; the classifier never copies the error body into it. Personality and the pause note are secret-scanned on write with the same helper the five existing files use. No new log line prints agent file content. |
-| **VIII — Plugin counts** | ✅ | Not applicable. |
-| **IX — Behaviour-first spec** | ✅ | `spec.md` names no class, no file and no endpoint; every one of them lives here. |
-| **X — Backwards compatibility** | ✅ | No field renamed or removed. `pause`/`resume` keep their paths and verbs; the body is newly optional, the response is additive. `AgentDto` grows. The one new refusal (`PATCH :id` with `level`) is on a field that was never accepted. |
+| Principle                              | Status | Justification                                                                                                                                                                                                                                                      |
+| -------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **I — Plugin-first**                   | ✅     | No external service is contacted; no plugin package is added or bypassed.                                                                                                                                                                                          |
+| **II — Capability-driven**             | ✅     | The halt detail stores a facade-resolved display name; no plugin id is branched on outside a plugin.                                                                                                                                                               |
+| **III — Source-of-truth repositories** | ✅     | `PERSONALITY.md` follows the existing split exactly: database column for workspace-scope agents, the scope's git repo for scoped agents. No content is relocated.                                                                                                  |
+| **IV — Job runtime**                   | ✅     | No new job. The resume drain reuses `drainForWork`, which enqueues through the existing `*_DISPATCHER` DI symbols. No call site imports a third-party SDK.                                                                                                         |
+| **V — Forward-only migrations**        | ✅     | Three additive migrations, all nullable except one `int` with a default, all with guarded `down()`. No rename, no drop, no backfill.                                                                                                                               |
+| **VI — Tests**                         | ✅     | 10 unit specs, 6 controller/e2e API specs, 5 Playwright specs, 5 component specs, named in §10.                                                                                                                                                                    |
+| **VII — Secrets**                      | ✅     | `haltDetail` carries a display name and a coarse kind; the classifier never copies the error body into it. Personality and the pause note are secret-scanned on write with the same helper the five existing files use. No new log line prints agent file content. |
+| **VIII — Plugin counts**               | ✅     | Not applicable.                                                                                                                                                                                                                                                    |
+| **IX — Behaviour-first spec**          | ✅     | `spec.md` names no class, no file and no endpoint; every one of them lives here.                                                                                                                                                                                   |
+| **X — Backwards compatibility**        | ✅     | No field renamed or removed. `pause`/`resume` keep their paths and verbs; the body is newly optional, the response is additive. `AgentDto` grows. The one new refusal (`PATCH :id` with `level`) is on a field that was never accepted.                            |
 
 ### 12.1 Program rules
 
-| Rule | Status | Justification |
-| --- | --- | --- |
-| Additive only (#1) | ✅ | Ten tabs stay ten. Six statuses stay six. Five files become six (AW-07) then seven. Nothing is renamed. |
-| No duplicate nouns (#2) | ✅ | Level is a field, halt reason is a field, status reason is derived, personality joins the existing file family, notes belongs to AW-07. Nothing new enters the program vocabulary table. |
-| Behaviour-first spec (#3) | ✅ | See IX. |
-| Plugin-first for external (#4) | ✅ | Nothing external. |
-| Job runtime (#5) | ✅ | See IV. |
-| Migrations in the same change (#6) | ✅ | Each phase's migration is a task in the same phase as its entity edit. |
-| Tests are a prerequisite (#7) | ✅ | See VI. |
-| i18n (#8) | ✅ | §8; every leaf camelCase, no literal dot. |
-| Every surface answers "what did it cost?" (#9) | ✅ | This epic spends nothing new — no model call, no sweep, no job. The only spend it touches is the `canSpend` default, shown in the preview before it is written. The voice preview is deliberately routed through chat so it inherits chat's existing cost accounting and receipt rather than inventing a second spend path. |
+| Rule                                           | Status | Justification                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Additive only (#1)                             | ✅     | Ten tabs stay ten. Six statuses stay six. Five files become six (AW-07) then seven. Nothing is renamed.                                                                                                                                                                                                                     |
+| No duplicate nouns (#2)                        | ✅     | Level is a field, halt reason is a field, status reason is derived, personality joins the existing file family, notes belongs to AW-07. Nothing new enters the program vocabulary table.                                                                                                                                    |
+| Behaviour-first spec (#3)                      | ✅     | See IX.                                                                                                                                                                                                                                                                                                                     |
+| Plugin-first for external (#4)                 | ✅     | Nothing external.                                                                                                                                                                                                                                                                                                           |
+| Job runtime (#5)                               | ✅     | See IV.                                                                                                                                                                                                                                                                                                                     |
+| Migrations in the same change (#6)             | ✅     | Each phase's migration is a task in the same phase as its entity edit.                                                                                                                                                                                                                                                      |
+| Tests are a prerequisite (#7)                  | ✅     | See VI.                                                                                                                                                                                                                                                                                                                     |
+| i18n (#8)                                      | ✅     | §8; every leaf camelCase, no literal dot.                                                                                                                                                                                                                                                                                   |
+| Every surface answers "what did it cost?" (#9) | ✅     | This epic spends nothing new — no model call, no sweep, no job. The only spend it touches is the `canSpend` default, shown in the preview before it is written. The voice preview is deliberately routed through chat so it inherits chat's existing cost accounting and receipt rather than inventing a second spend path. |
 
 ---
 

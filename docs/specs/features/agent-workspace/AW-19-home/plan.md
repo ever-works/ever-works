@@ -17,13 +17,13 @@ Every path below was opened before being cited.
 
 ### 1.1 The Home route as it stands
 
-| File | What it is today |
-| --- | --- |
-| [`apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx>) | Server component. One `Promise.all` of ~18 independently `.catch()`-defended fetches (works, work stats, Idea proposals ×2 shapes, Missions, account-wide usage, Agents total/active, Tasks in-progress/blocked/recent, recent Agents, pending agent approvals, errored Agents, blocked-Task rows, Teams total, "soon" runs, a 100-row Work pool for Idea→Work matching). Composes the Attention list with `composeAttentionItems()` and hands everything to `DashboardClient`. |
-| [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx>) | Client component. Renders welcome header → `StatsOverview` → a `divide-y` stack of conditional blocks: `ApprovalsQueue`, `AttentionSection`, `SoonSection`, `MissionsPreviewSection`, `WorkProposalsSection`, recent Works, `RecentTasks`, `AgentsPreviewSection`. |
-| [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts>) | `server-only`. Three helpers: `getTeamsTotal()` (probes `/organizations` then each org's `/teams`), `getSoonRuns()` (calls `schedulesAPI.getAll({enabledOnly:true})`, keeps only `work_schedule` and `mission_tick`, caps the preview at `SOON_MAX = 3`), and the pure `composeAttentionItems()` (danger before warning, most-recent first, `ATTENTION_MAX = 6`). |
-| [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.unit.spec.ts`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.unit.spec.ts>) | Existing unit coverage for those three helpers. |
-| [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>) | The shell: sidebar, chat panel, header, `<main id="main-content">`, footer, `JobRuntimeDegradedBanner`, `ScrollTopOnNavigate` (deliberately last child of `<main>`). Wires `useKeyboardShortcuts` once. |
+| File                                                                                                                                                                    | What it is today                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx>)                                       | Server component. One `Promise.all` of ~18 independently `.catch()`-defended fetches (works, work stats, Idea proposals ×2 shapes, Missions, account-wide usage, Agents total/active, Tasks in-progress/blocked/recent, recent Agents, pending agent approvals, errored Agents, blocked-Task rows, Teams total, "soon" runs, a 100-row Work pool for Idea→Work matching). Composes the Attention list with `composeAttentionItems()` and hands everything to `DashboardClient`. |
+| [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx>)               | Client component. Renders welcome header → `StatsOverview` → a `divide-y` stack of conditional blocks: `ApprovalsQueue`, `AttentionSection`, `SoonSection`, `MissionsPreviewSection`, `WorkProposalsSection`, recent Works, `RecentTasks`, `AgentsPreviewSection`.                                                                                                                                                                                                              |
+| [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts>)                     | `server-only`. Three helpers: `getTeamsTotal()` (probes `/organizations` then each org's `/teams`), `getSoonRuns()` (calls `schedulesAPI.getAll({enabledOnly:true})`, keeps only `work_schedule` and `mission_tick`, caps the preview at `SOON_MAX = 3`), and the pure `composeAttentionItems()` (danger before warning, most-recent first, `ATTENTION_MAX = 6`).                                                                                                               |
+| [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.unit.spec.ts`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.unit.spec.ts>) | Existing unit coverage for those three helpers.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>)                                   | The shell: sidebar, chat panel, header, `<main id="main-content">`, footer, `JobRuntimeDegradedBanner`, `ScrollTopOnNavigate` (deliberately last child of `<main>`). Wires `useKeyboardShortcuts` once.                                                                                                                                                                                                                                                                         |
 
 The five known weaknesses this epic fixes, all verified in source:
 
@@ -43,17 +43,17 @@ The five known weaknesses this epic fixes, all verified in source:
 
 ### 1.2 The data each new block will read
 
-| Block | Source that already exists | Where |
-| --- | --- | --- |
-| Needs you — decisions | `InboxService` (`question` / `approval` / `escalation` / `notice`), whose `reply()` proxies to approve/reject and to escalation-resolve | [`packages/agent/src/inbox/inbox.service.ts`](../../../../../packages/agent/src/inbox/inbox.service.ts), [`packages/agent/src/inbox/inbox.types.ts`](../../../../../packages/agent/src/inbox/inbox.types.ts), wire types in [`packages/contracts/src/inbox/inbox.types.ts`](../../../../../packages/contracts/src/inbox/inbox.types.ts) |
-| Needs you — the union backstop | `AgentApprovalsService` and `AgentEscalationService` both mirror into the Inbox via `INBOX_PRODUCER`, which is an `@Optional()` injection | [`packages/agent/src/agent-approvals/agent-approvals.service.ts`](../../../../../packages/agent/src/agent-approvals/agent-approvals.service.ts), [`packages/agent/src/agents/agent-escalation.service.ts`](../../../../../packages/agent/src/agents/agent-escalation.service.ts), binding in [`apps/api/src/inbox/inbox.module.ts`](../../../../../apps/api/src/inbox/inbox.module.ts) |
-| Needs you — "Also broken" | `composeAttentionItems()` + `AttentionSection` | [`apps/web/src/components/dashboard/AttentionSection.tsx`](../../../../../apps/web/src/components/dashboard/AttentionSection.tsx) |
-| Glance counters + Working now | `AgentRun` rows: `status`, `startedAt`, `finishedAt`, `awaitingInput`, `currentActivity` (varchar 300), `attentionReason` | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts), [`packages/agent/src/database/repositories/agent-run.repository.ts`](../../../../../packages/agent/src/database/repositories/agent-run.repository.ts) |
-| Today | `SchedulesService` → `ScheduleView[]` with all seven `sourceType`s, sorted by `nextRunAt` ascending, per-source `try/catch`, `MAX_PER_SOURCE = 500` | [`packages/agent/src/schedules/schedules.service.ts`](../../../../../packages/agent/src/schedules/schedules.service.ts), [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts), cadence text in [`packages/agent/src/schedules/cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts) |
-| This week | `CostsSummaryService.getSummary(userId, windowDays)` with `COSTS_WINDOW_DAYS = [7, 30, 90]`, plus `BudgetService.summarizeForUser(userId, prefs)` behind `GET /me/usage/account-wide`. **Both aggregate by `userId` only** — `PluginUsageRepository.getTotalSpendCentsForUser` filters `e.userId = :userId` with no scope predicate — so neither follows the active Organization as they stand. §3.5 adds the scoped read; the cap stays account-wide by definition | [`packages/agent/src/subscriptions/credits/costs-summary.service.ts`](../../../../../packages/agent/src/subscriptions/credits/costs-summary.service.ts), [`apps/api/src/subscriptions/costs.controller.ts`](../../../../../apps/api/src/subscriptions/costs.controller.ts), [`packages/agent/src/budgets/budget.service.ts`](../../../../../packages/agent/src/budgets/budget.service.ts), [`apps/api/src/budgets/account-usage.controller.ts`](../../../../../apps/api/src/budgets/account-usage.controller.ts), [`apps/web/src/lib/api/usage.ts`](../../../../../apps/web/src/lib/api/usage.ts) |
-| Recent activity | `ActivityLogRepository` / `ActivityLogService` (`activity_log`, indexed on `(userId, createdAt)`) | [`packages/agent/src/database/repositories/activity-log.repository.ts`](../../../../../packages/agent/src/database/repositories/activity-log.repository.ts), [`apps/api/src/activity-log/activity-log.controller.ts`](../../../../../apps/api/src/activity-log/activity-log.controller.ts) |
-| Composer | `POST /api/tasks` (60/min throttle) via `createTaskAction`; a body with no `status` gets the entity default `backlog`, so the Task lands in the board's first lane | [`apps/api/src/tasks/tasks.controller.ts`](../../../../../apps/api/src/tasks/tasks.controller.ts), [`apps/web/src/app/actions/tasks.ts`](../../../../../apps/web/src/app/actions/tasks.ts), client in [`apps/web/src/lib/api/tasks.ts`](../../../../../apps/web/src/lib/api/tasks.ts) |
-| Scope | `ScopeContextService` (request-scoped `AsyncLocalStorage`, `getOrganizationId()`) | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts) |
+| Block                          | Source that already exists                                                                                                                                                                                                                                                                                                                                                                                                                                          | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Needs you — decisions          | `InboxService` (`question` / `approval` / `escalation` / `notice`), whose `reply()` proxies to approve/reject and to escalation-resolve                                                                                                                                                                                                                                                                                                                             | [`packages/agent/src/inbox/inbox.service.ts`](../../../../../packages/agent/src/inbox/inbox.service.ts), [`packages/agent/src/inbox/inbox.types.ts`](../../../../../packages/agent/src/inbox/inbox.types.ts), wire types in [`packages/contracts/src/inbox/inbox.types.ts`](../../../../../packages/contracts/src/inbox/inbox.types.ts)                                                                                                                                                                                                                                                           |
+| Needs you — the union backstop | `AgentApprovalsService` and `AgentEscalationService` both mirror into the Inbox via `INBOX_PRODUCER`, which is an `@Optional()` injection                                                                                                                                                                                                                                                                                                                           | [`packages/agent/src/agent-approvals/agent-approvals.service.ts`](../../../../../packages/agent/src/agent-approvals/agent-approvals.service.ts), [`packages/agent/src/agents/agent-escalation.service.ts`](../../../../../packages/agent/src/agents/agent-escalation.service.ts), binding in [`apps/api/src/inbox/inbox.module.ts`](../../../../../apps/api/src/inbox/inbox.module.ts)                                                                                                                                                                                                            |
+| Needs you — "Also broken"      | `composeAttentionItems()` + `AttentionSection`                                                                                                                                                                                                                                                                                                                                                                                                                      | [`apps/web/src/components/dashboard/AttentionSection.tsx`](../../../../../apps/web/src/components/dashboard/AttentionSection.tsx)                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Glance counters + Working now  | `AgentRun` rows: `status`, `startedAt`, `finishedAt`, `awaitingInput`, `currentActivity` (varchar 300), `attentionReason`                                                                                                                                                                                                                                                                                                                                           | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts), [`packages/agent/src/database/repositories/agent-run.repository.ts`](../../../../../packages/agent/src/database/repositories/agent-run.repository.ts)                                                                                                                                                                                                                                                                                                                        |
+| Today                          | `SchedulesService` → `ScheduleView[]` with all seven `sourceType`s, sorted by `nextRunAt` ascending, per-source `try/catch`, `MAX_PER_SOURCE = 500`                                                                                                                                                                                                                                                                                                                 | [`packages/agent/src/schedules/schedules.service.ts`](../../../../../packages/agent/src/schedules/schedules.service.ts), [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts), cadence text in [`packages/agent/src/schedules/cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts)                                                                                                                                                                                                                         |
+| This week                      | `CostsSummaryService.getSummary(userId, windowDays)` with `COSTS_WINDOW_DAYS = [7, 30, 90]`, plus `BudgetService.summarizeForUser(userId, prefs)` behind `GET /me/usage/account-wide`. **Both aggregate by `userId` only** — `PluginUsageRepository.getTotalSpendCentsForUser` filters `e.userId = :userId` with no scope predicate — so neither follows the active Organization as they stand. §3.5 adds the scoped read; the cap stays account-wide by definition | [`packages/agent/src/subscriptions/credits/costs-summary.service.ts`](../../../../../packages/agent/src/subscriptions/credits/costs-summary.service.ts), [`apps/api/src/subscriptions/costs.controller.ts`](../../../../../apps/api/src/subscriptions/costs.controller.ts), [`packages/agent/src/budgets/budget.service.ts`](../../../../../packages/agent/src/budgets/budget.service.ts), [`apps/api/src/budgets/account-usage.controller.ts`](../../../../../apps/api/src/budgets/account-usage.controller.ts), [`apps/web/src/lib/api/usage.ts`](../../../../../apps/web/src/lib/api/usage.ts) |
+| Recent activity                | `ActivityLogRepository` / `ActivityLogService` (`activity_log`, indexed on `(userId, createdAt)`)                                                                                                                                                                                                                                                                                                                                                                   | [`packages/agent/src/database/repositories/activity-log.repository.ts`](../../../../../packages/agent/src/database/repositories/activity-log.repository.ts), [`apps/api/src/activity-log/activity-log.controller.ts`](../../../../../apps/api/src/activity-log/activity-log.controller.ts)                                                                                                                                                                                                                                                                                                        |
+| Composer                       | `POST /api/tasks` (60/min throttle) via `createTaskAction`; a body with no `status` gets the entity default `backlog`, so the Task lands in the board's first lane                                                                                                                                                                                                                                                                                                  | [`apps/api/src/tasks/tasks.controller.ts`](../../../../../apps/api/src/tasks/tasks.controller.ts), [`apps/web/src/app/actions/tasks.ts`](../../../../../apps/web/src/app/actions/tasks.ts), client in [`apps/web/src/lib/api/tasks.ts`](../../../../../apps/web/src/lib/api/tasks.ts)                                                                                                                                                                                                                                                                                                             |
+| Scope                          | `ScopeContextService` (request-scoped `AsyncLocalStorage`, `getOrganizationId()`)                                                                                                                                                                                                                                                                                                                                                                                   | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 ### 1.3 Conventions this plan must match
 
@@ -191,27 +191,27 @@ already set).
 ```ts
 @Entity({ name: 'user_home_preferences' })
 export class UserHomePreference {
-    @PrimaryColumn({ type: 'uuid' })
-    userId: string;
+	@PrimaryColumn({ type: 'uuid' })
+	userId: string;
 
-    @OneToOne(() => User, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'userId' })
-    user?: User;
+	@OneToOne(() => User, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'userId' })
+	user?: User;
 
-    /** Block ids the user turned off. NULL / [] = every block visible. */
-    @Column({ type: 'simple-json', nullable: true })
-    hiddenBlocks?: string[] | null;
+	/** Block ids the user turned off. NULL / [] = every block visible. */
+	@Column({ type: 'simple-json', nullable: true })
+	hiddenBlocks?: string[] | null;
 
-    /** Explicit block order. NULL = the default order in spec §4.1. */
-    @Column({ type: 'simple-json', nullable: true })
-    blockOrder?: string[] | null;
+	/** Explicit block order. NULL = the default order in spec §4.1. */
+	@Column({ type: 'simple-json', nullable: true })
+	blockOrder?: string[] | null;
 
-    /** NULL = the age-based default in spec FR-2. */
-    @Column({ type: 'boolean', nullable: true })
-    workspaceSectionExpanded?: boolean | null;
+	/** NULL = the age-based default in spec FR-2. */
+	@Column({ type: 'boolean', nullable: true })
+	workspaceSectionExpanded?: boolean | null;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+	@UpdateDateColumn()
+	updatedAt: Date;
 }
 ```
 
@@ -250,9 +250,9 @@ PR**. Both live in [`apps/api/src/migrations/`](../../../../../apps/api/src/migr
 (the newest on `develop` at time of writing is `1790100000000-AddReleaseVerification.ts`), are
 timestamp-prefixed from AW-19's reserved block ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)), and are re-stamped before merge if `develop` has moved past them.
 
-| Phase | File | Contents |
-| --- | --- | --- |
-| **P1** | `apps/api/src/migrations/1791190000000-AddAgentRunHomeIndexes.ts` | `CREATE INDEX IF NOT EXISTS` for `idx_agent_runs_user_status` and `idx_agent_runs_user_finished`, guarded with `queryRunner.getTable('agent_runs')` + `table.indices.some(...)` existence checks; `down()` drops exactly those two. |
+| Phase  | File                                                              | Contents                                                                                                                                                                                                                                                                        |
+| ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P1** | `apps/api/src/migrations/1791190000000-AddAgentRunHomeIndexes.ts` | `CREATE INDEX IF NOT EXISTS` for `idx_agent_runs_user_status` and `idx_agent_runs_user_finished`, guarded with `queryRunner.getTable('agent_runs')` + `table.indices.some(...)` existence checks; `down()` drops exactly those two.                                             |
 | **P2** | `apps/api/src/migrations/1791190100000-AddUserHomePreferences.ts` | `CREATE TABLE user_home_preferences` (userId uuid PK, hiddenBlocks text nullable, blockOrder text nullable, workspaceSectionExpanded boolean nullable, updatedAt timestamptz default now) + FK to `users(id)` `ON DELETE CASCADE`; existence-guarded; `down()` drops the table. |
 
 Both use portable `Table` / `TableIndex` / `TableForeignKey` DDL rather than raw
@@ -272,98 +272,129 @@ needs to change, i.e. none, since `src/index.ts` is already an entry). No new
 `exports` subpath and no `tsup.config.ts` change.
 
 ```ts
-export const HOME_BLOCK_IDS = [
-    'needsYou', 'glance', 'today', 'thisWeek', 'workingNow', 'recentActivity'
-] as const;
+export const HOME_BLOCK_IDS = ['needsYou', 'glance', 'today', 'thisWeek', 'workingNow', 'recentActivity'] as const;
 export type HomeBlockId = (typeof HOME_BLOCK_IDS)[number];
 
 export type HomeBlockStatus = 'ok' | 'failed';
 
 export interface HomeBlock<T> {
-    status: HomeBlockStatus;
-    /** Message KEY on failure — never provider text (spec FR-73). */
-    errorKey?: string;
-    data: T | null;
+	status: HomeBlockStatus;
+	/** Message KEY on failure — never provider text (spec FR-73). */
+	errorKey?: string;
+	data: T | null;
 }
 
 export type HomeDecisionKind = 'question' | 'approval' | 'escalation';
 
 export interface HomeDecisionRow {
-    id: string;                       // inbox item id when answerable, else `${source}:${id}`
-    kind: HomeDecisionKind;
-    title: string;                    // plain text, ≤120 chars, already truncated
-    agentName: string | null;
-    createdAt: string;                // ISO
-    waitingMs: number;
-    /** 1–3 options ⇒ answerable inline; else null and the row links out. */
-    options: { id: string; label: string }[] | null;
-    /** Present when the row is NOT inline-answerable. */
-    href: string;
+	id: string; // inbox item id when answerable, else `${source}:${id}`
+	kind: HomeDecisionKind;
+	title: string; // plain text, ≤120 chars, already truncated
+	agentName: string | null;
+	createdAt: string; // ISO
+	waitingMs: number;
+	/** 1–3 options ⇒ answerable inline; else null and the row links out. */
+	options: { id: string; label: string }[] | null;
+	/** Present when the row is NOT inline-answerable. */
+	href: string;
 }
 
 export interface HomeDecisions {
-    rows: HomeDecisionRow[];          // ≤5
-    total: number;                    // exact
-    overdueCount: number;             // waiting ≥72h
-    alsoBroken: HomeSignalRow[];      // ≤6, shaped like today's AttentionItem
+	rows: HomeDecisionRow[]; // ≤5
+	total: number; // exact
+	overdueCount: number; // waiting ≥72h
+	alsoBroken: HomeSignalRow[]; // ≤6, shaped like today's AttentionItem
 }
 
 export interface HomeGlance {
-    needsYou: number; workingNow: number; doneToday: number; failedToday: number;
+	needsYou: number;
+	workingNow: number;
+	doneToday: number;
+	failedToday: number;
 }
 
 export type HomeScheduleKind =
-    | 'recurring_task' | 'agent_heartbeat' | 'work_schedule' | 'mission_tick'
-    | 'source_validation' | 'data_sync' | 'inbound_trigger';
+	| 'recurring_task'
+	| 'agent_heartbeat'
+	| 'work_schedule'
+	| 'mission_tick'
+	| 'source_validation'
+	| 'data_sync'
+	| 'inbound_trigger';
 
 export interface HomeScheduleRow {
-    id: string; kind: HomeScheduleKind; name: string; href: string;
-    at: string;                       // ISO instant of the run
-    state: 'ran' | 'due';
-    status: 'active' | 'paused' | 'error';
+	id: string;
+	kind: HomeScheduleKind;
+	name: string;
+	href: string;
+	at: string; // ISO instant of the run
+	state: 'ran' | 'due';
+	status: 'active' | 'paused' | 'error';
 }
 
-export interface HomeToday { ran: HomeScheduleRow[]; due: HomeScheduleRow[]; dueTotal: number; }
+export interface HomeToday {
+	ran: HomeScheduleRow[];
+	due: HomeScheduleRow[];
+	dueTotal: number;
+}
 
 export interface HomeSpend {
-    // Scoped to the active Organization (or personal scope) — spec FR-37, FR-38.
-    windowDays: 7; totalCents: number; currency: string;
-    runsCount: number; avgPerRunCents: number | null;
-    scope: { kind: 'organization' | 'personal'; name: string | null };
-    // Account-wide by definition — spec FR-39a. Never combined with the fields above.
-    accountCap: {
-        periodSpendCents: number; periodCapCents: number | null;
-        percentUsed: number | null; blocked: boolean; allowOverage: boolean;
-    };
-    everSpent: boolean;               // account-wide; false ⇒ hide the panel (spec FR-43)
+	// Scoped to the active Organization (or personal scope) — spec FR-37, FR-38.
+	windowDays: 7;
+	totalCents: number;
+	currency: string;
+	runsCount: number;
+	avgPerRunCents: number | null;
+	scope: { kind: 'organization' | 'personal'; name: string | null };
+	// Account-wide by definition — spec FR-39a. Never combined with the fields above.
+	accountCap: {
+		periodSpendCents: number;
+		periodCapCents: number | null;
+		percentUsed: number | null;
+		blocked: boolean;
+		allowOverage: boolean;
+	};
+	everSpent: boolean; // account-wide; false ⇒ hide the panel (spec FR-43)
 }
 
 export interface HomeRunningRow {
-    runId: string; agentId: string; agentName: string;
-    activity: string | null;          // ≤100 chars, already truncated
-    startedAt: string; elapsedMs: number; href: string;
+	runId: string;
+	agentId: string;
+	agentName: string;
+	activity: string | null; // ≤100 chars, already truncated
+	startedAt: string;
+	elapsedMs: number;
+	href: string;
 }
 
-export interface HomeWorkingNow { rows: HomeRunningRow[]; total: number; }
+export interface HomeWorkingNow {
+	rows: HomeRunningRow[];
+	total: number;
+}
 
-export interface HomeActivityRow { id: string; at: string; summary: string; href: string | null; }
+export interface HomeActivityRow {
+	id: string;
+	at: string;
+	summary: string;
+	href: string | null;
+}
 
 export interface HomeSummaryDto {
-    computedAt: string;
-    timezone: string;                 // the tz actually used
-    timezoneFallback: boolean;        // true ⇒ render the UTC footnote
-    needsYou: HomeBlock<HomeDecisions>;
-    glance: HomeBlock<HomeGlance>;
-    today: HomeBlock<HomeToday>;
-    thisWeek: HomeBlock<HomeSpend>;
-    workingNow: HomeBlock<HomeWorkingNow>;
-    recentActivity: HomeBlock<HomeActivityRow[]>;
+	computedAt: string;
+	timezone: string; // the tz actually used
+	timezoneFallback: boolean; // true ⇒ render the UTC footnote
+	needsYou: HomeBlock<HomeDecisions>;
+	glance: HomeBlock<HomeGlance>;
+	today: HomeBlock<HomeToday>;
+	thisWeek: HomeBlock<HomeSpend>;
+	workingNow: HomeBlock<HomeWorkingNow>;
+	recentActivity: HomeBlock<HomeActivityRow[]>;
 }
 
 export interface HomePreferencesDto {
-    hiddenBlocks: HomeBlockId[];
-    blockOrder: HomeBlockId[];
-    workspaceSectionExpanded: boolean | null;
+	hiddenBlocks: HomeBlockId[];
+	blockOrder: HomeBlockId[];
+	workspaceSectionExpanded: boolean | null;
 }
 ```
 
@@ -408,11 +439,11 @@ Home-only filter:
 
 New module `apps/api/src/home/`.
 
-| Method | Endpoint | Auth | Throttle | Phase |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/home/summary` | session (global `AuthSessionGuard`), `@CurrentUser()` | inherits default | P1 |
-| `GET` | `/api/home/preferences` | session | inherits default | P2 |
-| `PUT` | `/api/home/preferences` | session | `{ long: { limit: 60, ttl: 60_000 } }` | P2 |
+| Method | Endpoint                | Auth                                                  | Throttle                               | Phase |
+| ------ | ----------------------- | ----------------------------------------------------- | -------------------------------------- | ----- |
+| `GET`  | `/api/home/summary`     | session (global `AuthSessionGuard`), `@CurrentUser()` | inherits default                       | P1    |
+| `GET`  | `/api/home/preferences` | session                                               | inherits default                       | P2    |
+| `PUT`  | `/api/home/preferences` | session                                               | `{ long: { limit: 60, ttl: 60_000 } }` | P2    |
 
 ### 4.1 `GET /api/home/summary`
 
@@ -420,16 +451,24 @@ Query DTO — `apps/api/src/home/dto/home-summary-query.dto.ts`:
 
 ```ts
 export class HomeSummaryQueryDto {
-    @ApiPropertyOptional({ description: 'IANA timezone, e.g. Europe/Kyiv' })
-    @IsOptional() @IsString() @MaxLength(64)
-    @Validate(IsIanaTimezoneConstraint)      // Intl.supportedValuesOf + UTC/GMT
-    tz?: string;
+	@ApiPropertyOptional({ description: 'IANA timezone, e.g. Europe/Kyiv' })
+	@IsOptional()
+	@IsString()
+	@MaxLength(64)
+	@Validate(IsIanaTimezoneConstraint) // Intl.supportedValuesOf + UTC/GMT
+	tz?: string;
 
-    @ApiPropertyOptional({ isArray: true, enum: HOME_BLOCK_IDS,
-        description: 'Limit the read to these blocks (per-block Retry).' })
-    @IsOptional() @Transform(csvToArray) @IsArray() @IsIn(HOME_BLOCK_IDS, { each: true })
-    @ArrayMaxSize(HOME_BLOCK_IDS.length)
-    blocks?: HomeBlockId[];
+	@ApiPropertyOptional({
+		isArray: true,
+		enum: HOME_BLOCK_IDS,
+		description: 'Limit the read to these blocks (per-block Retry).'
+	})
+	@IsOptional()
+	@Transform(csvToArray)
+	@IsArray()
+	@IsIn(HOME_BLOCK_IDS, { each: true })
+	@ArrayMaxSize(HOME_BLOCK_IDS.length)
+	blocks?: HomeBlockId[];
 }
 ```
 
@@ -453,18 +492,24 @@ param 400s rather than being ignored — the behaviour the schedules DTO relies 
 
 ```ts
 export class UpdateHomePreferencesDto {
-    @ApiPropertyOptional({ isArray: true, enum: HOME_BLOCK_IDS })
-    @IsOptional() @IsArray() @IsIn(HOME_BLOCK_IDS, { each: true })
-    @ArrayMaxSize(HOME_BLOCK_IDS.length)
-    hiddenBlocks?: HomeBlockId[];
+	@ApiPropertyOptional({ isArray: true, enum: HOME_BLOCK_IDS })
+	@IsOptional()
+	@IsArray()
+	@IsIn(HOME_BLOCK_IDS, { each: true })
+	@ArrayMaxSize(HOME_BLOCK_IDS.length)
+	hiddenBlocks?: HomeBlockId[];
 
-    @ApiPropertyOptional({ isArray: true, enum: HOME_BLOCK_IDS })
-    @IsOptional() @IsArray() @IsIn(HOME_BLOCK_IDS, { each: true })
-    @ArrayMaxSize(HOME_BLOCK_IDS.length)
-    blockOrder?: HomeBlockId[];
+	@ApiPropertyOptional({ isArray: true, enum: HOME_BLOCK_IDS })
+	@IsOptional()
+	@IsArray()
+	@IsIn(HOME_BLOCK_IDS, { each: true })
+	@ArrayMaxSize(HOME_BLOCK_IDS.length)
+	blockOrder?: HomeBlockId[];
 
-    @ApiPropertyOptional() @IsOptional() @IsBoolean()
-    workspaceSectionExpanded?: boolean;
+	@ApiPropertyOptional()
+	@IsOptional()
+	@IsBoolean()
+	workspaceSectionExpanded?: boolean;
 }
 ```
 
@@ -488,20 +533,20 @@ first change. Duplicate ids inside an array are de-duplicated server-side;
 
 ### 5.1 New components — `apps/web/src/components/home/`
 
-| File | Kind | Responsibility |
-| --- | --- | --- |
-| `home.shared.ts` | types-only, no directive | `HOME_BLOCK_IDS` re-export, `formatWaiting()`, `formatElapsed()`, `formatCount()` (`999+`), `greetingKeyForHour()`, `deriveTaskTitle()`. Imported by both server and client, so no `server-only` guard. |
-| `HomeSummaryProvider.tsx` | client | Holds the summary in state, owns the 60 s `setInterval` gated on `document.visibilityState`, exposes `refresh()` and `refreshBlock(id)`, computes the "new since you opened this" delta against the count at mount. |
-| `HomeGreeting.tsx` | client | Greeting + date + score line (`aria-live="polite"`) + `updated {n}s ago` + manual refresh. |
-| `HomeComposer.tsx` | client | The text field, counter, chips, inline errors, draft persistence, `Expand`. Calls `createTaskAction`. |
-| `NeedsYouBlock.tsx` | client | Decision rows, waiting chips, inline option buttons, overflow footer, the `Also broken` sub-list (renders the existing `AttentionSection`). Calls `replyToInboxItemAction`. |
-| `GlanceCounters.tsx` | client | The four linked counters. |
-| `ThisWeekPanel.tsx` | client | Spend headline, run line, cap bar, blocked/overage line, `Manage spend`. |
-| `WorkingNowPanel.tsx` | client | Running-run rows, `long run` / `still going` chips, empty state whose action focuses the composer. |
-| `RecentActivityBlock.tsx` | client | The 8-row tail. |
-| `HomeBlockShell.tsx` | client | One wrapper giving every block its heading, header link, skeleton, empty state and error card with `Retry`. This is what makes "empty ≠ failed" (spec FR-62) structural rather than per-block discipline. |
-| `WorkspaceSection.tsx` | client | The collapsible `Your workspace` region wrapping today's blocks unchanged. |
-| `HomeBlockMenu.tsx` | client (P2) | Show/hide toggles + reset; calls `updateHomePreferencesAction`. |
+| File                      | Kind                     | Responsibility                                                                                                                                                                                                      |
+| ------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `home.shared.ts`          | types-only, no directive | `HOME_BLOCK_IDS` re-export, `formatWaiting()`, `formatElapsed()`, `formatCount()` (`999+`), `greetingKeyForHour()`, `deriveTaskTitle()`. Imported by both server and client, so no `server-only` guard.             |
+| `HomeSummaryProvider.tsx` | client                   | Holds the summary in state, owns the 60 s `setInterval` gated on `document.visibilityState`, exposes `refresh()` and `refreshBlock(id)`, computes the "new since you opened this" delta against the count at mount. |
+| `HomeGreeting.tsx`        | client                   | Greeting + date + score line (`aria-live="polite"`) + `updated {n}s ago` + manual refresh.                                                                                                                          |
+| `HomeComposer.tsx`        | client                   | The text field, counter, chips, inline errors, draft persistence, `Expand`. Calls `createTaskAction`.                                                                                                               |
+| `NeedsYouBlock.tsx`       | client                   | Decision rows, waiting chips, inline option buttons, overflow footer, the `Also broken` sub-list (renders the existing `AttentionSection`). Calls `replyToInboxItemAction`.                                         |
+| `GlanceCounters.tsx`      | client                   | The four linked counters.                                                                                                                                                                                           |
+| `ThisWeekPanel.tsx`       | client                   | Spend headline, run line, cap bar, blocked/overage line, `Manage spend`.                                                                                                                                            |
+| `WorkingNowPanel.tsx`     | client                   | Running-run rows, `long run` / `still going` chips, empty state whose action focuses the composer.                                                                                                                  |
+| `RecentActivityBlock.tsx` | client                   | The 8-row tail.                                                                                                                                                                                                     |
+| `HomeBlockShell.tsx`      | client                   | One wrapper giving every block its heading, header link, skeleton, empty state and error card with `Retry`. This is what makes "empty ≠ failed" (spec FR-62) structural rather than per-block discipline.           |
+| `WorkspaceSection.tsx`    | client                   | The collapsible `Your workspace` region wrapping today's blocks unchanged.                                                                                                                                          |
+| `HomeBlockMenu.tsx`       | client (P2)              | Show/hide toggles + reset; calls `updateHomePreferencesAction`.                                                                                                                                                     |
 
 ### 5.2 Extended, not replaced
 
@@ -757,32 +802,32 @@ composer creates is logged by the existing Task create path.
 
 Through [`packages/monitoring`](../../../../../packages/monitoring):
 
-| Signal | When | Fields |
-| --- | --- | --- |
-| Error report | A block builder throws or times out | `block`, `reason` (`timeout` \| `error`), the exception, `userId` as a tag |
-| Error report | The whole summary fails | `reason`, duration |
-| Span | Every summary build | Total duration plus one child span per block, so a slow block is attributable without guessing |
-| Product event `home_composer_submitted` | Composer submit | `length` bucket, `outcome` (`created` \| `failed` \| `throttled`) |
-| Product event `home_decision_answered` | Inline answer | `kind`, `routed` (from `InboxReplyOutcome`), `waitingBucket` |
-| Product event `home_block_hidden` / `home_block_shown` | Block menu toggle | `block` |
-| Product event `home_block_retried` | Per-block `Retry` | `block` |
+| Signal                                                 | When                                | Fields                                                                                         |
+| ------------------------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Error report                                           | A block builder throws or times out | `block`, `reason` (`timeout` \| `error`), the exception, `userId` as a tag                     |
+| Error report                                           | The whole summary fails             | `reason`, duration                                                                             |
+| Span                                                   | Every summary build                 | Total duration plus one child span per block, so a slow block is attributable without guessing |
+| Product event `home_composer_submitted`                | Composer submit                     | `length` bucket, `outcome` (`created` \| `failed` \| `throttled`)                              |
+| Product event `home_decision_answered`                 | Inline answer                       | `kind`, `routed` (from `InboxReplyOutcome`), `waitingBucket`                                   |
+| Product event `home_block_hidden` / `home_block_shown` | Block menu toggle                   | `block`                                                                                        |
+| Product event `home_block_retried`                     | Per-block `Retry`                   | `block`                                                                                        |
 
 Explicitly **not** recorded: the composer's text, decision titles, activity
 summaries, agent names, currency amounts.
 
 ### 9.2 Failure modes and the response to each
 
-| Failure | Symptom | Handling |
-| --- | --- | --- |
-| One block exceeds 1500 ms | that block only | `status: 'failed'` + `errorKey`; block error card with `Retry`; error reported with the block name |
-| Inbox producer unbound in a deployment | decisions would be blank | the union backstop (§2.2) reads proposals and escalations directly, so rows still appear (link-out only) |
-| Schedules aggregation partially fails | some kinds missing | already isolated per source inside `SchedulesService`; Home reports `ok` with fewer rows, matching that service's documented contract |
-| Costs read fails | spend panel | block error card; the rest of Home is unaffected |
-| Invalid `tz` from a browser | 400 on every summary | the client sends `tz` only when `Intl` resolves one; a 400 falls back to a `tz`-less retry, which resolves to UTC and renders the footnote |
-| Whole summary fails | morning stack | one whole-summary error card; composer stays live; `Your workspace` still renders from its own fetches |
-| Refresh storm (many tabs) | repeated identical reads | the 10 s server micro-cache collapses them |
-| Answer race with another tab | stale row | `routed: 'already-decided'` → informational toast, then a forced `needsYou` re-read |
-| Clock skew between client and server | wrong elapsed times | every duration is computed server-side from `computedAt`; the client renders the number it was given and only interpolates between ticks |
+| Failure                                | Symptom                  | Handling                                                                                                                                   |
+| -------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| One block exceeds 1500 ms              | that block only          | `status: 'failed'` + `errorKey`; block error card with `Retry`; error reported with the block name                                         |
+| Inbox producer unbound in a deployment | decisions would be blank | the union backstop (§2.2) reads proposals and escalations directly, so rows still appear (link-out only)                                   |
+| Schedules aggregation partially fails  | some kinds missing       | already isolated per source inside `SchedulesService`; Home reports `ok` with fewer rows, matching that service's documented contract      |
+| Costs read fails                       | spend panel              | block error card; the rest of Home is unaffected                                                                                           |
+| Invalid `tz` from a browser            | 400 on every summary     | the client sends `tz` only when `Intl` resolves one; a 400 falls back to a `tz`-less retry, which resolves to UTC and renders the footnote |
+| Whole summary fails                    | morning stack            | one whole-summary error card; composer stays live; `Your workspace` still renders from its own fetches                                     |
+| Refresh storm (many tabs)              | repeated identical reads | the 10 s server micro-cache collapses them                                                                                                 |
+| Answer race with another tab           | stale row                | `routed: 'already-decided'` → informational toast, then a forced `needsYou` re-read                                                        |
+| Clock skew between client and server   | wrong elapsed times      | every duration is computed server-side from `computedAt`; the client renders the number it was given and only interpolates between ticks   |
 
 ---
 
@@ -793,48 +838,48 @@ an assertion.
 
 ### 10.1 Unit — agent package (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/home/__tests__/home-window.spec.ts` | Local day boundaries across DST transitions, across the date line, for `UTC`, and the rolling-7-day window; an unknown timezone throws rather than silently defaulting |
-| `packages/agent/src/home/__tests__/home-summary.service.spec.ts` | `Promise.allSettled` isolation (one builder rejects → one `failed`, five `ok`); the 1500 ms per-block timeout; `blocks` narrowing returns only the asked-for blocks; `computedAt` echo; the 10 s cache returns the same object and a different scope does not hit it |
-| `packages/agent/src/home/__tests__/decision-set.spec.ts` | Kind filter excludes `notice`; oldest-first ordering; the ≥72 h float; preview cap 5 with an exact total; the proposal/escalation de-dup against `proposalId`/`escalationId`; un-mirrored rows carry `href` and no `options`; options of length 0, 1, 3 and 4 |
-| `packages/agent/src/home/__tests__/run-counters.spec.ts` | `running AND awaitingInput` counts as `needsYou`, never `workingNow`; `done today` / `failed today` boundaries at 23:59:59 and 00:00:00 local; `999+` clamping; longest-running-first ordering; the 30 min and 120 min chip thresholds |
-| `packages/agent/src/home/__tests__/today-panel.spec.ts` | All seven kinds map to a label; a null `nextRunAt` is excluded and not counted in `dueTotal`; ran/due split; `disabled` and `ended` excluded, `paused` and `error` included; caps 3 and 6 |
-| `packages/agent/src/home/__tests__/spend-panel.spec.ts` | 7-day window pinned; `avgPerRunCents` null at zero runs; the 80% / 100% thresholds; `blocked` vs `allowOverage`; `everSpent: false` for a never-spent account; **scope**: the builder passes the request's `OwnershipScope` to `getSummary` and never to `summarizeForUser`; an Organization with no usage but an account with spend yields `totalCents: 0` and `everSpent: true` |
-| `packages/agent/src/database/repositories/plugin-usage.repository.scope.spec.ts` | Usage in Organization A, Organization B and personal scope: `getTotalSpendCentsForUser` with A's scope sums only A, with personal scope sums only personal rows, and with no scope returns the unchanged user-wide total |
-| `packages/agent/src/subscriptions/credits/costs-summary.service.scope.spec.ts` | `getSummary` with a scope scopes both spend and run count; without one it is byte-identical to today's result |
-| `packages/agent/src/home/__tests__/home-preferences.service.spec.ts` | Upsert on first write; unknown block ids rejected; unknown ids read from an older row ignored; array de-duplication |
-| `packages/agent/src/database/repositories/__tests__/user-home-preference.repository.spec.ts` | Owner scoping; cascade on user delete |
+| File                                                                                         | Covers                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/home/__tests__/home-window.spec.ts`                                      | Local day boundaries across DST transitions, across the date line, for `UTC`, and the rolling-7-day window; an unknown timezone throws rather than silently defaulting                                                                                                                                                                                                            |
+| `packages/agent/src/home/__tests__/home-summary.service.spec.ts`                             | `Promise.allSettled` isolation (one builder rejects → one `failed`, five `ok`); the 1500 ms per-block timeout; `blocks` narrowing returns only the asked-for blocks; `computedAt` echo; the 10 s cache returns the same object and a different scope does not hit it                                                                                                              |
+| `packages/agent/src/home/__tests__/decision-set.spec.ts`                                     | Kind filter excludes `notice`; oldest-first ordering; the ≥72 h float; preview cap 5 with an exact total; the proposal/escalation de-dup against `proposalId`/`escalationId`; un-mirrored rows carry `href` and no `options`; options of length 0, 1, 3 and 4                                                                                                                     |
+| `packages/agent/src/home/__tests__/run-counters.spec.ts`                                     | `running AND awaitingInput` counts as `needsYou`, never `workingNow`; `done today` / `failed today` boundaries at 23:59:59 and 00:00:00 local; `999+` clamping; longest-running-first ordering; the 30 min and 120 min chip thresholds                                                                                                                                            |
+| `packages/agent/src/home/__tests__/today-panel.spec.ts`                                      | All seven kinds map to a label; a null `nextRunAt` is excluded and not counted in `dueTotal`; ran/due split; `disabled` and `ended` excluded, `paused` and `error` included; caps 3 and 6                                                                                                                                                                                         |
+| `packages/agent/src/home/__tests__/spend-panel.spec.ts`                                      | 7-day window pinned; `avgPerRunCents` null at zero runs; the 80% / 100% thresholds; `blocked` vs `allowOverage`; `everSpent: false` for a never-spent account; **scope**: the builder passes the request's `OwnershipScope` to `getSummary` and never to `summarizeForUser`; an Organization with no usage but an account with spend yields `totalCents: 0` and `everSpent: true` |
+| `packages/agent/src/database/repositories/plugin-usage.repository.scope.spec.ts`             | Usage in Organization A, Organization B and personal scope: `getTotalSpendCentsForUser` with A's scope sums only A, with personal scope sums only personal rows, and with no scope returns the unchanged user-wide total                                                                                                                                                          |
+| `packages/agent/src/subscriptions/credits/costs-summary.service.scope.spec.ts`               | `getSummary` with a scope scopes both spend and run count; without one it is byte-identical to today's result                                                                                                                                                                                                                                                                     |
+| `packages/agent/src/home/__tests__/home-preferences.service.spec.ts`                         | Upsert on first write; unknown block ids rejected; unknown ids read from an older row ignored; array de-duplication                                                                                                                                                                                                                                                               |
+| `packages/agent/src/database/repositories/__tests__/user-home-preference.repository.spec.ts` | Owner scoping; cascade on user delete                                                                                                                                                                                                                                                                                                                                             |
 
 ### 10.2 Controller specs — API (Jest)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/home/home.controller.spec.ts` | `GET /api/home/summary` returns 200 with every block key present; `Cache-Control: private, no-store`; no user/org parameter is accepted; a caller sees only their own scope; block-level failure is a 200 with `status: 'failed'`; `blocks=today` narrows |
-| `apps/api/src/home/dto/home-summary-query.dto.spec.ts` | Valid IANA accepted, `UTC`/`GMT` accepted, garbage 400s, over-64-char 400s; `blocks` CSV parsing; an unknown block id 400s; `forbidNonWhitelisted` rejects an unknown param |
-| `apps/api/src/home/dto/home-preferences.dto.spec.ts` | Array validation, size caps, unknown ids rejected |
-| `apps/api/src/home/home-preferences.controller.spec.ts` | `GET` on a user with no row returns defaults; `PUT` upserts; `PUT` with an unknown id 400s |
+| File                                                    | Covers                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/home/home.controller.spec.ts`             | `GET /api/home/summary` returns 200 with every block key present; `Cache-Control: private, no-store`; no user/org parameter is accepted; a caller sees only their own scope; block-level failure is a 200 with `status: 'failed'`; `blocks=today` narrows |
+| `apps/api/src/home/dto/home-summary-query.dto.spec.ts`  | Valid IANA accepted, `UTC`/`GMT` accepted, garbage 400s, over-64-char 400s; `blocks` CSV parsing; an unknown block id 400s; `forbidNonWhitelisted` rejects an unknown param                                                                               |
+| `apps/api/src/home/dto/home-preferences.dto.spec.ts`    | Array validation, size caps, unknown ids rejected                                                                                                                                                                                                         |
+| `apps/api/src/home/home-preferences.controller.spec.ts` | `GET` on a user with no row returns defaults; `PUT` upserts; `PUT` with an unknown id 400s                                                                                                                                                                |
 
 ### 10.3 Unit — web (Vitest)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/src/components/home/home.shared.unit.spec.ts` | `formatWaiting` at 59 m / 60 m / 23 h 59 m / 24 h / 72 h; `formatElapsed`; `formatCount` at 999 / 1000; `greetingKeyForHour` at 04:59 / 05:00 / 11:59 / 12:00 / 17:59 / 18:00; `deriveTaskTitle` word-boundary truncation at 80, a 2-character first sentence, and a sentence with no terminator |
-| `apps/web/src/components/home/HomeComposer.unit.spec.tsx` | 2 vs 3 characters and the disabled `Send`; `Enter` vs `Shift+Enter` vs `Ctrl+Enter`; counter appears at 1800 and input refused past 2000; text preserved on failure and focus restored; the throttle message; chips capped at 3; draft restore and clear-on-success |
-| `apps/web/src/components/home/NeedsYouBlock.unit.spec.tsx` | Waiting-chip tones; the overdue header suffix; 1–3 options inline vs `Open` only; optimistic removal then reconcile; the already-decided informational path; `Also broken` capped at 6 and excluded from the count; titles rendered as plain text |
-| `apps/web/src/components/home/HomeBlockShell.unit.spec.tsx` | Skeleton / empty / error are three distinct renders; `Retry` calls back with the block id |
-| `apps/web/src/components/home/HomeSummaryProvider.unit.spec.tsx` | 60 s tick while visible; suspended while hidden; immediate read on becoming visible; the new-since pill appears and dismisses; a refresh does not clear the composer |
-| `apps/web/src/components/dashboard/SoonSection.unit.spec.tsx` | All seven kind labels; ran/due split; `+{n} more`; paused/error chips; both empty states |
+| File                                                             | Covers                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/web/src/components/home/home.shared.unit.spec.ts`          | `formatWaiting` at 59 m / 60 m / 23 h 59 m / 24 h / 72 h; `formatElapsed`; `formatCount` at 999 / 1000; `greetingKeyForHour` at 04:59 / 05:00 / 11:59 / 12:00 / 17:59 / 18:00; `deriveTaskTitle` word-boundary truncation at 80, a 2-character first sentence, and a sentence with no terminator |
+| `apps/web/src/components/home/HomeComposer.unit.spec.tsx`        | 2 vs 3 characters and the disabled `Send`; `Enter` vs `Shift+Enter` vs `Ctrl+Enter`; counter appears at 1800 and input refused past 2000; text preserved on failure and focus restored; the throttle message; chips capped at 3; draft restore and clear-on-success                              |
+| `apps/web/src/components/home/NeedsYouBlock.unit.spec.tsx`       | Waiting-chip tones; the overdue header suffix; 1–3 options inline vs `Open` only; optimistic removal then reconcile; the already-decided informational path; `Also broken` capped at 6 and excluded from the count; titles rendered as plain text                                                |
+| `apps/web/src/components/home/HomeBlockShell.unit.spec.tsx`      | Skeleton / empty / error are three distinct renders; `Retry` calls back with the block id                                                                                                                                                                                                        |
+| `apps/web/src/components/home/HomeSummaryProvider.unit.spec.tsx` | 60 s tick while visible; suspended while hidden; immediate read on becoming visible; the new-since pill appears and dismisses; a refresh does not clear the composer                                                                                                                             |
+| `apps/web/src/components/dashboard/SoonSection.unit.spec.tsx`    | All seven kind labels; ran/due split; `+{n} more`; paused/error chips; both empty states                                                                                                                                                                                                         |
 
 ### 10.4 End-to-end (Playwright, `apps/web/e2e/`)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/e2e/home-morning.spec.ts` | Spec S1, S4, S5, S6, S7 — block order, the score line, the day-scoped Today panel, the spend headline, the working-now rows, the activity tail |
-| `apps/web/e2e/home-composer.spec.ts` | Spec S2, S13, S14, S20 — one sentence creates a Task in the Backlog lane, the chip and its link, failure preserves the text, the throttle message, the length bounds, the no-runtime suffix |
-| `apps/web/e2e/home-decisions.spec.ts` | Spec S3, S12, S15, S16, S17 — inline answer with the routed toast, the already-decided path, waiting-on-input placement, the overdue float, the preview cap with the exact total |
-| `apps/web/e2e/home-degradation.spec.ts` | Spec S9, S10, S11, S18, S19, S21 — first-run empty, one block failed, whole summary failed, the UTC footnote, an Organization switch, refresh suspended on a hidden tab |
-| `apps/web/e2e/home-a11y.spec.ts` | Landmarks and accessible names, keyboard-only decision answering, focus rings, contrast in both themes, a locale switch leaving no English behind |
+| File                                    | Covers                                                                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/e2e/home-morning.spec.ts`     | Spec S1, S4, S5, S6, S7 — block order, the score line, the day-scoped Today panel, the spend headline, the working-now rows, the activity tail                                              |
+| `apps/web/e2e/home-composer.spec.ts`    | Spec S2, S13, S14, S20 — one sentence creates a Task in the Backlog lane, the chip and its link, failure preserves the text, the throttle message, the length bounds, the no-runtime suffix |
+| `apps/web/e2e/home-decisions.spec.ts`   | Spec S3, S12, S15, S16, S17 — inline answer with the routed toast, the already-decided path, waiting-on-input placement, the overdue float, the preview cap with the exact total            |
+| `apps/web/e2e/home-degradation.spec.ts` | Spec S9, S10, S11, S18, S19, S21 — first-run empty, one block failed, whole summary failed, the UTC footnote, an Organization switch, refresh suspended on a hidden tab                     |
+| `apps/web/e2e/home-a11y.spec.ts`        | Landmarks and accessible names, keyboard-only decision answering, focus rings, contrast in both themes, a locale switch leaving no English behind                                           |
 
 Existing [`apps/web/e2e/dashboard.spec.ts`](../../../../../apps/web/e2e/dashboard.spec.ts),
 `dashboard-authenticated.spec.ts` and `dashboard-comprehensive.spec.ts` must keep
@@ -893,16 +938,16 @@ fold, nothing is configurable, refresh is on navigation only.
 
 ## 12. Risks and mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-| --- | --- | --- | --- |
-| Six queries in one request make Home slower than the current 18 parallel ones | Medium | High | Every builder is bounded and indexed (§3.2); builders run concurrently, not serially; a 10 s micro-cache; a hard 1500 ms per block; the span-per-block telemetry makes a regression attributable on day one |
-| Two counter rows (the glance row and the stats strip) read as clutter | Medium | Medium | The glance row is time-bounded and the strip is inventory; the strip moves inside a collapsible section that is collapsed by default for established accounts |
-| Superseding the coming-up block reads as a removal | Low | Medium | The component and its keys are extended in place, not deleted; only two i18n *values* change, the precedent the schedules spec set |
-| The decision de-dup drops a real row | Low | High | De-dup is by explicit id match only (`proposalId` / `escalationId`), never by title or time; covered by `decision-set.spec.ts` |
-| Inline answering from a preview surface produces a wrong decision | Low | High | Only items that arrived with 1–3 explicit choices are answerable inline; everything else links out to full context; the answer path, throttle and audit are the existing ones |
-| Timezone handling produces wrong "today" counts | Medium | High | One pure helper, DST-tested; an invalid timezone 400s instead of silently defaulting; the response echoes what it used and the UI says so when it fell back |
-| 21 locale files drift | Medium | Low | All keys land in one PR per phase; the hydration spec already fails a shard on a missing key |
-| The new `n` / `r` keys collide with a future shortcut registry | Medium | Low | Both are registered through the existing hook and advertised in the help panel; AW-01 adopts them when it lands |
+| Risk                                                                          | Likelihood | Impact | Mitigation                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Six queries in one request make Home slower than the current 18 parallel ones | Medium     | High   | Every builder is bounded and indexed (§3.2); builders run concurrently, not serially; a 10 s micro-cache; a hard 1500 ms per block; the span-per-block telemetry makes a regression attributable on day one |
+| Two counter rows (the glance row and the stats strip) read as clutter         | Medium     | Medium | The glance row is time-bounded and the strip is inventory; the strip moves inside a collapsible section that is collapsed by default for established accounts                                               |
+| Superseding the coming-up block reads as a removal                            | Low        | Medium | The component and its keys are extended in place, not deleted; only two i18n _values_ change, the precedent the schedules spec set                                                                          |
+| The decision de-dup drops a real row                                          | Low        | High   | De-dup is by explicit id match only (`proposalId` / `escalationId`), never by title or time; covered by `decision-set.spec.ts`                                                                              |
+| Inline answering from a preview surface produces a wrong decision             | Low        | High   | Only items that arrived with 1–3 explicit choices are answerable inline; everything else links out to full context; the answer path, throttle and audit are the existing ones                               |
+| Timezone handling produces wrong "today" counts                               | Medium     | High   | One pure helper, DST-tested; an invalid timezone 400s instead of silently defaulting; the response echoes what it used and the UI says so when it fell back                                                 |
+| 21 locale files drift                                                         | Medium     | Low    | All keys land in one PR per phase; the hydration spec already fails a shard on a missing key                                                                                                                |
+| The new `n` / `r` keys collide with a future shortcut registry                | Medium     | Low    | Both are registered through the existing hook and advertised in the help panel; AW-01 adopts them when it lands                                                                                             |
 
 ---
 

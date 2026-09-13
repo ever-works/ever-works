@@ -27,7 +27,7 @@
 
 Ever Works today has exactly one way to let another human near a workspace: invite
 them into the Organization, which hands them a full dashboard sign-in and — because
-access is resolved tenant-wide — visibility into *every* Organization under the
+access is resolved tenant-wide — visibility into _every_ Organization under the
 same Tenant. There is no way to show someone the work without giving them the keys,
 and no way to let someone hand work to an Agent without creating them an account.
 
@@ -105,22 +105,22 @@ setting.
 
 ### 2.1 The questions this answers
 
-> *"How do I show someone what my agents are doing without giving them my
-> account?"*
+> _"How do I show someone what my agents are doing without giving them my
+> account?"_
 >
-> *"How do I let one colleague hand work to my agents without inviting them into
-> my whole workspace?"*
+> _"How do I let one colleague hand work to my agents without inviting them into
+> my whole workspace?"_
 
 ### 2.2 What a user does today instead
 
-| To… | Today they must… | What it costs them |
-| --- | --- | --- |
-| Show an investor or client the current state of the work | Screenshot the dashboard, or write a status note by hand | Stale the moment it is sent; has to be redone every week |
-| Give a colleague visibility | Invite them as an Organization member | They get a dashboard sign-in and, because membership is resolved tenant-wide, visibility into *every* Organization in the Tenant — the members panel says so verbatim in its own disclosure copy |
-| Let a colleague hand work to an Agent | The same invitation — there is no lighter option | Same over-grant, plus the colleague now needs to learn the dashboard |
-| Take that access back | Remove the member | Nothing lighter exists; there is no revocable link and no per-channel revocation |
-| Know who asked for a piece of work | Nothing. A Task records the owning user, not the person who requested it | Every Task looks like the owner asked for it |
-| Stop a stranger from messaging the workspace's Agents through a connected channel | Nothing — the inbound path admits any sender the provider's signature validates | Anyone in the connected workspace can spend the owner's tokens |
+| To…                                                                               | Today they must…                                                                | What it costs them                                                                                                                                                                               |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Show an investor or client the current state of the work                          | Screenshot the dashboard, or write a status note by hand                        | Stale the moment it is sent; has to be redone every week                                                                                                                                         |
+| Give a colleague visibility                                                       | Invite them as an Organization member                                           | They get a dashboard sign-in and, because membership is resolved tenant-wide, visibility into _every_ Organization in the Tenant — the members panel says so verbatim in its own disclosure copy |
+| Let a colleague hand work to an Agent                                             | The same invitation — there is no lighter option                                | Same over-grant, plus the colleague now needs to learn the dashboard                                                                                                                             |
+| Take that access back                                                             | Remove the member                                                               | Nothing lighter exists; there is no revocable link and no per-channel revocation                                                                                                                 |
+| Know who asked for a piece of work                                                | Nothing. A Task records the owning user, not the person who requested it        | Every Task looks like the owner asked for it                                                                                                                                                     |
+| Stop a stranger from messaging the workspace's Agents through a connected channel | Nothing — the inbound path admits any sender the provider's signature validates | Anyone in the connected workspace can spend the owner's tokens                                                                                                                                   |
 
 ### 2.3 The five concrete gaps
 
@@ -152,11 +152,11 @@ permission lattice to solve two concrete problems, and would make this epic XL.
 A link and an allowlist are the cheap answers, and they are cheap because they are
 **capability-shaped, not identity-shaped**:
 
-- A share link grants exactly one capability — *read these two sections* — to whoever
+- A share link grants exactly one capability — _read these two sections_ — to whoever
   holds it, and is revoked by replacing it. There is no account, no session, no role,
   and no state to reason about beyond "is this token current".
-- A channel allowlist grants exactly one capability — *speak to the Agents on this
-  channel* — to a named external identity, and is revoked by deleting one row.
+- A channel allowlist grants exactly one capability — _speak to the Agents on this
+  channel_ — to a named external identity, and is revoked by deleting one row.
 
 Neither one widens what a signed-in user can do, so neither one can be a step toward
 the wrong permission model later. When per-Organization roles do land, both fit under
@@ -188,7 +188,7 @@ writable control anywhere on the page.
 
 **S-3 — It is genuinely live.**
 **Given** an open share link,
-**when** an Agent moves a Task from *In flight* to *Done* while the visitor is
+**when** an Agent moves a Task from _In flight_ to _Done_ while the visitor is
 watching,
 **then** the card moves columns within 20 seconds without the visitor reloading, and the
 footer timestamp updates.
@@ -399,7 +399,7 @@ number.
 - **FR-9.** Regenerate is throttled to **10 per minute** per Workspace.
 - **FR-10.** **Turn off sharing** deactivates the Shared view but **keeps** the token.
   Turning it back on re-uses the same link. This is the difference the UI must make
-  obvious: *off* is a pause, *regenerate* is a kill.
+  obvious: _off_ is a pause, _regenerate_ is a kill.
 - **FR-11.** A request to an unknown, regenerated-away, or disabled token returns the
   same "no longer active" response, with the same status code and body, so a caller
   cannot distinguish "never existed" from "was revoked".
@@ -436,7 +436,7 @@ number.
   the product, a human's name, or an email address. Provenance is not published at all:
   a card on the shared view carries no "raised by Mission X" chip even though the
   private board's card does.
-- **FR-22.** A Task in the *Needs you* column publishes only that it is waiting on a
+- **FR-22.** A Task in the _Needs you_ column publishes only that it is waiting on a
   person. Which of the two grouped statuses it holds, and any Approval or Escalation
   attached to it — its subject, body, options and risk flags — are never published.
 - **FR-23.** The shared view publishes **no human identity at all** — not the owner's
@@ -632,25 +632,25 @@ number.
 
 ### 5.1 Already in Ever Works — read, extended, never replaced
 
-| Concept | What this epic does with it |
-| --- | --- |
-| **Organization** (the Workspace) | Owns at most one Shared view. Nothing about it changes. |
-| **Tenant** | Supplies the single owner user that every owner-only check resolves against. Unchanged. |
-| **Organization member** | Unchanged. Members keep exactly the access they have today, and gain the ability to *see* that a Shared view exists. |
-| **Task** | Projected into the published board — one card per Task. Gains an optional requester label. No status, column or lifecycle change. |
-| **Mission** | Unchanged: a standing initiative and a source of Tasks. Nothing about a Mission is published on the shared view, not even as a provenance chip on a card. Gains an optional requester label for the case where a guest asks for a standing initiative to be set up. |
-| **Agent** | Projected into the published roster as name, avatar, status and in-flight count. Nothing about an Agent changes. |
-| **Knowledge Base document** | Projected into the published library when its class is selected and its status permits. Gains an optional per-document exclusion flag (P3). |
-| **Activity log entry** | Gains new entry kinds for share and guest events, and carries the requester label in its detail. Existing kinds are untouched. |
-| **Approval** and **Escalation** | Gain an optional requester label and an explicit owner-routing rule. Their queues, states and endpoints are unchanged. |
-| **Connection** (a connected chat channel) | Becomes the thing a guest allowlist hangs off. Its settings, secrets and delivery behaviour are unchanged. |
-| **Notification event type** | Two new registered kinds so the new notifications can be routed to a channel rather than being stuck in-app forever. |
+| Concept                                   | What this epic does with it                                                                                                                                                                                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Organization** (the Workspace)          | Owns at most one Shared view. Nothing about it changes.                                                                                                                                                                                                             |
+| **Tenant**                                | Supplies the single owner user that every owner-only check resolves against. Unchanged.                                                                                                                                                                             |
+| **Organization member**                   | Unchanged. Members keep exactly the access they have today, and gain the ability to _see_ that a Shared view exists.                                                                                                                                                |
+| **Task**                                  | Projected into the published board — one card per Task. Gains an optional requester label. No status, column or lifecycle change.                                                                                                                                   |
+| **Mission**                               | Unchanged: a standing initiative and a source of Tasks. Nothing about a Mission is published on the shared view, not even as a provenance chip on a card. Gains an optional requester label for the case where a guest asks for a standing initiative to be set up. |
+| **Agent**                                 | Projected into the published roster as name, avatar, status and in-flight count. Nothing about an Agent changes.                                                                                                                                                    |
+| **Knowledge Base document**               | Projected into the published library when its class is selected and its status permits. Gains an optional per-document exclusion flag (P3).                                                                                                                         |
+| **Activity log entry**                    | Gains new entry kinds for share and guest events, and carries the requester label in its detail. Existing kinds are untouched.                                                                                                                                      |
+| **Approval** and **Escalation**           | Gain an optional requester label and an explicit owner-routing rule. Their queues, states and endpoints are unchanged.                                                                                                                                              |
+| **Connection** (a connected chat channel) | Becomes the thing a guest allowlist hangs off. Its settings, secrets and delivery behaviour are unchanged.                                                                                                                                                          |
+| **Notification event type**               | Two new registered kinds so the new notifications can be routed to a channel rather than being stuck in-app forever.                                                                                                                                                |
 
 ### 5.2 Shared view — states and transitions
 
 A **Shared view** is one Workspace's published, read-only face. It is a small,
-long-lived configuration object, not a document and not a snapshot: it holds *what may
-be read* and *by which token*, and the content is always computed live.
+long-lived configuration object, not a document and not a snapshot: it holds _what may
+be read_ and _by which token_, and the content is always computed live.
 
 ```
                  owner turns sharing on
@@ -665,11 +665,11 @@ be read* and *by which token*, and the content is always computed live.
                                              ACTIVE / PAUSED
 ```
 
-| State | Link resolves? | Owner sees | Visitor sees |
-| --- | --- | --- | --- |
-| *(none)* | — | "Sharing is off" and a **Turn on sharing** button | — |
-| `ACTIVE` | yes | the link, the sections, the counters | the published sections |
-| `PAUSED` | no | the link (greyed), the sections, the counters | "This link is no longer active." |
+| State    | Link resolves? | Owner sees                                        | Visitor sees                     |
+| -------- | -------------- | ------------------------------------------------- | -------------------------------- |
+| _(none)_ | —              | "Sharing is off" and a **Turn on sharing** button | —                                |
+| `ACTIVE` | yes            | the link, the sections, the counters              | the published sections           |
+| `PAUSED` | no             | the link (greyed), the sections, the counters     | "This link is no longer active." |
 
 Held on a Shared view: which sections are published, which Knowledge Base classes are
 selected, whether search engines are allowed, the encrypted token and its lookup hash,
@@ -682,7 +682,7 @@ Program rule #2 requires a new entity to be justified in the spec. There are two
 both are new because **Ever Works has no way today to represent a human who has no
 account**. Every existing access noun — Organization member, invitation, Team member —
 terminates in a User row and a dashboard session. Both nouns below exist precisely to
-*avoid* creating one.
+_avoid_ creating one.
 
 **1. Shared view** — one Workspace's read-only published face.
 
@@ -713,13 +713,13 @@ terminates in a User row and a dashboard session. Both nouns below exist precise
 
 ### 5.4 Explicitly not new entities
 
-| Considered | Rejected because |
-| --- | --- |
-| A per-Organization role | Roles are a whole permission lattice; this epic needs two capabilities, not a lattice (§2.4). Both new nouns fit under roles unchanged when roles land. |
-| A "share audit log" table | The activity log already is the audit surface, already scopes correctly and already exports. New entry kinds cost nothing. |
-| A "guest session" | The gate is stateless per message. Session state belongs to the chat/connector runtime, not here. |
-| A "published snapshot" | The value of the link is that it is live. A snapshot would be the stale artefact this epic exists to replace. |
-| A second Approval type for guest-originated decisions | Approvals and Escalations already exist and already route to a user. This epic adds a label and a rule, not a parallel queue. |
+| Considered                                            | Rejected because                                                                                                                                        |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A per-Organization role                               | Roles are a whole permission lattice; this epic needs two capabilities, not a lattice (§2.4). Both new nouns fit under roles unchanged when roles land. |
+| A "share audit log" table                             | The activity log already is the audit surface, already scopes correctly and already exports. New entry kinds cost nothing.                              |
+| A "guest session"                                     | The gate is stateless per message. Session state belongs to the chat/connector runtime, not here.                                                       |
+| A "published snapshot"                                | The value of the link is that it is live. A snapshot would be the stale artefact this epic exists to replace.                                           |
+| A second Approval type for guest-originated decisions | Approvals and Escalations already exist and already route to a user. This epic adds a label and a rule, not a parallel queue.                           |
 
 ---
 
@@ -727,12 +727,12 @@ terminates in a User row and a dashboard session. Both nouns below exist precise
 
 ### 6.1 Where it lives
 
-| Surface | Where | Who |
-| --- | --- | --- |
-| Sharing settings | **Settings → Sharing** (new entry, below *Organization*) | Owner: full. Member: read-only. |
-| Who can message this | A panel inside each connected channel's settings | Owner only |
-| The published page | A public route under `/share/<token>` | Anyone with the link |
-| Requester label | Task card, Task detail, Mission detail, My Decisions row | Signed-in users only |
+| Surface              | Where                                                    | Who                             |
+| -------------------- | -------------------------------------------------------- | ------------------------------- |
+| Sharing settings     | **Settings → Sharing** (new entry, below _Organization_) | Owner: full. Member: read-only. |
+| Who can message this | A panel inside each connected channel's settings         | Owner only                      |
+| The published page   | A public route under `/share/<token>`                    | Anyone with the link            |
+| Requester label      | Task card, Task detail, Mission detail, My Decisions row | Signed-in users only            |
 
 ### 6.2 Settings → Sharing — sharing off (first run)
 
@@ -1091,57 +1091,57 @@ detail drawer.
 
 ### 6.10 What an Agent says in the channel
 
-| Situation | Exact copy |
-| --- | --- |
+| Situation                                         | Exact copy                                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Sender not allowlisted (S-16, first time in 24 h) | "I can only take requests from people the workspace owner has added. Ask them to add you." |
-| Sender not allowlisted, again inside 24 h | *(nothing — silent)* |
-| Guest over the hourly limit (S-18) | "You've hit this workspace's hourly limit. Try again later." |
-| A decision is needed (S-8) | "I've sent this to {ownerName} for a decision. I'll reply here when it's answered." |
-| The decision was approved | "{ownerName} approved it — carrying on now." |
-| The decision was declined | "{ownerName} decided not to go ahead with this one." |
-| The decision was declined with a note | "{ownerName} decided not to go ahead with this one: {note}" |
-| Guest was revoked mid-request (S-17) | *(nothing — silent)* |
+| Sender not allowlisted, again inside 24 h         | _(nothing — silent)_                                                                       |
+| Guest over the hourly limit (S-18)                | "You've hit this workspace's hourly limit. Try again later."                               |
+| A decision is needed (S-8)                        | "I've sent this to {ownerName} for a decision. I'll reply here when it's answered."        |
+| The decision was approved                         | "{ownerName} approved it — carrying on now."                                               |
+| The decision was declined                         | "{ownerName} decided not to go ahead with this one."                                       |
+| The decision was declined with a note             | "{ownerName} decided not to go ahead with this one: {note}"                                |
+| Guest was revoked mid-request (S-17)              | _(nothing — silent)_                                                                       |
 
 ### 6.11 Exact user-visible copy (owner surfaces)
 
-| Where | Copy |
-| --- | --- |
-| Settings nav entry | `Sharing` |
-| Page subtitle | `Publish a read-only view of this workspace. No account needed to read it.` |
-| Off-state heading | `Sharing is off` |
-| Primary action, off | `Turn on sharing` |
-| Primary action, on | `Turn off sharing` |
-| Secondary actions | `Preview as a visitor` · `Regenerate link` · `Copy` |
-| Live badge | `Live` |
-| Counters line | `Regenerated {date} · Opened {n} times · Last opened {relative}` |
-| Never-opened counters line | `Regenerated {date} · Not opened yet` |
-| Section toggles | `Task board` · `Knowledge library` |
-| Section helper, board | `Columns, cards, agents, recent activity` |
-| Section helper, knowledge | `Documents you choose, listed and searchable` |
-| Class picker helper | `Choose which kinds of document are published. Nothing is published until you choose at least one.` |
-| Class picker footer | `{n} documents will be public.` |
-| Indexing options | `Blocked — we tell search engines to stay away` · `Allowed — this page can appear in search results` |
-| Non-owner notice | `Only the workspace owner can change sharing.` |
-| Copy confirmation toast | `Link copied` |
-| Allowlist heading | `Who can message this` |
-| Allowlist helper | `People here can hand work to your agents on this channel. You're always allowed and can't be removed.` |
-| Allowlist counter | `{n} of {max}` |
-| Add-form helper | `Their ID is on their profile in {service}. We show the display name you type here on everything they ask for.` |
-| First-view notification | `Your shared view was opened for the first time.` |
+| Where                      | Copy                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Settings nav entry         | `Sharing`                                                                                                       |
+| Page subtitle              | `Publish a read-only view of this workspace. No account needed to read it.`                                     |
+| Off-state heading          | `Sharing is off`                                                                                                |
+| Primary action, off        | `Turn on sharing`                                                                                               |
+| Primary action, on         | `Turn off sharing`                                                                                              |
+| Secondary actions          | `Preview as a visitor` · `Regenerate link` · `Copy`                                                             |
+| Live badge                 | `Live`                                                                                                          |
+| Counters line              | `Regenerated {date} · Opened {n} times · Last opened {relative}`                                                |
+| Never-opened counters line | `Regenerated {date} · Not opened yet`                                                                           |
+| Section toggles            | `Task board` · `Knowledge library`                                                                              |
+| Section helper, board      | `Columns, cards, agents, recent activity`                                                                       |
+| Section helper, knowledge  | `Documents you choose, listed and searchable`                                                                   |
+| Class picker helper        | `Choose which kinds of document are published. Nothing is published until you choose at least one.`             |
+| Class picker footer        | `{n} documents will be public.`                                                                                 |
+| Indexing options           | `Blocked — we tell search engines to stay away` · `Allowed — this page can appear in search results`            |
+| Non-owner notice           | `Only the workspace owner can change sharing.`                                                                  |
+| Copy confirmation toast    | `Link copied`                                                                                                   |
+| Allowlist heading          | `Who can message this`                                                                                          |
+| Allowlist helper           | `People here can hand work to your agents on this channel. You're always allowed and can't be removed.`         |
+| Allowlist counter          | `{n} of {max}`                                                                                                  |
+| Add-form helper            | `Their ID is on their profile in {service}. We show the display name you type here on everything they ask for.` |
+| First-view notification    | `Your shared view was opened for the first time.`                                                               |
 
 ### 6.12 Keyboard affordances
 
-| Surface | Key | Action |
-| --- | --- | --- |
-| Sharing settings | `c` | Copy the share link (owner only, when the link is focusable) |
-| Sharing settings | `Esc` | Dismiss the open confirmation dialog without acting |
-| Published page | `Tab` / `Shift+Tab` | Move through tabs, then columns, then cards, then documents |
-| Published page | `←` / `→` | Move between the Board and Knowledge tabs |
-| Published page | `/` | Focus the document search box (Knowledge tab only) |
-| Published page | `r` | Refresh now |
-| Published page | `Esc` | Clear the document search box |
-| Allowlist panel | `Enter` | Submit the add-someone form when both fields are filled |
-| Allowlist panel | `Esc` | Cancel the revoke confirmation |
+| Surface          | Key                 | Action                                                       |
+| ---------------- | ------------------- | ------------------------------------------------------------ |
+| Sharing settings | `c`                 | Copy the share link (owner only, when the link is focusable) |
+| Sharing settings | `Esc`               | Dismiss the open confirmation dialog without acting          |
+| Published page   | `Tab` / `Shift+Tab` | Move through tabs, then columns, then cards, then documents  |
+| Published page   | `←` / `→`           | Move between the Board and Knowledge tabs                    |
+| Published page   | `/`                 | Focus the document search box (Knowledge tab only)           |
+| Published page   | `r`                 | Refresh now                                                  |
+| Published page   | `Esc`               | Clear the document search box                                |
+| Allowlist panel  | `Enter`             | Submit the add-someone form when both fields are filled      |
+| Allowlist panel  | `Esc`               | Cancel the revoke confirmation                               |
 
 All column and section changes are announced through a polite live region so a screen
 reader user hears "In flight, 4 tasks" rather than nothing.
@@ -1355,33 +1355,33 @@ A reviewer can run this checklist top to bottom.
 
 ## 10. Non-functional requirements
 
-| Concern | Requirement |
-| --- | --- |
-| Latency | Published board first paint < 2 s at p95 (200 Tasks, 20 Agents); poll response < 400 ms at p95 |
-| Throughput | 60 requests/min/token, 600/hour/client, enforced before any database read beyond the token lookup |
-| Availability | The published page degrades to its last successful render plus a "couldn't refresh" line rather than blanking |
-| Data retention | View counters are cumulative; the salted client bucket lives ≤ 24 h and is never persisted |
+| Concern        | Requirement                                                                                                                                                                                                                 |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Latency        | Published board first paint < 2 s at p95 (200 Tasks, 20 Agents); poll response < 400 ms at p95                                                                                                                              |
+| Throughput     | 60 requests/min/token, 600/hour/client, enforced before any database read beyond the token lookup                                                                                                                           |
+| Availability   | The published page degrades to its last successful render plus a "couldn't refresh" line rather than blanking                                                                                                               |
+| Data retention | View counters are cumulative; the salted client bucket lives ≤ 24 h and is never persisted                                                                                                                                  |
 | Secret hygiene | The token is encrypted at rest, never logged, never in telemetry, never in an activity-log row, never returned to a non-owner, never in an API URL (FR-7a), and redacted by every request recorder before it writes (FR-7b) |
-| Auditability | Every owner-side change and every gate outcome writes exactly one activity-log entry |
-| Isolation | A share token resolves to exactly one Organization; no request derived from it can read another Organization's data even within the same Tenant |
-| Cost | A denied inbound message costs zero model tokens; the gate runs before any facade call |
+| Auditability   | Every owner-side change and every gate outcome writes exactly one activity-log entry                                                                                                                                        |
+| Isolation      | A share token resolves to exactly one Organization; no request derived from it can read another Organization's data even within the same Tenant                                                                             |
+| Cost           | A denied inbound message costs zero model tokens; the gate runs before any facade call                                                                                                                                      |
 
 ---
 
 ## 11. Constitution gates
 
-| Gate | Status | Note |
-| --- | --- | --- |
-| I — Plugin-first for external integrations | ✅ | No new external integration. The gate sits in front of the existing inbound path and reaches providers only through the existing plugin facades. |
-| II — No hardcoded plugin ids in core | ✅ | The allowlist is keyed on a Connection, not on a provider name; the gate resolves the provider through the registry. |
-| III — Content lives in user repos | ✅ | The Knowledge section publishes a projection; the documents stay in the user's repository as they do today. |
-| IV — Background work via the job-runtime provider | ✅ | The two background jobs (decision-outcome post-back, view-counter flush) are dispatched through the configured runtime, never a direct queue call. |
-| V — Forward-only migrations in the same PR | ✅ | Two new tables and four additive nullable columns, each with a migration in the same PR (see `plan.md` §3). |
-| VI — Tests are a prerequisite | ✅ | Unit, controller and end-to-end coverage is enumerated in `plan.md` §10. |
-| VII — Secret hygiene | ✅ | FR-7, FR-38, FR-41 and §10. |
-| VIII — Single source of truth for plugin lists | n/a | No plugin is added or removed. |
-| IX — Behaviour-first spec | ✅ | This document names no class, no path and no code. |
-| X — Backwards compatibility | ✅ | Every new column is nullable; every new endpoint is new; no existing response shape changes. |
+| Gate                                              | Status | Note                                                                                                                                               |
+| ------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I — Plugin-first for external integrations        | ✅     | No new external integration. The gate sits in front of the existing inbound path and reaches providers only through the existing plugin facades.   |
+| II — No hardcoded plugin ids in core              | ✅     | The allowlist is keyed on a Connection, not on a provider name; the gate resolves the provider through the registry.                               |
+| III — Content lives in user repos                 | ✅     | The Knowledge section publishes a projection; the documents stay in the user's repository as they do today.                                        |
+| IV — Background work via the job-runtime provider | ✅     | The two background jobs (decision-outcome post-back, view-counter flush) are dispatched through the configured runtime, never a direct queue call. |
+| V — Forward-only migrations in the same PR        | ✅     | Two new tables and four additive nullable columns, each with a migration in the same PR (see `plan.md` §3).                                        |
+| VI — Tests are a prerequisite                     | ✅     | Unit, controller and end-to-end coverage is enumerated in `plan.md` §10.                                                                           |
+| VII — Secret hygiene                              | ✅     | FR-7, FR-38, FR-41 and §10.                                                                                                                        |
+| VIII — Single source of truth for plugin lists    | n/a    | No plugin is added or removed.                                                                                                                     |
+| IX — Behaviour-first spec                         | ✅     | This document names no class, no path and no code.                                                                                                 |
+| X — Backwards compatibility                       | ✅     | Every new column is nullable; every new endpoint is new; no existing response shape changes.                                                       |
 
 ---
 

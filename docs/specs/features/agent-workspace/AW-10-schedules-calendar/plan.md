@@ -12,40 +12,40 @@
 
 ### 1.1 The unified read model already exists and is good
 
-| What exists | Where | What it already gives us |
-| --- | --- | --- |
-| `ScheduleView` projection types | [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts) | `id` (`${sourceType}:${ownerId}`), `sourceType` (7 values incl. `inbound_trigger`), `ownerType`, `ownerId`, `ownerName`, `ownerLink`, `cadenceRaw`, `cadenceHuman`, `nextRunAt`, `lastRunAt`, `lastRunStatus`, `status` (`active\|paused\|disabled\|error\|ended`), `enabled`. Plus `ScheduleQueryFilters` and `ScheduleScope`. |
-| The aggregation service | [`packages/agent/src/schedules/schedules.service.ts`](../../../../../packages/agent/src/schedules/schedules.service.ts) | `getSchedules(scope, filters)` runs seven independently try/catch-wrapped source queries (`recurringTasks`, `agentHeartbeats`, `workSchedules`, `missionTicks`, `sourceValidation`, `dataSync`, `inboundTriggers`), each `take(MAX_PER_SOURCE = 500)`, then `sortByNextRun`. A single bad cron degrades one slice, never the response. |
-| Cadence helpers | [`packages/agent/src/schedules/cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts) | `describeCron`, `describeRrule`, `describeWorkCadence`, `describeIntervalMinutes`, `describeEventDriven`, and `computeNextCronFire(expr, from)` — a bounded minute-walk with `MAX_LOOKAHEAD_MINUTES = 31 * 24 * 60` that returns `null` past the horizon. **Its own comment says a yearly / 29-Feb expression legitimately returns `null`** — which is exactly why NEVER RUNS must not be derived from it (spec FR-40). |
-| Cron parser | [`packages/agent/src/missions/cron-matcher.ts`](../../../../../packages/agent/src/missions/cron-matcher.ts) | `parseCron` — hand-rolled 5-field parser producing per-field `Set`s plus `domRestricted` / `dowRestricted` flags for Vixie OR semantics. All evaluation is UTC. |
-| Recurrence helpers | [`packages/agent/src/tasks-domain/recurrence.ts`](../../../../../packages/agent/src/tasks-domain/recurrence.ts) | `validateRecurrenceRule`, `validateRecurrenceCron`, `computeNextOccurrence`, `computeNextTemplateOccurrence`, `cloneRecurringTaskAsInstance`. Its header states: *all datetime math is UTC; the per-template `recurrenceTimezone` column is a hint for UI rendering, not for the dispatcher.* This is the factual basis for spec FR-11 and open question §9.1. |
-| Read endpoint | [`apps/api/src/schedules/schedules.controller.ts`](../../../../../apps/api/src/schedules/schedules.controller.ts) + [`schedules.module.ts`](../../../../../apps/api/src/schedules/schedules.module.ts) + [`dto/schedules-query.dto.ts`](../../../../../apps/api/src/schedules/dto/schedules-query.dto.ts) | `GET /api/schedules` returning a bare `ScheduleView[]`, scoped by `@CurrentUser()` + `ScopeContextService`, filters `sourceType` / `entityKind` / `enabledOnly` only, `forbidNonWhitelisted` on the DTO. |
-| Web client + action | [`apps/web/src/lib/api/schedules.ts`](../../../../../apps/web/src/lib/api/schedules.ts), [`apps/web/src/app/actions/dashboard/schedules.ts`](../../../../../apps/web/src/app/actions/dashboard/schedules.ts) | `schedulesAPI.getAll(params)` (server-only) and the `getSchedules` server action. The client re-declares the row type locally rather than importing a contract package — the documented convention here. |
-| Web surface | [`apps/web/src/components/schedules/SchedulesList.tsx`](../../../../../apps/web/src/components/schedules/SchedulesList.tsx), mounted from [`apps/web/src/app/[locale]/(dashboard)/activity/activity-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/activity/activity-client.tsx>) at line 464 behind `?view=schedules` | A read-only table with source-type and active-only filters. No route of its own. |
-| Second consumer | [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts>) `getSoonRuns()` | Home's "Soon" block already reads `GET /api/schedules` with `enabledOnly`. **This is why the endpoint's response shape must not change** (Principle X). |
-| Existing i18n | [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) → `dashboard.schedules.*` (from ~line 2632) | `title`, `subtitle`, `fetchFailed`, `retry`, `columns`, `filters`, `sourceTypes`, `statuses`, `empty`. Extended, never replaced. |
-| Existing tests | [`packages/agent/src/schedules/__tests__/schedules.service.spec.ts`](../../../../../packages/agent/src/schedules/__tests__/schedules.service.spec.ts), [`cadence.spec.ts`](../../../../../packages/agent/src/schedules/__tests__/cadence.spec.ts), [`apps/api/src/schedules/schedules.controller.spec.ts`](../../../../../apps/api/src/schedules/schedules.controller.spec.ts), [`dto/schedules-query.dto.spec.ts`](../../../../../apps/api/src/schedules/dto/schedules-query.dto.spec.ts) | Extended, not rewritten. |
+| What exists                     | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | What it already gives us                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ScheduleView` projection types | [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts)                                                                                                                                                                                                                                                                                                                                                                | `id` (`${sourceType}:${ownerId}`), `sourceType` (7 values incl. `inbound_trigger`), `ownerType`, `ownerId`, `ownerName`, `ownerLink`, `cadenceRaw`, `cadenceHuman`, `nextRunAt`, `lastRunAt`, `lastRunStatus`, `status` (`active\|paused\|disabled\|error\|ended`), `enabled`. Plus `ScheduleQueryFilters` and `ScheduleScope`.                                                                                         |
+| The aggregation service         | [`packages/agent/src/schedules/schedules.service.ts`](../../../../../packages/agent/src/schedules/schedules.service.ts)                                                                                                                                                                                                                                                                                                                                                                    | `getSchedules(scope, filters)` runs seven independently try/catch-wrapped source queries (`recurringTasks`, `agentHeartbeats`, `workSchedules`, `missionTicks`, `sourceValidation`, `dataSync`, `inboundTriggers`), each `take(MAX_PER_SOURCE = 500)`, then `sortByNextRun`. A single bad cron degrades one slice, never the response.                                                                                  |
+| Cadence helpers                 | [`packages/agent/src/schedules/cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts)                                                                                                                                                                                                                                                                                                                                                                                        | `describeCron`, `describeRrule`, `describeWorkCadence`, `describeIntervalMinutes`, `describeEventDriven`, and `computeNextCronFire(expr, from)` — a bounded minute-walk with `MAX_LOOKAHEAD_MINUTES = 31 * 24 * 60` that returns `null` past the horizon. **Its own comment says a yearly / 29-Feb expression legitimately returns `null`** — which is exactly why NEVER RUNS must not be derived from it (spec FR-40). |
+| Cron parser                     | [`packages/agent/src/missions/cron-matcher.ts`](../../../../../packages/agent/src/missions/cron-matcher.ts)                                                                                                                                                                                                                                                                                                                                                                                | `parseCron` — hand-rolled 5-field parser producing per-field `Set`s plus `domRestricted` / `dowRestricted` flags for Vixie OR semantics. All evaluation is UTC.                                                                                                                                                                                                                                                         |
+| Recurrence helpers              | [`packages/agent/src/tasks-domain/recurrence.ts`](../../../../../packages/agent/src/tasks-domain/recurrence.ts)                                                                                                                                                                                                                                                                                                                                                                            | `validateRecurrenceRule`, `validateRecurrenceCron`, `computeNextOccurrence`, `computeNextTemplateOccurrence`, `cloneRecurringTaskAsInstance`. Its header states: _all datetime math is UTC; the per-template `recurrenceTimezone` column is a hint for UI rendering, not for the dispatcher._ This is the factual basis for spec FR-11 and open question §9.1.                                                          |
+| Read endpoint                   | [`apps/api/src/schedules/schedules.controller.ts`](../../../../../apps/api/src/schedules/schedules.controller.ts) + [`schedules.module.ts`](../../../../../apps/api/src/schedules/schedules.module.ts) + [`dto/schedules-query.dto.ts`](../../../../../apps/api/src/schedules/dto/schedules-query.dto.ts)                                                                                                                                                                                  | `GET /api/schedules` returning a bare `ScheduleView[]`, scoped by `@CurrentUser()` + `ScopeContextService`, filters `sourceType` / `entityKind` / `enabledOnly` only, `forbidNonWhitelisted` on the DTO.                                                                                                                                                                                                                |
+| Web client + action             | [`apps/web/src/lib/api/schedules.ts`](../../../../../apps/web/src/lib/api/schedules.ts), [`apps/web/src/app/actions/dashboard/schedules.ts`](../../../../../apps/web/src/app/actions/dashboard/schedules.ts)                                                                                                                                                                                                                                                                               | `schedulesAPI.getAll(params)` (server-only) and the `getSchedules` server action. The client re-declares the row type locally rather than importing a contract package — the documented convention here.                                                                                                                                                                                                                |
+| Web surface                     | [`apps/web/src/components/schedules/SchedulesList.tsx`](../../../../../apps/web/src/components/schedules/SchedulesList.tsx), mounted from [`apps/web/src/app/[locale]/(dashboard)/activity/activity-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/activity/activity-client.tsx>) at line 464 behind `?view=schedules`                                                                                                                                                 | A read-only table with source-type and active-only filters. No route of its own.                                                                                                                                                                                                                                                                                                                                        |
+| Second consumer                 | [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts`](<../../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-data.ts>) `getSoonRuns()`                                                                                                                                                                                                                                                                                                                        | Home's "Soon" block already reads `GET /api/schedules` with `enabledOnly`. **This is why the endpoint's response shape must not change** (Principle X).                                                                                                                                                                                                                                                                 |
+| Existing i18n                   | [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) → `dashboard.schedules.*` (from ~line 2632)                                                                                                                                                                                                                                                                                                                                                                        | `title`, `subtitle`, `fetchFailed`, `retry`, `columns`, `filters`, `sourceTypes`, `statuses`, `empty`. Extended, never replaced.                                                                                                                                                                                                                                                                                        |
+| Existing tests                  | [`packages/agent/src/schedules/__tests__/schedules.service.spec.ts`](../../../../../packages/agent/src/schedules/__tests__/schedules.service.spec.ts), [`cadence.spec.ts`](../../../../../packages/agent/src/schedules/__tests__/cadence.spec.ts), [`apps/api/src/schedules/schedules.controller.spec.ts`](../../../../../apps/api/src/schedules/schedules.controller.spec.ts), [`dto/schedules-query.dto.spec.ts`](../../../../../apps/api/src/schedules/dto/schedules-query.dto.spec.ts) | Extended, not rewritten.                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### 1.2 The seven sources and how each is paused today
 
-| Source | Owning row | Enabled predicate today | Reversible pause today? |
-| --- | --- | --- | --- |
-| `recurring_task` | `tasks` ([`task.entity.ts`](../../../../../packages/agent/src/entities/task.entity.ts)) `isRecurring`, `recurrenceRule` xor `recurrenceCron`, `recurrenceTimezone`, `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`, `recurrenceOccurredCount`, `parentRecurringTaskId`, index `idx_tasks_recurrence_due (isRecurring, nextOccurrenceAt)` | `isRecurring = true AND parentRecurringTaskId IS NULL` | **No.** `DELETE /api/tasks/:id/recurring` clears the cadence — destructive. |
-| `agent_heartbeat` | `agents` ([`agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts)) `heartbeatCadence` (cron or `'manual'`), `nextHeartbeatAt`, `lastRunAt`, `lastRunStatus`, `errorCount`, `pauseAfterFailures` (default 3), index `idx_agents_next_heartbeat (status, nextHeartbeatAt)` | `heartbeatCadence IS NOT NULL` | **No.** Only by pausing the whole Agent, which also stops assigned Task work. |
-| `work_schedule` | `work_schedules` ([`work-schedule.entity.ts`](../../../../../packages/agent/src/entities/work-schedule.entity.ts)) `cadence`, `status`, `nextRunAt`, `lastRunAt`, `lastRunStatus`, `failureCount`, `maxFailureBeforePause` (default 3) | `status = active` | **Yes** — `WorkScheduleStatus.PAUSED`. |
-| `mission_tick` | `missions` ([`mission.entity.ts`](../../../../../packages/agent/src/entities/mission.entity.ts)) `type = scheduled`, `schedule` (cron), `status` (`MissionStatus`: `active` \| `paused` \| `completed` \| `failed`) | `status = active` | **Yes, but coarse** — pause writes `status = paused`, which stops the tick raising new Ideas; Ideas and Works already raised are untouched, and `runNow` still works on a paused Mission (spec FR-19). |
-| `source_validation` | `works` `sourceValidationEnabled`, `sourceValidationCadence`, `sourceValidationNextRunAt` | flag on | **Yes** — flip the flag; the cadence column survives. |
-| `data_sync` | `works` `syncIntervalMinutes`, `lastPolledAt` | interval > 0 | Partially — clearing the interval loses it. |
-| `inbound_trigger` | `inbound_triggers` ([`inbound-trigger.entity.ts`](../../../../../packages/agent/src/entities/inbound-trigger.entity.ts)) `status: active\|paused` | `status = active` | **Yes.** |
+| Source              | Owning row                                                                                                                                                                                                                                                                                                                                                   | Enabled predicate today                                | Reversible pause today?                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `recurring_task`    | `tasks` ([`task.entity.ts`](../../../../../packages/agent/src/entities/task.entity.ts)) `isRecurring`, `recurrenceRule` xor `recurrenceCron`, `recurrenceTimezone`, `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`, `recurrenceOccurredCount`, `parentRecurringTaskId`, index `idx_tasks_recurrence_due (isRecurring, nextOccurrenceAt)` | `isRecurring = true AND parentRecurringTaskId IS NULL` | **No.** `DELETE /api/tasks/:id/recurring` clears the cadence — destructive.                                                                                                                            |
+| `agent_heartbeat`   | `agents` ([`agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts)) `heartbeatCadence` (cron or `'manual'`), `nextHeartbeatAt`, `lastRunAt`, `lastRunStatus`, `errorCount`, `pauseAfterFailures` (default 3), index `idx_agents_next_heartbeat (status, nextHeartbeatAt)`                                                             | `heartbeatCadence IS NOT NULL`                         | **No.** Only by pausing the whole Agent, which also stops assigned Task work.                                                                                                                          |
+| `work_schedule`     | `work_schedules` ([`work-schedule.entity.ts`](../../../../../packages/agent/src/entities/work-schedule.entity.ts)) `cadence`, `status`, `nextRunAt`, `lastRunAt`, `lastRunStatus`, `failureCount`, `maxFailureBeforePause` (default 3)                                                                                                                       | `status = active`                                      | **Yes** — `WorkScheduleStatus.PAUSED`.                                                                                                                                                                 |
+| `mission_tick`      | `missions` ([`mission.entity.ts`](../../../../../packages/agent/src/entities/mission.entity.ts)) `type = scheduled`, `schedule` (cron), `status` (`MissionStatus`: `active` \| `paused` \| `completed` \| `failed`)                                                                                                                                          | `status = active`                                      | **Yes, but coarse** — pause writes `status = paused`, which stops the tick raising new Ideas; Ideas and Works already raised are untouched, and `runNow` still works on a paused Mission (spec FR-19). |
+| `source_validation` | `works` `sourceValidationEnabled`, `sourceValidationCadence`, `sourceValidationNextRunAt`                                                                                                                                                                                                                                                                    | flag on                                                | **Yes** — flip the flag; the cadence column survives.                                                                                                                                                  |
+| `data_sync`         | `works` `syncIntervalMinutes`, `lastPolledAt`                                                                                                                                                                                                                                                                                                                | interval > 0                                           | Partially — clearing the interval loses it.                                                                                                                                                            |
+| `inbound_trigger`   | `inbound_triggers` ([`inbound-trigger.entity.ts`](../../../../../packages/agent/src/entities/inbound-trigger.entity.ts)) `status: active\|paused`                                                                                                                                                                                                            | `status = active`                                      | **Yes.**                                                                                                                                                                                               |
 
 ### 1.3 The dispatchers that will gain a pause predicate
 
-| Worker | Cron | Service | Due-scan |
-| --- | --- | --- | --- |
-| [`packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts) | `* * * * *` | [`task-recurrence-dispatcher.service.ts`](../../../../../packages/agent/src/tasks-domain/task-recurrence-dispatcher.service.ts) `dispatchDue` / `dispatchDueScheduled` | `TaskRepository.findDueRecurringTemplates(limit, now)` and `findDueScheduledTasks` in [`task.repository.ts`](../../../../../packages/agent/src/database/repositories/task.repository.ts). CAS-claims by advancing `nextOccurrenceAt`; agent resolution is assignees → `task.agentId`, and on failure it raises a `task_run_no_agent` notification ([`task-notification.service.ts`](../../../../../packages/agent/src/tasks-domain/task-notification.service.ts)) rather than skipping silently. |
-| [`agent-heartbeat-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat-dispatcher.task.ts) | `*/N * * * *` | [`agent-schedule-dispatcher.service.ts`](../../../../../packages/agent/src/agents/agent-schedule-dispatcher.service.ts) `dispatchDue`, exporting `AGENT_HEARTBEAT_TRIGGER` | Scans `agents` for `nextHeartbeatAt <= now`, CAS-claims `active → running`. |
-| [`mission-tick.task.ts`](../../../../../packages/tasks/src/tasks/trigger/mission-tick.task.ts) | `* * * * *` | [`mission-tick.service.ts`](../../../../../packages/agent/src/missions/mission-tick.service.ts) | `tickDue` cron-matches every `status = ACTIVE`, `type = SCHEDULED` Mission and asks the generator for Ideas (`WorkProposal` rows, capped at `MAX_IDEAS_PER_TICK = 5`), queueing them for build when `autoBuildWorks` is on. **It creates no Task and dispatches no `AgentRun`** — its only record of a fire is an `ActivityActionType.MISSION_TICK` row, and cron-no-match minutes are deliberately not logged. Dispatcher untouched by this epic; §3.5 reads that activity row for the calendar. |
-| [`work-schedule-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts) | config-driven | `WorkScheduleDispatcherService` | Untouched. |
+| Worker                                                                                                                                                      | Cron          | Service                                                                                                                                                                    | Due-scan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/task-recurrence-dispatcher.task.ts) | `* * * * *`   | [`task-recurrence-dispatcher.service.ts`](../../../../../packages/agent/src/tasks-domain/task-recurrence-dispatcher.service.ts) `dispatchDue` / `dispatchDueScheduled`     | `TaskRepository.findDueRecurringTemplates(limit, now)` and `findDueScheduledTasks` in [`task.repository.ts`](../../../../../packages/agent/src/database/repositories/task.repository.ts). CAS-claims by advancing `nextOccurrenceAt`; agent resolution is assignees → `task.agentId`, and on failure it raises a `task_run_no_agent` notification ([`task-notification.service.ts`](../../../../../packages/agent/src/tasks-domain/task-notification.service.ts)) rather than skipping silently.  |
+| [`agent-heartbeat-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat-dispatcher.task.ts)                                  | `*/N * * * *` | [`agent-schedule-dispatcher.service.ts`](../../../../../packages/agent/src/agents/agent-schedule-dispatcher.service.ts) `dispatchDue`, exporting `AGENT_HEARTBEAT_TRIGGER` | Scans `agents` for `nextHeartbeatAt <= now`, CAS-claims `active → running`.                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| [`mission-tick.task.ts`](../../../../../packages/tasks/src/tasks/trigger/mission-tick.task.ts)                                                              | `* * * * *`   | [`mission-tick.service.ts`](../../../../../packages/agent/src/missions/mission-tick.service.ts)                                                                            | `tickDue` cron-matches every `status = ACTIVE`, `type = SCHEDULED` Mission and asks the generator for Ideas (`WorkProposal` rows, capped at `MAX_IDEAS_PER_TICK = 5`), queueing them for build when `autoBuildWorks` is on. **It creates no Task and dispatches no `AgentRun`** — its only record of a fire is an `ActivityActionType.MISSION_TICK` row, and cron-no-match minutes are deliberately not logged. Dispatcher untouched by this epic; §3.5 reads that activity row for the calendar. |
+| [`work-schedule-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/work-schedule-dispatcher.task.ts)                                      | config-driven | `WorkScheduleDispatcherService`                                                                                                                                            | Untouched.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 Dispatch indirection to respect (Constitution IV): [`packages/agent/src/tasks-domain/task-dispatcher.ts`](../../../../../packages/agent/src/tasks-domain/task-dispatcher.ts) declares `AGENT_TASK_EXECUTE_DISPATCHER`, `AGENT_CHAT_REPLY_DISPATCHER`, `TERMINAL_SESSION_STARTER` and `JOB_RUNTIME_NOT_CONFIGURED_REASON`. Nothing in `packages/agent` imports a third-party SDK; the adapters live in `packages/tasks` / `apps/api`.
 
@@ -134,7 +134,7 @@ Plus one new read/write surface at `/schedules`.
 
 **Seam rules.**
 
-- `SchedulesService` stays the single definition of "what is scheduled". The new services *decorate*
+- `SchedulesService` stays the single definition of "what is scheduled". The new services _decorate_
   its rows; none of them re-queries a source table to build a second list.
 - `ScheduleControlService` never writes an owning table directly. It resolves the synthetic id and
   calls the domain service that already owns that write (`TasksService`, `AgentsService`,
@@ -153,18 +153,18 @@ Plus one new read/write surface at `/schedules`.
 Added to [`packages/agent/src/entities/task.entity.ts`](../../../../../packages/agent/src/entities/task.entity.ts),
 grouped with the existing recurrence block:
 
-| Column | Type | Null | Default | Phase | Meaning |
-| --- | --- | --- | --- | --- | --- |
-| `recurrencePausedAt` | timestamp (`PortableDateColumn`) | yes | `null` | **A / P1** | Non-null = paused. The cadence, `nextOccurrenceAt` and every bound are untouched. |
-| `recurrenceProviderId` | `varchar(64)` | yes | `null` | B / P2 | Per-Schedule AI provider override. `null` = inherit the Agent. |
-| `recurrenceModelId` | `varchar(128)` | yes | `null` | B / P2 | Per-Schedule model override. |
-| `recurrenceTimeoutSeconds` | `int` | yes | `null` | B / P2 | 60–14 400. `null` = inherit the Agent's `maxRunDurationSeconds` (AW-09), then the deployment default. |
-| `recurrenceAnnounce` | `boolean` | no | `true` | B / P2 | Announce on completion. Seeded per FR-29 at creation, not by the column default. |
-| `recurrenceHideInstances` | `boolean` | no | `false` | B / P2 | When true, each spawned instance is stamped `hiddenFromBoard = true` (a column that already exists and is already server-written-only). |
-| `recurrenceFailureStreak` | `int` | no | `0` | B / P2 | Consecutive failed fires. Reset to 0 on any success and on resume. |
-| `recurrenceHealth` | `varchar(32)` | yes | `null` | B / P2 | Cached verdict: `null` = OK, else one of the seven reason codes. |
-| `recurrenceHealthCheckedAt` | timestamp | yes | `null` | B / P2 | When the verdict was computed. Drives the "health is stale" notice. |
-| `recurrenceLastFiredAt` | timestamp | yes | `null` | B / P2 | Last time the template actually spawned and dispatched. Today this is only derivable by scanning instances. |
+| Column                      | Type                             | Null | Default | Phase      | Meaning                                                                                                                                 |
+| --------------------------- | -------------------------------- | ---- | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `recurrencePausedAt`        | timestamp (`PortableDateColumn`) | yes  | `null`  | **A / P1** | Non-null = paused. The cadence, `nextOccurrenceAt` and every bound are untouched.                                                       |
+| `recurrenceProviderId`      | `varchar(64)`                    | yes  | `null`  | B / P2     | Per-Schedule AI provider override. `null` = inherit the Agent.                                                                          |
+| `recurrenceModelId`         | `varchar(128)`                   | yes  | `null`  | B / P2     | Per-Schedule model override.                                                                                                            |
+| `recurrenceTimeoutSeconds`  | `int`                            | yes  | `null`  | B / P2     | 60–14 400. `null` = inherit the Agent's `maxRunDurationSeconds` (AW-09), then the deployment default.                                   |
+| `recurrenceAnnounce`        | `boolean`                        | no   | `true`  | B / P2     | Announce on completion. Seeded per FR-29 at creation, not by the column default.                                                        |
+| `recurrenceHideInstances`   | `boolean`                        | no   | `false` | B / P2     | When true, each spawned instance is stamped `hiddenFromBoard = true` (a column that already exists and is already server-written-only). |
+| `recurrenceFailureStreak`   | `int`                            | no   | `0`     | B / P2     | Consecutive failed fires. Reset to 0 on any success and on resume.                                                                      |
+| `recurrenceHealth`          | `varchar(32)`                    | yes  | `null`  | B / P2     | Cached verdict: `null` = OK, else one of the seven reason codes.                                                                        |
+| `recurrenceHealthCheckedAt` | timestamp                        | yes  | `null`  | B / P2     | When the verdict was computed. Drives the "health is stale" notice.                                                                     |
+| `recurrenceLastFiredAt`     | timestamp                        | yes  | `null`  | B / P2     | Last time the template actually spawned and dispatched. Today this is only derivable by scanning instances.                             |
 
 Indexes (additive, existing ones untouched):
 
@@ -180,9 +180,9 @@ rollback of the app without a rollback of the schema still finds a usable index.
 
 Added to [`agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts):
 
-| Column | Type | Null | Default | Meaning |
-| --- | --- | --- | --- | --- |
-| `heartbeatPausedAt` | timestamp (`PortableDateColumn`) | yes | `null` | Non-null = the heartbeat is paused. `heartbeatCadence` and `nextHeartbeatAt` are preserved. Orthogonal to `AgentStatus`. |
+| Column              | Type                             | Null | Default | Meaning                                                                                                                  |
+| ------------------- | -------------------------------- | ---- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `heartbeatPausedAt` | timestamp (`PortableDateColumn`) | yes  | `null`  | Non-null = the heartbeat is paused. `heartbeatCadence` and `nextHeartbeatAt` are preserved. Orthogonal to `AgentStatus`. |
 
 Index: `@Index('idx_agents_heartbeat_due', ['status', 'heartbeatPausedAt', 'nextHeartbeatAt'])`,
 added beside the existing `idx_agents_next_heartbeat`.
@@ -192,21 +192,21 @@ added beside the existing `idx_agents_next_heartbeat`.
 New entity `packages/agent/src/entities/schedule-bulk-action.entity.ts`, table
 `schedule_bulk_actions`. The only new table in this epic.
 
-| Column | Type | Null | Notes |
-| --- | --- | --- | --- |
-| `id` | uuid PK | no | |
-| `userId` | uuid | no | Owner. Indexed with `createdAt`. |
-| `tenantId` | uuid | yes | Tier A scope stamping, copied from the acting scope. |
-| `organizationId` | uuid | yes | Tier A scope stamping. |
-| `kind` | `varchar(16)` | no | `pause` \| `fix`. |
-| `scopeKind` | `varchar(16)` | no | `agent` \| `workspace` \| `selection`. |
-| `agentId` | uuid | yes | Set when `scopeKind = 'agent'`. No FK — the Agent may be hard-deleted; the record is an audit fact. |
-| `entries` | `simple-json` | no | Up to 500 `{ scheduleId, sourceType, ownerId, before, after }`. `before`/`after` hold only the fields this epic changes, never instructions or anything secret. |
-| `entryCount` | `int` | no | Denormalised for the banner without parsing `entries`. |
-| `undoneAt` | timestamp | yes | Set once. A batch is undoable exactly once. |
-| `undoneByUserId` | uuid | yes | |
-| `undoSkipped` | `int` | no, default 0 | How many entries undo skipped because state had changed. |
-| `createdAt` / `updatedAt` | timestamp | no | |
+| Column                    | Type          | Null          | Notes                                                                                                                                                           |
+| ------------------------- | ------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                      | uuid PK       | no            |                                                                                                                                                                 |
+| `userId`                  | uuid          | no            | Owner. Indexed with `createdAt`.                                                                                                                                |
+| `tenantId`                | uuid          | yes           | Tier A scope stamping, copied from the acting scope.                                                                                                            |
+| `organizationId`          | uuid          | yes           | Tier A scope stamping.                                                                                                                                          |
+| `kind`                    | `varchar(16)` | no            | `pause` \| `fix`.                                                                                                                                               |
+| `scopeKind`               | `varchar(16)` | no            | `agent` \| `workspace` \| `selection`.                                                                                                                          |
+| `agentId`                 | uuid          | yes           | Set when `scopeKind = 'agent'`. No FK — the Agent may be hard-deleted; the record is an audit fact.                                                             |
+| `entries`                 | `simple-json` | no            | Up to 500 `{ scheduleId, sourceType, ownerId, before, after }`. `before`/`after` hold only the fields this epic changes, never instructions or anything secret. |
+| `entryCount`              | `int`         | no            | Denormalised for the banner without parsing `entries`.                                                                                                          |
+| `undoneAt`                | timestamp     | yes           | Set once. A batch is undoable exactly once.                                                                                                                     |
+| `undoneByUserId`          | uuid          | yes           |                                                                                                                                                                 |
+| `undoSkipped`             | `int`         | no, default 0 | How many entries undo skipped because state had changed.                                                                                                        |
+| `createdAt` / `updatedAt` | timestamp     | no            |                                                                                                                                                                 |
 
 `@Index('idx_schedule_bulk_actions_user_created', ['userId', 'createdAt'])`.
 Registered in `_entities-inventory.ts`, `_entity-names.ts` and `entities/index.ts`.
@@ -239,64 +239,73 @@ every field **added**, none changed or removed, so `GET /api/schedules` stays wi
 
 ```ts
 export type ScheduleHealthReason =
-    | 'impossible-date' | 'ended' | 'exhausted' | 'past-one-shot'
-    | 'unparseable' | 'no-agent' | 'owner-archived';
+	| 'impossible-date'
+	| 'ended'
+	| 'exhausted'
+	| 'past-one-shot'
+	| 'unparseable'
+	| 'no-agent'
+	| 'owner-archived';
 
 export type ScheduleRepairClass = 'automatic' | 'choice' | 'none';
 
 export interface ScheduleHealth {
-    ok: boolean;
-    reason: ScheduleHealthReason | null;
-    /** Plain-language sentence, already localised key-side by the client. */
-    reasonKey: string | null;
-    repair: ScheduleRepairClass;
-    checkedAt: string | null;
+	ok: boolean;
+	reason: ScheduleHealthReason | null;
+	/** Plain-language sentence, already localised key-side by the client. */
+	reasonKey: string | null;
+	repair: ScheduleRepairClass;
+	checkedAt: string | null;
 }
 
 export interface ScheduleControls {
-    runNow: boolean; pause: boolean; resume: boolean;
-    edit: boolean; duplicate: boolean; reassign: boolean;
-    /** Per-control reason key when false, e.g. 'dataSyncConfiguredOnWork'. */
-    disabledReasons: Partial<Record<keyof Omit<ScheduleControls, 'disabledReasons'>, string>>;
+	runNow: boolean;
+	pause: boolean;
+	resume: boolean;
+	edit: boolean;
+	duplicate: boolean;
+	reassign: boolean;
+	/** Per-control reason key when false, e.g. 'dataSyncConfiguredOnWork'. */
+	disabledReasons: Partial<Record<keyof Omit<ScheduleControls, 'disabledReasons'>, string>>;
 }
 
 export interface ScheduleOccurrence {
-    scheduleId: string;
-    expectedAt: string;              // ISO, UTC
-    outcome: 'ran' | 'failed' | 'did-not-run' | 'unknown' | 'upcoming' | 'paused';
-    /** How a past outcome was established. 'none' ⇒ outcome is 'unknown' or 'upcoming'. */
-    evidence: 'run' | 'sourceRecord' | 'none';
-    runId: string | null;            // set for ran / failed only when evidence === 'run'
-    /** Where to send the user when there is no receipt: the owning entity's link. */
-    ownerLink: string | null;
-    durationMs: number | null;       // null for sourceRecord evidence
-    costCents: number | null;        // null for sourceRecord evidence
-    notRunReasonKey: string | null;  // 'pausedAtTheTime' | 'noAgent' | null
+	scheduleId: string;
+	expectedAt: string; // ISO, UTC
+	outcome: 'ran' | 'failed' | 'did-not-run' | 'unknown' | 'upcoming' | 'paused';
+	/** How a past outcome was established. 'none' ⇒ outcome is 'unknown' or 'upcoming'. */
+	evidence: 'run' | 'sourceRecord' | 'none';
+	runId: string | null; // set for ran / failed only when evidence === 'run'
+	/** Where to send the user when there is no receipt: the owning entity's link. */
+	ownerLink: string | null;
+	durationMs: number | null; // null for sourceRecord evidence
+	costCents: number | null; // null for sourceRecord evidence
+	notRunReasonKey: string | null; // 'pausedAtTheTime' | 'noAgent' | null
 }
 
 // added to ScheduleView
 interface ScheduleViewAdditions {
-    agentId: string | null;
-    agentName: string | null;
-    health: ScheduleHealth;
-    controls: ScheduleControls;
-    pausedAt: string | null;
-    failureStreak: number;
-    announce: boolean | null;
-    timeoutSeconds: number | null;
-    timeoutSource: 'schedule' | 'agent' | 'deployment' | null;
-    modelLabel: string | null;
-    overlapCount: number;            // 0 unless heartbeat/schedule overlap detected
+	agentId: string | null;
+	agentName: string | null;
+	health: ScheduleHealth;
+	controls: ScheduleControls;
+	pausedAt: string | null;
+	failureStreak: number;
+	announce: boolean | null;
+	timeoutSeconds: number | null;
+	timeoutSource: 'schedule' | 'agent' | 'deployment' | null;
+	modelLabel: string | null;
+	overlapCount: number; // 0 unless heartbeat/schedule overlap detected
 }
 
 export interface SchedulePage {
-    items: ScheduleView[];
-    nextCursor: string | null;
-    total: number;
-    countsBySourceType: Record<ScheduleSourceType, number>;
-    healthCounts: { ok: number; neverRuns: number; overlap: number };
-    degradedSources: ScheduleSourceType[];   // sources whose query failed
-    healthCheckedAt: string | null;
+	items: ScheduleView[];
+	nextCursor: string | null;
+	total: number;
+	countsBySourceType: Record<ScheduleSourceType, number>;
+	healthCounts: { ok: number; neverRuns: number; overlap: number };
+	degradedSources: ScheduleSourceType[]; // sources whose query failed
+	healthCheckedAt: string | null;
 }
 ```
 
@@ -317,11 +326,11 @@ is updated in lockstep, following the local-interface convention that file alrea
 Three forward-only migrations in `apps/api/src/migrations/`, one per phase, each existence-guarded
 and written with portable `TableColumn` DDL:
 
-| File | Phase | Contents |
-| --- | --- | --- |
-| `1791100000000-AddSchedulePauseColumns.ts` | P1 | `tasks.recurrencePausedAt`; `agents.heartbeatPausedAt`; indexes `idx_tasks_recurrence_due_active`, `idx_agents_heartbeat_due`. No backfill — `NULL` on every existing row reads as "not paused", which is the current behaviour exactly. |
-| `1791100100000-AddScheduleDefinitionOptions.ts` | P2 | The nine remaining `tasks.recurrence*` columns and `idx_tasks_recurrence_health`. `recurrenceAnnounce` defaults `true` and `recurrenceHideInstances` defaults `false`, both of which reproduce today's behaviour for existing rows (they announce nothing today because nothing reads the column, and their instances are already visible). |
-| `1791100200000-CreateScheduleBulkActions.ts` | P3 | The `schedule_bulk_actions` table and its index. |
+| File                                            | Phase | Contents                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `1791100000000-AddSchedulePauseColumns.ts`      | P1    | `tasks.recurrencePausedAt`; `agents.heartbeatPausedAt`; indexes `idx_tasks_recurrence_due_active`, `idx_agents_heartbeat_due`. No backfill — `NULL` on every existing row reads as "not paused", which is the current behaviour exactly.                                                                                                    |
+| `1791100100000-AddScheduleDefinitionOptions.ts` | P2    | The nine remaining `tasks.recurrence*` columns and `idx_tasks_recurrence_health`. `recurrenceAnnounce` defaults `true` and `recurrenceHideInstances` defaults `false`, both of which reproduce today's behaviour for existing rows (they announce nothing today because nothing reads the column, and their instances are already visible). |
+| `1791100200000-CreateScheduleBulkActions.ts`    | P3    | The `schedule_bulk_actions` table and its index.                                                                                                                                                                                                                                                                                            |
 
 No column is renamed, no data is destroyed, and every `down()` drops only what its `up()` added.
 
@@ -345,15 +354,15 @@ Still returns a bare `ScheduleView[]`. Rows gain the additive fields of §3.5. `
 
 `SchedulePageQueryDto` (`forbidNonWhitelisted`, mirroring `schedules-query.dto.ts`):
 
-| Param | Rule |
-| --- | --- |
-| `cursor` | `@IsOptional() @IsString() @MaxLength(512)` — opaque, `{nextRunAt, id}` base64. |
-| `limit` | `@IsInt() @Min(1) @Max(50)`, default 50. |
-| `sourceType`, `entityKind`, `enabledOnly` | as today. |
-| `agentId` | `@IsOptional() @IsUUID()`. |
-| `status` | `@IsOptional() @IsIn(['active','paused','disabled','error','ended'])`. |
-| `health` | `@IsOptional() @IsIn(['ok','never-runs','overlap'])`. |
-| `q` | `@IsOptional() @IsString() @MaxLength(120)` — matched against owner name and instructions. |
+| Param                                     | Rule                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `cursor`                                  | `@IsOptional() @IsString() @MaxLength(512)` — opaque, `{nextRunAt, id}` base64.            |
+| `limit`                                   | `@IsInt() @Min(1) @Max(50)`, default 50.                                                   |
+| `sourceType`, `entityKind`, `enabledOnly` | as today.                                                                                  |
+| `agentId`                                 | `@IsOptional() @IsUUID()`.                                                                 |
+| `status`                                  | `@IsOptional() @IsIn(['active','paused','disabled','error','ended'])`.                     |
+| `health`                                  | `@IsOptional() @IsIn(['ok','never-runs','overlap'])`.                                      |
+| `q`                                       | `@IsOptional() @IsString() @MaxLength(120)` — matched against owner name and instructions. |
 
 Returns `SchedulePage`. Auth: the global session guard; scope from `ScopeContextService`.
 
@@ -391,14 +400,14 @@ Path param is a real UUID. Refuses `409 UNDO_WINDOW_CLOSED` beyond 15 minutes of
 
 ### 4.8 Per-schedule controls (P1 unless noted)
 
-| Method | Path | Body | Notes |
-| --- | --- | --- | --- |
-| `POST` | `/api/schedules/:id/run-now` | — | Throttled `10/min` per user. `409` codes: `SCHEDULE_ALREADY_RUNNING`, `SCHEDULE_NO_AGENT`, `SCHEDULE_OWNER_ARCHIVED`, `SCHEDULE_CREDITS_EXHAUSTED`. Returns `{ runId }`. Never touches `nextOccurrenceAt` / `nextHeartbeatAt`. |
-| `POST` | `/api/schedules/:id/pause` | `{ acknowledgeMissionPause?: boolean }` | `409 MISSION_PAUSE_NOT_ACKNOWLEDGED` for `mission_tick` without the flag. |
-| `POST` | `/api/schedules/:id/resume` | — | Resets `recurrenceFailureStreak` to 0 (P2). |
-| `PATCH` | `/api/schedules/:id` (P2) | `UpdateScheduleDto` | Name, instructions, cadence, options. `recurring_task` only; `409 SCHEDULE_NOT_EDITABLE` otherwise. |
-| `POST` | `/api/schedules/:id/duplicate` (P2) | — | `recurring_task` only. Copy starts paused. Returns the new `{ id }`. |
-| `POST` | `/api/schedules/:id/reassign` (P2) | `{ agentId }` | `recurring_task` only. `409 AGENT_ARCHIVED`, `404` for an unreachable Agent. |
+| Method  | Path                                | Body                                    | Notes                                                                                                                                                                                                                          |
+| ------- | ----------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST`  | `/api/schedules/:id/run-now`        | —                                       | Throttled `10/min` per user. `409` codes: `SCHEDULE_ALREADY_RUNNING`, `SCHEDULE_NO_AGENT`, `SCHEDULE_OWNER_ARCHIVED`, `SCHEDULE_CREDITS_EXHAUSTED`. Returns `{ runId }`. Never touches `nextOccurrenceAt` / `nextHeartbeatAt`. |
+| `POST`  | `/api/schedules/:id/pause`          | `{ acknowledgeMissionPause?: boolean }` | `409 MISSION_PAUSE_NOT_ACKNOWLEDGED` for `mission_tick` without the flag.                                                                                                                                                      |
+| `POST`  | `/api/schedules/:id/resume`         | —                                       | Resets `recurrenceFailureStreak` to 0 (P2).                                                                                                                                                                                    |
+| `PATCH` | `/api/schedules/:id` (P2)           | `UpdateScheduleDto`                     | Name, instructions, cadence, options. `recurring_task` only; `409 SCHEDULE_NOT_EDITABLE` otherwise.                                                                                                                            |
+| `POST`  | `/api/schedules/:id/duplicate` (P2) | —                                       | `recurring_task` only. Copy starts paused. Returns the new `{ id }`.                                                                                                                                                           |
+| `POST`  | `/api/schedules/:id/reassign` (P2)  | `{ agentId }`                           | `recurring_task` only. `409 AGENT_ARCHIVED`, `404` for an unreachable Agent.                                                                                                                                                   |
 
 Every one of these resolves the synthetic id, re-checks ownership through the owning domain
 service, and returns `404` — never `403` — for a foreign or missing id, matching the posture the
@@ -406,12 +415,12 @@ schedules and escalations controllers already use.
 
 ### 4.9 Endpoints added to existing controllers
 
-| Method | Path | File | Phase | Why here |
-| --- | --- | --- | --- | --- |
-| `POST` | `/api/tasks/:id/recurring/run-now` | [`apps/api/src/tasks/tasks.controller.ts`](../../../../../apps/api/src/tasks/tasks.controller.ts) | P1 | Closes the gap the existing schedules spec flagged (no run-now for a recurring template). The Task detail page needs it too, so it belongs in the Task domain; `/api/schedules/:id/run-now` delegates to it. Throttled `10/min`. |
-| `POST` | `/api/agents/:id/heartbeat/pause` · `/resume` | [`apps/api/src/agents/agents.controller.ts`](../../../../../apps/api/src/agents/agents.controller.ts) | P1 | Pausing a heartbeat is an Agent-domain write. Declared before the existing `:id` param routes are reached for these literal sub-segments. Throttled `30/min`, matching the other Agent writes. |
-| `GET` | `/api/agents/:id/schedule-overlaps` | same | P2 | Returns `{ coincidences: [{ scheduleId, sameMinuteFires }], duty: [{ scheduleId, overlapScore }], heartbeatTooTight: boolean }`. Read-only, no side effects. |
-| `PATCH` | `/api/tasks/:id` | same | P2 | Gains the five optional option fields on `UpdateTaskDto` in [`tasks.dto.ts`](../../../../../apps/api/src/tasks/tasks.dto.ts) with `@Min(60) @Max(14400)` on the timeout. No new guard. |
+| Method  | Path                                          | File                                                                                                  | Phase | Why here                                                                                                                                                                                                                         |
+| ------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST`  | `/api/tasks/:id/recurring/run-now`            | [`apps/api/src/tasks/tasks.controller.ts`](../../../../../apps/api/src/tasks/tasks.controller.ts)     | P1    | Closes the gap the existing schedules spec flagged (no run-now for a recurring template). The Task detail page needs it too, so it belongs in the Task domain; `/api/schedules/:id/run-now` delegates to it. Throttled `10/min`. |
+| `POST`  | `/api/agents/:id/heartbeat/pause` · `/resume` | [`apps/api/src/agents/agents.controller.ts`](../../../../../apps/api/src/agents/agents.controller.ts) | P1    | Pausing a heartbeat is an Agent-domain write. Declared before the existing `:id` param routes are reached for these literal sub-segments. Throttled `30/min`, matching the other Agent writes.                                   |
+| `GET`   | `/api/agents/:id/schedule-overlaps`           | same                                                                                                  | P2    | Returns `{ coincidences: [{ scheduleId, sameMinuteFires }], duty: [{ scheduleId, overlapScore }], heartbeatTooTight: boolean }`. Read-only, no side effects.                                                                     |
+| `PATCH` | `/api/tasks/:id`                              | same                                                                                                  | P2    | Gains the five optional option fields on `UpdateTaskDto` in [`tasks.dto.ts`](../../../../../apps/api/src/tasks/tasks.dto.ts) with `@Min(60) @Max(14400)` on the timeout. No new guard.                                           |
 
 ---
 
@@ -438,30 +447,30 @@ schedules and escalations controllers already use.
 
 ### 5.2 Components (all under `apps/web/src/components/schedules/`)
 
-| Component | Phase | Responsibility |
-| --- | --- | --- |
-| `SchedulesShell.tsx` | P1 | View switch, shared filter state, banners, keyboard map. |
-| `SchedulesListView.tsx` | P1 | The paged table, `Load more`, per-row `ScheduleRowMenu`. |
-| `ScheduleRow.tsx` | P1 | One row incl. source label, UTC + local cadence, countdown, health badge. |
-| `ScheduleCountdown.tsx` | P1 | 1 s tick, `aria-live="polite"` throttled to once a minute. |
-| `ScheduleHealthBadge.tsx` | P1 | `OK` / `NEVER RUNS` / `OVERLAP` with the reason in the accessible name. |
-| `ScheduleHealthBanner.tsx` | P1 | Count + `Review and fix`; session dismissal in `sessionStorage`. |
-| `ScheduleRowMenu.tsx` | P1 | Six controls, disabled entries kept in place with their reason. |
-| `SchedulesFilters.tsx` | P1 | Agent / source / status / health / search, URL-synced. |
-| `SchedulesEmptyState.tsx` | P1 | Two variants (nothing scheduled, filters match nothing). |
-| `SchedulesDegradedNotice.tsx` | P1 | Renders `degradedSources` with `Retry`. |
-| `ScheduleEditorDialog.tsx` | P2 | Guided form + free text + cadence picker + options; shows the next three fires. |
-| `GuidedInstructionForm.tsx` | P2 | The six slots; composes to plain text; `Edit as text` swaps to a textarea. |
-| `CadencePicker.tsx` | P2 | Three styles; validates on blur via a server action; renders UTC + local. |
-| `ScheduleOptionsPanel.tsx` | P2 | Model / time limit / announce / board visibility with inherited-value labels. |
-| `SchedulesCalendarView.tsx` | P2 | Week + Month grids as a semantic table. |
-| `OccurrenceChip.tsx` | P2 | Outcome marker, tooltip, links to the Schedule or the Run receipt. |
-| `ReassignDialog.tsx` | P2 | Agent picker excluding archived Agents. |
-| `OverlapWarning.tsx` | P2 | Coincidence + duty evidence, 30-day dismissal in `localStorage` keyed by pair. |
-| `FixAllDialog.tsx` | P3 | Preview list with before/after, checkbox selection, skip reasons, apply. |
-| `DisableAllDialog.tsx` | P3 | Both scopes; type-`PAUSE` confirm for workspace; in-flight Run count. |
-| `BreakerUndoBanner.tsx` | P3 | Countdown to the end of the undo window; `Undo`. |
-| `SchedulesBulkBar.tsx` | P3 | Multi-select pause/resume, cap 100 rows. |
+| Component                     | Phase | Responsibility                                                                  |
+| ----------------------------- | ----- | ------------------------------------------------------------------------------- |
+| `SchedulesShell.tsx`          | P1    | View switch, shared filter state, banners, keyboard map.                        |
+| `SchedulesListView.tsx`       | P1    | The paged table, `Load more`, per-row `ScheduleRowMenu`.                        |
+| `ScheduleRow.tsx`             | P1    | One row incl. source label, UTC + local cadence, countdown, health badge.       |
+| `ScheduleCountdown.tsx`       | P1    | 1 s tick, `aria-live="polite"` throttled to once a minute.                      |
+| `ScheduleHealthBadge.tsx`     | P1    | `OK` / `NEVER RUNS` / `OVERLAP` with the reason in the accessible name.         |
+| `ScheduleHealthBanner.tsx`    | P1    | Count + `Review and fix`; session dismissal in `sessionStorage`.                |
+| `ScheduleRowMenu.tsx`         | P1    | Six controls, disabled entries kept in place with their reason.                 |
+| `SchedulesFilters.tsx`        | P1    | Agent / source / status / health / search, URL-synced.                          |
+| `SchedulesEmptyState.tsx`     | P1    | Two variants (nothing scheduled, filters match nothing).                        |
+| `SchedulesDegradedNotice.tsx` | P1    | Renders `degradedSources` with `Retry`.                                         |
+| `ScheduleEditorDialog.tsx`    | P2    | Guided form + free text + cadence picker + options; shows the next three fires. |
+| `GuidedInstructionForm.tsx`   | P2    | The six slots; composes to plain text; `Edit as text` swaps to a textarea.      |
+| `CadencePicker.tsx`           | P2    | Three styles; validates on blur via a server action; renders UTC + local.       |
+| `ScheduleOptionsPanel.tsx`    | P2    | Model / time limit / announce / board visibility with inherited-value labels.   |
+| `SchedulesCalendarView.tsx`   | P2    | Week + Month grids as a semantic table.                                         |
+| `OccurrenceChip.tsx`          | P2    | Outcome marker, tooltip, links to the Schedule or the Run receipt.              |
+| `ReassignDialog.tsx`          | P2    | Agent picker excluding archived Agents.                                         |
+| `OverlapWarning.tsx`          | P2    | Coincidence + duty evidence, 30-day dismissal in `localStorage` keyed by pair.  |
+| `FixAllDialog.tsx`            | P3    | Preview list with before/after, checkbox selection, skip reasons, apply.        |
+| `DisableAllDialog.tsx`        | P3    | Both scopes; type-`PAUSE` confirm for workspace; in-flight Run count.           |
+| `BreakerUndoBanner.tsx`       | P3    | Countdown to the end of the undo window; `Undo`.                                |
+| `SchedulesBulkBar.tsx`        | P3    | Multi-select pause/resume, cap 100 rows.                                        |
 
 ### 5.3 Data fetching
 
@@ -495,8 +504,8 @@ schedules and escalations controllers already use.
 All through the configured job-runtime provider (Constitution IV) — no direct queue calls, no
 third-party SDK import inside `packages/agent`.
 
-| Task | Cron | File | Calls |
-| --- | --- | --- | --- |
+| Task                    | Cron         | File                                                                                                                                                                                        | Calls                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `schedule-health-sweep` | `17 6 * * *` | new `packages/tasks/src/tasks/trigger/schedule-health-sweep.task.ts`, exported from [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts) | `ScheduleHealthService.sweep()` — recompute `recurrenceHealth` for every recurring template, raise at most **one** notification per user per day summarising newly-flagged Schedules, and delete `schedule_bulk_actions` older than 30 days. Boots a transient `NestApplicationContext(TriggerInternalModule)` and closes it, the shape every task in that folder already uses. |
 
 Changed predicates in existing workers (no new workers):
@@ -635,16 +644,16 @@ is missing at runtime.
 Emitted through the existing monitoring package binding (`packages/monitoring`), one event per
 user action, no free text and no instruction bodies in properties:
 
-| Event | Properties |
-| --- | --- |
-| `schedule_surface_viewed` | `view`, `totalSchedules`, `neverRunsCount`, `degradedSources` |
-| `schedule_run_now` | `sourceType`, `outcome` (`dispatched` / refusal code) |
-| `schedule_paused` / `schedule_resumed` | `sourceType`, `origin` (`row` / `bulk` / `breaker`) |
-| `schedule_created` / `schedule_updated` | `sourceType`, `cadenceStyle`, `usedGuidedForm`, `hasModelOverride`, `hasTimeoutOverride`, `announce` |
-| `schedule_health_previewed` / `schedule_health_fixed` | `flaggedCount`, `automaticCount`, `appliedCount`, `skippedCount` |
-| `schedule_breaker_used` / `schedule_breaker_undone` | `scope`, `count`, `secondsToUndo` |
-| `schedule_overlap_warned` / `schedule_overlap_snoozed` | `coincidenceFires`, `dutyScore` |
-| `schedule_calendar_range` | `view`, `days`, `occurrenceCount`, `truncated` |
+| Event                                                  | Properties                                                                                           |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `schedule_surface_viewed`                              | `view`, `totalSchedules`, `neverRunsCount`, `degradedSources`                                        |
+| `schedule_run_now`                                     | `sourceType`, `outcome` (`dispatched` / refusal code)                                                |
+| `schedule_paused` / `schedule_resumed`                 | `sourceType`, `origin` (`row` / `bulk` / `breaker`)                                                  |
+| `schedule_created` / `schedule_updated`                | `sourceType`, `cadenceStyle`, `usedGuidedForm`, `hasModelOverride`, `hasTimeoutOverride`, `announce` |
+| `schedule_health_previewed` / `schedule_health_fixed`  | `flaggedCount`, `automaticCount`, `appliedCount`, `skippedCount`                                     |
+| `schedule_breaker_used` / `schedule_breaker_undone`    | `scope`, `count`, `secondsToUndo`                                                                    |
+| `schedule_overlap_warned` / `schedule_overlap_snoozed` | `coincidenceFires`, `dutyScore`                                                                      |
+| `schedule_calendar_range`                              | `view`, `days`, `occurrenceCount`, `truncated`                                                       |
 
 ### 9.2 Activity log
 
@@ -655,20 +664,20 @@ row per Schedule — a 500-row batch must not flood the feed.
 
 ### 9.3 Failure modes
 
-| Failure | Detection | Handling |
-| --- | --- | --- |
-| One source query throws | Existing per-source try/catch in `SchedulesService` | The slice is empty, its type is listed in `degradedSources`, the client renders the notice and excludes it from totals (FR-79 / U1). |
-| `computeNextCronFire` returns `null` for a valid rare cadence | Horizon exhausted at 31 days | `nextRunAt = null` with a "fires beyond the next month" note. **Never** a NEVER RUNS verdict (FR-40). |
-| Health sweep never runs (no job runtime) | `recurrenceHealthCheckedAt` older than 48 h | The staleness notice (spec §6.20). Health is still recomputed on every write, so edited rows are always right. |
-| Two clients fix the same Schedule | `expected` before-hash mismatch on apply | Skipped and counted; nothing is overwritten (FR-48 / U4). |
-| Undo races a teammate's edit | Per-entry state comparison before restore | That entry is skipped, `undoSkipped` incremented, and the count reported (FR-56 / U6). |
-| Breaker scope explodes past 500 | Counted before any write | `409 SCHEDULE_SCOPE_TOO_LARGE`; nothing is paused (FR-54 / U7). |
-| Run-now storms | `@Throttle` at 10/min per user | `429` with the copy in spec §6.18. |
-| Announcement storm | Per-Schedule daily counter | Rolled up hourly above 20/day (FR-70). |
-| Repeated fire failures | `recurrenceFailureStreak` in the post-processor | Auto-pause at 5, notify regardless of the announce setting (FR-71). |
-| Occurrence expansion explodes | Caps at 500/Schedule and 2 000/request | Truncation is reported per Schedule, never silently (FR-65 / U9). |
-| A Schedule's Runs have aged out of retention | Run lookup returns nothing and the occurrence predates the retention floor | Rendered `unknown`, never `did not run` (FR-63). |
-| A source produces no Run at all (`mission_tick` raising Ideas; the three Work-owned sources) | `evidence` resolution finds no `AgentRun` because none is ever created | Resolved from that source's own record — the `MISSION_TICK` activity row, or the source's `lastRun*` columns — and rendered `unknown` when no record is held. Never `did not run` (FR-62 / §3.5). |
+| Failure                                                                                      | Detection                                                                  | Handling                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One source query throws                                                                      | Existing per-source try/catch in `SchedulesService`                        | The slice is empty, its type is listed in `degradedSources`, the client renders the notice and excludes it from totals (FR-79 / U1).                                                              |
+| `computeNextCronFire` returns `null` for a valid rare cadence                                | Horizon exhausted at 31 days                                               | `nextRunAt = null` with a "fires beyond the next month" note. **Never** a NEVER RUNS verdict (FR-40).                                                                                             |
+| Health sweep never runs (no job runtime)                                                     | `recurrenceHealthCheckedAt` older than 48 h                                | The staleness notice (spec §6.20). Health is still recomputed on every write, so edited rows are always right.                                                                                    |
+| Two clients fix the same Schedule                                                            | `expected` before-hash mismatch on apply                                   | Skipped and counted; nothing is overwritten (FR-48 / U4).                                                                                                                                         |
+| Undo races a teammate's edit                                                                 | Per-entry state comparison before restore                                  | That entry is skipped, `undoSkipped` incremented, and the count reported (FR-56 / U6).                                                                                                            |
+| Breaker scope explodes past 500                                                              | Counted before any write                                                   | `409 SCHEDULE_SCOPE_TOO_LARGE`; nothing is paused (FR-54 / U7).                                                                                                                                   |
+| Run-now storms                                                                               | `@Throttle` at 10/min per user                                             | `429` with the copy in spec §6.18.                                                                                                                                                                |
+| Announcement storm                                                                           | Per-Schedule daily counter                                                 | Rolled up hourly above 20/day (FR-70).                                                                                                                                                            |
+| Repeated fire failures                                                                       | `recurrenceFailureStreak` in the post-processor                            | Auto-pause at 5, notify regardless of the announce setting (FR-71).                                                                                                                               |
+| Occurrence expansion explodes                                                                | Caps at 500/Schedule and 2 000/request                                     | Truncation is reported per Schedule, never silently (FR-65 / U9).                                                                                                                                 |
+| A Schedule's Runs have aged out of retention                                                 | Run lookup returns nothing and the occurrence predates the retention floor | Rendered `unknown`, never `did not run` (FR-63).                                                                                                                                                  |
+| A source produces no Run at all (`mission_tick` raising Ideas; the three Work-owned sources) | `evidence` resolution finds no `AgentRun` because none is ever created     | Resolved from that source's own record — the `MISSION_TICK` activity row, or the source's `lastRun*` columns — and rendered `unknown` when no record is held. Never `did not run` (FR-62 / §3.5). |
 
 ---
 
@@ -676,33 +685,33 @@ row per Schedule — a 500-row batch must not flood the feed.
 
 ### 10.1 Unit — agent package (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/schedules/__tests__/schedule-health.spec.ts` | All seven reasons produced by a matching fixture and by nothing else; a yearly cron, a 29-Feb cron and a paused row are **not** flagged; repair class per reason. |
-| `packages/agent/src/schedules/__tests__/schedule-repair.spec.ts` | `impossible-date` clamps to the last day existing in every named month (Feb → 28); end-date clear; occurrence-cap clear; past one-shot moves ≥5 min into the future; before-hash mismatch is refused. |
-| `packages/agent/src/schedules/__tests__/schedule-occurrence.spec.ts` | Expansion for cron and RRULE across a 92-day window; per-Schedule 500 and per-request 2 000 caps; ±10 min Run matching; `unknown` past the retention floor; paused occurrences marked, not dropped; a `mission_tick` occurrence resolving from its `MISSION_TICK` activity row with `evidence: 'sourceRecord'`, and reading `unknown` — never `did-not-run` — when no such row exists. |
-| `packages/agent/src/schedules/__tests__/schedule-controls.spec.ts` | The control descriptor per source type, and each disabled reason. |
-| `packages/agent/src/schedules/__tests__/schedule-bulk-action.service.spec.ts` | Record contents, 15-minute window, single-undo enforcement, per-entry skip on changed state, 30-day pruning. |
-| `packages/agent/src/schedules/__tests__/heartbeat-overlap.spec.ts` | Coincidence at exactly 1 vs 2 fires in 7 days; duty score at 0.34 vs 0.35; the tight-heartbeat rule at 15 min with 0 and 1 Schedules. |
-| `packages/agent/src/schedules/__tests__/schedules.service.spec.ts` (extend) | Cursor paging, the new filters, `degradedSources`, and that `getSchedules` keeps its bare-array shape. |
-| `packages/agent/src/schedules/__tests__/cadence.spec.ts` (extend) | Next-three-fires helper; UTC/local rendering inputs. |
-| `packages/agent/src/tasks-domain/__tests__/task-recurrence-pause.spec.ts` | `findDueRecurringTemplates` excludes paused templates; resume restores dispatch; pause preserves every recurrence column. |
-| `packages/agent/src/agents/__tests__/heartbeat-pause.spec.ts` | `dispatchDue` excludes `heartbeatPausedAt IS NOT NULL`; the Agent's status and assigned-Task dispatch are unaffected. |
-| `packages/agent/src/agents/__tests__/schedule-announce.spec.ts` | Announce on completion; forced announce on the second consecutive failure; roll-up above 20/day; auto-pause at 5 and reset on resume; idempotency key prevents a double post. |
+| File                                                                          | Covers                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/schedules/__tests__/schedule-health.spec.ts`              | All seven reasons produced by a matching fixture and by nothing else; a yearly cron, a 29-Feb cron and a paused row are **not** flagged; repair class per reason.                                                                                                                                                                                                                      |
+| `packages/agent/src/schedules/__tests__/schedule-repair.spec.ts`              | `impossible-date` clamps to the last day existing in every named month (Feb → 28); end-date clear; occurrence-cap clear; past one-shot moves ≥5 min into the future; before-hash mismatch is refused.                                                                                                                                                                                  |
+| `packages/agent/src/schedules/__tests__/schedule-occurrence.spec.ts`          | Expansion for cron and RRULE across a 92-day window; per-Schedule 500 and per-request 2 000 caps; ±10 min Run matching; `unknown` past the retention floor; paused occurrences marked, not dropped; a `mission_tick` occurrence resolving from its `MISSION_TICK` activity row with `evidence: 'sourceRecord'`, and reading `unknown` — never `did-not-run` — when no such row exists. |
+| `packages/agent/src/schedules/__tests__/schedule-controls.spec.ts`            | The control descriptor per source type, and each disabled reason.                                                                                                                                                                                                                                                                                                                      |
+| `packages/agent/src/schedules/__tests__/schedule-bulk-action.service.spec.ts` | Record contents, 15-minute window, single-undo enforcement, per-entry skip on changed state, 30-day pruning.                                                                                                                                                                                                                                                                           |
+| `packages/agent/src/schedules/__tests__/heartbeat-overlap.spec.ts`            | Coincidence at exactly 1 vs 2 fires in 7 days; duty score at 0.34 vs 0.35; the tight-heartbeat rule at 15 min with 0 and 1 Schedules.                                                                                                                                                                                                                                                  |
+| `packages/agent/src/schedules/__tests__/schedules.service.spec.ts` (extend)   | Cursor paging, the new filters, `degradedSources`, and that `getSchedules` keeps its bare-array shape.                                                                                                                                                                                                                                                                                 |
+| `packages/agent/src/schedules/__tests__/cadence.spec.ts` (extend)             | Next-three-fires helper; UTC/local rendering inputs.                                                                                                                                                                                                                                                                                                                                   |
+| `packages/agent/src/tasks-domain/__tests__/task-recurrence-pause.spec.ts`     | `findDueRecurringTemplates` excludes paused templates; resume restores dispatch; pause preserves every recurrence column.                                                                                                                                                                                                                                                              |
+| `packages/agent/src/agents/__tests__/heartbeat-pause.spec.ts`                 | `dispatchDue` excludes `heartbeatPausedAt IS NOT NULL`; the Agent's status and assigned-Task dispatch are unaffected.                                                                                                                                                                                                                                                                  |
+| `packages/agent/src/agents/__tests__/schedule-announce.spec.ts`               | Announce on completion; forced announce on the second consecutive failure; roll-up above 20/day; auto-pause at 5 and reset on resume; idempotency key prevents a double post.                                                                                                                                                                                                          |
 
 ### 10.2 Controller specs — API (Jest, beside the controller)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/schedules/schedules.controller.spec.ts` (extend) | `GET /api/schedules` shape unchanged; additive fields present. |
-| `apps/api/src/schedules/schedules.controller.page.spec.ts` | Paging, every filter, DTO rejection of unknown params, scope isolation, 404-never-403. |
-| `apps/api/src/schedules/schedules.controller.calendar.spec.ts` | 92-day refusal, truncation reporting, `generatedAt`. |
-| `apps/api/src/schedules/schedules.controller.controls.spec.ts` | Each control's success and every `409` code; `ParseScheduleIdPipe` rejecting a malformed id; the Mission-pause acknowledgement gate; run-now throttling. |
-| `apps/api/src/schedules/schedules.controller.health.spec.ts` | Dry-run preview, 200-row cap, `expected`-hash enforcement, bulk-undo windows. |
-| `apps/api/src/schedules/schedules.controller.breaker.spec.ts` | Both scopes, the typed confirm, the 500 cap, in-flight Run count, undo and partial undo. |
-| `apps/api/src/tasks/tasks.controller.recurring-controls.spec.ts` | `POST /api/tasks/:id/recurring/run-now` including the no-agent refusal; the new option fields on `PATCH /api/tasks/:id` with their bounds. |
-| `apps/api/src/agents/agents.controller.heartbeat-pause.spec.ts` | Heartbeat pause/resume, cadence preservation, `GET /api/agents/:id/schedule-overlaps`. |
-| `apps/api/src/schedules/dto/schedules-query.dto.spec.ts` (extend) | The new page/calendar DTOs. |
+| File                                                              | Covers                                                                                                                                                   |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/schedules/schedules.controller.spec.ts` (extend)    | `GET /api/schedules` shape unchanged; additive fields present.                                                                                           |
+| `apps/api/src/schedules/schedules.controller.page.spec.ts`        | Paging, every filter, DTO rejection of unknown params, scope isolation, 404-never-403.                                                                   |
+| `apps/api/src/schedules/schedules.controller.calendar.spec.ts`    | 92-day refusal, truncation reporting, `generatedAt`.                                                                                                     |
+| `apps/api/src/schedules/schedules.controller.controls.spec.ts`    | Each control's success and every `409` code; `ParseScheduleIdPipe` rejecting a malformed id; the Mission-pause acknowledgement gate; run-now throttling. |
+| `apps/api/src/schedules/schedules.controller.health.spec.ts`      | Dry-run preview, 200-row cap, `expected`-hash enforcement, bulk-undo windows.                                                                            |
+| `apps/api/src/schedules/schedules.controller.breaker.spec.ts`     | Both scopes, the typed confirm, the 500 cap, in-flight Run count, undo and partial undo.                                                                 |
+| `apps/api/src/tasks/tasks.controller.recurring-controls.spec.ts`  | `POST /api/tasks/:id/recurring/run-now` including the no-agent refusal; the new option fields on `PATCH /api/tasks/:id` with their bounds.               |
+| `apps/api/src/agents/agents.controller.heartbeat-pause.spec.ts`   | Heartbeat pause/resume, cadence preservation, `GET /api/agents/:id/schedule-overlaps`.                                                                   |
+| `apps/api/src/schedules/dto/schedules-query.dto.spec.ts` (extend) | The new page/calendar DTOs.                                                                                                                              |
 
 ### 10.3 Web unit (Vitest, beside the component)
 
@@ -722,17 +731,17 @@ row per Schedule — a 500-row batch must not flood the feed.
 
 ### 10.4 End-to-end (Playwright, `apps/web/e2e/`)
 
-| File | Golden path |
-| --- | --- |
-| `flow-schedules-workspace-list.spec.ts` | Open `/schedules` from the sidebar, see all sources, filter, page, run-now a Schedule and confirm the next fire is unchanged. |
+| File                                             | Golden path                                                                                                                   |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `flow-schedules-workspace-list.spec.ts`          | Open `/schedules` from the sidebar, see all sources, filter, page, run-now a Schedule and confirm the next fire is unchanged. |
 | `flow-schedules-pause-preserves-cadence.spec.ts` | Pause a recurring Schedule and a heartbeat, reload, confirm cadence and instructions survive, resume, confirm firing resumes. |
-| `flow-schedules-never-runs-fix.spec.ts` | Create an impossible cadence, see the badge and banner, preview the repair, apply, undo inside the window. |
-| `flow-schedules-standing-definition.spec.ts` | Author a Schedule through the guided form with options, see the next three fires, save, confirm the row. |
-| `flow-schedules-calendar.spec.ts` | Week and Month, step and Today, a past occurrence links to its receipt, a range over 92 days snaps back with filters intact. |
-| `flow-schedules-circuit-breaker.spec.ts` | Agent scope, then workspace scope with the typed confirm, the undo banner, undo, and the closed-window refusal. |
-| `flow-schedules-duplicate-reassign.spec.ts` | Duplicate starts paused; reassign moves options and leaves the next fire alone; an archived Agent is not offered. |
-| `flow-agent-heartbeat-overlap.spec.ts` | A tight heartbeat plus an overlapping Schedule raises both warnings, neither blocks, and the 30-day snooze holds. |
-| `flow-schedules-a11y.spec.ts` | Axe pass on both views plus keyboard traversal of §6.21. |
+| `flow-schedules-never-runs-fix.spec.ts`          | Create an impossible cadence, see the badge and banner, preview the repair, apply, undo inside the window.                    |
+| `flow-schedules-standing-definition.spec.ts`     | Author a Schedule through the guided form with options, see the next three fires, save, confirm the row.                      |
+| `flow-schedules-calendar.spec.ts`                | Week and Month, step and Today, a past occurrence links to its receipt, a range over 92 days snaps back with filters intact.  |
+| `flow-schedules-circuit-breaker.spec.ts`         | Agent scope, then workspace scope with the typed confirm, the undo banner, undo, and the closed-window refusal.               |
+| `flow-schedules-duplicate-reassign.spec.ts`      | Duplicate starts paused; reassign moves options and leaves the next fire alone; an archived Agent is not offered.             |
+| `flow-agent-heartbeat-overlap.spec.ts`           | A tight heartbeat plus an overlapping Schedule raises both warnings, neither blocks, and the 30-day snooze holds.             |
+| `flow-schedules-a11y.spec.ts`                    | Axe pass on both views plus keyboard traversal of §6.21.                                                                      |
 
 Existing specs that must stay green unchanged: `flow-schedules-list-projection-2.spec.ts`,
 `flow-schedules-ui-journey.spec.ts`, `flow-schedules-validation-matrix.spec.ts`,
@@ -752,7 +761,7 @@ Each phase is independently shippable and leaves `develop` green on its own.
 - `ScheduleHealthService.evaluate()` (read-time only, no cached column yet) and the control
   descriptor; `ScheduleView` gains `agentId`, `agentName`, `health`, `controls`, `pausedAt`.
 - `GET /api/schedules/page`, `GET /api/schedules/health`, `POST /api/schedules/:id/{run-now,
-  pause, resume}`, `POST /api/tasks/:id/recurring/run-now`,
+pause, resume}`, `POST /api/tasks/:id/recurring/run-now`,
   `POST /api/agents/:id/heartbeat/{pause,resume}`.
 - `/schedules` route, sidebar entry, List view, filters, health badge and banner, single-row Fix
   with preview, degraded-source notice, empty and error states, keyboard map.
@@ -777,7 +786,7 @@ Each phase is independently shippable and leaves `develop` green on its own.
 
 - Migration C: `schedule_bulk_actions`.
 - `POST /api/schedules/health/fix` with `expected`-hash enforcement, `POST /api/schedules/
-  disable-all`, `POST /api/schedules/bulk/:id/undo`.
+disable-all`, `POST /api/schedules/bulk/:id/undo`.
 - `FixAllDialog`, `DisableAllDialog` (both scopes, typed confirm), `BreakerUndoBanner`,
   `SchedulesBulkBar` (multi-select pause/resume, cap 100).
 - Bulk activity rows (one per batch), the 30-day pruning in the sweep.

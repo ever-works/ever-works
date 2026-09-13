@@ -17,15 +17,15 @@ Everything below was read in this worktree before being cited.
 
 ### 1.1 The record we read
 
-| Thing | Path |
-| --- | --- |
-| Entity (`@Entity('activity_log')`) | [`packages/agent/src/entities/activity-log.entity.ts`](../../../../../packages/agent/src/entities/activity-log.entity.ts) |
-| Action-type enum (162 members) + `ActivityStatus` + `CreateActivityLogDto` (line 321) + `ActivityLogQueryOptions` (line 335) | [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts) |
-| Write chokepoint — `log()` (line 95) → `repository.create()` → `dispatchAnalytics()` | [`packages/agent/src/activity-log/activity-log.service.ts`](../../../../../packages/agent/src/activity-log/activity-log.service.ts) |
-| Reads — `findAll` (317), `findByWork` (333), `findAgentEvents` (348), `findResourceEvents` (363), `countRunning` (373), `summarizeStatuses` (377) | same file |
-| Repository | [`packages/agent/src/database/repositories/activity-log.repository.ts`](../../../../../packages/agent/src/database/repositories/activity-log.repository.ts) |
-| Nest module | [`packages/agent/src/activity-log/activity-log.module.ts`](../../../../../packages/agent/src/activity-log/activity-log.module.ts) |
-| Barrel | [`packages/agent/src/activity-log/index.ts`](../../../../../packages/agent/src/activity-log/index.ts) |
+| Thing                                                                                                                                             | Path                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entity (`@Entity('activity_log')`)                                                                                                                | [`packages/agent/src/entities/activity-log.entity.ts`](../../../../../packages/agent/src/entities/activity-log.entity.ts)                                   |
+| Action-type enum (162 members) + `ActivityStatus` + `CreateActivityLogDto` (line 321) + `ActivityLogQueryOptions` (line 335)                      | [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts)                                     |
+| Write chokepoint — `log()` (line 95) → `repository.create()` → `dispatchAnalytics()`                                                              | [`packages/agent/src/activity-log/activity-log.service.ts`](../../../../../packages/agent/src/activity-log/activity-log.service.ts)                         |
+| Reads — `findAll` (317), `findByWork` (333), `findAgentEvents` (348), `findResourceEvents` (363), `countRunning` (373), `summarizeStatuses` (377) | same file                                                                                                                                                   |
+| Repository                                                                                                                                        | [`packages/agent/src/database/repositories/activity-log.repository.ts`](../../../../../packages/agent/src/database/repositories/activity-log.repository.ts) |
+| Nest module                                                                                                                                       | [`packages/agent/src/activity-log/activity-log.module.ts`](../../../../../packages/agent/src/activity-log/activity-log.module.ts)                           |
+| Barrel                                                                                                                                            | [`packages/agent/src/activity-log/index.ts`](../../../../../packages/agent/src/activity-log/index.ts)                                                       |
 
 Existing entity columns: `id`, `userId`, `workId?`, `actionType` (varchar 50), `action` (varchar 100),
 `status`, `summary` (varchar 500), `details?` / `metadata?` (simple-json), `ingestEventId?`,
@@ -70,52 +70,52 @@ existing controller spec at
 
 The one working push transport is the per-agent inbox stream:
 
-| Layer | Path |
-| --- | --- |
-| API endpoint (`GET email/messages/stream`, line 178) — headers at 189-192, 5s poll, 15s heartbeat comment, 10-minute lifetime cap, `cleanup()` on `req`/`res`/`req.socket` close | [`apps/api/src/email/email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts) |
-| Same-origin BFF proxy (EventSource cannot set an `Authorization` header, so the cookie is exchanged server-side and the upstream body is piped) | [`apps/web/src/app/api/email/messages/stream/route.ts`](../../../../../apps/web/src/app/api/email/messages/stream/route.ts) |
-| Client hook with poll fallback | [`apps/web/src/lib/hooks/use-inbox-stream.ts`](../../../../../apps/web/src/lib/hooks/use-inbox-stream.ts) |
+| Layer                                                                                                                                                                            | Path                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| API endpoint (`GET email/messages/stream`, line 178) — headers at 189-192, 5s poll, 15s heartbeat comment, 10-minute lifetime cap, `cleanup()` on `req`/`res`/`req.socket` close | [`apps/api/src/email/email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts)                           |
+| Same-origin BFF proxy (EventSource cannot set an `Authorization` header, so the cookie is exchanged server-side and the upstream body is piped)                                  | [`apps/web/src/app/api/email/messages/stream/route.ts`](../../../../../apps/web/src/app/api/email/messages/stream/route.ts) |
+| Client hook with poll fallback                                                                                                                                                   | [`apps/web/src/lib/hooks/use-inbox-stream.ts`](../../../../../apps/web/src/lib/hooks/use-inbox-stream.ts)                   |
 
 The feed copies this three-layer shape exactly and improves one thing: the API side is driven by
 the in-process event bus rather than a per-connection DB poll (§2.2).
 
 ### 1.5 The web surface today
 
-| Thing | Path |
-| --- | --- |
-| Activity page shell + client (`POLL_INTERVAL = 5000` at line 21; `type ActivityTab = 'log' \| 'schedules'` at line 19; tab persisted under `activity-tab` at 82-105; URL sync at 111-123) | [`apps/web/src/app/[locale]/(dashboard)/activity/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/activity/page.tsx>), [`activity-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/activity/activity-client.tsx>) |
-| Row/badge components (`TYPE_COLORS` / `TYPE_TO_I18N` cover ~15 of 162 action types) | [`apps/web/src/components/activity-log/`](../../../../../apps/web/src/components/activity-log/) — `ActivityTable.tsx`, `ActivityTypeBadge.tsx`, `ActivityStatusBadge.tsx`, `ActivityTimestamp.tsx`, `ActivityFilters.tsx`, `ActivityEmptyState.tsx`, `ActivityDetailModal.tsx`, `ActivityKanbanView.tsx` |
-| Server actions / typed client | [`apps/web/src/app/actions/activity-log.ts`](../../../../../apps/web/src/app/actions/activity-log.ts), [`apps/web/src/lib/api/activity-log.ts`](../../../../../apps/web/src/lib/api/activity-log.ts) |
-| BFF proxies | [`apps/web/src/app/api/activity-log/`](../../../../../apps/web/src/app/api/activity-log/) |
-| Routes constant (`DASHBOARD_ACTIVITY: '/activity'`, line 110) | [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) |
-| Sidebar (activity nav item at line 198; badge slot at 385) | [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx), [`SidebarActivityIndicator.tsx`](../../../../../apps/web/src/components/dashboard/SidebarActivityIndicator.tsx) |
-| Page header primitive | [`apps/web/src/components/common/PageHeader.tsx`](../../../../../apps/web/src/components/common/PageHeader.tsx) |
-| Messages (`dashboard.activity.*`; 21 locale files) | [`apps/web/messages/`](../../../../../apps/web/messages/) |
+| Thing                                                                                                                                                                                     | Path                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Activity page shell + client (`POLL_INTERVAL = 5000` at line 21; `type ActivityTab = 'log' \| 'schedules'` at line 19; tab persisted under `activity-tab` at 82-105; URL sync at 111-123) | [`apps/web/src/app/[locale]/(dashboard)/activity/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/activity/page.tsx>), [`activity-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/activity/activity-client.tsx>)                                                      |
+| Row/badge components (`TYPE_COLORS` / `TYPE_TO_I18N` cover ~15 of 162 action types)                                                                                                       | [`apps/web/src/components/activity-log/`](../../../../../apps/web/src/components/activity-log/) — `ActivityTable.tsx`, `ActivityTypeBadge.tsx`, `ActivityStatusBadge.tsx`, `ActivityTimestamp.tsx`, `ActivityFilters.tsx`, `ActivityEmptyState.tsx`, `ActivityDetailModal.tsx`, `ActivityKanbanView.tsx` |
+| Server actions / typed client                                                                                                                                                             | [`apps/web/src/app/actions/activity-log.ts`](../../../../../apps/web/src/app/actions/activity-log.ts), [`apps/web/src/lib/api/activity-log.ts`](../../../../../apps/web/src/lib/api/activity-log.ts)                                                                                                     |
+| BFF proxies                                                                                                                                                                               | [`apps/web/src/app/api/activity-log/`](../../../../../apps/web/src/app/api/activity-log/)                                                                                                                                                                                                                |
+| Routes constant (`DASHBOARD_ACTIVITY: '/activity'`, line 110)                                                                                                                             | [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts)                                                                                                                                                                                                                          |
+| Sidebar (activity nav item at line 198; badge slot at 385)                                                                                                                                | [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx), [`SidebarActivityIndicator.tsx`](../../../../../apps/web/src/components/dashboard/SidebarActivityIndicator.tsx)                                                       |
+| Page header primitive                                                                                                                                                                     | [`apps/web/src/components/common/PageHeader.tsx`](../../../../../apps/web/src/components/common/PageHeader.tsx)                                                                                                                                                                                          |
+| Messages (`dashboard.activity.*`; 21 locale files)                                                                                                                                        | [`apps/web/messages/`](../../../../../apps/web/messages/)                                                                                                                                                                                                                                                |
 
 ### 1.6 The actor side
 
-| Thing | Path |
-| --- | --- |
-| `Agent` entity — `name` (248), `slug` (250), `status` (307, `AgentStatus` at 49: `draft/active/running/paused/error/archived`), `avatarMode` (363), `avatarIcon` (367), `avatarImageUploadId` (375); indexes `idx_agents_user_status` (204) | [`packages/agent/src/entities/agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts) |
-| `AgentRun` — `AgentRunTriggerKind = 'heartbeat' \| 'manual' \| 'task' \| 'chat' \| 'event'` (line 18), `triggerKind` (66) | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts) |
-| Run lifecycle — `execute()` (247) and `finalize()` (1474). The terminal-activity emit is **gated on `context.kind === 'heartbeat'`** (1512 failed / 1541 completed); `logActivity()` helper at 2155-2188 stamps `details.resourceType = 'agent'` / `details.resourceId` | [`packages/agent/src/agents/agent-run.service.ts`](../../../../../packages/agent/src/agents/agent-run.service.ts) |
+| Thing                                                                                                                                                                                                                                                                   | Path                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `Agent` entity — `name` (248), `slug` (250), `status` (307, `AgentStatus` at 49: `draft/active/running/paused/error/archived`), `avatarMode` (363), `avatarIcon` (367), `avatarImageUploadId` (375); indexes `idx_agents_user_status` (204)                             | [`packages/agent/src/entities/agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts)         |
+| `AgentRun` — `AgentRunTriggerKind = 'heartbeat' \| 'manual' \| 'task' \| 'chat' \| 'event'` (line 18), `triggerKind` (66)                                                                                                                                               | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts) |
+| Run lifecycle — `execute()` (247) and `finalize()` (1474). The terminal-activity emit is **gated on `context.kind === 'heartbeat'`** (1512 failed / 1541 completed); `logActivity()` helper at 2155-2188 stamps `details.resourceType = 'agent'` / `details.resourceId` | [`packages/agent/src/agents/agent-run.service.ts`](../../../../../packages/agent/src/agents/agent-run.service.ts)   |
 
 **That gate is the emission gap in spec FR-53/FR-54.** A manual, task, chat or event run writes an
 `AgentRun` row and nothing in `activity_log`.
 
 ### 1.7 Everything else the plan leans on
 
-| Thing | Path |
-| --- | --- |
-| Request-scoped `{tenantId, organizationId}` via `AsyncLocalStorage` | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts) |
-| Tier-C auto-stamping subscriber | [`apps/api/src/scope/scope-stamping.subscriber.ts`](../../../../../apps/api/src/scope/scope-stamping.subscriber.ts) |
-| Migrations (latest on `develop` at time of writing: `1790100000000-AddReleaseVerification.ts`) | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) |
-| Contracts package | [`packages/contracts/src/api/`](../../../../../packages/contracts/src/api/) + [`index.ts`](../../../../../packages/contracts/src/api/index.ts) |
-| Deterministic-counts + optional-AI-narrative precedent, with scan caps and degradation reasons | [`packages/agent/src/digest/digest.service.ts`](../../../../../packages/agent/src/digest/digest.service.ts) |
-| The only sanctioned model path | [`packages/agent/src/facades/ai.facade.ts`](../../../../../packages/agent/src/facades/ai.facade.ts) |
-| Job-runtime tasks + barrel | [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/), [`index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts) |
-| Repository barrel-less convention — repositories are imported by path, specs sit beside the file | [`packages/agent/src/database/repositories/`](../../../../../packages/agent/src/database/repositories/) |
-| Web test runners — Vitest (`pnpm test` → `vitest run`), Playwright (`pnpm test:e2e`) | [`apps/web/vitest.config.ts`](../../../../../apps/web/vitest.config.ts), [`apps/web/playwright.config.ts`](../../../../../apps/web/playwright.config.ts), [`apps/web/e2e/`](../../../../../apps/web/e2e/) |
+| Thing                                                                                            | Path                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request-scoped `{tenantId, organizationId}` via `AsyncLocalStorage`                              | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts)                                                                                               |
+| Tier-C auto-stamping subscriber                                                                  | [`apps/api/src/scope/scope-stamping.subscriber.ts`](../../../../../apps/api/src/scope/scope-stamping.subscriber.ts)                                                                                       |
+| Migrations (latest on `develop` at time of writing: `1790100000000-AddReleaseVerification.ts`)   | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/)                                                                                                                                     |
+| Contracts package                                                                                | [`packages/contracts/src/api/`](../../../../../packages/contracts/src/api/) + [`index.ts`](../../../../../packages/contracts/src/api/index.ts)                                                            |
+| Deterministic-counts + optional-AI-narrative precedent, with scan caps and degradation reasons   | [`packages/agent/src/digest/digest.service.ts`](../../../../../packages/agent/src/digest/digest.service.ts)                                                                                               |
+| The only sanctioned model path                                                                   | [`packages/agent/src/facades/ai.facade.ts`](../../../../../packages/agent/src/facades/ai.facade.ts)                                                                                                       |
+| Job-runtime tasks + barrel                                                                       | [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/), [`index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts)                                           |
+| Repository barrel-less convention — repositories are imported by path, specs sit beside the file | [`packages/agent/src/database/repositories/`](../../../../../packages/agent/src/database/repositories/)                                                                                                   |
+| Web test runners — Vitest (`pnpm test` → `vitest run`), Playwright (`pnpm test:e2e`)             | [`apps/web/vitest.config.ts`](../../../../../apps/web/vitest.config.ts), [`apps/web/playwright.config.ts`](../../../../../apps/web/playwright.config.ts), [`apps/web/e2e/`](../../../../../apps/web/e2e/) |
 
 ---
 
@@ -224,13 +224,13 @@ the kind of destructive-adjacent migration Principle V exists to avoid.
 
 Derived, never stored. `resolveFeedKind(actionType, status)`:
 
-| Kind | Rule |
-| --- | --- |
-| `problem` | `status IN ('failed','cancelled')`, **or** action type ends in `_failed` / `_refused` / `_tripped` / `_exceeded` / `_capped`. Evaluated **first** (spec FR-18). |
-| `decision` | `inbox_item_created`, `inbox_item_answered`, and the approval/escalation action types |
-| `delivery` | the `kb_*` document lifecycle, `git_merged`, deployment-completed, generation-completed, export |
-| `system` | settings, plugins, MCP, environments, repo-connections, auth/account, member/team |
-| `work` | everything else — the agent / run / mission / task / goal / skill / idea clusters |
+| Kind       | Rule                                                                                                                                                            |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `problem`  | `status IN ('failed','cancelled')`, **or** action type ends in `_failed` / `_refused` / `_tripped` / `_exceeded` / `_capped`. Evaluated **first** (spec FR-18). |
+| `decision` | `inbox_item_created`, `inbox_item_answered`, and the approval/escalation action types                                                                           |
+| `delivery` | the `kb_*` document lifecycle, `git_merged`, deployment-completed, generation-completed, export                                                                 |
+| `system`   | settings, plugins, MCP, environments, repo-connections, auth/account, member/team                                                                               |
+| `work`     | everything else — the agent / run / mission / task / goal / skill / idea clusters                                                                               |
 
 The mapping table lives beside the narrator so one file answers "what does the feed do with this
 action type".
@@ -245,11 +245,11 @@ narration: { key: 'agentRunCompleted', params: { actor: 'Ivy', subject: 'Weekly 
 
 The web renders `t(\`dashboard.feed.narration.${key}\`, params)`. This keeps translation on the web
 side where the 21 message files live, keeps the API locale-free, and lets the same payload serve the
-CLI and MCP surfaces later. Every param is passed through a sanitiser that strips `<` and `>` and
-truncates to 120 characters with `…` (spec FR-16) — the same defence
+CLI and MCP surfaces later. Every param is passed through a sanitiser that strips `<`and`>`and
+truncates to 120 characters with`…` (spec FR-16) — the same defence
 [`NotificationService`](../../../../../packages/agent/src/notifications/notification.service.ts)
 applies with `sanitizeLabel`. An action type with no entry in the narrator table returns
-`{ key: 'fallback', params: { actor, action } }` where `action` is the humanised action type.
+`{ key: 'fallback', params: { actor, action } }`where`action` is the humanised action type.
 
 **Allow-listed params only.** Each narrator entry declares which `details` keys it may read. A key
 not on that entry's list is unreachable, which is what makes spec FR-20/S20 enforceable rather than
@@ -327,17 +327,17 @@ untouched. The new members cover the other four trigger kinds.
 (user, organization) — per-organization because spec FR-27 requires the unseen count to respect the
 active scope.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `userId` | uuid, indexed | `@ManyToOne(User, { onDelete: 'CASCADE' })` |
-| `organizationId` | uuid, nullable | Tier-A scope; `NULL` = bare-tenant scope |
-| `tenantId` | uuid, nullable | Tier-A scope |
-| `lastSeenAt` | timestamptz, NOT NULL | The watermark. Monotonic (spec FR-25) |
-| `lastSeenActivityId` | uuid, nullable | Tiebreaker for the `(createdAt, id)` ordering |
-| `lastOpenedAt` | timestamptz, nullable | Drives the "you were away for X" line |
-| `awaySummaryDismissedAt` | timestamptz, nullable | Spec FR-34 |
-| `createdAt` / `updatedAt` | timestamptz | |
+| Column                    | Type                  | Notes                                         |
+| ------------------------- | --------------------- | --------------------------------------------- |
+| `id`                      | uuid PK               |                                               |
+| `userId`                  | uuid, indexed         | `@ManyToOne(User, { onDelete: 'CASCADE' })`   |
+| `organizationId`          | uuid, nullable        | Tier-A scope; `NULL` = bare-tenant scope      |
+| `tenantId`                | uuid, nullable        | Tier-A scope                                  |
+| `lastSeenAt`              | timestamptz, NOT NULL | The watermark. Monotonic (spec FR-25)         |
+| `lastSeenActivityId`      | uuid, nullable        | Tiebreaker for the `(createdAt, id)` ordering |
+| `lastOpenedAt`            | timestamptz, nullable | Drives the "you were away for X" line         |
+| `awaySummaryDismissedAt`  | timestamptz, nullable | Spec FR-34                                    |
+| `createdAt` / `updatedAt` | timestamptz           |                                               |
 
 Null-safe uniqueness, following the partial-unique-index style already used on `activity_log`
 (and the `uq_agents_user_scope_slug` note in
@@ -385,14 +385,14 @@ from `ScopeContextService`, **never** from a request parameter (the reasoning is
 [`digest.controller.ts`](../../../../../apps/api/src/digest/digest.controller.ts) — a `userId`
 query param would be a ready-made cross-tenant oracle).
 
-| Method | Path | Query / body | Response | Throttle |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/feed` | `agentIds` (csv uuid, ≤20), `kinds` (csv of 5), `failedOnly` (bool), `cursor` (opaque), `limit` (1-50, default 30) | `FeedPageDto` | 120/min |
-| `GET` | `/api/feed/stream` | `agentIds`, `kinds`, `failedOnly`, `lastEventId` | `text/event-stream` | 12/min, max 3 concurrent |
-| `GET` | `/api/feed/actors` | `windowHours` (1-720, default 168) | `{ actors: FeedActorSummaryDto[] }` | 60/min |
-| `GET` | `/api/feed/away-summary` | — | `FeedAwaySummaryDto \| { shown: false }` | 20/min |
-| `POST` | `/api/feed/seen` | `{ upToActivityId?: string; upToCreatedAt?: string }` | `{ lastSeenAt; unseenCount }` | 60/min |
-| `POST` | `/api/feed/away-summary/dismiss` | — | `204` | 30/min |
+| Method | Path                             | Query / body                                                                                                       | Response                                 | Throttle                 |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- | ------------------------ |
+| `GET`  | `/api/feed`                      | `agentIds` (csv uuid, ≤20), `kinds` (csv of 5), `failedOnly` (bool), `cursor` (opaque), `limit` (1-50, default 30) | `FeedPageDto`                            | 120/min                  |
+| `GET`  | `/api/feed/stream`               | `agentIds`, `kinds`, `failedOnly`, `lastEventId`                                                                   | `text/event-stream`                      | 12/min, max 3 concurrent |
+| `GET`  | `/api/feed/actors`               | `windowHours` (1-720, default 168)                                                                                 | `{ actors: FeedActorSummaryDto[] }`      | 60/min                   |
+| `GET`  | `/api/feed/away-summary`         | —                                                                                                                  | `FeedAwaySummaryDto \| { shown: false }` | 20/min                   |
+| `POST` | `/api/feed/seen`                 | `{ upToActivityId?: string; upToCreatedAt?: string }`                                                              | `{ lastSeenAt; unseenCount }`            | 60/min                   |
+| `POST` | `/api/feed/away-summary/dismiss` | —                                                                                                                  | `204`                                    | 30/min                   |
 
 DTO classes with `class-validator` decorators live in `apps/api/src/activity-log/dto/`, beside the
 existing [`ingest-event.dto.ts`](../../../../../apps/api/src/activity-log/dto/ingest-event.dto.ts):
@@ -400,12 +400,12 @@ existing [`ingest-event.dto.ts`](../../../../../apps/api/src/activity-log/dto/in
 
 Error contract:
 
-| Status | When |
-| --- | --- |
-| `400 { error: 'invalid-cursor' }` | cursor fails to decode |
-| `400 { error: 'too-many-agents', max: 20 }` | more than 20 `agentIds` |
-| `401` | no session |
-| `429` + `Retry-After: 30` | 4th concurrent stream, or a throttle trip |
+| Status                                      | When                                      |
+| ------------------------------------------- | ----------------------------------------- |
+| `400 { error: 'invalid-cursor' }`           | cursor fails to decode                    |
+| `400 { error: 'too-many-agents', max: 20 }` | more than 20 `agentIds`                   |
+| `401`                                       | no session                                |
+| `429` + `Retry-After: 30`                   | 4th concurrent stream, or a throttle trip |
 
 ### 4.1 The SSE endpoint in detail
 
@@ -434,8 +434,10 @@ so a fan-out failure can never surface to the writer that logged the activity.
 
 ```ts
 export class ActivityLoggedEvent extends BaseEvent {
-    static EVENT_NAME = 'activity.logged';
-    constructor(public readonly activity: ActivityLog) { super(); }
+	static EVENT_NAME = 'activity.logged';
+	constructor(public readonly activity: ActivityLog) {
+		super();
+	}
 }
 ```
 
@@ -471,29 +473,29 @@ the API wiring (this is precisely the `NotificationService.dispatchFanout()` sha
 
 ### 5.2 Components — `apps/web/src/components/feed/`
 
-| File | Responsibility |
-| --- | --- |
-| `FeedList.tsx` | Virtual-free list (30-row pages, ≤600 rows/visit — no virtualiser needed), the divider slot, the sentinel for auto-paging |
-| `FeedRow.tsx` | Avatar, actor, narrated line, kind pill, relative time, activation target |
-| `FeedKindPill.tsx` | The 5 kinds; text label always present (never colour-only) |
-| `FeedDivider.tsx` | Sticky `New · N` separator, `role="separator"` with `aria-label` |
-| `FeedFilters.tsx` | Agent chips (≤12) + kind chips + `Only failed` |
-| `FeedAgentPicker.tsx` | Searchable overflow dialog, 20-selection cap and its inline message |
-| `AwaySummaryCard.tsx` | All four card states: normal, truncated, failed, dismissed |
-| `FeedNewPill.tsx` | `↑ N new`, pinned |
-| `FeedConnectionBanner.tsx` | `live` / `connecting` / `reconnecting` / `degraded` / `otherTab` |
-| `FeedEmptyState.tsx` | Never-any and filtered-empty variants |
-| `FeedErrorState.tsx` | Load failure, with both actions |
-| `FeedEndCard.tsx` | The 90-day / 20-page terminal card |
-| `FeedSkeleton.tsx` | 6 skeleton rows, same row height as the real row so nothing shifts |
+| File                       | Responsibility                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `FeedList.tsx`             | Virtual-free list (30-row pages, ≤600 rows/visit — no virtualiser needed), the divider slot, the sentinel for auto-paging |
+| `FeedRow.tsx`              | Avatar, actor, narrated line, kind pill, relative time, activation target                                                 |
+| `FeedKindPill.tsx`         | The 5 kinds; text label always present (never colour-only)                                                                |
+| `FeedDivider.tsx`          | Sticky `New · N` separator, `role="separator"` with `aria-label`                                                          |
+| `FeedFilters.tsx`          | Agent chips (≤12) + kind chips + `Only failed`                                                                            |
+| `FeedAgentPicker.tsx`      | Searchable overflow dialog, 20-selection cap and its inline message                                                       |
+| `AwaySummaryCard.tsx`      | All four card states: normal, truncated, failed, dismissed                                                                |
+| `FeedNewPill.tsx`          | `↑ N new`, pinned                                                                                                         |
+| `FeedConnectionBanner.tsx` | `live` / `connecting` / `reconnecting` / `degraded` / `otherTab`                                                          |
+| `FeedEmptyState.tsx`       | Never-any and filtered-empty variants                                                                                     |
+| `FeedErrorState.tsx`       | Load failure, with both actions                                                                                           |
+| `FeedEndCard.tsx`          | The 90-day / 20-page terminal card                                                                                        |
+| `FeedSkeleton.tsx`         | 6 skeleton rows, same row height as the real row so nothing shifts                                                        |
 
 ### 5.3 Hooks — `apps/web/src/lib/hooks/`
 
-| File | Responsibility |
-| --- | --- |
+| File                 | Responsibility                                                                                                                                           |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `use-feed-stream.ts` | `EventSource` against the BFF; backoff 1s→30s ±20% jitter; 3-failure → 10 s poll fallback; leadership handshake so only one tab streams (spec FR-8, S10) |
-| `use-feed-paging.ts` | Cursor state, `IntersectionObserver` at `rootMargin: '400px'`, page/day floors, dedupe by entry id |
-| `use-feed-seen.ts` | Watermark advance rule (visible + focused ≥3 s + top row in view, throttled to 2 s), `Mark all seen`, cross-tab sync |
+| `use-feed-paging.ts` | Cursor state, `IntersectionObserver` at `rootMargin: '400px'`, page/day floors, dedupe by entry id                                                       |
+| `use-feed-seen.ts`   | Watermark advance rule (visible + focused ≥3 s + top row in view, throttled to 2 s), `Mark all seen`, cross-tab sync                                     |
 
 **Cross-tab leadership** uses `BroadcastChannel('ever-works-feed')` with a `localStorage` lease key
 `feed-stream-leader` (holder id + expiry, renewed every 5 s, taken over after a 12 s stale lease).
@@ -539,11 +541,11 @@ call.
 **One job in P3**, for the optional written narrative (spec FR-36). A model call inside an
 interactive request is exactly what Principle IV forbids, so:
 
-| Piece | Path |
-| --- | --- |
-| DI symbol + dispatcher interface | `packages/agent/src/tasks/feed-away-summary-dispatcher.ts` — `export const FEED_AWAY_SUMMARY_DISPATCHER = Symbol('FEED_AWAY_SUMMARY_DISPATCHER')` |
-| Task | `packages/tasks/src/tasks/trigger/feed-away-summary.task.ts`, registered in [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts) |
-| Model access | via [`AiFacadeService`](../../../../../packages/agent/src/facades/ai.facade.ts) only, with the digest's caps (1,200 chars / 400 tokens) and its degrade-with-a-reason posture |
+| Piece                            | Path                                                                                                                                                                                |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DI symbol + dispatcher interface | `packages/agent/src/tasks/feed-away-summary-dispatcher.ts` — `export const FEED_AWAY_SUMMARY_DISPATCHER = Symbol('FEED_AWAY_SUMMARY_DISPATCHER')`                                   |
+| Task                             | `packages/tasks/src/tasks/trigger/feed-away-summary.task.ts`, registered in [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts) |
+| Model access                     | via [`AiFacadeService`](../../../../../packages/agent/src/facades/ai.facade.ts) only, with the digest's caps (1,200 chars / 400 tokens) and its degrade-with-a-reason posture       |
 
 `GET /api/feed/away-summary` returns the deterministic counts immediately with
 `narrative: null, narrativeStatus: 'queued'`, enqueues through the symbol, and the card polls once
@@ -636,32 +638,32 @@ in itself, and a `feed_opened` action type would also recurse straight into the 
 Instrumentation goes to the product-analytics and error paths instead, via
 [`packages/monitoring/`](../../../../../packages/monitoring/):
 
-| Signal | Where | Why |
-| --- | --- | --- |
-| `feed_opened` `{ unseenCount, awayMs, hadSummary }` | web, on mount | Is the away summary earning its place? |
-| `feed_marked_seen` `{ method: 'auto' \| 'manual', unseenCleared }` | web | Is the auto-advance rule (FR-23) too eager or too shy? |
-| `feed_filter_changed` `{ agentCount, kinds, failedOnly }` | web | Which filter dimension actually gets used |
-| `feed_page_loaded` `{ pageIndex, itemCount, ms }` | web | Paging depth in real sessions |
-| `feed_stream_state` `{ state, attempt, reason }` | web | Reconnect health from the client's point of view |
-| `feed.stream.open` / `.close` / `.rejected` gauges + `feed.stream.subscribers` | API | Concurrency ceiling in practice; is 3-per-user right? |
-| `feed.push.latencyMs` / `feed.poll.caughtCount` | API | How often the safety poll catches something the push missed — a rising number means a real multi-pod gap |
-| `feed.narration.fallbackRate` | API | The share of entries with no bespoke narration; the number FR-14's follow-ups are steered by |
-| Sentry tags `feature:aw-04-live-feed`, `feed.kind`, `feed.actorKind` | API + web | Grouping |
+| Signal                                                                         | Where         | Why                                                                                                      |
+| ------------------------------------------------------------------------------ | ------------- | -------------------------------------------------------------------------------------------------------- |
+| `feed_opened` `{ unseenCount, awayMs, hadSummary }`                            | web, on mount | Is the away summary earning its place?                                                                   |
+| `feed_marked_seen` `{ method: 'auto' \| 'manual', unseenCleared }`             | web           | Is the auto-advance rule (FR-23) too eager or too shy?                                                   |
+| `feed_filter_changed` `{ agentCount, kinds, failedOnly }`                      | web           | Which filter dimension actually gets used                                                                |
+| `feed_page_loaded` `{ pageIndex, itemCount, ms }`                              | web           | Paging depth in real sessions                                                                            |
+| `feed_stream_state` `{ state, attempt, reason }`                               | web           | Reconnect health from the client's point of view                                                         |
+| `feed.stream.open` / `.close` / `.rejected` gauges + `feed.stream.subscribers` | API           | Concurrency ceiling in practice; is 3-per-user right?                                                    |
+| `feed.push.latencyMs` / `feed.poll.caughtCount`                                | API           | How often the safety poll catches something the push missed — a rising number means a real multi-pod gap |
+| `feed.narration.fallbackRate`                                                  | API           | The share of entries with no bespoke narration; the number FR-14's follow-ups are steered by             |
+| Sentry tags `feature:aw-04-live-feed`, `feed.kind`, `feed.actorKind`           | API + web     | Grouping                                                                                                 |
 
 ### 9.2 Failure modes and the chosen behaviour
 
-| Mode | Behaviour |
-| --- | --- |
-| `EventEmitter2` not bound (agent-package unit tests, CLI) | `dispatchFeedEvent()` returns immediately; the row is still written. The feed degrades to its 15 s safety poll |
-| A listener throws | `{ suppressErrors: true }` — never surfaces to the writer. Logged and counted |
-| Multi-pod write | Safety poll picks it up within 15 s (§2.2) |
-| Abrupt socket RST | Triple `close` binding (`req`, `res`, `req.socket`) + the 10-minute lifetime cap, both copied from the email controller, so no timer leaks |
-| Slow away-summary | 3 s budget, then the "couldn't summarise" card; the feed itself is unaffected |
-| Cursor from an older deploy | `400 invalid-cursor`; the client discards it and reloads page 1 |
-| A record with an unmapped action type | Generic narration; `feed.narration.fallbackRate` rises; nothing is hidden (FR-15) |
-| A narration param containing markup or a secret-shaped string | Allow-list + `<`/`>` strip + 120-char truncation, applied before storage-free interpolation on the client (FR-16) |
-| Clock skew moving the watermark past a backdated row | Known and accepted at a few seconds; escalated in spec §9 as an open question |
-| Agent deleted | `actorLabel` survives; `href` resolves to `null`; the row renders as plain text (S19) |
+| Mode                                                          | Behaviour                                                                                                                                  |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EventEmitter2` not bound (agent-package unit tests, CLI)     | `dispatchFeedEvent()` returns immediately; the row is still written. The feed degrades to its 15 s safety poll                             |
+| A listener throws                                             | `{ suppressErrors: true }` — never surfaces to the writer. Logged and counted                                                              |
+| Multi-pod write                                               | Safety poll picks it up within 15 s (§2.2)                                                                                                 |
+| Abrupt socket RST                                             | Triple `close` binding (`req`, `res`, `req.socket`) + the 10-minute lifetime cap, both copied from the email controller, so no timer leaks |
+| Slow away-summary                                             | 3 s budget, then the "couldn't summarise" card; the feed itself is unaffected                                                              |
+| Cursor from an older deploy                                   | `400 invalid-cursor`; the client discards it and reloads page 1                                                                            |
+| A record with an unmapped action type                         | Generic narration; `feed.narration.fallbackRate` rises; nothing is hidden (FR-15)                                                          |
+| A narration param containing markup or a secret-shaped string | Allow-list + `<`/`>` strip + 120-char truncation, applied before storage-free interpolation on the client (FR-16)                          |
+| Clock skew moving the watermark past a backdated row          | Known and accepted at a few seconds; escalated in spec §9 as an open question                                                              |
+| Agent deleted                                                 | `actorLabel` survives; `href` resolves to `null`; the row renders as plain text (S19)                                                      |
 
 ---
 
@@ -669,46 +671,46 @@ Instrumentation goes to the product-analytics and error paths instead, via
 
 ### 10.1 Unit — agent package (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/activity-log/feed-narration.spec.ts` | Every one of the 48 narrator entries returns the right key; unknown action type → `fallback`; `<`/`>` stripped; 120-char truncation; a `details` key outside the allow-list is unreachable |
-| `packages/agent/src/activity-log/feed-kind.spec.ts` | The 5-kind mapping, and that `problem` wins over the cluster rule for a failed status (FR-18) |
-| `packages/agent/src/activity-log/feed.service.spec.ts` | Keyset cursor encode/decode; ordering stability with a head insert mid-page; scope filtering; actor-resolution ladder (all 5 rungs); `href` resolution order; the 20-agent cap |
-| `packages/agent/src/activity-log/feed-read-state.service.spec.ts` | Lazy create; monotonic watermark (a backwards write is a no-op, FR-25); unseen count; per-organization isolation; dismiss/re-arm |
-| `packages/agent/src/activity-log/feed-away-summary.service.spec.ts` | 30-minute and ≥1-unseen gates; 7-day clamp; 1,000-row scan cap and its flag; top-5 + remainder; zero-window → not shown |
-| `packages/agent/src/activity-log/activity-log.service.spec.ts` (extend) | `log()` emits `activity.logged` once; is a no-op with no emitter; a throwing listener does not fail `log()` |
-| `packages/agent/src/database/repositories/activity-log.repository.feed.spec.ts` | The keyset predicate and the agent/kind filters produce the expected query shape |
-| `packages/agent/src/agents/__tests__/agent-run-feed-activity.spec.ts` | `finalize()` emits the terminal record for all 5 trigger kinds; heartbeat still uses the heartbeat action types; a retry does not double-write |
+| File                                                                            | Covers                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/activity-log/feed-narration.spec.ts`                        | Every one of the 48 narrator entries returns the right key; unknown action type → `fallback`; `<`/`>` stripped; 120-char truncation; a `details` key outside the allow-list is unreachable |
+| `packages/agent/src/activity-log/feed-kind.spec.ts`                             | The 5-kind mapping, and that `problem` wins over the cluster rule for a failed status (FR-18)                                                                                              |
+| `packages/agent/src/activity-log/feed.service.spec.ts`                          | Keyset cursor encode/decode; ordering stability with a head insert mid-page; scope filtering; actor-resolution ladder (all 5 rungs); `href` resolution order; the 20-agent cap             |
+| `packages/agent/src/activity-log/feed-read-state.service.spec.ts`               | Lazy create; monotonic watermark (a backwards write is a no-op, FR-25); unseen count; per-organization isolation; dismiss/re-arm                                                           |
+| `packages/agent/src/activity-log/feed-away-summary.service.spec.ts`             | 30-minute and ≥1-unseen gates; 7-day clamp; 1,000-row scan cap and its flag; top-5 + remainder; zero-window → not shown                                                                    |
+| `packages/agent/src/activity-log/activity-log.service.spec.ts` (extend)         | `log()` emits `activity.logged` once; is a no-op with no emitter; a throwing listener does not fail `log()`                                                                                |
+| `packages/agent/src/database/repositories/activity-log.repository.feed.spec.ts` | The keyset predicate and the agent/kind filters produce the expected query shape                                                                                                           |
+| `packages/agent/src/agents/__tests__/agent-run-feed-activity.spec.ts`           | `finalize()` emits the terminal record for all 5 trigger kinds; heartbeat still uses the heartbeat action types; a retry does not double-write                                             |
 
 ### 10.2 Controller specs — API (Jest)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/activity-log/feed.controller.spec.ts` | All 6 endpoints: auth required; scope from `ScopeContextService` not from the request; `400 invalid-cursor`; `400 too-many-agents`; limit clamped to 50; `POST /seen` idempotent and monotonic; away-summary `{ shown: false }` branch |
-| `apps/api/src/activity-log/feed-stream.registry.spec.ts` | Subscribe/unsubscribe; the 4th concurrent connection is rejected with `Retry-After`; per-connection dedupe set and its 2,000 cap; filter matching |
-| `apps/api/src/activity-log/feed-stream.listener.spec.ts` | `activity.logged` reaches only matching subscribers; a listener error is suppressed |
+| File                                                     | Covers                                                                                                                                                                                                                                 |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/activity-log/feed.controller.spec.ts`      | All 6 endpoints: auth required; scope from `ScopeContextService` not from the request; `400 invalid-cursor`; `400 too-many-agents`; limit clamped to 50; `POST /seen` idempotent and monotonic; away-summary `{ shown: false }` branch |
+| `apps/api/src/activity-log/feed-stream.registry.spec.ts` | Subscribe/unsubscribe; the 4th concurrent connection is rejected with `Retry-After`; per-connection dedupe set and its 2,000 cap; filter matching                                                                                      |
+| `apps/api/src/activity-log/feed-stream.listener.spec.ts` | `activity.logged` reaches only matching subscribers; a listener error is suppressed                                                                                                                                                    |
 
 ### 10.3 Web unit (Vitest)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/src/components/feed/FeedRow.unit.spec.tsx` | Narration key + params render; missing `href` renders plain text; kind pill always carries text |
-| `apps/web/src/components/feed/AwaySummaryCard.unit.spec.tsx` | All four card states; every number is an interactive filter control (FR-32) |
-| `apps/web/src/lib/hooks/use-feed-stream.unit.spec.ts` | Backoff schedule and jitter bounds; 3-failure → poll fallback; leader lease acquire/renew/take-over |
-| `apps/web/src/lib/hooks/use-feed-seen.unit.spec.ts` | The three-condition advance rule; the 2 s throttle; no advance while the tab is hidden |
-| `apps/web/src/lib/hooks/use-feed-paging.unit.spec.ts` | No duplicate ids across pages; the 20-page and 90-day floors |
+| File                                                         | Covers                                                                                              |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/feed/FeedRow.unit.spec.tsx`         | Narration key + params render; missing `href` renders plain text; kind pill always carries text     |
+| `apps/web/src/components/feed/AwaySummaryCard.unit.spec.tsx` | All four card states; every number is an interactive filter control (FR-32)                         |
+| `apps/web/src/lib/hooks/use-feed-stream.unit.spec.ts`        | Backoff schedule and jitter bounds; 3-failure → poll fallback; leader lease acquire/renew/take-over |
+| `apps/web/src/lib/hooks/use-feed-seen.unit.spec.ts`          | The three-condition advance rule; the 2 s throttle; no advance while the tab is hidden              |
+| `apps/web/src/lib/hooks/use-feed-paging.unit.spec.ts`        | No duplicate ids across pages; the 20-page and 90-day floors                                        |
 
 ### 10.4 e2e (Playwright, `apps/web/e2e/`)
 
-| File | Covers |
-| --- | --- |
-| `feed-live.spec.ts` | S1 — a written record appears within 5 s; the connection banner states; S9 reconnect with no duplicates; S10 second-tab notice |
-| `feed-seen-divider.spec.ts` | S2/S3/S16 — divider placement and anchoring, **Mark all seen**, badge clearing, reload persistence, two-tab agreement |
-| `feed-away-summary.spec.ts` | S2/S14 — card contents, the truncation lines, dismissal persistence, the filter-on-click behaviour |
-| `feed-filters-paging.spec.ts` | S4/S5/S8/S12/S15 — agent filter + URL round-trip, the 20-cap message, infinite paging without repeats, only-failed, filtered-empty, the terminal card |
-| `feed-empty-and-error.spec.ts` | S11/S13 — the never-any empty state and the load-error state |
-| `feed-scope-isolation.spec.ts` | S18 — switching organization changes the feed, the badge and the summary; the other organization's records are unreachable |
-| `feed-a11y.spec.ts` | Keyboard flow end to end (§6.10) and an axe pass with zero serious/critical violations |
+| File                           | Covers                                                                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `feed-live.spec.ts`            | S1 — a written record appears within 5 s; the connection banner states; S9 reconnect with no duplicates; S10 second-tab notice                        |
+| `feed-seen-divider.spec.ts`    | S2/S3/S16 — divider placement and anchoring, **Mark all seen**, badge clearing, reload persistence, two-tab agreement                                 |
+| `feed-away-summary.spec.ts`    | S2/S14 — card contents, the truncation lines, dismissal persistence, the filter-on-click behaviour                                                    |
+| `feed-filters-paging.spec.ts`  | S4/S5/S8/S12/S15 — agent filter + URL round-trip, the 20-cap message, infinite paging without repeats, only-failed, filtered-empty, the terminal card |
+| `feed-empty-and-error.spec.ts` | S11/S13 — the never-any empty state and the load-error state                                                                                          |
+| `feed-scope-isolation.spec.ts` | S18 — switching organization changes the feed, the badge and the summary; the other organization's records are unreachable                            |
+| `feed-a11y.spec.ts`            | Keyboard flow end to end (§6.10) and an axe pass with zero serious/critical violations                                                                |
 
 ### 10.5 Regression guard
 
@@ -752,18 +754,18 @@ Sequencing: P1 has no dependencies. P2 depends on P1's read model only. P3 depen
 
 ## 12. Constitution compliance
 
-| Gate | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ N/A | No external integration is introduced. Everything read is a first-party table; everything called is a first-party endpoint. |
-| **II — Capability-driven, no hardcoded plugin ids** | ✅ | The only place a plugin id appears is as *data* in `metadata.source`, rendered through a generic narration key with the source as a parameter. No `if (source === …)` branch exists in feed code (§7). |
-| **III — Source-of-truth repos** | ✅ N/A | The feed reads platform metadata (the audit trail). No work content moves into the database. |
-| **IV — Job runtime via `*_DISPATCHER`** | ✅ | P1/P2 introduce no long-running or retryable work, and say so explicitly (§6). P3's model call is dispatched through `FEED_AWAY_SUMMARY_DISPATCHER`; no call site imports a vendor SDK. |
-| **V — Forward-only migrations, same PR** | ✅ | Two migrations, each shipping in the PR that changes the entity: `1791040000000-AddActivityLogFeedActor.ts` (3 nullable columns + 2 indexes, no backfill) and `1791040100000-CreateFeedReadState.ts` (new table). No `DROP`, no `NOT NULL` on an existing table, no rename. The three new action-type members need no migration — `actionType` is a plain `varchar(50)` (§3.2). |
-| **VI — Tests are a prerequisite** | ✅ | 8 unit specs, 3 controller specs, 5 web unit specs, 7 e2e specs, plus the untouched-`/activity` regression guard (§10). |
-| **VII — Secret hygiene** | ✅ | Narration reads an explicit per-action-type allow-list of `details` keys; every param is `<`/`>`-stripped and truncated. No credential can reach a feed line, and nothing new is logged. |
-| **VIII — Plugin counts in the canonical doc** | ✅ N/A | No plugin is added or removed. |
-| **IX — Behaviour-first spec** | ✅ | [spec.md](./spec.md) contains no class name, file path or code; every implementation detail lives here. |
-| **X — Backwards compatibility** | ✅ | Purely additive: 3 optional entity columns, 3 appended enum members, 1 new table, 6 new endpoints under a new base path, 1 new route. No existing DTO field changes shape; no existing endpoint changes behaviour; `/activity` is untouched. |
+| Gate                                                | Status | Justification                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**                                | ✅ N/A | No external integration is introduced. Everything read is a first-party table; everything called is a first-party endpoint.                                                                                                                                                                                                                                                     |
+| **II — Capability-driven, no hardcoded plugin ids** | ✅     | The only place a plugin id appears is as _data_ in `metadata.source`, rendered through a generic narration key with the source as a parameter. No `if (source === …)` branch exists in feed code (§7).                                                                                                                                                                          |
+| **III — Source-of-truth repos**                     | ✅ N/A | The feed reads platform metadata (the audit trail). No work content moves into the database.                                                                                                                                                                                                                                                                                    |
+| **IV — Job runtime via `*_DISPATCHER`**             | ✅     | P1/P2 introduce no long-running or retryable work, and say so explicitly (§6). P3's model call is dispatched through `FEED_AWAY_SUMMARY_DISPATCHER`; no call site imports a vendor SDK.                                                                                                                                                                                         |
+| **V — Forward-only migrations, same PR**            | ✅     | Two migrations, each shipping in the PR that changes the entity: `1791040000000-AddActivityLogFeedActor.ts` (3 nullable columns + 2 indexes, no backfill) and `1791040100000-CreateFeedReadState.ts` (new table). No `DROP`, no `NOT NULL` on an existing table, no rename. The three new action-type members need no migration — `actionType` is a plain `varchar(50)` (§3.2). |
+| **VI — Tests are a prerequisite**                   | ✅     | 8 unit specs, 3 controller specs, 5 web unit specs, 7 e2e specs, plus the untouched-`/activity` regression guard (§10).                                                                                                                                                                                                                                                         |
+| **VII — Secret hygiene**                            | ✅     | Narration reads an explicit per-action-type allow-list of `details` keys; every param is `<`/`>`-stripped and truncated. No credential can reach a feed line, and nothing new is logged.                                                                                                                                                                                        |
+| **VIII — Plugin counts in the canonical doc**       | ✅ N/A | No plugin is added or removed.                                                                                                                                                                                                                                                                                                                                                  |
+| **IX — Behaviour-first spec**                       | ✅     | [spec.md](./spec.md) contains no class name, file path or code; every implementation detail lives here.                                                                                                                                                                                                                                                                         |
+| **X — Backwards compatibility**                     | ✅     | Purely additive: 3 optional entity columns, 3 appended enum members, 1 new table, 6 new endpoints under a new base path, 1 new route. No existing DTO field changes shape; no existing endpoint changes behaviour; `/activity` is untouched.                                                                                                                                    |
 
 Program rules ([README §5](../README.md)) are met as well: additive only (#1); no duplicate noun —
 the single new entity is justified in [spec §5.1](./spec.md#51-why-one-new-entity-is-justified) and
@@ -776,14 +778,14 @@ card that used it.
 
 ## 13. Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-| --- | --- | --- | --- |
-| SSE connections exhaust the API's socket budget | Medium | High | 3 per user, 10-minute lifetime cap, triple-bound cleanup, `feed.stream.subscribers` gauge with an alert |
-| The safety poll becomes the real transport in a multi-pod deploy and 15 s feels slow | Medium | Medium | `feed.poll.caughtCount` measures it directly; if it rises, that is the evidence for adding a shared bus — not a guess made now |
-| Narration coverage stalls at 48 and most rows read generically | Medium | Medium | `feed.narration.fallbackRate` is a shipped metric, and P3 is explicitly steered by it |
-| Two migrations against the largest audit table lock it | Low | High | Both are metadata-only (`ADD COLUMN ... NULL`); the two new indexes are created concurrently in the migration's raw SQL |
-| The auto-advance rule (FR-23) marks things seen the user did not read | Medium | Medium | Three simultaneous conditions plus a 2 s throttle, and `feed_marked_seen{method}` tells us the auto/manual split after launch |
-| Cross-tab leadership misbehaves on browsers without `BroadcastChannel` | Low | Low | Explicit fallback to the 10 s poll in every tab |
+| Risk                                                                                 | Likelihood | Impact | Mitigation                                                                                                                     |
+| ------------------------------------------------------------------------------------ | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| SSE connections exhaust the API's socket budget                                      | Medium     | High   | 3 per user, 10-minute lifetime cap, triple-bound cleanup, `feed.stream.subscribers` gauge with an alert                        |
+| The safety poll becomes the real transport in a multi-pod deploy and 15 s feels slow | Medium     | Medium | `feed.poll.caughtCount` measures it directly; if it rises, that is the evidence for adding a shared bus — not a guess made now |
+| Narration coverage stalls at 48 and most rows read generically                       | Medium     | Medium | `feed.narration.fallbackRate` is a shipped metric, and P3 is explicitly steered by it                                          |
+| Two migrations against the largest audit table lock it                               | Low        | High   | Both are metadata-only (`ADD COLUMN ... NULL`); the two new indexes are created concurrently in the migration's raw SQL        |
+| The auto-advance rule (FR-23) marks things seen the user did not read                | Medium     | Medium | Three simultaneous conditions plus a 2 s throttle, and `feed_marked_seen{method}` tells us the auto/manual split after launch  |
+| Cross-tab leadership misbehaves on browsers without `BroadcastChannel`               | Low        | Low    | Explicit fallback to the 10 s poll in every tab                                                                                |
 
 ## 14. References
 

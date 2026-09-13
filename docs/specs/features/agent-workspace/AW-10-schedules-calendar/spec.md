@@ -92,7 +92,7 @@ a week or a month and marks every past occurrence with what actually happened, s
 The seven sources do not all produce the same thing, and the surface never pretends otherwise. A
 recurring Task fire spawns a **Task** that an Agent picks up and executes as a **Run**; a heartbeat
 wakes an Agent and produces a Run; a **Mission** tick raises **Ideas**, and through them Works — the
-tick itself spawns no Task and dispatches no Run. A Mission is therefore a *source* of work here —
+tick itself spawns no Task and dispatches no Run. A Mission is therefore a _source_ of work here —
 a Task filed against it carries its id, but the cadence does not create one — and it appears as an
 owner, a provenance chip and a filter, never as a unit of work itself.
 
@@ -121,8 +121,8 @@ can be undone exactly once within 15 minutes.
 
 ### 2.1 The user's question
 
-> *"What is my workspace going to do this week without me — and why did nothing happen on
-> Friday?"*
+> _"What is my workspace going to do this week without me — and why did nothing happen on
+> Friday?"_
 
 An owner who has delegated recurring work needs both halves of that sentence answered on one
 screen. The first half is a forecast; the second is an audit. Today Ever Works answers the first
@@ -130,17 +130,17 @@ half only partially and the second half not at all.
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer… | Today they must… | What breaks |
-| --- | --- | --- |
-| "What is scheduled at all?" | Open Activity, switch to the Schedules tab via a query parameter. | The unified projection exists and is good, but it is buried inside another page, has no route of its own, and is un-paginated with a hard cap of 500 rows per source. |
-| "What runs on Tuesday?" | Read a flat list sorted by next fire and do the date arithmetic in their head. | There is no time-shaped view of recurring work anywhere in the product. |
-| "Set up 'every morning, read the notes and update the summary'." | Create a Task, open it, set a recurrence rule, assign an Agent, hope the assignment resolves. | Authoring is spread across three steps on two surfaces, and the crucial options an unattended instruction needs — which model, how long it may run, whether it tells anyone it finished — do not exist at all. |
-| "Pause the 09:00 job for a week." | Delete its recurrence, then rebuild it later from memory. | There is no pause for a recurring Task. The only reversible stop is pausing the whole Agent, which also stops its assigned work. |
-| "Stop everything, I am restructuring this Agent." | Pause the Agent, or clear each cadence one at a time. | Pausing the Agent is a bigger hammer than intended and stops in-flight Task work too. Clearing cadences is destructive and unrecoverable. |
-| "Why did the month-end rollup never run?" | Nothing. | A cadence that names 30 February is accepted, stored, and silently does nothing forever. So is a recurrence whose end date has passed, and so is a recurring Task with no resolvable Agent — that last case raises one notification and then leaves the Task sitting in `todo` looking healthy. |
-| "Did Friday's scan run?" | Cross-reference the Schedules tab (what should have happened) with Runs (what did). | Two surfaces, two time models, and nothing that renders the expected occurrence and the actual Run side by side. |
-| "Which of these two things is doing the same job twice?" | Nothing. | An Agent with a 15-minute heartbeat *and* a 30-minute Schedule that reads the same inbox doubles the spend and produces duplicate output. Nothing detects it. |
-| "Tell me when the weekly report is done — but not every hour." | Nothing. | Announcement is all-or-nothing at the notification-preferences level, not a property of the individual Schedule, which is the only place where the author knows whether the output is interesting. |
+| To answer…                                                       | Today they must…                                                                              | What breaks                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "What is scheduled at all?"                                      | Open Activity, switch to the Schedules tab via a query parameter.                             | The unified projection exists and is good, but it is buried inside another page, has no route of its own, and is un-paginated with a hard cap of 500 rows per source.                                                                                                                           |
+| "What runs on Tuesday?"                                          | Read a flat list sorted by next fire and do the date arithmetic in their head.                | There is no time-shaped view of recurring work anywhere in the product.                                                                                                                                                                                                                         |
+| "Set up 'every morning, read the notes and update the summary'." | Create a Task, open it, set a recurrence rule, assign an Agent, hope the assignment resolves. | Authoring is spread across three steps on two surfaces, and the crucial options an unattended instruction needs — which model, how long it may run, whether it tells anyone it finished — do not exist at all.                                                                                  |
+| "Pause the 09:00 job for a week."                                | Delete its recurrence, then rebuild it later from memory.                                     | There is no pause for a recurring Task. The only reversible stop is pausing the whole Agent, which also stops its assigned work.                                                                                                                                                                |
+| "Stop everything, I am restructuring this Agent."                | Pause the Agent, or clear each cadence one at a time.                                         | Pausing the Agent is a bigger hammer than intended and stops in-flight Task work too. Clearing cadences is destructive and unrecoverable.                                                                                                                                                       |
+| "Why did the month-end rollup never run?"                        | Nothing.                                                                                      | A cadence that names 30 February is accepted, stored, and silently does nothing forever. So is a recurrence whose end date has passed, and so is a recurring Task with no resolvable Agent — that last case raises one notification and then leaves the Task sitting in `todo` looking healthy. |
+| "Did Friday's scan run?"                                         | Cross-reference the Schedules tab (what should have happened) with Runs (what did).           | Two surfaces, two time models, and nothing that renders the expected occurrence and the actual Run side by side.                                                                                                                                                                                |
+| "Which of these two things is doing the same job twice?"         | Nothing.                                                                                      | An Agent with a 15-minute heartbeat _and_ a 30-minute Schedule that reads the same inbox doubles the spend and produces duplicate output. Nothing detects it.                                                                                                                                   |
+| "Tell me when the weekly report is done — but not every hour."   | Nothing.                                                                                      | Announcement is all-or-nothing at the notification-preferences level, not a property of the individual Schedule, which is the only place where the author knows whether the output is interesting.                                                                                              |
 
 ### 2.3 The five gaps this epic closes
 
@@ -165,7 +165,7 @@ control — the recurrence section on a Task, the heartbeat field on an Agent's 
 schedule page, the Mission cadence field — keeps working and is not moved. The new surface reads
 and writes through the same paths those surfaces already use.
 
-### 2.5 What this epic deliberately does *not* re-invent
+### 2.5 What this epic deliberately does _not_ re-invent
 
 AW-09 owns the Run ledger, the receipt, and the Upcoming panel with its countdowns. This epic
 does not build a second run history and does not define a second notion of "what is about to
@@ -211,8 +211,8 @@ column updates, and an activity entry records who moved it, from which Agent, to
 **S5 — Catching the schedule that could never fire.**
 **Given** a Schedule whose cadence names day 30 of February,
 **when** the owner opens Schedules,
-**then** a banner reads *"3 schedules will never run"*, the row carries a red **NEVER RUNS**
-badge with the reason *"February never has a 30th day"*,
+**then** a banner reads _"3 schedules will never run"_, the row carries a red **NEVER RUNS**
+badge with the reason _"February never has a 30th day"_,
 **and** choosing **Fix** shows the proposed change — `Day 30 of February` → `Day 28 of February` —
 before anything is written.
 
@@ -237,8 +237,8 @@ a time, on purpose.
 **Given** an Agent with a 15-minute heartbeat and a 30-minute Schedule that reads the same
 inbox,
 **when** the owner opens either the Agent's heartbeat setting or that Schedule,
-**then** an advisory warning names the other one, states the evidence (*"these fire in the same
-minute 48 times in the next 7 days"* and *"their instructions overlap heavily"*), and offers to
+**then** an advisory warning names the other one, states the evidence (_"these fire in the same
+minute 48 times in the next 7 days"_ and _"their instructions overlap heavily"_), and offers to
 open the other for editing,
 **and** nothing is blocked — the owner may keep both.
 
@@ -261,79 +261,79 @@ stays active, and the Agent's assigned Task work is unaffected.
 **U1 — A source is temporarily unreadable.**
 **Given** the Mission query fails while the other six succeed,
 **when** the list loads,
-**then** the rows from the six healthy sources render, an inline notice reads *"Mission schedules
-could not be loaded"* with **Retry**, and the totals above the list say they exclude that source.
+**then** the rows from the six healthy sources render, an inline notice reads _"Mission schedules
+could not be loaded"_ with **Retry**, and the totals above the list say they exclude that source.
 The page never blanks because one source is sick.
 
 **U2 — Run now while a Run for the same Schedule is already in flight.**
 **Given** a Schedule whose previous fire is still running,
 **when** the owner chooses **Run now**,
-**then** the action is refused with *"This schedule is already running — opened at 09:04"* and a
+**then** the action is refused with _"This schedule is already running — opened at 09:04"_ and a
 link to the in-flight Run. No second Run is created.
 
 **U3 — Run now with no Agent that can run it.**
 **Given** a recurring Task Schedule with no assignee and no Agent,
 **when** the owner chooses **Run now**,
-**then** the action is refused with *"No agent is assigned to this schedule"* and an **Assign an
+**then** the action is refused with _"No agent is assigned to this schedule"_ and an **Assign an
 agent** control, and the row's health badge already read NEVER RUNS for the same reason.
 
 **U4 — Two people fix the same Schedule at once.**
 **Given** two members of the same Organization looking at the same NEVER RUNS banner,
 **when** both apply a fix,
 **then** the second apply detects that the Schedule no longer matches the previewed "before"
-state, skips it, and reports *"1 schedule changed since you previewed — nothing was overwritten"*.
+state, skips it, and reports _"1 schedule changed since you previewed — nothing was overwritten"_.
 No repair is ever applied to a state it did not preview.
 
 **U5 — Undo after the window has closed.**
 **Given** a disable-all performed 20 minutes ago,
 **when** the owner presses **Undo**,
-**then** the action is refused with *"The undo window has closed. Re-enable schedules
-individually."* and the list scrolls to the paused rows with a filter applied.
+**then** the action is refused with _"The undo window has closed. Re-enable schedules
+individually."_ and the list scrolls to the paused rows with a filter applied.
 
 **U6 — Undo after someone else changed one of the paused Schedules.**
 **Given** a disable-all batch of 12, one of which has since been edited and resumed by a
 teammate,
 **when** **Undo** is pressed inside the window,
 **then** 11 are resumed, the twelfth is left exactly as the teammate left it, and the result
-reads *"Resumed 11 of 12. 1 was changed after the pause and was left alone."*
+reads _"Resumed 11 of 12. 1 was changed after the pause and was left alone."_
 
 **U7 — The workspace breaker on a workspace that is too large.**
 **Given** a workspace with 640 enabled Schedules,
 **when** the owner opens the workspace-wide **Disable all**,
-**then** the action is refused before anything is written with *"Disable all covers up to 500
-schedules at once. Filter to an agent, or pause in batches."*
+**then** the action is refused before anything is written with _"Disable all covers up to 500
+schedules at once. Filter to an agent, or pause in batches."_
 
 **U8 — The calendar window is too wide.**
 **Given** an owner who navigates to a four-month range,
 **when** the calendar requests it,
-**then** the request is refused with *"Calendar shows up to 92 days at a time"* and the range
+**then** the request is refused with _"Calendar shows up to 92 days at a time"_ and the range
 snaps back to the last valid window, without losing the filters.
 
 **U9 — Too many occurrences to draw.**
 **Given** a month containing a per-5-minute Schedule,
 **when** the month view expands occurrences,
 **then** expansion stops at 500 occurrences for that Schedule and 2,000 for the view; the
-affected rows render a *"showing the first 500 of this schedule's fires"* marker rather than a
+affected rows render a _"showing the first 500 of this schedule's fires"_ marker rather than a
 truncated grid with no explanation.
 
 **U10 — Schedule cap reached.**
 **Given** an Agent that already owns 50 Schedules,
 **when** the owner tries to create the 51st,
-**then** creation is refused with *"This agent has the maximum of 50 schedules. Retire one, or
-create it on another agent."* and the create form stays populated so nothing is lost.
+**then** creation is refused with _"This agent has the maximum of 50 schedules. Retire one, or
+create it on another agent."_ and the create form stays populated so nothing is lost.
 
 **U11 — A cadence tighter than the floor.**
 **Given** an author who enters a 2-minute cadence,
 **when** they save,
-**then** the save is refused with *"The tightest cadence is every 5 minutes"*; a cadence between
+**then** the save is refused with _"The tightest cadence is every 5 minutes"_; a cadence between
 5 and 15 minutes saves but shows a persistent warning naming the expected daily fire count and
 linking to costs.
 
 **U12 — Permission denied.**
 **Given** a viewer who may read the workspace but not edit the Content Agent,
 **when** they open Schedules,
-**then** rows they may not change render with their controls disabled and a tooltip *"You do not
-have permission to change this agent's schedules"*; the row still shows cadence, next fire and
+**then** rows they may not change render with their controls disabled and a tooltip _"You do not
+have permission to change this agent's schedules"_; the row still shows cadence, next fire and
 health, because reading is allowed.
 
 **U13 — A Schedule for an entity the caller does not own.**
@@ -345,13 +345,13 @@ distinguishes "not yours" from "not there".
 **U14 — Nothing scheduled at all.**
 **Given** a brand-new workspace,
 **when** Schedules is opened,
-**then** the empty state reads *"Nothing is scheduled yet"* with one sentence of explanation and
+**then** the empty state reads _"Nothing is scheduled yet"_ with one sentence of explanation and
 three routes in: create a schedule, give an agent a heartbeat, or set a work to update itself.
 
 **U15 — Filters match nothing.**
 **Given** filters set to Agent = Finance, Health = Never runs,
 **when** no row matches,
-**then** the list reads *"No schedules match these filters"* with **Clear filters**, and the
+**then** the list reads _"No schedules match these filters"_ with **Clear filters**, and the
 unfiltered total is stated so the user knows the list is not empty.
 
 **U16 — Five failures in a row.**
@@ -365,18 +365,18 @@ click with the failure reason in front of the user.
 **Given** a Schedule that fires every 5 minutes with announcements on,
 **when** it completes more than 20 times in a day,
 **then** further announcements for that day are rolled into one hourly summary entry rather than
-being dropped, and the Schedule's row shows *"Announcements rolled up"*.
+being dropped, and the Schedule's row shows _"Announcements rolled up"_.
 
 **U18 — Reassigning to an archived Agent.**
 **Given** an Agent that has been archived,
 **when** it is chosen as the reassign target,
 **then** it is not offered in the picker at all; if it is archived between opening the picker and
-confirming, the confirm fails with *"That agent has been archived"* and the Schedule is unchanged.
+confirming, the confirm fails with _"That agent has been archived"_ and the Schedule is unchanged.
 
 **U19 — The background scan is not configured.**
 **Given** a deployment with no job runtime configured,
 **when** the health sweep would run,
-**then** the surface says so plainly — *"Health was last checked 3 days ago"* with the timestamp
+**then** the surface says so plainly — _"Health was last checked 3 days ago"_ with the timestamp
 — rather than presenting stale health as current. Health is recomputed on every write regardless,
 so an edited Schedule is always accurate.
 
@@ -466,8 +466,8 @@ Numbers here are normative. Every default, limit and threshold is a number.
 - **FR-24** A Schedule MUST carry: a **name** (1–200 characters), **instructions** (1–8,000
   characters), and a **cadence**. All three are required; a definition without a cadence is not a
   Schedule.
-- **FR-25** Cadence MUST be authorable in three styles: *every day at HH:MM*, *every
-  &lt;weekday&gt; at HH:MM*, and an advanced expression (a five-field cron expression or an
+- **FR-25** Cadence MUST be authorable in three styles: _every day at HH:MM_, _every
+  &lt;weekday&gt; at HH:MM_, and an advanced expression (a five-field cron expression or an
   RFC 5545 recurrence rule). The advanced field MUST validate on blur and show the next three
   computed fire times before saving.
 - **FR-26** The minimum cadence interval MUST be **5 minutes**. A cadence tighter than that MUST
@@ -500,9 +500,9 @@ Numbers here are normative. Every default, limit and threshold is a number.
   **15 minutes** on an Agent that also owns at least one enabled Schedule MUST show a warning.
 - **FR-36** The platform MUST detect and warn about two kinds of overlap between an Agent's
   heartbeat and its Schedules:
-  - **coincidence** — the two fire within the same minute **2 or more times in the next 7 days**;
-  - **duty overlap** — the significant-term overlap between the Schedule's instructions and the
-    Agent's heartbeat instructions is **0.35 or higher** on a normalised comparison.
+    - **coincidence** — the two fire within the same minute **2 or more times in the next 7 days**;
+    - **duty overlap** — the significant-term overlap between the Schedule's instructions and the
+      Agent's heartbeat instructions is **0.35 or higher** on a normalised comparison.
 - **FR-37** Overlap warnings MUST be advisory only. They MUST never block a save. They MUST be
   dismissible per pair for **30 days** and MUST reappear if either side is edited.
 - **FR-38** The overlap warning MUST name the specific counterpart, state the evidence in
@@ -513,15 +513,15 @@ Numbers here are normative. Every default, limit and threshold is a number.
 - **FR-39** Every Schedule MUST carry a health verdict, either **OK** or **NEVER RUNS** with
   exactly one reason from this closed set:
 
-  | Reason | Meaning |
-  | --- | --- |
-  | `impossible-date` | The cadence names a calendar date that cannot occur. |
-  | `ended` | The recurrence end date is in the past. |
-  | `exhausted` | The maximum number of occurrences has been reached. |
-  | `past-one-shot` | A one-time instant is in the past and was never claimed. |
-  | `unparseable` | The cadence cannot be parsed. |
-  | `no-agent` | No Agent can be resolved to execute it. |
-  | `owner-archived` | The owning Agent or Work is archived, or the owning Agent, Mission or Work no longer exists. A Mission the owner *completed* is **Ended**, not this. |
+    | Reason            | Meaning                                                                                                                                              |
+    | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `impossible-date` | The cadence names a calendar date that cannot occur.                                                                                                 |
+    | `ended`           | The recurrence end date is in the past.                                                                                                              |
+    | `exhausted`       | The maximum number of occurrences has been reached.                                                                                                  |
+    | `past-one-shot`   | A one-time instant is in the past and was never claimed.                                                                                             |
+    | `unparseable`     | The cadence cannot be parsed.                                                                                                                        |
+    | `no-agent`        | No Agent can be resolved to execute it.                                                                                                              |
+    | `owner-archived`  | The owning Agent or Work is archived, or the owning Agent, Mission or Work no longer exists. A Mission the owner _completed_ is **Ended**, not this. |
 
 - **FR-40** NEVER RUNS MUST mean **unsatisfiable**, not **infrequent**. A cadence that fires once
   a year, or on 29 February, MUST NOT be flagged. Absence of a fire inside any look-ahead window
@@ -541,15 +541,15 @@ Numbers here are normative. Every default, limit and threshold is a number.
 - **FR-45** Each reason MUST declare a repair class: **automatic** (a deterministic change with
   no decision), **choice** (needs input), or **none**.
 
-  | Reason | Class | Automatic repair |
-  | --- | --- | --- |
-  | `impossible-date` | automatic | Clamp the day of month to the last day that exists in every month named by the cadence (February → 28). |
-  | `ended` | automatic | Clear the end date. |
-  | `exhausted` | automatic | Clear the maximum-occurrence cap. |
-  | `past-one-shot` | automatic | Move to the next occurrence of the same time of day, at least **5 minutes** in the future. |
-  | `no-agent` | choice | Pick an Agent. |
-  | `owner-archived` | choice | Restore the owner, or delete the Schedule. |
-  | `unparseable` | none | Edit the cadence. |
+    | Reason            | Class     | Automatic repair                                                                                        |
+    | ----------------- | --------- | ------------------------------------------------------------------------------------------------------- |
+    | `impossible-date` | automatic | Clamp the day of month to the last day that exists in every month named by the cadence (February → 28). |
+    | `ended`           | automatic | Clear the end date.                                                                                     |
+    | `exhausted`       | automatic | Clear the maximum-occurrence cap.                                                                       |
+    | `past-one-shot`   | automatic | Move to the next occurrence of the same time of day, at least **5 minutes** in the future.              |
+    | `no-agent`        | choice    | Pick an Agent.                                                                                          |
+    | `owner-archived`  | choice    | Restore the owner, or delete the Schedule.                                                              |
+    | `unparseable`     | none      | Edit the cadence.                                                                                       |
 
 - **FR-46** A repair MUST NEVER be written without first showing the exact before and after. This
   applies to a single **Fix** and to **Fix all** equally.
@@ -663,19 +663,19 @@ Numbers here are normative. Every default, limit and threshold is a number.
 
 ## 5. Key entities
 
-| Concept | New or existing | What it is here |
-| --- | --- | --- |
-| **Schedule** | **Existing** (extended) | The unified recurring definition. Today it is a read-only projection over seven sources. This epic keeps that projection as the canonical shape and adds to each row: the owning Agent, a health verdict, a control descriptor, a paused-at instant, the consecutive-failure count, and the resolved options. |
-| **Standing definition** | **Existing form, extended** | The authored kind of Schedule: instructions + cadence + options, owned by an Agent. In Ever Works this is a recurring Task bound to an Agent — the same object the Tasks surface already shows — extended with a pause that preserves the cadence, a model, a time limit, an announce flag, and a board-visibility flag. **No new noun is introduced**: it is a Schedule, and its Task remains a Task. |
-| **Heartbeat** | **Existing** (extended) | A per-Agent, instruction-free periodic wake. Gains an independent pause that preserves the cadence, and overlap detection against that Agent's Schedules. |
-| **Schedule health** | **New — projection only, no new table** | The verdict OK / NEVER RUNS plus one reason and one repair class, computed from the cadence, the bounds, and the owner's reachability. Declared new because "a schedule that cannot fire" has no representation today. |
-| **Occurrence** | **New — projection only, no new table** | One expansion of a Schedule's cadence onto a calendar instant, past or future, together with what the platform knows actually happened at it: a matched Run for the sources that produce one, and the source's own record of the fire for those that do not. It has no id, cannot be opened on its own, and is never a Run. Presenting projections and records as the same object would make every id on this surface unreliable. |
-| **Schedule bulk action** | **New — a small record** | The durable receipt of one bulk operation: a disable-all batch or a fix batch. It stores exactly which Schedules were transitioned and their previous values, so undo restores precisely that set and touches nothing a teammate changed afterwards. Justified as new because an exact undo cannot be reconstructed from the current state, and reusing the activity log for functional state would make an audit record load-bearing. |
-| **Run** | **Existing** | One execution. A recurring Task fire and a heartbeat fire each produce one; a Mission tick does not (§5.2). This epic creates no run history of its own and links to AW-09's receipt. |
-| **Trigger** | **Existing** | The event-driven sibling. Appears in both views with a fixed "on event" cadence and no next fire, and is included in the workspace breaker because it also starts unattended work. |
-| **Task** | **Existing** | The unit of delegated work. A recurring Task template *is* the standing definition; each fire spawns a Task instance that an Agent picks up. Read and written through the Tasks paths only. |
-| **Mission** | **Existing** | A standing initiative that keeps raising **Ideas**, and through them Works. It owns **one** of the seven cadences here: that cadence is the Schedule row, and the Mission is the row's source, owner, provenance and filter — never itself a unit of work. Its statuses are its own (`active` · `paused` · `completed` · `failed`) and this surface neither renames nor extends them; the lifecycle in §5.1 belongs to the Schedule. Read and written through the Missions paths only. |
-| **Agent / Work** | **Existing** | Owners, link targets and filter dimensions. Read and written through their existing paths only. |
+| Concept                  | New or existing                         | What it is here                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Schedule**             | **Existing** (extended)                 | The unified recurring definition. Today it is a read-only projection over seven sources. This epic keeps that projection as the canonical shape and adds to each row: the owning Agent, a health verdict, a control descriptor, a paused-at instant, the consecutive-failure count, and the resolved options.                                                                                                                                                                          |
+| **Standing definition**  | **Existing form, extended**             | The authored kind of Schedule: instructions + cadence + options, owned by an Agent. In Ever Works this is a recurring Task bound to an Agent — the same object the Tasks surface already shows — extended with a pause that preserves the cadence, a model, a time limit, an announce flag, and a board-visibility flag. **No new noun is introduced**: it is a Schedule, and its Task remains a Task.                                                                                 |
+| **Heartbeat**            | **Existing** (extended)                 | A per-Agent, instruction-free periodic wake. Gains an independent pause that preserves the cadence, and overlap detection against that Agent's Schedules.                                                                                                                                                                                                                                                                                                                              |
+| **Schedule health**      | **New — projection only, no new table** | The verdict OK / NEVER RUNS plus one reason and one repair class, computed from the cadence, the bounds, and the owner's reachability. Declared new because "a schedule that cannot fire" has no representation today.                                                                                                                                                                                                                                                                 |
+| **Occurrence**           | **New — projection only, no new table** | One expansion of a Schedule's cadence onto a calendar instant, past or future, together with what the platform knows actually happened at it: a matched Run for the sources that produce one, and the source's own record of the fire for those that do not. It has no id, cannot be opened on its own, and is never a Run. Presenting projections and records as the same object would make every id on this surface unreliable.                                                      |
+| **Schedule bulk action** | **New — a small record**                | The durable receipt of one bulk operation: a disable-all batch or a fix batch. It stores exactly which Schedules were transitioned and their previous values, so undo restores precisely that set and touches nothing a teammate changed afterwards. Justified as new because an exact undo cannot be reconstructed from the current state, and reusing the activity log for functional state would make an audit record load-bearing.                                                 |
+| **Run**                  | **Existing**                            | One execution. A recurring Task fire and a heartbeat fire each produce one; a Mission tick does not (§5.2). This epic creates no run history of its own and links to AW-09's receipt.                                                                                                                                                                                                                                                                                                  |
+| **Trigger**              | **Existing**                            | The event-driven sibling. Appears in both views with a fixed "on event" cadence and no next fire, and is included in the workspace breaker because it also starts unattended work.                                                                                                                                                                                                                                                                                                     |
+| **Task**                 | **Existing**                            | The unit of delegated work. A recurring Task template _is_ the standing definition; each fire spawns a Task instance that an Agent picks up. Read and written through the Tasks paths only.                                                                                                                                                                                                                                                                                            |
+| **Mission**              | **Existing**                            | A standing initiative that keeps raising **Ideas**, and through them Works. It owns **one** of the seven cadences here: that cadence is the Schedule row, and the Mission is the row's source, owner, provenance and filter — never itself a unit of work. Its statuses are its own (`active` · `paused` · `completed` · `failed`) and this surface neither renames nor extends them; the lifecycle in §5.1 belongs to the Schedule. Read and written through the Missions paths only. |
+| **Agent / Work**         | **Existing**                            | Owners, link targets and filter dimensions. Read and written through their existing paths only.                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ### 5.1 Schedule lifecycle
 
@@ -1065,11 +1065,11 @@ Copy:
 - Time-limit helper: **"Between 60 and 14400 seconds. Inherited: {value} from {source}."**
 - Announce helper: **"On by default for schedules that fire once a day or less."**
 - Refusals:
-  - **"The tightest cadence is every 5 minutes."**
-  - **"That cadence fires {n} times a day. Check the cost before you save."**
-  - **"This agent has the maximum of 50 schedules. Retire one, or create it on another agent."**
-  - **"Your workspace has the maximum of 500 schedules."**
-  - **"That cadence cannot be read. Check the expression."**
+    - **"The tightest cadence is every 5 minutes."**
+    - **"That cadence fires {n} times a day. Check the cost before you save."**
+    - **"This agent has the maximum of 50 schedules. Retire one, or create it on another agent."**
+    - **"Your workspace has the maximum of 500 schedules."**
+    - **"That cadence cannot be read. Check the expression."**
 - Save confirmation: **"Saved. Next fire: {when} ({countdown})."**
 
 Keyboard: `Tab` walks the guided fields in order · `Ctrl`/`Cmd`+`Enter` saves · `Esc` closes with
@@ -1338,7 +1338,7 @@ separable from its Mission (FR-19):
    links to it; cancelling stays where it already is.
 6. **Cost caps and credit policy.** AW-17. This surface shows cost on a fire and refuses a
    run-now when credits cannot cover it; it sets no caps.
-7. **Notification routing and the attention budget.** AW-13. This surface decides *whether* a
+7. **Notification routing and the attention budget.** AW-13. This surface decides _whether_ a
    Schedule announces; it does not decide which channel that reaches.
 8. **Semantic overlap detection.** The overlap warning is deterministic term comparison and fire
    coincidence. No model is asked whether two instructions "mean the same thing".
@@ -1514,18 +1514,18 @@ A reviewer can run this list end to end.
 
 ## 10. Constitution gates
 
-| Gate | Verdict | Why |
-| --- | --- | --- |
-| I — Plugin-first | **Pass** | No external integration is added. Model selection resolves through the existing capability facade. |
-| II — Capability-driven resolution | **Pass** | The per-Schedule model option stores a provider/model choice resolved through the facade; no plugin id is hardcoded outside a plugin. |
-| III — Source-of-truth repositories | **Pass** | Schedules are platform metadata, which the constitution explicitly places in the database. No Work content moves. |
-| IV — Job runtime | **Pass** | The health sweep is registered as a cron task on the configured job-runtime provider; every dispatch goes through the existing dispatcher indirection. |
-| V — Forward-only migrations | **Pass** | Three additive migrations, one per phase; no column is renamed or dropped. |
-| VI — Tests first | **Pass** | Unit, controller and end-to-end coverage is named per phase in the plan. |
-| VII — Secrets | **Pass** | Instructions are scanned like existing agent instruction fields; nothing marked secret renders. |
-| VIII — Plugin counts | **N/A** | No plugin list changes. |
-| IX — Behaviour-first spec | **Pass** | This document names no class, path or code. |
-| X — Backwards compatibility | **Pass** | The existing schedules read endpoint keeps its shape and gains only additive fields; the paged form is a new endpoint. |
+| Gate                               | Verdict  | Why                                                                                                                                                    |
+| ---------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| I — Plugin-first                   | **Pass** | No external integration is added. Model selection resolves through the existing capability facade.                                                     |
+| II — Capability-driven resolution  | **Pass** | The per-Schedule model option stores a provider/model choice resolved through the facade; no plugin id is hardcoded outside a plugin.                  |
+| III — Source-of-truth repositories | **Pass** | Schedules are platform metadata, which the constitution explicitly places in the database. No Work content moves.                                      |
+| IV — Job runtime                   | **Pass** | The health sweep is registered as a cron task on the configured job-runtime provider; every dispatch goes through the existing dispatcher indirection. |
+| V — Forward-only migrations        | **Pass** | Three additive migrations, one per phase; no column is renamed or dropped.                                                                             |
+| VI — Tests first                   | **Pass** | Unit, controller and end-to-end coverage is named per phase in the plan.                                                                               |
+| VII — Secrets                      | **Pass** | Instructions are scanned like existing agent instruction fields; nothing marked secret renders.                                                        |
+| VIII — Plugin counts               | **N/A**  | No plugin list changes.                                                                                                                                |
+| IX — Behaviour-first spec          | **Pass** | This document names no class, path or code.                                                                                                            |
+| X — Backwards compatibility        | **Pass** | The existing schedules read endpoint keeps its shape and gains only additive fields; the paged form is a new endpoint.                                 |
 
 ---
 

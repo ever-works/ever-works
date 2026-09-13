@@ -19,7 +19,7 @@ read the attention state this epic makes authoritative.
 > **Additive rule (program §5.1, NN #20).** This epic finishes machinery Ever Works already
 > shipped. It renames no entity, deletes no table, drops no column, and removes no delivery
 > path. Every event that can reach a user today still reaches them after this epic; the change
-> is that the user can finally *see* and *choose* how.
+> is that the user can finally _see_ and _choose_ how.
 
 ---
 
@@ -29,7 +29,7 @@ Settings → Notifications becomes a working **notification matrix**: one row pe
 platform can tell you about, and two independent switches on every row — **In-app** and
 **Email** — plus one extra column for each chat channel the user has connected. Toggling a
 switch saves immediately; there is no Save button. The defaults are chosen by a single rule the
-page states out loud: *you are interrupted only for the things that only you can unblock*.
+page states out loud: _you are interrupted only for the things that only you can unblock_.
 On top of the matrix sits an **attention budget** — a per-user ceiling on how many interrupting
 deliveries may leave the platform in a rolling 24 hours. When the ceiling is reached, further
 non-urgent deliveries are **held**, not dropped: the in-app record is always written, and every
@@ -40,27 +40,27 @@ deferred by quiet hours.
 ## 2. Why now
 
 **The user's question.** An owner who has delegated work to four agents asks, once, on day two:
-*"How do I stop this thing from emailing me about everything, without turning off the two
-things I actually need to know?"*
+_"How do I stop this thing from emailing me about everything, without turning off the two
+things I actually need to know?"_
 
 **What they do today.** Nothing that works.
 
-| The user needs | Ever Works today |
-| --- | --- |
-| A screen where the choices are visible | Settings → Notifications renders the event grid as a **read-only table** — the checkboxes have no change handler, nothing is ever saved, and the page has no translated strings at all. Every checkbox is a lie. |
-| An **Email** switch | There is no built-in email delivery for notifications. The only built-in channel is in-app. Getting a notification by email requires creating a "channel" against a delivery plugin, and email is not one of the five that exist. |
-| An **In-app** switch that does something | The in-app row is written unconditionally by every producer. Turning "in-app" off in the grid changes nothing, even conceptually — there is no code path that reads it. |
-| To find the screen at all | The Notifications, Channels and Email-addresses settings pages shipped with **zero inbound links** from anywhere in the product. They are reachable only by typing the URL. |
-| Every event to be listed | Five of the events the platform actually emits — credit balance exhausted, payment past due, the two pay-as-you-go cap notices, digest ready, memory ready for review — are **not registered**, so they never appear as a row and can never be routed anywhere but in-app. A sixth, the budget-cap alert, has no event identity at all. |
-| Mute to work | Two registered events are filed under categories that are not valid mute targets, so they can never be muted no matter what the user does. |
-| Turning everything off for one event to stick | An empty selection is treated as "no preference" and silently falls back to the defaults, so the one gesture a frustrated user reaches for is the one that does not work. |
-| A ceiling | There is none. A busy week is an unbounded stream. The only blunt instruments are quiet hours (which delays, and only outside the window) and category mute (which is per-category, not per-event). |
-| The digest to actually arrive by email | The Digest settings page tells the user their digest is "delivered in-app and to any notification channel you have connected". Because the digest event is unregistered, it is in-app only. The page's own copy is false. |
+| The user needs                                | Ever Works today                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A screen where the choices are visible        | Settings → Notifications renders the event grid as a **read-only table** — the checkboxes have no change handler, nothing is ever saved, and the page has no translated strings at all. Every checkbox is a lie.                                                                                                                        |
+| An **Email** switch                           | There is no built-in email delivery for notifications. The only built-in channel is in-app. Getting a notification by email requires creating a "channel" against a delivery plugin, and email is not one of the five that exist.                                                                                                       |
+| An **In-app** switch that does something      | The in-app row is written unconditionally by every producer. Turning "in-app" off in the grid changes nothing, even conceptually — there is no code path that reads it.                                                                                                                                                                 |
+| To find the screen at all                     | The Notifications, Channels and Email-addresses settings pages shipped with **zero inbound links** from anywhere in the product. They are reachable only by typing the URL.                                                                                                                                                             |
+| Every event to be listed                      | Five of the events the platform actually emits — credit balance exhausted, payment past due, the two pay-as-you-go cap notices, digest ready, memory ready for review — are **not registered**, so they never appear as a row and can never be routed anywhere but in-app. A sixth, the budget-cap alert, has no event identity at all. |
+| Mute to work                                  | Two registered events are filed under categories that are not valid mute targets, so they can never be muted no matter what the user does.                                                                                                                                                                                              |
+| Turning everything off for one event to stick | An empty selection is treated as "no preference" and silently falls back to the defaults, so the one gesture a frustrated user reaches for is the one that does not work.                                                                                                                                                               |
+| A ceiling                                     | There is none. A busy week is an unbounded stream. The only blunt instruments are quiet hours (which delays, and only outside the window) and category mute (which is per-category, not per-event).                                                                                                                                     |
+| The digest to actually arrive by email        | The Digest settings page tells the user their digest is "delivered in-app and to any notification channel you have connected". Because the digest event is unregistered, it is in-app only. The page's own copy is false.                                                                                                               |
 
-**The consequence.** The safety story of the whole program — *"you will be told when only you
-can unblock it, and left alone otherwise"* — is currently unenforceable. Users cannot verify it,
-tune it, or trust it. [AW-04](../AW-04-live-feed/) makes the routine hum *visible*; this epic is
-what makes it *silent*, so that the loud things stay loud.
+**The consequence.** The safety story of the whole program — _"you will be told when only you
+can unblock it, and left alone otherwise"_ — is currently unenforceable. Users cannot verify it,
+tune it, or trust it. [AW-04](../AW-04-live-feed/) makes the routine hum _visible_; this epic is
+what makes it _silent_, so that the loud things stay loud.
 
 **Why it must be this epic and not a settings tidy-up.** Making the switches work is only the
 visible half. The half that matters is that a notification's route becomes **one decision, taken
@@ -82,18 +82,18 @@ handler sends its own email on a separate boolean column; quiet hours defers som
 
 - **S2 — Turning one thing off.**
   **Given** the matrix is open,
-  **when** the user clicks the **Email** switch on *A generation failed*,
+  **when** the user clicks the **Email** switch on _A generation failed_,
   **then** the switch flips immediately, a subtle "Saving…" marker appears on that row, and
   within 2 seconds it becomes "Saved"; reloading the page shows the switch still off.
 
 - **S3 — Turning one thing on that has never been on.**
-  **Given** *A run finished* is off in both columns,
+  **Given** _A run finished_ is off in both columns,
   **when** the user turns **In-app** on,
   **then** the next finished run produces a bell notification, and the row's helper text updates
   from "Visible in the Live Feed and on Runs" to "Also shown in your notifications".
 
 - **S4 — Email actually arrives.**
-  **Given** *An agent needs your decision* has Email on and the user's account address is
+  **Given** _An agent needs your decision_ has Email on and the user's account address is
   verified,
   **when** an agent escalates,
   **then** within 60 seconds an email arrives at the account address with the escalation's
@@ -131,7 +131,7 @@ handler sends its own email on a separate boolean column; quiet hours defers som
   and a hint that the channel is subject to the same budget as email.
 
 - **S10 — Turning everything off for one row and having it stick.**
-  **Given** *A generation finished* has In-app on,
+  **Given** _A generation finished_ has In-app on,
   **when** the user turns off every column on that row,
   **then** the row saves as an explicit "nothing", and after a reload it is still nothing —
   it does not silently revert to the platform defaults.
@@ -292,7 +292,7 @@ handler sends its own email on a separate boolean column; quiet hours defers som
   channel and MUST NOT depend on any chat provider.
 - **FR-17.** A notification email MUST contain: the event title, the message, the workspace name,
   one primary action button that deep-links to the place the decision or record lives, the reason
-  it was sent ("You get this because *An agent needs your decision* is on for Email"), and a link
+  it was sent ("You get this because _An agent needs your decision_ is on for Email"), and a link
   to the matrix.
 - **FR-18.** Email delivery MUST be retried on failure with the same bounded backoff the platform
   already uses for chat delivery, and MUST record one delivery-log row per attempt, including
@@ -324,48 +324,48 @@ handler sends its own email on a separate boolean column; quiet hours defers som
   today under categories that are not, and MUST be corrected.
 - **FR-26.** The shipped defaults MUST be exactly:
 
-  **Needs you — urgent; In-app ON, Email ON; never budgeted, never deferred by quiet hours**
+    **Needs you — urgent; In-app ON, Email ON; never budgeted, never deferred by quiet hours**
 
-  | Event | Category |
-  | --- | --- |
-  | An agent needs your decision | Agent |
-  | An agent asked you a question | Agent |
-  | An agent is waiting for your approval | Agent |
-  | An escalation is waiting for you | Agent |
-  | A mission is blocked | System |
-  | Your Git sign-in expired | Security |
-  | AI credits ran out | AI credits |
-  | Your credit balance is empty | AI credits |
-  | Pay-as-you-go cap reached | AI credits |
-  | A payment failed | AI credits |
-  | A budget cap was reached | AI credits |
+    | Event                                 | Category   |
+    | ------------------------------------- | ---------- |
+    | An agent needs your decision          | Agent      |
+    | An agent asked you a question         | Agent      |
+    | An agent is waiting for your approval | Agent      |
+    | An escalation is waiting for you      | Agent      |
+    | A mission is blocked                  | System     |
+    | Your Git sign-in expired              | Security   |
+    | AI credits ran out                    | AI credits |
+    | Your credit balance is empty          | AI credits |
+    | Pay-as-you-go cap reached             | AI credits |
+    | A payment failed                      | AI credits |
+    | A budget cap was reached              | AI credits |
 
-  **Signals — not urgent; In-app ON, Email OFF; budgeted**
+    **Signals — not urgent; In-app ON, Email OFF; budgeted**
 
-  | Event | Category |
-  | --- | --- |
-  | Pay-as-you-go at 80% of cap | AI credits |
-  | A budget cap is getting close | AI credits |
-  | A schedule paused itself | Generation |
-  | A model provider keeps failing | AI credits |
-  | A generation failed | Generation |
-  | A run is waiting for capacity | Agent |
-  | A run moved off your computer | Agent |
-  | New memory is ready for review | Agent |
-  | The platform filed a notice for you | System |
+    | Event                               | Category   |
+    | ----------------------------------- | ---------- |
+    | Pay-as-you-go at 80% of cap         | AI credits |
+    | A budget cap is getting close       | AI credits |
+    | A schedule paused itself            | Generation |
+    | A model provider keeps failing      | AI credits |
+    | A generation failed                 | Generation |
+    | A run is waiting for capacity       | Agent      |
+    | A run moved off your computer       | Agent      |
+    | New memory is ready for review      | Agent      |
+    | The platform filed a notice for you | System     |
 
-  **Routine — not urgent; In-app OFF, Email OFF; budgeted if switched on**
+    **Routine — not urgent; In-app OFF, Email OFF; budgeted if switched on**
 
-  | Event | Category | Visible instead in |
-  | --- | --- | --- |
-  | A run finished | Agent | Live Feed, Runs, Home |
-  | A generation finished | Generation | Live Feed, the Work's activity |
+    | Event                 | Category   | Visible instead in             |
+    | --------------------- | ---------- | ------------------------------ |
+    | A run finished        | Agent      | Live Feed, Runs, Home          |
+    | A generation finished | Generation | Live Feed, the Work's activity |
 
-  **Digest — not urgent; In-app OFF, Email ON**
+    **Digest — not urgent; In-app OFF, Email ON**
 
-  | Event | Category |
-  | --- | --- |
-  | Your digest is ready | Digest |
+    | Event                | Category |
+    | -------------------- | -------- |
+    | Your digest is ready | Digest   |
 
 - **FR-27.** Four events that are "only you can unblock" are not marked urgent today and MUST
   become urgent: an agent needs your decision, an agent is waiting for your approval, an
@@ -435,23 +435,23 @@ handler sends its own email on a separate boolean column; quiet hours defers som
 
 ## 5. Key entities
 
-| Concept | New? | Description |
-| --- | --- | --- |
-| **Notification** | Existing | The in-app record. Gains one attribute: whether it was written silently (FR-21). |
-| **Notification event type** | Existing | The registry row that makes an event addressable. This epic completes it (FR-24), corrects two categories (FR-25) and four urgency flags (FR-27). No shape change. |
-| **Subscription** | Existing | One per user per event, naming the delivery targets. This epic fixes the meaning of an empty selection (FR-13). No shape change. |
-| **Delivery target** | Existing concept, one new member | Today: the built-in *in-app*, plus each connected **Connection**-backed chat channel. This epic adds one more built-in member, **email**. It is not a new entity — it is a second sentinel alongside the one that already exists. |
-| **Notification preference** | Existing | The per-user row that holds quiet hours. Gains the two budget ceilings and the budget on/off flag. |
-| **Delivery log** | Existing | One row per delivery attempt. Gains the owning user and the built-in-target name, so email attempts can be recorded in the same log as chat attempts and so the budget can be counted from one place. |
-| **Attention hold** | **New entity** | One record per delivery the budget held. Justified below. |
-| **Digest** | Existing | Gains two sections (FR-41) and becomes the release valve for holds. |
-| **Category mute** | Existing | Unchanged behaviour; the matrix now surfaces it (S27). |
-| **Connection** | Existing | A connected chat account. Each one contributes one matrix column. Unchanged. |
-| **Approval / Escalation** | Existing | The source of the loudest events. Unchanged; only their routing changes. |
+| Concept                     | New?                             | Description                                                                                                                                                                                                                       |
+| --------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Notification**            | Existing                         | The in-app record. Gains one attribute: whether it was written silently (FR-21).                                                                                                                                                  |
+| **Notification event type** | Existing                         | The registry row that makes an event addressable. This epic completes it (FR-24), corrects two categories (FR-25) and four urgency flags (FR-27). No shape change.                                                                |
+| **Subscription**            | Existing                         | One per user per event, naming the delivery targets. This epic fixes the meaning of an empty selection (FR-13). No shape change.                                                                                                  |
+| **Delivery target**         | Existing concept, one new member | Today: the built-in _in-app_, plus each connected **Connection**-backed chat channel. This epic adds one more built-in member, **email**. It is not a new entity — it is a second sentinel alongside the one that already exists. |
+| **Notification preference** | Existing                         | The per-user row that holds quiet hours. Gains the two budget ceilings and the budget on/off flag.                                                                                                                                |
+| **Delivery log**            | Existing                         | One row per delivery attempt. Gains the owning user and the built-in-target name, so email attempts can be recorded in the same log as chat attempts and so the budget can be counted from one place.                             |
+| **Attention hold**          | **New entity**                   | One record per delivery the budget held. Justified below.                                                                                                                                                                         |
+| **Digest**                  | Existing                         | Gains two sections (FR-41) and becomes the release valve for holds.                                                                                                                                                               |
+| **Category mute**           | Existing                         | Unchanged behaviour; the matrix now surfaces it (S27).                                                                                                                                                                            |
+| **Connection**              | Existing                         | A connected chat account. Each one contributes one matrix column. Unchanged.                                                                                                                                                      |
+| **Approval / Escalation**   | Existing                         | The source of the loudest events. Unchanged; only their routing changes.                                                                                                                                                          |
 
 ### 5.1 Why one new entity is justified
 
-The budget's promise is *"held, not dropped."* A counter can enforce a ceiling but cannot keep
+The budget's promise is _"held, not dropped."_ A counter can enforce a ceiling but cannot keep
 that promise: once a delivery is suppressed, nothing in the system remembers **what** was
 suppressed, and the digest has nothing to list. The in-app record is not sufficient either — it
 does not record that an external delivery was refused, or to which target class, and rebuilding
@@ -719,60 +719,60 @@ retrievable under the Muted filter. Persistent notifications are always `loud` (
 
 ### 6.9 Exact user-visible copy
 
-| Where | Copy |
-| --- | --- |
-| Page title | **Notifications** |
-| Page subtitle | You are interrupted only for things that only you can unblock. Everything else stays visible in the Live Feed and your digest. |
-| Group: needs you | **Needs you** — we interrupt you for these |
-| Group: signals | **Signals** — worth knowing, not worth an interruption by email |
-| Group: routine | **Routine** — off, because you can already see it |
-| Group: digest | **Digest** |
-| Column: in-app | In-app |
-| Column: email | Email |
-| Column overflow | +{count} more |
-| Row state saving | Saving… |
-| Row state saved | Saved |
-| Row state failed | Couldn't save — Try again |
-| Row locked | Always shown in the app |
-| Row muted | Muted until {time} · Unmute |
-| Row quiet-deferred | Email held until {time} |
-| Routine helper 1 | Visible in the Live Feed, on Runs and on Home. |
-| Routine helper 2 | Visible in the Live Feed and on the Work's activity. |
-| Digest helper | {cadence}. Change cadence → |
-| Budget card title | **Attention budget** |
-| Budget meter | {used} of {limit} · {held} held |
-| Budget reset | Resets in {duration} |
-| Budget off | Off. Nothing is held. |
-| Budget over | Over your limit. {held} held and summarised in your digest. |
-| Budget zero | Non-urgent email is held and summarised in your digest. Urgent alerts still send. |
-| Budget dialog title | Attention budget |
-| Budget dialog body | How many times a day may we interrupt you outside the app? Urgent alerts — decisions, blocked missions, billing — always send, whatever you set here. |
-| Budget dialog note | Anything over the limit is held and listed in your next digest. Nothing is ever silently dropped. |
-| Quiet hours empty | Quiet hours: not set |
-| Quiet hours preset | Set 22:00 – 07:00 |
-| Quiet hours set | Quiet hours: {start} – {end} ({timezone}) · Change |
-| Reset button | Reset to recommended |
-| Reset dialog title | Reset to recommended? |
-| Reset dialog body | {count} of {total} rows will change back to the recommended setting. Your quiet hours, budget limits and connected channels are not affected. |
-| Email unverified | Not verified · Verify now → |
-| Email not configured | Not configured on this workspace |
-| Channel disabled | Disabled — deliveries are skipped |
-| Channel removed | "{name}" no longer exists. Its column has been removed. Your other choices are unchanged. |
-| Too many targets | An event can be sent to at most {max} places. Turn one off first. |
-| Test email link | Send yourself a test email → |
-| Test email sent | Sent. Check {address}. |
-| Test email failed | Couldn't send: {reason} |
-| Test email throttled | You can send {max} test emails every {minutes} minutes. Try again in {duration}. |
-| Connect channel link | Want a chat channel too? Connect one → |
-| Empty registry title | Nothing to configure yet |
-| Empty registry body | No events are registered on this workspace, so there is nothing to route. Everything your agents do is still in the Live Feed. |
-| Load error | Couldn't load your notification settings. Nothing has changed. |
-| Holds expiring | {count} items are held and will expire in {duration}. Turn on a digest to receive them. |
-| Email footer reason | You get this because **{event}** is on for Email. Change what you hear about → |
-| Digest section title | Held for you |
-| Digest section body | {count} notifications were held while you were over your attention budget. |
-| Digest attention line | {emailUsed} of {emailLimit} emails and {channelUsed} of {channelLimit} channel messages were sent this period. |
-| Bell footer link | Notification settings → |
+| Where                 | Copy                                                                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page title            | **Notifications**                                                                                                                                     |
+| Page subtitle         | You are interrupted only for things that only you can unblock. Everything else stays visible in the Live Feed and your digest.                        |
+| Group: needs you      | **Needs you** — we interrupt you for these                                                                                                            |
+| Group: signals        | **Signals** — worth knowing, not worth an interruption by email                                                                                       |
+| Group: routine        | **Routine** — off, because you can already see it                                                                                                     |
+| Group: digest         | **Digest**                                                                                                                                            |
+| Column: in-app        | In-app                                                                                                                                                |
+| Column: email         | Email                                                                                                                                                 |
+| Column overflow       | +{count} more                                                                                                                                         |
+| Row state saving      | Saving…                                                                                                                                               |
+| Row state saved       | Saved                                                                                                                                                 |
+| Row state failed      | Couldn't save — Try again                                                                                                                             |
+| Row locked            | Always shown in the app                                                                                                                               |
+| Row muted             | Muted until {time} · Unmute                                                                                                                           |
+| Row quiet-deferred    | Email held until {time}                                                                                                                               |
+| Routine helper 1      | Visible in the Live Feed, on Runs and on Home.                                                                                                        |
+| Routine helper 2      | Visible in the Live Feed and on the Work's activity.                                                                                                  |
+| Digest helper         | {cadence}. Change cadence →                                                                                                                           |
+| Budget card title     | **Attention budget**                                                                                                                                  |
+| Budget meter          | {used} of {limit} · {held} held                                                                                                                       |
+| Budget reset          | Resets in {duration}                                                                                                                                  |
+| Budget off            | Off. Nothing is held.                                                                                                                                 |
+| Budget over           | Over your limit. {held} held and summarised in your digest.                                                                                           |
+| Budget zero           | Non-urgent email is held and summarised in your digest. Urgent alerts still send.                                                                     |
+| Budget dialog title   | Attention budget                                                                                                                                      |
+| Budget dialog body    | How many times a day may we interrupt you outside the app? Urgent alerts — decisions, blocked missions, billing — always send, whatever you set here. |
+| Budget dialog note    | Anything over the limit is held and listed in your next digest. Nothing is ever silently dropped.                                                     |
+| Quiet hours empty     | Quiet hours: not set                                                                                                                                  |
+| Quiet hours preset    | Set 22:00 – 07:00                                                                                                                                     |
+| Quiet hours set       | Quiet hours: {start} – {end} ({timezone}) · Change                                                                                                    |
+| Reset button          | Reset to recommended                                                                                                                                  |
+| Reset dialog title    | Reset to recommended?                                                                                                                                 |
+| Reset dialog body     | {count} of {total} rows will change back to the recommended setting. Your quiet hours, budget limits and connected channels are not affected.         |
+| Email unverified      | Not verified · Verify now →                                                                                                                           |
+| Email not configured  | Not configured on this workspace                                                                                                                      |
+| Channel disabled      | Disabled — deliveries are skipped                                                                                                                     |
+| Channel removed       | "{name}" no longer exists. Its column has been removed. Your other choices are unchanged.                                                             |
+| Too many targets      | An event can be sent to at most {max} places. Turn one off first.                                                                                     |
+| Test email link       | Send yourself a test email →                                                                                                                          |
+| Test email sent       | Sent. Check {address}.                                                                                                                                |
+| Test email failed     | Couldn't send: {reason}                                                                                                                               |
+| Test email throttled  | You can send {max} test emails every {minutes} minutes. Try again in {duration}.                                                                      |
+| Connect channel link  | Want a chat channel too? Connect one →                                                                                                                |
+| Empty registry title  | Nothing to configure yet                                                                                                                              |
+| Empty registry body   | No events are registered on this workspace, so there is nothing to route. Everything your agents do is still in the Live Feed.                        |
+| Load error            | Couldn't load your notification settings. Nothing has changed.                                                                                        |
+| Holds expiring        | {count} items are held and will expire in {duration}. Turn on a digest to receive them.                                                               |
+| Email footer reason   | You get this because **{event}** is on for Email. Change what you hear about →                                                                        |
+| Digest section title  | Held for you                                                                                                                                          |
+| Digest section body   | {count} notifications were held while you were over your attention budget.                                                                            |
+| Digest attention line | {emailUsed} of {emailLimit} emails and {channelUsed} of {channelLimit} channel messages were sent this period.                                        |
+| Bell footer link      | Notification settings →                                                                                                                               |
 
 ### 6.10 Keyboard
 

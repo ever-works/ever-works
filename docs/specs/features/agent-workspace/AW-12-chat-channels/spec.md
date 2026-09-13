@@ -47,23 +47,23 @@ explicitly, in the product, per message, and shows the answer back to the person
 
 ### 2.1 The questions our users cannot answer today
 
-> *"I have eleven Agents. Which one am I talking to, where did last Tuesday's conversation about
-> the pricing page go, and how do I tell all of them at once that the launch slipped?"*
+> _"I have eleven Agents. Which one am I talking to, where did last Tuesday's conversation about
+> the pricing page go, and how do I tell all of them at once that the launch slipped?"_
 
 They cannot answer any of the three. Here is what they do instead.
 
-| What the user wants | What Ever Works gives them today | What they do instead |
-| --- | --- | --- |
-| "Talk to *this* Agent" | The assistant panel is **not addressed at an Agent at all**. A Conversation row records a user, a provider and a model — there is no Agent on it. The tool-calling assistant is a single generalist. | Open the Agent's detail page and read its run history, then come back to the panel and describe the Agent in prose. |
-| "One conversation per job" | Conversations exist and persist, but a new one is created only by pressing **New chat**, which silently clears the panel. Nothing marks a Conversation as being *about* anything. | Let one Conversation run for weeks and scroll. |
-| "Name this one, it matters" | Titles exist but are **machine-written only** — auto-derived from the first message, then rewritten once by a model at four messages. There is no way to set or clear a name. | Recognise Conversations by their first line in the history list. |
-| "Keep it open while I work" | The panel does dock and does remember its width — but it holds exactly **one** live conversation, has no internal navigation, and reopening the history list replaces the whole panel body. | Keep two browser tabs open. |
-| "Loop in the research Agent" | Impossible. A Conversation belongs to **one user** and has no participant concept of any kind — no second Agent, no second person. | Copy the transcript into a new Conversation and re-explain. |
-| "Tell everyone the launch slipped" | Impossible. There is no broadcast of any kind. | Open eleven Conversations and paste eleven times. |
-| "What are my Agents saying to each other?" | Agents can already delegate to one another through an explicit collaborator allow-list, and those child executions are real — but the coordination is only visible as separate rows in a run list. | Read two run transcripts side by side and infer the exchange. |
-| "Did that reach the paused one?" | Nothing shows delivery. An Agent that is `paused`, in `error`, or parked behind the concurrency valve simply does not act, silently. | Check each Agent's status page one at a time. |
-| "This `@` — will it work?" | `@`-mention parsing exists and works server-side **for Task chat**, and `@kb:` document references exist and work server-side **for the assistant panel** — but neither has any composer affordance. Nothing lights up, nothing is picked, and an unresolvable token is dropped after send, silently. | Type the mention, send, wait, notice nothing happened, retype it. |
-| "That send failed" | The panel shows a generic inline error banner and the text is gone from the composer. | Retype the message from memory. |
+| What the user wants                        | What Ever Works gives them today                                                                                                                                                                                                                                                                      | What they do instead                                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| "Talk to _this_ Agent"                     | The assistant panel is **not addressed at an Agent at all**. A Conversation row records a user, a provider and a model — there is no Agent on it. The tool-calling assistant is a single generalist.                                                                                                  | Open the Agent's detail page and read its run history, then come back to the panel and describe the Agent in prose. |
+| "One conversation per job"                 | Conversations exist and persist, but a new one is created only by pressing **New chat**, which silently clears the panel. Nothing marks a Conversation as being _about_ anything.                                                                                                                     | Let one Conversation run for weeks and scroll.                                                                      |
+| "Name this one, it matters"                | Titles exist but are **machine-written only** — auto-derived from the first message, then rewritten once by a model at four messages. There is no way to set or clear a name.                                                                                                                         | Recognise Conversations by their first line in the history list.                                                    |
+| "Keep it open while I work"                | The panel does dock and does remember its width — but it holds exactly **one** live conversation, has no internal navigation, and reopening the history list replaces the whole panel body.                                                                                                           | Keep two browser tabs open.                                                                                         |
+| "Loop in the research Agent"               | Impossible. A Conversation belongs to **one user** and has no participant concept of any kind — no second Agent, no second person.                                                                                                                                                                    | Copy the transcript into a new Conversation and re-explain.                                                         |
+| "Tell everyone the launch slipped"         | Impossible. There is no broadcast of any kind.                                                                                                                                                                                                                                                        | Open eleven Conversations and paste eleven times.                                                                   |
+| "What are my Agents saying to each other?" | Agents can already delegate to one another through an explicit collaborator allow-list, and those child executions are real — but the coordination is only visible as separate rows in a run list.                                                                                                    | Read two run transcripts side by side and infer the exchange.                                                       |
+| "Did that reach the paused one?"           | Nothing shows delivery. An Agent that is `paused`, in `error`, or parked behind the concurrency valve simply does not act, silently.                                                                                                                                                                  | Check each Agent's status page one at a time.                                                                       |
+| "This `@` — will it work?"                 | `@`-mention parsing exists and works server-side **for Task chat**, and `@kb:` document references exist and work server-side **for the assistant panel** — but neither has any composer affordance. Nothing lights up, nothing is picked, and an unresolvable token is dropped after send, silently. | Type the mention, send, wait, notice nothing happened, retype it.                                                   |
+| "That send failed"                         | The panel shows a generic inline error banner and the text is gone from the composer.                                                                                                                                                                                                                 | Retype the message from memory.                                                                                     |
 
 ### 2.2 Why this is the right moment
 
@@ -85,7 +85,7 @@ They cannot answer any of the three. Here is what they do instead.
    silently exhaust the org's concurrency budget.
 4. **The panel is already the right shape.** It already docks, already resizes by pointer drag,
    already persists its width, already has a distinct mobile full-screen mode, and already restores
-   the active Conversation across reloads. This epic adds navigation *inside* it, not a new panel.
+   the active Conversation across reloads. This epic adds navigation _inside_ it, not a new panel.
 5. **There is dead weight to reclaim.** Message-edit copy already exists in the message catalogue
    with no component rendering it. This epic either uses those strings or leaves them alone — it
    does not add a second vocabulary next to them.
@@ -578,17 +578,17 @@ Every number below is normative.
 
 ## 5. Key entities
 
-| Concept | Status | Notes |
-| --- | --- | --- |
-| **Conversation** | **Exists, extended** | Today: one user, an optional machine title, a provider and a model. This epic adds a *kind*, an optional addressed **Agent**, a name that a person owns, an optional attached context object, an archived state, a last-activity time and a link to a related Conversation. No rename, no replacement. |
-| **Conversation message** | **Exists, extended** | Today: role, content, parts, model, token usage. This epic adds an **author** (a person or an Agent), resolved **mentions**, **attachments**, a **send status**, a client identifier for safe retry, and — on channel posts — a **reach receipt**. |
-| **Conversation participant** | **NEW** | The one genuinely new entity. Today a Conversation has exactly one user and no way to express a second party. A participant is a person or an Agent in a Conversation, with a role (`owner`, `member`, `observer`), a joined and optionally departed time, a last-read position and a mute flag. Everything in this epic that is not one-to-one needs it: group membership, channel membership, Agent pairs, unread state and read receipts. It is added to the program vocabulary table in the same change. |
-| **Agent** | **Exists, unchanged** | Addressed by Conversations and by mentions. Its status lifecycle (`draft`, `active`, `running`, `paused`, `error`, `archived`) is what the reach receipt reports against. Its collaborator allow-list is what authorises an Agent pair. |
-| **Run** | **Exists, extended** | An Agent reply is a Run like any other. This epic adds a link from a Run back to the Conversation message that triggered it, and a trigger kind for it. |
-| **Organization** | **Exists, unchanged** | Owns exactly one organization channel and scopes Agent-pair visibility. |
-| **Mention** | **Exists as a field, generalised** | Task comments already carry resolved mentions of people, Agents and documents. The same shape is reused; nothing new is invented. |
-| **Reach receipt** | New **field**, not an entity | Per-Agent delivery outcome recorded on a channel post. Deliberately not a table: it is written once, read with its message, and bounded by the Agent count. |
-| **Knowledge Base document** | **Exists, referenced** | The `#` reference target. Owned by [AW-06](../AW-06-knowledge-library/). |
+| Concept                      | Status                             | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Conversation**             | **Exists, extended**               | Today: one user, an optional machine title, a provider and a model. This epic adds a _kind_, an optional addressed **Agent**, a name that a person owns, an optional attached context object, an archived state, a last-activity time and a link to a related Conversation. No rename, no replacement.                                                                                                                                                                                                       |
+| **Conversation message**     | **Exists, extended**               | Today: role, content, parts, model, token usage. This epic adds an **author** (a person or an Agent), resolved **mentions**, **attachments**, a **send status**, a client identifier for safe retry, and — on channel posts — a **reach receipt**.                                                                                                                                                                                                                                                           |
+| **Conversation participant** | **NEW**                            | The one genuinely new entity. Today a Conversation has exactly one user and no way to express a second party. A participant is a person or an Agent in a Conversation, with a role (`owner`, `member`, `observer`), a joined and optionally departed time, a last-read position and a mute flag. Everything in this epic that is not one-to-one needs it: group membership, channel membership, Agent pairs, unread state and read receipts. It is added to the program vocabulary table in the same change. |
+| **Agent**                    | **Exists, unchanged**              | Addressed by Conversations and by mentions. Its status lifecycle (`draft`, `active`, `running`, `paused`, `error`, `archived`) is what the reach receipt reports against. Its collaborator allow-list is what authorises an Agent pair.                                                                                                                                                                                                                                                                      |
+| **Run**                      | **Exists, extended**               | An Agent reply is a Run like any other. This epic adds a link from a Run back to the Conversation message that triggered it, and a trigger kind for it.                                                                                                                                                                                                                                                                                                                                                      |
+| **Organization**             | **Exists, unchanged**              | Owns exactly one organization channel and scopes Agent-pair visibility.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Mention**                  | **Exists as a field, generalised** | Task comments already carry resolved mentions of people, Agents and documents. The same shape is reused; nothing new is invented.                                                                                                                                                                                                                                                                                                                                                                            |
+| **Reach receipt**            | New **field**, not an entity       | Per-Agent delivery outcome recorded on a channel post. Deliberately not a table: it is written once, read with its message, and bounded by the Agent count.                                                                                                                                                                                                                                                                                                                                                  |
+| **Knowledge Base document**  | **Exists, referenced**             | The `#` reference target. Owned by [AW-06](../AW-06-knowledge-library/).                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### 5.1 Conversation states and transitions
 
@@ -976,21 +976,21 @@ RETRY IN FLIGHT
 
 ### 6.12 Keyboard affordances
 
-| Key | Where | Effect |
-| --- | --- | --- |
-| `Enter` | Composer | Send |
-| `Shift`+`Enter` | Composer | New line |
-| `Esc` | Composer with picker open | Dismiss the picker, keep the text |
-| `Esc` | Composer, no picker | Move focus out of the composer; never closes the panel |
-| `@` | Composer | Open the mention picker |
-| `#` | Composer | Open the document picker |
-| `↑` `↓` | Picker open | Move the selection |
-| `Enter` / `Tab` | Picker open | Insert the highlighted candidate |
-| `↑` | Empty composer | Focus the last message for keyboard reading |
-| `Alt`+`←` | Panel | Back one panel view (Conversation → list → switcher) |
-| `Alt`+`↑` / `Alt`+`↓` | Panel list | Previous / next Conversation |
-| `Ctrl`/`Cmd`+`Enter` | Failed message focused | Retry |
-| `Tab` | Panel edge handle | Focus the resize handle; `←`/`→` resize by 16 px; `Home` resets |
+| Key                   | Where                     | Effect                                                          |
+| --------------------- | ------------------------- | --------------------------------------------------------------- |
+| `Enter`               | Composer                  | Send                                                            |
+| `Shift`+`Enter`       | Composer                  | New line                                                        |
+| `Esc`                 | Composer with picker open | Dismiss the picker, keep the text                               |
+| `Esc`                 | Composer, no picker       | Move focus out of the composer; never closes the panel          |
+| `@`                   | Composer                  | Open the mention picker                                         |
+| `#`                   | Composer                  | Open the document picker                                        |
+| `↑` `↓`               | Picker open               | Move the selection                                              |
+| `Enter` / `Tab`       | Picker open               | Insert the highlighted candidate                                |
+| `↑`                   | Empty composer            | Focus the last message for keyboard reading                     |
+| `Alt`+`←`             | Panel                     | Back one panel view (Conversation → list → switcher)            |
+| `Alt`+`↑` / `Alt`+`↓` | Panel list                | Previous / next Conversation                                    |
+| `Ctrl`/`Cmd`+`Enter`  | Failed message focused    | Retry                                                           |
+| `Tab`                 | Panel edge handle         | Focus the resize handle; `←`/`→` resize by 16 px; `Home` resets |
 
 Every control named in §6 is reachable by keyboard, has an accessible name, and the panel traps
 nothing — focus can always leave it with `Tab`.
@@ -1123,7 +1123,7 @@ nothing — focus can always leave it with `Tab`.
 ## 9. Open questions
 
 - **[NEEDS CLARIFICATION: should Agents be able to post to the organization channel unprompted?]**
-  This spec allows an Agent to *reply* in the channel but does not let one *start* a channel post.
+  This spec allows an Agent to _reply_ in the channel but does not let one _start_ a channel post.
   Allowing it would make the channel a genuine team feed; refusing it keeps the channel a
   person-initiated broadcast. The reach receipt is defined only for person-authored posts today.
 - **[NEEDS CLARIFICATION: what exactly is an "active" Agent for broadcast purposes?]** This spec
@@ -1148,5 +1148,5 @@ nothing — focus can always leave it with `Tab`.
   chatty pair can consume another pair's allowance.
 - **[NEEDS CLARIFICATION: what happens to a group when its last Agent is archived?]** The group
   currently persists as a read-only record. Product may prefer auto-archiving it.
-</content>
-</invoke>
+  </content>
+  </invoke>

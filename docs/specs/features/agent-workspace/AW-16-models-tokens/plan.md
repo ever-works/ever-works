@@ -17,41 +17,41 @@ Every path below was opened before being cited.
 
 ### 1.1 The model path today
 
-| Concern | Where it lives now | What it does |
-| --- | --- | --- |
-| Capability facade | `packages/agent/src/facades/ai.facade.ts` (1059 lines) | `askJson`, `createChatCompletion`, `createStreamingChatCompletion`, `embed`, `transcribe`, `testConnection`, `getAvailableModels`, `getProviderConfig`, `resolveModelMetadata`, `resolveModelContextLength`. |
-| Facade contract | `packages/plugin/src/facades/ai-facade.interface.ts` | `AiRoutingOptions` has exactly five fields — `complexity`, `taskId`, `autoEscalate`, `providerOverride`, `modelOverride`. No effort, no timeout, no fallback. |
-| Call-site context | `packages/plugin/src/facades/facade-options.interface.ts` | `FacadeOptions` = `userId`, `workId?`, `providerOverride?`, `agentId?`, `taskId?`, `runId?`. This is the object every call already threads; it is where the resolved policy will ride. |
-| Plugin/settings resolution | `packages/agent/src/facades/base.facade.ts` | `resolvePlugin()` and `getResolvedSettings()` implement the work → user → admin cascade (Constitution II). |
-| Model choice | `ai.facade.ts:1025` `resolveModel()` | `routing.modelOverride` → `{complexity}Model` setting → `defaultModel` setting → plugin default. |
-| "Fallback" today | `ai.facade.ts:295` `withEscalation()` / `:318` `escalateModel()` | Retries **once**, on the **same plugin and the same credential**, at the next complexity alias. There is no cross-provider path. |
-| Budget gate | `ai.facade.ts:93` `enforceBudget()` | Calls `BudgetGuardService.checkBudget`, throws before the plugin is reached. Must remain a hard stop (spec FR-46). |
-| Usage ledger | `packages/agent/src/entities/plugin-usage-event.entity.ts` | Carries `pluginId`, `modelId`, `costCents`, `agentId`, `taskId`, `runId`, `ownerType`/`ownerId`, `tenantId`/`organizationId`. Written by every facade method. |
-| Model catalogue | `packages/agent/src/facades/model-catalog.ts` | Live merge of two public catalogue endpoints, 10 s timeout, 16 MB read cap; the facade caches it in-process for 1 hour (`CACHE_TTL = 3_600_000`). `matchModelCatalogEntry` does exact then loosened id matching. |
-| Reasoning today | `packages/plugin/src/ai/reasoning.utils.ts` | A hardcoded model-name-regex registry that only ever *reduces* thinking. Not a setting, not exposed. |
-| Timeout today | `packages/plugin/src/ai/ai-operations.ts` | One hardcoded `TIMEOUT_MS = 15_000` inside `testConnection`. Regular calls take a caller-supplied `AbortSignal` and otherwise have no deadline. |
-| Per-agent override | `packages/agent/src/entities/agent.entity.ts:273-277` | `aiProviderId?: string \| null` and `modelId?: string \| null`, under the comment `// ── AI provider routing ──`. Flat, single-valued, no chain, no effort. |
-| Run record | `packages/agent/src/entities/agent-run.entity.ts` | Has `totalTokens` and `costCents`; **no** model, provider or account. `AgentRunStatus = 'queued' \| 'running' \| 'completed' \| 'failed' \| 'cancelled'`. |
-| Provider settings storage | `packages/agent/src/plugins/entities/plugin.entity.ts`, `user-plugin.entity.ts`, `work-plugin.entity.ts` | `settings` / `secretSettings` JSON blobs. One blob per scope, hence exactly one credential per provider. |
-| Secret encryption | `packages/agent/src/plugins/services/plugin-secret-enc.service.ts`, wrapped by `packages/agent/src/entities/_secret-json-column.ts` (`EncryptedJsonColumn`) | AES-256-GCM `enc::v1::` envelope as a transparent TypeORM transformer; passes through when no key is configured; re-encrypts legacy plaintext on next write. |
-| HTTP surface | `apps/api/src/plugins/plugins.controller.ts` | `GET plugins/:pluginId/models`, `GET plugins/:pluginId/connection-status`, `PATCH plugins/:pluginId/settings`, `POST plugins/:pluginId/validate-connection`, plus the work-scoped variants. Settings PATCH validates presence, not catalogue membership. |
-| Web — provider settings | `apps/web/src/app/[locale]/(dashboard)/settings/plugins/[category]/page.tsx` | Generic per-category plugin settings cards; the AI category renders the four model-alias pickers. |
-| Web — per-agent override | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/settings/page.tsx` | Picks `aiProviderId` + `modelId`; also calls `listByCategory('ai-gateway')` which resolves to `[]` because that category does not exist in `PLUGIN_CATEGORIES` (`packages/plugin/src/contracts/plugin-manifest.types.ts`). |
-| Web — model widgets | `apps/web/src/components/plugins/form/PluginModelSelect.tsx`, `apps/web/src/components/ai/ChatModelSelector.tsx`, `apps/web/src/lib/ai/model-catalog.ts` | The existing model-picker vocabulary to reuse rather than reinvent. |
-| Settings shell | `apps/web/src/app/[locale]/(dashboard)/settings/layout.tsx` + `settings-layout-client.tsx` | Static tab list plus a dynamic plugin section. New tabs are added here. |
-| Dashboard banner precedent | `apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx`, mounted at `apps/web/src/app/[locale]/(dashboard)/layout-client.tsx:511` | Hydration-gated, localStorage-dismissed, renders nothing on `null`. Exactly the shape both new banners take. |
-| Live-probed contract | `apps/web/e2e/flow-plugin-ai-models-catalogue.spec.ts` | Documents the verified behaviour of the models/settings endpoints. Must stay green. |
+| Concern                    | Where it lives now                                                                                                                                          | What it does                                                                                                                                                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Capability facade          | `packages/agent/src/facades/ai.facade.ts` (1059 lines)                                                                                                      | `askJson`, `createChatCompletion`, `createStreamingChatCompletion`, `embed`, `transcribe`, `testConnection`, `getAvailableModels`, `getProviderConfig`, `resolveModelMetadata`, `resolveModelContextLength`.                                             |
+| Facade contract            | `packages/plugin/src/facades/ai-facade.interface.ts`                                                                                                        | `AiRoutingOptions` has exactly five fields — `complexity`, `taskId`, `autoEscalate`, `providerOverride`, `modelOverride`. No effort, no timeout, no fallback.                                                                                            |
+| Call-site context          | `packages/plugin/src/facades/facade-options.interface.ts`                                                                                                   | `FacadeOptions` = `userId`, `workId?`, `providerOverride?`, `agentId?`, `taskId?`, `runId?`. This is the object every call already threads; it is where the resolved policy will ride.                                                                   |
+| Plugin/settings resolution | `packages/agent/src/facades/base.facade.ts`                                                                                                                 | `resolvePlugin()` and `getResolvedSettings()` implement the work → user → admin cascade (Constitution II).                                                                                                                                               |
+| Model choice               | `ai.facade.ts:1025` `resolveModel()`                                                                                                                        | `routing.modelOverride` → `{complexity}Model` setting → `defaultModel` setting → plugin default.                                                                                                                                                         |
+| "Fallback" today           | `ai.facade.ts:295` `withEscalation()` / `:318` `escalateModel()`                                                                                            | Retries **once**, on the **same plugin and the same credential**, at the next complexity alias. There is no cross-provider path.                                                                                                                         |
+| Budget gate                | `ai.facade.ts:93` `enforceBudget()`                                                                                                                         | Calls `BudgetGuardService.checkBudget`, throws before the plugin is reached. Must remain a hard stop (spec FR-46).                                                                                                                                       |
+| Usage ledger               | `packages/agent/src/entities/plugin-usage-event.entity.ts`                                                                                                  | Carries `pluginId`, `modelId`, `costCents`, `agentId`, `taskId`, `runId`, `ownerType`/`ownerId`, `tenantId`/`organizationId`. Written by every facade method.                                                                                            |
+| Model catalogue            | `packages/agent/src/facades/model-catalog.ts`                                                                                                               | Live merge of two public catalogue endpoints, 10 s timeout, 16 MB read cap; the facade caches it in-process for 1 hour (`CACHE_TTL = 3_600_000`). `matchModelCatalogEntry` does exact then loosened id matching.                                         |
+| Reasoning today            | `packages/plugin/src/ai/reasoning.utils.ts`                                                                                                                 | A hardcoded model-name-regex registry that only ever _reduces_ thinking. Not a setting, not exposed.                                                                                                                                                     |
+| Timeout today              | `packages/plugin/src/ai/ai-operations.ts`                                                                                                                   | One hardcoded `TIMEOUT_MS = 15_000` inside `testConnection`. Regular calls take a caller-supplied `AbortSignal` and otherwise have no deadline.                                                                                                          |
+| Per-agent override         | `packages/agent/src/entities/agent.entity.ts:273-277`                                                                                                       | `aiProviderId?: string \| null` and `modelId?: string \| null`, under the comment `// ── AI provider routing ──`. Flat, single-valued, no chain, no effort.                                                                                              |
+| Run record                 | `packages/agent/src/entities/agent-run.entity.ts`                                                                                                           | Has `totalTokens` and `costCents`; **no** model, provider or account. `AgentRunStatus = 'queued' \| 'running' \| 'completed' \| 'failed' \| 'cancelled'`.                                                                                                |
+| Provider settings storage  | `packages/agent/src/plugins/entities/plugin.entity.ts`, `user-plugin.entity.ts`, `work-plugin.entity.ts`                                                    | `settings` / `secretSettings` JSON blobs. One blob per scope, hence exactly one credential per provider.                                                                                                                                                 |
+| Secret encryption          | `packages/agent/src/plugins/services/plugin-secret-enc.service.ts`, wrapped by `packages/agent/src/entities/_secret-json-column.ts` (`EncryptedJsonColumn`) | AES-256-GCM `enc::v1::` envelope as a transparent TypeORM transformer; passes through when no key is configured; re-encrypts legacy plaintext on next write.                                                                                             |
+| HTTP surface               | `apps/api/src/plugins/plugins.controller.ts`                                                                                                                | `GET plugins/:pluginId/models`, `GET plugins/:pluginId/connection-status`, `PATCH plugins/:pluginId/settings`, `POST plugins/:pluginId/validate-connection`, plus the work-scoped variants. Settings PATCH validates presence, not catalogue membership. |
+| Web — provider settings    | `apps/web/src/app/[locale]/(dashboard)/settings/plugins/[category]/page.tsx`                                                                                | Generic per-category plugin settings cards; the AI category renders the four model-alias pickers.                                                                                                                                                        |
+| Web — per-agent override   | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/settings/page.tsx`                                                                                       | Picks `aiProviderId` + `modelId`; also calls `listByCategory('ai-gateway')` which resolves to `[]` because that category does not exist in `PLUGIN_CATEGORIES` (`packages/plugin/src/contracts/plugin-manifest.types.ts`).                               |
+| Web — model widgets        | `apps/web/src/components/plugins/form/PluginModelSelect.tsx`, `apps/web/src/components/ai/ChatModelSelector.tsx`, `apps/web/src/lib/ai/model-catalog.ts`    | The existing model-picker vocabulary to reuse rather than reinvent.                                                                                                                                                                                      |
+| Settings shell             | `apps/web/src/app/[locale]/(dashboard)/settings/layout.tsx` + `settings-layout-client.tsx`                                                                  | Static tab list plus a dynamic plugin section. New tabs are added here.                                                                                                                                                                                  |
+| Dashboard banner precedent | `apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx`, mounted at `apps/web/src/app/[locale]/(dashboard)/layout-client.tsx:511`                  | Hydration-gated, localStorage-dismissed, renders nothing on `null`. Exactly the shape both new banners take.                                                                                                                                             |
+| Live-probed contract       | `apps/web/e2e/flow-plugin-ai-models-catalogue.spec.ts`                                                                                                      | Documents the verified behaviour of the models/settings endpoints. Must stay green.                                                                                                                                                                      |
 
 ### 1.2 Fleet — how credentials reach a computer today
 
-| Concern | Where | Notes |
-| --- | --- | --- |
-| Node entity | `packages/agent/src/entities/fleet-node.entity.ts` | `enrollmentTokenHash` (unique), `credentialIssuedAt`, `previousCredentialHash`, `previousCredentialExpiresAt`, `rotationRequestedAt`, `cliVersion`, `status`. |
-| Node HTTP | `apps/api/src/fleet/fleet.controller.ts` | `POST fleet/heartbeat` is `@Public()` and authenticates on the node secret; the response already carries a server→node instruction (`rotationRequested`). `POST fleet/rotate-credential` is the node-initiated rotation. |
-| Node loop | `apps/node/src/core/heartbeat.ts`, `apps/node/src/core/types.ts` | `DEFAULT_HEARTBEAT_INTERVAL_MS = 60_000`, exponential backoff on failure. |
-| Node secrets | `apps/node/src/core/secret-store.ts` | OS keychain first (`@napi-rs/keyring`, service `ever-works-node`), file fallback with an owner-only ACL and a loud warning. |
-| Node model execution | `apps/node/src/core/executors/model-cli.ts`, `apps/node/src/core/model-cli-probe.ts` | Spawns local model CLIs with an allow-listed `envPassthrough`; values are read from the machine's own `process.env` and scrubbed out of reported output. **This is why credentials today arrive on a machine by hand.** |
-| Credential versioning precedent | `packages/agent/src/entities/tenant-credential-snapshot.entity.ts` + `CredentialVersionService` (`packages/agent/src/tasks/_tasks-symbols.ts`) | Monotonic `credentialVersion`, per-version snapshots, graceful drain. The pattern this epic copies for bundles. |
+| Concern                         | Where                                                                                                                                          | Notes                                                                                                                                                                                                                    |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Node entity                     | `packages/agent/src/entities/fleet-node.entity.ts`                                                                                             | `enrollmentTokenHash` (unique), `credentialIssuedAt`, `previousCredentialHash`, `previousCredentialExpiresAt`, `rotationRequestedAt`, `cliVersion`, `status`.                                                            |
+| Node HTTP                       | `apps/api/src/fleet/fleet.controller.ts`                                                                                                       | `POST fleet/heartbeat` is `@Public()` and authenticates on the node secret; the response already carries a server→node instruction (`rotationRequested`). `POST fleet/rotate-credential` is the node-initiated rotation. |
+| Node loop                       | `apps/node/src/core/heartbeat.ts`, `apps/node/src/core/types.ts`                                                                               | `DEFAULT_HEARTBEAT_INTERVAL_MS = 60_000`, exponential backoff on failure.                                                                                                                                                |
+| Node secrets                    | `apps/node/src/core/secret-store.ts`                                                                                                           | OS keychain first (`@napi-rs/keyring`, service `ever-works-node`), file fallback with an owner-only ACL and a loud warning.                                                                                              |
+| Node model execution            | `apps/node/src/core/executors/model-cli.ts`, `apps/node/src/core/model-cli-probe.ts`                                                           | Spawns local model CLIs with an allow-listed `envPassthrough`; values are read from the machine's own `process.env` and scrubbed out of reported output. **This is why credentials today arrive on a machine by hand.**  |
+| Credential versioning precedent | `packages/agent/src/entities/tenant-credential-snapshot.entity.ts` + `CredentialVersionService` (`packages/agent/src/tasks/_tasks-symbols.ts`) | Monotonic `credentialVersion`, per-version snapshots, graceful drain. The pattern this epic copies for bundles.                                                                                                          |
 
 ### 1.3 The three things that are currently written and never read
 
@@ -157,13 +157,13 @@ Four rules keep this additive:
 `ModelFailureClassifier` (pure function, no I/O) maps a provider error to one of five
 outcomes. It is the only place in the epic that reads an error.
 
-| Class | Signals | Effect |
-| --- | --- | --- |
-| `rate_limited` | HTTP 429; provider error codes advertising a retry delay | next **account**, same model; cooldown = `Retry-After` or 60 s, capped 30 min |
-| `credential` | HTTP 401, 403; provider "invalid key"/"revoked" codes | account → `invalid` immediately; next **account**; cooldown 15 min |
-| `transient` | HTTP 5xx, connection reset, DNS failure, attempt-deadline abort | next **account**; cooldown 60 s (5 min after 3 in 5 min) |
-| `context_too_large` | provider context-window rejections | next **chain entry with a larger known window**, else fail |
-| `fatal` | HTTP 400/404/422, unknown model id, schema failure | fail the call immediately, no further attempts |
+| Class               | Signals                                                         | Effect                                                                        |
+| ------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `rate_limited`      | HTTP 429; provider error codes advertising a retry delay        | next **account**, same model; cooldown = `Retry-After` or 60 s, capped 30 min |
+| `credential`        | HTTP 401, 403; provider "invalid key"/"revoked" codes           | account → `invalid` immediately; next **account**; cooldown 15 min            |
+| `transient`         | HTTP 5xx, connection reset, DNS failure, attempt-deadline abort | next **account**; cooldown 60 s (5 min after 3 in 5 min)                      |
+| `context_too_large` | provider context-window rejections                              | next **chain entry with a larger known window**, else fail                    |
+| `fatal`             | HTTP 400/404/422, unknown model id, schema failure              | fail the call immediately, no further attempts                                |
 
 A budget block never reaches the classifier — it is thrown before attempt 1.
 
@@ -189,7 +189,7 @@ resolver, one unique index, and one place to test narrowest-wins.
 export class ModelAccount {
 	@PrimaryGeneratedColumn('uuid') id: string;
 
-	@Column('uuid') userId: string;              // creator / owner of record
+	@Column('uuid') userId: string; // creator / owner of record
 	@Column({ type: 'uuid', nullable: true }) tenantId?: string | null;
 	@Column({ type: 'uuid', nullable: true }) organizationId?: string | null;
 
@@ -328,19 +328,19 @@ export class ModelCredentialBundle {
 
 ### 3.4 Additive columns on existing tables
 
-| Table | Column | Type | Why |
-| --- | --- | --- | --- |
-| `agent_runs` | `modelRouting` | `simple-json` NULL | The routing record (spec FR-79..84). Shape below. |
-| `fleet_nodes` | `appliedModelBundleVersion` | `int` NULL | What the computer reports it has applied (spec FR-71). NULL on every pre-existing row and on every node running an older daemon. |
-| `fleet_nodes` | `modelBundleRequestedAt` | `timestamp` NULL | Set by *Send now*; cleared when the node reports the current version. |
+| Table         | Column                      | Type               | Why                                                                                                                              |
+| ------------- | --------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_runs`  | `modelRouting`              | `simple-json` NULL | The routing record (spec FR-79..84). Shape below.                                                                                |
+| `fleet_nodes` | `appliedModelBundleVersion` | `int` NULL         | What the computer reports it has applied (spec FR-71). NULL on every pre-existing row and on every node running an older daemon. |
+| `fleet_nodes` | `modelBundleRequestedAt`    | `timestamp` NULL   | Set by _Send now_; cleared when the node reports the current version.                                                            |
 
 `agent_runs.modelRouting` shape (written by the facade, read by AW-09's receipt):
 
 ```ts
 interface AgentRunModelRouting {
-	provider: string;            // plugin id that answered
-	model: string;               // model id that answered
-	accountId?: string;          // NULL when the plugin's own settings answered
+	provider: string; // plugin id that answered
+	model: string; // model id that answered
+	accountId?: string; // NULL when the plugin's own settings answered
 	accountLabel?: string;
 	effort: ReasoningEffort | 'not-applicable';
 	runTimeoutSeconds: number;
@@ -389,16 +389,16 @@ every step guarded on the current table shape so a partially-applied database co
 migration blocks ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)); re-stamp before merge if `develop` has moved past them.
 
 1. `apps/api/src/migrations/1791160000000-CreateModelAccountsAndPolicies.ts`
-   - `CREATE TABLE model_accounts` with the two unique indexes and the FK.
-   - `CREATE TABLE model_policies` with its unique index.
-   - No backfill: a workspace with no rows resolves to today's behaviour (spec FR-35).
+    - `CREATE TABLE model_accounts` with the two unique indexes and the FK.
+    - `CREATE TABLE model_policies` with its unique index.
+    - No backfill: a workspace with no rows resolves to today's behaviour (spec FR-35).
 2. `apps/api/src/migrations/1791160100000-AddAgentRunModelRouting.ts`
-   - `ALTER TABLE agent_runs ADD COLUMN modelRouting` (nullable json/text). No default, no
-     backfill — a pre-existing run genuinely has no routing record and must not claim one.
+    - `ALTER TABLE agent_runs ADD COLUMN modelRouting` (nullable json/text). No default, no
+      backfill — a pre-existing run genuinely has no routing record and must not claim one.
 3. `apps/api/src/migrations/1791160200000-CreateModelCredentialBundle.ts`
-   - `CREATE TABLE model_credential_bundle` with its unique index.
-   - `ALTER TABLE fleet_nodes ADD COLUMN appliedModelBundleVersion` (int NULL) and
-     `modelBundleRequestedAt` (timestamp NULL).
+    - `CREATE TABLE model_credential_bundle` with its unique index.
+    - `ALTER TABLE fleet_nodes ADD COLUMN appliedModelBundleVersion` (int NULL) and
+      `modelBundleRequestedAt` (timestamp NULL).
 
 Each ships with a migration spec under `apps/api/src/migrations/__tests__/`, matching the
 existing `AddFleetCredentialRotation.spec.ts` pattern: apply on an empty schema, apply twice
@@ -417,7 +417,7 @@ and `apps/node` all need the same shapes:
   `ResolvedModelPolicy`.
 - `AgentRunModelRouting` (§3.4) — consumed by AW-09's receipt.
 - `ModelBundleView` — `version`, `contentHash`, `accounts: Array<{ id, providerPluginId,
-  envVarNames: string[] }>`. The **view** never carries values; only the node-authenticated
+envVarNames: string[] }>`. The **view** never carries values; only the node-authenticated
   fetch (§4.4) returns material.
 
 ## 4. API surface
@@ -429,16 +429,16 @@ workspace-admin (spec FR-85).
 
 ### 4.1 `apps/api/src/model-routing/model-accounts.controller.ts` — `@Controller('api/model-accounts')`
 
-| Method | Path | Body / params | Auth | Returns |
-| --- | --- | --- | --- | --- |
-| `GET` | `/` | `?providerPluginId` optional | member | `ModelAccountView[]`, grouped by provider, ordered by `position` |
-| `POST` | `/` | `CreateModelAccountDto` | admin | `201` `ModelAccountView` |
-| `PATCH` | `/:id` | `UpdateModelAccountDto` (label, enabled) | admin | `ModelAccountView` |
-| `POST` | `/:id/credentials` | `ReplaceCredentialsDto` | admin | `ModelAccountView` (verified first) |
-| `POST` | `/reorder` | `ReorderModelAccountsDto` | admin | `ModelAccountView[]` |
-| `POST` | `/:id/check` | — | admin | `{ health, checkedAt }` |
-| `DELETE` | `/:id` | — | admin | `{ ok: true, renumbered: ModelAccountView[] }` |
-| `GET` | `/providers` | — | member | installed AI-provider plugins + their credential field descriptors, from the plugin manifest |
+| Method   | Path               | Body / params                            | Auth   | Returns                                                                                      |
+| -------- | ------------------ | ---------------------------------------- | ------ | -------------------------------------------------------------------------------------------- |
+| `GET`    | `/`                | `?providerPluginId` optional             | member | `ModelAccountView[]`, grouped by provider, ordered by `position`                             |
+| `POST`   | `/`                | `CreateModelAccountDto`                  | admin  | `201` `ModelAccountView`                                                                     |
+| `PATCH`  | `/:id`             | `UpdateModelAccountDto` (label, enabled) | admin  | `ModelAccountView`                                                                           |
+| `POST`   | `/:id/credentials` | `ReplaceCredentialsDto`                  | admin  | `ModelAccountView` (verified first)                                                          |
+| `POST`   | `/reorder`         | `ReorderModelAccountsDto`                | admin  | `ModelAccountView[]`                                                                         |
+| `POST`   | `/:id/check`       | —                                        | admin  | `{ health, checkedAt }`                                                                      |
+| `DELETE` | `/:id`             | —                                        | admin  | `{ ok: true, renumbered: ModelAccountView[] }`                                               |
+| `GET`    | `/providers`       | —                                        | member | installed AI-provider plugins + their credential field descriptors, from the plugin manifest |
 
 DTOs live in `apps/api/src/model-routing/dto/`, class-validator decorated:
 
@@ -446,14 +446,14 @@ DTOs live in `apps/api/src/model-routing/dto/`, class-validator decorated:
 export class CreateModelAccountDto {
 	@IsString() @Length(1, 128) providerPluginId: string;
 	@IsString() @Length(1, 60) label: string;
-	@IsObject() credentials: Record<string, string>;   // keys validated against the plugin schema
+	@IsObject() credentials: Record<string, string>; // keys validated against the plugin schema
 	@IsIn(['first', 'last']) position: 'first' | 'last';
 }
 
 export class ReorderModelAccountsDto {
 	@IsString() @Length(1, 128) providerPluginId: string;
 	@IsArray() @ArrayMaxSize(8) @IsUUID('4', { each: true }) orderedIds: string[];
-	@IsInt() expectedVersion: number;                  // optimistic concurrency (spec S17)
+	@IsInt() expectedVersion: number; // optimistic concurrency (spec S17)
 }
 ```
 
@@ -468,18 +468,18 @@ test wrote (spec FR-87).
 
 ### 4.2 `apps/api/src/model-routing/model-policies.controller.ts` — `@Controller('api/model-policies')`
 
-| Method | Path | Auth | Notes |
-| --- | --- | --- | --- |
-| `GET` | `/workspace` | member | The workspace policy, or `null` |
-| `PUT` | `/workspace` | admin | Upsert |
-| `DELETE` | `/workspace` | admin | Revert to plugin defaults |
-| `GET` | `/agent/:agentId` | member | Agent policy or `null` |
-| `PUT` | `/agent/:agentId` | admin | Upsert |
-| `DELETE` | `/agent/:agentId` | admin | Return to inheriting |
-| `GET` | `/schedule/:ownerId/:variant` | member | Schedule policy or `null` |
-| `PUT` | `/schedule/:ownerId/:variant` | admin | Upsert |
-| `DELETE` | `/schedule/:ownerId/:variant` | admin | Return to inheriting |
-| `GET` | `/resolved` | member | `?agentId&scheduleOwnerId&scheduleVariant` → the `ResolvedModelPolicy` the runtime would use, with a `source` per field. Powers "you are overriding X". |
+| Method   | Path                          | Auth   | Notes                                                                                                                                                   |
+| -------- | ----------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/workspace`                  | member | The workspace policy, or `null`                                                                                                                         |
+| `PUT`    | `/workspace`                  | admin  | Upsert                                                                                                                                                  |
+| `DELETE` | `/workspace`                  | admin  | Revert to plugin defaults                                                                                                                               |
+| `GET`    | `/agent/:agentId`             | member | Agent policy or `null`                                                                                                                                  |
+| `PUT`    | `/agent/:agentId`             | admin  | Upsert                                                                                                                                                  |
+| `DELETE` | `/agent/:agentId`             | admin  | Return to inheriting                                                                                                                                    |
+| `GET`    | `/schedule/:ownerId/:variant` | member | Schedule policy or `null`                                                                                                                               |
+| `PUT`    | `/schedule/:ownerId/:variant` | admin  | Upsert                                                                                                                                                  |
+| `DELETE` | `/schedule/:ownerId/:variant` | admin  | Return to inheriting                                                                                                                                    |
+| `GET`    | `/resolved`                   | member | `?agentId&scheduleOwnerId&scheduleVariant` → the `ResolvedModelPolicy` the runtime would use, with a `source` per field. Powers "you are overriding X". |
 
 `UpsertModelPolicyDto` validation carries the spec's invariants so they cannot be bypassed by
 an API client:
@@ -493,10 +493,10 @@ an API client:
 
 ### 4.3 `apps/api/src/model-routing/model-bundle.controller.ts` — `@Controller('api/model-bundle')`
 
-| Method | Path | Auth | Notes |
-| --- | --- | --- | --- |
-| `GET` | `/status` | member | `{ version, outOfSyncCount, unreachable: [{ nodeId, name, lastSeenAt }] }` |
-| `POST` | `/send` | admin | Sets `modelBundleRequestedAt` on every enrolled node; `202 Accepted` |
+| Method | Path      | Auth   | Notes                                                                      |
+| ------ | --------- | ------ | -------------------------------------------------------------------------- |
+| `GET`  | `/status` | member | `{ version, outOfSyncCount, unreachable: [{ nodeId, name, lastSeenAt }] }` |
+| `POST` | `/send`   | admin  | Sets `modelBundleRequestedAt` on every enrolled node; `202 Accepted`       |
 
 ### 4.4 Node-authenticated fetch — on the existing fleet controller
 
@@ -504,8 +504,8 @@ an API client:
 `rotate-credential`, following their exact shape (`@Public()`, node-secret authenticated,
 throttled, one undifferentiated failure message):
 
-| Method | Path | Auth | Notes |
-| --- | --- | --- | --- |
+| Method | Path                 | Auth                               | Notes                                                                                                                         |
+| ------ | -------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `POST` | `fleet/model-bundle` | node secret (`{ nodeId, secret }`) | Returns the current bundle **with credential material**, once. Node applies it and reports the version on its next heartbeat. |
 
 And `FleetHeartbeatDto` / `FleetHeartbeatResponse`
@@ -545,22 +545,22 @@ inserted after `connections` and before `job-runtime`.
 
 ### 5.2 New components — `apps/web/src/components/settings/`
 
-| Component | Responsibility |
-| --- | --- |
-| `ModelSettings.tsx` | Client shell: two panels, dirty tracking, `Cmd/Ctrl+S`, conflict handling. |
-| `ModelAccountsPanel.tsx` | Grouped account list; add / rename / replace / pause / reorder / remove; roving tabindex + `Alt+↑`/`Alt+↓` with a polite `aria-live` announcement. |
-| `ModelAccountRow.tsx` | One row: position, label, health pill, last-used link into Runs, `[···]` menu. |
-| `AddModelAccountDialog.tsx` | Credential fields rendered **from the plugin's declared schema** (never a hardcoded field list); "Check and add" performs verification before save. |
-| `ModelDefaultsPanel.tsx` | Primary picker, chain builder, effort radio group, run-timeout field. |
-| `ModelChainBuilder.tsx` | The ordered fallback list. Owns FR-39/40/41: the picker's option list is built by filtering out the current primary and any entry already present. |
-| `ModelPickerField.tsx` | Wraps the existing catalogue client (`apps/web/src/lib/ai/model-catalog.ts`), reusing the search + tiering vocabulary of `apps/web/src/components/ai/ChatModelSelector.tsx`. Free-typed ids allowed, badged unverified. |
-| `ModelBundleSyncBanner.tsx` | Sync states; mounted both in the page and in the dashboard shell. |
+| Component                   | Responsibility                                                                                                                                                                                                          |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ModelSettings.tsx`         | Client shell: two panels, dirty tracking, `Cmd/Ctrl+S`, conflict handling.                                                                                                                                              |
+| `ModelAccountsPanel.tsx`    | Grouped account list; add / rename / replace / pause / reorder / remove; roving tabindex + `Alt+↑`/`Alt+↓` with a polite `aria-live` announcement.                                                                      |
+| `ModelAccountRow.tsx`       | One row: position, label, health pill, last-used link into Runs, `[···]` menu.                                                                                                                                          |
+| `AddModelAccountDialog.tsx` | Credential fields rendered **from the plugin's declared schema** (never a hardcoded field list); "Check and add" performs verification before save.                                                                     |
+| `ModelDefaultsPanel.tsx`    | Primary picker, chain builder, effort radio group, run-timeout field.                                                                                                                                                   |
+| `ModelChainBuilder.tsx`     | The ordered fallback list. Owns FR-39/40/41: the picker's option list is built by filtering out the current primary and any entry already present.                                                                      |
+| `ModelPickerField.tsx`      | Wraps the existing catalogue client (`apps/web/src/lib/ai/model-catalog.ts`), reusing the search + tiering vocabulary of `apps/web/src/components/ai/ChatModelSelector.tsx`. Free-typed ids allowed, badged unverified. |
+| `ModelBundleSyncBanner.tsx` | Sync states; mounted both in the page and in the dashboard shell.                                                                                                                                                       |
 
 Agent + schedule overrides:
 
-| Component | Where it mounts |
-| --- | --- |
-| `apps/web/src/components/agents/AgentModelPanel.tsx` | New section inside `apps/web/src/app/[locale]/(dashboard)/agents/[id]/settings/page.tsx`, replacing the provider/model pair. |
+| Component                                                   | Where it mounts                                                                                                                                               |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/agents/AgentModelPanel.tsx`        | New section inside `apps/web/src/app/[locale]/(dashboard)/agents/[id]/settings/page.tsx`, replacing the provider/model pair.                                  |
 | `apps/web/src/components/schedules/ScheduleModelDrawer.tsx` | Opened from a schedule row; the surface that owns the row belongs to AW-10, so the drawer is exported standalone and takes `{ ownerId, variant, agentName }`. |
 
 Dashboard banner:
@@ -590,11 +590,11 @@ reach domain services through `withWorkerContext` exactly as
 `packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts` does. Nothing in this epic calls
 a queue directly, and no call site imports a vendor SDK.
 
-| Task file | Cron | What it does | Idempotency |
-| --- | --- | --- | --- |
-| `packages/tasks/src/tasks/trigger/model-account-health.task.ts` | `19 */6 * * *` (offset off the hour, per the `kb-reconcile` rationale) | Probes every non-paused account via the plugin's own cheapest identity/catalogue call; writes `health`, `lastCheckedAt`, `credentialExpiresAt`. | Atomic `UPDATE model_accounts SET lastCheckedAt = now() WHERE id = $1 AND (lastCheckedAt IS NULL OR lastCheckedAt < $cutoff)` claims each row; a second overlapping tick claims nothing. |
-| `packages/tasks/src/tasks/trigger/model-account-cooldown-sweeper.task.ts` | `*/5 * * *` | Clears `cooldownUntil`/`cooldownReason` that have elapsed and decays `consecutiveFailures`. Belt to the inline clear on the attempt path. | Idempotent by construction — a `WHERE cooldownUntil < now()` update. |
-| `packages/tasks/src/tasks/trigger/model-bundle-fanout.task.ts` | on demand, via `MODEL_BUNDLE_FANOUT_DISPATCHER` | Stamps `modelBundleRequestedAt` on every enrolled node of a workspace after a bundle version bump; the nodes pull on their own beat. | Keyed on `(workspaceScope, version)`; re-running for a version already stamped is a no-op. |
+| Task file                                                                 | Cron                                                                   | What it does                                                                                                                                    | Idempotency                                                                                                                                                                              |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/tasks/src/tasks/trigger/model-account-health.task.ts`           | `19 */6 * * *` (offset off the hour, per the `kb-reconcile` rationale) | Probes every non-paused account via the plugin's own cheapest identity/catalogue call; writes `health`, `lastCheckedAt`, `credentialExpiresAt`. | Atomic `UPDATE model_accounts SET lastCheckedAt = now() WHERE id = $1 AND (lastCheckedAt IS NULL OR lastCheckedAt < $cutoff)` claims each row; a second overlapping tick claims nothing. |
+| `packages/tasks/src/tasks/trigger/model-account-cooldown-sweeper.task.ts` | `*/5 * * *`                                                            | Clears `cooldownUntil`/`cooldownReason` that have elapsed and decays `consecutiveFailures`. Belt to the inline clear on the attempt path.       | Idempotent by construction — a `WHERE cooldownUntil < now()` update.                                                                                                                     |
+| `packages/tasks/src/tasks/trigger/model-bundle-fanout.task.ts`            | on demand, via `MODEL_BUNDLE_FANOUT_DISPATCHER`                        | Stamps `modelBundleRequestedAt` on every enrolled node of a workspace after a bundle version bump; the nodes pull on their own beat.            | Keyed on `(workspaceScope, version)`; re-running for a version already stamped is a no-op.                                                                                               |
 
 New dispatcher symbol, following the `webhook-delivery-dispatcher.ts` shape exactly:
 
@@ -610,7 +610,7 @@ New dispatcher symbol, following the `webhook-delivery-dispatcher.ts` shape exac
 
 Health probing must never fail a Run or block a page render (spec FR-69): the task wraps each
 account in its own `try/catch` and a failure sets `health = 'unknown'`, never `invalid`. Only
-a *rejection* — from a probe or a live call — sets `invalid`.
+a _rejection_ — from a probe or a live call — sets `invalid`.
 
 ## 7. Plugin boundaries
 
@@ -619,25 +619,25 @@ a *rejection* — from a probe or a live call — sets `invalid`.
   (`packages/plugins/*` declaring the `ai-provider` capability). Constitution I is satisfied
   because nothing external is reached except through those plugins.
 - **No hardcoded plugin id anywhere outside a plugin** (Constitution II). Concretely:
-  - `GET /api/model-accounts/providers` builds its list from the plugin registry by
-    capability, never from a literal array.
-  - The Add-account dialog renders its fields from the plugin's declared settings schema —
-    including `x-secret` (Constitution VII) — so a provider that authenticates with something
-    other than a single key works without a code change.
-  - The credential keys stored in `ModelAccount.credentials` are exactly the plugin's own
-    setting names, so the planner can merge them over `getResolvedSettings()` output without
-    translation.
-  - No copy string in `apps/web/messages/en.json` names a provider; provider names are
-    interpolated from the manifest at render time.
+    - `GET /api/model-accounts/providers` builds its list from the plugin registry by
+      capability, never from a literal array.
+    - The Add-account dialog renders its fields from the plugin's declared settings schema —
+      including `x-secret` (Constitution VII) — so a provider that authenticates with something
+      other than a single key works without a code change.
+    - The credential keys stored in `ModelAccount.credentials` are exactly the plugin's own
+      setting names, so the planner can merge them over `getResolvedSettings()` output without
+      translation.
+    - No copy string in `apps/web/messages/en.json` names a provider; provider names are
+      interpolated from the manifest at render time.
 - **Two small additions to the plugin contract**, both optional, both defaulting to today's
   behaviour, published as a minor `@ever-works/plugin` bump (Constitution X):
-  1. `IAiProviderPlugin.reasoningSupport?: (modelId: string) => ReasoningEffort[] | null` —
-     lets a provider declare which effort levels a model actually exposes, so FR-49/FR-50 are
-     answered by the provider rather than guessed by core. Absent → core falls back to the
-     existing `packages/plugin/src/ai/reasoning.utils.ts` registry, which is left untouched.
-  2. `IAiProviderPlugin.checkCredential?: (settings) => Promise<{ ok: boolean; expiresAt?: Date }>`
-     — the cheap identity check FR-62 wants. Absent → the health task falls back to
-     `listModels`, and if that is also unavailable, to `health = 'unknown'`.
+    1. `IAiProviderPlugin.reasoningSupport?: (modelId: string) => ReasoningEffort[] | null` —
+       lets a provider declare which effort levels a model actually exposes, so FR-49/FR-50 are
+       answered by the provider rather than guessed by core. Absent → core falls back to the
+       existing `packages/plugin/src/ai/reasoning.utils.ts` registry, which is left untouched.
+    2. `IAiProviderPlugin.checkCredential?: (settings) => Promise<{ ok: boolean; expiresAt?: Date }>`
+       — the cheap identity check FR-62 wants. Absent → the health task falls back to
+       `listModels`, and if that is also unavailable, to `health = 'unknown'`.
 - `AiRoutingOptions` (`packages/plugin/src/facades/ai-facade.interface.ts`) gains
   `reasoningEffort?`, `attemptTimeoutMs?` and `scheduleId?` — all optional, all additive, so
   every existing caller compiles. This finally makes the real interface a superset of what
@@ -728,72 +728,72 @@ One entry per mutation, using the nine new `ActivityActionType` members (§3.5).
 
 ### 9.2 Metrics and Sentry
 
-| Signal | Shape |
-| --- | --- |
-| `model_attempt_total` | counter, tags `provider`, `result` (`ok`/`rate_limited`/`credential`/`transient`/`context_too_large`/`fatal`) |
-| `model_fallback_depth` | histogram, 1..6 — how deep calls actually go. The number that tells us whether the chain is doing anything. |
-| `model_call_duration_ms` | histogram, tag `provider` |
-| `model_account_health` | gauge per health value |
-| `model_bundle_lag_seconds` | histogram — publish → node-applied. Backs the FR-74 p95. |
-| Sentry tag `model.provider` / `model.account` (label, not id) / `model.attempt` | on any exception raised from an attempt |
+| Signal                                                                          | Shape                                                                                                         |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `model_attempt_total`                                                           | counter, tags `provider`, `result` (`ok`/`rate_limited`/`credential`/`transient`/`context_too_large`/`fatal`) |
+| `model_fallback_depth`                                                          | histogram, 1..6 — how deep calls actually go. The number that tells us whether the chain is doing anything.   |
+| `model_call_duration_ms`                                                        | histogram, tag `provider`                                                                                     |
+| `model_account_health`                                                          | gauge per health value                                                                                        |
+| `model_bundle_lag_seconds`                                                      | histogram — publish → node-applied. Backs the FR-74 p95.                                                      |
+| Sentry tag `model.provider` / `model.account` (label, not id) / `model.attempt` | on any exception raised from an attempt                                                                       |
 
 Credential values are never a tag, a breadcrumb, a message or an extra. The redaction spec in
 §3.4 covers the routing record; a second spec covers the Sentry scope builder.
 
 ### 9.3 Failure modes and what the user sees
 
-| Failure | Blast radius | Behaviour |
-| --- | --- | --- |
-| `model_accounts` unreachable at call time | one call | The planner falls back to the plugin's own `getResolvedSettings()` credential — i.e. today's behaviour — and records `accountId: null`. Runs do not fail because the accounts table is down. |
-| Policy row unreadable | one call | Same: fall through the ladder to the plugin default. |
-| Health task down | none | Health goes stale, not wrong. `lastCheckedAt` ages and the UI shows the age. |
-| Catalogue endpoints down | model picker only | The 1-hour in-process cache serves; if empty, the picker degrades to free-typed ids with the unverified badge. |
-| Bundle fetch fails on a node | that computer | Node keeps the credentials it already has; the sync banner keeps showing it as pending until it succeeds or goes unreachable. No run is failed for this. |
-| An `unverified` model id is genuinely wrong | one call | Provider rejects it as `fatal`; the chain does **not** walk (FR-44); the error names the id. |
-| Reorder race | one save | `409 stale_order`; the list reloads; no partial order is written. |
-| Attempt ceiling hit | one call | `outcome: 'exhausted'`, `truncatedAtAttemptCeiling: true`, one run-log line, one Run failure. |
-| Encryption key absent (dev) | dev only | `PluginSecretEncService` passes values through in plaintext exactly as it does for `secretSettings` today; a boot warning already exists. Production sets the key. |
+| Failure                                     | Blast radius      | Behaviour                                                                                                                                                                                    |
+| ------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model_accounts` unreachable at call time   | one call          | The planner falls back to the plugin's own `getResolvedSettings()` credential — i.e. today's behaviour — and records `accountId: null`. Runs do not fail because the accounts table is down. |
+| Policy row unreadable                       | one call          | Same: fall through the ladder to the plugin default.                                                                                                                                         |
+| Health task down                            | none              | Health goes stale, not wrong. `lastCheckedAt` ages and the UI shows the age.                                                                                                                 |
+| Catalogue endpoints down                    | model picker only | The 1-hour in-process cache serves; if empty, the picker degrades to free-typed ids with the unverified badge.                                                                               |
+| Bundle fetch fails on a node                | that computer     | Node keeps the credentials it already has; the sync banner keeps showing it as pending until it succeeds or goes unreachable. No run is failed for this.                                     |
+| An `unverified` model id is genuinely wrong | one call          | Provider rejects it as `fatal`; the chain does **not** walk (FR-44); the error names the id.                                                                                                 |
+| Reorder race                                | one save          | `409 stale_order`; the list reloads; no partial order is written.                                                                                                                            |
+| Attempt ceiling hit                         | one call          | `outcome: 'exhausted'`, `truncatedAtAttemptCeiling: true`, one run-log line, one Run failure.                                                                                                |
+| Encryption key absent (dev)                 | dev only          | `PluginSecretEncService` passes values through in plaintext exactly as it does for `secretSettings` today; a boot warning already exists. Production sets the key.                           |
 
 ## 10. Test plan
 
 ### 10.1 Unit — `packages/agent` (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/facades/__tests__/model-policy-resolver.spec.ts` | The ladder: per-field narrowest-wins across workspace/agent/schedule; a Schedule that sets only the model inherits effort and timeout; deleted scopes; the legacy path where an Agent has `aiProviderId`/`modelId` and no policy row (FR-25..36). |
-| `packages/agent/src/facades/__tests__/model-attempt-planner.spec.ts` | Attempt-list construction: models outer × accounts inner; paused and cooling-down accounts absent; no duplicate pairs; ceiling of 6; a chain entry with no account skipped without consuming an attempt (FR-15..24, FR-42). |
-| `packages/agent/src/facades/__tests__/model-failure-classifier.spec.ts` | Every row of the §2.2 table, including that 400/422 is `fatal` and that a context rejection only advances when a later entry is larger (FR-43..45). |
-| `packages/agent/src/facades/__tests__/model-attempt-planner.redaction.spec.ts` | The serialised routing record contains none of the account's credential values, in whole or in substring (FR-83). |
-| `packages/agent/src/facades/__tests__/ai.facade.spec.ts` (extended) | The no-policy path is byte-identical to today; budget block short-circuits before attempt 1 and tries no fallback (FR-46); in-flight runs keep their resolved routing (FR-32). |
-| `packages/agent/src/services/__tests__/model-account.service.spec.ts` | Limits of 8 and 32; contiguous renumbering on delete; duplicate label rejection; optimistic reorder conflict; pause/resume preserving position (FR-1..12). |
-| `packages/agent/src/services/__tests__/model-account-health.service.spec.ts` | 14-day and 3-day thresholds; probe failure sets `unknown` not `invalid`; a live rejection sets `invalid` immediately; cooldown arithmetic incl. the 30-minute cap (FR-20..22, FR-60..69). |
-| `packages/agent/src/services/__tests__/model-bundle.service.spec.ts` | Version monotonicity; content hash stability under key reordering; out-of-sync and unreachable counting at the 10-minute threshold (FR-70..78). |
+| File                                                                           | Covers                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/facades/__tests__/model-policy-resolver.spec.ts`           | The ladder: per-field narrowest-wins across workspace/agent/schedule; a Schedule that sets only the model inherits effort and timeout; deleted scopes; the legacy path where an Agent has `aiProviderId`/`modelId` and no policy row (FR-25..36). |
+| `packages/agent/src/facades/__tests__/model-attempt-planner.spec.ts`           | Attempt-list construction: models outer × accounts inner; paused and cooling-down accounts absent; no duplicate pairs; ceiling of 6; a chain entry with no account skipped without consuming an attempt (FR-15..24, FR-42).                       |
+| `packages/agent/src/facades/__tests__/model-failure-classifier.spec.ts`        | Every row of the §2.2 table, including that 400/422 is `fatal` and that a context rejection only advances when a later entry is larger (FR-43..45).                                                                                               |
+| `packages/agent/src/facades/__tests__/model-attempt-planner.redaction.spec.ts` | The serialised routing record contains none of the account's credential values, in whole or in substring (FR-83).                                                                                                                                 |
+| `packages/agent/src/facades/__tests__/ai.facade.spec.ts` (extended)            | The no-policy path is byte-identical to today; budget block short-circuits before attempt 1 and tries no fallback (FR-46); in-flight runs keep their resolved routing (FR-32).                                                                    |
+| `packages/agent/src/services/__tests__/model-account.service.spec.ts`          | Limits of 8 and 32; contiguous renumbering on delete; duplicate label rejection; optimistic reorder conflict; pause/resume preserving position (FR-1..12).                                                                                        |
+| `packages/agent/src/services/__tests__/model-account-health.service.spec.ts`   | 14-day and 3-day thresholds; probe failure sets `unknown` not `invalid`; a live rejection sets `invalid` immediately; cooldown arithmetic incl. the 30-minute cap (FR-20..22, FR-60..69).                                                         |
+| `packages/agent/src/services/__tests__/model-bundle.service.spec.ts`           | Version monotonicity; content hash stability under key reordering; out-of-sync and unreachable counting at the 10-minute threshold (FR-70..78).                                                                                                   |
 
 ### 10.2 Controller specs — `apps/api` (Jest)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/model-routing/__tests__/model-accounts.controller.spec.ts` | Every route's auth matrix (member reads, admin writes, 403 otherwise); the fail-closed serialisation assertion (no credential in any body); 409 shapes for both limits and for `stale_order`; 422 on a rejected credential. |
-| `apps/api/src/model-routing/__tests__/model-policies.controller.spec.ts` | DTO validation rejects a fallback list of 4, a chain containing the primary, a duplicate entry, a timeout of 30 s or 3 h, an effort of `extreme`; `GET /resolved` returns a per-field `source`. |
-| `apps/api/src/model-routing/__tests__/model-bundle.controller.spec.ts` | `GET /status` counts; `POST /send` is admin-only and returns 202. |
-| `apps/api/src/fleet/__tests__/fleet-model-bundle.controller.spec.ts` | The node route rejects a bad node secret with the same undifferentiated message as `heartbeat`; a valid fetch returns material; the heartbeat accepts and stores `modelBundleVersion` and omitting it leaves the column alone. |
-| `apps/api/src/migrations/__tests__/CreateModelAccountsAndPolicies.spec.ts`, `AddAgentRunModelRouting.spec.ts`, `CreateModelCredentialBundle.spec.ts` | Apply, re-apply, revert; no `DROP COLUMN` on a pre-existing column. |
+| File                                                                                                                                                 | Covers                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/model-routing/__tests__/model-accounts.controller.spec.ts`                                                                             | Every route's auth matrix (member reads, admin writes, 403 otherwise); the fail-closed serialisation assertion (no credential in any body); 409 shapes for both limits and for `stale_order`; 422 on a rejected credential.    |
+| `apps/api/src/model-routing/__tests__/model-policies.controller.spec.ts`                                                                             | DTO validation rejects a fallback list of 4, a chain containing the primary, a duplicate entry, a timeout of 30 s or 3 h, an effort of `extreme`; `GET /resolved` returns a per-field `source`.                                |
+| `apps/api/src/model-routing/__tests__/model-bundle.controller.spec.ts`                                                                               | `GET /status` counts; `POST /send` is admin-only and returns 202.                                                                                                                                                              |
+| `apps/api/src/fleet/__tests__/fleet-model-bundle.controller.spec.ts`                                                                                 | The node route rejects a bad node secret with the same undifferentiated message as `heartbeat`; a valid fetch returns material; the heartbeat accepts and stores `modelBundleVersion` and omitting it leaves the column alone. |
+| `apps/api/src/migrations/__tests__/CreateModelAccountsAndPolicies.spec.ts`, `AddAgentRunModelRouting.spec.ts`, `CreateModelCredentialBundle.spec.ts` | Apply, re-apply, revert; no `DROP COLUMN` on a pre-existing column.                                                                                                                                                            |
 
 ### 10.3 End-to-end — `apps/web/e2e` (Playwright)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/e2e/settings-model-accounts.spec.ts` | Add a second account; both appear numbered; reorder in three interactions; pause and resume; remove with the consequence-naming confirm; the two over-limit states; the read-only state for a non-admin; the load-error panel. |
-| `apps/web/e2e/settings-model-defaults.spec.ts` | Set a default; add fallbacks; the picker never lists the primary; changing the primary removes it from the chain and says so; the chain-too-long note; effort radios; timeout bounds and the "schedules will time out" warning. |
-| `apps/web/e2e/model-override-ladder.spec.ts` | Agent override shows what it overrides and resets in one action; schedule override beats agent; both show the inherited value by name; `GET /resolved` matches what the UI claims. |
-| `apps/web/e2e/model-account-health-banner.spec.ts` | Expiring-in-2-days banner; broken-with-fallback and broken-without-fallback variants; dismissal persists; the banner returns when the unhealthy set changes. |
-| `apps/web/e2e/model-bundle-sync.spec.ts` | Pending / sending / unreachable / cleared; no banner at all with zero enrolled computers. |
-| `apps/web/e2e/flow-plugin-ai-models-catalogue.spec.ts` (existing — **must stay green, do not edit**) | The live-probed plugin/models contract is unchanged by this epic. |
+| File                                                                                                 | Covers                                                                                                                                                                                                                          |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/e2e/settings-model-accounts.spec.ts`                                                       | Add a second account; both appear numbered; reorder in three interactions; pause and resume; remove with the consequence-naming confirm; the two over-limit states; the read-only state for a non-admin; the load-error panel.  |
+| `apps/web/e2e/settings-model-defaults.spec.ts`                                                       | Set a default; add fallbacks; the picker never lists the primary; changing the primary removes it from the chain and says so; the chain-too-long note; effort radios; timeout bounds and the "schedules will time out" warning. |
+| `apps/web/e2e/model-override-ladder.spec.ts`                                                         | Agent override shows what it overrides and resets in one action; schedule override beats agent; both show the inherited value by name; `GET /resolved` matches what the UI claims.                                              |
+| `apps/web/e2e/model-account-health-banner.spec.ts`                                                   | Expiring-in-2-days banner; broken-with-fallback and broken-without-fallback variants; dismissal persists; the banner returns when the unhealthy set changes.                                                                    |
+| `apps/web/e2e/model-bundle-sync.spec.ts`                                                             | Pending / sending / unreachable / cleared; no banner at all with zero enrolled computers.                                                                                                                                       |
+| `apps/web/e2e/flow-plugin-ai-models-catalogue.spec.ts` (existing — **must stay green, do not edit**) | The live-probed plugin/models contract is unchanged by this epic.                                                                                                                                                               |
 
 ### 10.4 Node — `apps/node` (Vitest)
 
-| File | Covers |
-| --- | --- |
+| File                                            | Covers                                                                                                                                                                                                                               |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `apps/node/src/core/model-bundle-apply.spec.ts` | Applying a bundle writes each value through `secret-store.ts` and never to a log; a fetch failure keeps the previously applied version; the applied version is reported on the next heartbeat; an unchanged content hash is a no-op. |
 
 ## 11. Phasing
@@ -827,25 +827,25 @@ Ships green because: an empty fallback list produces exactly the P1 attempt list
 
 `model_credential_bundle`, the third migration, the bundle service and its fan-out dispatcher,
 the node-authenticated fetch, the two heartbeat fields, `apps/node` apply-and-report, the sync
-banner and *Send now*.
+banner and _Send now_.
 
 Ships green because: a node that never reports a version is simply not counted, and a
 workspace with no enrolled computers renders no banner (FR-78).
 
 ## 12. Constitution reconciliation
 
-| Principle | How this plan satisfies it |
-| --- | --- |
-| **I — Plugin-first** | No provider client is written. Credentials are stored for, and calls are made through, the installed `ai-provider` plugins via `AiFacadeService`. The two new plugin-contract methods are optional and defaulted. |
-| **II — Capability-driven** | The provider list comes from the registry by capability; credential fields come from each plugin's declared schema; no plugin id literal exists in `apps/api`, `apps/web` or any i18n value. |
-| **III — Source-of-truth repos** | Untouched. This epic stores configuration and credentials, never work content. |
-| **IV — Job runtime** | Health probing, cooldown sweeping and bundle fan-out are `schedules.task()` / dispatcher-symbol work routed through `job-runtime.providers.ts`. No direct queue call, no vendor SDK import at any call site, and the new symbol is registered in `_tasks-symbols.ts`. |
-| **V — Forward-only migrations** | Three additive migrations in `apps/api/src/migrations/`, shipped in the same PRs as their entities, each with an idempotent-apply and revert spec, none dropping or renaming anything. |
-| **VI — Tests** | Eight unit suites, five controller/migration suites, five e2e specs and one node suite, enumerated in §10, all written with the code they cover. |
-| **VII — Secrets** | Credentials use the existing `EncryptedJsonColumn` envelope; the view mapper is explicit and fail-closed; a redaction spec asserts absence in the routing record and the Sentry scope; the activity log records field names only; the node transport is authenticated, unlogged and keychain-backed. |
-| **VIII — Plugin counts** | No plugin added or removed; `docs/plugin-system/built-in-plugins.md` is untouched. |
-| **IX — Behaviour-first specs** | [`spec.md`](./spec.md) contains no class name, file path or code; all of that lives here. |
-| **X — Compatibility** | `FacadeOptions` and `AiRoutingOptions` gain optional fields only; `Agent.aiProviderId`/`modelId` keep working and are read as a policy of one; the plugin-contract additions ship as a minor `@ever-works/plugin` bump; the existing plugin/models HTTP contract and its live-probed e2e spec are unchanged. |
+| Principle                       | How this plan satisfies it                                                                                                                                                                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **I — Plugin-first**            | No provider client is written. Credentials are stored for, and calls are made through, the installed `ai-provider` plugins via `AiFacadeService`. The two new plugin-contract methods are optional and defaulted.                                                                                            |
+| **II — Capability-driven**      | The provider list comes from the registry by capability; credential fields come from each plugin's declared schema; no plugin id literal exists in `apps/api`, `apps/web` or any i18n value.                                                                                                                 |
+| **III — Source-of-truth repos** | Untouched. This epic stores configuration and credentials, never work content.                                                                                                                                                                                                                               |
+| **IV — Job runtime**            | Health probing, cooldown sweeping and bundle fan-out are `schedules.task()` / dispatcher-symbol work routed through `job-runtime.providers.ts`. No direct queue call, no vendor SDK import at any call site, and the new symbol is registered in `_tasks-symbols.ts`.                                        |
+| **V — Forward-only migrations** | Three additive migrations in `apps/api/src/migrations/`, shipped in the same PRs as their entities, each with an idempotent-apply and revert spec, none dropping or renaming anything.                                                                                                                       |
+| **VI — Tests**                  | Eight unit suites, five controller/migration suites, five e2e specs and one node suite, enumerated in §10, all written with the code they cover.                                                                                                                                                             |
+| **VII — Secrets**               | Credentials use the existing `EncryptedJsonColumn` envelope; the view mapper is explicit and fail-closed; a redaction spec asserts absence in the routing record and the Sentry scope; the activity log records field names only; the node transport is authenticated, unlogged and keychain-backed.         |
+| **VIII — Plugin counts**        | No plugin added or removed; `docs/plugin-system/built-in-plugins.md` is untouched.                                                                                                                                                                                                                           |
+| **IX — Behaviour-first specs**  | [`spec.md`](./spec.md) contains no class name, file path or code; all of that lives here.                                                                                                                                                                                                                    |
+| **X — Compatibility**           | `FacadeOptions` and `AiRoutingOptions` gain optional fields only; `Agent.aiProviderId`/`modelId` keep working and are read as a policy of one; the plugin-contract additions ship as a minor `@ever-works/plugin` bump; the existing plugin/models HTTP contract and its live-probed e2e spec are unchanged. |
 
 ## 13. References
 

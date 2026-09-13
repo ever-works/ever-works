@@ -25,11 +25,11 @@ safety.
   `PortableDateColumn`, placed inside the existing recurrence block, with a doc comment stating
   that pausing preserves `recurrenceRule` / `recurrenceCron` / `nextOccurrenceAt` and every bound.
   Add `@Index('idx_tasks_recurrence_due_active', ['isRecurring', 'recurrencePausedAt',
-  'nextOccurrenceAt'])` **beside** the existing `idx_tasks_recurrence_due` (do not replace it).
+'nextOccurrenceAt'])` **beside** the existing `idx_tasks_recurrence_due` (do not replace it).
 - `packages/agent/src/entities/agent.entity.ts` — add `heartbeatPausedAt` as a nullable
   `PortableDateColumn` in the `// ── Heartbeat ──` block, with a comment stating it is orthogonal
   to `AgentStatus`. Add `@Index('idx_agents_heartbeat_due', ['status', 'heartbeatPausedAt',
-  'nextHeartbeatAt'])` beside the existing `idx_agents_next_heartbeat`.
+'nextHeartbeatAt'])` beside the existing `idx_agents_next_heartbeat`.
 
 **Done when** both entities compile, no existing column or index is altered, and
 `pnpm --filter @ever-works/agent build` passes.

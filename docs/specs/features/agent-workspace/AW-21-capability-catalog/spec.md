@@ -19,7 +19,7 @@ section of the catalogue links into the shelf it builds)
 >
 > **Two new nouns, justified in §5 and added to the program vocabulary table in the same PR**
 > (program rule #2): **Playbook** (a packaged outcome in the catalogue) and **Playbook
-> adoption** (the record of a workspace having set one up). Every *other* thing this epic touches
+> adoption** (the record of a workspace having set one up). Every _other_ thing this epic touches
 > is an existing Ever Works noun — Agent, Skill, Task, Mission, Schedule, Trigger, Approval,
 > Escalation, Run, Knowledge Base, Plugin, Connection, Workflow.
 
@@ -50,8 +50,8 @@ days and what those runs cost.
 
 ### 2.1 The user's question
 
-> *"I have agents, skills, missions, schedules, a knowledge base and forty-odd plugins. What do I
-> actually **do** with them on a Monday morning?"*
+> _"I have agents, skills, missions, schedules, a knowledge base and forty-odd plugins. What do I
+> actually **do** with them on a Monday morning?"_
 
 Ever Works has a capability problem that is the opposite of the usual one. The capabilities are
 built. What is missing is any surface that names an **outcome** and shows the path to it. A new
@@ -62,33 +62,33 @@ and every one of them is a container waiting to be filled with an idea the owner
 
 They assemble it by hand, across six screens, in this order, with nothing telling them the order:
 
-| Step | Where they go today | What can go wrong |
-| --- | --- | --- |
-| 1. Create an agent | `/agents/new`, or `/agents/templates` for one of the 6 built-in presets | The preset list is a scaffold page that carries no outcome, only a role |
-| 2. Give it skills | `/agents#skills` → catalogue → install → bind | Nothing tells them *which* skills that role needs |
-| 3. Write its instructions | Agent instructions editor | Blank page. This is where most attempts die |
-| 4. Give it a cadence | Agent settings heartbeat, or a recurring Task, or a Work schedule, or an inbound trigger — four different mechanisms | No guidance on which mechanism fits which job |
-| 5. Decide what it may do alone | Agent guardrails (`require_approval` / `autonomous`, blocked action types) | Defaults to asking about everything, which trains people to click Approve without reading |
-| 6. Connect what it needs | `/plugins` → install → enable → settings | Discovered at run time, as a failure, after all five steps above |
+| Step                           | Where they go today                                                                                                  | What can go wrong                                                                         |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1. Create an agent             | `/agents/new`, or `/agents/templates` for one of the 6 built-in presets                                              | The preset list is a scaffold page that carries no outcome, only a role                   |
+| 2. Give it skills              | `/agents#skills` → catalogue → install → bind                                                                        | Nothing tells them _which_ skills that role needs                                         |
+| 3. Write its instructions      | Agent instructions editor                                                                                            | Blank page. This is where most attempts die                                               |
+| 4. Give it a cadence           | Agent settings heartbeat, or a recurring Task, or a Work schedule, or an inbound trigger — four different mechanisms | No guidance on which mechanism fits which job                                             |
+| 5. Decide what it may do alone | Agent guardrails (`require_approval` / `autonomous`, blocked action types)                                           | Defaults to asking about everything, which trains people to click Approve without reading |
+| 6. Connect what it needs       | `/plugins` → install → enable → settings                                                                             | Discovered at run time, as a failure, after all five steps above                          |
 
 Six screens, five judgement calls, and the first evidence that any of it was right arrives a week
 later. The measurable costs, all of them ours:
 
-| Gap | What it costs us |
-| --- | --- |
-| No outcome-shaped entry point | The onboarding wizard ends by creating a Work and then stops. There is no second step that says "here is a job your agents can do this week." |
+| Gap                                                    | What it costs us                                                                                                                                                                                                                                      |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No outcome-shaped entry point                          | The onboarding wizard ends by creating a Work and then stops. There is no second step that says "here is a job your agents can do this week."                                                                                                         |
 | Capability catalogues are scattered across five routes | Four of the five (`/agents/templates`, `/skills/templates`, `/tasks/templates`, the Work-blueprint chips) are labelled by their own authors as scaffolds, three of them are not internationalised, and none of them is reachable from a single index. |
-| Multi-step task templates are invisible | The mechanism that instantiates a parent Task plus one sub-task per step, with dependency edges, assignees and approvers, in one transaction, is rendered underneath an unrelated catalogue on a page nothing links to. |
-| Saved workflow graphs have no screen at all | A user can save a graph, run it, and read its trace — but only with a raw HTTP client. Nothing in the product lists them. |
-| Nothing states an escalation point up front | Guardrails are configured on the agent, days after the agent was created, by somebody who has not yet seen the agent do anything. The result is an all-or-nothing choice made with no evidence. |
-| Nothing states a cost up front | An owner cannot find out what a weekly research job costs until they have run one. |
+| Multi-step task templates are invisible                | The mechanism that instantiates a parent Task plus one sub-task per step, with dependency edges, assignees and approvers, in one transaction, is rendered underneath an unrelated catalogue on a page nothing links to.                               |
+| Saved workflow graphs have no screen at all            | A user can save a graph, run it, and read its trace — but only with a raw HTTP client. Nothing in the product lists them.                                                                                                                             |
+| Nothing states an escalation point up front            | Guardrails are configured on the agent, days after the agent was created, by somebody who has not yet seen the agent do anything. The result is an all-or-nothing choice made with no evidence.                                                       |
+| Nothing states a cost up front                         | An owner cannot find out what a weekly research job costs until they have run one.                                                                                                                                                                    |
 
 ### 2.3 Why a catalogue and not more documentation
 
 Documentation tells you a thing is possible. It cannot tell you whether **your** workspace can do
 it right now — whether the search plugin is enabled, whether an agent exists, whether the daily
 budget has room. The catalogue can, because it reads your workspace before it offers you the
-button. A playbook card that says *"needs a search connection — you do not have one"* and links
+button. A playbook card that says _"needs a search connection — you do not have one"_ and links
 straight to the plugin page is worth more than a paragraph that says the same thing to everybody.
 
 And it closes the loop the program is built around: an adopted playbook produces Runs with
@@ -290,7 +290,7 @@ Every threshold below is a number on purpose. "Reasonable", "quickly" and "a few
 - **FR-7** Filter chips on the Playbooks section filter by category. Categories in v1 are exactly
   five: `Reporting`, `Content`, `Operations`, `Research`, `Inbox`.
 - **FR-8** A second chip row filters by readiness: `Ready now`, `Needs a connection`, `Already set
-  up`. Chips are additive within a row and intersecting across rows.
+up`. Chips are additive within a row and intersecting across rows.
 - **FR-9** The index makes at most **1** network round trip after first paint. All five sections
   are server-rendered on first load.
 - **FR-10** Catalogue reads are cached server-side for **300 s** per scope. Readiness (which
@@ -393,7 +393,7 @@ Every threshold below is a number on purpose. "Reasonable", "quickly" and "a few
   as `already gone` and does not fail the batch.
 - **FR-47** An adoption shows a 30-day rollup: run count, total cost in the workspace currency to
   2 decimal places, and last run outcome. When there have been no runs it reads `No runs yet ·
-  first run <date>`.
+first run <date>`.
 - **FR-48** An adoption whose last **3** consecutive runs failed shows a persistent warning with
   the last failure reason and a `Run now` control. It is not silently left failing.
 - **FR-49** After **14** days active with **zero** rejected approvals, an adoption shows one
@@ -448,7 +448,7 @@ Every threshold below is a number on purpose. "Reasonable", "quickly" and "a few
 A **Playbook** is a packaged outcome: trigger, steps, required connections, artefacts,
 escalation points, guardrails and caps, packaged under one slug and one version.
 
-*Why it cannot be an existing noun.* Every existing Ever Works template is a template of **one
+_Why it cannot be an existing noun._ Every existing Ever Works template is a template of **one
 thing**: an Agent template makes an Agent, a Skill template makes a Skill, a Task template makes a
 Task tree, a Work template makes a Work. A Playbook is the only object that spans them — it is a
 packaged outcome whose output is an Agent **and** its Skills **and** a Task template **and** a Schedule
@@ -456,12 +456,12 @@ packaged outcome whose output is an Agent **and** its Skills **and** a Task temp
 it as a sixth kind of `Template` would misuse an entity whose whole shape (repository owner, repo
 name, branch, fork target) is about git-hosted starting points.
 
-*Why it has no table.* Playbook definitions are **catalogue data, not user data**. They are
+_Why it has no table._ Playbook definitions are **catalogue data, not user data**. They are
 supplied by an installed provider plugin exactly as Skill catalogue entries already are, cached in
 memory, and re-resolved on a TTL. Nothing about a definition is user-specific, so nothing about it
 needs a row. What **is** user-specific is the adoption, below.
 
-*Disambiguation.* A Knowledge Base folder named `Playbooks` (a common convention, used as an
+_Disambiguation._ A Knowledge Base folder named `Playbooks` (a common convention, used as an
 example in [AW-06](../AW-06-knowledge-library/spec.md)) is documents. A **Playbook** here is a
 catalogue entry. The two never appear in the same surface.
 
@@ -473,7 +473,7 @@ given workspace, derived from readiness, and `superseded` when a higher version 
 A record that this workspace set up this playbook: which playbook, which version, who did it, what
 instance name, what it created, and whether it is running.
 
-*Why it has to exist.* Without it there is no way to show `Already set up`, no way to stop a second
+_Why it has to exist._ Without it there is no way to show `Already set up`, no way to stop a second
 click creating a duplicate Agent, no way to pause the thing as a unit, no way to attribute a run's
 cost to the job it belongs to, and no way to answer "what did this create?" when somebody wants to
 undo it. It is the receipt, and this program's rule #9 says every new surface has to be able to
@@ -511,7 +511,7 @@ means the owner explicitly ticked every artefact and confirmed.
 One row per thing an adoption created: its type, its id in the owning table, the name it had at
 creation, and its current state.
 
-*Why not a JSON column on the adoption.* Two reads need it in the other direction — "which playbook
+_Why not a JSON column on the adoption._ Two reads need it in the other direction — "which playbook
 created this Agent?" on the Agent page (FR-50), and "which of these artefacts still exists and has
 it changed?" for the removal flow (FR-45). Both are per-artefact lookups against a set that is
 written once and read often.
@@ -522,20 +522,20 @@ written by a sweep.
 
 ### 5.2 Existing entities this epic reads and writes
 
-| Ever Works noun | How this epic uses it | Written? |
-| --- | --- | --- |
-| **Agent** | Created from a built-in agent template at adoption; guardrails set on it | Created + guardrails written |
-| **Skill** + **Skill binding** | Installed from the skills catalogue and bound to the created Agent | Created |
-| **Task** template (multi-step) | Created from the playbook's step list; surfaced as its own catalogue section | Created |
-| **Schedule** / **Trigger** | The playbook's cadence becomes an agent cadence or an inbound trigger | Created |
-| **Approval** (agent action proposal) | An adopted playbook's escalation points become approvals under `require_approval` guardrails | Read for the 30-day rollup |
-| **Escalation** | A playbook that declares an escalation point raises one at run time | Read only |
-| **Run** | The 30-day rollup counts runs and sums their cost | Read only |
-| **Knowledge Base** document | The artefact most playbooks produce | Never written by this epic itself |
-| **Plugin** / **Connection** | Readiness asks whether a capability has an enabled provider | Read only |
-| **Workflow** + **Workflow run** | Listed, run and traced by the Workflows section | Run records created |
-| **Mission** | An artefact some playbooks produce | Never written by this epic itself |
-| **Organization / Workspace scope** | Every catalogue read and every adoption is scoped to the active workspace | — |
+| Ever Works noun                      | How this epic uses it                                                                        | Written?                          |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- | --------------------------------- |
+| **Agent**                            | Created from a built-in agent template at adoption; guardrails set on it                     | Created + guardrails written      |
+| **Skill** + **Skill binding**        | Installed from the skills catalogue and bound to the created Agent                           | Created                           |
+| **Task** template (multi-step)       | Created from the playbook's step list; surfaced as its own catalogue section                 | Created                           |
+| **Schedule** / **Trigger**           | The playbook's cadence becomes an agent cadence or an inbound trigger                        | Created                           |
+| **Approval** (agent action proposal) | An adopted playbook's escalation points become approvals under `require_approval` guardrails | Read for the 30-day rollup        |
+| **Escalation**                       | A playbook that declares an escalation point raises one at run time                          | Read only                         |
+| **Run**                              | The 30-day rollup counts runs and sums their cost                                            | Read only                         |
+| **Knowledge Base** document          | The artefact most playbooks produce                                                          | Never written by this epic itself |
+| **Plugin** / **Connection**          | Readiness asks whether a capability has an enabled provider                                  | Read only                         |
+| **Workflow** + **Workflow run**      | Listed, run and traced by the Workflows section                                              | Run records created               |
+| **Mission**                          | An artefact some playbooks produce                                                           | Never written by this epic itself |
+| **Organization / Workspace scope**   | Every catalogue read and every adoption is scoped to the active workspace                    | —                                 |
 
 **No existing entity is renamed, no existing column changes meaning, and no existing endpoint
 changes its response shape.**
@@ -631,9 +631,9 @@ Empty-state copy, verbatim:
 - Workflows: `No saved workflows. A workflow is a graph of steps you save once and re-run.` /
   action `Read how workflows work`
 - Task templates: `No task templates yet. A template turns one click into a task and its
-  sub-tasks.` / action `Make one`
+sub-tasks.` / action `Make one`
 - Playbooks (only possible if every source fails): `The playbook catalogue is unavailable right
-  now. Everything else on this page still works.`
+now. Everything else on this page still works.`
 
 ### 6.3 The index — loading
 
@@ -748,16 +748,17 @@ adopted.
 ```
 
 Copy, verbatim:
+
 - Heading: `Set up "<title>"`
 - Field labels: `Name it` · `Run it` · `For`
 - List heading: `This will create`
 - Reassurance line: `It will not send anything, spend anything above your caps, or change agents
-  you already have.`
+you already have.`
 - Buttons: `Cancel` · `Create it`
 - Duplicate warning (FR-3.6): `You already run this once. A second copy runs on its own cadence
-  and costs the same again.`
+and costs the same again.`
 - Collision note (FR-27): `You already have an agent called "Ops reporter" — this one will be
-  "Ops reporter 2".`
+"Ops reporter 2".`
 
 ### 6.8 Adoption in progress, and adopted
 
@@ -857,16 +858,16 @@ The primary button's label counts live: `Remove 0 items` (disabled) → `Remove 
 
 ### 6.13 Keyboard affordances
 
-| Key | Where | Does |
-| --- | --- | --- |
-| `/` | index | Focus search |
-| `Esc` | search focused | Clear the search and blur |
-| `←` `→` `↑` `↓` | a card focused | Move focus within the section grid |
-| `Tab` | index | Move to the next section's first card |
-| `Enter` | a card focused | Open its detail |
-| `Enter` | a workflow row focused | Open its run history |
-| `Esc` | any sheet | Close and return focus to the opener |
-| `⏎` on `Create it` | setup sheet | Confirm — the only key that starts an adoption |
+| Key                | Where                  | Does                                           |
+| ------------------ | ---------------------- | ---------------------------------------------- |
+| `/`                | index                  | Focus search                                   |
+| `Esc`              | search focused         | Clear the search and blur                      |
+| `←` `→` `↑` `↓`    | a card focused         | Move focus within the section grid             |
+| `Tab`              | index                  | Move to the next section's first card          |
+| `Enter`            | a card focused         | Open its detail                                |
+| `Enter`            | a workflow row focused | Open its run history                           |
+| `Esc`              | any sheet              | Close and return focus to the opener           |
+| `⏎` on `Create it` | setup sheet            | Confirm — the only key that starts an adoption |
 
 Nothing in this epic binds a global single-key shortcut. `/` is scoped to the catalogue page and
 released when a text field has focus.
@@ -897,6 +898,7 @@ released when a text field has focus.
 A reviewer can run this list top to bottom against a running build.
 
 **Browsing**
+
 - [ ] `Catalog` appears in the sidebar and opens a page headed `What you can do`.
 - [ ] Exactly five sections render, in the order Playbooks, Skills, Workflows, Task templates,
       Starting points.
@@ -908,16 +910,18 @@ A reviewer can run this list top to bottom against a running build.
 - [ ] Category chips and readiness chips both filter, and combine.
 
 **Playbook content**
+
 - [ ] 8 playbooks ship built in; at least 5 show `Ready` on a workspace with default plugins only.
 - [ ] Every detail page renders all eight labelled sections (`WHEN IT RUNS` … `WHAT IT MAY DO
-      ALONE`) with non-empty content.
+ALONE`) with non-empty content.
 - [ ] Every step that stops for a human is marked with the `asks you` flag in the step list.
 - [ ] A catalogue entry with an over-long title is truncated at 120 characters, and an entry with
       an invalid slug does not render at all.
 
 **Readiness and preflight**
+
 - [ ] With no search plugin enabled, `Market watch brief` reads `Not ready — 1 required connection
-      missing`, names `Search`, and its primary button is disabled with an actionable label.
+missing`, names `Search`, and its primary button is disabled with an actionable label.
 - [ ] Enabling a search plugin and returning within 60 s shows `Ready`.
 - [ ] Preflight creates nothing: run it 20 times and the agent, skill, task-template and schedule
       counts are unchanged.
@@ -925,6 +929,7 @@ A reviewer can run this list top to bottom against a running build.
       de-duplicated name, and the sheet shows the collision note.
 
 **Adoption**
+
 - [ ] `Set it up` → sheet → `Create it` returns in under 1 s with a `provisioning` adoption.
 - [ ] Within 60 s the adoption is `active` and links to exactly the rows the sheet itemised —
       no more, no fewer.
@@ -940,6 +945,7 @@ A reviewer can run this list top to bottom against a running build.
 - [ ] Adoption writes one activity-log entry naming the playbook and the row count.
 
 **Living with it**
+
 - [ ] `Pause` stops the schedule; the Agent's own status is unchanged.
 - [ ] `Retire` shows the "everything is kept" confirmation and moves the adoption to the collapsed
       `Retired` group.
@@ -956,6 +962,7 @@ A reviewer can run this list top to bottom against a running build.
 - [ ] Opening the created Agent shows which playbook and adoption created it.
 
 **Workflows, task templates, starting points**
+
 - [ ] Saved workflows list with name, status, node count, run count and last run.
 - [ ] `Run` on an active workflow returns in under 1 s with a queued run; the trace shows per-node
       outcome, edges traversed and decision points.
@@ -965,6 +972,7 @@ A reviewer can run this list top to bottom against a running build.
 - [ ] `Starting points` links to the existing template pages and duplicates none of their controls.
 
 **Access, i18n, accessibility**
+
 - [ ] A read-only member sees no `Set it up`, `Pause`, `Retire`, `Run` or `Use it` control.
 - [ ] Every visible string resolves from a translation key; switching locale to one with no
       translation falls back to English without a missing-key warning in the console.

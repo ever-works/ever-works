@@ -25,11 +25,11 @@ it in prose.
 This epic adds one surface — **the Agent's computer** — reachable as a peer of "Message" on the
 Agent page, and three acts on it:
 
-| Act | What it is | Why it earns its place |
-| --- | --- | --- |
-| **Watch** | A live picture of the Agent's browser window, or its shell, on the Node it is bound to. Read-only. The Agent keeps working. | Autonomy is extended only as far as it can be observed. |
-| **Take over** | The owner's mouse and keyboard drive that machine. The Agent's own input is paused. Every take-over is a permissioned, time-boxed, audited act with a recording attached to the Run. | The last 5% of a job is often a click only a human can make. Today that means abandoning the run. |
-| **Teach** | The owner takes over, does the job once while it is recorded, and the Agent turns the recording into a **draft Skill** that lands in chat for approval. Passwords and one-time codes are never captured. | Demonstration replaces prompt engineering. The artefact is a reusable Skill, not a video. |
+| Act           | What it is                                                                                                                                                                                               | Why it earns its place                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Watch**     | A live picture of the Agent's browser window, or its shell, on the Node it is bound to. Read-only. The Agent keeps working.                                                                              | Autonomy is extended only as far as it can be observed.                                           |
+| **Take over** | The owner's mouse and keyboard drive that machine. The Agent's own input is paused. Every take-over is a permissioned, time-boxed, audited act with a recording attached to the Run.                     | The last 5% of a job is often a click only a human can make. Today that means abandoning the run. |
+| **Teach**     | The owner takes over, does the job once while it is recorded, and the Agent turns the recording into a **draft Skill** that lands in chat for approval. Passwords and one-time codes are never captured. | Demonstration replaces prompt engineering. The artefact is a reusable Skill, not a video.         |
 
 ```
    AGENT PAGE
@@ -85,7 +85,7 @@ an exclusive one (one controller at a time, with a request-and-hand-over flow), 
 had it).
 
 From take-over, the owner can **teach a task**: name what they are about to show, press record, do
-the job once in the Agent's own browser, and press finish. The system captures the *steps* — the
+the job once in the Agent's own browser, and press finish. The system captures the _steps_ — the
 pages visited, the controls clicked, the values typed — and never captures passwords, one-time
 codes, or the contents of any field the browser marks as a credential. The Agent then studies the
 recording and replies in the owner's conversation with it, carrying a **draft Skill**: a title, a
@@ -105,27 +105,27 @@ another's signed-in accounts, and the owner can reset one Agent's logins without
 
 ### 2.1 The user's question
 
-> *"What is it actually doing on my machine right now — and can I just do this one step myself?"*
+> _"What is it actually doing on my machine right now — and can I just do this one step myself?"_
 
 And, ten minutes later:
 
-> *"That took me forty seconds. Why can't it just watch me do it once?"*
+> _"That took me forty seconds. Why can't it just watch me do it once?"_
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer… | Today they must… | What breaks |
-| --- | --- | --- |
-| "What is my Agent doing on that machine?" | Read a Node's status row: online/offline, last heartbeat, disk free, capability tags, and the last 25 job rows. | None of that is *what it is doing*. There is no live view of a Node of any kind — no screen, no browser view, no screenshot, no Node log ever reaching the platform. The Node's own logs stay in a tray window on the machine. |
-| "Show me the shell." | Open the Agent's Terminal tab. | That terminal streams a shell hosted in the platform's job worker, keyed to a Run — **not** a shell on the enrolled machine. Every enrolled Node advertises a `terminal` capability that no job kind ever exercises. The user believes they are looking at their PC; they are not. |
-| "It got stuck on a login wall — let me click it." | Cancel the run, do the work by hand on the machine, restart the run and hope the state carries. | There is no way to hand control to a human mid-run and hand it back. A run that needs one human click is a failed run. |
-| "Teach it how we do this." | Write instructions into the Agent's files or author a Skill by hand, guessing at selectors and page names. | Skills are authored as prose in a Markdown textarea. The most reliable source of truth — a person doing the job — cannot be turned into a Skill at all. |
-| "Which Agent is signed into which account on that machine?" | Nothing. | The Node provisions a git worktree per Task, but there is no per-Agent browser profile or per-Agent file root. Two Agents on one Node share whatever browser state exists. The connection scopes granted in the control plane and the logged-in sessions on the machine are not the same boundary. |
-| "Who reached into my machine, and when?" | Nothing for this, though the Fleet already keeps an audit trail for credential and panic actions. | There is no take-over to audit yet — but when there is, it must land in the same ledger on day one, not as a follow-up. |
+| To answer…                                                  | Today they must…                                                                                                | What breaks                                                                                                                                                                                                                                                                                        |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "What is my Agent doing on that machine?"                   | Read a Node's status row: online/offline, last heartbeat, disk free, capability tags, and the last 25 job rows. | None of that is _what it is doing_. There is no live view of a Node of any kind — no screen, no browser view, no screenshot, no Node log ever reaching the platform. The Node's own logs stay in a tray window on the machine.                                                                     |
+| "Show me the shell."                                        | Open the Agent's Terminal tab.                                                                                  | That terminal streams a shell hosted in the platform's job worker, keyed to a Run — **not** a shell on the enrolled machine. Every enrolled Node advertises a `terminal` capability that no job kind ever exercises. The user believes they are looking at their PC; they are not.                 |
+| "It got stuck on a login wall — let me click it."           | Cancel the run, do the work by hand on the machine, restart the run and hope the state carries.                 | There is no way to hand control to a human mid-run and hand it back. A run that needs one human click is a failed run.                                                                                                                                                                             |
+| "Teach it how we do this."                                  | Write instructions into the Agent's files or author a Skill by hand, guessing at selectors and page names.      | Skills are authored as prose in a Markdown textarea. The most reliable source of truth — a person doing the job — cannot be turned into a Skill at all.                                                                                                                                            |
+| "Which Agent is signed into which account on that machine?" | Nothing.                                                                                                        | The Node provisions a git worktree per Task, but there is no per-Agent browser profile or per-Agent file root. Two Agents on one Node share whatever browser state exists. The connection scopes granted in the control plane and the logged-in sessions on the machine are not the same boundary. |
+| "Who reached into my machine, and when?"                    | Nothing for this, though the Fleet already keeps an audit trail for credential and panic actions.               | There is no take-over to audit yet — but when there is, it must land in the same ledger on day one, not as a follow-up.                                                                                                                                                                            |
 
 ### 2.3 The four gaps this epic closes
 
 1. **The Fleet is blind.** Everything needed to run work on a user's machine exists and is
-   hardened; the one thing missing is a picture. That is a *surfacing* job on a subsystem that
+   hardened; the one thing missing is a picture. That is a _surfacing_ job on a subsystem that
    already has enrolment, credentials, capability detection, leasing, affinity, cost ceilings, a
    kill switch and an audit ledger.
 2. **The terminal points at the wrong machine.** A capability tag advertised by every Node with
@@ -156,8 +156,8 @@ The screen channel is a new channel beside the existing terminal one, not a repl
   **when** the owner opens the Agent page and clicks **Watch computer** in the action row,
   **then** the computer surface opens, shows a connecting state within 500 ms, and renders its
   first live frame within 6 seconds; the header strip reads `<Agent> · <Node> · <Node local
-  time> · Screen · Sharp` with a `● LIVE` badge, and the status line reads
-  *"Watching — <Agent> keeps working."*
+time> · Screen · Sharp` with a `● LIVE` badge, and the status line reads
+  _"Watching — <Agent> keeps working."_
 
 - **S2 — The picture is legible.**
   **Given** the Node is executing a Task for that Agent,
@@ -175,7 +175,7 @@ The screen channel is a new channel beside the existing terminal one, not a repl
   **Given** the owner is watching and the Node's control policy permits them,
   **when** they click **Take over** (or press `T`),
   **then** within 2 seconds the mode changes to **In control**, the stage border turns amber, the
-  status line reads *"You have control — <Agent>'s input is paused"*, the stage takes pointer and
+  status line reads _"You have control — <Agent>'s input is paused"_, the stage takes pointer and
   keyboard focus, and the Agent's own synthetic input to that surface is suppressed until control
   is released. An audit row is written naming the person, the Node, the Agent and the time.
 
@@ -183,17 +183,17 @@ The screen channel is a new channel beside the existing terminal one, not a repl
   **Given** the owner has control,
   **when** they click **Give back control** (or press `Escape` twice),
   **then** the mode returns to watching within 2 seconds, the Agent's input resumes, the status
-  line reads *"Watching — <Agent> keeps working"*, and a second audit row closes the control span
+  line reads _"Watching — <Agent> keeps working"_, and a second audit row closes the control span
   with its duration.
 
 - **S6 — Teach a task end to end.**
   **Given** the owner has control of the Agent's browser,
-  **when** they open **Teach a task**, type *"File a supplier invoice in the finance portal"* into
+  **when** they open **Teach a task**, type _"File a supplier invoice in the finance portal"_ into
   **What are you about to show?** and press **Start recording**,
   **then** the Agent's own browser comes to the front on the Node (launching if needed), a red
-  recording strip appears reading *"Recording your demonstration — passwords and one-time codes
-  are never captured"*, and a live step counter increments as they work. When they press
-  **Finish**, the strip closes, the surface says *"<Agent> is studying your demonstration"*, and
+  recording strip appears reading _"Recording your demonstration — passwords and one-time codes
+  are never captured"_, and a live step counter increments as they work. When they press
+  **Finish**, the strip closes, the surface says _"<Agent> is studying your demonstration"_, and
   within 3 minutes a message arrives in their conversation with that Agent carrying a draft
   Skill: a title, a one-line description, numbered instructions, and a list of the inputs and
   secrets the Skill will ask for. The same draft appears in **My Decisions** as an
@@ -203,7 +203,7 @@ The screen channel is a new channel beside the existing terminal one, not a repl
   **Given** a draft Skill is pending,
   **when** the owner clicks **Approve**,
   **then** a Skill is created, bound to that Agent, and appears on the Agent's Skills tab within
-  5 seconds; the chat message updates to *"Added to <Agent>'s skills"*; the decision, the
+  5 seconds; the chat message updates to _"Added to <Agent>'s skills"_; the decision, the
   approver and the timestamp are recorded.
 
 - **S8 — Choose a different machine.**
@@ -251,15 +251,15 @@ The screen channel is a new channel beside the existing terminal one, not a repl
 - **U2 — The Node is offline.**
   **Given** the selected Node has not heartbeated within the offline threshold,
   **when** the owner opens the surface,
-  **then** the stage shows *"This computer is offline"* with the last heartbeat in relative time
+  **then** the stage shows _"This computer is offline"_ with the last heartbeat in relative time
   and an absolute tooltip, a **Try again** button, and no session is opened. Opening is refused
   server-side too, not merely hidden.
 
 - **U3 — The Node cannot show a screen.**
   **Given** the Node is online but advertises neither a display nor a launchable browser,
   **when** the owner selects it,
-  **then** the surface refuses with the specific missing piece named — *"No browser found on this
-  computer"* or *"This computer has no display session"* — and offers the terminal channel if the
+  **then** the surface refuses with the specific missing piece named — _"No browser found on this
+  computer"_ or _"This computer has no display session"_ — and offers the terminal channel if the
   Node can serve it.
 
 - **U4 — The Node is not attended.**
@@ -273,7 +273,7 @@ The screen channel is a new channel beside the existing terminal one, not a repl
 - **U5 — Someone else already has control.**
   **Given** another permitted person holds control of the same Node,
   **when** the owner clicks **Take over**,
-  **then** they stay in watching mode and see *"<Name> has had control since 09:12"* with
+  **then** they stay in watching mode and see _"<Name> has had control since 09:12"_ with
   **Request control**; the request appears to the current controller as an in-page prompt with
   **Hand over** / **Keep control**; it auto-declines after 60 seconds and the requester is told
   so. Control never transfers silently.
@@ -282,32 +282,32 @@ The screen channel is a new channel beside the existing terminal one, not a repl
   **Given** the Node's control policy is owner-only and the viewer is an Organization member,
   **when** they open the surface,
   **then** they may watch, the **Take over** button is present but disabled, and its tooltip reads
-  *"Only the owner of this computer can take control."* The server refuses the same act with the
+  _"Only the owner of this computer can take control."_ The server refuses the same act with the
   same reason if called directly.
 
 - **U7 — The controller's connection dies.**
   **Given** a controller's browser closes or its socket drops mid-control,
   **when** 30 seconds pass with no input and no heartbeat from that client,
   **then** control is released automatically, the Agent's input resumes, the audit row is closed
-  with reason `disconnected`, and any other viewer sees *"Control was released automatically"*.
+  with reason `disconnected`, and any other viewer sees _"Control was released automatically"_.
 
 - **U8 — Control goes idle.**
   **Given** a controller has held control for 10 minutes with no pointer or key input,
-  **then** a 30-second countdown appears — *"Giving control back in 0:30"* — with **Keep control**;
+  **then** a 30-second countdown appears — _"Giving control back in 0:30"_ — with **Keep control**;
   ignoring it releases control and resumes the Agent.
 
 - **U9 — The stream stalls.**
   **Given** frames stop arriving,
-  **then** at 6 seconds the strip reads *"Stream stalled — last frame 6s ago"* over a dimmed last
+  **then** at 6 seconds the strip reads _"Stream stalled — last frame 6s ago"_ over a dimmed last
   frame (never a black rectangle), at 20 seconds a refresh is attempted automatically once, and at
-  45 seconds the session ends with *"The stream stopped. The computer may be busy or asleep."* and
+  45 seconds the session ends with _"The stream stopped. The computer may be busy or asleep."_ and
   a **Reconnect** button. The Agent's work is untouched by any of this.
 
 - **U10 — Too many sessions.**
   **Given** two live sessions already exist on the Node, or five across the Organization,
   **when** a third is requested,
-  **then** the request is refused with *"This computer already has 2 live views. Close one to open
-  another."* and the existing sessions are listed with who holds them and since when.
+  **then** the request is refused with _"This computer already has 2 live views. Close one to open
+  another."_ and the existing sessions are listed with who holds them and since when.
 
 - **U11 — The Fleet stop switch is on.**
   **Given** an operator has thrown the Fleet stop switch,
@@ -319,38 +319,38 @@ The screen channel is a new channel beside the existing terminal one, not a repl
   **Given** the owner is watching, not controlling,
   **when** they click **Teach a task**,
   **then** the dialog opens with **Start recording** disabled and a guard line at the top:
-  *"Take control of the computer first — a recording of <Agent> working is not a demonstration."*
+  _"Take control of the computer first — a recording of <Agent> working is not a demonstration."_
   with a **Take control** button that satisfies the guard in place.
 
 - **U13 — Teaching on a Node with no browser.**
   **Given** the Node can capture a display but has no launchable browser,
   **when** the owner opens **Teach a task**,
-  **then** it refuses before any recording begins: *"Teaching needs <Agent>'s own browser, and
-  this computer has none."*
+  **then** it refuses before any recording begins: _"Teaching needs <Agent>'s own browser, and
+  this computer has none."_
 
 - **U14 — A password is typed during a demonstration.**
   **Given** the owner types into a password field, a one-time-code field, or a field the page
   marks as a credential,
-  **then** the step is recorded as *"Sign in — 🔒 secret, not captured"*, the value is never sent
+  **then** the step is recorded as _"Sign in — 🔒 secret, not captured"_, the value is never sent
   off the machine, the step counter still increments, and the resulting draft Skill lists that
   secret as a required input by its label rather than its value.
 
 - **U15 — The demonstration runs long.**
   **Given** a demonstration reaches 200 steps or 15 minutes,
-  **then** recording stops at that boundary, the strip reads *"Recording stopped — that is as long
-  as a demonstration can be"*, and the owner is offered **Use what I have** or **Discard**.
+  **then** recording stops at that boundary, the strip reads _"Recording stopped — that is as long
+  as a demonstration can be"_, and the owner is offered **Use what I have** or **Discard**.
 
 - **U16 — Synthesis fails.**
   **Given** the Agent cannot turn the recording into a Skill after three attempts,
-  **then** the chat message says so plainly — *"I could not turn that into a Skill. The recording
-  is saved; you can ask me to try again."* — the demonstration is kept for 30 days, and no
+  **then** the chat message says so plainly — _"I could not turn that into a Skill. The recording
+  is saved; you can ask me to try again."_ — the demonstration is kept for 30 days, and no
   half-formed Skill is created.
 
 - **U17 — The draft is rejected.**
   **Given** a draft Skill is pending,
   **when** the owner rejects it,
-  **then** no Skill is created, the decision is recorded, the chat message updates to *"Discarded
-  — the demonstration is kept for 30 days if you want another draft."*
+  **then** no Skill is created, the decision is recorded, the chat message updates to _"Discarded
+  — the demonstration is kept for 30 days if you want another draft."_
 
 - **U18 — Two draft Skills collide.**
   **Given** an approved draft's title would collide with an existing Skill in the same scope,
@@ -359,14 +359,14 @@ The screen channel is a new channel beside the existing terminal one, not a repl
 
 - **U19 — Recording storage is unavailable.**
   **Given** the storage backend is unreachable when a controlled session starts,
-  **then** the session still opens, the strip reads *"Not being recorded — storage is
-  unavailable"*, the audit row records that the session was unrecorded, and the Run receipt later
+  **then** the session still opens, the strip reads _"Not being recorded — storage is
+  unavailable"_, the audit row records that the session was unrecorded, and the Run receipt later
   says so rather than showing an empty player.
 
 - **U20 — A viewer loses permission mid-session.**
   **Given** an Organization member is watching and their membership is revoked,
-  **then** their session is closed within 30 seconds with *"You no longer have access to this
-  computer"*, and any control they held is released first.
+  **then** their session is closed within 30 seconds with _"You no longer have access to this
+  computer"_, and any control they held is released first.
 
 - **U21 — The Node reboots mid-session.**
   **Given** the Node process restarts,
@@ -376,8 +376,8 @@ The screen channel is a new channel beside the existing terminal one, not a repl
 - **U22 — Profile reset while a Run is live.**
   **Given** a Run is in flight for that Agent on that Node,
   **when** the owner asks to reset the Agent's logins and files,
-  **then** the request is refused with *"<Agent> is working on this computer right now. Pause it or
-  wait for the run to finish."* — a reset never lands under a live run.
+  **then** the request is refused with _"<Agent> is working on this computer right now. Pause it or
+  wait for the run to finish."_ — a reset never lands under a live run.
 
 ---
 
@@ -439,7 +439,7 @@ operator-configurable the default and the clamp are both given.
 - **FR-15** The default MUST be **Sharp**, and the chosen setting MUST persist per user per Node.
 - **FR-16** The system MUST drop one quality tier automatically when the Node's publish backlog
   exceeds 3 frames for 5 continuous seconds or the acknowledgement round trip exceeds 1500 ms for
-  5 continuous seconds, MUST say so in the strip — *"Lowered to Steady — the connection is slow"* —
+  5 continuous seconds, MUST say so in the strip — _"Lowered to Steady — the connection is slow"_ —
   and MUST return to the user's chosen tier after 30 continuous seconds within limits.
 - **FR-17** A single frame MUST NOT exceed 512 KiB and a single publish MUST NOT exceed 8 frames
   or 512 KiB in total.
@@ -463,10 +463,10 @@ operator-configurable the default and the clamp are both given.
   recorded frames.
 - **FR-25** When the Node is executing a Task for the Agent, a brief overlay MUST show
   `BRIEF · <Task title>` and the Mission name, and MUST link to that Task.
-- **FR-26** When no Task is in flight, the overlay MUST read *"Idle — no task in flight"* rather
+- **FR-26** When no Task is in flight, the overlay MUST read _"Idle — no task in flight"_ rather
   than disappearing, so the absence of work is itself legible.
-- **FR-27** The status line MUST read *"Watching — <Agent> keeps working."* in watching mode and
-  *"You have control — <Agent>'s input is paused."* in control mode.
+- **FR-27** The status line MUST read _"Watching — <Agent> keeps working."_ in watching mode and
+  _"You have control — <Agent>'s input is paused."_ in control mode.
 
 ### 4.5 Take-over
 
@@ -584,7 +584,7 @@ operator-configurable the default and the clamp are both given.
 - **FR-70** Every Node row MUST carry a status dot, name, platform, last heartbeat in relative
   time, and — when it cannot be watched — a one-line reason drawn from a closed set: offline,
   paused, disabled, draining, no display, no browser, no terminal, not attended, cluster node.
-  *No display* and *no browser* make only the screen channel unavailable, and *no terminal* only
+  _No display_ and _no browser_ make only the screen channel unavailable, and _no terminal_ only
   the terminal channel; a Node is unwatchable only when it can serve **neither** channel, and a
   Node that can serve one channel is listed as watchable on that channel with the other channel's
   reason shown beside it (FR-4a).
@@ -636,18 +636,18 @@ operator-configurable the default and the clamp are both given.
 
 ## 5. Key entities
 
-| Entity / concept | New? | Description |
-| --- | --- | --- |
-| **Agent** | Existing | The person-shaped worker whose computer is being watched. |
-| **Node** (member of the **Fleet**) | Existing | The machine. Gains a control policy, a watch-recording opt-in and a recording retention window. |
-| **Run** | Existing | One Agent execution. A Computer session binds to the Run in flight when there is one; the Run gains a marker saying a recording exists. |
-| **Task** / **Mission** | Existing | The source of the working brief overlay. |
-| **Skill** / **Skill binding** | Existing | The artefact a demonstration becomes, and how it reaches the Agent. |
-| **Approval** (surfaced as **My Decisions**) | Existing | Where a draft Skill waits for a human. Gains one new action kind for adopting a Skill. |
-| **Activity Log** / **Fleet audit** | Existing | Where every watch, take-over and reset is recorded. |
-| **Computer session** | **NEW** | One episode of watching or controlling a Node from the product. Carries the Agent, the Node, the opener, the channel, the mode, the control spans, the bound Run and the close reason. |
-| **Node profile (per-Agent)** | **NEW** | An Agent's own browser profile and file root on one Node. Carries its creation time, last use, signed-in-site count, disk usage and last reset. |
-| **Demonstration** | **NEW** | One recorded teaching episode: its intent, its ordered steps, its redactions, its synthesis state and the draft Skill it produced. |
+| Entity / concept                            | New?     | Description                                                                                                                                                                            |
+| ------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent**                                   | Existing | The person-shaped worker whose computer is being watched.                                                                                                                              |
+| **Node** (member of the **Fleet**)          | Existing | The machine. Gains a control policy, a watch-recording opt-in and a recording retention window.                                                                                        |
+| **Run**                                     | Existing | One Agent execution. A Computer session binds to the Run in flight when there is one; the Run gains a marker saying a recording exists.                                                |
+| **Task** / **Mission**                      | Existing | The source of the working brief overlay.                                                                                                                                               |
+| **Skill** / **Skill binding**               | Existing | The artefact a demonstration becomes, and how it reaches the Agent.                                                                                                                    |
+| **Approval** (surfaced as **My Decisions**) | Existing | Where a draft Skill waits for a human. Gains one new action kind for adopting a Skill.                                                                                                 |
+| **Activity Log** / **Fleet audit**          | Existing | Where every watch, take-over and reset is recorded.                                                                                                                                    |
+| **Computer session**                        | **NEW**  | One episode of watching or controlling a Node from the product. Carries the Agent, the Node, the opener, the channel, the mode, the control spans, the bound Run and the close reason. |
+| **Node profile (per-Agent)**                | **NEW**  | An Agent's own browser profile and file root on one Node. Carries its creation time, last use, signed-in-site count, disk usage and last reset.                                        |
+| **Demonstration**                           | **NEW**  | One recorded teaching episode: its intent, its ordered steps, its redactions, its synthesis state and the draft Skill it produced.                                                     |
 
 ### 5.1 Why three new nouns are justified
 
@@ -772,7 +772,7 @@ The `⋯` menu holds: **Own logins and files**, **Copy link to this view**, **Ba
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Tooltip on the timer: *"A single stretch of control lasts at most an hour. You can extend it once."*
+Tooltip on the timer: _"A single stretch of control lasts at most an hour. You can extend it once."_
 
 ### 6.4 Idle release warning
 
@@ -815,7 +815,7 @@ Tooltip on the timer: *"A single stretch of control lasts at most an hour. You c
 └────────────────────────────────────────────────────────────────┘
 ```
 
-After 20 seconds the sub-line becomes *"studio-imac has not answered yet. It may be busy."*
+After 20 seconds the sub-line becomes _"studio-imac has not answered yet. It may be busy."_
 After 40 seconds it becomes §6.10.
 
 ### 6.7 Empty — no computers at all
@@ -861,7 +861,7 @@ After 40 seconds it becomes §6.10.
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-The display variant reads: *"office-nuc has no display session"* with the same shape.
+The display variant reads: _"office-nuc has no display session"_ with the same shape.
 
 ### 6.10 Not attended / nobody claimed the session
 
@@ -924,7 +924,7 @@ Shown to the current controller:
 └───────────────────────────────────────────────────────────────┘
 ```
 
-Shown to the requester on auto-decline: *"Dana did not answer. You still have watching access."*
+Shown to the requester on auto-decline: _"Dana did not answer. You still have watching access."_
 
 ### 6.14 Control denied by policy
 
@@ -1007,10 +1007,10 @@ Tooltip: "Only the owner of this computer can take control."
 ```
 
 On a secret step the strip flashes once and reads, for 3 seconds:
-*"🔒 Secret skipped — Ops will ask you for this when it runs."*
+_"🔒 Secret skipped — Ops will ask you for this when it runs."_
 
 At the cap:
-*"Recording stopped — that is as long as a demonstration can be."* `[ Use what I have ] [ Discard ]`
+_"Recording stopped — that is as long as a demonstration can be."_ `[ Use what I have ] [ Discard ]`
 
 ### 6.20 After finish
 
@@ -1047,11 +1047,11 @@ At the cap:
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-After approval the card collapses to: *"Added to Ops' skills as “File a supplier invoice in the
-finance portal”."* with a link.
-After rejection: *"Discarded — the demonstration is kept for 30 days if you want another draft."*
-On synthesis failure: *"I could not turn that into a skill. The recording is saved; ask me to try
-again."* `[ Try again ]`
+After approval the card collapses to: _"Added to Ops' skills as “File a supplier invoice in the
+finance portal”."_ with a link.
+After rejection: _"Discarded — the demonstration is kept for 30 days if you want another draft."_
+On synthesis failure: _"I could not turn that into a skill. The recording is saved; ask me to try
+again."_ `[ Try again ]`
 
 ### 6.22 The demonstration review (opened from the card's **Edit first**)
 
@@ -1104,8 +1104,8 @@ Confirmation:
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Refusal while a Run is live: *"Ops is working on this computer right now. Pause it or wait for the
-run to finish."*
+Refusal while a Run is live: _"Ops is working on this computer right now. Pause it or wait for the
+run to finish."_
 
 ### 6.24 Recording playback from a Run receipt
 
@@ -1127,8 +1127,8 @@ run to finish."*
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-When there is nothing to play: *"This run was not recorded."* with the reason when one is known
-(*"storage was unavailable"*, *"watching sessions are not recorded on this computer"*).
+When there is nothing to play: _"This run was not recorded."_ with the reason when one is known
+(_"storage was unavailable"_, _"watching sessions are not recorded on this computer"_).
 
 ### 6.25 Terminal channel
 
@@ -1161,7 +1161,7 @@ When there is nothing to play: *"This run was not recorded."* with the reason wh
 
 ### 6.27 Accessibility notes
 
-- The stage is a labelled region: *"Live view of Ops' computer studio-imac. Watching."* Its label
+- The stage is a labelled region: _"Live view of Ops' computer studio-imac. Watching."_ Its label
   changes with the mode and is announced through a polite live region.
 - The `● LIVE` indicator is never colour-only: it carries the word `LIVE` and a title attribute.
 - The amber control border is accompanied by the `✋ YOU` badge and the status sentence.
@@ -1205,9 +1205,9 @@ When there is nothing to play: *"This run was not recorded."* with the reason wh
 - [ ] With an online, attended, screen-capable Node, the first frame renders within 6 s (p95).
 - [ ] The identity strip shows Agent, Node, the Node's local clock ticking, channel and quality.
 - [ ] The watermark is visible on screen and appears in a screenshot of the page.
-- [ ] The status line reads exactly *"Watching — <Agent> keeps working."*
+- [ ] The status line reads exactly _"Watching — <Agent> keeps working."_
 - [ ] The brief overlay shows the live Task and Mission and links to the Task; with no Task it
-      reads *"Idle — no task in flight"*.
+      reads _"Idle — no task in flight"_.
 - [ ] Watching for 10 minutes changes no Run's duration, verdict or cost.
 - [ ] Switching quality changes the declared frame size and rate and persists per user per Node.
 - [ ] A forced backlog degrades to Steady, says so, and recovers after 30 s.
@@ -1247,7 +1247,7 @@ When there is nothing to play: *"This run was not recorded."* with the reason wh
 - [ ] Teach is disabled without control and shows the guard sentence verbatim.
 - [ ] The dialog requires 3–120 characters and states the secret rule in the body.
 - [ ] Starting brings the Agent's browser to the front, launching it when needed.
-- [ ] A password, a new-password, a one-time-code field and a field labelled *API key* are all
+- [ ] A password, a new-password, a one-time-code field and a field labelled _API key_ are all
       recorded as redacted secret steps with no value leaving the machine.
 - [ ] A value that trips the secret scanner is replaced by a placeholder and the step says so.
 - [ ] Recording stops at 200 steps or 15 minutes and offers Use what I have / Discard.
@@ -1263,8 +1263,8 @@ When there is nothing to play: *"This run was not recorded."* with the reason wh
 
 - [ ] Control and teaching sessions are recorded; watching sessions are not unless the Node opts in.
 - [ ] A recording stops at 1 fps / 200 MB / 4 h and states which limit it hit.
-- [ ] The Run receipt offers *Watch the recording* and the player marks control spans.
-- [ ] *Make a Skill from this run* runs synthesis over stored steps with no new demonstration.
+- [ ] The Run receipt offers _Watch the recording_ and the player marks control spans.
+- [ ] _Make a Skill from this run_ runs synthesis over stored steps with no new demonstration.
 - [ ] When storage is unavailable the session still opens, says it is not recorded, and the receipt
       repeats that.
 - [ ] Recordings older than the retention window are gone after the sweep runs.
@@ -1297,25 +1297,25 @@ When there is nothing to play: *"This run was not recorded."* with the reason wh
 ## 9. Open questions
 
 - `[NEEDS CLARIFICATION: Should watching a Node be visible to the Agent — i.e. should the Agent's
-  own context ever say "your owner is watching"? Argument for: honesty and better behaviour under
-  observation. Argument against: it changes the Agent's behaviour, which defeats the point of
-  watching. Default assumed in this spec: the Agent is told only when its input is paused by a
-  take-over, never merely by being watched.]`
+own context ever say "your owner is watching"? Argument for: honesty and better behaviour under
+observation. Argument against: it changes the Agent's behaviour, which defeats the point of
+watching. Default assumed in this spec: the Agent is told only when its input is paused by a
+take-over, never merely by being watched.]`
 - `[NEEDS CLARIFICATION: Default control policy for Organization-owned Nodes. This spec defaults
-  every Node to owner-only. Should a Node enrolled inside an Organization default to
-  organization-admins instead, so a team is not blocked by one person's absence?]`
+every Node to owner-only. Should a Node enrolled inside an Organization default to
+organization-admins instead, so a team is not blocked by one person's absence?]`
 - `[NEEDS CLARIFICATION: Retention default for recordings. 14 days is proposed. Does the plan tier
-  matter here the way it does for terminal transcripts, and if so what are the per-tier windows?]`
+matter here the way it does for terminal transcripts, and if so what are the per-tier windows?]`
 - `[NEEDS CLARIFICATION: Should a demonstration be allowed to span more than one browser tab or
-  window? The step model supports it; the redaction guarantees are easier to reason about if it
-  does not. Proposed: allow it, and name every distinct origin visited in the draft Skill.]`
+window? The step model supports it; the redaction guarantees are easier to reason about if it
+does not. Proposed: allow it, and name every distinct origin visited in the draft Skill.]`
 - `[NEEDS CLARIFICATION: When a draft Skill is approved, should it be bound to the Agent only, or
-  offered at Organization scope so siblings inherit it? Proposed: Agent scope on adoption, with a
-  one-click "share with the team" afterwards, so nothing is broadened without a second decision.]`
+offered at Organization scope so siblings inherit it? Proposed: Agent scope on adoption, with a
+one-click "share with the team" afterwards, so nothing is broadened without a second decision.]`
 - `[NEEDS CLARIFICATION: Bandwidth accounting. Should a live session's bytes count toward any
-  metered allowance, or remain unmetered as this spec assumes?]`
+metered allowance, or remain unmetered as this spec assumes?]`
 - `[NEEDS CLARIFICATION: Does the take-over surface need a break-glass for an operator who is not
-  the Node's owner (support scenario), and if so what consent does the owner give first?]`
+the Node's owner (support scenario), and if so what consent does the owner give first?]`
 
 ---
 

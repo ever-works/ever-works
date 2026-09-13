@@ -68,7 +68,7 @@
       stating that reverting discards organization-scope folders and only unfiles documents;
       the migration applies cleanly to a database restored from a pre-change dump.
 
-- [ ] **T6 · Migration test** *(parallel with T5)*
+- [ ] **T6 · Migration test** _(parallel with T5)_
       Add a case to `apps/api/src/migrations/__tests__/` following the existing convention there.
       **Done:** the test asserts every new column exists with the right nullability and default,
       both partial unique indexes exist, and both foreign keys are `ON DELETE SET NULL`.
@@ -89,7 +89,7 @@
       **Done:** `pnpm --filter @ever-works/contracts build` emits declarations without the
       conditional-spread DTS failure (use explicit `if` blocks, never `...cond && { k: v }`).
 
-- [ ] **T9 · Contract unit spec** *(parallel with T8)*
+- [ ] **T9 · Contract unit spec** _(parallel with T8)_
       Create `packages/contracts/src/kb/__tests__/kb-library.types.spec.ts` next to the existing
       `kb-document-class.spec.ts`.
       **Done:** asserts every numeric constant's exact value, so a silent limit change breaks a test.
@@ -146,7 +146,7 @@
       list excludes archived documents; `tree` returns `hasUnread: false` everywhere in P1 (read
       state lands in P2) without a second code path.
 
-- [ ] **T16 · Service unit specs** *(parallel with T15)*
+- [ ] **T16 · Service unit specs** _(parallel with T15)_
       Create `packages/agent/src/services/__tests__/kb-content-hash.spec.ts`,
       `packages/agent/src/services/__tests__/knowledge-library.service.spec.ts`, and
       `packages/agent/src/services/knowledge-base.service.revision.spec.ts`. Extend
@@ -226,7 +226,7 @@
       **Done:** view-only members see the controls disabled with the exact tooltip copy, never
       hidden.
 
-- [ ] **T25 · Component unit specs** *(parallel with T22–T24)*
+- [ ] **T25 · Component unit specs** _(parallel with T22–T24)_
       Add co-located `*.unit.spec.tsx` files for every new component, matching the convention in
       `apps/web/src/components/memory/` and `apps/web/src/components/kb/workbench/`.
       **Done:** each spec covers the component's empty, error and over-limit states.
@@ -280,7 +280,7 @@
       **Done:** one extra query per list page, not one per row; the pinned group is computed from
       the `(userId, pinnedAt)` index.
 
-- [ ] **T32 · Reader-state unit spec** *(parallel with T30)*
+- [ ] **T32 · Reader-state unit spec** _(parallel with T30)_
       Create `packages/agent/src/services/__tests__/knowledge-reader-state.service.spec.ts`.
       **Done:** covers the full state machine from [spec §5.1](./spec.md#51-document-read-state--states-and-transitions),
       subtree folder mark-read, actor isolation, the cache and its invalidation, and the pin cap.
@@ -295,7 +295,7 @@
       **Done:** all four require only view access; none of them writes an activity-log entry
       (spec FR-66); the controller spec asserts both.
 
-- [ ] **T34 · Read-state BFF routes** *(parallel with T33)*
+- [ ] **T34 · Read-state BFF routes** _(parallel with T33)_
       Create `apps/web/src/app/api/knowledge/documents/[docId]/pin/route.ts`,
       `.../read/route.ts`, `.../unread/route.ts` and `apps/web/src/app/api/knowledge/read-all/route.ts`,
       each with a `route.unit.spec.ts`.
@@ -383,7 +383,7 @@
       references immediately after the memory-recall block (currently ending around line 445),
       write one `WorkKnowledgeCitation` per resolved document with `consumerType = 'agent-run'`,
       and emit a `kb-references` step log with `{ resolved, unresolved, ambiguous, truncated,
-      tokens }`. Apply the same helper in
+tokens }`. Apply the same helper in
       `packages/agent/src/pipeline/full-pipeline-executor.service.ts`.
       Create `packages/agent/src/agents/__tests__/agent-run.references.spec.ts`.
       **Done:** a resolution failure logs and **continues** — it never fails the run, matching the

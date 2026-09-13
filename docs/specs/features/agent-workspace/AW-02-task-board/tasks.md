@@ -44,36 +44,20 @@ Re-read these before every task. They are what makes this epic additive.
 
 ## P1.A — Pure domain logic (no I/O, no framework)
 
-- [ ] **T1. Column tables and drop resolution.**
-    - Create `packages/agent/src/tasks-domain/task-board-columns.ts` exporting:
-        - `export type BoardLayout = 'status' | 'focus';`
-        - `export interface BoardColumnDef { key: string; statuses: readonly TaskStatus[]; terminal: boolean; }`
-        - `STATUS_COLUMNS: readonly BoardColumnDef[]` — seven entries, one status
-          each, in the order `backlog, todo, in_progress, in_review, blocked, done,
-          cancelled`.
-        - `FOCUS_COLUMNS: readonly BoardColumnDef[]` — `backlog` (`backlog`, `todo`),
-          `in_flight` (`in_progress`), `needs_you` (`in_review`, `blocked`), `done`
-          (`done`), plus a `cancelled` entry marked as toggle-only.
-        - `columnsFor(layout, opts: { includeCancelled: boolean }): BoardColumnDef[]`
-        - `columnForStatus(layout, status): string`
-        - `resolveDrop(from: TaskStatus, column: BoardColumnDef, allowed: Record<TaskStatus, TaskStatus[]>): { kind: 'apply'; to: TaskStatus } | { kind: 'ask'; options: TaskStatus[] } | { kind: 'refuse' }`
-    - **No imports** from TypeORM, NestJS, or any service. `TaskStatus` is imported
-      as a type only.
-    - Add a file-header comment stating the invariant: *every `TaskStatus` value
+- [ ] **T1. Column tables and drop resolution.** - Create `packages/agent/src/tasks-domain/task-board-columns.ts` exporting: - `export type BoardLayout = 'status' | 'focus';` - `export interface BoardColumnDef { key: string; statuses: readonly TaskStatus[]; terminal: boolean; }` - `STATUS_COLUMNS: readonly BoardColumnDef[]` — seven entries, one status
+      each, in the order `backlog, todo, in_progress, in_review, blocked, done,
+cancelled`. - `FOCUS_COLUMNS: readonly BoardColumnDef[]` — `backlog` (`backlog`, `todo`),
+      `in_flight` (`in_progress`), `needs_you` (`in_review`, `blocked`), `done`
+      (`done`), plus a `cancelled` entry marked as toggle-only. - `columnsFor(layout, opts: { includeCancelled: boolean }): BoardColumnDef[]` - `columnForStatus(layout, status): string` - `resolveDrop(from: TaskStatus, column: BoardColumnDef, allowed: Record<TaskStatus, TaskStatus[]>): { kind: 'apply'; to: TaskStatus } | { kind: 'ask'; options: TaskStatus[] } | { kind: 'refuse' }` - **No imports** from TypeORM, NestJS, or any service. `TaskStatus` is imported
+      as a type only. - Add a file-header comment stating the invariant: _every `TaskStatus` value
       appears in exactly one column of each layout; a column is never derived from
-      anything but status.*
-    - **Test**: `packages/agent/src/tasks-domain/__tests__/task-board-columns.spec.ts`
-        - Both layouts cover all seven statuses exactly once (assert by set equality
-          against `Object.values(TaskStatus)`, so adding a status to the enum without
-          adding a column fails the suite).
-        - `resolveDrop` over the full 7 × 5 matrix, asserting the verdict for every
-          pair.
-        - `in_progress → needs_you` is the **only** `ask` in the whole matrix.
-        - Every drop out of `cancelled` is `refuse`.
-    - **Done when**: `pnpm --filter @ever-works/agent test task-board-columns` is
+      anything but status._ - **Test**: `packages/agent/src/tasks-domain/__tests__/task-board-columns.spec.ts` - Both layouts cover all seven statuses exactly once (assert by set equality
+      against `Object.values(TaskStatus)`, so adding a status to the enum without
+      adding a column fails the suite). - `resolveDrop` over the full 7 × 5 matrix, asserting the verdict for every
+      pair. - `in_progress → needs_you` is the **only** `ask` in the whole matrix. - Every drop out of `cancelled` is `refuse`. - **Done when**: `pnpm --filter @ever-works/agent test task-board-columns` is
       green and the file imports nothing outside `entities/task.entity`.
 
-- [ ] **T2. The stall predicate.** *(parallel with T1)*
+- [ ] **T2. The stall predicate.** _(parallel with T1)_
     - Create `packages/agent/src/tasks-domain/task-board-stall.ts` exporting:
         - `export const DEFAULT_STALL_AFTER_DAYS = 2;`
         - `clampStallAfterDays(value: number | null | undefined): number` — 1..30,
@@ -91,7 +75,7 @@ Re-read these before every task. They are what makes this epic additive.
       stalled); the clamp at `0`, `1`, `30`, `31`, `null`, `undefined`, `NaN`.
     - **Done when**: green, and the file has no framework import.
 
-- [ ] **T3. Provenance ordering.** *(parallel with T1)*
+- [ ] **T3. Provenance ordering.** _(parallel with T1)_
     - Create `packages/agent/src/tasks-domain/task-board-provenance.ts` exporting:
         - `export type ProvenanceKind = 'trigger' | 'recurringTemplate' | 'scheduled' | 'mission' | 'idea' | 'work' | 'team' | 'goal' | 'agent' | 'raisedByAgent' | 'delegated' | 'creator';`
         - `PROVENANCE_PRECEDENCE: readonly ProvenanceKind[]` in spec FR-28's order.
@@ -176,24 +160,17 @@ Re-read these before every task. They are what makes this epic additive.
 
 ## P1.D — API surface
 
-- [ ] **T8. `GET /api/tasks/board`.**
-    - Modify `apps/api/src/tasks/tasks.controller.ts`. Place the route **above**
+- [ ] **T8. `GET /api/tasks/board`.** - Modify `apps/api/src/tasks/tasks.controller.ts`. Place the route **above**
       `@Get(':id')` — the existing file already warns that a later static segment is
-      shadowed by the param route, and `run-batch` carries that comment; follow it.
-    - Declare **every** query parameter with an explicit `@ApiQuery({ required:
-      false })`. The file's own comment explains why: without the CLI plugin, a bare
+      shadowed by the param route, and `run-batch` carries that comment; follow it. - Declare **every** query parameter with an explicit `@ApiQuery({ required:
+false })`. The file's own comment explains why: without the CLI plugin, a bare
       `@Query('x') x?: string` is emitted as required and the MCP tool schema then
-      forces every filter.
-    - Parameters and defaults exactly as [`plan.md`](./plan.md) §4.1. Reuse the
-      controller's existing `parsePriorityList` helper; do not write a second parser.
-    - Throttle: match the existing list route.
-    - Ownership: `@CurrentUser()` + `this.scopeContext.getScope()`, same as every
-      neighbour.
-    - **Test**: `apps/api/src/tasks/tasks.controller.board.spec.ts` — defaults;
+      forces every filter. - Parameters and defaults exactly as [`plan.md`](./plan.md) §4.1. Reuse the
+      controller's existing `parsePriorityList` helper; do not write a second parser. - Throttle: match the existing list route. - Ownership: `@CurrentUser()` + `this.scopeContext.getScope()`, same as every
+      neighbour. - **Test**: `apps/api/src/tasks/tasks.controller.board.spec.ts` — defaults;
       `layout=focus` returns four columns; `columnLimit` clamps at 1 and 100;
       `terminalWindowDays` clamps at 1 and 90; each `include*` flag flips one
-      predicate; malformed values fall back to the default rather than 500ing.
-    - **Done when**: green **and** `tasks.controller.scope.spec.ts` and
+      predicate; malformed values fall back to the default rather than 500ing. - **Done when**: green **and** `tasks.controller.scope.spec.ts` and
       `tasks.controller.board-visibility.spec.ts` still pass unmodified.
 
 - [ ] **T9. `GET /api/tasks/board/column`.**
@@ -297,22 +274,17 @@ Re-read these before every task. They are what makes this epic additive.
 
 ## P1.F — i18n (a P1 gate, not a P3 nicety)
 
-- [ ] **T19. Move every hardcoded board string into the catalogue.**
-    - Modify `apps/web/messages/en.json`: add the `dashboard.tasksPage.board` parent
-      and the leaves listed in [`plan.md`](./plan.md) §8.
-    - **Reuse, do not re-declare**: the seven column names must read from the existing
+- [ ] **T19. Move every hardcoded board string into the catalogue.** - Modify `apps/web/messages/en.json`: add the `dashboard.tasksPage.board` parent
+      and the leaves listed in [`plan.md`](./plan.md) §8. - **Reuse, do not re-declare**: the seven column names must read from the existing
       `dashboard.tasksPage.status.*` leaves and the five priority labels from the
       existing `dashboard.tasksPage.priority.*` leaves. Copying those strings into
       `board.*` is a review-blocking mistake — they are already translated across
-      every locale.
-    - Replace in `TasksKanbanView.tsx` / the new `board/*` files and in
+      every locale. - Replace in `TasksKanbanView.tsx` / the new `board/*` files and in
       `TasksList.tsx`: `Backlog`, `Todo`, `In Progress`, `In Review`, `Blocked`,
       `Done`, `Cancelled`, `Cards`, `Table`, `Kanban`, `All`, `Move →`, `Run all`,
       `Run N Task(s) in X`, `empty`, `Show N more`, `Preview the changes on this
-      Task's branch`, `n/m started`, `Transition failed`.
-    - Every leaf name camelCase, **no literal dot**, and the `board` parent added in
-      the same change so no subtree can collapse.
-    - **Done when**: `grep` for each of those literals in
+Task's branch`, `n/m started`, `Transition failed`. - Every leaf name camelCase, **no literal dot**, and the `board` parent added in
+      the same change so no subtree can collapse. - **Done when**: `grep` for each of those literals in
       `apps/web/src/components/tasks/` returns nothing, and the board renders in
       English through the catalogue.
 
@@ -381,7 +353,7 @@ Re-read these before every task. They are what makes this epic additive.
       column**.
     - **Done when**: green.
 
-- [ ] **T25. Sub-task roll-up and the top-level default.** *(parallel with T24)*
+- [ ] **T25. Sub-task roll-up and the top-level default.** _(parallel with T24)_
     - Card shows `▣ done/total` when the Task has sub-tasks, linking to the parent's
       existing sub-task checklist.
     - **Show sub-tasks** toggle flips `includeSubtasks`, restoring today's flat
@@ -393,7 +365,7 @@ Re-read these before every task. They are what makes this epic additive.
       `2/5`; the toggle restores six cards; the FR-42 case renders the extra card.
     - **Done when**: green.
 
-- [ ] **T26. Decision chip and the two header counters.** *(parallel with T24)*
+- [ ] **T26. Decision chip and the two header counters.** _(parallel with T24)_
     - Chip with the open-decision count and an **Open decision** action, rendered in
       whatever column the Task's status puts it in.
     - Header: `N waiting on you` (clicking filters the board to exactly those) and
@@ -404,7 +376,7 @@ Re-read these before every task. They are what makes this epic additive.
       `In progress`; the counter matches; clicking it filters.
     - **Done when**: green.
 
-- [ ] **T27. Comment count and reply.** *(parallel with T24)*
+- [ ] **T27. Comment count and reply.** _(parallel with T24)_
     - Chip when the thread has ≥ 1 message, `99+` above 99, opening the existing
       thread. A reply composed from the board posts through the **existing**
       `POST /api/tasks/:id/chat`.
@@ -415,7 +387,7 @@ Re-read these before every task. They are what makes this epic additive.
       starting a second, exactly as the detail page already behaves.
     - **Done when**: green.
 
-- [ ] **T28. Untrusted text.** *(parallel with T24)*
+- [ ] **T28. Untrusted text.** _(parallel with T24)_
     - Every Agent-authored string a card renders — title, branch name, label — is
       plain text, never markup, never auto-linked, truncated for display with the full
       value in the accessible name.
@@ -445,7 +417,7 @@ Re-read these before every task. They are what makes this epic additive.
       putting templates back into the columns.
     - **Done when**: green.
 
-- [ ] **T31. Instance and scheduled chips.** *(parallel with T30)*
+- [ ] **T31. Instance and scheduled chips.** _(parallel with T30)_
     - An instance carries `⟳ {template title}` linking to its template; a one-shot
       scheduled Task carries `🕑 Scheduled {when}` until it fires. Both are ordinary,
       draggable cards.
@@ -453,7 +425,7 @@ Re-read these before every task. They are what makes this epic additive.
       treated as a template.
     - **Done when**: green.
 
-- [ ] **T32. Hidden-work toggle.** *(parallel with T30)*
+- [ ] **T32. Hidden-work toggle.** _(parallel with T30)_
     - **Show trigger-hidden Tasks** reveals `hiddenFromBoard` rows with a `Hidden`
       chip. Off by default; absent from every column and every count while off.
     - **Test**: covered by T11 server-side; add the e2e for the toggle.
@@ -550,7 +522,7 @@ Re-read these before every task. They are what makes this epic additive.
       `TasksKanbanView.tsx` removes the largest chunk.
     - **Done when**: both edits land in the same PR as P1.
 
-- [ ] **T41. Fix the stale doc comments this epic touched.** *(parallel with T40)*
+- [ ] **T41. Fix the stale doc comments this epic touched.** _(parallel with T40)_
     - `apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx` — its header says
       "Kanban + per-target tabs land in Phase 14"; Kanban shipped.
     - **Done when**: the comment describes what the file does.
@@ -607,5 +579,9 @@ Re-read these before every task. They are what makes this epic additive.
   `apps/api`, the Vitest suites in `apps/web`, the locale-sync check, and the
   Playwright specs are green.
 - The Constitution gate table in [`spec.md`](./spec.md) §11 and
-  [`plan.md`](./plan.md) §12 is still accurate — in particular gate V, which claims
-  this epic ships no migration.
+  [`plan.md`](./plan.md) §12 is still accurate. Gate V is conditional on T39:
+    - **T39 not adopted** — the epic ships no entity change and no migration; gate V
+      holds as written.
+    - **T39 adopted** — the epic ships exactly one entity column and its one additive,
+      forward-only migration (`1791020000000`) in the same PR; gate V is satisfied by that
+      migration, and the "no migration" wording in §11/§12 is updated in the same PR.

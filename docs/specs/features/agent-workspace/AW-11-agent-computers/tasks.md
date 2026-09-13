@@ -29,21 +29,16 @@
 
 ## P1.A — Contracts
 
-- [ ] **T1. Extract the secret scanner into the zero-dependency contracts package.**
-    - Create `packages/contracts/src/secret/secret-patterns.ts` holding, moved verbatim from
+- [ ] **T1. Extract the secret scanner into the zero-dependency contracts package.** - Create `packages/contracts/src/secret/secret-patterns.ts` holding, moved verbatim from
       `packages/agent/src/utils/secret-scan.ts`: the pattern table, `SecretMatch`,
       `scanForSecrets`, `containsSecret`, `redactSecrets`. Keep every length floor and every
       comment explaining why a pattern is conservative — they are the reason it has a low false
-      positive rate.
-    - Create `packages/contracts/src/secret/index.ts` and export it from
-      `packages/contracts/src/index.ts`.
-    - Rewrite `packages/agent/src/utils/secret-scan.ts` to `export { ... } from
-      '@ever-works/contracts'` for the four moved symbols and keep only `assertNoSecrets` (the one
+      positive rate. - Create `packages/contracts/src/secret/index.ts` and export it from
+      `packages/contracts/src/index.ts`. - Rewrite `packages/agent/src/utils/secret-scan.ts` to `export { ... } from
+'@ever-works/contracts'` for the four moved symbols and keep only `assertNoSecrets` (the one
       function that imports `BadRequestException`). **No caller changes** — the agent package's
-      export surface is identical (Constitution X).
-    - **Test**: create `packages/contracts/src/secret/__tests__/secret-patterns.spec.ts` (Vitest)
-      porting the existing agent-package cases; keep the agent-package spec passing untouched.
-    - **Done when**: `pnpm --filter @ever-works/contracts test` and
+      export surface is identical (Constitution X). - **Test**: create `packages/contracts/src/secret/__tests__/secret-patterns.spec.ts` (Vitest)
+      porting the existing agent-package cases; keep the agent-package spec passing untouched. - **Done when**: `pnpm --filter @ever-works/contracts test` and
       `cd packages/agent && pnpm test -- secret-scan` are both green, and
       `grep -rn "scanForSecrets" packages/agent/src | wc -l` is unchanged.
 
@@ -81,7 +76,7 @@
     - **Done when**: `pnpm --filter @ever-works/contracts test` is green and the codec has a case
       proving an inbound `frame` and an outbound `pointer` are both rejected by the direction map.
 
-- [ ] **T3. Add the session view types to contracts.** *(parallel)*
+- [ ] **T3. Add the session view types to contracts.** _(parallel)_
     - Create `packages/contracts/src/computer/computer-session.types.ts`:
       `ComputerSessionStatus`, `ComputerChannel`, `ComputerQuality`, `ComputerSessionView`,
       `ComputerControlSpan`, `ComputerNodeOption` (with `watchable: boolean` and
@@ -127,7 +122,7 @@
     - **Done when**: `pnpm --filter @ever-works/agent build` is clean and every column carries a
       doc comment naming what writes it.
 
-- [ ] **T6. Add the `NodeAgentProfile` entity.** *(parallel)*
+- [ ] **T6. Add the `NodeAgentProfile` entity.** _(parallel)_
     - Create `packages/agent/src/entities/node-agent-profile.entity.ts` per
       [`plan.md`](./plan.md) §3.1. `profileKey` is an opaque id the Node maps to a directory —
       document explicitly that the platform **never** stores a filesystem path.
@@ -240,7 +235,7 @@
 - [ ] **T14. Extend the fleet audit writer with the eight computer actions.**
     - Modify `packages/agent/src/fleet/fleet-audit.service.ts` only where a new helper is genuinely
       needed; the eight actions are new **values**, not a new writer.
-    - **Naming rule (this bites):** `REDACTED_KEY_RE` in that file drops any value whose *key*
+    - **Naming rule (this bites):** `REDACTED_KEY_RE` in that file drops any value whose _key_
       contains `secret|token|credential|password|passphrase|hash|apikey|api_key`. Name the audit
       fields for what they mean — `profileRef`, not `profileKeyHash`.
     - **Test**: extend `packages/agent/src/fleet/__tests__/fleet-audit.service.spec.ts` — each new
@@ -409,7 +404,7 @@
     - **Done when**: the page renders every empty/offline/error state from spec §6 without opening
       a session.
 
-- [ ] **T29. Write the stage, strip, overlay and controls.** *(parallel)*
+- [ ] **T29. Write the stage, strip, overlay and controls.** _(parallel)_
     - Create, under `apps/web/src/components/computer/`: `ComputerStage.tsx`,
       `ComputerIdentityStrip.tsx`, `ComputerStatusLine.tsx`, `ComputerBriefOverlay.tsx`,
       `ComputerWatermark.tsx`, `ComputerControls.tsx`, `ComputerNodePicker.tsx`,
@@ -479,17 +474,13 @@
 
 ## P2.A — Control
 
-- [ ] **T35. Write the control arbiter.**
-    - Create `packages/agent/src/computer/control-arbiter.service.ts` implementing the CAS lock in
+- [ ] **T35. Write the control arbiter.** - Create `packages/agent/src/computer/control-arbiter.service.ts` implementing the CAS lock in
       [`plan.md`](./plan.md) §2.4 as a single owner-scoped `UPDATE … WHERE (holder IS NULL OR
-      expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale releaser can
+expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale releaser can
       never evict a newer holder), `requestControl`, `answerRequest`, `extendOnce`, and the idle /
-      ceiling / disconnect sweeps.
-    - Create `packages/agent/src/computer/control-policy.ts` — a pure
-      `canControl(policy, viewerRole)` truth table.
-    - **Test**: `packages/agent/src/computer/__tests__/control-arbiter.spec.ts` and
-      `.../control-policy.spec.ts` per [`plan.md`](./plan.md) §10.2.
-    - **Done when**: two concurrent take-overs produce exactly one winner and the loser reads the
+      ceiling / disconnect sweeps. - Create `packages/agent/src/computer/control-policy.ts` — a pure
+      `canControl(policy, viewerRole)` truth table. - **Test**: `packages/agent/src/computer/__tests__/control-arbiter.spec.ts` and
+      `.../control-policy.spec.ts` per [`plan.md`](./plan.md) §10.2. - **Done when**: two concurrent take-overs produce exactly one winner and the loser reads the
       real holder.
 
 - [ ] **T36. Wire control into the controller, relay and WS.**
@@ -679,7 +670,7 @@
     - Create `apps/web/src/components/computer/ComputerRecordingPlayer.tsx` and the route at
       `apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/recordings/[sessionId]/page.tsx`.
     - Add the `COMPUTER` block from spec §6.24 to the AW-09 receipt component, gated on
-      `agent_runs.computerRecordedAt`, with the *not recorded* variants and their reasons.
+      `agent_runs.computerRecordedAt`, with the _not recorded_ variants and their reasons.
     - The scrubber is a slider with a 1 s keyboard step and a 10 s page step; control spans are
       marked on the timeline.
     - **Test**: extend the AW-09 receipt unit spec — the block renders, and its three not-recorded
@@ -718,7 +709,7 @@
       browser probe resolving nothing and no display, a terminal-only session spawns the PTY,
       publishes `ComputerTerminalFrame`s and never starts a capture.
     - **Test (web unit)**: extend `computer-session.shared.unit.spec.ts` — that Node is listed as
-      watchable with `servableChannels: ['terminal']` and the screen channel's *no display*
+      watchable with `servableChannels: ['terminal']` and the screen channel's _no display_
       reason beside it.
     - **Done when**: spec FR-4a and its acceptance criterion hold end to end on a headless
       machine started with `--attend`.

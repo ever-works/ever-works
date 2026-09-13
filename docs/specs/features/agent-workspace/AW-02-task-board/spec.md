@@ -53,13 +53,13 @@ question the program exists to answer.
 
 1. **It is a view of one page, not of the work.** The page fetches the first 50
    Tasks ordered by last-update and buckets them client-side. Every column count is
-   a count of *what happened to be fetched*. With 300 Tasks the board is wrong and
+   a count of _what happened to be fetched_. With 300 Tasks the board is wrong and
    says nothing about being wrong.
 2. **Priority is decorative.** Nothing anywhere sorts by it. A `p0` and a `p3` are
    interleaved by last-update.
 3. **A card has no provenance and no shape.** A Task raised by a Mission, fired by
    a Trigger, cloned from a recurring template, delegated by an Agent or typed by a
-   person all render identically — and recurring *templates* and *sub-tasks* render
+   person all render identically — and recurring _templates_ and _sub-tasks_ render
    as ordinary, draggable cards alongside the real work.
 4. **Nothing says "this needs me" and nothing says "this is stuck."** Open
    escalations are reachable one Task at a time; there is no stall signal anywhere
@@ -86,9 +86,9 @@ in the column of its real status — `Backlog`, `To do`, `In progress`, `In revi
 not the count of one fetched page, and with `p0` work at the top of each column
 rather than scattered by last-edit.
 
-Each card says where its work came from: *raised by the Mission "Keep pricing
-current"*, *fired by the "Stripe webhook" Trigger*, *the 14th run of a weekly
-recurring Task*, *delegated by the Editor Agent*, or *filed by you*. Recurring
+Each card says where its work came from: _raised by the Mission "Keep pricing
+current"_, _fired by the "Stripe webhook" Trigger_, _the 14th run of a weekly
+recurring Task_, _delegated by the Editor Agent_, or _filed by you_. Recurring
 templates are not cards at all — they sit in a strip above the board that says when
 the next one fires. Sub-tasks are not cards either; their parent carries a `▣ 3/5`
 roll-up, and one toggle brings them back if the user wants the flat view they have
@@ -111,7 +111,7 @@ click away.
 
 ### 2.1 The question this answers
 
-> *"What are my agents doing right now, and what needs me?"*
+> _"What are my agents doing right now, and what needs me?"_
 
 That question is asked several times a day by exactly the person Ever Works is built
 for: an owner who has delegated work and now has to decide whether to trust it. The
@@ -122,19 +122,19 @@ board is where it should be answered. Today it is answered wrongly, quietly.
 Read this before sizing anything below. The following all ship today and this epic
 extends, rather than replaces, every one of them:
 
-| Already shipped | Where the user meets it |
-| --- | --- |
-| A drag-and-drop Kanban view with one column per `TaskStatus` | `/tasks`, and every scoped Task list — `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks` |
-| Card chips for the Task's branch, its latest run, its acceptance-gate verdict and its pull request with a CI dot | Every card |
-| Drag-to-transition through the real transition lattice, with the illegal targets refused before the drop | Every card |
-| A per-card **Run** with an agent picker, an `r` keyboard shortcut, and a per-column **Run all** capped at 20 | Every card and column header |
-| A diff sheet showing the changes on a Task's branch | The `± N files` affordance on a card |
-| Live run polling that refreshes run and CI state without a page reload | Automatic while any card has a queued or running run |
-| A per-Task comment thread with `@agent` and `[[kb]]` mentions, a 5-minute edit window, and delivery **into a live run** rather than restarting it | `/tasks/[id]` |
-| Watchers, assignees, reviewers, approvers, blockers, relations, attachments, escalations and a per-Task activity feed | `/tasks/[id]` |
-| Recurrence (RRULE **xor** cron) and one-shot scheduling, both dispatching through the same gated run path a board **Run** click uses | `/tasks/[id]` |
-| Filters for status, priority, label, free text, and every owner — Mission, Idea, Work, Team, Agent, Goal, parent Task | The `/tasks` filter bar and the list API |
-| A `hiddenFromBoard` marker so trigger-spawned work can be kept off the human board without being deleted | Set by a Trigger; respected by every default list |
+| Already shipped                                                                                                                                   | Where the user meets it                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| A drag-and-drop Kanban view with one column per `TaskStatus`                                                                                      | `/tasks`, and every scoped Task list — `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks` |
+| Card chips for the Task's branch, its latest run, its acceptance-gate verdict and its pull request with a CI dot                                  | Every card                                                                                              |
+| Drag-to-transition through the real transition lattice, with the illegal targets refused before the drop                                          | Every card                                                                                              |
+| A per-card **Run** with an agent picker, an `r` keyboard shortcut, and a per-column **Run all** capped at 20                                      | Every card and column header                                                                            |
+| A diff sheet showing the changes on a Task's branch                                                                                               | The `± N files` affordance on a card                                                                    |
+| Live run polling that refreshes run and CI state without a page reload                                                                            | Automatic while any card has a queued or running run                                                    |
+| A per-Task comment thread with `@agent` and `[[kb]]` mentions, a 5-minute edit window, and delivery **into a live run** rather than restarting it | `/tasks/[id]`                                                                                           |
+| Watchers, assignees, reviewers, approvers, blockers, relations, attachments, escalations and a per-Task activity feed                             | `/tasks/[id]`                                                                                           |
+| Recurrence (RRULE **xor** cron) and one-shot scheduling, both dispatching through the same gated run path a board **Run** click uses              | `/tasks/[id]`                                                                                           |
+| Filters for status, priority, label, free text, and every owner — Mission, Idea, Work, Team, Agent, Goal, parent Task                             | The `/tasks` filter bar and the list API                                                                |
+| A `hiddenFromBoard` marker so trigger-spawned work can be kept off the human board without being deleted                                          | Set by a Trigger; respected by every default list                                                       |
 
 The correct reading of this epic is the one [EXISTING-SUBSTRATE.md](../EXISTING-SUBSTRATE.md)
 §4 asks for: **most of it is binding a finished backend to a screen, and finishing
@@ -158,12 +158,12 @@ a last mile that was never finished.**
 4. **Every string on the board is hardcoded English** — the column names, `Move →`,
    `Run all`, `empty`, `Show N more`, the diff tooltip — while the message
    catalogue already carries `Backlog · To do · In progress · In review · Blocked ·
-   Done · Cancelled` and `Urgent · High · Medium · Normal · Low`, already
+Done · Cancelled` and `Urgent · High · Medium · Normal · Low`, already
    translated across the platform's locales. This breaks program rule #8 and wastes
    translation that is already paid for.
 5. **A card carries no provenance, and the wrong rows are cards.** Nothing on a card
    says a Mission raised it, a Trigger fired it, a recurrence produced it or an
-   Agent delegated it. Meanwhile a recurring *template* — a row that never moves and
+   Agent delegated it. Meanwhile a recurring _template_ — a row that never moves and
    whose whole job is to clone instances — renders as a draggable card, and a
    workflow template instantiated as a parent plus five sub-tasks renders as six
    cards for one piece of work.
@@ -400,27 +400,28 @@ attempts to count or render an unbounded terminal column.
 - **FR-2** The default layout, **Status**, MUST provide exactly seven columns, one
   per status, in this order and with this mapping:
 
-  | Column | `TaskStatus` |
-  | --- | --- |
-  | Backlog | `backlog` |
-  | To do | `todo` |
-  | In progress | `in_progress` |
-  | In review | `in_review` |
-  | Blocked | `blocked` |
-  | Done | `done` |
-  | Cancelled | `cancelled` |
+    | Column      | `TaskStatus`  |
+    | ----------- | ------------- |
+    | Backlog     | `backlog`     |
+    | To do       | `todo`        |
+    | In progress | `in_progress` |
+    | In review   | `in_review`   |
+    | Blocked     | `blocked`     |
+    | Done        | `done`        |
+    | Cancelled   | `cancelled`   |
 
-  This is the layout that ships today and it MUST remain available and MUST remain
-  the default until a workspace chooses otherwise.
+    This is the layout that ships today and it MUST remain available and MUST remain
+    the default until a workspace chooses otherwise.
+
 - **FR-3** The board MUST additionally offer a **Focus** layout of four columns
   grouping the same seven statuses, for the user who wants the coarse read:
 
-  | Column | `TaskStatus` values it groups |
-  | --- | --- |
-  | Backlog | `backlog`, `todo` |
-  | In flight | `in_progress` |
-  | Needs you | `in_review`, `blocked` |
-  | Done | `done` |
+    | Column    | `TaskStatus` values it groups |
+    | --------- | ----------------------------- |
+    | Backlog   | `backlog`, `todo`             |
+    | In flight | `in_progress`                 |
+    | Needs you | `in_review`, `blocked`        |
+    | Done      | `done`                        |
 
 - **FR-4** `cancelled` MUST NOT be dropped by the Focus layout. It MUST be reachable
   as a collapsed **Cancelled** column shown by a **Show cancelled** toggle, and
@@ -490,26 +491,26 @@ attempts to count or render an unbounded terminal column.
   present: the branch chip, the pull-request pill with its CI dot, the run chip, the
   acceptance-gate chip, the `± N files` diff affordance, the **Run** control and the
   **Move →** menu.
-- **FR-26** A card MUST show up to two **provenance chips** — one *origin* (how this
-  Task came to exist) and one *owner* (what it belongs to) — with any remainder
+- **FR-26** A card MUST show up to two **provenance chips** — one _origin_ (how this
+  Task came to exist) and one _owner_ (what it belongs to) — with any remainder
   behind a `+N` that expands in the card menu.
 - **FR-27** Provenance MUST be derived exclusively from state that already exists.
   No new column may be added to a Task to carry it. The derivations are:
 
-  | Chip | Derived from |
-  | --- | --- |
-  | `Mission · {name}` | the Task's Mission owner |
-  | `Idea · {title}` | the Task's Idea owner |
-  | `Work · {name}` | the Task's Work owner |
-  | `Team · {name}` | the Task's Team owner |
-  | `Goal · {name}` | the Task's Goal owner |
-  | `Agent · {name}` | the Task's Agent owner — the Agent it is worked by |
-  | `⟳ {template title}` | the Task points at the recurring template that cloned it |
-  | `🕑 Scheduled {when}` | the Task carries a one-shot scheduled time |
-  | `Trigger · {name}` | an inbound-trigger fire recorded this Task as its result |
-  | `Raised by {agent name}` | the Task was created by an Agent rather than a person |
-  | `Delegated · depth {n}` | the Task carries a sub-agent delegation depth above zero |
-  | `You` / `{person}` | the Task was created by a person |
+    | Chip                     | Derived from                                             |
+    | ------------------------ | -------------------------------------------------------- |
+    | `Mission · {name}`       | the Task's Mission owner                                 |
+    | `Idea · {title}`         | the Task's Idea owner                                    |
+    | `Work · {name}`          | the Task's Work owner                                    |
+    | `Team · {name}`          | the Task's Team owner                                    |
+    | `Goal · {name}`          | the Task's Goal owner                                    |
+    | `Agent · {name}`         | the Task's Agent owner — the Agent it is worked by       |
+    | `⟳ {template title}`     | the Task points at the recurring template that cloned it |
+    | `🕑 Scheduled {when}`    | the Task carries a one-shot scheduled time               |
+    | `Trigger · {name}`       | an inbound-trigger fire recorded this Task as its result |
+    | `Raised by {agent name}` | the Task was created by an Agent rather than a person    |
+    | `Delegated · depth {n}`  | the Task carries a sub-agent delegation depth above zero |
+    | `You` / `{person}`       | the Task was created by a person                         |
 
 - **FR-28** Chip precedence when more than two apply MUST be: Trigger, then
   recurring template, then Mission, then Idea, then Work, then Team, then Goal, then
@@ -661,17 +662,17 @@ attempts to count or render an unbounded terminal column.
 
 ### 5.1 Already in Ever Works — used as-is
 
-| Concept | What it is today | What this epic does with it |
-| --- | --- | --- |
-| **Task** | A trackable work item assigned to people or Agents. Status (`backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled`), priority (`p0`–`p4`), labels, slug, six independent nullable owners (Mission, Idea, Work, Team, Agent, Goal), a parent Task, recurrence, one-shot scheduling, branch and pull-request state, a latest-run denormalisation, acceptance gates, a hidden-from-board marker, and eleven side tables | **Nothing is added.** The board is a read over what is there |
-| **Mission** | A long-running initiative that continuously drives Idea generation and, via Ideas, Work creation. Statuses `active`, `paused`, `completed`, `failed`; type one-shot or scheduled; no priority; ticks on a cron | Appears on the board only as a **filter** and as a **provenance chip on a card**. Never as a card. Never given a priority, a comment thread or a board column |
-| **Run** | One Agent execution, already linked to a Task and already denormalised onto it | Read for the run chip and for the stall signal. Unchanged |
-| **Escalation / Approval** | The two shapes of "a human must decide", already readable per Task | Counted for the Decision chip and the header counter. The board links out; [AW-03](../AW-03-decision-queue/) owns the queue |
-| **Task chat message** | The per-Task comment thread, with mentions, a 5-minute edit window, and delivery into a live run through the existing steering seam | Surfaced as a card chip and a reply affordance. **No new comment noun** |
-| **Task watcher** | An explicit subscription to a Task's transitions | Not surfaced by this epic. See §5.4 |
-| **Inbound trigger / trigger fire** | Signed webhook delivery that creates Tasks, with a fire log recording which Task each fire produced | The fire log is read backwards to attribute a `Trigger` chip. Unchanged |
-| **Notification** | Existing in-product notifications, with a Task category and a per-user deduplication key | Gains one stall kind. The category and the dedupe mechanism already exist |
-| **Activity log** | Already records Task created, updated, transitioned, commented, completed and recurrence-fired | Read only. The board writes no new activity type of its own beyond what the existing transition and run paths already write |
+| Concept                            | What it is today                                                                                                                                                                                                                                                                                                                                                                                                                            | What this epic does with it                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Task**                           | A trackable work item assigned to people or Agents. Status (`backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled`), priority (`p0`–`p4`), labels, slug, six independent nullable owners (Mission, Idea, Work, Team, Agent, Goal), a parent Task, recurrence, one-shot scheduling, branch and pull-request state, a latest-run denormalisation, acceptance gates, a hidden-from-board marker, and eleven side tables | **Nothing is added.** The board is a read over what is there                                                                                                  |
+| **Mission**                        | A long-running initiative that continuously drives Idea generation and, via Ideas, Work creation. Statuses `active`, `paused`, `completed`, `failed`; type one-shot or scheduled; no priority; ticks on a cron                                                                                                                                                                                                                              | Appears on the board only as a **filter** and as a **provenance chip on a card**. Never as a card. Never given a priority, a comment thread or a board column |
+| **Run**                            | One Agent execution, already linked to a Task and already denormalised onto it                                                                                                                                                                                                                                                                                                                                                              | Read for the run chip and for the stall signal. Unchanged                                                                                                     |
+| **Escalation / Approval**          | The two shapes of "a human must decide", already readable per Task                                                                                                                                                                                                                                                                                                                                                                          | Counted for the Decision chip and the header counter. The board links out; [AW-03](../AW-03-decision-queue/) owns the queue                                   |
+| **Task chat message**              | The per-Task comment thread, with mentions, a 5-minute edit window, and delivery into a live run through the existing steering seam                                                                                                                                                                                                                                                                                                         | Surfaced as a card chip and a reply affordance. **No new comment noun**                                                                                       |
+| **Task watcher**                   | An explicit subscription to a Task's transitions                                                                                                                                                                                                                                                                                                                                                                                            | Not surfaced by this epic. See §5.4                                                                                                                           |
+| **Inbound trigger / trigger fire** | Signed webhook delivery that creates Tasks, with a fire log recording which Task each fire produced                                                                                                                                                                                                                                                                                                                                         | The fire log is read backwards to attribute a `Trigger` chip. Unchanged                                                                                       |
+| **Notification**                   | Existing in-product notifications, with a Task category and a per-user deduplication key                                                                                                                                                                                                                                                                                                                                                    | Gains one stall kind. The category and the dedupe mechanism already exist                                                                                     |
+| **Activity log**                   | Already records Task created, updated, transitioned, commented, completed and recurrence-fired                                                                                                                                                                                                                                                                                                                                              | Read only. The board writes no new activity type of its own beyond what the existing transition and run paths already write                                   |
 
 ### 5.2 Task — status, and what the board does with it
 
@@ -728,7 +729,7 @@ one: `p0` Urgent · `p1` High · `p2` Medium · `p3` Normal (stored default) · 
 
 ### 5.3 What "needs you" means here, and what it does not
 
-The program's operating loop needs one place that answers *what is waiting on me*.
+The program's operating loop needs one place that answers _what is waiting on me_.
 This epic supplies the **signal** and the **count**; it does not supply the queue.
 
 - A Task in `in_review` or `blocked` is work that has **stopped and needs a person**.
@@ -751,7 +752,7 @@ and rejected on the same test: does Ever Works already have this?
   built. The board surfaces it; it does not re-declare it.
 - **No board watcher.** A Task watcher entity already exists and already drives
   transition notifications. It is currently unreachable from any UI, which is a real
-  gap — but it is a *notification* gap, and notification surfaces belong to
+  gap — but it is a _notification_ gap, and notification surfaces belong to
   [AW-13](../AW-13-attention-controls/). This epic does not claim it, and explicitly
   records it as an unbound backend so it is not rediscovered as missing.
 - **No last-progress column.** A twelfth denormalised column on Task to carry "when
@@ -841,17 +842,17 @@ its count ("To do, 31 Tasks").
 └────────────────────────────────────────────────┘
 ```
 
-| Element | Rule | New? |
-| --- | --- | --- |
-| Slug, title, priority chip, labels, `Move →`, `▶ Run`, updated date | As today | — |
-| Branch chip, PR pill with CI dot, run chip, gate chip, `± N files` | As today | — |
-| Stalled flag | `In progress` only, over threshold only. Tooltip: "No run since 3 Sep, 09:12" | new |
-| Decision chip | Whenever open decisions ≥ 1, in any column. Carries the **Open decision** action | new |
-| Provenance chips | Up to 2 by the precedence of FR-28; the rest under `+N` in the menu | new |
-| Sub-task roll-up | `▣ done/total` when the Task has sub-tasks | new |
-| Comment count | Shown when ≥ 1; `99+` above 99 | new |
-| `⟳ Template` chip | Only when **Show templates** is on. Card is not draggable | new |
-| `Hidden` chip | Only when **Show trigger-hidden Tasks** is on | new |
+| Element                                                             | Rule                                                                             | New? |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---- |
+| Slug, title, priority chip, labels, `Move →`, `▶ Run`, updated date | As today                                                                         | —    |
+| Branch chip, PR pill with CI dot, run chip, gate chip, `± N files`  | As today                                                                         | —    |
+| Stalled flag                                                        | `In progress` only, over threshold only. Tooltip: "No run since 3 Sep, 09:12"    | new  |
+| Decision chip                                                       | Whenever open decisions ≥ 1, in any column. Carries the **Open decision** action | new  |
+| Provenance chips                                                    | Up to 2 by the precedence of FR-28; the rest under `+N` in the menu              | new  |
+| Sub-task roll-up                                                    | `▣ done/total` when the Task has sub-tasks                                       | new  |
+| Comment count                                                       | Shown when ≥ 1; `99+` above 99                                                   | new  |
+| `⟳ Template` chip                                                   | Only when **Show templates** is on. Card is not draggable                        | new  |
+| `Hidden` chip                                                       | Only when **Show trigger-hidden Tasks** is on                                    | new  |
 
 ### 6.4 Card menu
 
@@ -953,15 +954,15 @@ strip, the view switcher and **+ New Task** stay usable.
 
 Per-column empty copy, one line each:
 
-| Column | Copy |
-| --- | --- |
-| Backlog | `Nothing in the backlog.` |
-| To do | `Nothing queued.` |
-| In progress | `Nothing running.` |
-| In review | `Nothing to review.` |
-| Blocked | `Nothing blocked. 🎉` |
-| Done | `Nothing finished in the last {days} days.` |
-| Cancelled | `Nothing cancelled in the last {days} days.` |
+| Column      | Copy                                         |
+| ----------- | -------------------------------------------- |
+| Backlog     | `Nothing in the backlog.`                    |
+| To do       | `Nothing queued.`                            |
+| In progress | `Nothing running.`                           |
+| In review   | `Nothing to review.`                         |
+| Blocked     | `Nothing blocked. 🎉`                        |
+| Done        | `Nothing finished in the last {days} days.`  |
+| Cancelled   | `Nothing cancelled in the last {days} days.` |
 
 ### 6.10 Over the column cap
 
@@ -1029,18 +1030,18 @@ is the first non-empty of `In progress`, `In review`, `To do`.
 
 ### 6.14 Keyboard affordances
 
-| Key | Where | Action | New? |
-| --- | --- | --- | --- |
-| `r` | Card focused | Run the Task | existing |
-| `n` | Board, no field focused | New Task | new |
-| `/` | Board, no field focused | Focus the search box | new |
-| `←` `→` | Card focused | Move focus to the adjacent column, same index | new |
-| `↑` `↓` | Card focused | Move focus within the column | new |
-| `Home` `End` | Card focused | First / last card in the column | new |
-| `Enter` | Card focused | Open the Task | new |
-| `Shift`+`F10` or menu key | Card focused | Open the card menu | new |
-| `1`…`5` | Card menu → Priority | Set Urgent…Low | new |
-| `Esc` | Anywhere | Close the topmost dialog, menu or popover | new |
+| Key                       | Where                   | Action                                        | New?     |
+| ------------------------- | ----------------------- | --------------------------------------------- | -------- |
+| `r`                       | Card focused            | Run the Task                                  | existing |
+| `n`                       | Board, no field focused | New Task                                      | new      |
+| `/`                       | Board, no field focused | Focus the search box                          | new      |
+| `←` `→`                   | Card focused            | Move focus to the adjacent column, same index | new      |
+| `↑` `↓`                   | Card focused            | Move focus within the column                  | new      |
+| `Home` `End`              | Card focused            | First / last card in the column               | new      |
+| `Enter`                   | Card focused            | Open the Task                                 | new      |
+| `Shift`+`F10` or menu key | Card focused            | Open the card menu                            | new      |
+| `1`…`5`                   | Card menu → Priority    | Set Urgent…Low                                | new      |
+| `Esc`                     | Anywhere                | Close the topmost dialog, menu or popover     | new      |
 
 The board uses one tab stop per column with roving focus inside it, so tabbing across
 seven columns is seven stops, not 350. Shortcuts are ignored while a text input has
@@ -1053,42 +1054,42 @@ Every string below is a catalogue key. Ones marked **†** replace a string hard
 the board today; ones marked **‡** already exist in the catalogue and are reused, not
 re-declared.
 
-| Where | String |
-| --- | --- |
-| Page subtitle | `Everything you and your Agents are working on.` |
-| Header counters | `{count} waiting on you` · `{count} done today` |
-| View switcher | `Cards` **†** · `Table` **†** · `Board` **†** |
-| Layout switcher | `Status` · `Focus` |
-| Status column names | `Backlog` · `To do` · `In progress` · `In review` · `Blocked` · `Done` · `Cancelled` **‡** |
-| Focus column names | `Backlog` · `In flight` · `Needs you` · `Done` |
-| Focus column subtitles | `backlog · to do` · `in progress` · `in review · blocked` · `done` |
-| Priority labels | `Urgent` · `High` · `Medium` · `Normal` · `Low` **‡** |
-| Sort tooltip | `Urgent first, then oldest first.` |
-| Column window | `Last {days} days` |
-| Card move menu | `Move →` **†** |
-| Column batch run | `Run all` **†** · `Run {count} Tasks in {column}` **†** |
-| Column overflow | `Showing {shown} of {total}` · `Show {n} more` **†** |
-| Column empty | `Nothing running.` etc. — see §6.9 **†** (today: `empty`) |
-| Diff affordance tooltip | `Preview the changes on this Task's branch` **†** |
-| Stalled flag | `Stalled` — tooltip `In progress since {date}. No run for {days} days.` |
-| Decision chip | `{count} decisions` / `1 decision` · action `Open decision` |
-| Sub-task roll-up | `{done}/{total} sub-tasks` |
-| Comment count | `{count} comments` / `1 comment` |
-| Provenance chips | `Mission · {name}` · `Idea · {title}` · `Work · {name}` · `Team · {name}` · `Goal · {name}` · `Agent · {name}` · `Trigger · {name}` · `Scheduled {when}` · `Raised by {agentName}` · `Delegated · depth {n}` · `Filed by you` |
-| Recurring instance chip | `⟳ {templateTitle}` |
-| Recurring strip | `{count} recurring Tasks · next fires {when}` · `Show` · `Hide` |
-| Recurring strip lead | `These produce Tasks. They are not Tasks you move.` |
-| Recurring strip ended | `ended {date}` |
-| Template chip | `Template` — tooltip `A recurring template. It creates Tasks; it isn't one you move.` |
-| Toggles | `Show sub-tasks` · `Show templates` · `Show cancelled` · `Show trigger-hidden Tasks` |
-| Hidden chip | `Hidden` — tooltip `A Trigger keeps this off the board.` |
-| Sub-task-of chip | `Sub-task of {parentTitle}` |
-| Board error | `Couldn't load the board.` / `Your Tasks are safe — this is a display problem.` / `Try again` / `Open the Table view instead` |
-| Empty board | `No Tasks yet.` / `A Task is a piece of work you hand to an Agent or take on yourself. File one and it lands in Backlog, ready to run.` |
-| Cancelled drop refusal | `A cancelled Task can't be reopened.` |
-| Two-target drop picker | `Move "{title}" to…` |
-| Clear filters | `Clear filters` |
-| Stall notification | `{title} hasn't moved in {days} days` / `It's been in progress since {date} with nothing running. Open it to see where it stopped.` |
+| Where                   | String                                                                                                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page subtitle           | `Everything you and your Agents are working on.`                                                                                                                                                                              |
+| Header counters         | `{count} waiting on you` · `{count} done today`                                                                                                                                                                               |
+| View switcher           | `Cards` **†** · `Table` **†** · `Board` **†**                                                                                                                                                                                 |
+| Layout switcher         | `Status` · `Focus`                                                                                                                                                                                                            |
+| Status column names     | `Backlog` · `To do` · `In progress` · `In review` · `Blocked` · `Done` · `Cancelled` **‡**                                                                                                                                    |
+| Focus column names      | `Backlog` · `In flight` · `Needs you` · `Done`                                                                                                                                                                                |
+| Focus column subtitles  | `backlog · to do` · `in progress` · `in review · blocked` · `done`                                                                                                                                                            |
+| Priority labels         | `Urgent` · `High` · `Medium` · `Normal` · `Low` **‡**                                                                                                                                                                         |
+| Sort tooltip            | `Urgent first, then oldest first.`                                                                                                                                                                                            |
+| Column window           | `Last {days} days`                                                                                                                                                                                                            |
+| Card move menu          | `Move →` **†**                                                                                                                                                                                                                |
+| Column batch run        | `Run all` **†** · `Run {count} Tasks in {column}` **†**                                                                                                                                                                       |
+| Column overflow         | `Showing {shown} of {total}` · `Show {n} more` **†**                                                                                                                                                                          |
+| Column empty            | `Nothing running.` etc. — see §6.9 **†** (today: `empty`)                                                                                                                                                                     |
+| Diff affordance tooltip | `Preview the changes on this Task's branch` **†**                                                                                                                                                                             |
+| Stalled flag            | `Stalled` — tooltip `In progress since {date}. No run for {days} days.`                                                                                                                                                       |
+| Decision chip           | `{count} decisions` / `1 decision` · action `Open decision`                                                                                                                                                                   |
+| Sub-task roll-up        | `{done}/{total} sub-tasks`                                                                                                                                                                                                    |
+| Comment count           | `{count} comments` / `1 comment`                                                                                                                                                                                              |
+| Provenance chips        | `Mission · {name}` · `Idea · {title}` · `Work · {name}` · `Team · {name}` · `Goal · {name}` · `Agent · {name}` · `Trigger · {name}` · `Scheduled {when}` · `Raised by {agentName}` · `Delegated · depth {n}` · `Filed by you` |
+| Recurring instance chip | `⟳ {templateTitle}`                                                                                                                                                                                                           |
+| Recurring strip         | `{count} recurring Tasks · next fires {when}` · `Show` · `Hide`                                                                                                                                                               |
+| Recurring strip lead    | `These produce Tasks. They are not Tasks you move.`                                                                                                                                                                           |
+| Recurring strip ended   | `ended {date}`                                                                                                                                                                                                                |
+| Template chip           | `Template` — tooltip `A recurring template. It creates Tasks; it isn't one you move.`                                                                                                                                         |
+| Toggles                 | `Show sub-tasks` · `Show templates` · `Show cancelled` · `Show trigger-hidden Tasks`                                                                                                                                          |
+| Hidden chip             | `Hidden` — tooltip `A Trigger keeps this off the board.`                                                                                                                                                                      |
+| Sub-task-of chip        | `Sub-task of {parentTitle}`                                                                                                                                                                                                   |
+| Board error             | `Couldn't load the board.` / `Your Tasks are safe — this is a display problem.` / `Try again` / `Open the Table view instead`                                                                                                 |
+| Empty board             | `No Tasks yet.` / `A Task is a piece of work you hand to an Agent or take on yourself. File one and it lands in Backlog, ready to run.`                                                                                       |
+| Cancelled drop refusal  | `A cancelled Task can't be reopened.`                                                                                                                                                                                         |
+| Two-target drop picker  | `Move "{title}" to…`                                                                                                                                                                                                          |
+| Clear filters           | `Clear filters`                                                                                                                                                                                                               |
+| Stall notification      | `{title} hasn't moved in {days} days` / `It's been in progress since {date} with nothing running. Open it to see where it stopped.`                                                                                           |
 
 ---
 
@@ -1263,7 +1264,7 @@ re-declared.
   **Recommendation:** ship Status as the default in P1 and revisit after the first
   usage read, rather than deciding it here.
 - `[NEEDS CLARIFICATION: whether "waiting on you" should also count in_review and
-  blocked.]` As specified, the counter counts open decisions only, and `in_review` /
+blocked.]` As specified, the counter counts open decisions only, and `in_review` /
   `blocked` are visible as columns. An owner may reasonably read "waiting on you" as
   all three. **Recommendation:** decisions only — the counter should mean "something
   is asking you a question", which a blocked Task is not.

@@ -80,7 +80,7 @@ of the workspace are legible on one screen.
 
 ### 2.1 The user's question
 
-> *"What did my agents actually do yesterday, and why did that cost me eleven dollars?"*
+> _"What did my agents actually do yesterday, and why did that cost me eleven dollars?"_
 
 An owner who has delegated real work to agents needs to answer that question in under a minute,
 without being an engineer, and without opening five pages. Autonomy is only extended as far as
@@ -91,16 +91,16 @@ the surface where that trust is earned or lost.
 
 Ever Works has all the raw material and none of the assembly:
 
-| To answer… | Today they must… | What breaks |
-| --- | --- | --- |
-| "What ran yesterday?" | Open **Sessions** under Agents, scroll a flat reverse-chronological list of the most recent 100 runs, and count backwards to find yesterday. | There is no date navigation of any kind. A busy workspace pushes yesterday off the page by lunchtime. |
-| "What did *this* agent do this week?" | Open each Agent's **Activity** tab one at a time. | Per-Agent only. No cross-Agent view of a time window exists. |
-| "Which runs failed?" | Filter Sessions by status = failed. | Works, but the filter set is status / Work / Agent / trigger only — no date range, no Mission, no model, no free-text search over the summary. |
-| "What did it cost?" | Leave Runs entirely, open **Settings → Usage & Credits → Costs**, choose a rolling 7/30/90-day window, and read *Top runs by cost*. | Cost lives on a different page under a different window model. Going from "that Tuesday was expensive" to "*this* run made it expensive" is a cross-referencing exercise across two surfaces with incompatible time controls. |
-| "How many tokens did that run read from cache?" | Nothing. | The metering path records prompt and completion tokens into a log row's free-form metadata and records **no cached-read tokens at all**. The Costs page's per-Agent panel documents this omission in its own API description rather than fabricating a number. |
-| "Which Skills did the agent actually load for that run?" | Nothing. | Skill resolution happens per run, is dropped when it exceeds the Agent's context budget, and is written only as a transient log line. The most common real cause of odd agent behaviour — "it did not load the playbook you thought it would" — is invisible after the fact. |
-| "It timed out. Now what?" | Guess. Ask an operator to change an environment variable. | The run duration ceiling is a single instance-wide setting (30 minutes by default). There is no per-Agent override, so the owner of a legitimately long-running agent has no self-service fix. |
-| "What is about to run?" | Open Activity → Schedules and read next-run times. | A separate page and a separate mental model from "what already ran". |
+| To answer…                                               | Today they must…                                                                                                                             | What breaks                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "What ran yesterday?"                                    | Open **Sessions** under Agents, scroll a flat reverse-chronological list of the most recent 100 runs, and count backwards to find yesterday. | There is no date navigation of any kind. A busy workspace pushes yesterday off the page by lunchtime.                                                                                                                                                                        |
+| "What did _this_ agent do this week?"                    | Open each Agent's **Activity** tab one at a time.                                                                                            | Per-Agent only. No cross-Agent view of a time window exists.                                                                                                                                                                                                                 |
+| "Which runs failed?"                                     | Filter Sessions by status = failed.                                                                                                          | Works, but the filter set is status / Work / Agent / trigger only — no date range, no Mission, no model, no free-text search over the summary.                                                                                                                               |
+| "What did it cost?"                                      | Leave Runs entirely, open **Settings → Usage & Credits → Costs**, choose a rolling 7/30/90-day window, and read _Top runs by cost_.          | Cost lives on a different page under a different window model. Going from "that Tuesday was expensive" to "_this_ run made it expensive" is a cross-referencing exercise across two surfaces with incompatible time controls.                                                |
+| "How many tokens did that run read from cache?"          | Nothing.                                                                                                                                     | The metering path records prompt and completion tokens into a log row's free-form metadata and records **no cached-read tokens at all**. The Costs page's per-Agent panel documents this omission in its own API description rather than fabricating a number.               |
+| "Which Skills did the agent actually load for that run?" | Nothing.                                                                                                                                     | Skill resolution happens per run, is dropped when it exceeds the Agent's context budget, and is written only as a transient log line. The most common real cause of odd agent behaviour — "it did not load the playbook you thought it would" — is invisible after the fact. |
+| "It timed out. Now what?"                                | Guess. Ask an operator to change an environment variable.                                                                                    | The run duration ceiling is a single instance-wide setting (30 minutes by default). There is no per-Agent override, so the owner of a legitimately long-running agent has no self-service fix.                                                                               |
+| "What is about to run?"                                  | Open Activity → Schedules and read next-run times.                                                                                           | A separate page and a separate mental model from "what already ran".                                                                                                                                                                                                         |
 
 ### 2.3 The three gaps this epic closes
 
@@ -150,8 +150,8 @@ the files the run touched, and a link that takes them to the Mission or Task the
 **S4 — Diagnosing a repeated failure.**
 **Given** the same scheduled Agent has failed 3 times inside the selected window,
 **when** the owner opens Runs for that window,
-**then** a banner above the list reads *"3 runs from the same schedule failed in this window —
-the schedule is more likely at fault than any single run"* with a control that jumps straight
+**then** a banner above the list reads _"3 runs from the same schedule failed in this window —
+the schedule is more likely at fault than any single run"_ with a control that jumps straight
 to that schedule's definition.
 
 **S5 — Raising a time limit.**
@@ -186,14 +186,14 @@ receipt already open.
 **S9 — Nothing ran that day.**
 **Given** a day with no runs,
 **when** the owner navigates to it,
-**then** the list shows *"Nothing ran on this day"* with the two adjacent days that do have runs
+**then** the list shows _"Nothing ran on this day"_ with the two adjacent days that do have runs
 offered as one-tap jumps, and the rail shows zeros rather than blank space. The window is not
 silently changed for them.
 
 **S10 — Brand-new workspace.**
 **Given** a workspace whose agents have never run,
 **when** the owner opens Runs,
-**then** they see *"No runs yet"*, one sentence explaining that runs appear here the moment an
+**then** they see _"No runs yet"_, one sentence explaining that runs appear here the moment an
 agent starts working, and links to create an Agent and to set a heartbeat. No calendar chrome
 is hidden — the date controls still work so the page never looks broken.
 
@@ -209,33 +209,33 @@ jumping or losing the user's scroll position.
 **Given** an open receipt for a `running` Run,
 **when** new timeline entries are captured,
 **then** they append at the bottom and the cost and token figures are labelled
-*"so far"* — never presented as final. The Skills block is available as soon as the run has
+_"so far"_ — never presented as final. The Skills block is available as soon as the run has
 assembled its prompt.
 
 **S13 — Capture cap reached.**
 **Given** a Run that produced more captured entries than the per-run capture cap,
 **when** the owner opens its receipt,
-**then** the timeline ends with an explicit marker — *"Older entries were omitted — this run
-reached its capture limit of 200 entries"* — rather than silently showing a partial history.
+**then** the timeline ends with an explicit marker — _"Older entries were omitted — this run
+reached its capture limit of 200 entries"_ — rather than silently showing a partial history.
 
 **S14 — Cost detail aged out.**
 **Given** a Run older than the 12-month usage-detail retention window,
 **when** the owner opens its receipt,
 **then** the settled total cost is still shown (it is stamped on the run itself), and the
-per-model and per-tool breakdown is replaced by *"Itemised usage for this run is older than 12
-months and is no longer retained. The settled total is unchanged."*
+per-model and per-tool breakdown is replaced by _"Itemised usage for this run is older than 12
+months and is no longer retained. The settled total is unchanged."_
 
 **S15 — Cost never attributed.**
 **Given** a Run whose cost was never settled (it was cancelled before settlement, or every
 provider call used the owner's own API key),
 **when** the owner opens its receipt,
-**then** the cost line reads *"Not attributable"* or *"Your own provider key — no platform
-charge"* respectively. It never reads `$0.00`, because zero and unknown are different answers.
+**then** the cost line reads _"Not attributable"_ or _"Your own provider key — no platform
+charge"_ respectively. It never reads `$0.00`, because zero and unknown are different answers.
 
 **S16 — Another person's run.**
 **Given** a Run id belonging to a different account or a different Organization scope,
 **when** it is requested directly by URL,
-**then** the page renders *"This run does not exist, or you do not have access to it"* — the
+**then** the page renders _"This run does not exist, or you do not have access to it"_ — the
 same response for a missing id and a forbidden id, so the surface never confirms that a run
 exists.
 
@@ -243,45 +243,45 @@ exists.
 **Given** a teammate with read access to the workspace,
 **when** they open a failed run's receipt,
 **then** they can read everything the owner can read, and the **"Raise the time limit"** control
-is present but disabled with the tooltip *"You need permission to change this Agent's settings."*
+is present but disabled with the tooltip _"You need permission to change this Agent's settings."_
 
 **S18 — The ledger request fails.**
 **Given** the runs list request errors,
 **when** the page loads,
 **then** the calendar chrome, filters and rail skeletons still render, the list area shows
-*"We could not load runs for this window"* with a **Retry** control, and the previously loaded
+_"We could not load runs for this window"_ with a **Retry** control, and the previously loaded
 window is not wiped from the screen. A failing rail does not blank the list, and a failing list
 does not blank the rail.
 
 **S19 — Raising a limit that someone else already raised.**
 **Given** two people open the same failed receipt and both choose **"Raise the time limit"**,
 **when** the second confirmation is submitted after the first has applied,
-**then** the second is told *"This Agent's time limit is already 60 minutes — no change made"*
+**then** the second is told _"This Agent's time limit is already 60 minutes — no change made"_
 and nothing is overwritten. The control re-reads the current effective limit before it proposes
 a new one.
 
 **S20 — Raising a limit that is already at the ceiling.**
 **Given** an Agent already at the 4-hour maximum,
 **when** the owner opens a timed-out run's receipt,
-**then** the shortcut is replaced by *"This Agent is already at the maximum time limit of 4
-hours. This run is doing too much for one execution — split the work into smaller Tasks."*
+**then** the shortcut is replaced by _"This Agent is already at the maximum time limit of 4
+hours. This run is doing too much for one execution — split the work into smaller Tasks."_
 
 **S21 — Filters that select nothing.**
 **Given** filters that match no runs in the window,
 **when** they are applied,
-**then** the list shows *"No runs match these filters in this window"* with a **Clear filters**
+**then** the list shows _"No runs match these filters in this window"_ with a **Clear filters**
 control and a **Search the last 90 days** control that widens the window instead of the filters.
 
 **S22 — Export too large.**
 **Given** a selected window and filter set that resolves to more than 50,000 rows,
 **when** the owner chooses **Export CSV**,
-**then** the export is refused before it starts with *"That is more than 50,000 runs. Narrow the
-window or the filters and try again."* — never a truncated file presented as complete.
+**then** the export is refused before it starts with _"That is more than 50,000 runs. Narrow the
+window or the filters and try again."_ — never a truncated file presented as complete.
 
 **S23 — A run with no Mission.**
 **Given** a heartbeat Run that belongs to no Mission or Task,
 **when** its receipt is opened,
-**then** the related-work block reads *"This run was not part of a Mission"* and links to the
+**then** the related-work block reads _"This run was not part of a Mission"_ and links to the
 Agent instead. The section is never rendered as an empty box.
 
 **S24 — Clock and timezone.**
@@ -359,7 +359,7 @@ timezone in force is stated once beneath the date control so a number is never a
   contains fewer than **1** terminal run.
 - **FR-22** Each rail metric MUST be a filter shortcut: choosing the error count MUST apply
   outcome = failed to the current window rather than navigating away.
-- **FR-23** The rail MUST state its scope in words — *"this day"*, *"this week"*, *"this month"*
+- **FR-23** The rail MUST state its scope in words — _"this day"_, _"this week"_, _"this month"_
   — so a number is never mistaken for an all-time total.
 
 ### 4.5 The receipt
@@ -370,7 +370,7 @@ timezone in force is stated once beneath the date control so a number is never a
   trigger, start, duration, outcome), **Summary**, **Error** (failures only), **Cost**,
   **Skills used**, **Timeline**, **Files touched**, **Related work**.
 - **FR-26** The **Summary** block MUST show the agent's own end-of-run summary, or
-  *"No summary was recorded for this run"* when none exists.
+  _"No summary was recorded for this run"_ when none exists.
 - **FR-27** The **Skills used** block MUST list every Skill resolved for the run in the priority
   order the agent loaded them, and MUST separately list Skills that were resolved but **dropped**
   because the run exceeded the Agent's Skill context budget, and Skills **suppressed** because the
@@ -378,7 +378,7 @@ timezone in force is stated once beneath the date control so a number is never a
 - **FR-28** The **Cost** block MUST show: total cost in the account currency, credits debited,
   the model or models used, and token counts split into **input**, **output**, **cached read**
   and **cached write**. Where the platform genuinely has no cache figure for a provider, the
-  cache rows MUST read *"Not reported by this provider"* rather than `0`.
+  cache rows MUST read _"Not reported by this provider"_ rather than `0`.
 - **FR-29** The **Cost** block MUST show a per-model breakdown when a run used more than one
   model, and a per-capability breakdown separating model spend from search, extraction,
   screenshot and email spend.
@@ -395,7 +395,7 @@ timezone in force is stated once beneath the date control so a number is never a
 - **FR-34** A run produced by a schedule MUST offer a control that jumps directly to that
   schedule's definition.
 - **FR-35** Cost, token and credit figures for a run that is not yet terminal MUST be labelled
-  *"so far"*.
+  _"so far"_.
 - **FR-36** For runs older than **12 months**, the itemised cost breakdown MUST be replaced with a
   retention notice while the settled total remains visible.
 
@@ -432,8 +432,8 @@ timezone in force is stated once beneath the date control so a number is never a
   immediately when the browser tab regains focus.
 - **FR-48** A schedule that is paused, disabled or ended MUST NOT appear in Upcoming.
 - **FR-49** Choosing an upcoming entry MUST navigate to the schedule's definition, not to Runs.
-- **FR-50** When nothing is scheduled, the panel MUST read *"Nothing scheduled in the next 7
-  days"* and link to where a schedule is created.
+- **FR-50** When nothing is scheduled, the panel MUST read _"Nothing scheduled in the next 7
+  days"_ and link to where a schedule is created.
 
 ### 4.8 Export, scope and permissions
 
@@ -467,17 +467,17 @@ timezone in force is stated once beneath the date control so a number is never a
 
 ## 5. Key entities
 
-| Concept | New or existing | What it is here |
-| --- | --- | --- |
-| **Run** | **Existing** (extended) | One agent execution. Already carries trigger, status, start/finish, duration, summary, error, total tokens, cost, quality-gate state, workspace metadata and attention flags. This epic adds durable per-run telemetry: the token split, the models used, the Skills loaded, the classified failure reason, the time limit that was in force, and a tool-call count. |
-| **Run receipt** | **New — projection only, no new table** | The itemised, after-the-fact account of one Run, assembled at read time from the Run, its captured log entries, and its usage events. Named as a new noun in the [program README](../README.md#0-why-this-program-exists); it is a *view*, never a stored record. |
-| **Usage event** | **Existing** (extended) | One metered provider call, already attributed to user, Work, Agent, Task and Run, and already carrying capability, plugin, model, units and cost. This epic adds first-class input / output / cached-read / cached-write token columns, which today exist only as free-form metadata (and, for cache, not at all). |
-| **Run log entry** | **Existing** | The captured, redacted, size-capped timeline rows a run writes as it works. Read unchanged. |
-| **Agent** | **Existing** (extended) | Gains an optional per-Agent maximum run duration. `null` means "inherit the deployment default". |
-| **Schedule** | **Existing** | The unified projection over recurring Tasks, Agent heartbeats, Work schedules, Mission ticks, source-validation and data-sync. Read unchanged; supplies both the Upcoming panel and the "jump to definition" target. |
-| **Upcoming fire** | **New — projection only, no new table** | One future occurrence of an existing Schedule, with a countdown. Derived at read time; it is not a Run and never becomes one. |
-| **Credit ledger entry** | **Existing** | The credit movement a settled Run produces, already correlated to the Run. Read to populate the receipt's credits line. |
-| **Mission / Task / Work / Skill** | **Existing** | Link targets and filter dimensions. Read unchanged. |
+| Concept                           | New or existing                         | What it is here                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Run**                           | **Existing** (extended)                 | One agent execution. Already carries trigger, status, start/finish, duration, summary, error, total tokens, cost, quality-gate state, workspace metadata and attention flags. This epic adds durable per-run telemetry: the token split, the models used, the Skills loaded, the classified failure reason, the time limit that was in force, and a tool-call count. |
+| **Run receipt**                   | **New — projection only, no new table** | The itemised, after-the-fact account of one Run, assembled at read time from the Run, its captured log entries, and its usage events. Named as a new noun in the [program README](../README.md#0-why-this-program-exists); it is a _view_, never a stored record.                                                                                                    |
+| **Usage event**                   | **Existing** (extended)                 | One metered provider call, already attributed to user, Work, Agent, Task and Run, and already carrying capability, plugin, model, units and cost. This epic adds first-class input / output / cached-read / cached-write token columns, which today exist only as free-form metadata (and, for cache, not at all).                                                   |
+| **Run log entry**                 | **Existing**                            | The captured, redacted, size-capped timeline rows a run writes as it works. Read unchanged.                                                                                                                                                                                                                                                                          |
+| **Agent**                         | **Existing** (extended)                 | Gains an optional per-Agent maximum run duration. `null` means "inherit the deployment default".                                                                                                                                                                                                                                                                     |
+| **Schedule**                      | **Existing**                            | The unified projection over recurring Tasks, Agent heartbeats, Work schedules, Mission ticks, source-validation and data-sync. Read unchanged; supplies both the Upcoming panel and the "jump to definition" target.                                                                                                                                                 |
+| **Upcoming fire**                 | **New — projection only, no new table** | One future occurrence of an existing Schedule, with a countdown. Derived at read time; it is not a Run and never becomes one.                                                                                                                                                                                                                                        |
+| **Credit ledger entry**           | **Existing**                            | The credit movement a settled Run produces, already correlated to the Run. Read to populate the receipt's credits line.                                                                                                                                                                                                                                              |
+| **Mission / Task / Work / Skill** | **Existing**                            | Link targets and filter dimensions. Read unchanged.                                                                                                                                                                                                                                                                                                                  |
 
 ### 5.1 Run lifecycle as this surface renders it
 
@@ -502,23 +502,23 @@ timezone in force is stated once beneath the date control so a number is never a
     cancelled  → duration, "Cancelled by you" or "Cancelled by the platform"
 ```
 
-An **Upcoming fire** is deliberately *not* a state of Run. It has no id, cannot be opened, and
+An **Upcoming fire** is deliberately _not_ a state of Run. It has no id, cannot be opened, and
 disappears the moment the schedule fires and a real `queued` Run appears in the list. Presenting
 projections and records as the same object would make every id on this page unreliable.
 
 ### 5.2 Failure classification
 
-| Classified reason | Assigned when | Remediation offered |
-| --- | --- | --- |
-| `timeout` | The execution exceeded the effective run time limit, or the stale-run sweeper reaped it after the duration ceiling plus its safety margin. | **Raise the time limit** |
-| `provider-error` | A model or provider call failed. | Link to the Agent's model settings |
-| `tool-error` | A tool invocation failed and the run could not recover. | Link to the failing tool's Connection |
-| `budget-stop` | A Work or Agent spend cap refused the run. | Link to the cap |
-| `credits-exhausted` | The credit balance could not cover the run. | Link to credits |
-| `guardrail-refusal` | A guardrail or policy refused the action. | Link to the Agent's guardrails |
-| `cancelled-by-user` | A person cancelled or interrupted it. | None |
-| `swept-stale` | The run stopped reporting and was reaped. | None; explains itself |
-| `unknown` | Everything else. | None — the exact error is shown verbatim |
+| Classified reason   | Assigned when                                                                                                                              | Remediation offered                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `timeout`           | The execution exceeded the effective run time limit, or the stale-run sweeper reaped it after the duration ceiling plus its safety margin. | **Raise the time limit**                 |
+| `provider-error`    | A model or provider call failed.                                                                                                           | Link to the Agent's model settings       |
+| `tool-error`        | A tool invocation failed and the run could not recover.                                                                                    | Link to the failing tool's Connection    |
+| `budget-stop`       | A Work or Agent spend cap refused the run.                                                                                                 | Link to the cap                          |
+| `credits-exhausted` | The credit balance could not cover the run.                                                                                                | Link to credits                          |
+| `guardrail-refusal` | A guardrail or policy refused the action.                                                                                                  | Link to the Agent's guardrails           |
+| `cancelled-by-user` | A person cancelled or interrupted it.                                                                                                      | None                                     |
+| `swept-stale`       | The run stopped reporting and was reaped.                                                                                                  | None; explains itself                    |
+| `unknown`           | Everything else.                                                                                                                           | None — the exact error is shown verbatim |
 
 ---
 
@@ -828,7 +828,7 @@ Copy: **"Nothing scheduled in the next 7 days."**; **"Set up a schedule"**.
 ### 6.15 Accessibility notes
 
 - The list is a table with a caption naming the window and filters, so a screen reader announces
-  *"Runs, Monday 8 September 2026, filtered by Agent: Ops, 41 rows"*.
+  _"Runs, Monday 8 September 2026, filtered by Agent: Ops, 41 rows"_.
 - Outcome is conveyed by an icon **and** a text label, never by colour alone; the mini-calendar
   uses two distinct shapes for "has runs" and "has failures".
 - Live-updating regions (elapsed timers, countdowns) are polite live regions and are paused when
@@ -850,7 +850,7 @@ Copy: **"Nothing scheduled in the next 7 days."**; **"Set up a schedule"**.
 - **Notifications on failure.** Alerting, digests and the attention budget belong to AW-13.
   Runs is a pull surface in this epic.
 - **Managing schedules.** Creating, editing, pausing or deleting a Schedule belongs to AW-10.
-  Runs only *reads* schedules for the Upcoming panel and the jump-to-definition control.
+  Runs only _reads_ schedules for the Upcoming panel and the jump-to-definition control.
 - **Spend caps and budgets.** Setting caps, credits top-up and the meters belong to AW-17. Runs
   displays what was spent and links to those surfaces.
 - **Full raw tool payloads.** The receipt shows the redacted, size-capped previews the platform
@@ -871,6 +871,7 @@ Copy: **"Nothing scheduled in the next 7 days."**; **"Set up a schedule"**.
 A reviewer can run this list against the merged change.
 
 **Ledger**
+
 - [ ] `/runs` exists in the dashboard navigation and lists runs for a selected window.
 - [ ] Day / Week / Month all render, and the week starts on Monday.
 - [ ] Default landing is Day / today in the profile timezone; the timezone is stated on screen.
@@ -882,6 +883,7 @@ A reviewer can run this list against the merged change.
 - [ ] A refresh does not move the scroll position or close an open receipt.
 
 **Navigation**
+
 - [ ] `←`, `→`, `t`, `d`, `w`, `m`, `j`, `k`, `Enter`, `o`, `Esc`, `/`, `f`, `?` all behave per
       FR-11, and none of them fire while a text input has focus.
 - [ ] The mini-calendar marks days with runs and days with failures using two different shapes.
@@ -889,6 +891,7 @@ A reviewer can run this list against the merged change.
       the open receipt.
 
 **Filters and rail**
+
 - [ ] Filtering by Agent, trigger, outcome, Mission, Work and model each narrows the list.
 - [ ] A one-character search is rejected; a 2-character search matches summaries and errors.
 - [ ] The rail's numbers change when a filter is applied.
@@ -897,6 +900,7 @@ A reviewer can run this list against the merged change.
 - [ ] An archived Agent still resolves its historical rows and is labelled archived.
 
 **Receipt**
+
 - [ ] Every block in FR-25 renders, in that order.
 - [ ] A run with no summary shows the "no summary" copy, not an empty block.
 - [ ] Skills used lists loaded, dropped and suppressed Skills distinctly, each linking to the Skill.
@@ -910,6 +914,7 @@ A reviewer can run this list against the merged change.
 - [ ] A non-terminal run's cost and tokens are labelled "so far".
 
 **Failures**
+
 - [ ] Every failed run shows a classified reason from the closed set plus the exact error.
 - [ ] "Raise the time limit" appears only for `timeout`.
 - [ ] The confirmation shows the current effective limit and its source, and the proposed value.
@@ -920,6 +925,7 @@ A reviewer can run this list against the merged change.
 - [ ] Two or more failures sharing a schedule in the window produce one grouped, dismissible banner.
 
 **Upcoming**
+
 - [ ] The panel lists the next fires within 7 days, capped at 50, ordered soonest first.
 - [ ] Countdowns tick at least once per second and stop when the tab is hidden.
 - [ ] Paused, disabled and ended schedules never appear.
@@ -927,6 +933,7 @@ A reviewer can run this list against the merged change.
 - [ ] With nothing scheduled, the empty copy renders with a create link.
 
 **Export, scope, security**
+
 - [ ] CSV export streams and matches the on-screen window and filters.
 - [ ] A >50,000-row or >92-day export is refused before any bytes are produced.
 - [ ] No request parameter can name another user, Organization or tenant.
@@ -934,6 +941,7 @@ A reviewer can run this list against the merged change.
 - [ ] No secret-shaped value appears anywhere in a receipt, including inside an error message.
 
 **Resilience and performance**
+
 - [ ] The rail failing does not blank the list; the list failing does not blank the rail; the
       upcoming panel failing does not blank either.
 - [ ] The list request meets the 800 ms P95 budget and the rail request the 400 ms budget at
@@ -945,33 +953,33 @@ A reviewer can run this list against the merged change.
 ## 9. Open questions
 
 - `[NEEDS CLARIFICATION: Should the receipt be able to show complete, unredacted tool request and
-  response bodies behind an explicit per-Agent opt-in? Today only redacted 4,096-character
-  previews are captured, which is sometimes too little to debug a tool. Storing full bodies means
-  storing whatever a connected system returned — customer records included — so this needs a
-  privacy decision and a retention rule before it is built, not after.]`
+response bodies behind an explicit per-Agent opt-in? Today only redacted 4,096-character
+previews are captured, which is sometimes too little to debug a tool. Storing full bodies means
+storing whatever a connected system returned — customer records included — so this needs a
+privacy decision and a retention rule before it is built, not after.]`
 - `[NEEDS CLARIFICATION: Should Runs have its own retention policy? Run records are currently kept
-  indefinitely while itemised usage detail is pruned at 12 months, so a 3-year-old run shows a
-  total with no breakdown. Options: prune runs on the same 12-month clock, keep runs forever and
-  document the asymmetry, or make retention a workspace setting.]`
+indefinitely while itemised usage detail is pruned at 12 months, so a 3-year-old run shows a
+total with no breakdown. Options: prune runs on the same 12-month clock, keep runs forever and
+document the asymmetry, or make retention a workspace setting.]`
 - `[NEEDS CLARIFICATION: Should the per-Agent time limit ladder be 30 min / 60 min / 2 h / 4 h, and
-  is 4 hours the right ceiling? Task-assigned executions already run under a 60-minute ceiling
-  today while heartbeats run under 30 — should raising the limit be expressed per Agent, or per
-  trigger kind within an Agent?]`
+is 4 hours the right ceiling? Task-assigned executions already run under a 60-minute ceiling
+today while heartbeats run under 30 — should raising the limit be expressed per Agent, or per
+trigger kind within an Agent?]`
 - `[NEEDS CLARIFICATION: Which run kinds should the trigger filter expose once agent email lands
-  (AW-05)? Inbound-mail triage has no trigger value today. Adding one is trivial, but naming it
-  before AW-05 fixes its semantics risks a label we then have to live with.]`
+(AW-05)? Inbound-mail triage has no trigger value today. Adding one is trivial, but naming it
+before AW-05 fixes its semantics risks a label we then have to live with.]`
 - `[NEEDS CLARIFICATION: Should a delegated sub-agent run appear as its own row, nested under its
-  parent, or both? Sub-agent delegation exists and produces real runs; a flat list makes a
-  three-deep delegation look like three unrelated executions.]`
+parent, or both? Sub-agent delegation exists and produces real runs; a flat list makes a
+three-deep delegation look like three unrelated executions.]`
 - `[NEEDS CLARIFICATION: Should the Upcoming panel offer "skip this fire" or "run it now"? Both
-  are one call away from existing endpoints, but they are schedule *controls* and AW-10 owns
-  schedule controls. Confirm the split with Product.]`
+are one call away from existing endpoints, but they are schedule *controls* and AW-10 owns
+schedule controls. Confirm the split with Product.]`
 - `[NEEDS CLARIFICATION: When a viewer's timezone differs from the timezone a schedule is
-  expressed in, should the Upcoming countdown show both? A schedule that fires "every day at
-  09:00" in one timezone is confusing to a viewer in another.]`
+expressed in, should the Upcoming countdown show both? A schedule that fires "every day at
+09:00" in one timezone is confusing to a viewer in another.]`
 - `[NEEDS CLARIFICATION: Should the grouped repeat-failure banner threshold of 2 be workspace-
-  configurable? Two is deliberate — a second failure from one schedule is evidence about the
-  schedule — but a very high-frequency heartbeat may trip it constantly.]`
+configurable? Two is deliberate — a second failure from one schedule is evidence about the
+schedule — but a very high-frequency heartbeat may trip it constantly.]`
 
 ---
 

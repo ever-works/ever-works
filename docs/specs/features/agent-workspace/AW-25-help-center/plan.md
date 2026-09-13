@@ -13,28 +13,28 @@ Every path below was opened before it was cited.
 
 ### 1.1 The one help surface that exists
 
-| File | What it is today | What this epic does to it |
-| --- | --- | --- |
-| [`apps/web/src/components/dashboard/HelpDrawer.tsx`](../../../../../apps/web/src/components/dashboard/HelpDrawer.tsx) | 601 lines. A Headless UI `Dialog` + `Transition` slide-over with four tabs (`tips`, `shortcuts`, `faq`, `resources`), module-level constants `DOCS_URL`, `GITHUB_URL`, `ISSUES_URL`, `DISCUSSIONS_URL`, plus `APP_ENV` / `STATUS_URL` env chips, and local `CARD` / `DIVIDE` / `ROW` style tokens. Translations come from `useTranslations('dashboard.header.help')`. | Gains a **new first tab** whose panel is `<HelpCenterPanel/>`. The four existing tabs, their copy, their constants and their external links are untouched (spec FR-13). |
-| [`apps/web/src/components/dashboard/DashboardHeader.tsx`](../../../../../apps/web/src/components/dashboard/DashboardHeader.tsx) | 124 lines. Mobile hamburger, `WorkSwitcher`, optional onboarding pill, then `NotificationDropdown` / `ThemeToggle` / a Help button that calls the layout's `onOpenHelp`. | Unchanged wiring; the Help button's tooltip string changes to `Help — press ?`. |
-| [`apps/web/src/lib/hooks/use-keyboard-shortcuts.ts`](../../../../../apps/web/src/lib/hooks/use-keyboard-shortcuts.ts) | Three global bindings on one `document.keydown` listener: `Ctrl/Cmd+K` → `router.push('/works?focus=search')`, `C` → `ROUTES.DASHBOARD_WORKS_NEW`, `?` → `onOpenHelp()` (guarded against `input` / `textarea` / `select` / `contentEditable`). | **Not modified by this epic.** [AW-01](../AW-01-command-palette/plan.md) already repoints `Ctrl/Cmd+K`; `?` keeps calling `onOpenHelp`, which now lands on the manual tab. |
-| [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>) | 540-line client shell. Mounts `DashboardSidebar`, `ChatPanel`, `DashboardHeader`, `<main id="main-content">`, `Footer`, `HelpDrawer`, and calls `useKeyboardShortcuts({ onOpenHelp })`. Already owns the drawer's open/close state. | Wraps its body in `<HelpCenterProvider>` so any component can call `openHelpAt(target)`, and passes the provider's requested target into `HelpDrawer`. |
-| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) | 628 lines. The user menu at the bottom carries `profileMenu.helpDocs` (external docs link), `profileMenu.support`, `profileMenu.keyboardShortcuts` (opens the drawer). | `helpDocs` opens the manual; a new adjacent row keeps the external documentation link (spec FR-10.4). No entry is removed. |
+| File                                                                                                                                  | What it is today                                                                                                                                                                                                                                                                                                                                                      | What this epic does to it                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/web/src/components/dashboard/HelpDrawer.tsx`](../../../../../apps/web/src/components/dashboard/HelpDrawer.tsx)                 | 601 lines. A Headless UI `Dialog` + `Transition` slide-over with four tabs (`tips`, `shortcuts`, `faq`, `resources`), module-level constants `DOCS_URL`, `GITHUB_URL`, `ISSUES_URL`, `DISCUSSIONS_URL`, plus `APP_ENV` / `STATUS_URL` env chips, and local `CARD` / `DIVIDE` / `ROW` style tokens. Translations come from `useTranslations('dashboard.header.help')`. | Gains a **new first tab** whose panel is `<HelpCenterPanel/>`. The four existing tabs, their copy, their constants and their external links are untouched (spec FR-13).    |
+| [`apps/web/src/components/dashboard/DashboardHeader.tsx`](../../../../../apps/web/src/components/dashboard/DashboardHeader.tsx)       | 124 lines. Mobile hamburger, `WorkSwitcher`, optional onboarding pill, then `NotificationDropdown` / `ThemeToggle` / a Help button that calls the layout's `onOpenHelp`.                                                                                                                                                                                              | Unchanged wiring; the Help button's tooltip string changes to `Help — press ?`.                                                                                            |
+| [`apps/web/src/lib/hooks/use-keyboard-shortcuts.ts`](../../../../../apps/web/src/lib/hooks/use-keyboard-shortcuts.ts)                 | Three global bindings on one `document.keydown` listener: `Ctrl/Cmd+K` → `router.push('/works?focus=search')`, `C` → `ROUTES.DASHBOARD_WORKS_NEW`, `?` → `onOpenHelp()` (guarded against `input` / `textarea` / `select` / `contentEditable`).                                                                                                                        | **Not modified by this epic.** [AW-01](../AW-01-command-palette/plan.md) already repoints `Ctrl/Cmd+K`; `?` keeps calling `onOpenHelp`, which now lands on the manual tab. |
+| [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>) | 540-line client shell. Mounts `DashboardSidebar`, `ChatPanel`, `DashboardHeader`, `<main id="main-content">`, `Footer`, `HelpDrawer`, and calls `useKeyboardShortcuts({ onOpenHelp })`. Already owns the drawer's open/close state.                                                                                                                                   | Wraps its body in `<HelpCenterProvider>` so any component can call `openHelpAt(target)`, and passes the provider's requested target into `HelpDrawer`.                     |
+| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx)     | 628 lines. The user menu at the bottom carries `profileMenu.helpDocs` (external docs link), `profileMenu.support`, `profileMenu.keyboardShortcuts` (opens the drawer).                                                                                                                                                                                                | `helpDocs` opens the manual; a new adjacent row keeps the external documentation link (spec FR-10.4). No entry is removed.                                                 |
 
 ### 1.2 What the manual has to bind to
 
-| File | Why it matters here |
-| --- | --- |
-| [`apps/api/src/health/build-info.ts`](../../../../../apps/api/src/health/build-info.ts) | `getBuildInfo()` returns `{ name, version, gitSha, shortSha, gitRef, buildRun, buildTime, commitUrl }`, every field degrading to a safe default. This is the build stamp in spec FR-8 — already built, already published, already safe. |
-| [`apps/web/src/lib/api/version.ts`](../../../../../apps/web/src/lib/api/version.ts) | `versionAPI` — the client the dashboard footer already uses. The server layout fetches it once, cached 5 minutes. The manual reads the same value the footer shows, so the two can never disagree. |
-| [`apps/web/src/components/footer/index.tsx`](../../../../../apps/web/src/components/footer/index.tsx) | Where that version chip renders today; the visual precedent for the manual's stamp. |
-| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) | `ROUTES` (from line 107) is the single source of truth for every path. It also carries the documented dead constant `DASHBOARD_NOTIFICATIONS` (`/notifications` soft-404s). Both facts are load-bearing for spec FR-5.2. |
-| [`apps/web/src/components/common/EmptyState.tsx`](../../../../../apps/web/src/components/common/EmptyState.tsx) | The genuinely shared empty-state primitive (title / description / action / icon). Adding one optional prop here wires most of spec FR-23 in a single edit. |
-| [`apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx`](../../../../../apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx) | 79 lines, amber, dismissible, `localStorage`-persisted. The canonical "error message that explains nothing" from spec §2.2. |
-| [`apps/web/src/components/dashboard/AttentionSection.tsx`](../../../../../apps/web/src/components/dashboard/AttentionSection.tsx) | Renders the home attention items; the kinds actually emitted today are `agent-error`, `generation-failed`, `task-blocked`, `budget-exceeded`. |
-| [`apps/web/src/components/posthog/PostHogProvider.tsx`](../../../../../apps/web/src/components/posthog/PostHogProvider.tsx) + [`PostHogIdentify.tsx`](../../../../../apps/web/src/components/posthog/PostHogIdentify.tsx) | Already mounted in the shell; the only analytics path this epic uses. |
-| [`apps/web/src/lib/api/bff-proxy.ts`](../../../../../apps/web/src/lib/api/bff-proxy.ts) | `bffProxy(handler, { scope })` — resolves the auth cookie and forwards the workspace selector. Mandatory for the one browser-facing route this epic adds. |
-| [`apps/web/scripts/sync-locale-parity.mjs`](../../../../../apps/web/scripts/sync-locale-parity.mjs) | The existing tool for seeding a new namespace into all 20 non-English locale files. Its own comment records why full paths must be seeded: a missing **parent** object collapses the whole subtree into a runtime error rather than falling back to English. |
+| File                                                                                                                                                                                                                      | Why it matters here                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`apps/api/src/health/build-info.ts`](../../../../../apps/api/src/health/build-info.ts)                                                                                                                                   | `getBuildInfo()` returns `{ name, version, gitSha, shortSha, gitRef, buildRun, buildTime, commitUrl }`, every field degrading to a safe default. This is the build stamp in spec FR-8 — already built, already published, already safe.                      |
+| [`apps/web/src/lib/api/version.ts`](../../../../../apps/web/src/lib/api/version.ts)                                                                                                                                       | `versionAPI` — the client the dashboard footer already uses. The server layout fetches it once, cached 5 minutes. The manual reads the same value the footer shows, so the two can never disagree.                                                           |
+| [`apps/web/src/components/footer/index.tsx`](../../../../../apps/web/src/components/footer/index.tsx)                                                                                                                     | Where that version chip renders today; the visual precedent for the manual's stamp.                                                                                                                                                                          |
+| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts)                                                                                                                                           | `ROUTES` (from line 107) is the single source of truth for every path. It also carries the documented dead constant `DASHBOARD_NOTIFICATIONS` (`/notifications` soft-404s). Both facts are load-bearing for spec FR-5.2.                                     |
+| [`apps/web/src/components/common/EmptyState.tsx`](../../../../../apps/web/src/components/common/EmptyState.tsx)                                                                                                           | The genuinely shared empty-state primitive (title / description / action / icon). Adding one optional prop here wires most of spec FR-23 in a single edit.                                                                                                   |
+| [`apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx`](../../../../../apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx)                                                                         | 79 lines, amber, dismissible, `localStorage`-persisted. The canonical "error message that explains nothing" from spec §2.2.                                                                                                                                  |
+| [`apps/web/src/components/dashboard/AttentionSection.tsx`](../../../../../apps/web/src/components/dashboard/AttentionSection.tsx)                                                                                         | Renders the home attention items; the kinds actually emitted today are `agent-error`, `generation-failed`, `task-blocked`, `budget-exceeded`.                                                                                                                |
+| [`apps/web/src/components/posthog/PostHogProvider.tsx`](../../../../../apps/web/src/components/posthog/PostHogProvider.tsx) + [`PostHogIdentify.tsx`](../../../../../apps/web/src/components/posthog/PostHogIdentify.tsx) | Already mounted in the shell; the only analytics path this epic uses.                                                                                                                                                                                        |
+| [`apps/web/src/lib/api/bff-proxy.ts`](../../../../../apps/web/src/lib/api/bff-proxy.ts)                                                                                                                                   | `bffProxy(handler, { scope })` — resolves the auth cookie and forwards the workspace selector. Mandatory for the one browser-facing route this epic adds.                                                                                                    |
+| [`apps/web/scripts/sync-locale-parity.mjs`](../../../../../apps/web/scripts/sync-locale-parity.mjs)                                                                                                                       | The existing tool for seeding a new namespace into all 20 non-English locale files. Its own comment records why full paths must be seeded: a missing **parent** object collapses the whole subtree into a runtime error rather than falling back to English. |
 
 ### 1.3 The plumbing this epic copies rather than invents
 
@@ -139,15 +139,15 @@ type-check` already runs on every PR, so the gate costs nothing new. The runtime
 
 ### 3.1 The decision: content in the build, feedback in the database
 
-| | **A — articles in a table + an admin editor** | **B — articles in the build, only feedback in a table** ✅ |
-| --- | --- | --- |
-| Tables added | 3+ (articles, sections, feedback) | **1** (`help_article_feedback`) |
-| Publishing an article | write a row, remember to deploy nothing | a PR alongside the feature |
-| Can the manual describe a screen the build lacks? | Yes — a row outlives the rollback and lies | **No, structurally** (spec FR-1, FR-5.2, FR-6) |
-| Air-gapped / self-hosted | Needs seeding, then drifts per install | Correct on every install, always |
-| Search | server round trip, index maintenance, a new read model | zero I/O, offline, ~26 documents |
-| Review | invisible to code review | the same reviewer as the feature |
-| Localisation | a translation table and a fallback policy per row | a build artefact the existing pipeline can see |
+|                                                   | **A — articles in a table + an admin editor**          | **B — articles in the build, only feedback in a table** ✅ |
+| ------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| Tables added                                      | 3+ (articles, sections, feedback)                      | **1** (`help_article_feedback`)                            |
+| Publishing an article                             | write a row, remember to deploy nothing                | a PR alongside the feature                                 |
+| Can the manual describe a screen the build lacks? | Yes — a row outlives the rollback and lies             | **No, structurally** (spec FR-1, FR-5.2, FR-6)             |
+| Air-gapped / self-hosted                          | Needs seeding, then drifts per install                 | Correct on every install, always                           |
+| Search                                            | server round trip, index maintenance, a new read model | zero I/O, offline, ~26 documents                           |
+| Review                                            | invisible to code review                               | the same reviewer as the feature                           |
+| Localisation                                      | a translation table and a fallback policy per row      | a build artefact the existing pipeline can see             |
 
 **B is chosen.** The requirement is "never disagrees with the running build"; B satisfies it by
 construction. The corpus is capped at 200 articles (spec FR-3) and identical for every reader, so
@@ -158,15 +158,7 @@ it has none of the properties that would justify a table.
 `packages/agent/src/entities/help-article-feedback.entity.ts`
 
 ```ts
-import {
-	Column,
-	CreateDateColumn,
-	Entity,
-	Index,
-	PrimaryGeneratedColumn,
-	Unique,
-	UpdateDateColumn
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
 
 /**
  * AW-25 — one row per (person, help article): "was this article helpful?".
@@ -308,8 +300,8 @@ export interface HelpArticleHealthDto {
 	articleId: string;
 	responses: number;
 	negative: number;
-	negativeShare: number;   // 0..1
-	flagged: boolean;        // spec FR-48
+	negativeShare: number; // 0..1
+	flagged: boolean; // spec FR-48
 	lastResponseAt: string | null;
 }
 ```
@@ -395,7 +387,7 @@ export class CreateHelpArticleFeedback1791250000000 implements MigrationInterfac
 ```
 
 **Note on the unique constraint and `articleId = NULL`.** PostgreSQL treats NULLs as distinct in a
-unique index, so the S-13 no-results notes (which carry `articleId = NULL`) are *not* collapsed to
+unique index, so the S-13 no-results notes (which carry `articleId = NULL`) are _not_ collapsed to
 one row per person — which is the behaviour we want: a person may report several missing topics,
 but may hold only one verdict per article (spec FR-32). This is stated in the entity doc comment
 so a later "fix" does not add a partial index that breaks it.
@@ -422,6 +414,7 @@ order: 10
 A mission is one piece of delegated work. …
 
 ## What a mission is
+
 …
 ```
 
@@ -439,26 +432,25 @@ three scripts already in that folder):
    **Link blocks** (spec FR-27a). A line whose entire content is one Markdown link becomes
    `{ kind: 'link', label, target }`; the target's scheme picks the type:
 
-   | Authored | Parsed target | Generator validation (hard error naming the line) |
-   | --- | --- | --- |
-   | `[Write a brief](help:missions#writing-a-brief)` | `{ type: 'article', articleId: 'missions', headingId: 'writing-a-brief' }` | the article id exists in the corpus; the heading id, when given, exists in that article (checked after step 4 for every article) |
-   | `[Open Missions](route:DASHBOARD_MISSIONS)` | `{ type: 'screen', routeKey: 'DASHBOARD_MISSIONS' }` | the key matches `^[A-Z][A-Z0-9_]*$`; existence in `ROUTES` is checked by the unit spec below, because the generator does not parse TypeScript |
-   | `[Status page](https://status.example.org)` | `{ type: 'external', href }` | `new URL(href)` succeeds; `protocol === 'https:'`; no `username` / `password`; length <= 2048 |
+    | Authored                                         | Parsed target                                                              | Generator validation (hard error naming the line)                                                                                             |
+    | ------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+    | `[Write a brief](help:missions#writing-a-brief)` | `{ type: 'article', articleId: 'missions', headingId: 'writing-a-brief' }` | the article id exists in the corpus; the heading id, when given, exists in that article (checked after step 4 for every article)              |
+    | `[Open Missions](route:DASHBOARD_MISSIONS)`      | `{ type: 'screen', routeKey: 'DASHBOARD_MISSIONS' }`                       | the key matches `^[A-Z][A-Z0-9_]*$`; existence in `ROUTES` is checked by the unit spec below, because the generator does not parse TypeScript |
+    | `[Status page](https://status.example.org)`      | `{ type: 'external', href }`                                               | `new URL(href)` succeeds; `protocol === 'https:'`; no `username` / `password`; length <= 2048                                                 |
 
-   Everything else is a hard error: a link inside paragraph or list text (inline links are not in
-   the grammar); an empty or > 80-character label, or a label containing markup; a relative or
-   literal in-product path such as `/missions` (the message points the author at `route:`); any
-   other scheme — `http:`, `javascript:`, `data:`, `mailto:`, protocol-relative `//host`. The
-   `help:` targets are also collected into the `HelpTarget` union check, so an article link that
-   rots fails `tsc` exactly like a help link does (spec FR-5.3, FR-5.7).
+    Everything else is a hard error: a link inside paragraph or list text (inline links are not in
+    the grammar); an empty or > 80-character label, or a label containing markup; a relative or
+    literal in-product path such as `/missions` (the message points the author at `route:`); any
+    other scheme — `http:`, `javascript:`, `data:`, `mailto:`, protocol-relative `//host`. The
+    `help:` targets are also collected into the `HelpTarget` union check, so an article link that
+    rots fails `tsc` exactly like a help link does (spec FR-5.3, FR-5.7).
+
 4. Slugify every `##` heading into an anchor id; duplicates inside one article are a hard error.
-5. Emit:
-   - `apps/web/src/lib/help/help-catalog.generated.ts` — `HELP_ARTICLES` (metadata only:
-     `id`, `section`, `title`, `summary`, `keywords`, `documents`, `related`, `reviewedAt`,
-     `order`, `headings: {id,text}[]`), `HELP_SECTION_ORDER`, and
-     `export type HelpTarget = …` (the union of every `id` and every `` `${id}#${headingId}` ``).
-   - `apps/web/src/lib/help/help-content.generated.json` — `{ bodies: Record<id, Block[]>,
-     postings: Record<token, Array<[articleIndex, field, headingIndex]>> }`.
+5. Emit: - `apps/web/src/lib/help/help-catalog.generated.ts` — `HELP_ARTICLES` (metadata only:
+   `id`, `section`, `title`, `summary`, `keywords`, `documents`, `related`, `reviewedAt`,
+   `order`, `headings: {id,text}[]`), `HELP_SECTION_ORDER`, and
+   `export type HelpTarget = …` (the union of every `id` and every `` `${id}#${headingId}` ``). - `apps/web/src/lib/help/help-content.generated.json` — `{ bodies: Record<id, Block[]>,
+postings: Record<token, Array<[articleIndex, field, headingIndex]>> }`.
 6. `--check` mode regenerates into memory and exits non-zero with a diff summary when the
    committed outputs differ. Wired as `apps/web`'s `prebuild`, so `pnpm build` cannot ship a
    stale catalogue.
@@ -488,15 +480,15 @@ One new module, `apps/api/src/help/`, base path `api/help`. Authentication comes
 `@ApiBearerAuth('JWT-auth')` so the OpenAPI document picks it up. Every response carries
 `Cache-Control: private, no-store`.
 
-| Method | Path | Body / query | Response | Auth & limits |
-| --- | --- | --- | --- | --- |
-| `POST` | `/api/help/feedback` | `SubmitHelpFeedbackDto` | `201` `HelpFeedbackAckDto` | Session. `@Throttle` 20 per 3 600 s per user (spec FR-34). `422` when the note matches a credential shape (spec FR-35). `400` on an `articleId` that fails `[a-z0-9-]{3,64}`, a note over its cap, or `helpful === null` with no note. |
-| `GET` | `/api/help/health-summary` | `?since=<ISO date>` | `200` `HelpArticleHealthDto[]` | Session **plus** the existing platform-admin check used by the other operator endpoints. `403` otherwise. Default throttle. |
+| Method | Path                       | Body / query            | Response                       | Auth & limits                                                                                                                                                                                                                          |
+| ------ | -------------------------- | ----------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/help/feedback`       | `SubmitHelpFeedbackDto` | `201` `HelpFeedbackAckDto`     | Session. `@Throttle` 20 per 3 600 s per user (spec FR-34). `422` when the note matches a credential shape (spec FR-35). `400` on an `articleId` that fails `[a-z0-9-]{3,64}`, a note over its cap, or `helpful === null` with no note. |
+| `GET`  | `/api/help/health-summary` | `?since=<ISO date>`     | `200` `HelpArticleHealthDto[]` | Session **plus** the existing platform-admin check used by the other operator endpoints. `403` otherwise. Default throttle.                                                                                                            |
 
 Notes:
 
 - **Upsert semantics** (spec FR-32) are a single `INSERT … ON CONFLICT (userId, articleId) DO
-  UPDATE` on the unique constraint, so two rapid submissions from two tabs cannot produce two rows.
+UPDATE` on the unique constraint, so two rapid submissions from two tabs cannot produce two rows.
 - **The `GET` never returns notes to anyone but a platform administrator**, and never returns a
   `userId` at all — the summary is counts per article (spec FR-36).
 - **No read endpoint for articles.** The manual is not served by the API in this epic (spec §7.7).
@@ -567,19 +559,19 @@ apps/web/src/app/api/help/feedback/route.ts        POST, bffProxy
 
 ### 5.2 Modified files — all additive
 
-| File | Change |
-| --- | --- |
-| [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>) | Wrap the shell body in `<HelpCenterProvider>`; pass its `currentTarget` into `HelpDrawer`. No change to `useKeyboardShortcuts`, the chat panel, or the existing drawer state. |
-| [`apps/web/src/components/dashboard/HelpDrawer.tsx`](../../../../../apps/web/src/components/dashboard/HelpDrawer.tsx) | Add `manual` as the first tab id and render `<HelpCenterPanel/>` for it; accept an optional `initialTarget` prop that selects that tab and opens the article. The four existing tabs are moved by exactly one position and otherwise untouched. |
-| [`apps/web/src/components/dashboard/DashboardHeader.tsx`](../../../../../apps/web/src/components/dashboard/DashboardHeader.tsx) | Tooltip key only. |
-| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) | `profileMenu.helpDocs` opens the manual; a new adjacent row keeps the external documentation link. Nothing removed. |
-| [`apps/web/src/components/common/EmptyState.tsx`](../../../../../apps/web/src/components/common/EmptyState.tsx) | One optional `helpTarget?: HelpTarget` prop; when present, renders `<HelpLink/>` after the existing action. Existing call sites are unaffected. |
-| [`apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx`](../../../../../apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx) | One `<HelpLink variant="error"/>` in the existing action row. |
-| [`apps/web/src/components/dashboard/AttentionSection.tsx`](../../../../../apps/web/src/components/dashboard/AttentionSection.tsx) | One `<HelpLink variant="error"/>` per attention kind, from a map of the four kinds actually emitted today. |
-| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) | Two additions: `DASHBOARD_HELP = '/help'` and `DASHBOARD_HELP_ARTICLE = (slug: string) => '/help/' + slug`. |
-| [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) + the 20 sibling locale files | The new `dashboard.helpCenter` namespace and `metadata.pages.help` (§8). |
-| The list screens' empty states (Missions, Tasks, Agents, Works, Ideas, Skills, Teams, Memory, Knowledge Base, Plugins, Schedules) | One `helpTarget` prop each. |
-| The command-palette registry from [AW-01](../AW-01-command-palette/plan.md#53-components) | One new client-side source registering the **Help** group. |
+| File                                                                                                                                              | Change                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>)             | Wrap the shell body in `<HelpCenterProvider>`; pass its `currentTarget` into `HelpDrawer`. No change to `useKeyboardShortcuts`, the chat panel, or the existing drawer state.                                                                   |
+| [`apps/web/src/components/dashboard/HelpDrawer.tsx`](../../../../../apps/web/src/components/dashboard/HelpDrawer.tsx)                             | Add `manual` as the first tab id and render `<HelpCenterPanel/>` for it; accept an optional `initialTarget` prop that selects that tab and opens the article. The four existing tabs are moved by exactly one position and otherwise untouched. |
+| [`apps/web/src/components/dashboard/DashboardHeader.tsx`](../../../../../apps/web/src/components/dashboard/DashboardHeader.tsx)                   | Tooltip key only.                                                                                                                                                                                                                               |
+| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx)                 | `profileMenu.helpDocs` opens the manual; a new adjacent row keeps the external documentation link. Nothing removed.                                                                                                                             |
+| [`apps/web/src/components/common/EmptyState.tsx`](../../../../../apps/web/src/components/common/EmptyState.tsx)                                   | One optional `helpTarget?: HelpTarget` prop; when present, renders `<HelpLink/>` after the existing action. Existing call sites are unaffected.                                                                                                 |
+| [`apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx`](../../../../../apps/web/src/components/dashboard/JobRuntimeDegradedBanner.tsx) | One `<HelpLink variant="error"/>` in the existing action row.                                                                                                                                                                                   |
+| [`apps/web/src/components/dashboard/AttentionSection.tsx`](../../../../../apps/web/src/components/dashboard/AttentionSection.tsx)                 | One `<HelpLink variant="error"/>` per attention kind, from a map of the four kinds actually emitted today.                                                                                                                                      |
+| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts)                                                                   | Two additions: `DASHBOARD_HELP = '/help'` and `DASHBOARD_HELP_ARTICLE = (slug: string) => '/help/' + slug`.                                                                                                                                     |
+| [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) + the 20 sibling locale files                                             | The new `dashboard.helpCenter` namespace and `metadata.pages.help` (§8).                                                                                                                                                                        |
+| The list screens' empty states (Missions, Tasks, Agents, Works, Ideas, Skills, Teams, Memory, Knowledge Base, Plugins, Schedules)                 | One `helpTarget` prop each.                                                                                                                                                                                                                     |
+| The command-palette registry from [AW-01](../AW-01-command-palette/plan.md#53-components)                                                         | One new client-side source registering the **Help** group.                                                                                                                                                                                      |
 
 ### 5.3 State and data fetching
 
@@ -626,14 +618,14 @@ packages/tasks/src/tasks/trigger/index.ts                  one registration line
 - **Cadence:** weekly, Mondays at `07:41 UTC` — deliberately staggered off the round hours the
   other scheduled jobs use, matching the existing convention of avoiding a coincident burst.
 - **What it does, in one transaction-free pass:**
-  1. Aggregate `help_article_feedback` for the last 7 days into per-article counts.
-  2. Flag every article with ≥ 10 responses and ≥ 40% negative (spec FR-48).
-  3. Read the article ids and `reviewedAt` dates from the catalogue **as shipped in this build**
-     and flag anything older than 180 days (spec FR-7). When the catalogue is not resolvable from
-     the worker (a self-hosted split deployment), that half of the summary is omitted with a
-     stated reason rather than failing the job.
-  4. Delete rows older than 400 days (spec FR-36).
-  5. Write one activity-log entry summarising the pass.
+    1. Aggregate `help_article_feedback` for the last 7 days into per-article counts.
+    2. Flag every article with ≥ 10 responses and ≥ 40% negative (spec FR-48).
+    3. Read the article ids and `reviewedAt` dates from the catalogue **as shipped in this build**
+       and flag anything older than 180 days (spec FR-7). When the catalogue is not resolvable from
+       the worker (a self-hosted split deployment), that half of the summary is omitted with a
+       stated reason rather than failing the job.
+    4. Delete rows older than 400 days (spec FR-36).
+    5. Write one activity-log entry summarising the pass.
 - **Constitution IV compliance:** the cron is registered through the configured job-runtime
   provider's native cron mechanism. There is **no** `@Cron` decorator on the API process and **no**
   `import '@trigger.dev/sdk'` outside `packages/tasks`. This job is a pure schedule, so it needs no
@@ -753,7 +745,7 @@ Plus one key in the existing metadata namespace: `metadata.pages.help` → `"Hel
 
 **Article titles, summaries and bodies are not translated** (spec FR-39). They are build content,
 never passed through next-intl, and are rendered beneath the `englishOnly` notice when the reader's
-locale is not `en`. Section names *are* translated, because they are chrome.
+locale is not `en`. Section names _are_ translated, because they are chrome.
 
 One string in the existing `dashboard.sidebar.profileMenu` tree gains a sibling for the preserved
 external link; `helpDocs` keeps its key and its position.
@@ -767,14 +759,14 @@ external link; `helpDocs` keeps its key and its position.
 Client-side, through the already-mounted
 [`PostHogProvider.tsx`](../../../../../apps/web/src/components/posthog/PostHogProvider.tsx).
 
-| Event | Properties | Answers |
-| --- | --- | --- |
-| `help_opened` | `source` (`shortcut` \| `header` \| `sidebar` \| `palette` \| `deep_link` \| `url`), `route_group` | Is the manual reachable where people actually get stuck? |
-| `help_search` | `query_length`, `result_count`, `zero_results`, `sections_matched[]`, `degraded` | Is search finding things? Which sections carry the load? |
-| `help_article_opened` | `article_id`, `section`, `source`, `via_heading` | Which articles earn their place. |
-| `help_deep_link_followed` | `target`, `surface` (`empty_state` \| `error_banner` \| `attention_item`) | **The number this epic exists to move.** |
-| `help_feedback_submitted` | `article_id`, `helpful`, `has_note` | Which articles fail their readers. |
-| `help_content_load_failed` | `reason` | How often S-20 fires in the wild. |
+| Event                      | Properties                                                                                         | Answers                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `help_opened`              | `source` (`shortcut` \| `header` \| `sidebar` \| `palette` \| `deep_link` \| `url`), `route_group` | Is the manual reachable where people actually get stuck? |
+| `help_search`              | `query_length`, `result_count`, `zero_results`, `sections_matched[]`, `degraded`                   | Is search finding things? Which sections carry the load? |
+| `help_article_opened`      | `article_id`, `section`, `source`, `via_heading`                                                   | Which articles earn their place.                         |
+| `help_deep_link_followed`  | `target`, `surface` (`empty_state` \| `error_banner` \| `attention_item`)                          | **The number this epic exists to move.**                 |
+| `help_feedback_submitted`  | `article_id`, `helpful`, `has_note`                                                                | Which articles fail their readers.                       |
+| `help_content_load_failed` | `reason`                                                                                           | How often S-20 fires in the wild.                        |
 
 **Never captured:** the query text (spec FR-19, FR-37), the note text, dwell time, scroll depth,
 the article body, or any workspace identifier. No server-side activity-log entry is written when a
@@ -783,17 +775,17 @@ audit trail.
 
 ### 9.2 Failure modes
 
-| Failure | Blast radius | Behaviour |
-| --- | --- | --- |
-| The lazy content chunk 404s or times out | Search quality only | Degrade to title + summary matching over the eager catalogue; footer line; browsing and reading titles unaffected (spec S-20). Reading an article body is unavailable until the chunk resolves — the reader sees the summary plus a retry. |
-| `localStorage` throws | "Recently opened" only | Group omitted. Every access is in `try/catch`. |
-| The version endpoint fails | The stamp only | Stamp omitted entirely; no placeholder, no `undefined` (spec FR-8). |
-| The feedback endpoint is down or the session expired | Feedback only | Six explicit states (spec §6.10). Reading is never blocked. |
-| A generated file is stale in a working tree | Development only | `prebuild --check` fails; `tsc` fails on any `HelpTarget` that changed; the unit spec fails on route drift. Never reaches a release. |
-| An article names a removed screen | Build | Hard failure with the article path and the key (spec FR-5.2). |
-| A help link points at a removed article | Build (`tsc`) and, as a net, runtime | Type error at the call site; at runtime `HelpLink` renders nothing (spec FR-22, S-16). |
-| The weekly job fails | The summary only | Retried by the job runtime; no reader-facing effect; the next run recomputes from the same rows. |
-| A credential is pasted into a note | None | Rejected before storage; the text stays in the field; nothing is logged (spec FR-35). |
+| Failure                                              | Blast radius                         | Behaviour                                                                                                                                                                                                                                  |
+| ---------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The lazy content chunk 404s or times out             | Search quality only                  | Degrade to title + summary matching over the eager catalogue; footer line; browsing and reading titles unaffected (spec S-20). Reading an article body is unavailable until the chunk resolves — the reader sees the summary plus a retry. |
+| `localStorage` throws                                | "Recently opened" only               | Group omitted. Every access is in `try/catch`.                                                                                                                                                                                             |
+| The version endpoint fails                           | The stamp only                       | Stamp omitted entirely; no placeholder, no `undefined` (spec FR-8).                                                                                                                                                                        |
+| The feedback endpoint is down or the session expired | Feedback only                        | Six explicit states (spec §6.10). Reading is never blocked.                                                                                                                                                                                |
+| A generated file is stale in a working tree          | Development only                     | `prebuild --check` fails; `tsc` fails on any `HelpTarget` that changed; the unit spec fails on route drift. Never reaches a release.                                                                                                       |
+| An article names a removed screen                    | Build                                | Hard failure with the article path and the key (spec FR-5.2).                                                                                                                                                                              |
+| A help link points at a removed article              | Build (`tsc`) and, as a net, runtime | Type error at the call site; at runtime `HelpLink` renders nothing (spec FR-22, S-16).                                                                                                                                                     |
+| The weekly job fails                                 | The summary only                     | Retried by the job runtime; no reader-facing effect; the next run recomputes from the same rows.                                                                                                                                           |
+| A credential is pasted into a note                   | None                                 | Rejected before storage; the text stays in the field; nothing is logged (spec FR-35).                                                                                                                                                      |
 
 ---
 
@@ -801,43 +793,43 @@ audit trail.
 
 ### 10.1 Unit — web (Vitest, `apps/web/vitest.config.ts`, glob `src/**/*.unit.spec.{ts,tsx}`)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/src/lib/help/help-catalog.unit.spec.ts` | Every FR-3 limit; unique ids; unique anchors per article; exactly 6 sections; every `documents` key exists in `ROUTES`; none is `DASHBOARD_NOTIFICATIONS`; every `related` id resolves; every article belongs to a rendered section; the FR-9 floor (≥ 18 articles, ≥ 2 per section) |
-| `apps/web/src/lib/help/help-target.unit.spec.ts` | Parse and format of `<article>` and `<article>#<heading>`; an unknown article resolves to `null`; a known article with an unknown heading resolves to the article plus a `headingMissing` flag (spec S-15) |
-| `apps/web/src/lib/help/help-search.unit.spec.ts` | The whole FR-18 score table; the +5 current-screen boost and the 100 cap; tie-breaks; the 20-total / 6-per-section caps; the 2-character floor; diacritic folding; degraded mode returns title and summary matches only |
-| `apps/web/src/lib/help/help-recents.unit.spec.ts` | 5-entry cap; move-to-top on repeat; 90-day expiry; a throwing storage API does not throw into render |
-| `apps/web/src/components/help/HelpCenterPanel.unit.spec.tsx` | browse / results / article / no-results / degraded / index-loading views; `Esc` precedence (article → results → browse → close); re-opening preserves query and scroll (spec S-22) |
-| `apps/web/src/components/help/HelpArticleReader.unit.spec.tsx` | Every block kind renders; no block kind produces raw markup; the "Open the screen" action disables with `Needs owner access`; the English-only notice appears only for non-`en` locales |
+| File                                                           | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/help/help-catalog.unit.spec.ts`              | Every FR-3 limit; unique ids; unique anchors per article; exactly 6 sections; every `documents` key exists in `ROUTES`; none is `DASHBOARD_NOTIFICATIONS`; every `related` id resolves; every article belongs to a rendered section; the FR-9 floor (≥ 18 articles, ≥ 2 per section)                                                                                                                                                                                                                           |
+| `apps/web/src/lib/help/help-target.unit.spec.ts`               | Parse and format of `<article>` and `<article>#<heading>`; an unknown article resolves to `null`; a known article with an unknown heading resolves to the article plus a `headingMissing` flag (spec S-15)                                                                                                                                                                                                                                                                                                     |
+| `apps/web/src/lib/help/help-search.unit.spec.ts`               | The whole FR-18 score table; the +5 current-screen boost and the 100 cap; tie-breaks; the 20-total / 6-per-section caps; the 2-character floor; diacritic folding; degraded mode returns title and summary matches only                                                                                                                                                                                                                                                                                        |
+| `apps/web/src/lib/help/help-recents.unit.spec.ts`              | 5-entry cap; move-to-top on repeat; 90-day expiry; a throwing storage API does not throw into render                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `apps/web/src/components/help/HelpCenterPanel.unit.spec.tsx`   | browse / results / article / no-results / degraded / index-loading views; `Esc` precedence (article → results → browse → close); re-opening preserves query and scroll (spec S-22)                                                                                                                                                                                                                                                                                                                             |
+| `apps/web/src/components/help/HelpArticleReader.unit.spec.tsx` | Every block kind renders; no block kind produces raw markup; the "Open the screen" action disables with `Needs owner access`; the English-only notice appears only for non-`en` locales                                                                                                                                                                                                                                                                                                                        |
 | `apps/web/src/components/help/HelpArticleBlocks.unit.spec.tsx` | **`link` blocks**: an `article` target calls `openHelpAt` in the panel and renders a same-origin link on `/help/[slug]`; a `screen` target renders the `ROUTES` href and disables with `Needs owner access` when unreachable; an `external` target renders `target="_blank"`, `rel="noopener noreferrer"`, the leaving-the-app icon and the `externalLink` accessible text; a stale block with `javascript:`, `http:`, `data:` or an unresolvable article/route renders its label as plain text with no anchor |
-| `apps/web/src/lib/help/help-link-blocks.unit.spec.ts` | Imports the pure `parseArticleBody` the generator exports (the Vitest glob is `src/**/*.unit.spec.*`, so the spec lives beside the catalogue) and runs it over fixture articles: each of the three authored forms produces the exact `HelpLinkBlock`; an inline link, an empty or 81-character label, `/missions`, `http:`, `javascript:`, `data:`, `mailto:`, `//host`, a userinfo URL, a missing article and a missing heading each fail with the article path and line number |
-| `apps/web/src/components/help/HelpLink.unit.spec.tsx` | Renders the empty-state phrase and the error phrase; renders **nothing** for an unresolvable target; never renders as a primary button; calls `openHelpAt` rather than navigating |
-| `apps/web/src/components/help/HelpFeedback.unit.spec.tsx` | All six states in spec §6.10; the note field appears only after **No**; the 500-character cap; disabled while in flight; a second submission replaces rather than adds |
-| `apps/web/src/app/api/help/feedback/route.unit.spec.ts` | `bffProxy` wiring; article-id pattern rejection; note-length rejection; `422` and `429` mapped to the two copy strings without leaking the upstream body |
+| `apps/web/src/lib/help/help-link-blocks.unit.spec.ts`          | Imports the pure `parseArticleBody` the generator exports (the Vitest glob is `src/**/*.unit.spec.*`, so the spec lives beside the catalogue) and runs it over fixture articles: each of the three authored forms produces the exact `HelpLinkBlock`; an inline link, an empty or 81-character label, `/missions`, `http:`, `javascript:`, `data:`, `mailto:`, `//host`, a userinfo URL, a missing article and a missing heading each fail with the article path and line number                               |
+| `apps/web/src/components/help/HelpLink.unit.spec.tsx`          | Renders the empty-state phrase and the error phrase; renders **nothing** for an unresolvable target; never renders as a primary button; calls `openHelpAt` rather than navigating                                                                                                                                                                                                                                                                                                                              |
+| `apps/web/src/components/help/HelpFeedback.unit.spec.tsx`      | All six states in spec §6.10; the note field appears only after **No**; the 500-character cap; disabled while in flight; a second submission replaces rather than adds                                                                                                                                                                                                                                                                                                                                         |
+| `apps/web/src/app/api/help/feedback/route.unit.spec.ts`        | `bffProxy` wiring; article-id pattern rejection; note-length rejection; `422` and `429` mapped to the two copy strings without leaking the upstream body                                                                                                                                                                                                                                                                                                                                                       |
 
 ### 10.2 Unit — API (Jest, `apps/api/jest.config.js`, `rootDir: 'src'`, `*.spec.ts`)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/help/help.controller.spec.ts` | `201` on a valid submission; `400` on a bad article id, an over-length note, and a verdict-less, note-less body; `403` on the health summary for a non-platform-admin; throttle metadata present on the write route |
-| `apps/api/src/help/help-feedback.service.spec.ts` | Upsert replaces rather than inserts for the same `(userId, articleId)`; two S-13 notes from one person both persist (`articleId` NULL); 400-day pruning selects the right rows |
-| `apps/api/src/help/credential-shape.spec.ts` | Rejects the credential shapes we actually issue and the common third-party prefixes; accepts ordinary prose containing the words "key" and "token"; the rejected note appears in no log line |
+| File                                              | Covers                                                                                                                                                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/help/help.controller.spec.ts`       | `201` on a valid submission; `400` on a bad article id, an over-length note, and a verdict-less, note-less body; `403` on the health summary for a non-platform-admin; throttle metadata present on the write route |
+| `apps/api/src/help/help-feedback.service.spec.ts` | Upsert replaces rather than inserts for the same `(userId, articleId)`; two S-13 notes from one person both persist (`articleId` NULL); 400-day pruning selects the right rows                                      |
+| `apps/api/src/help/credential-shape.spec.ts`      | Rejects the credential shapes we actually issue and the common third-party prefixes; accepts ordinary prose containing the words "key" and "token"; the rejected note appears in no log line                        |
 
 ### 10.3 Unit — agent package (Jest)
 
-| File | Covers |
-| --- | --- |
+| File                                                                    | Covers                                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/agent/src/help/__tests__/help-content-health.service.spec.ts` | Per-article aggregation; the ≥ 10 responses / ≥ 40% negative flag boundary (9 responses does not flag; exactly 40% does); staleness at exactly 180 days; the pass still completes with a stated reason when the catalogue is unavailable |
 
 ### 10.4 E2E (Playwright, `apps/web/e2e/`)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/e2e/help-center.spec.ts` | `?` opens the panel from four different screens and is ignored inside a text field; the header control and the sidebar entry open it; browse → article → `Esc` returns to browse; the build stamp matches the footer's version; `/help` and `/help/[slug]` render inside the shell and require a session |
-| `apps/web/e2e/help-search.spec.ts` | 1 character does not search, 2 do; zero network requests are issued during search; result caps; the no-results state and its three actions; blocking the content chunk yields the degraded footer line and title matches |
-| `apps/web/e2e/help-deep-links.spec.ts` | Each wired empty state and the degraded-background-work banner opens the panel in place at the right article and heading with no navigation; a URL with an unknown heading shows the "moved" line; a URL with an unknown article shows the not-in-this-build page carrying the running version |
-| `apps/web/e2e/help-feedback.spec.ts` | Yes then No leaves exactly one response; the note field cap; a credential-shaped note is rejected with the text preserved; the rate-limit copy after the cap |
-| `apps/web/e2e/help-a11y.spec.ts` | Focus trap and focus restoration; arrow-key navigation skipping section headings; the polite result-count announcement; a 375 px viewport renders full-screen with no horizontal page scroll; a right-to-left locale mirrors without overlap |
+| File                                   | Covers                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/e2e/help-center.spec.ts`     | `?` opens the panel from four different screens and is ignored inside a text field; the header control and the sidebar entry open it; browse → article → `Esc` returns to browse; the build stamp matches the footer's version; `/help` and `/help/[slug]` render inside the shell and require a session |
+| `apps/web/e2e/help-search.spec.ts`     | 1 character does not search, 2 do; zero network requests are issued during search; result caps; the no-results state and its three actions; blocking the content chunk yields the degraded footer line and title matches                                                                                 |
+| `apps/web/e2e/help-deep-links.spec.ts` | Each wired empty state and the degraded-background-work banner opens the panel in place at the right article and heading with no navigation; a URL with an unknown heading shows the "moved" line; a URL with an unknown article shows the not-in-this-build page carrying the running version           |
+| `apps/web/e2e/help-feedback.spec.ts`   | Yes then No leaves exactly one response; the note field cap; a credential-shaped note is rejected with the text preserved; the rate-limit copy after the cap                                                                                                                                             |
+| `apps/web/e2e/help-a11y.spec.ts`       | Focus trap and focus restoration; arrow-key navigation skipping section headings; the polite result-count announcement; a 375 px viewport renders full-screen with no horizontal page scroll; a right-to-left locale mirrors without overlap                                                             |
 
 Register every row in [`apps/web/e2e/COVERAGE.md`](../../../../../apps/web/e2e/COVERAGE.md),
 which is hand-maintained per controller and per web route.
@@ -869,8 +861,8 @@ Search in P1 matches **titles, summaries and keywords** from the eager catalogue
 at this corpus size, and it means P1 has no lazy chunk to fail. No database, no API, no background
 job, no palette dependency.
 
-**Done when:** every acceptance-criteria box under *Reaching it*, *Not disagreeing with the build*,
-*Deep links*, *Reading* and *Language, accessibility, layout* is ticked, minus the search rows.
+**Done when:** every acceptance-criteria box under _Reaching it_, _Not disagreeing with the build_,
+_Deep links_, _Reading_ and _Language, accessibility, layout_ is ticked, minus the search rows.
 
 ### P2 — Full-text search and the palette
 
@@ -882,7 +874,7 @@ into the command palette.
 **Depends on:** [AW-01](../AW-01-command-palette/plan.md) for the palette group only. Every other
 part of P2 ships without it.
 
-**Done when:** the *Searching* acceptance rows are ticked and the palette shows a Help group with
+**Done when:** the _Searching_ acceptance rows are ticked and the palette shows a Help group with
 the network disabled.
 
 ### P3 — Feedback, content health, and the mirror
@@ -892,25 +884,25 @@ report control, the weekly content-health job with its 400-day pruning, the prin
 — optionally — `export-help-docs.mjs` writing a mirror into `docs/help/` with a one-time sidebar
 entry in [`apps/docs/sidebarsPlatform.ts`](../../../../../apps/docs/sidebarsPlatform.ts).
 
-**Done when:** the *Feedback* and *Content health* acceptance rows are ticked and the migration has
+**Done when:** the _Feedback_ and _Content health_ acceptance rows are ticked and the migration has
 run on a fresh database and on a database that already has the table.
 
 ---
 
 ## 12. Constitution compliance
 
-| Gate | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | No external integration. The manual is a build artefact; the only network hop is web → our own API. No provider, no credential, no settings schema, no outbound call. |
-| **II — Capability-driven resolution** | ✅ | No plugin id appears anywhere in this epic. Section identifiers are content taxonomy. "Ask the assistant about this" hands off to the existing assistant, which resolves its model through the existing capability resolution. |
-| **III — Source-of-truth repositories** | ✅ | Untouched. The manual is our product documentation, not user content; it never enters a user's data or site repository, and no user content enters the manual. |
-| **IV — Job runtime** | ✅ | The one scheduled job is registered through the configured provider's native cron mechanism in `packages/tasks`. No `@Cron` on the API process, no `@trigger.dev/sdk` import outside `packages/tasks`. A future fan-out variant must declare a `*_DISPATCHER` symbol and register it in `_tasks-symbols.ts` (§6). |
-| **V — Forward-only migrations** | ✅ | One entity, one migration, same PR (§3.2, §3.4). `up()` creates only new objects with `ifNotExists`; `down()` drops only what it created; no data is destroyed and nothing pre-existing is altered. |
-| **VI — Tests are a prerequisite** | ✅ | 9 web unit specs, 3 API specs, 1 agent spec, 5 e2e specs, plus five build-level gates (§10). The catalogue-invariants spec is itself the mechanism for spec FR-5. |
-| **VII — Privacy & secret hygiene** | ✅ | Search query text is never stored or logged (FR-19, FR-37). Notes matching a credential shape are rejected before storage and never logged (FR-35). Feedback notes are platform-admin-only and expire at 400 days. No secret-bearing field is read by any part of this epic. |
-| **VIII — Single source of truth for plugin lists** | ✅ | The manual links to the canonical built-in-plugins document rather than restating counts or lists; the authoring rules in `apps/web/src/content/help/README.md` forbid a plugin count in an article. |
-| **IX — Specs are behaviour-first** | ✅ | [spec.md](./spec.md) contains no file path, class name or code. Every implementation detail — the generator, the union type, the entity, the migration, the job — is in this plan. |
-| **X — Backwards compatibility** | ✅ | Two additive endpoints under a new path, additive-only contracts exports, two additive `ROUTES` constants, one additive optional prop on the shared empty state, one additive drawer tab. Nothing renamed, nothing removed, no existing response shape changed. Article identifiers are never reused (FR-3), so an old link either resolves to the same article or shows the not-in-this-build page. |
+| Gate                                               | Status | Justification                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**                               | ✅     | No external integration. The manual is a build artefact; the only network hop is web → our own API. No provider, no credential, no settings schema, no outbound call.                                                                                                                                                                                                                                |
+| **II — Capability-driven resolution**              | ✅     | No plugin id appears anywhere in this epic. Section identifiers are content taxonomy. "Ask the assistant about this" hands off to the existing assistant, which resolves its model through the existing capability resolution.                                                                                                                                                                       |
+| **III — Source-of-truth repositories**             | ✅     | Untouched. The manual is our product documentation, not user content; it never enters a user's data or site repository, and no user content enters the manual.                                                                                                                                                                                                                                       |
+| **IV — Job runtime**                               | ✅     | The one scheduled job is registered through the configured provider's native cron mechanism in `packages/tasks`. No `@Cron` on the API process, no `@trigger.dev/sdk` import outside `packages/tasks`. A future fan-out variant must declare a `*_DISPATCHER` symbol and register it in `_tasks-symbols.ts` (§6).                                                                                    |
+| **V — Forward-only migrations**                    | ✅     | One entity, one migration, same PR (§3.2, §3.4). `up()` creates only new objects with `ifNotExists`; `down()` drops only what it created; no data is destroyed and nothing pre-existing is altered.                                                                                                                                                                                                  |
+| **VI — Tests are a prerequisite**                  | ✅     | 9 web unit specs, 3 API specs, 1 agent spec, 5 e2e specs, plus five build-level gates (§10). The catalogue-invariants spec is itself the mechanism for spec FR-5.                                                                                                                                                                                                                                    |
+| **VII — Privacy & secret hygiene**                 | ✅     | Search query text is never stored or logged (FR-19, FR-37). Notes matching a credential shape are rejected before storage and never logged (FR-35). Feedback notes are platform-admin-only and expire at 400 days. No secret-bearing field is read by any part of this epic.                                                                                                                         |
+| **VIII — Single source of truth for plugin lists** | ✅     | The manual links to the canonical built-in-plugins document rather than restating counts or lists; the authoring rules in `apps/web/src/content/help/README.md` forbid a plugin count in an article.                                                                                                                                                                                                 |
+| **IX — Specs are behaviour-first**                 | ✅     | [spec.md](./spec.md) contains no file path, class name or code. Every implementation detail — the generator, the union type, the entity, the migration, the job — is in this plan.                                                                                                                                                                                                                   |
+| **X — Backwards compatibility**                    | ✅     | Two additive endpoints under a new path, additive-only contracts exports, two additive `ROUTES` constants, one additive optional prop on the shared empty state, one additive drawer tab. Nothing renamed, nothing removed, no existing response shape changed. Article identifiers are never reused (FR-3), so an old link either resolves to the same article or shows the not-in-this-build page. |
 
 ---
 

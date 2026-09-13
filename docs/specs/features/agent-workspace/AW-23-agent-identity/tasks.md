@@ -28,8 +28,8 @@
 
 ## Phase P1 — The brake and the stated reason
 
-> P1 changes nothing about what an agent *is*. It makes the platform tell the truth about
-> what an agent is *doing*, and makes Pause mean what its label says. Shipped alone it is
+> P1 changes nothing about what an agent _is_. It makes the platform tell the truth about
+> what an agent is _doing_, and makes Pause mean what its label says. Shipped alone it is
 > already the highest-value half of the epic.
 
 ### P1.a — Contracts and data model
@@ -118,7 +118,7 @@
 - [ ] **T8. `AgentHaltClassifier`.**
       Create `packages/agent/src/agents/agent-halt-classifier.ts` — a pure predicate
       `isCredentialFault(input: { statusCode?: number; errorMessage?: string | null }):
-      boolean` over HTTP 401/403 plus a small **closed, provider-agnostic** phrase list.
+boolean` over HTTP 401/403 plus a small **closed, provider-agnostic** phrase list.
       It must default to `false`. It must **never** copy any part of `errorMessage` into
       the returned halt detail; the detail's `subjectLabel` is supplied by the caller from
       a facade-resolved display name.
@@ -183,12 +183,10 @@
       **Done when**: an empty pause body behaves byte-for-byte as today.
 
 - [ ] **T13. Refuse dispatch to a paused agent.**
-      Modify `apps/api/src/agents/agents.controller.ts`:
-      - `assignTask` (line 1482) passes `agentId: id` into `this.dispatchGate.admit(...)`;
-        no other change — a paused agent now returns the existing
-        `{ runId, queued: true, queuedReason: 'agent-paused' }` shape.
-      - `POST :id/run-now` throws a `409` named `AgentPausedError` **before** any run row
-        is created when the agent is paused.
+      Modify `apps/api/src/agents/agents.controller.ts`: - `assignTask` (line 1482) passes `agentId: id` into `this.dispatchGate.admit(...)`;
+      no other change — a paused agent now returns the existing
+      `{ runId, queued: true, queuedReason: 'agent-paused' }` shape. - `POST :id/run-now` throws a `409` named `AgentPausedError` **before** any run row
+      is created when the agent is paused.
       Modify `apps/api/src/agents/sub-agent-delegation.runner.ts` (line ~136, which today
       refuses only `ARCHIVED`) to also refuse `PAUSED` with a named reason written to the
       parent's run log.
@@ -449,7 +447,7 @@
       Enforce `AGENT_PERSONALITY_MAX_BYTES` and run the same secret scan the other five
       files use on write.
       Create `packages/agent/src/agents/__tests__/agent-file.personality.spec.ts`,
-      including **the ETag regression**: a write carrying a hash computed *before* the name
+      including **the ETag regression**: a write carrying a hash computed _before_ the name
       list changed still succeeds, because `contentHash` is stored and returned rather than
       recomputed on read.
       **Done when**: green, and `PUT /api/agents/:id/files/PERSONALITY.md` round-trips.
@@ -544,16 +542,16 @@
 
 ## Task-to-requirement map
 
-| Tasks | Requirements covered |
-| --- | --- |
-| T2, T3, T7, T8 | FR-16, FR-17, FR-31, FR-32, FR-33 |
-| T4, T5, T9, T10, T11, T13 | FR-21 – FR-27, FR-30, NFR-2, NFR-3 |
-| T6, T14, T17, T18 | FR-10 – FR-15, FR-18 – FR-20, NFR-8 |
-| T12, T19, T20 | FR-1 – FR-9, FR-28, FR-29 |
-| T23 – T30 | FR-34 – FR-48 |
-| T33 – T38 | FR-49 – FR-61, FR-63, FR-64 |
-| T37, T38 | FR-62 (surfacing only; the file itself is AW-07) |
-| T21, T31, T39 | Program rule #8 (i18n) |
-| T15, T22, T28, T32, T40, T42 | Constitution VI |
-| T41 | NFR-5, NFR-4 |
-| T3, T25, T34 | Constitution V |
+| Tasks                        | Requirements covered                             |
+| ---------------------------- | ------------------------------------------------ |
+| T2, T3, T7, T8               | FR-16, FR-17, FR-31, FR-32, FR-33                |
+| T4, T5, T9, T10, T11, T13    | FR-21 – FR-27, FR-30, NFR-2, NFR-3               |
+| T6, T14, T17, T18            | FR-10 – FR-15, FR-18 – FR-20, NFR-8              |
+| T12, T19, T20                | FR-1 – FR-9, FR-28, FR-29                        |
+| T23 – T30                    | FR-34 – FR-48                                    |
+| T33 – T38                    | FR-49 – FR-61, FR-63, FR-64                      |
+| T37, T38                     | FR-62 (surfacing only; the file itself is AW-07) |
+| T21, T31, T39                | Program rule #8 (i18n)                           |
+| T15, T22, T28, T32, T40, T42 | Constitution VI                                  |
+| T41                          | NFR-5, NFR-4                                     |
+| T3, T25, T34                 | Constitution V                                   |

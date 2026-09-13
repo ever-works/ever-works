@@ -37,25 +37,25 @@ made legible.
 ## 2. Why now
 
 **The user's question.** An owner who has delegated work to four agents asks, several times a day:
-*"What is happening right now, and what happened while I was in that meeting?"*
+_"What is happening right now, and what happened while I was in that meeting?"_
 
 **What they do today.** They open `/activity`, which is a forensic audit table: 162 distinct
 action types rendered as raw, undifferentiated rows, refreshed by a 5-second poll that silently
-re-renders the whole list under them. It answers *"is there an audit record of X?"* very well. It
+re-renders the whole list under them. It answers _"is there an audit record of X?"_ very well. It
 does not answer either half of the user's actual question:
 
-| The user needs | Activity Log today |
-| --- | --- |
-| A line they can read without decoding | Rows show a raw action token (`agent_run_triggered`) and an untranslated grey badge for every action type outside the original ~15-member set |
-| To know **who** did it | There is no actor column. The acting agent is buried inside a details blob for some action types and absent for others |
-| To be told **what changed since they last looked** | Nothing tracks what the user has already seen. Every visit shows the same undifferentiated list |
-| A summary on return | Nothing exists. The daily Digest is the closest thing, and it is off by default, arrives once a day by notification, and is not a screen |
-| Updates that arrive | A 5-second poll that replaces the list wholesale; a row that lands while the user is mid-scroll shifts the page under their cursor |
-| To watch one agent | There is no per-agent filter; the type-filter dropdown offers ~15 of 162 action types and none of the agent ones |
-| To keep scrolling backwards | Offset pagination with a page-number control, which drifts and duplicates rows as new activity lands at the head |
+| The user needs                                     | Activity Log today                                                                                                                            |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| A line they can read without decoding              | Rows show a raw action token (`agent_run_triggered`) and an untranslated grey badge for every action type outside the original ~15-member set |
+| To know **who** did it                             | There is no actor column. The acting agent is buried inside a details blob for some action types and absent for others                        |
+| To be told **what changed since they last looked** | Nothing tracks what the user has already seen. Every visit shows the same undifferentiated list                                               |
+| A summary on return                                | Nothing exists. The daily Digest is the closest thing, and it is off by default, arrives once a day by notification, and is not a screen      |
+| Updates that arrive                                | A 5-second poll that replaces the list wholesale; a row that lands while the user is mid-scroll shifts the page under their cursor            |
+| To watch one agent                                 | There is no per-agent filter; the type-filter dropdown offers ~15 of 162 action types and none of the agent ones                              |
+| To keep scrolling backwards                        | Offset pagination with a page-number control, which drifts and duplicates rows as new activity lands at the head                              |
 
 **The consequence.** The most interesting things the platform does — an agent picking up a
-mission, finishing a run, hitting a wall and escalating — are recorded but not *legible*. Users
+mission, finishing a run, hitting a wall and escalating — are recorded but not _legible_. Users
 compensate by opening four different pages (agents, missions, tasks, activity) and by asking the
 agent in chat what it did. Trust in autonomous work is built by watching it work; today there is
 nowhere to watch.
@@ -64,7 +64,7 @@ nowhere to watch.
 the two most important things an agent does, and neither reliably reaches the Activity Log today:
 only heartbeat-triggered runs emit start/complete/fail records, and manually or task-triggered
 runs emit only a "triggered" record with no terminal counterpart. A feed of "everything agents do"
-that omits *finished* is not credible. Closing those gaps in the existing subsystem — rather than
+that omits _finished_ is not credible. Closing those gaps in the existing subsystem — rather than
 building a second stream that reads run records directly — is a requirement of this epic.
 
 ## 3. User scenarios
@@ -361,18 +361,18 @@ bound.
 
 ## 5. Key entities
 
-| Concept | New? | Description |
-| --- | --- | --- |
-| **Activity record** | Existing | The single row already written whenever something user-visible happens. The feed reads these and writes none. This epic adds an actor to it. |
-| **Actor** | New attribute on an existing record | Who did the thing: an agent, the user, an external source, or the platform. Carries a display name captured at write time so history does not change when an agent is renamed. |
-| **Feed kind** | New attribute (derived) | One of five buckets — `work`, `decision`, `delivery`, `problem`, `system` — computed from the action type and the outcome. Derived, never stored per row. |
-| **Feed entry** | Not an entity | One activity record rendered as a narrated line. Explicitly **not** a record of its own; the feed introduces no second store. |
-| **Feed read state** | **New entity** | Exactly one per user: the point up to which they have seen the feed, when they last opened it, and whether they dismissed the current away summary. Justified below. |
-| **Away summary** | Not an entity | A computed payload describing an absence. Never stored; recomputed on each open. |
-| **Agent** | Existing | The primary actor and the primary filter dimension. Its name, avatar and status are read for the feed's actor chips. |
-| **Run** | Existing | One agent execution. Feed entries about runs link to the run's receipt, which [AW-09](../AW-09-runs-receipts/) owns. |
-| **Approval / Escalation** | Existing | The `decision` kind's source. Feed entries about them link to My Decisions, which [AW-03](../AW-03-decision-queue/) owns. |
-| **Organization / Workspace scope** | Existing | Bounds every read. Activity in a non-active organization is invisible to the feed. |
+| Concept                            | New?                                | Description                                                                                                                                                                    |
+| ---------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Activity record**                | Existing                            | The single row already written whenever something user-visible happens. The feed reads these and writes none. This epic adds an actor to it.                                   |
+| **Actor**                          | New attribute on an existing record | Who did the thing: an agent, the user, an external source, or the platform. Carries a display name captured at write time so history does not change when an agent is renamed. |
+| **Feed kind**                      | New attribute (derived)             | One of five buckets — `work`, `decision`, `delivery`, `problem`, `system` — computed from the action type and the outcome. Derived, never stored per row.                      |
+| **Feed entry**                     | Not an entity                       | One activity record rendered as a narrated line. Explicitly **not** a record of its own; the feed introduces no second store.                                                  |
+| **Feed read state**                | **New entity**                      | Exactly one per user: the point up to which they have seen the feed, when they last opened it, and whether they dismissed the current away summary. Justified below.           |
+| **Away summary**                   | Not an entity                       | A computed payload describing an absence. Never stored; recomputed on each open.                                                                                               |
+| **Agent**                          | Existing                            | The primary actor and the primary filter dimension. Its name, avatar and status are read for the feed's actor chips.                                                           |
+| **Run**                            | Existing                            | One agent execution. Feed entries about runs link to the run's receipt, which [AW-09](../AW-09-runs-receipts/) owns.                                                           |
+| **Approval / Escalation**          | Existing                            | The `decision` kind's source. Feed entries about them link to My Decisions, which [AW-03](../AW-03-decision-queue/) owns.                                                      |
+| **Organization / Workspace scope** | Existing                            | Bounds every read. Activity in a non-active organization is invisible to the feed.                                                                                             |
 
 ### 5.1 Why one new entity is justified
 
@@ -381,7 +381,7 @@ record is written once and read many times; it cannot live in browser storage, b
 of the feature is that the divider and the away summary are the same on a phone and a laptop; and
 it cannot be derived from anything that exists, because nothing today records that a human looked
 at something. One row per user, holding a marker and two timestamps, is the smallest possible shape
-that satisfies the behaviour. It introduces no new vocabulary: it is state *about* the Live Feed,
+that satisfies the behaviour. It introduces no new vocabulary: it is state _about_ the Live Feed,
 not a new noun in the product.
 
 ### 5.2 States and transitions
@@ -612,54 +612,54 @@ on each agent.
 
 ### 6.9 Exact user-visible copy
 
-| Where | Copy |
-| --- | --- |
-| Page title | `Live Feed` |
-| Page subtitle | `Everything your agents are doing, as it happens.` |
-| Navigation label | `Live Feed` |
-| Live indicator | `Live` |
-| Connecting indicator | `Connecting…` |
-| Mark-all action | `Mark all seen` |
-| Divider | `New · {count}` |
-| New-entries pill | `↑ {count} new` |
-| Away card heading | `While you were away` |
-| Away card lead | `You were away for {duration}. {count} things happened.` |
-| Away card truncation | `Showing the last 7 days — you were away for {duration}.` |
-| Away card scan cap | `Counts are based on the most recent 1,000 entries.` |
-| Away card kinds | `{work} work · {decision} decisions waiting · {delivery} delivered · {problem} failed · {system} system` |
-| Away card actors | `{list} · and {count} others` |
-| Away card actions | `Show the {count} failures` / `Show the {count} decisions` |
-| Away card failed | `We couldn't summarise your time away.` / `The feed below is complete and up to date.` / `Retry` |
-| Filter bar labels | `Agents:` / `Kinds:` / `Only failed` |
-| Agent overflow | `Watch agents` / `Search agents` / `{selected} of 20 selected` / `Clear all` / `Done` |
-| Agent limit | `You can watch up to 20 agents at once. Deselect one to add another.` |
-| Load control | `Load older` |
-| End of history | `That's the last 90 days` / `Older records live in your Activity log.` / `Open the Activity log` |
-| Empty — never | `Nothing has happened yet` / `When your agents pick up work, finish a run, publish a document or need a decision from you, it shows up here — live.` / `Create an agent` / `Start a mission` |
-| Empty — filtered | `No activity from the agents you picked` / `Nothing matched in the last 90 days. New activity will still appear here as it happens.` / `Clear filters` |
-| Load error | `We couldn't load the feed` / `Nothing was lost — every entry is still in your Activity log.` / `Try again` / `Open the Activity log` |
-| Reconnecting | `Live updates paused — reconnecting…` |
-| Degraded | `Live updates unavailable — refreshing every 10s` / `Try live again` |
-| Other tab | `Live updates are open in another tab — refreshing every 10s` |
-| Generic narration | `{actor} · {action}` |
-| Relative time | `just now` / `{n}m ago` / `{n}h ago` / `Yesterday {time}` / `{date}` |
+| Where                | Copy                                                                                                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page title           | `Live Feed`                                                                                                                                                                                  |
+| Page subtitle        | `Everything your agents are doing, as it happens.`                                                                                                                                           |
+| Navigation label     | `Live Feed`                                                                                                                                                                                  |
+| Live indicator       | `Live`                                                                                                                                                                                       |
+| Connecting indicator | `Connecting…`                                                                                                                                                                                |
+| Mark-all action      | `Mark all seen`                                                                                                                                                                              |
+| Divider              | `New · {count}`                                                                                                                                                                              |
+| New-entries pill     | `↑ {count} new`                                                                                                                                                                              |
+| Away card heading    | `While you were away`                                                                                                                                                                        |
+| Away card lead       | `You were away for {duration}. {count} things happened.`                                                                                                                                     |
+| Away card truncation | `Showing the last 7 days — you were away for {duration}.`                                                                                                                                    |
+| Away card scan cap   | `Counts are based on the most recent 1,000 entries.`                                                                                                                                         |
+| Away card kinds      | `{work} work · {decision} decisions waiting · {delivery} delivered · {problem} failed · {system} system`                                                                                     |
+| Away card actors     | `{list} · and {count} others`                                                                                                                                                                |
+| Away card actions    | `Show the {count} failures` / `Show the {count} decisions`                                                                                                                                   |
+| Away card failed     | `We couldn't summarise your time away.` / `The feed below is complete and up to date.` / `Retry`                                                                                             |
+| Filter bar labels    | `Agents:` / `Kinds:` / `Only failed`                                                                                                                                                         |
+| Agent overflow       | `Watch agents` / `Search agents` / `{selected} of 20 selected` / `Clear all` / `Done`                                                                                                        |
+| Agent limit          | `You can watch up to 20 agents at once. Deselect one to add another.`                                                                                                                        |
+| Load control         | `Load older`                                                                                                                                                                                 |
+| End of history       | `That's the last 90 days` / `Older records live in your Activity log.` / `Open the Activity log`                                                                                             |
+| Empty — never        | `Nothing has happened yet` / `When your agents pick up work, finish a run, publish a document or need a decision from you, it shows up here — live.` / `Create an agent` / `Start a mission` |
+| Empty — filtered     | `No activity from the agents you picked` / `Nothing matched in the last 90 days. New activity will still appear here as it happens.` / `Clear filters`                                       |
+| Load error           | `We couldn't load the feed` / `Nothing was lost — every entry is still in your Activity log.` / `Try again` / `Open the Activity log`                                                        |
+| Reconnecting         | `Live updates paused — reconnecting…`                                                                                                                                                        |
+| Degraded             | `Live updates unavailable — refreshing every 10s` / `Try live again`                                                                                                                         |
+| Other tab            | `Live updates are open in another tab — refreshing every 10s`                                                                                                                                |
+| Generic narration    | `{actor} · {action}`                                                                                                                                                                         |
+| Relative time        | `just now` / `{n}m ago` / `{n}h ago` / `Yesterday {time}` / `{date}`                                                                                                                         |
 
 ### 6.10 Keyboard
 
 All keys are single-press and active only when no text input has focus.
 
-| Key | Action |
-| --- | --- |
-| `j` | Move selection to the next (older) entry |
-| `k` | Move selection to the previous (newer) entry |
-| `Enter` or `o` | Open the selected entry's destination |
-| `Esc` | Clear the selection; close the agent picker |
-| `t` | Jump to the top and release any queued entries |
-| `m` | Mark all seen |
-| `a` | Open the agent picker |
-| `1`–`5` | Toggle the corresponding kind chip |
-| `x` | Toggle **Only failed** |
-| `Shift`+`L` | Load the next older page |
+| Key            | Action                                         |
+| -------------- | ---------------------------------------------- |
+| `j`            | Move selection to the next (older) entry       |
+| `k`            | Move selection to the previous (newer) entry   |
+| `Enter` or `o` | Open the selected entry's destination          |
+| `Esc`          | Clear the selection; close the agent picker    |
+| `t`            | Jump to the top and release any queued entries |
+| `m`            | Mark all seen                                  |
+| `a`            | Open the agent picker                          |
+| `1`–`5`        | Toggle the corresponding kind chip             |
+| `x`            | Toggle **Only failed**                         |
+| `Shift`+`L`    | Load the next older page                       |
 
 Accessibility requirements that are part of this spec, not decoration:
 
@@ -740,7 +740,7 @@ Accessibility requirements that are part of this spec, not decoration:
 
 - `[NEEDS CLARIFICATION: Ordering under clock skew.]` The seen marker is a point in time. Two API
   instances with a small clock difference, or a worker that backdates a record it is catching up on,
-  can insert a record slightly *before* the marker after the marker has advanced — that record would
+  can insert a record slightly _before_ the marker after the marker has advanced — that record would
   never be counted as unseen. Accepting a few seconds of exposure is the cheap answer; a
   monotonically increasing sequence number on activity records is the correct one but is a wider
   change to a hot audit table. Which do we take?

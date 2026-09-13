@@ -41,8 +41,8 @@ gracefully rather than breaking the inbox.
 
 ### 2.1 The user's question
 
-> *"My Agent is supposed to be handling my supplier mail. Did it? What did it say? What is it
-> about to say? And how do I stop it before it says something dumb?"*
+> _"My Agent is supposed to be handling my supplier mail. Did it? What did it say? What is it
+> about to say? And how do I stop it before it says something dumb?"_
 
 Today an Ever Works owner cannot answer any of those four questions from the product.
 
@@ -50,24 +50,24 @@ Today an Ever Works owner cannot answer any of those four questions from the pro
 
 Email exists in Ever Works, and a lot of it works well. Addresses are registered per tenant and
 bound to a provider plugin; five provider plugins ship; inbound webhooks are
-signature-verified against the *owning tenant's* secret; delivery events fold onto a message
+signature-verified against the _owning tenant's_ secret; delivery events fold onto a message
 row; per-agent conversation threading is implemented; outbound sends record a usage event; and
 two independent IDOR fixes have already landed on the send path. The gap is not plumbing.
 
 The gap is that **there is no loop, no ceiling, and no front door**:
 
-| The owner wants to | Today | Consequence |
-| --- | --- | --- |
-| See their Agent's mail | `/agents/{id}/inbox` exists and works — but no tab, no route constant, and nothing anywhere links to it | The page is reachable only by typing the URL. In practice, invisible. |
-| Give an Agent an address | Not possible from any surface. There is no API and no UI for the per-agent binding | The binding can only be created by writing a row to the database by hand. |
-| Verify an address | The confirm-token endpoint is implemented and tested — but nothing ever transmits a token | An address can only become verified by an out-of-band call. |
-| Read mail as conversations | The message list is a flat table of the last 50 rows, one row per message | A five-message thread reads as five unrelated rows. |
-| Approve before sending | There is no pre-send state at all. `deliveryStatus` is post-send provider telemetry | An Agent with the send tool sends immediately. A human composing sends immediately. |
-| Stop a runaway | Nothing. The compose/send endpoint carries no rate limit, no per-inbox cap, no per-workspace cap | One prompt-injected loop is an unbounded outbound mail cannon on the workspace's domain reputation. |
-| Say who may write to it | Nothing. Every inbound message reaches the Agent's reasoning | Every internet sender has a direct line into an LLM prompt. |
-| Send from their own domain | Nothing. One free-text `defaultSenderDomain` field exists in one plugin's settings and is read nowhere | Every Agent sends from a provider-shaped address. |
-| Send later | Nothing | "Reply at 9am their time" is not expressible. |
-| See what it cost | The send records a usage event, but no surface joins it back to the Run | Program rule #9 is unmet for the highest-frequency surface. |
+| The owner wants to         | Today                                                                                                   | Consequence                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| See their Agent's mail     | `/agents/{id}/inbox` exists and works — but no tab, no route constant, and nothing anywhere links to it | The page is reachable only by typing the URL. In practice, invisible.                               |
+| Give an Agent an address   | Not possible from any surface. There is no API and no UI for the per-agent binding                      | The binding can only be created by writing a row to the database by hand.                           |
+| Verify an address          | The confirm-token endpoint is implemented and tested — but nothing ever transmits a token               | An address can only become verified by an out-of-band call.                                         |
+| Read mail as conversations | The message list is a flat table of the last 50 rows, one row per message                               | A five-message thread reads as five unrelated rows.                                                 |
+| Approve before sending     | There is no pre-send state at all. `deliveryStatus` is post-send provider telemetry                     | An Agent with the send tool sends immediately. A human composing sends immediately.                 |
+| Stop a runaway             | Nothing. The compose/send endpoint carries no rate limit, no per-inbox cap, no per-workspace cap        | One prompt-injected loop is an unbounded outbound mail cannon on the workspace's domain reputation. |
+| Say who may write to it    | Nothing. Every inbound message reaches the Agent's reasoning                                            | Every internet sender has a direct line into an LLM prompt.                                         |
+| Send from their own domain | Nothing. One free-text `defaultSenderDomain` field exists in one plugin's settings and is read nowhere  | Every Agent sends from a provider-shaped address.                                                   |
+| Send later                 | Nothing                                                                                                 | "Reply at 9am their time" is not expressible.                                                       |
+| See what it cost           | The send records a usage event, but no surface joins it back to the Run                                 | Program rule #9 is unmet for the highest-frequency surface.                                         |
 
 ### 2.3 What owners do instead today
 
@@ -119,7 +119,7 @@ design.
 ### 3.1 Primary scenarios
 
 - **S1 — Give an Agent an address.**
-  **Given** I own an Agent named *Nova* and my workspace has an email provider connection,
+  **Given** I own an Agent named _Nova_ and my workspace has an email provider connection,
   **when** I open Nova's Inbox tab and press **Give Nova an address**,
   **then** the platform provisions `nova@northwind.agents.ever.works`, shows it on the page
   within 10 seconds, and the inbox opens in **Draft for review** mode with the shipped starter
@@ -144,7 +144,7 @@ design.
   **Given** a Draft whose second paragraph is wrong,
   **when** I click into the body, fix the paragraph and press **Approve & send**,
   **then** what is sent is exactly what I edited, the message detail keeps both my version and
-  the Agent's original under **Version history**, and — because *Learn from my edits* is on for
+  the Agent's original under **Version history**, and — because _Learn from my edits_ is on for
   this inbox — the platform offers the correction to Nova's Memory as a writing-style fact with
   a one-click **Don't learn this** on the confirmation toast.
 
@@ -163,7 +163,7 @@ design.
   thread already referenced.
 
 - **S7 — Scheduled send with cancel.**
-  **Given** I ask Nova in chat to *"send this tomorrow at 9am the recipient's time"*,
+  **Given** I ask Nova in chat to _"send this tomorrow at 9am the recipient's time"_,
   **when** the draft is approved,
   **then** the card shows **Scheduled** with the absolute local time, the recipient's timezone,
   a live countdown, and a **Cancel send** button; pressing Cancel any time before it fires
@@ -251,7 +251,7 @@ design.
   **Given** three inboxes send from `northwind.example.com`,
   **when** I remove the domain,
   **then** I first see `3 inboxes send from this domain. They will fall back to the default
-  sending domain and keep receiving at their old address for 30 days.`; on confirm, sending
+sending domain and keep receiving at their old address for 30 days.`; on confirm, sending
   continues from the platform default and no inbox breaks.
 
 - **S20 — Empty states.**
@@ -300,7 +300,7 @@ Every default, limit, threshold and cadence below is a number, not an adjective.
 - **FR-5** The system MUST retain at most **5** previous addresses per inbox as receiving
   aliases, expiring each **30 days** after it was replaced.
 - **FR-6** An Agent Inbox MUST carry: an address, a sending domain, standing instructions, a
-  mode, a send cap, a *learn from my edits* flag, an allow-list mode, and a set of rules.
+  mode, a send cap, a _learn from my edits_ flag, an allow-list mode, and a set of rules.
 - **FR-7** Deleting an Agent Inbox MUST stop inbound delivery immediately, cancel every
   outstanding scheduled send on it, leave every thread and message readable, and MUST NOT delete
   the Agent.
@@ -325,7 +325,7 @@ Every default, limit, threshold and cadence below is a number, not an adjective.
 - **FR-14** A thread row MUST show, before it is opened: the owning Agent, the other party, the
   subject, relative time, the message count, an attachment indicator when any message in the
   thread has attachments, unread state, and the thread's most significant state badge (Escalated
-  > Draft > Scheduled > Failed > Sent > Received).
+    > Draft > Scheduled > Failed > Sent > Received).
 - **FR-15** The thread view MUST show one card per message, newest last, each carrying its status
   badge, its sender and recipients, its timestamp and its attachment list; quoted history MUST be
   collapsed by default with an expand control.
@@ -359,7 +359,7 @@ Every default, limit, threshold and cadence below is a number, not an adjective.
   what was on screen at approval.
 - **FR-27** The system MUST keep the last **10** versions of a draft, each stamped with who or
   what produced it, viewable as **Version history**.
-- **FR-28** When *Learn from my edits* is on (default **on**), an approved edit MUST offer the
+- **FR-28** When _Learn from my edits_ is on (default **on**), an approved edit MUST offer the
   before/after pair to the Agent's Memory as a writing-style fact, with a **Don't learn this**
   control on the confirmation toast and a per-inbox off switch.
 - **FR-29** **Revise with <Agent>** MUST accept up to **2,000** characters of notes, start a Run,
@@ -424,7 +424,7 @@ Every default, limit, threshold and cadence below is a number, not an adjective.
   and the rule.
 - **FR-53** Precedence MUST be, in order: **inbox scope beats workspace scope**, then
   **exact address beats domain**, then **allow beats block**. The winning rule alone decides.
-- **FR-54** An **empty** allow-list MUST mean *no restriction*, never *allow nothing*.
+- **FR-54** An **empty** allow-list MUST mean _no restriction_, never _allow nothing_.
 - **FR-55** A non-empty allow-list's meaning MUST be explicit per inbox via an **allow-list mode**:
   `additive` (default — allow rules only override blocks; an unmatched address is permitted) or
   `exclusive` (an address matching no allow rule for that direction is refused).
@@ -442,14 +442,14 @@ Every default, limit, threshold and cadence below is a number, not an adjective.
 - **FR-60** The system MUST enforce these ceilings at send time, in the single code path every
   send converges on:
 
-  | Scope | Limit | Window | Default | Settable |
-  | --- | --- | --- | --- | --- |
-  | One inbox | sends | rolling 24 hours | **100** | yes, **1–1000**, by the workspace owner |
-  | One inbox | sends | rolling 60 seconds | **10** | no |
-  | One inbox | distinct recipients | rolling 300 seconds | **20** | no |
-  | Workspace | sends | rolling 24 hours | **500** | platform operator only |
-  | Workspace | sends | rolling 30 days | **10,000** | platform operator only |
-  | One message | recipients (to + cc + bcc) | — | **50** | no |
+    | Scope       | Limit                      | Window              | Default    | Settable                                |
+    | ----------- | -------------------------- | ------------------- | ---------- | --------------------------------------- |
+    | One inbox   | sends                      | rolling 24 hours    | **100**    | yes, **1–1000**, by the workspace owner |
+    | One inbox   | sends                      | rolling 60 seconds  | **10**     | no                                      |
+    | One inbox   | distinct recipients        | rolling 300 seconds | **20**     | no                                      |
+    | Workspace   | sends                      | rolling 24 hours    | **500**    | platform operator only                  |
+    | Workspace   | sends                      | rolling 30 days     | **10,000** | platform operator only                  |
+    | One message | recipients (to + cc + bcc) | —                   | **50**     | no                                      |
 
 - **FR-61** Windows MUST be **rolling**, not calendar. Capacity returns continuously as sends age
   out — never in a batch at midnight.
@@ -507,14 +507,14 @@ Every default, limit, threshold and cadence below is a number, not an adjective.
 
 - **FR-83** These events MUST be notifiable, with these shipped defaults:
 
-  | Event | In-app | Email to the owner |
-  | --- | --- | --- |
-  | An Agent drafted a reply for review | **on** | off |
-  | An Agent's inbox received mail | **on** | off |
-  | An Agent escalated a decision | **on** | **on** |
-  | A send was refused by a cap or a rule | **on** | **on** |
-  | A message bounced | **on** | off (3 in 24h → **on**) |
-  | A sending domain verified, or stopped verifying | **on** | **on** |
+    | Event                                           | In-app | Email to the owner      |
+    | ----------------------------------------------- | ------ | ----------------------- |
+    | An Agent drafted a reply for review             | **on** | off                     |
+    | An Agent's inbox received mail                  | **on** | off                     |
+    | An Agent escalated a decision                   | **on** | **on**                  |
+    | A send was refused by a cap or a rule           | **on** | **on**                  |
+    | A message bounced                               | **on** | off (3 in 24h → **on**) |
+    | A sending domain verified, or stopped verifying | **on** | **on**                  |
 
 - **FR-84** Every message — received, drafted, revised, approved, scheduled, cancelled, sent,
   failed, escalated, discarded — MUST be recoverable from the audit trail with the actor, the
@@ -539,26 +539,26 @@ Every default, limit, threshold and cadence below is a number, not an adjective.
 
 ### 5.1 Existing — extended, never renamed
 
-| Entity | Today | This epic adds |
-| --- | --- | --- |
-| **Agent** | The person-shaped worker | Optionally owns one Agent Inbox |
-| **Tenant email address** | Registry of provider-bound addresses | Unchanged; an Agent Inbox points at one |
-| **Agent email assignment** | Per-agent address binding with priority and dispatch mode | Unchanged; it stays the many-to-many join. Policy moves to the Agent Inbox |
-| **Email message** | Per-message audit row with post-send delivery status | A pre-send **status**, unread state, scheduling fields, draft version history, thread membership for outbound messages, attachment metadata |
-| **Email conversation** | Per-agent thread keyed on reply headers or subject | Becomes the universal grouping unit for inbound **and** outbound; gains subject, counts, unread count, state and escalation link |
-| **Approval** | Pending agent-action proposal, surfaced in My Decisions | A new proposal kind for an email draft |
-| **Escalation** | The record of an Agent giving up, surfaced in My Decisions | A new reason for an email the Agent refused to answer |
-| **Run** | One agent execution | Linked from every message it produced |
-| **Memory** | Durable facts | Receives writing-style facts learned from approved edits |
-| **Plugin / Connection** | Provider plugins and accounts | Sending-domain description and verification become plugin capabilities |
+| Entity                     | Today                                                      | This epic adds                                                                                                                              |
+| -------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent**                  | The person-shaped worker                                   | Optionally owns one Agent Inbox                                                                                                             |
+| **Tenant email address**   | Registry of provider-bound addresses                       | Unchanged; an Agent Inbox points at one                                                                                                     |
+| **Agent email assignment** | Per-agent address binding with priority and dispatch mode  | Unchanged; it stays the many-to-many join. Policy moves to the Agent Inbox                                                                  |
+| **Email message**          | Per-message audit row with post-send delivery status       | A pre-send **status**, unread state, scheduling fields, draft version history, thread membership for outbound messages, attachment metadata |
+| **Email conversation**     | Per-agent thread keyed on reply headers or subject         | Becomes the universal grouping unit for inbound **and** outbound; gains subject, counts, unread count, state and escalation link            |
+| **Approval**               | Pending agent-action proposal, surfaced in My Decisions    | A new proposal kind for an email draft                                                                                                      |
+| **Escalation**             | The record of an Agent giving up, surfaced in My Decisions | A new reason for an email the Agent refused to answer                                                                                       |
+| **Run**                    | One agent execution                                        | Linked from every message it produced                                                                                                       |
+| **Memory**                 | Durable facts                                              | Receives writing-style facts learned from approved edits                                                                                    |
+| **Plugin / Connection**    | Provider plugins and accounts                              | Sending-domain description and verification become plugin capabilities                                                                      |
 
 ### 5.2 New — and why each is genuinely new
 
-| Entity | Definition | Why it cannot be an existing noun |
-| --- | --- | --- |
-| **Agent Inbox** | An Agent's mail identity **and** the policy attached to it: address, sending domain, standing instructions, mode, caps, allow-list mode, learn-from-edits flag | The tenant address registry is tenant-scoped and provider-shaped; the agent–address assignment is legitimately many-to-many and per-direction. Neither is 1:1 with an Agent, and neither can own per-agent policy without becoming two things at once. Putting these on the Agent would give every Agent eight nullable mail columns it will never use. |
-| **Email rule** | One allow or block entry: type, match, direction, scope, with match counters | Not a policy matrix row (those govern merges and tool grants), not a notification preference. It is evaluated in the mail path, upstream of the model, and needs its own precedence semantics. |
-| **Sending domain** | A workspace-owned domain for outbound mail: DNS records, verification state, last check, failure reason | The existing custom-domain concept describes the domain a **published website** is served from and is bound to a deployment provider. A sending domain is bound to an **email** provider and needs SPF/DKIM/DMARC-shaped records and continuous re-verification. Overloading one entity would put website-deployment state and mail-reputation state in one row. |
+| Entity             | Definition                                                                                                                                                     | Why it cannot be an existing noun                                                                                                                                                                                                                                                                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent Inbox**    | An Agent's mail identity **and** the policy attached to it: address, sending domain, standing instructions, mode, caps, allow-list mode, learn-from-edits flag | The tenant address registry is tenant-scoped and provider-shaped; the agent–address assignment is legitimately many-to-many and per-direction. Neither is 1:1 with an Agent, and neither can own per-agent policy without becoming two things at once. Putting these on the Agent would give every Agent eight nullable mail columns it will never use.          |
+| **Email rule**     | One allow or block entry: type, match, direction, scope, with match counters                                                                                   | Not a policy matrix row (those govern merges and tool grants), not a notification preference. It is evaluated in the mail path, upstream of the model, and needs its own precedence semantics.                                                                                                                                                                   |
+| **Sending domain** | A workspace-owned domain for outbound mail: DNS records, verification state, last check, failure reason                                                        | The existing custom-domain concept describes the domain a **published website** is served from and is bound to a deployment provider. A sending domain is bound to an **email** provider and needs SPF/DKIM/DMARC-shaped records and continuous re-verification. Overloading one entity would put website-deployment state and mail-reputation state in one row. |
 
 ### 5.3 States and transitions
 
@@ -934,22 +934,22 @@ Remove confirmation:
 
 ### 6.10 Keyboard affordances
 
-| Key | Where | Does |
-| --- | --- | --- |
-| `g` then `e` | anywhere | Go to Email |
-| `j` / `k` or `↓` / `↑` | thread list | Move selection |
-| `Enter` | thread list | Open the thread |
-| `Esc` | thread view / any dialog | Back to the list / close |
-| `1` … `6` | Email screen | Received / Sent / Unread / Drafts / Escalations / Scheduled |
-| `[` / `]` | Email screen | Previous / next inbox in the switcher |
-| `u` | thread list or thread | Toggle unread |
-| `a` | a focused draft | Approve & send (the 5-second Undo toast is the safety net) |
-| `r` | a focused draft | Revise with the Agent (opens the notes dialog, focus in the field) |
-| `s` | a focused draft | Schedule… |
-| `d` | a focused draft | Discard (confirms) |
-| `c` | Email screen | Compose |
-| `/` | Email screen | Focus search |
-| `?` | Email screen | Show this list |
+| Key                    | Where                    | Does                                                               |
+| ---------------------- | ------------------------ | ------------------------------------------------------------------ |
+| `g` then `e`           | anywhere                 | Go to Email                                                        |
+| `j` / `k` or `↓` / `↑` | thread list              | Move selection                                                     |
+| `Enter`                | thread list              | Open the thread                                                    |
+| `Esc`                  | thread view / any dialog | Back to the list / close                                           |
+| `1` … `6`              | Email screen             | Received / Sent / Unread / Drafts / Escalations / Scheduled        |
+| `[` / `]`              | Email screen             | Previous / next inbox in the switcher                              |
+| `u`                    | thread list or thread    | Toggle unread                                                      |
+| `a`                    | a focused draft          | Approve & send (the 5-second Undo toast is the safety net)         |
+| `r`                    | a focused draft          | Revise with the Agent (opens the notes dialog, focus in the field) |
+| `s`                    | a focused draft          | Schedule…                                                          |
+| `d`                    | a focused draft          | Discard (confirms)                                                 |
+| `c`                    | Email screen             | Compose                                                            |
+| `/`                    | Email screen             | Focus search                                                       |
+| `?`                    | Email screen             | Show this list                                                     |
 
 Every control is reachable by `Tab` in visual order; state badges carry text, never colour alone;
 the countdown is announced politely to screen readers at 1h, 10m and 1m rather than every second.
@@ -961,7 +961,7 @@ the countdown is announced politely to screen readers at 1h, 10m and 1m rather t
 - **Bulk campaigns, newsletters and marketing sequences.** Different discipline, different
   deliverability stack, different consent model. The caps in FR-60 deliberately make this
   impossible, and that is a feature.
-- **Sending or downloading attachments.** This epic records inbound attachment *metadata*
+- **Sending or downloading attachments.** This epic records inbound attachment _metadata_
   (filename, type, size, up to 25 per message) and shows it. Storing, serving and sending
   attachment content is a follow-up.
 - **A rich HTML composer.** Drafts and Compose are plain text plus the existing server-rendered
@@ -987,6 +987,7 @@ the countdown is announced politely to screen readers at 1h, 10m and 1m rather t
 A reviewer can run this list top to bottom against a merged build.
 
 **Provisioning and identity**
+
 - [ ] Provisioning an inbox from the Agent's Inbox tab yields a live address within 10 seconds.
 - [ ] A second provisioning attempt returns the same inbox and does not error.
 - [ ] Editing the local part keeps the old address receiving; the settings page states the expiry
@@ -994,6 +995,7 @@ A reviewer can run this list top to bottom against a merged build.
 - [ ] The Agent detail page has an Inbox tab, and the Email screen is reachable from the sidebar.
 
 **Threads and views**
+
 - [ ] A five-message conversation renders as one thread with a message count, not five rows.
 - [ ] The All-inboxes view lists every readable inbox with per-inbox unread counts and an All row.
 - [ ] All six filters return the right set and are reflected in the URL.
@@ -1003,6 +1005,7 @@ A reviewer can run this list top to bottom against a merged build.
       **Load images** is pressed.
 
 **The draft loop**
+
 - [ ] With the inbox in Draft for review, an Agent calling its send tool produces a draft and
       sends nothing — verified by asserting no provider call was made.
 - [ ] Approve & send shows a 5-second Undo; Undo returns the message to draft and sends nothing.
@@ -1015,12 +1018,14 @@ A reviewer can run this list top to bottom against a merged build.
 - [ ] Every draft appears in My Decisions, and approving there sends exactly once.
 
 **Escalations**
+
 - [ ] An escalated thread sends nothing while open.
 - [ ] The escalation appears on the thread, in the Escalations filter and in My Decisions.
 - [ ] Dismiss resolves it everywhere within one refresh; Instruct opens the Agent's chat with the
       thread referenced.
 
 **Scheduled sends**
+
 - [ ] A scheduled send shows a countdown, the absolute time and the recipient timezone.
 - [ ] Cancel returns it to draft and releases the held capacity, visible on the cap meter.
 - [ ] Cancelling after the send has started is refused with the stated copy and produces no
@@ -1029,6 +1034,7 @@ A reviewer can run this list top to bottom against a merged build.
 - [ ] The 201st scheduled send on one inbox is refused, naming the limit.
 
 **Rules**
+
 - [ ] A blocked sender produces no thread, no Run and no model call — asserted, not assumed.
 - [ ] The precedence chain resolves the workspace-block / inbox-exact-allow conflict in favour of
       allow.
@@ -1040,6 +1046,7 @@ A reviewer can run this list top to bottom against a merged build.
 - [ ] Blocked mail is readable in the Blocked view for 30 days and unreachable by any Agent.
 
 **Caps**
+
 - [ ] The 101st send in 24 hours is refused from every path: agent tool, agent-to-agent message,
       human Compose, approved draft and scheduled fire.
 - [ ] The refusal names the limit, the count, the ceiling and when capacity returns.
@@ -1054,6 +1061,7 @@ A reviewer can run this list top to bottom against a merged build.
       any counter or ceiling.
 
 **Sending domains**
+
 - [ ] Adding a domain shows SPF, DKIM, DMARC and MX records with copy buttons and an explanation
       of each.
 - [ ] Verification retries every 15 minutes and gives up after 72 hours with a specific reason.
@@ -1062,6 +1070,7 @@ A reviewer can run this list top to bottom against a merged build.
       breaking any inbox.
 
 **Permissions, audit and cost**
+
 - [ ] A read-only collaborator can read but cannot approve, revise, discard, compose, schedule,
       cancel or change settings — enforced server-side, not only by a disabled button.
 - [ ] A cross-tenant identifier returns the same response as a nonexistent one.
@@ -1075,28 +1084,28 @@ A reviewer can run this list top to bottom against a merged build.
 ## 9. Open questions
 
 - `[NEEDS CLARIFICATION: role names for approval rights. This spec says "write access to the
-  Agent" approves and "workspace owner" changes caps and domains. The concrete grant names in the
-  collaborator model need to be pinned before implementation, and we should decide whether a
-  dedicated "may approve outbound mail" grant is worth a separate switch.]`
+Agent" approves and "workspace owner" changes caps and domains. The concrete grant names in the
+collaborator model need to be pinned before implementation, and we should decide whether a
+dedicated "may approve outbound mail" grant is worth a separate switch.]`
 - `[NEEDS CLARIFICATION: the exact platform mail domain. This spec assumes
-  <agent-slug>@<workspace-slug>.agents.ever.works with the parent domain operator-configurable.
-  Confirm the zone, whether a shared parent is acceptable for deliverability, and whether
-  self-hosted deployments get a default at all or must connect a domain first.]`
+<agent-slug>@<workspace-slug>.agents.ever.works with the parent domain operator-configurable.
+Confirm the zone, whether a shared parent is acceptable for deliverability, and whether
+self-hosted deployments get a default at all or must connect a domain first.]`
 - `[NEEDS CLARIFICATION: workspace cap ceilings for paid tiers. 500/day and 10,000/30 days are
-  proposed as the shipped defaults. Do higher tiers get higher ceilings automatically, and who
-  can raise them — the workspace owner, or only a platform operator?]`
+proposed as the shipped defaults. Do higher tiers get higher ceilings automatically, and who
+can raise them — the workspace owner, or only a platform operator?]`
 - `[NEEDS CLARIFICATION: message retention. How long are threads and message bodies kept, and is
-  there an export? Blocked mail is specified at 30 days; ordinary mail is unspecified.]`
+there an export? Blocked mail is specified at 30 days; ordinary mail is unspecified.]`
 - `[NEEDS CLARIFICATION: whether an auto-suppression list is warranted — after N hard bounces to
-  one recipient address, refuse further sends to it workspace-wide. This spec only forces the
-  inbox back to Draft for review after 3 bounces in 24 hours.]`
+one recipient address, refuse further sends to it workspace-wide. This spec only forces the
+inbox back to Draft for review after 3 bounces in 24 hours.]`
 - `[NEEDS CLARIFICATION: how "learn from my edits" interacts with AW-07's memory load meter. A
-  style fact per approved edit could crowd the context budget. Proposed mitigation: cap at 20
-  style facts per Agent, consolidating older ones — needs AW-07 to confirm the mechanism.]`
+style fact per approved edit could crowd the context budget. Proposed mitigation: cap at 20
+style facts per Agent, consolidating older ones — needs AW-07 to confirm the mechanism.]`
 - `[NEEDS CLARIFICATION: whether an inbox may be shared read-only with a teammate who has no
-  access to the owning Agent, for AW-18's shared dashboards.]`
+access to the owning Agent, for AW-18's shared dashboards.]`
 - `[NEEDS CLARIFICATION: does an inbound message count against anything? This spec meters
-  outbound only. If inbound volume becomes an abuse vector we need an inbound ceiling too.]`
+outbound only. If inbound volume becomes an abuse vector we need an inbound ceiling too.]`
 
 ---
 

@@ -11,7 +11,7 @@
 > and re-binds no existing keyboard shortcut. It adds one header control, one slide-over
 > panel, one full-page list, and one read-state record per person per entry.
 >
-> **One new noun, already sanctioned.** The program overview names *Changelog entry* as one of
+> **One new noun, already sanctioned.** The program overview names _Changelog entry_ as one of
 > the three genuinely-new nouns this program is allowed to introduce
 > ([program overview §0](../README.md#0-why-this-program-exists)). §5 justifies it and, more
 > importantly, fences it off from the Work content history that already exists.
@@ -38,8 +38,8 @@ not actually have.
 
 ## 2. Why now
 
-**The user's question this answers:** *"What can it even do — and what changed since I last
-looked?"* The program overview names the first half of that question and hands it to the
+**The user's question this answers:** _"What can it even do — and what changed since I last
+looked?"_ The program overview names the first half of that question and hands it to the
 capability catalogue ([AW-21](../README.md#3-epics)). This epic owns the second half, which is
 the half that repeats every week forever.
 
@@ -47,27 +47,27 @@ the half that repeats every week forever.
 continuously and tells the people using it in exactly two places, neither of which is a
 changelog:
 
-| Where a change can surface today | Why it does not work as a changelog |
-| --- | --- |
-| The build/version chip in the dashboard footer | It is a build identifier. It tells you the deploy changed; it cannot tell you *what* changed or why you should care. |
-| The notification bell | Every alert there is about **your** workspace — credits, a failed generation, an escalation. A product announcement dropped into that stream competes with, and dilutes, the alerts that are actually urgent, and inherits their dismiss-and-forget semantics. |
-| The public documentation site | Off-product, requires leaving the dashboard, is organised by topic rather than by date, and does not know whether you have read a page. |
-| The onboarding wizard | Fires once, for new accounts only, and is about setup rather than about change. |
+| Where a change can surface today               | Why it does not work as a changelog                                                                                                                                                                                                                            |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The build/version chip in the dashboard footer | It is a build identifier. It tells you the deploy changed; it cannot tell you _what_ changed or why you should care.                                                                                                                                           |
+| The notification bell                          | Every alert there is about **your** workspace — credits, a failed generation, an escalation. A product announcement dropped into that stream competes with, and dilutes, the alerts that are actually urgent, and inherits their dismiss-and-forget semantics. |
+| The public documentation site                  | Off-product, requires leaving the dashboard, is organised by topic rather than by date, and does not know whether you have read a page.                                                                                                                        |
+| The onboarding wizard                          | Fires once, for new accounts only, and is about setup rather than about change.                                                                                                                                                                                |
 
 The concrete costs of that gap, all of them ours:
 
-| Gap | What it costs |
-| --- | --- |
-| Shipped features stay invisible | Every epic in this program adds surfaces. A surface nobody discovers is indistinguishable from a surface that was never built. |
-| Returning users cannot tell what moved | Someone who was away for three weeks has no cheap way to catch up, so they carry a stale mental model of the product and keep using the old, slower path. |
-| Support answers the same "can it…?" question repeatedly | The answer is often "yes, since last month" — and there is nowhere to point. |
-| Behaviour changes arrive unannounced | A changed default, a new limit or a tightened permission is invisible until it surprises somebody mid-task. |
-| Self-hosted deployments are worst off | An operator running their own build has no release feed at all inside the product they are running, and no reliable way to know which changes their build actually contains. |
+| Gap                                                     | What it costs                                                                                                                                                                |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shipped features stay invisible                         | Every epic in this program adds surfaces. A surface nobody discovers is indistinguishable from a surface that was never built.                                               |
+| Returning users cannot tell what moved                  | Someone who was away for three weeks has no cheap way to catch up, so they carry a stale mental model of the product and keep using the old, slower path.                    |
+| Support answers the same "can it…?" question repeatedly | The answer is often "yes, since last month" — and there is nowhere to point.                                                                                                 |
+| Behaviour changes arrive unannounced                    | A changed default, a new limit or a tightened permission is invisible until it surprises somebody mid-task.                                                                  |
+| Self-hosted deployments are worst off                   | An operator running their own build has no release feed at all inside the product they are running, and no reliable way to know which changes their build actually contains. |
 
 **Why it is worth doing now, and why it is cheap.** This program is about to add roughly two
 dozen new surfaces to a product whose only navigation is a sidebar. The discovery cost of every
 one of those surfaces is paid by this epic or by nobody. Sized S with no blocking dependency,
-it also gets *cheaper* the earlier it lands, because from that point on "announce it" is a
+it also gets _cheaper_ the earlier it lands, because from that point on "announce it" is a
 paragraph in the feature's own change rather than a retrospective archaeology exercise.
 
 And the ingredients already exist: the dashboard shell already fetches a handful of small
@@ -103,7 +103,7 @@ immediately regardless of how long it was on screen.
 **Given** a list of 20 entries spanning five categories,
 **When** the owner selects the **Knowledge & Memory** chip,
 **Then** only entries in that category remain, the chip shows as selected, the header count
-still reflects *all* unread entries (not just the filtered ones), and selecting **All** restores
+still reflects _all_ unread entries (not just the filtered ones), and selecting **All** restores
 the full list.
 
 **S-5 — Clear it in one action.**
@@ -159,7 +159,7 @@ because a changelog count is unavailable.
 to it,
 **When** the list renders,
 **Then** the panel shows "Nothing here yet — no updates in Decisions & Safety." with a "Show
-all updates" action, which is a *different* message from the never-any-entries empty state.
+all updates" action, which is a _different_ message from the never-any-entries empty state.
 
 **S-13 — A deployment with no entries at all.**
 **Given** a freshly-installed self-hosted deployment whose build shipped an empty entry list,
@@ -257,11 +257,11 @@ Every requirement below is testable. Every default, limit, threshold and cadence
 - **FR-8.** At most **1** entry may be pinned at any moment. The pinned entry sorts first
   regardless of date; all other entries sort by publish timestamp descending, ties broken by
   identifier ascending so ordering is stable.
-- **FR-9.** Category is exactly one of **6** values, surfaced as: *Agents & Missions*,
-  *Decisions & Safety*, *Knowledge & Memory*, *Connections & Computers*, *Runs & Costs*,
-  *Platform*. The set is closed; adding a seventh is a spec change, not an authoring decision.
-- **FR-10.** Kind is exactly one of **4** values, surfaced as a badge: *New*, *Improved*,
-  *Fixed*, *Security*. Kind is **not** a filter dimension in this epic.
+- **FR-9.** Category is exactly one of **6** values, surfaced as: _Agents & Missions_,
+  _Decisions & Safety_, _Knowledge & Memory_, _Connections & Computers_, _Runs & Costs_,
+  _Platform_. The set is closed; adding a seventh is a spec change, not an authoring decision.
+- **FR-10.** Kind is exactly one of **4** values, surfaced as a badge: _New_, _Improved_,
+  _Fixed_, _Security_. Kind is **not** a filter dimension in this epic.
 - **FR-11.** An entry's title and body are authored in English and are **not** translated per
   locale in this epic; the surrounding interface chrome (headings, chips, buttons, empty
   states, counts, dates) is fully localised. Dates are formatted in the reader's locale.
@@ -386,10 +386,10 @@ Every requirement below is testable. Every default, limit, threshold and cadence
 
 ### 5.1 New
 
-**Changelog Entry** — *new, and deliberately so.*
+**Changelog Entry** — _new, and deliberately so._
 A dated, human-readable description of one change we shipped to the Ever Works product.
 
-*Why a new noun is unavoidable.* Every existing noun in the vocabulary describes something
+_Why a new noun is unavoidable._ Every existing noun in the vocabulary describes something
 that happens **inside a customer's workspace**: a Mission is work they delegated, an Activity
 Log row is something their agents did, a Notification is an alert about their account. A
 changelog entry is the opposite direction of travel — it is us telling them what we changed
@@ -398,17 +398,17 @@ Notifications it inherits dismiss semantics and competes with credit and escalat
 the same attention budget; routed through the Activity Log it pollutes an audit trail whose
 value is that every row is attributable to somebody in the workspace.
 
-*How it is fenced off from what exists.* Ever Works already has a per-Work content history that
+_How it is fenced off from what exists._ Ever Works already has a per-Work content history that
 records what a generation run added, updated and removed inside one directory. That is a record
 of **content inside a Work**. A Changelog Entry is a record of **a change to the product**.
 They share no data, no surface and no reader intent; nothing in this epic reads, writes or
-renders the other. Where ambiguity is possible, this one is qualified as the *product*
+renders the other. Where ambiguity is possible, this one is qualified as the _product_
 changelog.
 
-*Attributes (conceptual):* identifier (slug, permalink), title, body, category (1 of 6), kind
+_Attributes (conceptual):_ identifier (slug, permalink), title, body, category (1 of 6), kind
 (1 of 4), publish timestamp, pinned flag, optional call-to-action (label + in-product path).
 
-*States and transitions:*
+_States and transitions:_
 
 ```
    authored in a change          publish timestamp passes
@@ -433,10 +433,10 @@ There is no manual state transition. `SCHEDULED → PUBLISHED` is time alone. `P
 ABSENT` only happens when a later build stops shipping the entry; read records that point at an
 absent entry are ignored, then cleaned up (FR-22).
 
-**Changelog Read** — *new, and the smallest possible record.*
+**Changelog Read** — _new, and the smallest possible record._
 One record per (person, entry) meaning "this person has seen this entry".
 
-*States:* it exists or it does not. Absent = unread; present = read. There is no un-read
+_States:_ it exists or it does not. Absent = unread; present = read. There is no un-read
 transition (FR-21), no partial state, and no per-workspace variant (FR-13).
 
 ```
@@ -449,13 +449,13 @@ transition (FR-21), no partial state, and no per-workspace variant (FR-13).
 
 ### 5.2 Existing, and how this epic touches them
 
-| Existing entity | Relationship | Changed by this epic? |
-| --- | --- | --- |
-| **Person / account** | Its creation timestamp is the read baseline (FR-14). | No — read only. |
-| **Organization / Workspace scope** | Explicitly **not** part of read state or visibility (FR-13). | No. |
-| **Notification** | Explicitly not used to deliver changelog entries; the bell keeps meaning "something about *your* workspace needs you". | No. |
-| **Activity Log** | Not written to by this epic; a changelog entry is not workspace activity. | No. |
-| **Build/version identity** | Already surfaced in the footer; the changelog is the human-readable companion to that machine identifier. | No. |
+| Existing entity                    | Relationship                                                                                                           | Changed by this epic? |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **Person / account**               | Its creation timestamp is the read baseline (FR-14).                                                                   | No — read only.       |
+| **Organization / Workspace scope** | Explicitly **not** part of read state or visibility (FR-13).                                                           | No.                   |
+| **Notification**                   | Explicitly not used to deliver changelog entries; the bell keeps meaning "something about _your_ workspace needs you". | No.                   |
+| **Activity Log**                   | Not written to by this epic; a changelog entry is not workspace activity.                                              | No.                   |
+| **Build/version identity**         | Already surfaced in the footer; the changelog is the human-readable companion to that machine identifier.              | No.                   |
 
 ## 6. UX
 
@@ -662,48 +662,48 @@ States of the control:
 
 ### 6.9 Exact user-visible copy
 
-| Where | String |
-| --- | --- |
-| Control tooltip / accessible name, no unread | `What's new` |
-| Control accessible name, with unread | `What's new — {count} unread` |
-| Badge, count > 9 | `9+` |
-| Panel heading | `What's new` |
-| Panel subheading, unread ≥ 1 | `{count} updates you haven't read` |
-| Panel subheading, unread = 1 | `1 update you haven't read` |
-| Panel subheading, unread = 0 | `All caught up` |
-| Filter chips | `All` · `Agents & Missions` · `Decisions & Safety` · `Knowledge & Memory` · `Connections & Computers` · `Runs & Costs` · `Platform` |
-| Disabled chip tooltip | `No updates in this area yet` |
-| Kind badges | `New` · `Improved` · `Fixed` · `Security` |
-| Pinned marker | `Pinned` |
-| Unread indicator, accessible text | `Unread` |
-| Mark-all button | `Mark all as read` |
-| Mark-all confirmation (inline, 3 s) | `All caught up` |
-| Panel footer link | `See all updates` |
-| Page heading | `What's new` |
-| Page subheading | `Everything we've shipped, newest first.` |
-| Permalink button, accessible name | `Copy link to this update` |
-| Permalink copied toast | `Link copied` |
-| Load-more button | `Load more` |
-| End of list, at the 200-entry cap | `That's the last 200 updates.` |
-| Empty — never any entries | `No updates yet` / `New releases will show up here.` |
-| Empty — filter matched nothing | `Nothing here yet` / `No updates in {category}.` / `Show all updates` |
-| Error | `Couldn't load updates.` / `Try again` |
-| Unknown permalink | `That update isn't available on this version.` / `See all updates` |
-| Close button, accessible name | `Close what's new` |
+| Where                                        | String                                                                                                                              |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Control tooltip / accessible name, no unread | `What's new`                                                                                                                        |
+| Control accessible name, with unread         | `What's new — {count} unread`                                                                                                       |
+| Badge, count > 9                             | `9+`                                                                                                                                |
+| Panel heading                                | `What's new`                                                                                                                        |
+| Panel subheading, unread ≥ 1                 | `{count} updates you haven't read`                                                                                                  |
+| Panel subheading, unread = 1                 | `1 update you haven't read`                                                                                                         |
+| Panel subheading, unread = 0                 | `All caught up`                                                                                                                     |
+| Filter chips                                 | `All` · `Agents & Missions` · `Decisions & Safety` · `Knowledge & Memory` · `Connections & Computers` · `Runs & Costs` · `Platform` |
+| Disabled chip tooltip                        | `No updates in this area yet`                                                                                                       |
+| Kind badges                                  | `New` · `Improved` · `Fixed` · `Security`                                                                                           |
+| Pinned marker                                | `Pinned`                                                                                                                            |
+| Unread indicator, accessible text            | `Unread`                                                                                                                            |
+| Mark-all button                              | `Mark all as read`                                                                                                                  |
+| Mark-all confirmation (inline, 3 s)          | `All caught up`                                                                                                                     |
+| Panel footer link                            | `See all updates`                                                                                                                   |
+| Page heading                                 | `What's new`                                                                                                                        |
+| Page subheading                              | `Everything we've shipped, newest first.`                                                                                           |
+| Permalink button, accessible name            | `Copy link to this update`                                                                                                          |
+| Permalink copied toast                       | `Link copied`                                                                                                                       |
+| Load-more button                             | `Load more`                                                                                                                         |
+| End of list, at the 200-entry cap            | `That's the last 200 updates.`                                                                                                      |
+| Empty — never any entries                    | `No updates yet` / `New releases will show up here.`                                                                                |
+| Empty — filter matched nothing               | `Nothing here yet` / `No updates in {category}.` / `Show all updates`                                                               |
+| Error                                        | `Couldn't load updates.` / `Try again`                                                                                              |
+| Unknown permalink                            | `That update isn't available on this version.` / `See all updates`                                                                  |
+| Close button, accessible name                | `Close what's new`                                                                                                                  |
 
 ### 6.10 Keyboard affordances
 
-| Key | Where | Effect |
-| --- | --- | --- |
-| `Tab` | Top bar | Reaches the What's-new control in visual order, before the notification bell. |
-| `Enter` / `Space` | On the control | Opens the panel; focus moves to the panel heading. |
-| `Escape` | Panel open | Closes the panel; focus returns to the control. |
-| `Tab` / `Shift+Tab` | Panel open | Cycles within the panel only (focus trap). |
-| `↑` / `↓` | Panel or page list | Moves focus between entry cards. |
-| `Home` / `End` | Panel or page list | Focuses the first / last card. |
-| `Enter` | On a focused card | Follows that card's call-to-action, if it has one. |
-| `←` / `→` | On the chip row | Moves between chips (roving tab stop); selection follows focus. |
-| `Enter` / `Space` | On a chip | Applies that filter (for assistive tech that does not follow focus). |
+| Key                 | Where              | Effect                                                                        |
+| ------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| `Tab`               | Top bar            | Reaches the What's-new control in visual order, before the notification bell. |
+| `Enter` / `Space`   | On the control     | Opens the panel; focus moves to the panel heading.                            |
+| `Escape`            | Panel open         | Closes the panel; focus returns to the control.                               |
+| `Tab` / `Shift+Tab` | Panel open         | Cycles within the panel only (focus trap).                                    |
+| `↑` / `↓`           | Panel or page list | Moves focus between entry cards.                                              |
+| `Home` / `End`      | Panel or page list | Focuses the first / last card.                                                |
+| `Enter`             | On a focused card  | Follows that card's call-to-action, if it has one.                            |
+| `←` / `→`           | On the chip row    | Moves between chips (roving tab stop); selection follows focus.               |
+| `Enter` / `Space`   | On a chip          | Applies that filter (for assistive tech that does not follow focus).          |
 
 No new global shortcut is introduced and no existing one is re-bound. Where the command palette
 exists, it offers a "What's new" command that opens this panel.
@@ -817,7 +817,7 @@ A reviewer can run this list end to end against a deployment.
   release-notes destination before the cap message ships.
 - **Q-3.** [NEEDS CLARIFICATION: Does an operator of a self-hosted deployment want to add their
   own entries?] An operator who forks or extends Ever Works might reasonably want to announce
-  *their* changes in the same panel. That is a natural extension of a build-shipped catalogue
+  _their_ changes in the same panel. That is a natural extension of a build-shipped catalogue
   and needs no runtime authoring — but it does need a documented extension point, and we should
   decide whether that is in scope for a later phase or explicitly declined.
 - **Q-4.** [NEEDS CLARIFICATION: Should Security-kind entries be allowed to bypass the "never
@@ -832,5 +832,5 @@ A reviewer can run this list end to end against a deployment.
   rule reading "New since you were last here" between unread and read entries is a small,
   well-liked affordance, but it needs a per-person last-visit timestamp, which is a second
   piece of state this epic otherwise avoids. Defer unless there is demand.
-</content>
-</invoke>
+  </content>
+  </invoke>

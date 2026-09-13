@@ -16,12 +16,12 @@
 > **Additive by default (program rule #1).** Nothing here deletes a block, a
 > route, an endpoint or an i18n key. Every section that renders on Home today
 > still renders after this epic — the inventory blocks (stats strip, Missions
-> preview, Ideas, recent Works, Tasks, Agents) move *below* the new morning
+> preview, Ideas, recent Works, Tasks, Agents) move _below_ the new morning
 > stack, and the two signal blocks that already exist (needs-attention, coming-up)
 > are **widened in place** rather than replaced. One new entity is introduced
 > (a per-user Home preference row) and is justified in §5.4.
 
-> **Dependency posture.** Home is a *reader*. It composes signals that
+> **Dependency posture.** Home is a _reader_. It composes signals that
 > AW-02 / AW-03 / AW-04 own. It must therefore degrade cleanly when those epics
 > have not landed: §4.11 pins exactly what each block reads today and what it
 > switches to once its owning epic ships. Home never becomes the only place a
@@ -68,7 +68,7 @@
 ```
 
 Home is the first screen after login and the most-visited route in the product.
-Today it answers *"how big is my workspace?"* — twelve total-count tiles, a list
+Today it answers _"how big is my workspace?"_ — twelve total-count tiles, a list
 of Works, a list of Ideas. It does not answer the question the owner actually
 opens it with: **"what happened while I was away, what needs me, and what is
 coming?"**
@@ -97,8 +97,8 @@ Three phases, each independently shippable:
 A user signs in and lands on **Home**. A greeting names them and the date; one
 line under it scores the night — how many things need them, how many agents are
 working, how much finished, how much failed. A single text field invites one
-sentence, and one sentence is enough: typing *"summarise every item added this
-week and flag the duplicates"* and pressing Enter creates a Task, which lands in
+sentence, and one sentence is enough: typing _"summarise every item added this
+week and flag the duplicates"_ and pressing Enter creates a Task, which lands in
 the Task board's Backlog lane and starts being picked up.
 
 Below the composer, a **Needs you** block lists everything blocked on a human
@@ -124,7 +124,7 @@ answer in one screen without scrolling into a second one.
 
 ### 2.1 The question this answers
 
-> *"What happened, what needs me, and what is coming?"*
+> _"What happened, what needs me, and what is coming?"_
 
 This is the first question of every working day for the person Ever Works is
 built for: an owner who delegated work overnight and now has to decide whether
@@ -133,15 +133,15 @@ run. It is asked once at 07:00 and three or four more times before lunch.
 
 ### 2.2 What a user does today instead
 
-| To find out… | Today they must… |
-| --- | --- |
-| Whether anything is blocked on me | Read the approvals block on Home (agent action proposals only), then open Inbox for questions and escalations — two surfaces, neither of which is complete on its own |
-| What my agents finished overnight | Open the activity page and scroll, correlating timestamps by eye; there is no "today" boundary anywhere |
-| Whether anything failed | Read the needs-attention block, which covers errored Agents, failed generations, blocked Tasks and budget overage — but not failed Runs, which is the most common failure |
-| Who is working right now | Open the runs list and filter it to `running`; Home shows a *total* Agents count and an *active* Agents count, neither of which is "executing right now" |
-| What is scheduled today | Read the coming-up block, which knows only two of the seven kinds of schedule the platform actually runs and shows the next three regardless of whether they are today or next month |
-| What I have spent this week | Open settings, then Usage & Credits, then the Costs tab, then change the window to 7 days — four navigations from Home |
-| Hand out a new piece of work | Open the "+ New" page, pick the right one out of eleven chips (Task, Mission, Idea, Agent and the Work kinds), fill a form, submit |
+| To find out…                      | Today they must…                                                                                                                                                                     |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Whether anything is blocked on me | Read the approvals block on Home (agent action proposals only), then open Inbox for questions and escalations — two surfaces, neither of which is complete on its own                |
+| What my agents finished overnight | Open the activity page and scroll, correlating timestamps by eye; there is no "today" boundary anywhere                                                                              |
+| Whether anything failed           | Read the needs-attention block, which covers errored Agents, failed generations, blocked Tasks and budget overage — but not failed Runs, which is the most common failure            |
+| Who is working right now          | Open the runs list and filter it to `running`; Home shows a _total_ Agents count and an _active_ Agents count, neither of which is "executing right now"                             |
+| What is scheduled today           | Read the coming-up block, which knows only two of the seven kinds of schedule the platform actually runs and shows the next three regardless of whether they are today or next month |
+| What I have spent this week       | Open settings, then Usage & Credits, then the Costs tab, then change the window to 7 days — four navigations from Home                                                               |
+| Hand out a new piece of work      | Open the "+ New" page, pick the right one out of eleven chips (Task, Mission, Idea, Agent and the Work kinds), fill a form, submit                                                   |
 
 ### 2.3 The five concrete gaps
 
@@ -152,7 +152,7 @@ run. It is asked once at 07:00 and three or four more times before lunch.
    questions and escalations only render in Inbox. Neither surface says how long
    something has been waiting, so a decision can sit for three days without
    anything on screen getting louder.
-3. **Nothing on Home is time-bounded.** Twelve tiles all say *total*. "Total
+3. **Nothing on Home is time-bounded.** Twelve tiles all say _total_. "Total
    Missions: 26" is the same number today, tomorrow and next month; it cannot
    answer "did anything happen last night?"
 4. **The two signal blocks under-report.** The coming-up block silently drops
@@ -171,7 +171,7 @@ failure posture and the wrong performance posture: eighteen round trips fan out
 on every navigation to the most-visited route in the product, and because an
 empty block and a failed block look identical, a broken signal is invisible.
 
-This epic replaces the *morning stack's* fan-out with **one composed read** that
+This epic replaces the _morning stack's_ fan-out with **one composed read** that
 returns every block in a single response, with a per-block status so a failed
 block can say so instead of pretending to be empty. The inventory blocks below
 the fold keep their existing fetches unchanged.
@@ -226,7 +226,7 @@ the 18:00 catalog check as still due — and does **not** show tomorrow's 09:00 
 because "today" is the user's own calendar day and not a rolling window.
 
 **S5 — Spend with the cap in view.**
-**Given** the active Organization *Acme*, in which $18.42 of usage landed in the
+**Given** the active Organization _Acme_, in which $18.42 of usage landed in the
 last 7 days across 61 Runs, and an account with an account-wide monthly cap of
 $50 of which $39.10 has been spent so far this billing period across all of the
 user's Organizations,
@@ -399,7 +399,7 @@ that backs the morning stack.
 
 - **FR-6.** The composer is a single auto-growing text field, 1 row at rest,
   growing to at most 6 rows, with the placeholder `Hand something to your
-  agents…`.
+agents…`.
 - **FR-7.** `Enter` submits. `Shift+Enter` inserts a newline. `Ctrl/Cmd+Enter`
   also submits. `Escape` blurs the field without clearing it.
 - **FR-8.** Submission requires a trimmed length of at least **3** characters.
@@ -465,7 +465,7 @@ that backs the morning stack.
 - **FR-26.** Four counters render, each a link: `need you`, `working now`,
   `done today`, `failed today`.
 - **FR-27.** `need you` is the exact count from §4.3's decision set. `working
-  now` counts Runs currently executing and **not** waiting on a human.
+now` counts Runs currently executing and **not** waiting on a human.
   `done today` counts Runs that finished successfully since the start of the
   user's local day. `failed today` counts Runs that ended in failure in the same
   window.
@@ -644,17 +644,17 @@ that backs the morning stack.
 
 ### 5.1 Already in Ever Works — read, not changed
 
-| Concept | What Home reads from it | Changed by this epic? |
-| --- | --- | --- |
-| **Task** | Created by the composer; blocked Tasks feed the "Also broken" list | No — creation uses the existing path |
-| **Mission** | A standing initiative, never a unit of work here: a scheduled Mission's tick is one of the seven kinds in the Today panel, and the existing Missions preview keeps its own read below the fold | No |
-| **Agent** | Names in the decision rows and the working-now rows; errored Agents feed "Also broken" | No |
-| **Run** | Working-now rows; the `done today` / `failed today` / `working now` counters | No — one additive index only (see plan) |
-| **Approval / Escalation / Question** | The decision set behind "Needs you" | No |
-| **Schedule** (the aggregated read model) | The Today panel | Widened to label all seven kinds |
-| **Activity** | The recent-activity tail | No |
-| **Spend / budget** | The This-week panel | No |
-| **Organization / Workspace scope** | Scopes every read | No |
+| Concept                                  | What Home reads from it                                                                                                                                                                        | Changed by this epic?                   |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Task**                                 | Created by the composer; blocked Tasks feed the "Also broken" list                                                                                                                             | No — creation uses the existing path    |
+| **Mission**                              | A standing initiative, never a unit of work here: a scheduled Mission's tick is one of the seven kinds in the Today panel, and the existing Missions preview keeps its own read below the fold | No                                      |
+| **Agent**                                | Names in the decision rows and the working-now rows; errored Agents feed "Also broken"                                                                                                         | No                                      |
+| **Run**                                  | Working-now rows; the `done today` / `failed today` / `working now` counters                                                                                                                   | No — one additive index only (see plan) |
+| **Approval / Escalation / Question**     | The decision set behind "Needs you"                                                                                                                                                            | No                                      |
+| **Schedule** (the aggregated read model) | The Today panel                                                                                                                                                                                | Widened to label all seven kinds        |
+| **Activity**                             | The recent-activity tail                                                                                                                                                                       | No                                      |
+| **Spend / budget**                       | The This-week panel                                                                                                                                                                            | No                                      |
+| **Organization / Workspace scope**       | Scopes every read                                                                                                                                                                              | No                                      |
 
 ### 5.2 States and transitions Home depends on
 
@@ -676,7 +676,7 @@ item's own surface performs, and the effect on the waiting work is one of:
 ```
 
 **A Run** is `queued → running → completed | failed | cancelled`, and while
-`running` may additionally be *waiting on input*. Home's rule (FR-44, S15):
+`running` may additionally be _waiting on input_. Home's rule (FR-44, S15):
 
 ```
    running AND NOT waiting-on-input   →  Working now
@@ -709,7 +709,7 @@ Why it must persist server-side rather than per-browser:
 1. Home is the landing route. A block a user has deliberately dismissed
    reappearing on their laptop after they hid it on their desktop is the kind of
    small betrayal that makes a screen feel untrustworthy.
-2. The choice is a statement about the *account's* way of working (an owner with
+2. The choice is a statement about the _account's_ way of working (an owner with
    no schedules never wants the Today panel), not about one browser.
 3. Browser storage is already used for the composer draft (FR-13), which is
    genuinely per-device. Mixing durable preference into the same store would make
@@ -727,7 +727,7 @@ but a layout choice.
 ### 5.5 Explicitly not new entities
 
 - **No "briefing" or "digest" entity.** The morning read is computed, never
-  stored. The scheduled roll-up that *is* stored and delivered already exists and
+  stored. The scheduled roll-up that _is_ stored and delivered already exists and
   is a different feature.
 - **No "counter" or "metric" table.** Every counter is a scoped query over rows
   that already exist.
@@ -1031,87 +1031,87 @@ choice button is never narrower than 44 px.
 
 ### 6.13 Keyboard affordances
 
-| Key | Where | Does |
-| --- | --- | --- |
-| `n` | anywhere on Home, when focus is not in a text field | Focuses the composer |
-| `Enter` | composer | Submits |
-| `Shift+Enter` | composer | Newline |
-| `Ctrl/Cmd+Enter` | composer | Submits |
-| `Escape` | composer | Blurs without clearing |
-| `r` | anywhere on Home, when focus is not in a text field | Refreshes the summary |
-| `Tab` / `Shift+Tab` | anywhere | Moves through blocks in visual order; each block is one tab stop group |
-| `Enter` / `Space` | a focused decision choice | Answers |
-| `Enter` | a focused block header link | Opens the owning surface |
+| Key                 | Where                                               | Does                                                                   |
+| ------------------- | --------------------------------------------------- | ---------------------------------------------------------------------- |
+| `n`                 | anywhere on Home, when focus is not in a text field | Focuses the composer                                                   |
+| `Enter`             | composer                                            | Submits                                                                |
+| `Shift+Enter`       | composer                                            | Newline                                                                |
+| `Ctrl/Cmd+Enter`    | composer                                            | Submits                                                                |
+| `Escape`            | composer                                            | Blurs without clearing                                                 |
+| `r`                 | anywhere on Home, when focus is not in a text field | Refreshes the summary                                                  |
+| `Tab` / `Shift+Tab` | anywhere                                            | Moves through blocks in visual order; each block is one tab stop group |
+| `Enter` / `Space`   | a focused decision choice                           | Answers                                                                |
+| `Enter`             | a focused block header link                         | Opens the owning surface                                               |
 
 `n` and `r` must not collide with the shortcuts the shell already registers; they
 are registered through the same mechanism so the help panel lists them.
 
 ### 6.14 Exact user-visible copy
 
-| Where | Copy |
-| --- | --- |
-| Greeting (morning / afternoon / evening) | `Good morning, {name}.` · `Good afternoon, {name}.` · `Good evening, {name}.` |
-| Score line | `{n} need you · {n} working now · {n} done today · {n} failed` |
-| Freshness | `updated {n}s ago` · `updated {n}m ago` |
-| Composer placeholder | `Hand something to your agents…` |
-| Composer hint | `Describe a job in a sentence. An agent will pick it up.` |
-| Composer send | `Send` |
-| Composer expand | `Expand` |
-| Composer counter | `{used} / 2000` |
-| Composer success | `Task created — "{title}"` · link `Open` |
-| Composer failure | `Couldn't create that Task.` · action `Try again` |
-| Composer throttled | `You're creating these faster than we can file them. Try again in a minute.` |
-| Composer runtime note | `Nothing will run until a job runtime is configured.` · link `Configure` |
-| Needs-you heading | `Needs you` |
-| Needs-you overdue suffix | `{n} waiting over 3 days` |
-| Needs-you link | `Open all ({n})` |
-| Needs-you overflow footer | `{n} more waiting` |
-| Kind chips | `Approve` · `Question` · `Escalation` |
-| Waiting chip | `waiting {n}m` · `waiting {n}h` · `waiting {n}d` |
-| Row action | `Open` |
-| Answering state | `Answering…` |
-| Answer success (steered) | `Sent. The agent picked it up.` |
-| Answer success (resumed) | `Sent. A run resumed to answer it.` |
-| Answer success (approval) | `Approved.` · `Rejected.` |
-| Answer success (escalation) | `Resolved.` |
-| Answer already decided | `Already answered elsewhere.` |
-| Answer failure | `Couldn't send that answer.` · action `Try again` |
-| Needs-you empty | `Nothing needs you right now.` / `Your agents will raise anything they can't decide themselves.` |
-| Also-broken heading | `Also broken` |
-| Glance heading | `Today at a glance` |
-| Glance labels | `need you` · `working now` · `done today` · `failed today` |
-| Today heading | `Today` |
-| Today kind labels | `recurring task` · `heartbeat` · `work schedule` · `mission tick` · `source check` · `data sync` · `trigger` |
-| Today ran marker | `ran at {time}` |
-| Today overflow | `+{n} more` |
-| Today empty | `Nothing scheduled today.` · action `Set something up` |
-| Today nothing left | `Nothing else scheduled today.` |
-| Today paused chip | `paused` · `error` |
-| This-week heading | `This week` |
-| This-week sublabel | `last 7 days in {scope}` (Organization name, or `Personal`) |
-| This-week second line | `{n} runs · {amount} avg per run` |
-| This-week cap bar | `{n}% of your account-wide cap this billing period` |
-| This-week cap note | `The cap applies across all your Organizations.` |
-| This-week link description | `Opens account-wide spend` |
-| This-week blocked | `New runs are blocked.` |
-| This-week overage | `Overage is allowed.` |
-| This-week no cap | `No spend cap set.` · action `Set a cap` |
-| This-week link | `Manage spend` |
-| Working-now heading | `Working now ({n})` |
-| Working-now fallback line | `Working…` |
-| Working-now chips | `long run` · `still going` |
-| Working-now link | `See all runs` |
-| Working-now empty | `Nobody is working right now.` · action `Hand out some work` |
-| Recent-activity heading | `Recent activity` |
-| Recent-activity link | `Open the feed` |
-| Recent-activity empty | `Nothing has happened yet.` |
-| Block error | `Couldn't load {block}.` · action `Retry` |
-| Whole-summary error | `We couldn't load your morning report.` / `Everything is still running — this screen just can't see it right now.` · action `Try again` |
-| New-since pill | `{n} new since you opened this` |
-| Timezone footnote | `Times shown in UTC.` |
-| Workspace section | `Your workspace` |
-| Block menu | `Blocks` / `Show on Home` / `Reset to defaults` |
-| First-run empty | `Nothing yet.` / `Once your agents start working, this is where the morning report lands — what needs you, what ran, what it cost.` · action `Set up your first agent` |
+| Where                                    | Copy                                                                                                                                                                   |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Greeting (morning / afternoon / evening) | `Good morning, {name}.` · `Good afternoon, {name}.` · `Good evening, {name}.`                                                                                          |
+| Score line                               | `{n} need you · {n} working now · {n} done today · {n} failed`                                                                                                         |
+| Freshness                                | `updated {n}s ago` · `updated {n}m ago`                                                                                                                                |
+| Composer placeholder                     | `Hand something to your agents…`                                                                                                                                       |
+| Composer hint                            | `Describe a job in a sentence. An agent will pick it up.`                                                                                                              |
+| Composer send                            | `Send`                                                                                                                                                                 |
+| Composer expand                          | `Expand`                                                                                                                                                               |
+| Composer counter                         | `{used} / 2000`                                                                                                                                                        |
+| Composer success                         | `Task created — "{title}"` · link `Open`                                                                                                                               |
+| Composer failure                         | `Couldn't create that Task.` · action `Try again`                                                                                                                      |
+| Composer throttled                       | `You're creating these faster than we can file them. Try again in a minute.`                                                                                           |
+| Composer runtime note                    | `Nothing will run until a job runtime is configured.` · link `Configure`                                                                                               |
+| Needs-you heading                        | `Needs you`                                                                                                                                                            |
+| Needs-you overdue suffix                 | `{n} waiting over 3 days`                                                                                                                                              |
+| Needs-you link                           | `Open all ({n})`                                                                                                                                                       |
+| Needs-you overflow footer                | `{n} more waiting`                                                                                                                                                     |
+| Kind chips                               | `Approve` · `Question` · `Escalation`                                                                                                                                  |
+| Waiting chip                             | `waiting {n}m` · `waiting {n}h` · `waiting {n}d`                                                                                                                       |
+| Row action                               | `Open`                                                                                                                                                                 |
+| Answering state                          | `Answering…`                                                                                                                                                           |
+| Answer success (steered)                 | `Sent. The agent picked it up.`                                                                                                                                        |
+| Answer success (resumed)                 | `Sent. A run resumed to answer it.`                                                                                                                                    |
+| Answer success (approval)                | `Approved.` · `Rejected.`                                                                                                                                              |
+| Answer success (escalation)              | `Resolved.`                                                                                                                                                            |
+| Answer already decided                   | `Already answered elsewhere.`                                                                                                                                          |
+| Answer failure                           | `Couldn't send that answer.` · action `Try again`                                                                                                                      |
+| Needs-you empty                          | `Nothing needs you right now.` / `Your agents will raise anything they can't decide themselves.`                                                                       |
+| Also-broken heading                      | `Also broken`                                                                                                                                                          |
+| Glance heading                           | `Today at a glance`                                                                                                                                                    |
+| Glance labels                            | `need you` · `working now` · `done today` · `failed today`                                                                                                             |
+| Today heading                            | `Today`                                                                                                                                                                |
+| Today kind labels                        | `recurring task` · `heartbeat` · `work schedule` · `mission tick` · `source check` · `data sync` · `trigger`                                                           |
+| Today ran marker                         | `ran at {time}`                                                                                                                                                        |
+| Today overflow                           | `+{n} more`                                                                                                                                                            |
+| Today empty                              | `Nothing scheduled today.` · action `Set something up`                                                                                                                 |
+| Today nothing left                       | `Nothing else scheduled today.`                                                                                                                                        |
+| Today paused chip                        | `paused` · `error`                                                                                                                                                     |
+| This-week heading                        | `This week`                                                                                                                                                            |
+| This-week sublabel                       | `last 7 days in {scope}` (Organization name, or `Personal`)                                                                                                            |
+| This-week second line                    | `{n} runs · {amount} avg per run`                                                                                                                                      |
+| This-week cap bar                        | `{n}% of your account-wide cap this billing period`                                                                                                                    |
+| This-week cap note                       | `The cap applies across all your Organizations.`                                                                                                                       |
+| This-week link description               | `Opens account-wide spend`                                                                                                                                             |
+| This-week blocked                        | `New runs are blocked.`                                                                                                                                                |
+| This-week overage                        | `Overage is allowed.`                                                                                                                                                  |
+| This-week no cap                         | `No spend cap set.` · action `Set a cap`                                                                                                                               |
+| This-week link                           | `Manage spend`                                                                                                                                                         |
+| Working-now heading                      | `Working now ({n})`                                                                                                                                                    |
+| Working-now fallback line                | `Working…`                                                                                                                                                             |
+| Working-now chips                        | `long run` · `still going`                                                                                                                                             |
+| Working-now link                         | `See all runs`                                                                                                                                                         |
+| Working-now empty                        | `Nobody is working right now.` · action `Hand out some work`                                                                                                           |
+| Recent-activity heading                  | `Recent activity`                                                                                                                                                      |
+| Recent-activity link                     | `Open the feed`                                                                                                                                                        |
+| Recent-activity empty                    | `Nothing has happened yet.`                                                                                                                                            |
+| Block error                              | `Couldn't load {block}.` · action `Retry`                                                                                                                              |
+| Whole-summary error                      | `We couldn't load your morning report.` / `Everything is still running — this screen just can't see it right now.` · action `Try again`                                |
+| New-since pill                           | `{n} new since you opened this`                                                                                                                                        |
+| Timezone footnote                        | `Times shown in UTC.`                                                                                                                                                  |
+| Workspace section                        | `Your workspace`                                                                                                                                                       |
+| Block menu                               | `Blocks` / `Show on Home` / `Reset to defaults`                                                                                                                        |
+| First-run empty                          | `Nothing yet.` / `Once your agents start working, this is where the morning report lands — what needs you, what ran, what it cost.` · action `Set up your first agent` |
 
 ---
 
@@ -1351,18 +1351,18 @@ A reviewer can run this list against a build.
 
 ## 11. Constitution gates
 
-| Gate | Status | Note |
-| --- | --- | --- |
-| I — Plugin-first | ✅ | No external integration. Home reads platform data only. |
-| II — Capability-driven | ✅ | No plugin id appears anywhere in this epic. |
-| III — Source-of-truth repos | ✅ | No content is read from or written to a repository. |
-| IV — Job runtime | ✅ | Home dispatches no background work. The composer creates a Task through the existing path; whatever that path dispatches is unchanged. |
-| V — Forward-only migrations | ✅ | One additive preference table and one additive index, both forward-only, both shipping with the change that needs them. |
-| VI — Tests first-class | ✅ | Unit tests for every threshold in §4, controller tests for the new read, an end-to-end test per user scenario in §3.1 and for §3.2's failure paths. |
-| VII — Secrets | ✅ | Nothing Home reads is a secret; failure copy is keyed, never provider text (FR-73). |
-| VIII — Plugin counts | ✅ | No plugin list changes. |
-| IX — Behaviour-first spec | ✅ | This document names no class, path or library. |
-| X — Backwards compatibility | ✅ | No existing endpoint, response shape or i18n key changes meaning. One new read is added; existing reads keep working. |
+| Gate                        | Status | Note                                                                                                                                                |
+| --------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I — Plugin-first            | ✅     | No external integration. Home reads platform data only.                                                                                             |
+| II — Capability-driven      | ✅     | No plugin id appears anywhere in this epic.                                                                                                         |
+| III — Source-of-truth repos | ✅     | No content is read from or written to a repository.                                                                                                 |
+| IV — Job runtime            | ✅     | Home dispatches no background work. The composer creates a Task through the existing path; whatever that path dispatches is unchanged.              |
+| V — Forward-only migrations | ✅     | One additive preference table and one additive index, both forward-only, both shipping with the change that needs them.                             |
+| VI — Tests first-class      | ✅     | Unit tests for every threshold in §4, controller tests for the new read, an end-to-end test per user scenario in §3.1 and for §3.2's failure paths. |
+| VII — Secrets               | ✅     | Nothing Home reads is a secret; failure copy is keyed, never provider text (FR-73).                                                                 |
+| VIII — Plugin counts        | ✅     | No plugin list changes.                                                                                                                             |
+| IX — Behaviour-first spec   | ✅     | This document names no class, path or library.                                                                                                      |
+| X — Backwards compatibility | ✅     | No existing endpoint, response shape or i18n key changes meaning. One new read is added; existing reads keep working.                               |
 
 ---
 

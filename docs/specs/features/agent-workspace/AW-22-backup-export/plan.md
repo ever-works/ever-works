@@ -13,24 +13,24 @@
 
 ### 1.1 The export that exists today
 
-| Concern | File | What it does |
-| --- | --- | --- |
-| Domain service | [`packages/agent/src/account-transfer/account-export.service.ts`](../../../../../packages/agent/src/account-transfer/account-export.service.ts) — 379 lines | Loads the user, their Works and their user-plugin rows, walks each Work for items/categories/tags/collections/comparisons via `DataRepository` + `GitFacadeService`, masks secret settings, and returns one `AccountExportPayload` object. Optional v2 tail for agents/skills/tasks. |
-| v2 tail | [`agents-skills-tasks-export.service.ts`](../../../../../packages/agent/src/account-transfer/agents-skills-tasks-export.service.ts) — 228 lines | Agents, skills, tasks and task chat, behind four per-feature toggles. Injected `@Optional()`, and a throw inside it is caught and downgraded to a v1 payload. |
-| Wire contract | [`types.ts`](../../../../../packages/agent/src/account-transfer/types.ts) — 450 lines | `AccountExportPayload`, `ExportedProfile`, `ExportedWork`, … The `ExportedProfile` doc comment already enumerates the columns deliberately withheld (platform-admin flag, credits, fleet nodes, scope pointers) — that reasoning is reused verbatim by this epic's exclusions list. |
-| Import | [`account-import.service.ts`](../../../../../packages/agent/src/account-transfer/account-import.service.ts) — 1 149 lines | Preview with conflict detection, then apply with per-conflict skip / overwrite / rename. |
-| Config-repo sync | [`github-sync.service.ts`](../../../../../packages/agent/src/account-transfer/github-sync.service.ts) — 732 lines | Push/pull the account as a private config repo. |
-| Module | [`account-transfer.module.ts`](../../../../../packages/agent/src/account-transfer/account-transfer.module.ts) | Providers + exports for all of the above. |
-| HTTP | [`apps/api/src/account/account.controller.ts`](../../../../../apps/api/src/account/account.controller.ts) | `GET /api/account/export` (returns the whole payload in the response body, with a `Content-Disposition` header), plus import preview/apply and the sync routes. Carries hand-rolled DoS caps on the import body. |
-| API module | [`apps/api/src/account/account.module.ts`](../../../../../apps/api/src/account/account.module.ts) | Imports `AccountTransferModule` and `TenantJobRuntimeModule`; declares `AccountController`. |
-| Server actions | [`apps/web/src/app/actions/account-transfer.ts`](../../../../../apps/web/src/app/actions/account-transfer.ts) | `exportAccountData`, `previewImport`, `applyImport`, plus the sync actions. |
-| Web client | [`apps/web/src/lib/api/account-transfer.ts`](../../../../../apps/web/src/lib/api/account-transfer.ts) + [`account-transfer.types.ts`](../../../../../apps/web/src/lib/api/account-transfer.types.ts) | Typed fetch wrappers. |
-| UI | [`apps/web/src/components/settings/DataManagement.tsx`](../../../../../apps/web/src/components/settings/DataManagement.tsx) | Export card with five checkboxes; builds a `Blob` from `JSON.stringify(result.data, null, 2)` **in the browser** and clicks a synthetic `<a download>`. Also renders `ImportFlow` and `GitHubSync`. |
-| Page | [`settings/data/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/data/page.tsx>) | Nine lines: metadata + `<DataManagement />`. |
-| Danger zone | [`apps/web/src/components/settings/DangerZone.tsx`](../../../../../apps/web/src/components/settings/DangerZone.tsx) | Renders an export button that calls the same server action, next to the account-deletion control. |
-| Nav | [`settings-layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx>) | The settings tab list. `data` is already a tab; no new tab is required. |
-| Route constants | [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) | `DASHBOARD_SETTINGS_DATA: '/settings/data'` (line 233), `DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger'` (line 232). Both already exist. |
-| E2E | [`apps/web/e2e/account-data.spec.ts`](../../../../../apps/web/e2e/account-data.spec.ts) | Covers the page renders, the danger-zone confirmation, and `GET /api/account/export` returning 200. |
+| Concern          | File                                                                                                                                                                                                 | What it does                                                                                                                                                                                                                                                                         |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Domain service   | [`packages/agent/src/account-transfer/account-export.service.ts`](../../../../../packages/agent/src/account-transfer/account-export.service.ts) — 379 lines                                          | Loads the user, their Works and their user-plugin rows, walks each Work for items/categories/tags/collections/comparisons via `DataRepository` + `GitFacadeService`, masks secret settings, and returns one `AccountExportPayload` object. Optional v2 tail for agents/skills/tasks. |
+| v2 tail          | [`agents-skills-tasks-export.service.ts`](../../../../../packages/agent/src/account-transfer/agents-skills-tasks-export.service.ts) — 228 lines                                                      | Agents, skills, tasks and task chat, behind four per-feature toggles. Injected `@Optional()`, and a throw inside it is caught and downgraded to a v1 payload.                                                                                                                        |
+| Wire contract    | [`types.ts`](../../../../../packages/agent/src/account-transfer/types.ts) — 450 lines                                                                                                                | `AccountExportPayload`, `ExportedProfile`, `ExportedWork`, … The `ExportedProfile` doc comment already enumerates the columns deliberately withheld (platform-admin flag, credits, fleet nodes, scope pointers) — that reasoning is reused verbatim by this epic's exclusions list.  |
+| Import           | [`account-import.service.ts`](../../../../../packages/agent/src/account-transfer/account-import.service.ts) — 1 149 lines                                                                            | Preview with conflict detection, then apply with per-conflict skip / overwrite / rename.                                                                                                                                                                                             |
+| Config-repo sync | [`github-sync.service.ts`](../../../../../packages/agent/src/account-transfer/github-sync.service.ts) — 732 lines                                                                                    | Push/pull the account as a private config repo.                                                                                                                                                                                                                                      |
+| Module           | [`account-transfer.module.ts`](../../../../../packages/agent/src/account-transfer/account-transfer.module.ts)                                                                                        | Providers + exports for all of the above.                                                                                                                                                                                                                                            |
+| HTTP             | [`apps/api/src/account/account.controller.ts`](../../../../../apps/api/src/account/account.controller.ts)                                                                                            | `GET /api/account/export` (returns the whole payload in the response body, with a `Content-Disposition` header), plus import preview/apply and the sync routes. Carries hand-rolled DoS caps on the import body.                                                                     |
+| API module       | [`apps/api/src/account/account.module.ts`](../../../../../apps/api/src/account/account.module.ts)                                                                                                    | Imports `AccountTransferModule` and `TenantJobRuntimeModule`; declares `AccountController`.                                                                                                                                                                                          |
+| Server actions   | [`apps/web/src/app/actions/account-transfer.ts`](../../../../../apps/web/src/app/actions/account-transfer.ts)                                                                                        | `exportAccountData`, `previewImport`, `applyImport`, plus the sync actions.                                                                                                                                                                                                          |
+| Web client       | [`apps/web/src/lib/api/account-transfer.ts`](../../../../../apps/web/src/lib/api/account-transfer.ts) + [`account-transfer.types.ts`](../../../../../apps/web/src/lib/api/account-transfer.types.ts) | Typed fetch wrappers.                                                                                                                                                                                                                                                                |
+| UI               | [`apps/web/src/components/settings/DataManagement.tsx`](../../../../../apps/web/src/components/settings/DataManagement.tsx)                                                                          | Export card with five checkboxes; builds a `Blob` from `JSON.stringify(result.data, null, 2)` **in the browser** and clicks a synthetic `<a download>`. Also renders `ImportFlow` and `GitHubSync`.                                                                                  |
+| Page             | [`settings/data/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/data/page.tsx>)                                                                                            | Nine lines: metadata + `<DataManagement />`.                                                                                                                                                                                                                                         |
+| Danger zone      | [`apps/web/src/components/settings/DangerZone.tsx`](../../../../../apps/web/src/components/settings/DangerZone.tsx)                                                                                  | Renders an export button that calls the same server action, next to the account-deletion control.                                                                                                                                                                                    |
+| Nav              | [`settings-layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx>)                                                                           | The settings tab list. `data` is already a tab; no new tab is required.                                                                                                                                                                                                              |
+| Route constants  | [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts)                                                                                                                      | `DASHBOARD_SETTINGS_DATA: '/settings/data'` (line 233), `DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger'` (line 232). Both already exist.                                                                                                                                         |
+| E2E              | [`apps/web/e2e/account-data.spec.ts`](../../../../../apps/web/e2e/account-data.spec.ts)                                                                                                              | Covers the page renders, the danger-zone confirmation, and `GET /api/account/export` returning 200.                                                                                                                                                                                  |
 
 **The three properties that make it unfit for the spec's job**, all visible in the files above:
 
@@ -44,35 +44,35 @@
 
 ### 1.2 The storage seam
 
-| File | Relevance |
-| --- | --- |
+| File                                                                                                                                                | Relevance                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`packages/plugin/src/contracts/capabilities/storage.interface.ts`](../../../../../packages/plugin/src/contracts/capabilities/storage.interface.ts) | `IStoragePlugin` — `putObject(StoragePutInput): Promise<StoragePutResult>`, `getObject(key)`, `deleteObject(key)`, optional `presignPut`. **`StoragePutInput.buffer` is a `Buffer`** — the whole object must be in memory. §7 addresses this. |
-| [`apps/api/src/uploads/storage-backend.factory.ts`](../../../../../apps/api/src/uploads/storage-backend.factory.ts) | `getActiveStorageBackend()` — selects and caches the backend from `STORAGE_BACKEND` (`local-fs` default, `aws-s3`, `minio`, `github-storage`), running the plugin's `onLoad` against a stub context. |
-| [`apps/api/src/uploads/uploads.service.ts`](../../../../../apps/api/src/uploads/uploads.service.ts) | The existing consumer, and the model for owner-scoped reads. |
-| [`apps/api/src/uploads/uploads.module.ts`](../../../../../apps/api/src/uploads/uploads.module.ts) | Wiring, including the `USER_UPLOAD_REPOSITORY` / `WORK_REPO_RESOLVER` token indirection used to keep TypeORM out of the uploads unit-test import graph. |
+| [`apps/api/src/uploads/storage-backend.factory.ts`](../../../../../apps/api/src/uploads/storage-backend.factory.ts)                                 | `getActiveStorageBackend()` — selects and caches the backend from `STORAGE_BACKEND` (`local-fs` default, `aws-s3`, `minio`, `github-storage`), running the plugin's `onLoad` against a stub context.                                          |
+| [`apps/api/src/uploads/uploads.service.ts`](../../../../../apps/api/src/uploads/uploads.service.ts)                                                 | The existing consumer, and the model for owner-scoped reads.                                                                                                                                                                                  |
+| [`apps/api/src/uploads/uploads.module.ts`](../../../../../apps/api/src/uploads/uploads.module.ts)                                                   | Wiring, including the `USER_UPLOAD_REPOSITORY` / `WORK_REPO_RESOLVER` token indirection used to keep TypeORM out of the uploads unit-test import graph.                                                                                       |
 
 ### 1.3 The background-work seam
 
-| File | Relevance |
-| --- | --- |
-| [`packages/agent/src/tasks/_tasks-symbols.ts`](../../../../../packages/agent/src/tasks/_tasks-symbols.ts) | The single source of truth for the runtime symbols the `@ever-works/agent/tasks` barrel exposes. Adding a dispatcher without adding its name here fails `tasks.spec.ts`. |
-| [`packages/agent/src/tasks/kb-embed-document-dispatcher.ts`](../../../../../packages/agent/src/tasks/kb-embed-document-dispatcher.ts) | The shape every dispatcher copies: a `Payload` type, an interface with one `dispatchX(payload): Promise<string \| null>`, and a `Symbol(...)` token. `null` means "could not enqueue". |
-| [`packages/agent/src/tasks/job-runtime.providers.ts`](../../../../../packages/agent/src/tasks/job-runtime.providers.ts) | `buildJobRuntimeProviders()` — binds every `*_DISPATCHER` symbol through `JOB_RUNTIME_PROVIDER_REGISTRY`. New symbols are wired here, never at a call site. |
-| [`packages/tasks/src/trigger/trigger.service.ts`](../../../../../packages/tasks/src/trigger/trigger.service.ts) | The producer-side implementation (`dispatchWorkImport`, `dispatchKbEmbedDocument`, …), each guarded by `ensureConfigured()`. |
-| [`packages/tasks/src/tasks/trigger/kb-embed-document.task.ts`](../../../../../packages/tasks/src/tasks/trigger/kb-embed-document.task.ts) | The consumer-side model: `task<'id', Payload>({ … })`, `withWorkerContext`, explicit skip-and-ack reasons versus real throws. |
-| [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts) | Task barrel. |
-| [`packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts`](../../../../../packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts) | The closest model for this epic's retention sweeper: a cron `schedules.task` that deletes aged rows. |
+| File                                                                                                                                                | Relevance                                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/agent/src/tasks/_tasks-symbols.ts`](../../../../../packages/agent/src/tasks/_tasks-symbols.ts)                                           | The single source of truth for the runtime symbols the `@ever-works/agent/tasks` barrel exposes. Adding a dispatcher without adding its name here fails `tasks.spec.ts`.               |
+| [`packages/agent/src/tasks/kb-embed-document-dispatcher.ts`](../../../../../packages/agent/src/tasks/kb-embed-document-dispatcher.ts)               | The shape every dispatcher copies: a `Payload` type, an interface with one `dispatchX(payload): Promise<string \| null>`, and a `Symbol(...)` token. `null` means "could not enqueue". |
+| [`packages/agent/src/tasks/job-runtime.providers.ts`](../../../../../packages/agent/src/tasks/job-runtime.providers.ts)                             | `buildJobRuntimeProviders()` — binds every `*_DISPATCHER` symbol through `JOB_RUNTIME_PROVIDER_REGISTRY`. New symbols are wired here, never at a call site.                            |
+| [`packages/tasks/src/trigger/trigger.service.ts`](../../../../../packages/tasks/src/trigger/trigger.service.ts)                                     | The producer-side implementation (`dispatchWorkImport`, `dispatchKbEmbedDocument`, …), each guarded by `ensureConfigured()`.                                                           |
+| [`packages/tasks/src/tasks/trigger/kb-embed-document.task.ts`](../../../../../packages/tasks/src/tasks/trigger/kb-embed-document.task.ts)           | The consumer-side model: `task<'id', Payload>({ … })`, `withWorkerContext`, explicit skip-and-ack reasons versus real throws.                                                          |
+| [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts)                                             | Task barrel.                                                                                                                                                                           |
+| [`packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts`](../../../../../packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts) | The closest model for this epic's retention sweeper: a cron `schedules.task` that deletes aged rows.                                                                                   |
 
 ### 1.4 Entity, repository and scope registration
 
-| File | Why it must be touched for a new entity |
-| --- | --- |
-| [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts) | Barrel export. |
-| [`packages/agent/src/database/_entity-names.ts`](../../../../../packages/agent/src/database/_entity-names.ts) | `AGENT_ENTITY_NAMES` — a drift spec counts it. |
-| [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts) | The `ENTITIES` array consumed by the datasource config. |
-| [`packages/agent/src/database/_repository-inventory.ts`](../../../../../packages/agent/src/database/_repository-inventory.ts) + [`database/index.ts`](../../../../../packages/agent/src/database/index.ts) | `REPOSITORY_PROVIDERS` and the barrel. |
-| [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts), [`scope-stamping.subscriber.ts`](../../../../../apps/api/src/scope/scope-stamping.subscriber.ts), [`scope-ownership.guard.ts`](../../../../../apps/api/src/scope/scope-ownership.guard.ts) | Resolve the active workspace, stamp `tenantId`/`organizationId` on insert, and gate reads. |
-| [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) | Timestamp-prefixed files; highest on `develop` at time of writing is `1790100000000-AddReleaseVerification.ts`. This epic stamps from its reserved block ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). |
+| File                                                                                                                                                                                                                                                                                                    | Why it must be touched for a new entity                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts)                                                                                                                                                                                                           | Barrel export.                                                                                                                                                                                                                                    |
+| [`packages/agent/src/database/_entity-names.ts`](../../../../../packages/agent/src/database/_entity-names.ts)                                                                                                                                                                                           | `AGENT_ENTITY_NAMES` — a drift spec counts it.                                                                                                                                                                                                    |
+| [`packages/agent/src/database/_entities-inventory.ts`](../../../../../packages/agent/src/database/_entities-inventory.ts)                                                                                                                                                                               | The `ENTITIES` array consumed by the datasource config.                                                                                                                                                                                           |
+| [`packages/agent/src/database/_repository-inventory.ts`](../../../../../packages/agent/src/database/_repository-inventory.ts) + [`database/index.ts`](../../../../../packages/agent/src/database/index.ts)                                                                                              | `REPOSITORY_PROVIDERS` and the barrel.                                                                                                                                                                                                            |
+| [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts), [`scope-stamping.subscriber.ts`](../../../../../apps/api/src/scope/scope-stamping.subscriber.ts), [`scope-ownership.guard.ts`](../../../../../apps/api/src/scope/scope-ownership.guard.ts) | Resolve the active workspace, stamp `tenantId`/`organizationId` on insert, and gate reads.                                                                                                                                                        |
+| [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/)                                                                                                                                                                                                                                   | Timestamp-prefixed files; highest on `develop` at time of writing is `1790100000000-AddReleaseVerification.ts`. This epic stamps from its reserved block ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)). |
 
 ### 1.5 What does not exist today
 
@@ -135,7 +135,7 @@
 - **The runner lives beside the existing exporter, not inside it.** `AccountExportService`
   answers "give me a JSON payload for these opt-in sections"; the runner answers "write every
   domain to a stream". Merging them would force the small, useful, synchronous export to grow a
-  streaming shape it does not need. The runner *reuses* the existing per-Work content walk for
+  streaming shape it does not need. The runner _reuses_ the existing per-Work content walk for
   domain D6 by calling `AccountExportService`'s Work path, so there is exactly one implementation
   of "read a Work's items out of its data repo".
 - **The archive never passes through the API process as one object.** The runner writes into a
@@ -159,40 +159,40 @@
 **Create:** `packages/agent/src/entities/workspace-backup.entity.ts` **(new)**
 `@Entity('workspace_backups')`.
 
-| Column | Type | Null | Notes |
-| --- | --- | --- | --- |
-| `id` | `uuid` PK | no | `@PrimaryGeneratedColumn('uuid')` |
-| `userId` | `uuid` | no | The owner who requested it (spec FR-10) |
-| `tenantId` | `uuid` | yes | Scope, stamped by `scope-stamping.subscriber.ts` |
-| `organizationId` | `uuid` | yes | `NULL` = the un-organized workspace (spec FR-9) |
-| `status` | `varchar(24)` | no | `queued` `running` `ready` `ready_with_gaps` `failed` `cancelled` `expired` `deleted` |
-| `failureReason` | `varchar(32)` | yes | `stalled` `timeout` `too_large` `storage_unavailable` `cancelled_by_user` `internal` |
-| `failureDetail` | `text` | yes | Operator-facing detail; never rendered raw to the user |
-| `includeFullHistory` | `boolean` default `false` | no | Spec FR-7 |
-| `formatVersion` | `varchar(16)` | no | e.g. `1.0` (spec FR-27) |
-| `buildRef` | `varchar(64)` | yes | The build that produced it (spec FR-24) |
-| `requestedAt` | `timestamptz` | no | `@CreateDateColumn` |
-| `startedAt` | `timestamptz` | yes | |
-| `finishedAt` | `timestamptz` | yes | |
-| `lastHeartbeatAt` | `timestamptz` | yes | Stall detection (spec FR-5) |
-| `progressPercent` | `int` default `0` | no | |
-| `currentDomain` | `varchar(48)` | yes | Domain key, translated client-side |
-| `domainsCompleted` | `int` default `0` | no | |
-| `domainsTotal` | `int` default `15` | no | Stored, not derived, so an old row stays legible when the domain list grows |
-| `manifestSummary` | `text` (`simple-json`) | yes | The manifest minus its per-file lists — survives artefact deletion (spec FR-29) |
-| `storageBackend` | `varchar(32)` | yes | Which backend holds it |
-| `storageKey` | `varchar(512)` | yes | Opaque key from `putObject` |
-| `sizeBytes` | `bigint` | yes | |
-| `sha256` | `varchar(64)` | yes | Of the archive itself |
-| `fileCount` | `int` default `0` | no | Files included |
-| `omittedFileCount` | `int` default `0` | no | Spec FR-15 |
-| `expiresAt` | `timestamptz` | yes | `finishedAt + retention` (spec FR-28) |
-| `artifactDeletedAt` | `timestamptz` | yes | Set on expiry or manual delete |
-| `downloadCount` | `int` default `0` | no | Telemetry (§9) |
-| `lastDownloadedAt` | `timestamptz` | yes | |
-| `runtimeRunId` | `varchar(128)` | yes | Handle returned by the dispatcher, for cancellation |
-| `credentialVersion` | `int` | yes | Enqueue-time stamp, mirroring the pattern in `packages/agent/src/tasks/runtime-binding-stamper.service.ts` |
-| `updatedAt` | `timestamptz` | no | `@UpdateDateColumn` |
+| Column               | Type                      | Null | Notes                                                                                                      |
+| -------------------- | ------------------------- | ---- | ---------------------------------------------------------------------------------------------------------- |
+| `id`                 | `uuid` PK                 | no   | `@PrimaryGeneratedColumn('uuid')`                                                                          |
+| `userId`             | `uuid`                    | no   | The owner who requested it (spec FR-10)                                                                    |
+| `tenantId`           | `uuid`                    | yes  | Scope, stamped by `scope-stamping.subscriber.ts`                                                           |
+| `organizationId`     | `uuid`                    | yes  | `NULL` = the un-organized workspace (spec FR-9)                                                            |
+| `status`             | `varchar(24)`             | no   | `queued` `running` `ready` `ready_with_gaps` `failed` `cancelled` `expired` `deleted`                      |
+| `failureReason`      | `varchar(32)`             | yes  | `stalled` `timeout` `too_large` `storage_unavailable` `cancelled_by_user` `internal`                       |
+| `failureDetail`      | `text`                    | yes  | Operator-facing detail; never rendered raw to the user                                                     |
+| `includeFullHistory` | `boolean` default `false` | no   | Spec FR-7                                                                                                  |
+| `formatVersion`      | `varchar(16)`             | no   | e.g. `1.0` (spec FR-27)                                                                                    |
+| `buildRef`           | `varchar(64)`             | yes  | The build that produced it (spec FR-24)                                                                    |
+| `requestedAt`        | `timestamptz`             | no   | `@CreateDateColumn`                                                                                        |
+| `startedAt`          | `timestamptz`             | yes  |                                                                                                            |
+| `finishedAt`         | `timestamptz`             | yes  |                                                                                                            |
+| `lastHeartbeatAt`    | `timestamptz`             | yes  | Stall detection (spec FR-5)                                                                                |
+| `progressPercent`    | `int` default `0`         | no   |                                                                                                            |
+| `currentDomain`      | `varchar(48)`             | yes  | Domain key, translated client-side                                                                         |
+| `domainsCompleted`   | `int` default `0`         | no   |                                                                                                            |
+| `domainsTotal`       | `int` default `15`        | no   | Stored, not derived, so an old row stays legible when the domain list grows                                |
+| `manifestSummary`    | `text` (`simple-json`)    | yes  | The manifest minus its per-file lists — survives artefact deletion (spec FR-29)                            |
+| `storageBackend`     | `varchar(32)`             | yes  | Which backend holds it                                                                                     |
+| `storageKey`         | `varchar(512)`            | yes  | Opaque key from `putObject`                                                                                |
+| `sizeBytes`          | `bigint`                  | yes  |                                                                                                            |
+| `sha256`             | `varchar(64)`             | yes  | Of the archive itself                                                                                      |
+| `fileCount`          | `int` default `0`         | no   | Files included                                                                                             |
+| `omittedFileCount`   | `int` default `0`         | no   | Spec FR-15                                                                                                 |
+| `expiresAt`          | `timestamptz`             | yes  | `finishedAt + retention` (spec FR-28)                                                                      |
+| `artifactDeletedAt`  | `timestamptz`             | yes  | Set on expiry or manual delete                                                                             |
+| `downloadCount`      | `int` default `0`         | no   | Telemetry (§9)                                                                                             |
+| `lastDownloadedAt`   | `timestamptz`             | yes  |                                                                                                            |
+| `runtimeRunId`       | `varchar(128)`            | yes  | Handle returned by the dispatcher, for cancellation                                                        |
+| `credentialVersion`  | `int`                     | yes  | Enqueue-time stamp, mirroring the pattern in `packages/agent/src/tasks/runtime-binding-stamper.service.ts` |
+| `updatedAt`          | `timestamptz`             | no   | `@UpdateDateColumn`                                                                                        |
 
 Indexes:
 
@@ -342,11 +342,11 @@ Every `*.jsonl` line is one record: `{ "id": …, "…": … }`, keys in a stabl
 Implemented once, in `packages/agent/src/account-transfer/backup/redaction.ts` **(new)**, and
 unit-tested against a fixture row of every entity that carries a secret column:
 
-| Rule | Applies to |
-| --- | --- |
-| Drop the column, emit `"<field>": { "wasSet": true }` | every `*Encrypted` / `*SecretEncrypted` column, plugin `secretSettings`, connection auth headers, trigger signing secrets, webhook secrets |
-| Drop the row entirely | `session`, `refresh_tokens`, `account`, `verification`, `cache_entries`, `credit_meter_events`, `tenant_credential_snapshot`, `work_knowledge_chunks`, `work_knowledge_chunk_coordinates` |
-| Drop named columns | `users.password`, `users.passwordResetToken`, `users.emailVerificationToken`, `users.magicLinkToken`, `users.isPlatformAdmin`, `api_keys.hashedKey`, `fleet_nodes.enrollmentTokenHash`, `billing_profiles.providerCustomerId` and every `provider*Id` on billing rows |
+| Rule                                                  | Applies to                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drop the column, emit `"<field>": { "wasSet": true }` | every `*Encrypted` / `*SecretEncrypted` column, plugin `secretSettings`, connection auth headers, trigger signing secrets, webhook secrets                                                                                                                            |
+| Drop the row entirely                                 | `session`, `refresh_tokens`, `account`, `verification`, `cache_entries`, `credit_meter_events`, `tenant_credential_snapshot`, `work_knowledge_chunks`, `work_knowledge_chunk_coordinates`                                                                             |
+| Drop named columns                                    | `users.password`, `users.passwordResetToken`, `users.emailVerificationToken`, `users.magicLinkToken`, `users.isPlatformAdmin`, `api_keys.hashedKey`, `fleet_nodes.enrollmentTokenHash`, `billing_profiles.providerCustomerId` and every `provider*Id` on billing rows |
 
 A CI guard (`redaction.spec.ts`) reflects over `AGENT_ENTITY_NAMES` and fails when an entity has
 a column matching `/secret|password|token|hash|credential/i` that no rule covers — so a new
@@ -365,21 +365,21 @@ class-validator classes so the global `ValidationPipe` applies — deliberately 
 export/import routes, whose hand-rolled caps exist precisely because their bodies are erased
 interfaces.
 
-| # | Method | Path | Request | Response | Notes |
-| --- | --- | --- | --- | --- | --- |
-| 1 | `POST` | `/api/account/backups` | `CreateBackupDto { includeFullHistory?: boolean }` | `202 { backup: BackupDto }`; `200 { backup, adopted: true }` when one is already running; `429 { retryAt }` over the daily allowance; `503` when storage is unconfigured | FR-2, FR-3, FR-4, FR-46 |
-| 2 | `GET` | `/api/account/backups` | `?limit=20&cursor=` | `200 { backups: BackupDto[], nextCursor }` | `limit` max 50, default 20 (FR-30) |
-| 3 | `GET` | `/api/account/backups/current` | — | `200 { backup: BackupDto \| null }` | The poll target while running (FR-41) |
-| 4 | `GET` | `/api/account/backups/:id` | — | `200 { backup: BackupDto }` · `404` cross-scope | |
-| 5 | `POST` | `/api/account/backups/:id/cancel` | — | `202` · `409` if terminal | FR-8 |
-| 6 | `DELETE` | `/api/account/backups/:id` | — | `204` | Deletes bytes, keeps the row as `deleted` (FR-31) |
-| 7 | `POST` | `/api/account/backups/:id/download-link` | — | `200 { url, expiresAt }` | HMAC token, 15-minute TTL, bound to backup id + user id + scope (FR-12) |
-| 8 | `GET` | `/api/account/backups/:id/download` | `?token=` | `200` streamed `application/zip` with `Content-Disposition`, `Content-Length`, `X-Checksum-Sha256` · `410` expired · `403` bad token | Pipes from the storage backend; never buffers |
-| 9 | `POST` | `/api/account/backups/verify` | `VerifyManifestDto { manifest: object }`, body cap 8 MiB | `200 { report: BackupCheckReport }` · `422 { code: 'not_a_backup_manifest', looked_for: [...] }` · `422 { code: 'format_too_new', formatVersion }` | FR-34, FR-35, S-18, S-19 |
-| 10 | `GET` | `/api/account/backups/format` | — | `200 { formatVersion, domains: BackupDomainDescriptor[] }` | The machine-readable field reference; the docs page renders from it |
-| 11 | `POST` | `/api/account/backups/:id/restore/preview` | `RestorePreviewDto { domains?: BackupDomainKey[] }` | `200 { report, conflicts }` | **P2** — restore from a backup this workspace holds |
-| 12 | `POST` | `/api/account/backups/:id/restore/apply` | `RestoreApplyDto { resolutions: [] }` | `202 { restoreId }` | **P2**, runs on the job runtime, per-domain transaction (FR-38) |
-| 13 | `POST` | `/api/account/backups/restore/upload` | multipart archive | `202 { backupId }` | **P3** — ingest a foreign archive, then routes 11/12 |
+| #   | Method   | Path                                       | Request                                                  | Response                                                                                                                                                                 | Notes                                                                   |
+| --- | -------- | ------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 1   | `POST`   | `/api/account/backups`                     | `CreateBackupDto { includeFullHistory?: boolean }`       | `202 { backup: BackupDto }`; `200 { backup, adopted: true }` when one is already running; `429 { retryAt }` over the daily allowance; `503` when storage is unconfigured | FR-2, FR-3, FR-4, FR-46                                                 |
+| 2   | `GET`    | `/api/account/backups`                     | `?limit=20&cursor=`                                      | `200 { backups: BackupDto[], nextCursor }`                                                                                                                               | `limit` max 50, default 20 (FR-30)                                      |
+| 3   | `GET`    | `/api/account/backups/current`             | —                                                        | `200 { backup: BackupDto \| null }`                                                                                                                                      | The poll target while running (FR-41)                                   |
+| 4   | `GET`    | `/api/account/backups/:id`                 | —                                                        | `200 { backup: BackupDto }` · `404` cross-scope                                                                                                                          |                                                                         |
+| 5   | `POST`   | `/api/account/backups/:id/cancel`          | —                                                        | `202` · `409` if terminal                                                                                                                                                | FR-8                                                                    |
+| 6   | `DELETE` | `/api/account/backups/:id`                 | —                                                        | `204`                                                                                                                                                                    | Deletes bytes, keeps the row as `deleted` (FR-31)                       |
+| 7   | `POST`   | `/api/account/backups/:id/download-link`   | —                                                        | `200 { url, expiresAt }`                                                                                                                                                 | HMAC token, 15-minute TTL, bound to backup id + user id + scope (FR-12) |
+| 8   | `GET`    | `/api/account/backups/:id/download`        | `?token=`                                                | `200` streamed `application/zip` with `Content-Disposition`, `Content-Length`, `X-Checksum-Sha256` · `410` expired · `403` bad token                                     | Pipes from the storage backend; never buffers                           |
+| 9   | `POST`   | `/api/account/backups/verify`              | `VerifyManifestDto { manifest: object }`, body cap 8 MiB | `200 { report: BackupCheckReport }` · `422 { code: 'not_a_backup_manifest', looked_for: [...] }` · `422 { code: 'format_too_new', formatVersion }`                       | FR-34, FR-35, S-18, S-19                                                |
+| 10  | `GET`    | `/api/account/backups/format`              | —                                                        | `200 { formatVersion, domains: BackupDomainDescriptor[] }`                                                                                                               | The machine-readable field reference; the docs page renders from it     |
+| 11  | `POST`   | `/api/account/backups/:id/restore/preview` | `RestorePreviewDto { domains?: BackupDomainKey[] }`      | `200 { report, conflicts }`                                                                                                                                              | **P2** — restore from a backup this workspace holds                     |
+| 12  | `POST`   | `/api/account/backups/:id/restore/apply`   | `RestoreApplyDto { resolutions: [] }`                    | `202 { restoreId }`                                                                                                                                                      | **P2**, runs on the job runtime, per-domain transaction (FR-38)         |
+| 13  | `POST`   | `/api/account/backups/restore/upload`      | multipart archive                                        | `202 { backupId }`                                                                                                                                                       | **P3** — ingest a foreign archive, then routes 11/12                    |
 
 `BackupDto` mirrors the entity minus `storageKey`, `failureDetail`, `runtimeRunId` and
 `credentialVersion` — a response DTO with `@Exclude()` on those, never the entity itself.
@@ -398,27 +398,27 @@ param, carries the workspace selector via `?scope=` and converts it with
 
 ### 5.1 New files
 
-| File | Kind | Responsibility |
-| --- | --- | --- |
-| `apps/web/src/lib/api/workspace-backup.ts` **(new)** | client | Typed fetch wrappers for routes 1–10 |
-| `apps/web/src/lib/api/workspace-backup.types.ts` **(new)** | types | `BackupDto`, `BackupCheckReport`, re-exporting `BackupDomainKey` from `@ever-works/contracts` |
-| `apps/web/src/app/actions/workspace-backup.ts` **(new)** | `'use server'` | `createBackup`, `cancelBackup`, `deleteBackup`, `mintDownloadLink`, `verifyManifest`; each `ensureAuth()`-guarded and Zod-validated, mirroring `account-transfer.ts` |
-| `apps/web/src/components/settings/WorkspaceBackupCard.tsx` **(new)** | client | The card and all eleven states of spec §6 |
-| `apps/web/src/components/settings/WorkspaceBackupHistory.tsx` **(new)** | client | The last-20 list with per-row actions and arrow-key navigation |
-| `apps/web/src/components/settings/WorkspaceBackupCoverageDrawer.tsx` **(new)** | client | "What's inside" — renders `manifestSummary`; `Esc` closes, focus returns |
-| `apps/web/src/components/settings/BackupCheckPanel.tsx` **(new)** | client | Drop a `manifest.json`, render the report, route into restore |
-| `apps/web/src/components/settings/useWorkspaceBackup.ts` **(new)** | hook | Poll `current` at 5 s for 5 minutes then 15 s; stop on `document.hidden`; expose status, progress and a 30 s-throttled live-region string |
-| `apps/web/src/components/settings/LastBackupBanner.tsx` **(new)** | client | The Danger-zone banner |
-| `apps/web/src/app/api/account/backups/[id]/download/route.ts` **(new)** | BFF | Streaming proxy (§4) |
+| File                                                                           | Kind           | Responsibility                                                                                                                                                       |
+| ------------------------------------------------------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/api/workspace-backup.ts` **(new)**                           | client         | Typed fetch wrappers for routes 1–10                                                                                                                                 |
+| `apps/web/src/lib/api/workspace-backup.types.ts` **(new)**                     | types          | `BackupDto`, `BackupCheckReport`, re-exporting `BackupDomainKey` from `@ever-works/contracts`                                                                        |
+| `apps/web/src/app/actions/workspace-backup.ts` **(new)**                       | `'use server'` | `createBackup`, `cancelBackup`, `deleteBackup`, `mintDownloadLink`, `verifyManifest`; each `ensureAuth()`-guarded and Zod-validated, mirroring `account-transfer.ts` |
+| `apps/web/src/components/settings/WorkspaceBackupCard.tsx` **(new)**           | client         | The card and all eleven states of spec §6                                                                                                                            |
+| `apps/web/src/components/settings/WorkspaceBackupHistory.tsx` **(new)**        | client         | The last-20 list with per-row actions and arrow-key navigation                                                                                                       |
+| `apps/web/src/components/settings/WorkspaceBackupCoverageDrawer.tsx` **(new)** | client         | "What's inside" — renders `manifestSummary`; `Esc` closes, focus returns                                                                                             |
+| `apps/web/src/components/settings/BackupCheckPanel.tsx` **(new)**              | client         | Drop a `manifest.json`, render the report, route into restore                                                                                                        |
+| `apps/web/src/components/settings/useWorkspaceBackup.ts` **(new)**             | hook           | Poll `current` at 5 s for 5 minutes then 15 s; stop on `document.hidden`; expose status, progress and a 30 s-throttled live-region string                            |
+| `apps/web/src/components/settings/LastBackupBanner.tsx` **(new)**              | client         | The Danger-zone banner                                                                                                                                               |
+| `apps/web/src/app/api/account/backups/[id]/download/route.ts` **(new)**        | BFF            | Streaming proxy (§4)                                                                                                                                                 |
 
 ### 5.2 Modified files (all additive)
 
-| File | Change |
-| --- | --- |
+| File                                                                                                                        | Change                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`apps/web/src/components/settings/DataManagement.tsx`](../../../../../apps/web/src/components/settings/DataManagement.tsx) | Render `<WorkspaceBackupCard />` **above** the existing export card. Nothing existing is removed, re-worded or re-ordered relative to itself. |
-| [`apps/web/src/components/settings/DangerZone.tsx`](../../../../../apps/web/src/components/settings/DangerZone.tsx) | Render `<LastBackupBanner />` at the top. The existing export button and deletion control are untouched. |
-| [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) | New keys under `dashboard.settings.data.backup` (§8) |
-| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) | No change — `/settings/data` and `/settings/danger` already exist |
+| [`apps/web/src/components/settings/DangerZone.tsx`](../../../../../apps/web/src/components/settings/DangerZone.tsx)         | Render `<LastBackupBanner />` at the top. The existing export button and deletion control are untouched.                                      |
+| [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json)                                                     | New keys under `dashboard.settings.data.backup` (§8)                                                                                          |
+| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts)                                             | No change — `/settings/data` and `/settings/danger` already exist                                                                             |
 
 ### 5.3 State and data fetching
 
@@ -609,38 +609,38 @@ subtree for that locale.
 
 Emitted through the existing monitoring package; no new provider.
 
-| Event / metric | Fields | Question it answers |
-| --- | --- | --- |
-| `workspace_backup_requested` | `includeFullHistory`, `adopted`, `refusedReason?` | How often is the daily allowance actually hit? |
-| `workspace_backup_completed` | `durationMs`, `sizeBytes`, `recordCount`, `fileCount`, `omittedFileCount`, `domainsFailed` | Are the FR-14/FR-15 limits set at the right place? |
-| `workspace_backup_failed` | `reason`, `domain?`, `durationMs` | Which failure dominates — stalls, timeouts, storage? |
-| `workspace_backup_domain_duration` | `domain`, `ms`, `records` | Which domain to optimise first. |
-| `workspace_backup_downloaded` | `ageHours`, `downloadCount` | Do people actually retrieve them, and how soon? |
-| `workspace_backup_expired_undownloaded` | — | Is 14 days too short, or is nobody downloading? |
-| `workspace_backup_checked` | `formatVersion`, `outcome` | Is the verify path used, and by whom? |
-| `workspace_restore_applied` | `domains`, `conflicts`, `skipped`, `failedDomains` | Does restore work in the field? |
+| Event / metric                          | Fields                                                                                     | Question it answers                                  |
+| --------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| `workspace_backup_requested`            | `includeFullHistory`, `adopted`, `refusedReason?`                                          | How often is the daily allowance actually hit?       |
+| `workspace_backup_completed`            | `durationMs`, `sizeBytes`, `recordCount`, `fileCount`, `omittedFileCount`, `domainsFailed` | Are the FR-14/FR-15 limits set at the right place?   |
+| `workspace_backup_failed`               | `reason`, `domain?`, `durationMs`                                                          | Which failure dominates — stalls, timeouts, storage? |
+| `workspace_backup_domain_duration`      | `domain`, `ms`, `records`                                                                  | Which domain to optimise first.                      |
+| `workspace_backup_downloaded`           | `ageHours`, `downloadCount`                                                                | Do people actually retrieve them, and how soon?      |
+| `workspace_backup_expired_undownloaded` | —                                                                                          | Is 14 days too short, or is nobody downloading?      |
+| `workspace_backup_checked`              | `formatVersion`, `outcome`                                                                 | Is the verify path used, and by whom?                |
+| `workspace_restore_applied`             | `domains`, `conflicts`, `skipped`, `failedDomains`                                         | Does restore work in the field?                      |
 
 Activity-history entries (§3.4) carry the backup id, so a support conversation can start from the
 workspace's own record.
 
 ### 9.2 Failure modes
 
-| Mode | Detection | Behaviour | Spec |
-| --- | --- | --- | --- |
-| Job runtime not configured | Dispatcher returns `null` | Row → `failed` / `internal` immediately; card shows the unavailable copy | FR-46 |
-| Storage backend unreachable | `putObject*` throws | 3 retries with backoff, then `failed` / `storage_unavailable`; allowance not charged | S-23 |
-| One domain throws | Per-collector try/catch | 2 retries, then domain marked `failed`, archive still completes | FR-17, S-13 |
-| Worker killed | No heartbeat for 10 min | Sweeper marks `stalled`, deletes the partial object | FR-5, S-14 |
-| Job exceeds an hour | `maxDuration` | `failed` / `timeout` with copy that suggests turning off full history | FR-6 |
-| Structured data over the ceiling | Running byte counter in the writer | Abort, `failed` / `too_large`, support path named | FR-16, S-12 |
-| Attachment budget reached | Running byte counter | Stop adding files, keep going, list every omission | FR-15, S-11 |
-| Two tabs press create | Partial unique index → conflict | Service catches the conflict and returns the running row with `adopted: true` | FR-3, S-9 |
-| Stale download token | HMAC expiry check | `403`; client re-mints transparently | FR-12, S-15 |
-| Foreign or corrupt manifest | Sentinel field check | `422 not_a_backup_manifest` naming the two fields looked for | S-18 |
-| Newer format | Version compare | Described but not restorable, with that reason | FR-27, S-19 |
-| Restore collides | Conflict detection before write | Per-item skip / overwrite / rename, default skip | FR-37, S-21 |
-| Restore domain fails mid-way | Per-domain transaction | Roll back that domain only, report it | FR-38 |
-| Expired archive requested | `status = expired` | `410` with the expiry date, not a `404` | S-16 |
+| Mode                             | Detection                          | Behaviour                                                                            | Spec        |
+| -------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------ | ----------- |
+| Job runtime not configured       | Dispatcher returns `null`          | Row → `failed` / `internal` immediately; card shows the unavailable copy             | FR-46       |
+| Storage backend unreachable      | `putObject*` throws                | 3 retries with backoff, then `failed` / `storage_unavailable`; allowance not charged | S-23        |
+| One domain throws                | Per-collector try/catch            | 2 retries, then domain marked `failed`, archive still completes                      | FR-17, S-13 |
+| Worker killed                    | No heartbeat for 10 min            | Sweeper marks `stalled`, deletes the partial object                                  | FR-5, S-14  |
+| Job exceeds an hour              | `maxDuration`                      | `failed` / `timeout` with copy that suggests turning off full history                | FR-6        |
+| Structured data over the ceiling | Running byte counter in the writer | Abort, `failed` / `too_large`, support path named                                    | FR-16, S-12 |
+| Attachment budget reached        | Running byte counter               | Stop adding files, keep going, list every omission                                   | FR-15, S-11 |
+| Two tabs press create            | Partial unique index → conflict    | Service catches the conflict and returns the running row with `adopted: true`        | FR-3, S-9   |
+| Stale download token             | HMAC expiry check                  | `403`; client re-mints transparently                                                 | FR-12, S-15 |
+| Foreign or corrupt manifest      | Sentinel field check               | `422 not_a_backup_manifest` naming the two fields looked for                         | S-18        |
+| Newer format                     | Version compare                    | Described but not restorable, with that reason                                       | FR-27, S-19 |
+| Restore collides                 | Conflict detection before write    | Per-item skip / overwrite / rename, default skip                                     | FR-37, S-21 |
+| Restore domain fails mid-way     | Per-domain transaction             | Roll back that domain only, report it                                                | FR-38       |
+| Expired archive requested        | `status = expired`                 | `410` with the expiry date, not a `404`                                              | S-16        |
 
 ---
 
@@ -648,39 +648,39 @@ workspace's own record.
 
 ### 10.1 Unit — agent package (Jest, `packages/agent`)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/account-transfer/backup/workspace-backup.service.spec.ts` **(new)** | Create/adopt semantics, the 3-per-24h allowance (including that failures do not count), cancel compare-and-set, expiry maths, download-token minting and rejection |
-| `packages/agent/src/account-transfer/backup/workspace-backup-runner.spec.ts` **(new)** | The fifteen-domain walk against fixture repositories; a domain that throws twice is marked `failed` while the other fourteen complete; heartbeats are written; cancellation is observed between pages |
-| `packages/agent/src/account-transfer/backup/backup-archive-writer.spec.ts` **(new)** | Zip layout matches §3.5; JSONL line counts match the manifest; `checksums.txt` verifies; the byte counters trip the FR-15 and FR-16 limits; two runs over unchanged fixtures differ only in timestamps |
-| `packages/agent/src/account-transfer/backup/backup-manifest.spec.ts` **(new)** | Every one of the fifteen domains is present with a status; trims carry a cutoff and a count; the exclusions list carries all nine categories |
-| `packages/agent/src/account-transfer/backup/redaction.spec.ts` **(new)** | Fixture rows for every secret-bearing entity emit no value; the reflection guard fails on an unhandled secret-shaped column |
-| `packages/agent/src/account-transfer/backup/backup-verify.service.spec.ts` **(new)** | Sentinel rejection, older format accepted, newer format described-not-restorable, restorability classification |
-| `packages/contracts/src/__tests__/backup-format.spec.ts` **(new)** — Vitest, this package's runner | `BACKUP_DOMAINS.length === 15`; every key has a collector id and a restorability class; the version constant parses. `index.barrel.spec.ts` is extended with the new `backup` area in the same change |
+| File                                                                                               | Covers                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/account-transfer/backup/workspace-backup.service.spec.ts` **(new)**            | Create/adopt semantics, the 3-per-24h allowance (including that failures do not count), cancel compare-and-set, expiry maths, download-token minting and rejection                                     |
+| `packages/agent/src/account-transfer/backup/workspace-backup-runner.spec.ts` **(new)**             | The fifteen-domain walk against fixture repositories; a domain that throws twice is marked `failed` while the other fourteen complete; heartbeats are written; cancellation is observed between pages  |
+| `packages/agent/src/account-transfer/backup/backup-archive-writer.spec.ts` **(new)**               | Zip layout matches §3.5; JSONL line counts match the manifest; `checksums.txt` verifies; the byte counters trip the FR-15 and FR-16 limits; two runs over unchanged fixtures differ only in timestamps |
+| `packages/agent/src/account-transfer/backup/backup-manifest.spec.ts` **(new)**                     | Every one of the fifteen domains is present with a status; trims carry a cutoff and a count; the exclusions list carries all nine categories                                                           |
+| `packages/agent/src/account-transfer/backup/redaction.spec.ts` **(new)**                           | Fixture rows for every secret-bearing entity emit no value; the reflection guard fails on an unhandled secret-shaped column                                                                            |
+| `packages/agent/src/account-transfer/backup/backup-verify.service.spec.ts` **(new)**               | Sentinel rejection, older format accepted, newer format described-not-restorable, restorability classification                                                                                         |
+| `packages/contracts/src/__tests__/backup-format.spec.ts` **(new)** — Vitest, this package's runner | `BACKUP_DOMAINS.length === 15`; every key has a collector id and a restorability class; the version constant parses. `index.barrel.spec.ts` is extended with the new `backup` area in the same change  |
 
 ### 10.2 Controller spec — API (Jest, `apps/api`)
 
-| File | Covers |
-| --- | --- |
+| File                                                                 | Covers                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `apps/api/src/account/workspace-backup.controller.spec.ts` **(new)** | All thirteen routes: owner-only gating (member → 403), cross-scope `404`, `202` on create, `200 + adopted` while running, `429` with `retryAt`, `503` with no storage, `410` on an expired download, `403` on a bad token, the 8 MiB verify cap, and that `BackupDto` never contains `storageKey`, `failureDetail` or `runtimeRunId` |
-| `apps/api/src/account/account.controller.spec.ts` (existing) | Extended with one assertion that the legacy `GET /api/account/export` behaviour is byte-for-byte unchanged |
+| `apps/api/src/account/account.controller.spec.ts` (existing)         | Extended with one assertion that the legacy `GET /api/account/export` behaviour is byte-for-byte unchanged                                                                                                                                                                                                                           |
 
 ### 10.3 Unit — web (Vitest, `apps/web/vitest.config.ts`)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/src/components/settings/WorkspaceBackupCard.unit.spec.tsx` **(new)** | Each of the eleven states renders its §6.11 copy; no Create button during the loading state; disabled controls carry their reason |
-| `apps/web/src/components/settings/useWorkspaceBackup.unit.spec.ts` **(new)** | 5 s → 15 s backoff, polling stops when hidden and refetches on show, the live-region string is throttled to 30 s |
-| `apps/web/src/components/settings/BackupCheckPanel.unit.spec.tsx` **(new)** | Over-8-MiB and non-JSON files are refused **without** a network call; the refusal names both sentinel fields |
+| File                                                                              | Covers                                                                                                                                                    |
+| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/settings/WorkspaceBackupCard.unit.spec.tsx` **(new)**    | Each of the eleven states renders its §6.11 copy; no Create button during the loading state; disabled controls carry their reason                         |
+| `apps/web/src/components/settings/useWorkspaceBackup.unit.spec.ts` **(new)**      | 5 s → 15 s backoff, polling stops when hidden and refetches on show, the live-region string is throttled to 30 s                                          |
+| `apps/web/src/components/settings/BackupCheckPanel.unit.spec.tsx` **(new)**       | Over-8-MiB and non-JSON files are refused **without** a network call; the refusal names both sentinel fields                                              |
 | `apps/web/src/app/api/account/backups/[id]/download/route.unit.spec.ts` **(new)** | Only `token` is forwarded; the scope selector is consumed, not relayed; the body is piped, not buffered; the fallback `Content-Disposition` is a constant |
 
 ### 10.4 E2E (Playwright, `apps/web/e2e/`)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/e2e/workspace-backup.spec.ts` **(new)** | Golden path: create → running → ready → the coverage drawer lists 15 sections → download returns a zip with the right content type. Plus: a second create adopts the first; a non-owner sees disabled controls; the danger-zone banner reflects the last backup |
-| `apps/web/e2e/workspace-backup-check.spec.ts` **(new)** | Drop a good manifest → report; a foreign manifest → the named refusal; a newer-format manifest → described, restore refused |
-| [`apps/web/e2e/account-data.spec.ts`](../../../../../apps/web/e2e/account-data.spec.ts) (existing) | Unchanged, and must stay green — it is the regression guard for the untouched export/import/sync path |
+| File                                                                                               | Covers                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/e2e/workspace-backup.spec.ts` **(new)**                                                  | Golden path: create → running → ready → the coverage drawer lists 15 sections → download returns a zip with the right content type. Plus: a second create adopts the first; a non-owner sees disabled controls; the danger-zone banner reflects the last backup |
+| `apps/web/e2e/workspace-backup-check.spec.ts` **(new)**                                            | Drop a good manifest → report; a foreign manifest → the named refusal; a newer-format manifest → described, restore refused                                                                                                                                     |
+| [`apps/web/e2e/account-data.spec.ts`](../../../../../apps/web/e2e/account-data.spec.ts) (existing) | Unchanged, and must stay green — it is the regression guard for the untouched export/import/sync path                                                                                                                                                           |
 
 ### 10.5 Guards that come for free
 
@@ -732,31 +732,31 @@ calls, and archive upload routes into the P2 restore path.
 
 ## 12. Constitution compliance
 
-| Principle | Status | Justification |
-| --- | --- | --- |
-| **I. Plugin-first** | Pass | No external service is spoken to directly; the archive is written and read entirely through `IStoragePlugin`. The two new methods are optional additions to the existing contract, implemented inside the existing storage plugin packages — no inline client anywhere. |
-| **II. Capability-driven resolution** | Pass | The backend is resolved by `getActiveStorageBackend()` and probed by capability (`putObjectStream` present or not). No plugin id appears in the runner, the service, the controller or the web layer. |
-| **III. Source-of-truth repositories** | Pass | Work content is still read *from* the user's data repo through the existing `DataRepository` walk and snapshotted into the archive. The archive is a copy for the user, never a new source of truth, and nothing is written back into a repo. |
-| **IV. Job runtime** | Pass | Every long-running piece — the archive build, the restore, the hourly sweeper — is dispatched through `WORKSPACE_BACKUP_DISPATCHER` / `WORKSPACE_RESTORE_DISPATCHER` and a `schedules.task`. No call site imports a vendor SDK; `POST /api/account/backups` returns `202` immediately. |
-| **V. Forward-only migrations** | Pass | One additive create-table migration ships in the same PR as the entity (§3.3); no column is renamed, dropped or repurposed; `down()` drops only the new table. |
-| **VI. Tests first-class** | Pass | Seven unit specs, two controller specs, four web unit specs and two e2e specs, listed by filename in §10, plus three CI drift guards that fail on a missing registration. |
-| **VII. Privacy and secret hygiene** | Pass | Spec FR-18 is implemented as one redaction module with a reflection-based CI guard that fails when a new secret-shaped column is not covered; the archive carries field **names** only; download links are HMAC-signed, short-lived and account-bound; the encryption posture is stated to the user rather than implied. |
-| **VIII. Single source of truth for plugin lists** | Pass | The two new storage capabilities are recorded in `docs/plugin-system/built-in-plugins.md` and nowhere else; no plugin count is repeated in this epic's documentation. |
-| **IX. Behaviour-first specs** | Pass | `spec.md` names no class, file or library; every implementation detail lives here. |
-| **X. Backwards compatibility** | Pass | The existing `GET /api/account/export` contract and both import routes are untouched and still asserted by their tests; the new routes live under a new path; the storage-contract additions are optional so no plugin major version is required; the archive format is explicitly versioned with defined read-old / refuse-newer behaviour (spec FR-27). |
+| Principle                                         | Status | Justification                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I. Plugin-first**                               | Pass   | No external service is spoken to directly; the archive is written and read entirely through `IStoragePlugin`. The two new methods are optional additions to the existing contract, implemented inside the existing storage plugin packages — no inline client anywhere.                                                                                   |
+| **II. Capability-driven resolution**              | Pass   | The backend is resolved by `getActiveStorageBackend()` and probed by capability (`putObjectStream` present or not). No plugin id appears in the runner, the service, the controller or the web layer.                                                                                                                                                     |
+| **III. Source-of-truth repositories**             | Pass   | Work content is still read _from_ the user's data repo through the existing `DataRepository` walk and snapshotted into the archive. The archive is a copy for the user, never a new source of truth, and nothing is written back into a repo.                                                                                                             |
+| **IV. Job runtime**                               | Pass   | Every long-running piece — the archive build, the restore, the hourly sweeper — is dispatched through `WORKSPACE_BACKUP_DISPATCHER` / `WORKSPACE_RESTORE_DISPATCHER` and a `schedules.task`. No call site imports a vendor SDK; `POST /api/account/backups` returns `202` immediately.                                                                    |
+| **V. Forward-only migrations**                    | Pass   | One additive create-table migration ships in the same PR as the entity (§3.3); no column is renamed, dropped or repurposed; `down()` drops only the new table.                                                                                                                                                                                            |
+| **VI. Tests first-class**                         | Pass   | Seven unit specs, two controller specs, four web unit specs and two e2e specs, listed by filename in §10, plus three CI drift guards that fail on a missing registration.                                                                                                                                                                                 |
+| **VII. Privacy and secret hygiene**               | Pass   | Spec FR-18 is implemented as one redaction module with a reflection-based CI guard that fails when a new secret-shaped column is not covered; the archive carries field **names** only; download links are HMAC-signed, short-lived and account-bound; the encryption posture is stated to the user rather than implied.                                  |
+| **VIII. Single source of truth for plugin lists** | Pass   | The two new storage capabilities are recorded in `docs/plugin-system/built-in-plugins.md` and nowhere else; no plugin count is repeated in this epic's documentation.                                                                                                                                                                                     |
+| **IX. Behaviour-first specs**                     | Pass   | `spec.md` names no class, file or library; every implementation detail lives here.                                                                                                                                                                                                                                                                        |
+| **X. Backwards compatibility**                    | Pass   | The existing `GET /api/account/export` contract and both import routes are untouched and still asserted by their tests; the new routes live under a new path; the storage-contract additions are optional so no plugin major version is required; the archive format is explicitly versioned with defined read-old / refuse-newer behaviour (spec FR-27). |
 
 ### Program rules
 
-| Rule | Status |
-| --- | --- |
-| 1 · Additive only | Pass — two render calls added, nothing removed or renamed |
-| 2 · No duplicate nouns | Pass — one new noun (*Workspace backup*), justified in spec §5.1, added to the program vocabulary table in the same change |
-| 3 · Behaviour-first spec | Pass |
-| 4 · Plugin-first for anything external | Pass |
-| 5 · Background work through the job runtime | Pass |
-| 6 · Migration in the same PR | Pass |
-| 7 · Tests as a prerequisite | Pass |
-| 8 · i18n with camelCase, dot-free leaves | Pass — §8 |
+| Rule                                          | Status                                                                                                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 · Additive only                             | Pass — two render calls added, nothing removed or renamed                                                                                                          |
+| 2 · No duplicate nouns                        | Pass — one new noun (_Workspace backup_), justified in spec §5.1, added to the program vocabulary table in the same change                                         |
+| 3 · Behaviour-first spec                      | Pass                                                                                                                                                               |
+| 4 · Plugin-first for anything external        | Pass                                                                                                                                                               |
+| 5 · Background work through the job runtime   | Pass                                                                                                                                                               |
+| 6 · Migration in the same PR                  | Pass                                                                                                                                                               |
+| 7 · Tests as a prerequisite                   | Pass                                                                                                                                                               |
+| 8 · i18n with camelCase, dot-free leaves      | Pass — §8                                                                                                                                                          |
 | 9 · Every surface answers "what did it cost?" | N/A with a note — a backup spends no tokens and makes no model call. The card states the storage cost instead (size and retention), which is the only cost it has. |
 
 ## 13. References

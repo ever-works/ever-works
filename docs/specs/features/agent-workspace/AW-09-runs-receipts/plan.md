@@ -17,32 +17,32 @@ repo-relative and each one exists today.
 
 ### 1.1 The Run record and its history
 
-| What exists | Where | What it already gives us |
-| --- | --- | --- |
-| `AgentRun` entity (`agent_runs`) | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts) | `agentId`, `userId`, `triggerKind` (`heartbeat \| manual \| task \| chat \| event`), `status` (`queued \| running \| completed \| failed \| cancelled`), `startedAt`, `finishedAt`, `durationMs`, `errorMessage`, `summary`, `taskId`, `chatMessageId`, `workId`, `totalTokens`, `costCents`, `changedFilesCount`, `currentActivity`, `runnerKind`, `workspaceMeta.filesTouched`, `awaitingInput`, `queuedReason`, `attentionReason`, gate fields, `tenantId`/`organizationId`. Indexes include `idx_agent_runs_user_created` on `(userId, createdAt)` and `idx_agent_runs_agent_started` on `(agentId, startedAt)`. |
-| `AgentRunLog` entity (`agent_run_logs`) | [`packages/agent/src/entities/agent-run-log.entity.ts`](../../../../../packages/agent/src/entities/agent-run-log.entity.ts) | Per-run structured rows: `level`, `step`, `message`, `metadata`. The timeline the receipt renders is stored here. |
-| Timeline capture | [`packages/agent/src/agents/run-capture.ts`](../../../../../packages/agent/src/agents/run-capture.ts) | Writes `assistant-message`, `user-message`, `tool-invocation` and `capture-truncated` rows. Constants already fixed: `CAPTURE_PREVIEW_MAX_CHARS = 4096`, `CAPTURE_MESSAGE_MAX_CHARS = 8192`, `CAPTURE_MAX_ENTRIES = 200`, `FILES_TOUCHED_CAP = 200`. |
-| Run execution loop | [`packages/agent/src/agents/agent-run.service.ts`](../../../../../packages/agent/src/agents/agent-run.service.ts) | Per model round-trip it folds `round.usage.totalTokens` into `agent_runs.totalTokens` and writes an `INFO` `ai-dispatch` run-log row whose `metadata` carries `model`, `promptTokens`, `completionTokens`, `totalTokens`. **The split is in free-form metadata only; nothing durable holds it, and no cache figure is captured anywhere.** Skill resolution happens in the same service (`resolveSkillsForRun`, `selectSkillsWithinBudget`) and only surfaces as `WARN` `skills` / `prompt-assembly` log rows. |
-| Sessions list endpoint | [`apps/api/src/agents/agents.controller.ts`](../../../../../apps/api/src/agents/agents.controller.ts) `GET /api/agents/runs` (declared before the `:id` routes so the literal `runs` segment never hits `ParseUUIDPipe`) | Owner-scoped list with `status`/`workId`/`agentId`/`taskId`/`kind`/`attention` filters and offset paging. **No date range.** |
-| Session detail endpoint | same file, `GET /api/agents/runs/:runId/detail` | Run projection + `counts` + `filesTouched` + a cursor-paged timeline built from `SESSION_TIMELINE_STEPS`. |
-| Repositories | [`agent-run.repository.ts`](../../../../../packages/agent/src/database/repositories/agent-run.repository.ts), [`agent-run-log.repository.ts`](../../../../../packages/agent/src/database/repositories/agent-run-log.repository.ts) | `listSessionsForUser`, `findTimelineByRun`, `countByRunSteps`. |
-| Web surfaces | [`apps/web/src/app/[locale]/(dashboard)/agents/sessions/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/sessions/page.tsx>), [`.../sessions/[runId]/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/sessions/[runId]/page.tsx>), [`.../agents/[id]/activity/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/activity/page.tsx>) | Flat, undated session list; run detail with steering; per-Agent interleaved run+event timeline. |
-| Client types | [`apps/web/src/lib/api/agents.shared.ts`](../../../../../apps/web/src/lib/api/agents.shared.ts) | `AgentRunSession`, `AgentRunSessionDetail`, `AgentRunTimelineEntry`, `timelineEntryCursor`. |
+| What exists                             | Where                                                                                                                                                                                                                                                                                                                                                                                                        | What it already gives us                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentRun` entity (`agent_runs`)        | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts)                                                                                                                                                                                                                                                                                          | `agentId`, `userId`, `triggerKind` (`heartbeat \| manual \| task \| chat \| event`), `status` (`queued \| running \| completed \| failed \| cancelled`), `startedAt`, `finishedAt`, `durationMs`, `errorMessage`, `summary`, `taskId`, `chatMessageId`, `workId`, `totalTokens`, `costCents`, `changedFilesCount`, `currentActivity`, `runnerKind`, `workspaceMeta.filesTouched`, `awaitingInput`, `queuedReason`, `attentionReason`, gate fields, `tenantId`/`organizationId`. Indexes include `idx_agent_runs_user_created` on `(userId, createdAt)` and `idx_agent_runs_agent_started` on `(agentId, startedAt)`. |
+| `AgentRunLog` entity (`agent_run_logs`) | [`packages/agent/src/entities/agent-run-log.entity.ts`](../../../../../packages/agent/src/entities/agent-run-log.entity.ts)                                                                                                                                                                                                                                                                                  | Per-run structured rows: `level`, `step`, `message`, `metadata`. The timeline the receipt renders is stored here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Timeline capture                        | [`packages/agent/src/agents/run-capture.ts`](../../../../../packages/agent/src/agents/run-capture.ts)                                                                                                                                                                                                                                                                                                        | Writes `assistant-message`, `user-message`, `tool-invocation` and `capture-truncated` rows. Constants already fixed: `CAPTURE_PREVIEW_MAX_CHARS = 4096`, `CAPTURE_MESSAGE_MAX_CHARS = 8192`, `CAPTURE_MAX_ENTRIES = 200`, `FILES_TOUCHED_CAP = 200`.                                                                                                                                                                                                                                                                                                                                                                 |
+| Run execution loop                      | [`packages/agent/src/agents/agent-run.service.ts`](../../../../../packages/agent/src/agents/agent-run.service.ts)                                                                                                                                                                                                                                                                                            | Per model round-trip it folds `round.usage.totalTokens` into `agent_runs.totalTokens` and writes an `INFO` `ai-dispatch` run-log row whose `metadata` carries `model`, `promptTokens`, `completionTokens`, `totalTokens`. **The split is in free-form metadata only; nothing durable holds it, and no cache figure is captured anywhere.** Skill resolution happens in the same service (`resolveSkillsForRun`, `selectSkillsWithinBudget`) and only surfaces as `WARN` `skills` / `prompt-assembly` log rows.                                                                                                       |
+| Sessions list endpoint                  | [`apps/api/src/agents/agents.controller.ts`](../../../../../apps/api/src/agents/agents.controller.ts) `GET /api/agents/runs` (declared before the `:id` routes so the literal `runs` segment never hits `ParseUUIDPipe`)                                                                                                                                                                                     | Owner-scoped list with `status`/`workId`/`agentId`/`taskId`/`kind`/`attention` filters and offset paging. **No date range.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Session detail endpoint                 | same file, `GET /api/agents/runs/:runId/detail`                                                                                                                                                                                                                                                                                                                                                              | Run projection + `counts` + `filesTouched` + a cursor-paged timeline built from `SESSION_TIMELINE_STEPS`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Repositories                            | [`agent-run.repository.ts`](../../../../../packages/agent/src/database/repositories/agent-run.repository.ts), [`agent-run-log.repository.ts`](../../../../../packages/agent/src/database/repositories/agent-run-log.repository.ts)                                                                                                                                                                           | `listSessionsForUser`, `findTimelineByRun`, `countByRunSteps`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Web surfaces                            | [`apps/web/src/app/[locale]/(dashboard)/agents/sessions/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/sessions/page.tsx>), [`.../sessions/[runId]/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/sessions/[runId]/page.tsx>), [`.../agents/[id]/activity/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/agents/[id]/activity/page.tsx>) | Flat, undated session list; run detail with steering; per-Agent interleaved run+event timeline.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Client types                            | [`apps/web/src/lib/api/agents.shared.ts`](../../../../../apps/web/src/lib/api/agents.shared.ts)                                                                                                                                                                                                                                                                                                              | `AgentRunSession`, `AgentRunSessionDetail`, `AgentRunTimelineEntry`, `timelineEntryCursor`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### 1.2 Cost and metering
 
-| What exists | Where | Note |
-| --- | --- | --- |
-| `PluginUsageEvent` (`plugin_usage_events`) | [`packages/agent/src/entities/plugin-usage-event.entity.ts`](../../../../../packages/agent/src/entities/plugin-usage-event.entity.ts) | One row per metered provider call. Carries `capability`, `pluginId`, `units`, `costCents`, `modelId`, `metadata`, and attribution `agentId`/`taskId`/`runId`/`ownerType`/`ownerId`, with an index on `(runId, occurredAt)`. **No token-split columns.** |
-| Usage writer | [`packages/agent/src/usage/plugin-usage.service.ts`](../../../../../packages/agent/src/usage/plugin-usage.service.ts) | `record(input)` — the single write path. |
-| AI facade | [`packages/agent/src/facades/ai.facade.ts`](../../../../../packages/agent/src/facades/ai.facade.ts) | Calls `pluginUsageService.record({ units: usage.totalTokens, modelId: response.model, metadata: { promptTokens, completionTokens } })`. This is the seam where the split becomes columns. |
-| Provider token tracker | [`packages/plugin/src/ai/token-usage.tracker.ts`](../../../../../packages/plugin/src/ai/token-usage.tracker.ts) | `TokenUsage { inputTokens, outputTokens, totalTokens }` only. Reads a tolerant set of provider field names. **Nothing reads cache fields.** |
-| Token mapping | [`packages/plugin/src/ai/ai-operations.ts`](../../../../../packages/plugin/src/ai/ai-operations.ts) `mapTokenUsage` | Maps the tracker to `{ promptTokens, completionTokens, totalTokens }`. |
-| Dispatch shape | [`packages/agent/src/agents/agent-ai-dispatch-facade.ts`](../../../../../packages/agent/src/agents/agent-ai-dispatch-facade.ts) | `usage?: { promptTokens; completionTokens; totalTokens }`. |
-| Settlement | [`packages/agent/src/subscriptions/credits/run-cost-settlement.service.ts`](../../../../../packages/agent/src/subscriptions/credits/run-cost-settlement.service.ts) | On terminal transition, sums the run's usage events, stamps `agent_runs.costCents`, and writes one `CONSUMPTION` credit-ledger row keyed `run:{runId}`. |
-| Cost dashboard | [`apps/api/src/subscriptions/costs.controller.ts`](../../../../../apps/api/src/subscriptions/costs.controller.ts) + [`costs-summary.service.ts`](../../../../../packages/agent/src/subscriptions/credits/costs-summary.service.ts) | `summary`/`daily`/`by-agent`/`by-model`/`top-runs` over a rolling 7/30/90-day window. The `by-agent` endpoint's own description states there is no cache-hit column *"because the metering path does not record cached-read tokens, and a derived percentage would be fabricated"* — this epic is what makes that column honest. |
-| Credit ledger | [`packages/agent/src/database/repositories/credit-ledger.repository.ts`](../../../../../packages/agent/src/database/repositories/credit-ledger.repository.ts) | Movements correlate to a run via `refType`/`refId`. |
-| Retention | [`apps/api/src/budgets/plugin-usage-cleanup.service.ts`](../../../../../apps/api/src/budgets/plugin-usage-cleanup.service.ts) | Prunes `plugin_usage_events` older than 12 months. `agent_runs` is not pruned — hence spec §4.5 FR-36. |
+| What exists                                | Where                                                                                                                                                                                                                              | Note                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PluginUsageEvent` (`plugin_usage_events`) | [`packages/agent/src/entities/plugin-usage-event.entity.ts`](../../../../../packages/agent/src/entities/plugin-usage-event.entity.ts)                                                                                              | One row per metered provider call. Carries `capability`, `pluginId`, `units`, `costCents`, `modelId`, `metadata`, and attribution `agentId`/`taskId`/`runId`/`ownerType`/`ownerId`, with an index on `(runId, occurredAt)`. **No token-split columns.**                                                                          |
+| Usage writer                               | [`packages/agent/src/usage/plugin-usage.service.ts`](../../../../../packages/agent/src/usage/plugin-usage.service.ts)                                                                                                              | `record(input)` — the single write path.                                                                                                                                                                                                                                                                                         |
+| AI facade                                  | [`packages/agent/src/facades/ai.facade.ts`](../../../../../packages/agent/src/facades/ai.facade.ts)                                                                                                                                | Calls `pluginUsageService.record({ units: usage.totalTokens, modelId: response.model, metadata: { promptTokens, completionTokens } })`. This is the seam where the split becomes columns.                                                                                                                                        |
+| Provider token tracker                     | [`packages/plugin/src/ai/token-usage.tracker.ts`](../../../../../packages/plugin/src/ai/token-usage.tracker.ts)                                                                                                                    | `TokenUsage { inputTokens, outputTokens, totalTokens }` only. Reads a tolerant set of provider field names. **Nothing reads cache fields.**                                                                                                                                                                                      |
+| Token mapping                              | [`packages/plugin/src/ai/ai-operations.ts`](../../../../../packages/plugin/src/ai/ai-operations.ts) `mapTokenUsage`                                                                                                                | Maps the tracker to `{ promptTokens, completionTokens, totalTokens }`.                                                                                                                                                                                                                                                           |
+| Dispatch shape                             | [`packages/agent/src/agents/agent-ai-dispatch-facade.ts`](../../../../../packages/agent/src/agents/agent-ai-dispatch-facade.ts)                                                                                                    | `usage?: { promptTokens; completionTokens; totalTokens }`.                                                                                                                                                                                                                                                                       |
+| Settlement                                 | [`packages/agent/src/subscriptions/credits/run-cost-settlement.service.ts`](../../../../../packages/agent/src/subscriptions/credits/run-cost-settlement.service.ts)                                                                | On terminal transition, sums the run's usage events, stamps `agent_runs.costCents`, and writes one `CONSUMPTION` credit-ledger row keyed `run:{runId}`.                                                                                                                                                                          |
+| Cost dashboard                             | [`apps/api/src/subscriptions/costs.controller.ts`](../../../../../apps/api/src/subscriptions/costs.controller.ts) + [`costs-summary.service.ts`](../../../../../packages/agent/src/subscriptions/credits/costs-summary.service.ts) | `summary`/`daily`/`by-agent`/`by-model`/`top-runs` over a rolling 7/30/90-day window. The `by-agent` endpoint's own description states there is no cache-hit column _"because the metering path does not record cached-read tokens, and a derived percentage would be fabricated"_ — this epic is what makes that column honest. |
+| Credit ledger                              | [`packages/agent/src/database/repositories/credit-ledger.repository.ts`](../../../../../packages/agent/src/database/repositories/credit-ledger.repository.ts)                                                                      | Movements correlate to a run via `refType`/`refId`.                                                                                                                                                                                                                                                                              |
+| Retention                                  | [`apps/api/src/budgets/plugin-usage-cleanup.service.ts`](../../../../../apps/api/src/budgets/plugin-usage-cleanup.service.ts)                                                                                                      | Prunes `plugin_usage_events` older than 12 months. `agent_runs` is not pruned — hence spec §4.5 FR-36.                                                                                                                                                                                                                           |
 
 ### 1.3 Schedules (the Upcoming panel's source)
 
@@ -54,20 +54,20 @@ The unified schedule projection already shipped and needs no change:
 
 ### 1.4 The run time limit
 
-| What exists | Where | Value |
-| --- | --- | --- |
-| Instance-wide ceiling | [`packages/agent/src/config/index.ts`](../../../../../packages/agent/src/config/index.ts) `agents.getMaxRunDurationSeconds()` | `AGENT_MAX_RUN_DURATION_SECONDS`, default **1800**. |
-| Applied to heartbeats | [`packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts) | `maxDuration: config.agents.getMaxRunDurationSeconds()`. |
-| Applied to task runs | [`packages/tasks/src/tasks/trigger/agent-task-execute.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-task-execute.task.ts) | Pinned `maxDuration: 3600`. |
-| Stale reaper | [`packages/agent/src/agents/agent-run-sweeper.service.ts`](../../../../../packages/agent/src/agents/agent-run-sweeper.service.ts) + [`packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts) | Cron `23 */2 * * *`; sweep age derived from the ceiling with a 3× floor. |
-| Per-Agent override | **does not exist** — [`packages/agent/src/entities/agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts) has no duration column. | This is what "Raise the time limit" writes. |
+| What exists           | Where                                                                                                                                                                                                                                                                         | Value                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Instance-wide ceiling | [`packages/agent/src/config/index.ts`](../../../../../packages/agent/src/config/index.ts) `agents.getMaxRunDurationSeconds()`                                                                                                                                                 | `AGENT_MAX_RUN_DURATION_SECONDS`, default **1800**.                      |
+| Applied to heartbeats | [`packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts)                                                                                                                                         | `maxDuration: config.agents.getMaxRunDurationSeconds()`.                 |
+| Applied to task runs  | [`packages/tasks/src/tasks/trigger/agent-task-execute.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-task-execute.task.ts)                                                                                                                                   | Pinned `maxDuration: 3600`.                                              |
+| Stale reaper          | [`packages/agent/src/agents/agent-run-sweeper.service.ts`](../../../../../packages/agent/src/agents/agent-run-sweeper.service.ts) + [`packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts) | Cron `23 */2 * * *`; sweep age derived from the ceiling with a 3× floor. |
+| Per-Agent override    | **does not exist** — [`packages/agent/src/entities/agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts) has no duration column.                                                                                                                      | This is what "Raise the time limit" writes.                              |
 
 ### 1.5 Web shell the new page hangs off
 
 - Dashboard group: `apps/web/src/app/[locale]/(dashboard)/` with [`layout.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout.tsx>).
 - Sidebar: [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) (entries built from `ROUTES` + `t('navigation.*')`).
 - Routes: [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) (`DASHBOARD_AGENT_SESSIONS`, `DASHBOARD_ACTIVITY`, …).
-- BFF proxy patterns to copy: [`apps/web/src/app/api/usage/costs/[section]/route.ts`](<../../../../../apps/web/src/app/api/usage/costs/[section]/route.ts>) (closed section allowlist) and [`apps/web/src/app/api/credits/usage/export/route.ts`](../../../../../apps/web/src/app/api/credits/usage/export/route.ts) (streams `response.body`, never buffers).
+- BFF proxy patterns to copy: [`apps/web/src/app/api/usage/costs/[section]/route.ts`](../../../../../apps/web/src/app/api/usage/costs/[section]/route.ts) (closed section allowlist) and [`apps/web/src/app/api/credits/usage/export/route.ts`](../../../../../apps/web/src/app/api/credits/usage/export/route.ts) (streams `response.body`, never buffers).
 - Server-action + typed-client pattern: [`apps/web/src/app/actions/activity-log.ts`](../../../../../apps/web/src/app/actions/activity-log.ts) + [`apps/web/src/lib/api/activity-log.ts`](../../../../../apps/web/src/lib/api/activity-log.ts).
 
 ### 1.6 Summary of the delta
@@ -234,10 +234,10 @@ Both live in [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations
 stamped from AW-09's reserved block — [README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow) — and re-stamped before merge if `develop` has moved past them). Per Constitution V they
 ship in the **same PR** as the entity change.
 
-| File | Phase | Contents |
-| --- | --- | --- |
-| `apps/api/src/migrations/1791090000000-AddRunReceiptTelemetry.ts` | P2 | `ALTER TABLE agent_runs` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `modelIds`, `primaryModelId`, `skillsUsed`, `toolCallCount`, `creditsDebited`; `CREATE INDEX idx_agent_runs_user_started ON agent_runs (userId, startedAt)`; `ALTER TABLE plugin_usage_events` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`. |
-| `apps/api/src/migrations/1791090100000-AddAgentRunFailureAndTimeout.ts` | P3 | `ALTER TABLE agent_runs` add `failureCode`, `effectiveTimeoutSeconds`; `ALTER TABLE agents` add `maxRunDurationSeconds`. |
+| File                                                                    | Phase | Contents                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/migrations/1791090000000-AddRunReceiptTelemetry.ts`       | P2    | `ALTER TABLE agent_runs` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `modelIds`, `primaryModelId`, `skillsUsed`, `toolCallCount`, `creditsDebited`; `CREATE INDEX idx_agent_runs_user_started ON agent_runs (userId, startedAt)`; `ALTER TABLE plugin_usage_events` add `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`. |
+| `apps/api/src/migrations/1791090100000-AddAgentRunFailureAndTimeout.ts` | P3    | `ALTER TABLE agent_runs` add `failureCode`, `effectiveTimeoutSeconds`; `ALTER TABLE agents` add `maxRunDurationSeconds`.                                                                                                                                                                                                                                                    |
 
 Generation command from `apps/api/`:
 `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AddRunReceiptTelemetry`,
@@ -256,119 +256,133 @@ from [`packages/contracts/src/index.ts`](../../../../../packages/contracts/src/i
 export type RunLedgerGranularity = 'day' | 'week' | 'month';
 
 export interface RunLedgerWindow {
-    granularity: RunLedgerGranularity;
-    /** Inclusive start, ISO 8601 with offset, resolved in the caller's timezone. */
-    from: string;
-    /** Exclusive end. */
-    to: string;
-    timezone: string;
-    /** True when the requested window was clamped to the 12-month reach. */
-    clamped: boolean;
+	granularity: RunLedgerGranularity;
+	/** Inclusive start, ISO 8601 with offset, resolved in the caller's timezone. */
+	from: string;
+	/** Exclusive end. */
+	to: string;
+	timezone: string;
+	/** True when the requested window was clamped to the 12-month reach. */
+	clamped: boolean;
 }
 
 export interface RunLedgerRow {
-    id: string;
-    agentId: string;
-    agentName: string;
-    agentArchived: boolean;
-    triggerKind: AgentRunTriggerKind;
-    status: AgentRunStatus;
-    failureCode: RunFailureCode | null;
-    startedAt: string | null;
-    createdAt: string;
-    finishedAt: string | null;
-    durationMs: number | null;
-    primaryModelId: string | null;
-    modelCount: number;
-    costCents: number | null;
-    creditsDebited: number | null;
-    totalTokens: number | null;
-    summary: string | null;
-    errorMessage: string | null;
-    currentActivity: string | null;
-    missionId: string | null;
-    missionTitle: string | null;
-    taskId: string | null;
-    workId: string | null;
-    /** `${sourceType}:${ownerId}` when the run came from a schedule, else null. */
-    scheduleKey: string | null;
-    attentionReason: string | null;
-    awaitingInput: boolean;
+	id: string;
+	agentId: string;
+	agentName: string;
+	agentArchived: boolean;
+	triggerKind: AgentRunTriggerKind;
+	status: AgentRunStatus;
+	failureCode: RunFailureCode | null;
+	startedAt: string | null;
+	createdAt: string;
+	finishedAt: string | null;
+	durationMs: number | null;
+	primaryModelId: string | null;
+	modelCount: number;
+	costCents: number | null;
+	creditsDebited: number | null;
+	totalTokens: number | null;
+	summary: string | null;
+	errorMessage: string | null;
+	currentActivity: string | null;
+	missionId: string | null;
+	missionTitle: string | null;
+	taskId: string | null;
+	workId: string | null;
+	/** `${sourceType}:${ownerId}` when the run came from a schedule, else null. */
+	scheduleKey: string | null;
+	attentionReason: string | null;
+	awaitingInput: boolean;
 }
 
 export interface RunLedgerPage {
-    window: RunLedgerWindow;
-    rows: RunLedgerRow[];
-    /** Opaque `<epochMillis>_<uuid>`; null = last page. */
-    nextCursor: string | null;
-    total: number;
-    limit: number;
+	window: RunLedgerWindow;
+	rows: RunLedgerRow[];
+	/** Opaque `<epochMillis>_<uuid>`; null = last page. */
+	nextCursor: string | null;
+	total: number;
+	limit: number;
 }
 
 export interface RunWindowStats {
-    window: RunLedgerWindow;
-    total: number;
-    byStatus: Record<AgentRunStatus, number>;
-    /** completed / terminal, 0–100 with one decimal; null when terminal = 0. */
-    successRate: number | null;
-    errorCount: number;
-    totalDurationMs: number;
-    costCents: number;
-    creditsDebited: number;
-    tokens: RunTokenSplit;
-    byTrigger: Record<string, number>;
-    /** Schedules with >= 2 failures in the window (spec FR-43). */
-    repeatFailures: Array<{ scheduleKey: string; ownerName: string; ownerLink: string; failures: number }>;
+	window: RunLedgerWindow;
+	total: number;
+	byStatus: Record<AgentRunStatus, number>;
+	/** completed / terminal, 0–100 with one decimal; null when terminal = 0. */
+	successRate: number | null;
+	errorCount: number;
+	totalDurationMs: number;
+	costCents: number;
+	creditsDebited: number;
+	tokens: RunTokenSplit;
+	byTrigger: Record<string, number>;
+	/** Schedules with >= 2 failures in the window (spec FR-43). */
+	repeatFailures: Array<{ scheduleKey: string; ownerName: string; ownerLink: string; failures: number }>;
 }
 
 export interface RunTokenSplit {
-    input: number | null;
-    output: number | null;
-    cacheRead: number | null;
-    cacheWrite: number | null;
-    total: number | null;
+	input: number | null;
+	output: number | null;
+	cacheRead: number | null;
+	cacheWrite: number | null;
+	total: number | null;
 }
 
 export interface RunCalendarDay {
-    /** `YYYY-MM-DD` in the caller's timezone. */
-    date: string;
-    runs: number;
-    failures: number;
+	/** `YYYY-MM-DD` in the caller's timezone. */
+	date: string;
+	runs: number;
+	failures: number;
 }
 
 export interface RunCostBreakdown {
-    totalCents: number | null;
-    currency: string;
-    creditsDebited: number | null;
-    /** False once the run's usage rows have aged past the 12-month prune. */
-    detailRetained: boolean;
-    tokens: RunTokenSplit;
-    byModel: Array<{ modelId: string | null; costCents: number; tokens: RunTokenSplit }>;
-    byCapability: Array<{ capability: string; calls: number; costCents: number }>;
-    /** True when every provider call resolved a user-owned key (no platform charge). */
-    byoKeyOnly: boolean;
+	totalCents: number | null;
+	currency: string;
+	creditsDebited: number | null;
+	/** False once the run's usage rows have aged past the 12-month prune. */
+	detailRetained: boolean;
+	tokens: RunTokenSplit;
+	byModel: Array<{ modelId: string | null; costCents: number; tokens: RunTokenSplit }>;
+	byCapability: Array<{ capability: string; calls: number; costCents: number }>;
+	/** True when every provider call resolved a user-owned key (no platform charge). */
+	byoKeyOnly: boolean;
 }
 
 export interface RunReceipt {
-    row: RunLedgerRow;
-    cost: RunCostBreakdown;
-    skills: RunSkillUse[];
-    failure: { code: RunFailureCode; message: string; effectiveTimeoutSeconds: number | null; timeoutSource: 'agent' | 'default' | null } | null;
-    filesTouched: string[];
-    counts: { messages: number; toolCalls: number; filesTouched: number };
-    related: { missionId: string | null; missionTitle: string | null; taskId: string | null; taskTitle: string | null; workId: string | null; workName: string | null; scheduleKey: string | null; scheduleLink: string | null };
-    /** Reuses the existing timeline shape — not a second definition. */
-    timeline: { entries: AgentRunTimelineEntry[]; nextCursor: string | null; limit: number; captureTruncated: boolean };
+	row: RunLedgerRow;
+	cost: RunCostBreakdown;
+	skills: RunSkillUse[];
+	failure: {
+		code: RunFailureCode;
+		message: string;
+		effectiveTimeoutSeconds: number | null;
+		timeoutSource: 'agent' | 'default' | null;
+	} | null;
+	filesTouched: string[];
+	counts: { messages: number; toolCalls: number; filesTouched: number };
+	related: {
+		missionId: string | null;
+		missionTitle: string | null;
+		taskId: string | null;
+		taskTitle: string | null;
+		workId: string | null;
+		workName: string | null;
+		scheduleKey: string | null;
+		scheduleLink: string | null;
+	};
+	/** Reuses the existing timeline shape — not a second definition. */
+	timeline: { entries: AgentRunTimelineEntry[]; nextCursor: string | null; limit: number; captureTruncated: boolean };
 }
 
 export interface UpcomingFire {
-    /** The ScheduleView id — `${sourceType}:${ownerId}`. Not a run id. */
-    scheduleKey: string;
-    ownerName: string;
-    ownerLink: string;
-    cadenceHuman: string;
-    nextRunAt: string;
-    agentId: string | null;
+	/** The ScheduleView id — `${sourceType}:${ownerId}`. Not a run id. */
+	scheduleKey: string;
+	ownerName: string;
+	ownerLink: string;
+	cadenceHuman: string;
+	nextRunAt: string;
+	agentId: string | null;
 }
 ```
 
@@ -393,34 +407,34 @@ Route order in the controller: the literal segments `stats`, `calendar`, `upcomi
 are declared **before** `:runId`, so the literal never reaches `ParseUUIDPipe` — the same guard
 comment that exists on `GET /api/agents/runs` today.
 
-| # | Method | Path | Auth | Throttle | Phase |
-| --- | --- | --- | --- | --- | --- |
-| 1 | `GET` | `/api/runs` | session | `long: 120/60s` | P1 |
-| 2 | `GET` | `/api/runs/stats` | session | `long: 120/60s` | P1 |
-| 3 | `GET` | `/api/runs/calendar` | session | `long: 60/60s` | P1 |
-| 4 | `GET` | `/api/runs/export` | session | `long: 10/60s` | P2 |
-| 5 | `GET` | `/api/runs/upcoming` | session | `long: 60/60s` | P3 |
-| 6 | `GET` | `/api/runs/:runId/receipt` | session | `long: 120/60s` | P1 |
-| 7 | `PATCH` | `/api/agents/:id` *(existing, one new optional field)* | session | existing `long: 30/60s` | P3 |
+| #   | Method  | Path                                                   | Auth    | Throttle                | Phase |
+| --- | ------- | ------------------------------------------------------ | ------- | ----------------------- | ----- |
+| 1   | `GET`   | `/api/runs`                                            | session | `long: 120/60s`         | P1    |
+| 2   | `GET`   | `/api/runs/stats`                                      | session | `long: 120/60s`         | P1    |
+| 3   | `GET`   | `/api/runs/calendar`                                   | session | `long: 60/60s`          | P1    |
+| 4   | `GET`   | `/api/runs/export`                                     | session | `long: 10/60s`          | P2    |
+| 5   | `GET`   | `/api/runs/upcoming`                                   | session | `long: 60/60s`          | P3    |
+| 6   | `GET`   | `/api/runs/:runId/receipt`                             | session | `long: 120/60s`         | P1    |
+| 7   | `PATCH` | `/api/agents/:id` _(existing, one new optional field)_ | session | existing `long: 30/60s` | P3    |
 
 ### 4.1 `GET /api/runs` — the ledger page
 
 `ListRunsQueryDto` (class-validator, all optional except the window pair):
 
-| Field | Rules |
-| --- | --- |
-| `from`, `to` | `@IsISO8601()`. Both required together. `to - from` ≤ **93 days**; `from` ≥ now − 12 months; `to` ≤ now + 7 days. Violations → `400 { code: 'runs.windowOutOfRange' }`. |
-| `granularity` | `@IsIn(['day','week','month'])`, default `day`. Echoed back for the client's labelling; the server trusts `from`/`to`. |
-| `timezone` | `@IsString()` validated against `Intl.supportedValuesOf('timeZone')` plus explicit `UTC`/`GMT` (the same allowance the notification quiet-hours DTO makes for a documented V8 quirk). Default: the caller's profile timezone, then `UTC`. |
-| `agentId` | `@IsUUID('4', { each: true })`, max **20** values. |
-| `kind` | `@IsIn(TRIGGER_KINDS, { each: true })`. |
-| `status` | `@IsIn(RUN_STATUSES, { each: true })`. |
-| `failureCode` | `@IsIn(FAILURE_CODES, { each: true })`. |
-| `missionId`, `workId` | `@IsUUID('4')`. |
-| `modelId` | `@IsString() @MaxLength(128)`. |
-| `q` | `@IsString() @MinLength(2) @MaxLength(200)`. |
-| `limit` | `@Type(() => Number) @IsInt() @Min(1) @Max(200)`, default **50**. |
-| `cursor` | `@IsString() @MaxLength(128)` — opaque `<epochMillis>_<uuid>`, the same shape the session timeline already uses. |
+| Field                 | Rules                                                                                                                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `from`, `to`          | `@IsISO8601()`. Both required together. `to - from` ≤ **93 days**; `from` ≥ now − 12 months; `to` ≤ now + 7 days. Violations → `400 { code: 'runs.windowOutOfRange' }`.                                                                   |
+| `granularity`         | `@IsIn(['day','week','month'])`, default `day`. Echoed back for the client's labelling; the server trusts `from`/`to`.                                                                                                                    |
+| `timezone`            | `@IsString()` validated against `Intl.supportedValuesOf('timeZone')` plus explicit `UTC`/`GMT` (the same allowance the notification quiet-hours DTO makes for a documented V8 quirk). Default: the caller's profile timezone, then `UTC`. |
+| `agentId`             | `@IsUUID('4', { each: true })`, max **20** values.                                                                                                                                                                                        |
+| `kind`                | `@IsIn(TRIGGER_KINDS, { each: true })`.                                                                                                                                                                                                   |
+| `status`              | `@IsIn(RUN_STATUSES, { each: true })`.                                                                                                                                                                                                    |
+| `failureCode`         | `@IsIn(FAILURE_CODES, { each: true })`.                                                                                                                                                                                                   |
+| `missionId`, `workId` | `@IsUUID('4')`.                                                                                                                                                                                                                           |
+| `modelId`             | `@IsString() @MaxLength(128)`.                                                                                                                                                                                                            |
+| `q`                   | `@IsString() @MinLength(2) @MaxLength(200)`.                                                                                                                                                                                              |
+| `limit`               | `@Type(() => Number) @IsInt() @Min(1) @Max(200)`, default **50**.                                                                                                                                                                         |
+| `cursor`              | `@IsString() @MaxLength(128)` — opaque `<epochMillis>_<uuid>`, the same shape the session timeline already uses.                                                                                                                          |
 
 `@Type(() => Number)` before `@IsInt()` on every numeric query field — without it a query string's
 `'50'` never satisfies the numeric validator (the trap already documented on the Costs DTO).
@@ -498,10 +512,10 @@ logged in full.
 
 ### 5.1 Routes and navigation
 
-| Path | File | Notes |
-| --- | --- | --- |
-| `/runs` | `apps/web/src/app/[locale]/(dashboard)/runs/page.tsx` | RSC shell. Reads `searchParams` for granularity / anchor date / filters, resolves the caller's timezone, does the first `getRuns` + `getRunStats` fetch with `Promise.allSettled` so one failure cannot 500 the page, and hands both to the client component with their own error flags. |
-| `/runs/[runId]` | `apps/web/src/app/[locale]/(dashboard)/runs/[runId]/page.tsx` | Standalone receipt for deep links, refresh and sharing. `notFound()` when the receipt read 404s. |
+| Path            | File                                                          | Notes                                                                                                                                                                                                                                                                                    |
+| --------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/runs`         | `apps/web/src/app/[locale]/(dashboard)/runs/page.tsx`         | RSC shell. Reads `searchParams` for granularity / anchor date / filters, resolves the caller's timezone, does the first `getRuns` + `getRunStats` fetch with `Promise.allSettled` so one failure cannot 500 the page, and hands both to the client component with their own error flags. |
+| `/runs/[runId]` | `apps/web/src/app/[locale]/(dashboard)/runs/[runId]/page.tsx` | Standalone receipt for deep links, refresh and sharing. `notFound()` when the receipt read 404s.                                                                                                                                                                                         |
 
 `ROUTES` additions in [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts):
 `DASHBOARD_RUNS: '/runs'` and `DASHBOARD_RUN: (runId: string) => '/runs/' + runId`.
@@ -512,33 +526,34 @@ the existing Activity entry — Runs answers "what did my agents do", Activity a
 in my workspace", and adjacency makes the distinction learnable.
 
 Cross-links added (all additive, nothing removed):
+
 - Sessions list gains a header link **"Open in Runs"** → `/runs?agentId=…`.
 - Session detail gains **"Open receipt"** → `/runs/{runId}`.
 - Per-Agent Activity tab gains **"See this agent in Runs"**.
-- The Costs dashboard's *Top runs* rows link to `/runs/{runId}` instead of dead-ending.
+- The Costs dashboard's _Top runs_ rows link to `/runs/{runId}` instead of dead-ending.
 
 ### 5.2 Components
 
 All new, under `apps/web/src/components/runs/`:
 
-| File | Responsibility |
-| --- | --- |
-| `RunsClient.tsx` | `'use client'` shell. Owns granularity, anchor date, filters, focused row, open receipt id. Mirrors all of it into the URL with `router.replace` (the pattern already used by the activity client). Owns the 5 s conditional poll and the keyboard handler. |
-| `RunsCalendarBar.tsx` | Day/Week/Month segmented control, Previous/Next, Today, the timezone line, and the mini-calendar trigger. |
-| `RunsMiniCalendar.tsx` | Month grid fed by `GET /api/runs/calendar`; two marker shapes; 12-month reach; announces the reach in text. |
-| `RunsFilters.tsx` | Agent / trigger / outcome / Mission / Work / model multi-selects, the search box, the active-count chip and **Clear filters**. |
-| `RunsTable.tsx` + `RunRow.tsx` | The list. `<table>` with a caption naming window and filters; one row per run; live elapsed timer for `running`; the `⚙` schedule jump; roving `j`/`k` focus. |
-| `RunsRail.tsx` | Window aggregates, each a filter shortcut; explicit scope wording; independent loading and error state. |
-| `UpcomingFiresPanel.tsx` | Upcoming list, 1 s countdown tick via one shared interval, paused on `document.hidden`, 60 s refetch and refetch on focus. |
-| `RunReceiptPanel.tsx` | The drawer. Composes the blocks below; focus-trapped dialog; `Esc` closes and returns focus. |
-| `RunReceiptCost.tsx` | Cost, credits, token split, per-model and per-capability tables, the retention notice, the "so far" labelling. |
-| `RunReceiptSkills.tsx` | Loaded / dropped / suppressed Skills with reasons and links. |
-| `RunReceiptFailure.tsx` | Classified reason, exact error, and the **Raise the time limit** flow. |
-| `RaiseTimeLimitDialog.tsx` | Re-reads the Agent's current limit, proposes the next ladder value, confirms, calls the server action, toasts, and handles the already-raised and at-ceiling cases. |
-| `RepeatFailureBanner.tsx` | The `≥ 2 failures from one schedule` banner; dismissal held in `sessionStorage`. |
-| `RunsEmptyState.tsx` | The three empty variants (no runs ever / nothing this day / no filter matches). |
-| `RunsShortcutSheet.tsx` | The `?` overlay. |
-| `runs.shared.ts` | Client-safe mirrors of the contract types plus `runRowCursor()`, `formatTokenSplit()`, `nextTimeLimitStep()`. Pure, unit-tested, importable from client components. |
+| File                           | Responsibility                                                                                                                                                                                                                                              |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RunsClient.tsx`               | `'use client'` shell. Owns granularity, anchor date, filters, focused row, open receipt id. Mirrors all of it into the URL with `router.replace` (the pattern already used by the activity client). Owns the 5 s conditional poll and the keyboard handler. |
+| `RunsCalendarBar.tsx`          | Day/Week/Month segmented control, Previous/Next, Today, the timezone line, and the mini-calendar trigger.                                                                                                                                                   |
+| `RunsMiniCalendar.tsx`         | Month grid fed by `GET /api/runs/calendar`; two marker shapes; 12-month reach; announces the reach in text.                                                                                                                                                 |
+| `RunsFilters.tsx`              | Agent / trigger / outcome / Mission / Work / model multi-selects, the search box, the active-count chip and **Clear filters**.                                                                                                                              |
+| `RunsTable.tsx` + `RunRow.tsx` | The list. `<table>` with a caption naming window and filters; one row per run; live elapsed timer for `running`; the `⚙` schedule jump; roving `j`/`k` focus.                                                                                               |
+| `RunsRail.tsx`                 | Window aggregates, each a filter shortcut; explicit scope wording; independent loading and error state.                                                                                                                                                     |
+| `UpcomingFiresPanel.tsx`       | Upcoming list, 1 s countdown tick via one shared interval, paused on `document.hidden`, 60 s refetch and refetch on focus.                                                                                                                                  |
+| `RunReceiptPanel.tsx`          | The drawer. Composes the blocks below; focus-trapped dialog; `Esc` closes and returns focus.                                                                                                                                                                |
+| `RunReceiptCost.tsx`           | Cost, credits, token split, per-model and per-capability tables, the retention notice, the "so far" labelling.                                                                                                                                              |
+| `RunReceiptSkills.tsx`         | Loaded / dropped / suppressed Skills with reasons and links.                                                                                                                                                                                                |
+| `RunReceiptFailure.tsx`        | Classified reason, exact error, and the **Raise the time limit** flow.                                                                                                                                                                                      |
+| `RaiseTimeLimitDialog.tsx`     | Re-reads the Agent's current limit, proposes the next ladder value, confirms, calls the server action, toasts, and handles the already-raised and at-ceiling cases.                                                                                         |
+| `RepeatFailureBanner.tsx`      | The `≥ 2 failures from one schedule` banner; dismissal held in `sessionStorage`.                                                                                                                                                                            |
+| `RunsEmptyState.tsx`           | The three empty variants (no runs ever / nothing this day / no filter matches).                                                                                                                                                                             |
+| `RunsShortcutSheet.tsx`        | The `?` overlay.                                                                                                                                                                                                                                            |
+| `runs.shared.ts`               | Client-safe mirrors of the contract types plus `runRowCursor()`, `formatTokenSplit()`, `nextTimeLimitStep()`. Pure, unit-tested, importable from client components.                                                                                         |
 
 **Reuse, not reimplementation:** the timeline renderer inside
 [`SessionDetailClient.tsx`](../../../../../apps/web/src/components/agents/SessionDetailClient.tsx)
@@ -573,13 +588,13 @@ its existing unit spec must stay green as the definition of "unchanged".
 **This epic adds no new job.** Constitution IV is satisfied by not needing a dispatcher: every
 number on the surface is either already stamped by the run path or computed at read time.
 
-Two existing background paths are *extended in place*, both already scheduled through the
+Two existing background paths are _extended in place_, both already scheduled through the
 configured job-runtime provider:
 
-| Existing job | File | Extension | Phase |
-| --- | --- | --- | --- |
-| `agent-run-sweeper` (cron `23 */2 * * *`) | [`packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts) → [`agent-run-sweeper.service.ts`](../../../../../packages/agent/src/agents/agent-run-sweeper.service.ts) | When it reaps a stale run, stamp `failureCode` — `'timeout'` when the run's elapsed time exceeded `effectiveTimeoutSeconds`, else `'swept-stale'`. Same CAS write it already performs; one extra column. | P3 |
-| `agent-heartbeat` / `agent-task-execute` `onFailure` | [`agent-heartbeat.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts), [`agent-task-execute.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-task-execute.task.ts) | Classify the failure into `RunFailureCode` when marking the run failed, and stamp `effectiveTimeoutSeconds` at dispatch. Tasks are already registered with the provider; `maxDuration` becomes `agent.maxRunDurationSeconds ?? config.agents.getMaxRunDurationSeconds()`. | P3 |
+| Existing job                                         | File                                                                                                                                                                                                                                                | Extension                                                                                                                                                                                                                                                                 | Phase |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `agent-run-sweeper` (cron `23 */2 * * *`)            | [`packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts) → [`agent-run-sweeper.service.ts`](../../../../../packages/agent/src/agents/agent-run-sweeper.service.ts) | When it reaps a stale run, stamp `failureCode` — `'timeout'` when the run's elapsed time exceeded `effectiveTimeoutSeconds`, else `'swept-stale'`. Same CAS write it already performs; one extra column.                                                                  | P3    |
+| `agent-heartbeat` / `agent-task-execute` `onFailure` | [`agent-heartbeat.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-heartbeat.task.ts), [`agent-task-execute.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-task-execute.task.ts)                                    | Classify the failure into `RunFailureCode` when marking the run failed, and stamp `effectiveTimeoutSeconds` at dispatch. Tasks are already registered with the provider; `maxDuration` becomes `agent.maxRunDurationSeconds ?? config.agents.getMaxRunDurationSeconds()`. | P3    |
 
 Neither change imports a vendor SDK at a call site, and neither introduces a direct queue call —
 the existing `*_DISPATCHER` symbols and `schedules.task()` registrations are untouched.
@@ -829,14 +844,14 @@ Product events through the existing PostHog binding
 ([`packages/monitoring/src/posthog/`](../../../../../packages/monitoring/src/posthog)), fired
 client-side from `RunsClient`:
 
-| Event | Properties | Why |
-| --- | --- | --- |
-| `runs_window_changed` | `granularity`, `direction` (`prev`/`next`/`today`/`calendar`), `viaKeyboard` | Tells us whether calendar navigation is used, and whether the shortcuts earn their complexity. |
-| `runs_filter_applied` | `dimension`, `valueCount` | Which filters matter; unused ones get cut. |
-| `runs_receipt_opened` | `status`, `failureCode`, `hasCostDetail` | Is the receipt read mostly for forensics or for money? |
-| `runs_time_limit_raised` | `fromSeconds`, `toSeconds`, `agentId` | The remediation's actual usage, and whether the ladder's steps are the right ones. |
-| `runs_repeat_failure_banner_shown` / `_followed` | `failures` | Does the ≥ 2 threshold produce a signal people act on? |
-| `runs_export_requested` / `_refused` | `rowCount`, `windowDays`, `reason` | Whether the 50,000-row cap is set in the right place. |
+| Event                                            | Properties                                                                   | Why                                                                                            |
+| ------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `runs_window_changed`                            | `granularity`, `direction` (`prev`/`next`/`today`/`calendar`), `viaKeyboard` | Tells us whether calendar navigation is used, and whether the shortcuts earn their complexity. |
+| `runs_filter_applied`                            | `dimension`, `valueCount`                                                    | Which filters matter; unused ones get cut.                                                     |
+| `runs_receipt_opened`                            | `status`, `failureCode`, `hasCostDetail`                                     | Is the receipt read mostly for forensics or for money?                                         |
+| `runs_time_limit_raised`                         | `fromSeconds`, `toSeconds`, `agentId`                                        | The remediation's actual usage, and whether the ladder's steps are the right ones.             |
+| `runs_repeat_failure_banner_shown` / `_followed` | `failures`                                                                   | Does the ≥ 2 threshold produce a signal people act on?                                         |
+| `runs_export_requested` / `_refused`             | `rowCount`, `windowDays`, `reason`                                           | Whether the 50,000-row cap is set in the right place.                                          |
 
 ### 9.2 Activity log
 
@@ -845,26 +860,26 @@ time limit — flows through the existing agent-update path and appears as an `a
 with the field name in `details`.
 
 Runs deliberately does **not** duplicate the activity log. The activity log answers "what changed
-in my workspace"; Runs answers "what did my agents execute". Closing the *emission* gaps for
+in my workspace"; Runs answers "what did my agents execute". Closing the _emission_ gaps for
 automated schedule fires in the activity log is the schedules feature's own scope, already
 specified, and is not repeated here.
 
 ### 9.3 Failure modes and their handling
 
-| Failure | Blast radius | Handling |
-| --- | --- | --- |
-| Ledger query slow or failing | The list only | `Promise.allSettled` on the server; independent client error state; rail and upcoming keep rendering (spec FR-58). |
-| Stats query failing | The rail only | Rail shows its own error; the list is untouched. |
-| Schedules projection failing | Upcoming only | Panel shows its error copy; the ledger is unaffected. |
-| Receipt cost aggregation slow | The cost block | Cost is fetched with the receipt but rendered progressively; a failure shows "cost unavailable" while the summary, skills and timeline render. |
-| Usage rows pruned (>12 months) | Cost detail only | `detailRetained: false`; retention notice; settled total still shown. |
-| Provider reports no cache tokens | Two rows in the receipt | `null` → "Not reported by this provider". **Never 0.** |
-| Run predates the migration | The whole cost block | `null` columns render as not-measured copy; nothing is inferred. |
-| Poll storm from many open tabs | API load | Poll only when the window includes now *and* a non-terminal run is listed; stop on `document.hidden`; throttle 120/min. |
-| Clock skew on countdowns | Upcoming only | Countdowns computed against the server's `generatedAt`, not the browser clock. |
-| Two people raise the same limit | One write | The dialog re-reads the current value and reports "no change made" instead of overwriting. |
-| Very large window requested | API | DTO rejects >93 days before any query runs. |
-| Secret echoed in a provider error | The receipt | Error text is redacted at write time by the run service and again at render; the receipt never renders raw markup. |
+| Failure                           | Blast radius            | Handling                                                                                                                                       |
+| --------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ledger query slow or failing      | The list only           | `Promise.allSettled` on the server; independent client error state; rail and upcoming keep rendering (spec FR-58).                             |
+| Stats query failing               | The rail only           | Rail shows its own error; the list is untouched.                                                                                               |
+| Schedules projection failing      | Upcoming only           | Panel shows its error copy; the ledger is unaffected.                                                                                          |
+| Receipt cost aggregation slow     | The cost block          | Cost is fetched with the receipt but rendered progressively; a failure shows "cost unavailable" while the summary, skills and timeline render. |
+| Usage rows pruned (>12 months)    | Cost detail only        | `detailRetained: false`; retention notice; settled total still shown.                                                                          |
+| Provider reports no cache tokens  | Two rows in the receipt | `null` → "Not reported by this provider". **Never 0.**                                                                                         |
+| Run predates the migration        | The whole cost block    | `null` columns render as not-measured copy; nothing is inferred.                                                                               |
+| Poll storm from many open tabs    | API load                | Poll only when the window includes now _and_ a non-terminal run is listed; stop on `document.hidden`; throttle 120/min.                        |
+| Clock skew on countdowns          | Upcoming only           | Countdowns computed against the server's `generatedAt`, not the browser clock.                                                                 |
+| Two people raise the same limit   | One write               | The dialog re-reads the current value and reports "no change made" instead of overwriting.                                                     |
+| Very large window requested       | API                     | DTO rejects >93 days before any query runs.                                                                                                    |
+| Secret echoed in a provider error | The receipt             | Error text is redacted at write time by the run service and again at render; the receipt never renders raw markup.                             |
 
 ---
 
@@ -875,26 +890,26 @@ Vitest-style `*.unit.spec.tsx` beside the component; web end-to-end = Playwright
 
 ### 10.1 Unit — agent package (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/agents/run-ledger.service.spec.ts` | Window resolution across Day/Week/Month, Monday week start, DST boundaries in a non-UTC zone, the 12-month/7-day clamp, cursor stability while rows are inserted, filter composition (AND across / OR within), `scheduleKey` derivation. |
-| `packages/agent/src/agents/run-window-stats.spec.ts` | Success-rate maths, suppression at zero terminal runs, token summation with `null` mixed in, repeat-failure grouping at exactly 1 / 2 / 3 failures. |
-| `packages/agent/src/agents/run-failure-classifier.spec.ts` | Every `RunFailureCode` branch, including "timeout only when elapsed ≥ effective limit" and the `unknown` fallback. |
-| `packages/agent/src/agents/run-receipt.service.spec.ts` | Receipt assembly, `detailRetained` flip past 12 months, BYO-key-only detection, per-model and per-capability grouping, "not attributable" vs `0`. |
-| `packages/agent/src/agents/run-skill-capture.spec.ts` | `RunSkillUse[]` produced from the loaded/dropped/suppressed sets with the right reasons. |
-| `packages/agent/src/database/repositories/agent-run.ledger.spec.ts` | Repository-level scope filter: a second user's rows are unreachable through every filter combination. |
-| `packages/plugin/src/ai/token-usage.tracker.spec.ts` *(extend existing coverage)* | Cache fields read from each tolerated field name; absent cache stays `undefined`, never `0`. |
-| `packages/agent/src/subscriptions/credits/run-cost-settlement.service.spec.ts` *(extend)* | `primaryModelId` and `creditsDebited` stamped once; a retried settlement does not double-count. |
+| File                                                                                      | Covers                                                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/agents/run-ledger.service.spec.ts`                                    | Window resolution across Day/Week/Month, Monday week start, DST boundaries in a non-UTC zone, the 12-month/7-day clamp, cursor stability while rows are inserted, filter composition (AND across / OR within), `scheduleKey` derivation. |
+| `packages/agent/src/agents/run-window-stats.spec.ts`                                      | Success-rate maths, suppression at zero terminal runs, token summation with `null` mixed in, repeat-failure grouping at exactly 1 / 2 / 3 failures.                                                                                      |
+| `packages/agent/src/agents/run-failure-classifier.spec.ts`                                | Every `RunFailureCode` branch, including "timeout only when elapsed ≥ effective limit" and the `unknown` fallback.                                                                                                                       |
+| `packages/agent/src/agents/run-receipt.service.spec.ts`                                   | Receipt assembly, `detailRetained` flip past 12 months, BYO-key-only detection, per-model and per-capability grouping, "not attributable" vs `0`.                                                                                        |
+| `packages/agent/src/agents/run-skill-capture.spec.ts`                                     | `RunSkillUse[]` produced from the loaded/dropped/suppressed sets with the right reasons.                                                                                                                                                 |
+| `packages/agent/src/database/repositories/agent-run.ledger.spec.ts`                       | Repository-level scope filter: a second user's rows are unreachable through every filter combination.                                                                                                                                    |
+| `packages/plugin/src/ai/token-usage.tracker.spec.ts` _(extend existing coverage)_         | Cache fields read from each tolerated field name; absent cache stays `undefined`, never `0`.                                                                                                                                             |
+| `packages/agent/src/subscriptions/credits/run-cost-settlement.service.spec.ts` _(extend)_ | `primaryModelId` and `creditsDebited` stamped once; a retried settlement does not double-count.                                                                                                                                          |
 
 ### 10.2 Controller specs — API (Jest, beside the controller)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/runs/runs.controller.spec.ts` | Route ordering (`stats`/`calendar`/`upcoming`/`export` never reach `ParseUUIDPipe`); DTO rejection of a 120-day window, `limit=500`, a 1-character `q`, an unknown timezone; default `limit=50`; that no query parameter can name another user or Organization. |
-| `apps/api/src/runs/runs.controller.receipt.spec.ts` | `404` for both an unknown and a foreign run id, with byte-identical bodies; timeline paging; the P1-shaped cost block. |
-| `apps/api/src/runs/runs.controller.export.spec.ts` | Refusal at 50,001 rows and at 93 days *before* streaming; headers; streamed, non-buffered body. |
-| `apps/api/src/runs/runs.controller.upcoming.spec.ts` | Horizon and limit clamps; paused/disabled/ended schedules excluded; ascending order; `generatedAt` present. |
-| `apps/api/src/agents/agents.controller.timeout.spec.ts` | `PATCH /api/agents/:id` accepts `maxRunDurationSeconds` in 60…14400, rejects 59 and 14401, accepts `null`, and 404s cross-user. |
+| File                                                    | Covers                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/runs/runs.controller.spec.ts`             | Route ordering (`stats`/`calendar`/`upcoming`/`export` never reach `ParseUUIDPipe`); DTO rejection of a 120-day window, `limit=500`, a 1-character `q`, an unknown timezone; default `limit=50`; that no query parameter can name another user or Organization. |
+| `apps/api/src/runs/runs.controller.receipt.spec.ts`     | `404` for both an unknown and a foreign run id, with byte-identical bodies; timeline paging; the P1-shaped cost block.                                                                                                                                          |
+| `apps/api/src/runs/runs.controller.export.spec.ts`      | Refusal at 50,001 rows and at 93 days _before_ streaming; headers; streamed, non-buffered body.                                                                                                                                                                 |
+| `apps/api/src/runs/runs.controller.upcoming.spec.ts`    | Horizon and limit clamps; paused/disabled/ended schedules excluded; ascending order; `generatedAt` present.                                                                                                                                                     |
+| `apps/api/src/agents/agents.controller.timeout.spec.ts` | `PATCH /api/agents/:id` accepts `maxRunDurationSeconds` in 60…14400, rejects 59 and 14401, accepts `null`, and 404s cross-user.                                                                                                                                 |
 
 ### 10.3 Web unit (beside the component)
 
@@ -908,15 +923,15 @@ Query by role and label text rather than by test id, and keep the existing
 
 ### 10.4 End-to-end (Playwright, `apps/web/e2e/`)
 
-| File | Golden path |
-| --- | --- |
-| `apps/web/e2e/runs-ledger.spec.ts` | Open `/runs`; assert Day/today and the timezone line; press `w`, `←`, `t`; assert the URL reflects each; assert the rail scope wording changes with granularity. |
-| `apps/web/e2e/runs-filters.spec.ts` | Apply Agent + outcome; assert the list narrows and the rail recomputes; reload and assert the view is restored; clear filters. |
-| `apps/web/e2e/runs-receipt.spec.ts` | Open a completed run's receipt; assert summary, skills, token split and related-work links; `Esc` returns focus to the row; open `/runs/{id}` directly. |
+| File                                            | Golden path                                                                                                                                                                                                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/e2e/runs-ledger.spec.ts`              | Open `/runs`; assert Day/today and the timezone line; press `w`, `←`, `t`; assert the URL reflects each; assert the rail scope wording changes with granularity.                                               |
+| `apps/web/e2e/runs-filters.spec.ts`             | Apply Agent + outcome; assert the list narrows and the rail recomputes; reload and assert the view is restored; clear filters.                                                                                 |
+| `apps/web/e2e/runs-receipt.spec.ts`             | Open a completed run's receipt; assert summary, skills, token split and related-work links; `Esc` returns focus to the row; open `/runs/{id}` directly.                                                        |
 | `apps/web/e2e/runs-failure-remediation.spec.ts` | Open a timed-out run; assert the classified reason and the shortcut; raise the limit; assert the toast and that a second attempt reports "no change made"; assert the at-ceiling copy for an Agent at 4 hours. |
-| `apps/web/e2e/runs-empty-and-errors.spec.ts` | Never-ran empty state; nothing-on-this-day with jump chips; no-filter-match; a stubbed 500 on the list leaving the rail and calendar rendered. |
-| `apps/web/e2e/runs-upcoming.spec.ts` | Upcoming entries with countdowns; a paused schedule absent; the empty copy; following an entry lands on the schedule. |
-| `apps/web/e2e/runs-accessibility.spec.ts` | Axe pass on the ledger and the open receipt; focus trap; table caption; outcome conveyed by icon **and** text. |
+| `apps/web/e2e/runs-empty-and-errors.spec.ts`    | Never-ran empty state; nothing-on-this-day with jump chips; no-filter-match; a stubbed 500 on the list leaving the rail and calendar rendered.                                                                 |
+| `apps/web/e2e/runs-upcoming.spec.ts`            | Upcoming entries with countdowns; a paused schedule absent; the empty copy; following an entry lands on the schedule.                                                                                          |
+| `apps/web/e2e/runs-accessibility.spec.ts`       | Axe pass on the ledger and the open receipt; focus trap; table caption; outcome conveyed by icon **and** text.                                                                                                 |
 
 Add every new spec to the existing shard mapping and to `apps/web/e2e/COVERAGE.md`.
 
@@ -936,7 +951,7 @@ Ships the whole navigation and reading experience over data that already exists.
 - `/runs` and `/runs/[runId]` pages, all components except cost detail, upcoming and remediation.
 - Sidebar entry, `ROUTES`, i18n, cross-links from Sessions / Agent activity / Costs top-runs.
 - Timeline renderer extracted and shared.
-- **Exit criteria**: spec acceptance groups *Ledger*, *Navigation*, *Filters and rail*, plus the
+- **Exit criteria**: spec acceptance groups _Ledger_, _Navigation_, _Filters and rail_, plus the
   receipt criteria that do not involve token split or Skills. Existing Sessions specs still green.
 
 ### P2 — The cost breakdown (migration A)
@@ -956,7 +971,7 @@ Ships the whole navigation and reading experience over data that already exists.
   dispatch; `maxDuration` resolved from the Agent then the deployment default.
 - `maxRunDurationSeconds` on `UpdateAgentDto`; the dialog and server action.
 - `GET /api/runs/upcoming` and the Upcoming panel; the repeat-failure banner.
-- **Exit criteria**: the *Failures* and *Upcoming* acceptance groups, including the already-raised,
+- **Exit criteria**: the _Failures_ and _Upcoming_ acceptance groups, including the already-raised,
   at-ceiling and no-permission cases.
 
 Dependencies: P2 and P3 both depend on P1's surface; they are independent of each other and may

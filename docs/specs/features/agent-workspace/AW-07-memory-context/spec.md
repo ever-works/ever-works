@@ -42,22 +42,22 @@ the change instead of typing the edit.
 
 ### 2.1 The user's question
 
-> *"I told it this last week. Why does it not know?"*
+> _"I told it this last week. Why does it not know?"_
 
 and its twin:
 
-> *"I wrote three pages of instructions for this agent. Is it even reading them?"*
+> _"I wrote three pages of instructions for this agent. Is it even reading them?"_
 
 ### 2.2 What they do today instead
 
-| The need | What Ever Works offers today | What the user actually does |
-| --- | --- | --- |
-| Teach a durable fact | Nothing first-party. Agent-memory is an **optional plugin capability** — if no provider is enabled, `GET /api/agent-memory/check-availability` reports unavailable and nothing is remembered at all. | Repeats the fact in every task description. |
-| See what is remembered | The Memory page shows **documents, uploads, meetings and provider sessions** — never the individual facts. There is no list of facts anywhere in the product. | Guesses. Or opens a run and reads the prompt. |
-| Correct a wrong fact | The delete-one-record endpoint exists (`DELETE /api/agent-memory/entries/:entryId`) but **no UI lists the records**, so there is no id to delete. | Wipes the provider's store by hand, or gives up. |
-| State a fact once for every agent | No shared always-loaded context exists. The run prompt is assembled from the agent's **own** files plus skills, scope and recent activity — nothing carries organization-wide facts. | Pastes the same paragraph into every agent's `SOUL.md`, then watches the copies drift. |
-| Know whether the instructions fit | Nothing. The prompt assembler silently truncates over-budget material, and its truncation for long authored files keeps the **end** and drops the **beginning** — the top of a carefully-ordered instruction file is the first thing to disappear. | Nothing, because they cannot see it happen. |
-| Give an agent durable notes of its own | The five canonical files are human-authored config. An agent has nowhere to record what it learned that is scoped to itself. | Nothing. |
+| The need                               | What Ever Works offers today                                                                                                                                                                                                                       | What the user actually does                                                            |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Teach a durable fact                   | Nothing first-party. Agent-memory is an **optional plugin capability** — if no provider is enabled, `GET /api/agent-memory/check-availability` reports unavailable and nothing is remembered at all.                                               | Repeats the fact in every task description.                                            |
+| See what is remembered                 | The Memory page shows **documents, uploads, meetings and provider sessions** — never the individual facts. There is no list of facts anywhere in the product.                                                                                      | Guesses. Or opens a run and reads the prompt.                                          |
+| Correct a wrong fact                   | The delete-one-record endpoint exists (`DELETE /api/agent-memory/entries/:entryId`) but **no UI lists the records**, so there is no id to delete.                                                                                                  | Wipes the provider's store by hand, or gives up.                                       |
+| State a fact once for every agent      | No shared always-loaded context exists. The run prompt is assembled from the agent's **own** files plus skills, scope and recent activity — nothing carries organization-wide facts.                                                               | Pastes the same paragraph into every agent's `SOUL.md`, then watches the copies drift. |
+| Know whether the instructions fit      | Nothing. The prompt assembler silently truncates over-budget material, and its truncation for long authored files keeps the **end** and drops the **beginning** — the top of a carefully-ordered instruction file is the first thing to disappear. | Nothing, because they cannot see it happen.                                            |
+| Give an agent durable notes of its own | The five canonical files are human-authored config. An agent has nowhere to record what it learned that is scoped to itself.                                                                                                                       | Nothing.                                                                               |
 
 Three concrete gaps, all of them ours:
 
@@ -122,7 +122,7 @@ Three concrete gaps, all of them ours:
   **then** the row updates immediately, the change is recorded in the activity
   feed, and every run started **after** the save uses the corrected wording. Runs
   already in flight keep the old value and the row says so:
-  *"2 runs in flight still hold the previous version."*
+  _"2 runs in flight still hold the previous version."_
 
 - **S4 — Forget one fact.**
   **Given** a fact that is no longer true,
@@ -144,7 +144,7 @@ Three concrete gaps, all of them ours:
   **when** the owner opens that file,
   **then** the meter reads **1,500 / 1,500 · 2,600 tokens skipped**, the
   **Preview** toggle shows the file with a marked block where the middle is cut,
-  and the block is labelled *"Skipped — the agent never sees this"*.
+  and the block is labelled _"Skipped — the agent never sees this"_.
 
 - **S7 — Fix a file by asking.**
   **Given** the owner is looking at an agent's Notes file and does not want to
@@ -168,37 +168,37 @@ Three concrete gaps, all of them ours:
 - **S9 — Nothing remembered yet (empty state).**
   **Given** a brand-new workspace,
   **when** the owner opens Memory ▸ Facts,
-  **then** they see *"Nothing remembered yet"* with the sub-line *"Facts land here
-  when you say 'remember…' in chat, or add one below"*, a primary **Add a fact**
+  **then** they see _"Nothing remembered yet"_ with the sub-line _"Facts land here
+  when you say 'remember…' in chat, or add one below"_, a primary **Add a fact**
   button, and a copyable starter prompt. No spinner, no error.
 
 - **S10 — Search finds nothing.**
   **Given** 40 facts,
   **when** the owner searches `refund policy` and no fact is close enough,
-  **then** the list shows *"No fact matches 'refund policy'"* with **Clear
+  **then** the list shows _"No fact matches 'refund policy'"_ with **Clear
   search** and **Add "refund policy" as a fact** — the second button pre-fills the
   add form with the query text.
 
 - **S11 — Two people edit the same file.**
   **Given** two owners have the Glossary open,
   **when** the second saves after the first,
-  **then** the second save is refused with *"This file changed while you were
-  editing. Reload to see the current version — your text is kept below."*, the
+  **then** the second save is refused with _"This file changed while you were
+  editing. Reload to see the current version — your text is kept below."_, the
   typed text is preserved in the editor, and a **Compare** link shows both
   versions side by side. Nothing is silently overwritten.
 
 - **S12 — Over the always-loaded file limit.**
   **Given** three workspace context files are already set to load every run,
   **when** the owner switches a fourth to **Loaded every run**,
-  **then** the switch is refused with *"At most 3 context files can load on every
-  run. Switch one of About you, Voice or Organization to on-demand first."* and
+  **then** the switch is refused with _"At most 3 context files can load on every
+  run. Switch one of About you, Voice or Organization to on-demand first."_ and
   the list highlights the three current always-loaded files.
 
 - **S13 — The memory store is full.**
   **Given** a workspace already holding 2,000 active facts,
   **when** anything tries to add another,
-  **then** the write is refused with *"Memory is full — 2,000 facts is the limit.
-  Forget some facts, or run Tidy up to merge duplicates."*, a **Tidy up** button
+  **then** the write is refused with _"Memory is full — 2,000 facts is the limit.
+  Forget some facts, or run Tidy up to merge duplicates."_, a **Tidy up** button
   opens the existing consolidation review, and — if the write came from an agent
   during a run — the run continues normally and one line lands in the run's log
   rather than failing the run.
@@ -208,35 +208,35 @@ Three concrete gaps, all of them ours:
   contained text instructing it to remember something,
   **when** the agent calls the remember tool,
   **then** the fact is stored as **Proposed**, never as active; it is **not**
-  recalled by any run; it appears in the Review panel labelled *"Proposed by
-  {agent} during run {id}"* with **Accept** and **Discard**; and if more than 200
+  recalled by any run; it appears in the Review panel labelled _"Proposed by
+  {agent} during run {id}"_ with **Accept** and **Discard**; and if more than 200
   proposals are already waiting, the new one is dropped and the run logs
-  *"memory proposal dropped — review backlog full"*.
+  _"memory proposal dropped — review backlog full"_.
 
 - **S15 — Forget everything, on purpose.**
   **Given** a list that has filled up with noise,
   **when** the owner presses **Forget all** and types `FORGET ALL` into the
   confirmation field,
   **then** every active and proposed fact in the current workspace is forgotten;
-  the dialog states before confirming exactly what is **not** touched — *"Your
-  context files, agent files, uploads and Knowledge Base are not affected"* — and
-  after the wipe the list shows the empty state with *"Agents start learning
-  again immediately."*
+  the dialog states before confirming exactly what is **not** touched — _"Your
+  context files, agent files, uploads and Knowledge Base are not affected"_ — and
+  after the wipe the list shows the empty state with _"Agents start learning
+  again immediately."_
 
 - **S16 — Semantic search unavailable.**
   **Given** the deployment has no embedding-capable AI provider resolved (or the
   database lacks vector support, as in local SQLite runs),
   **when** the owner searches Facts,
   **then** search still works as a plain text match, an inline note reads
-  *"Matching by exact words — meaning-based search needs an AI provider"* with a
+  _"Matching by exact words — meaning-based search needs an AI provider"_ with a
   link to plugin settings, and no error is thrown. Facts saved while embeddings
   are unavailable are queued and embedded automatically once a provider appears.
 
 - **S17 — Permission denied on an agent write.**
   **Given** an agent without the "edit agent files" permission,
   **when** the owner asks it in chat to update its own Notes file,
-  **then** the agent replies *"I can't edit my own files — here's the change I'd
-  make"* and returns the proposed text as a diff with an **Apply** button the
+  **then** the agent replies _"I can't edit my own files — here's the change I'd
+  make"_ and returns the proposed text as a diff with an **Apply** button the
   owner presses; nothing is written until they do.
 
 - **S18 — Someone else's workspace.**
@@ -254,8 +254,8 @@ Three concrete gaps, all of them ours:
 - **S20 — A file is edited while a run is reading it.**
   **Given** a run started at 10:00 that loaded the agent's Notes,
   **when** the owner saves a change at 10:01,
-  **then** the in-flight run keeps the 10:00 text, the file page shows *"Takes
-  effect on the next run · 1 run in flight"*, and the next run picks up the new
+  **then** the in-flight run keeps the 10:00 text, the file page shows _"Takes
+  effect on the next run · 1 run in flight"_, and the next run picks up the new
   text. The run receipt for the 10:00 run records which revision it used.
 
 ## 4. Functional requirements
@@ -372,15 +372,15 @@ Three concrete gaps, all of them ours:
   budget), **near** (90–100 %), **over** (above 100 %).
 - **FR-42** When a file is over budget, the editor MUST identify the exact region
   that is skipped, by character range, and the **Preview** toggle MUST render it
-  visibly marked and labelled *"Skipped — the agent never sees this"*.
+  visibly marked and labelled _"Skipped — the agent never sees this"_.
 - **FR-43** Truncation of an authored context file MUST preserve the **head and
   the tail** and drop the **middle** — specifically, the first 70 % of the budget
   from the top and the last 30 % from the bottom, with a single marker line in
   between. Feed-shaped material (recent activity, recent runs, conversation) keeps
   its existing newest-first behaviour and is out of this rule.
 - **FR-44** The editor MUST state the authoring rule this truncation implies:
-  *"Lead with what matters most — the top of a file is the part that always
-  survives."*
+  _"Lead with what matters most — the top of a file is the part that always
+  survives."_
 - **FR-45** The meter MUST be computable without running the agent, so a file that
   has never been used still shows an accurate figure.
 - **FR-46** Each agent MUST have a whole-agent context report listing every
@@ -389,22 +389,22 @@ Three concrete gaps, all of them ours:
   output contract — each with its budget, its usage and its state.
 - **FR-47** The per-segment budgets MUST be exactly:
 
-  | Segment | Source | Budget (tokens) |
-  | --- | --- | --- |
-  | Identity | agent Identity file | 1,200 |
-  | Role | agent Role file | 1,200 |
-  | Notes | agent Notes file (new) | 1,500 |
-  | Capabilities | agent capabilities text | 400 |
-  | Operating loop | agent Operating-loop file | 800 |
-  | Tools | agent Tools file + grants | 1,500 |
-  | Skills | bound skills | 4,000, or the agent's own override |
-  | Workspace context | always-loaded context files | 1,500 shared |
-  | Memory facts | pinned + recalled facts | 1,200 |
-  | Scope prompts | Work-level prompt customisation | 600 |
-  | Scope context | Mission / Idea / Work description | 800 |
-  | Recent activity | activity feed extract | 1,200 |
-  | Recent runs | previous run summaries | 800 |
-  | Output contract | response-shape reminder | 150 |
+    | Segment           | Source                            | Budget (tokens)                    |
+    | ----------------- | --------------------------------- | ---------------------------------- |
+    | Identity          | agent Identity file               | 1,200                              |
+    | Role              | agent Role file                   | 1,200                              |
+    | Notes             | agent Notes file (new)            | 1,500                              |
+    | Capabilities      | agent capabilities text           | 400                                |
+    | Operating loop    | agent Operating-loop file         | 800                                |
+    | Tools             | agent Tools file + grants         | 1,500                              |
+    | Skills            | bound skills                      | 4,000, or the agent's own override |
+    | Workspace context | always-loaded context files       | 1,500 shared                       |
+    | Memory facts      | pinned + recalled facts           | 1,200                              |
+    | Scope prompts     | Work-level prompt customisation   | 600                                |
+    | Scope context     | Mission / Idea / Work description | 800                                |
+    | Recent activity   | activity feed extract             | 1,200                              |
+    | Recent runs       | previous run summaries            | 800                                |
+    | Output contract   | response-shape reminder           | 150                                |
 
 - **FR-48** The overall per-run instruction budget MUST be **17,000 tokens**,
   which is strictly above the sum of every segment budget (16,850), so a segment
@@ -455,26 +455,26 @@ Three concrete gaps, all of them ours:
 
 ## 5. Key entities & domain concepts
 
-| Concept | New? | Description | States → transitions |
-| --- | --- | --- | --- |
-| **Memory** | Existing (extended) | The workspace's durable knowledge. Until now it meant documents and uploads; it now also has an atomic-fact tier. | — |
-| **Memory fact** | **New** | One atomic durable statement — a decision, a preference, a person, a constraint — scoped to the workspace or to one agent. | `proposed` → `active` (accept) · `proposed` → `forgotten` (discard) · `active` → `forgotten` (forget) · `forgotten` → `active` (restore, ≤30 days) · `forgotten` → purged (sweep, terminal) |
-| **Context file** | **New noun** | An authored document that is injected into runs rather than retrieved as a search result. Two families: **workspace context files** (six, shared) and **agent context files** (per agent). Distinct from both Memory facts (atomic, recalled) and Knowledge Base documents (retrieved, cited). See §5.1. | `empty` → `written` → `written` (each save is a new revision). No delete. |
-| **Context file revision** | **New** | An immutable prior body of a context file with its author and time. | append-only; pruned by the retention rule |
-| **Load report** | **New (read model, not stored in v1)** | The computed answer to "how much of this reaches the agent". Per segment: budget, used, included, skipped range, state. | computed on demand; from P2 also captured per run |
-| **Agent** | Existing (extended) | Gains one new file, **Notes**. | unchanged |
-| **Agent file** | Existing (extended) | The canonical per-agent instruction files. The set grows from five to six. Identity and Role keep their meaning; the editor gives them plain-English captions. | unchanged |
-| **Run** | Existing (extended) | Gains a record of what its instruction budget actually spent (P2). | unchanged |
-| **Knowledge Base** | Existing (untouched) | Documents with citations and retrieval trails. Explicitly *not* what a context file is. | unchanged |
-| **Skill** | Existing (untouched) | Reusable capability, already a budgeted prompt segment. | unchanged |
+| Concept                   | New?                                   | Description                                                                                                                                                                                                                                                                                              | States → transitions                                                                                                                                                                        |
+| ------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Memory**                | Existing (extended)                    | The workspace's durable knowledge. Until now it meant documents and uploads; it now also has an atomic-fact tier.                                                                                                                                                                                        | —                                                                                                                                                                                           |
+| **Memory fact**           | **New**                                | One atomic durable statement — a decision, a preference, a person, a constraint — scoped to the workspace or to one agent.                                                                                                                                                                               | `proposed` → `active` (accept) · `proposed` → `forgotten` (discard) · `active` → `forgotten` (forget) · `forgotten` → `active` (restore, ≤30 days) · `forgotten` → purged (sweep, terminal) |
+| **Context file**          | **New noun**                           | An authored document that is injected into runs rather than retrieved as a search result. Two families: **workspace context files** (six, shared) and **agent context files** (per agent). Distinct from both Memory facts (atomic, recalled) and Knowledge Base documents (retrieved, cited). See §5.1. | `empty` → `written` → `written` (each save is a new revision). No delete.                                                                                                                   |
+| **Context file revision** | **New**                                | An immutable prior body of a context file with its author and time.                                                                                                                                                                                                                                      | append-only; pruned by the retention rule                                                                                                                                                   |
+| **Load report**           | **New (read model, not stored in v1)** | The computed answer to "how much of this reaches the agent". Per segment: budget, used, included, skipped range, state.                                                                                                                                                                                  | computed on demand; from P2 also captured per run                                                                                                                                           |
+| **Agent**                 | Existing (extended)                    | Gains one new file, **Notes**.                                                                                                                                                                                                                                                                           | unchanged                                                                                                                                                                                   |
+| **Agent file**            | Existing (extended)                    | The canonical per-agent instruction files. The set grows from five to six. Identity and Role keep their meaning; the editor gives them plain-English captions.                                                                                                                                           | unchanged                                                                                                                                                                                   |
+| **Run**                   | Existing (extended)                    | Gains a record of what its instruction budget actually spent (P2).                                                                                                                                                                                                                                       | unchanged                                                                                                                                                                                   |
+| **Knowledge Base**        | Existing (untouched)                   | Documents with citations and retrieval trails. Explicitly _not_ what a context file is.                                                                                                                                                                                                                  | unchanged                                                                                                                                                                                   |
+| **Skill**                 | Existing (untouched)                   | Reusable capability, already a budgeted prompt segment.                                                                                                                                                                                                                                                  | unchanged                                                                                                                                                                                   |
 
 ### 5.0 Verbs
 
-**Forget**, not *delete*, is the verb on a fact. This is not new vocabulary: the
+**Forget**, not _delete_, is the verb on a fact. This is not new vocabulary: the
 platform's own memory capability contract already describes its
 delete-one-record operation as the "forget me" operation, so the word is already
-ours and the UI simply catches up with it. A fact is *forgotten*; a file is
-*saved*; a revision is *restored*; a proposal is *accepted* or *discarded*. No
+ours and the UI simply catches up with it. A fact is _forgotten_; a file is
+_saved_; a revision is _restored_; a proposal is _accepted_ or _discarded_. No
 other verbs are introduced.
 
 ### 5.1 Why "context file" is a new noun and not a synonym
@@ -493,8 +493,8 @@ file is neither:
   file is what the agent knows.
 
 `Context file` is therefore added to the program vocabulary table in the same
-change, with the note that its two families are *workspace context files* and
-*agent context files*.
+change, with the note that its two families are _workspace context files_ and
+_agent context files_.
 
 ### 5.2 What this epic deliberately does not add as a new noun
 
@@ -504,9 +504,9 @@ already has an identity file and a role file per agent. Adding separate
 program rule #2 forbids. So:
 
 - **Identity** is the existing agent identity file, relabelled in the editor with
-  the caption *"Who this agent is — voice, values, how it carries itself."*
-- **Role** is the existing agent role file, captioned *"What it owns and how it
-  works."*
+  the caption _"Who this agent is — voice, values, how it carries itself."_
+- **Role** is the existing agent role file, captioned _"What it owns and how it
+  works."_
 - **Notes** is the one genuinely new file, and it is new because it is the only
   agent-writable durable tier — a place the agent puts what it learned that no
   human authored.
@@ -550,8 +550,8 @@ program rule #2 forbids. So:
 ```
 
 Copy — rail headings: `Facts`, `Context files`, `Agents`, `Also here`.
-Copy — page subtitle: *"Every fact, file and note your agents carry into a run —
-visible and editable."*
+Copy — page subtitle: _"Every fact, file and note your agents carry into a run —
+visible and editable."_
 
 ### 6.2 Facts list — loaded
 
@@ -657,7 +657,7 @@ UNDO TOAST (10s)                        FORGET ALL
 ### 6.6 Context file editor — over budget, and the marked skipped region
 
 ```
-WRITE MODE (over)                                                              
+WRITE MODE (over)
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  Notes — Research agent                            ⟳ Loaded every run        │
 ├──────────────────────────────────────────────────────────────────────────────┤
@@ -720,10 +720,10 @@ text — never colour alone, so it survives a monochrome or high-contrast render
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Empty state (a brand-new agent): every bar at zero, with *"Nothing written yet —
-this agent runs on defaults."*
-Error state (report cannot be computed): *"Couldn't measure this agent's context.
-Retry"* with the bars replaced by a single inline error row; the editor above
+Empty state (a brand-new agent): every bar at zero, with _"Nothing written yet —
+this agent runs on defaults."_
+Error state (report cannot be computed): _"Couldn't measure this agent's context.
+Retry"_ with the bars replaced by a single inline error row; the editor above
 stays fully usable.
 
 ### 6.8 Ask an agent to update this → chat, and the context chip
@@ -750,8 +750,8 @@ Copy — button: `Ask an agent to update this`.
 Copy — pre-filled message, agent file: `@{agent-slug} update your {File} file: `
 Copy — pre-filled message, workspace file: `Update the {File} context file: `
 Copy — chip title on expand: `What rides along with your message, exactly as sent:`
-Copy — when the agent lacks the permission: *"I can't edit my own files — here's
-the change I'd make."* with **Apply** / **Discard**.
+Copy — when the agent lacks the permission: _"I can't edit my own files — here's
+the change I'd make."_ with **Apply** / **Discard**.
 
 ### 6.9 Concurrent-edit conflict
 
@@ -768,26 +768,26 @@ nothing is written until they reload and re-save.
 
 ### 6.10 Keyboard affordances
 
-| Where | Key | Action |
-| --- | --- | --- |
-| Memory page | `/` | Focus the Facts search box |
-| Memory page | `g` then `f` | Jump to Facts · `g` `c` Context files · `g` `a` Agents |
-| Facts list | `↑` `↓` | Move the row focus |
-| Facts list | `Enter` | Open the focused fact for editing |
-| Facts list | `e` | Edit the focused fact in place |
-| Facts list | `f` | Forget the focused fact (undo toast follows) |
-| Facts list | `p` | Pin / unpin the focused fact |
-| Fact editor | `Esc` | Cancel the edit, restoring the previous text |
-| Fact editor | `⌘/Ctrl` `Enter` | Save and close |
-| File editor | `⌘/Ctrl` `S` | Save |
-| File editor | `⌘/Ctrl` `⇧` `P` | Toggle Write / Preview |
-| File editor | `⌘/Ctrl` `⇧` `A` | Ask an agent to update this |
-| Preview | `n` / `N` | Jump to the next / previous skipped block |
-| Forget-all dialog | `Esc` | Cancel (never confirms) |
-| Any dialog | `Tab` | Cycles within the dialog; focus returns to the trigger on close |
+| Where             | Key              | Action                                                          |
+| ----------------- | ---------------- | --------------------------------------------------------------- |
+| Memory page       | `/`              | Focus the Facts search box                                      |
+| Memory page       | `g` then `f`     | Jump to Facts · `g` `c` Context files · `g` `a` Agents          |
+| Facts list        | `↑` `↓`          | Move the row focus                                              |
+| Facts list        | `Enter`          | Open the focused fact for editing                               |
+| Facts list        | `e`              | Edit the focused fact in place                                  |
+| Facts list        | `f`              | Forget the focused fact (undo toast follows)                    |
+| Facts list        | `p`              | Pin / unpin the focused fact                                    |
+| Fact editor       | `Esc`            | Cancel the edit, restoring the previous text                    |
+| Fact editor       | `⌘/Ctrl` `Enter` | Save and close                                                  |
+| File editor       | `⌘/Ctrl` `S`     | Save                                                            |
+| File editor       | `⌘/Ctrl` `⇧` `P` | Toggle Write / Preview                                          |
+| File editor       | `⌘/Ctrl` `⇧` `A` | Ask an agent to update this                                     |
+| Preview           | `n` / `N`        | Jump to the next / previous skipped block                       |
+| Forget-all dialog | `Esc`            | Cancel (never confirms)                                         |
+| Any dialog        | `Tab`            | Cycles within the dialog; focus returns to the trigger on close |
 
 Every meter exposes its numbers to assistive technology as text
-(*"Notes: 1,500 of 1,500 tokens used, 2,600 tokens skipped"*), not only as a bar.
+(_"Notes: 1,500 of 1,500 tokens used, 2,600 tokens skipped"_), not only as a bar.
 
 ## 7. Out of scope
 
@@ -866,8 +866,7 @@ Every meter exposes its numbers to assistive technology as text
 - [ ] **Ask an agent to update this** opens chat with the file attached and the
       message pre-filled; the chip expands to exactly the text that is sent,
       including the marked skipped region.
-- [ ] A fact or context file belonging to another organization returns 404, not
-      403.
+- [ ] A fact or context file belonging to another organization returns 404, not 403.
 - [ ] Every keyboard affordance in §6.10 works, and focus returns to the trigger
       when a dialog closes.
 - [ ] Every user-visible string is a message key; no literal English in a

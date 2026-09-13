@@ -12,7 +12,7 @@
 > and the GitHub config-repo sync that ship on `/settings/data` today are untouched. This epic
 > adds a second, complete artefact alongside them, and a record of the artefacts produced.
 >
-> **One new noun.** *Workspace backup* — a durable record of one produced archive. §5 justifies
+> **One new noun.** _Workspace backup_ — a durable record of one produced archive. §5 justifies
 > it and fences it off from the existing stateless export. No existing noun changes meaning.
 
 ---
@@ -31,8 +31,8 @@ not recreate.
 
 ## 2. Why now
 
-**The user's question this answers:** *"If I stop paying, if I want to move, if something goes
-badly wrong — do I still have my work?"* Every other epic in this program persuades an owner to
+**The user's question this answers:** _"If I stop paying, if I want to move, if something goes
+badly wrong — do I still have my work?"_ Every other epic in this program persuades an owner to
 put more of their operation into Ever Works: their agents' instructions, their missions, their
 decisions, their knowledge, their machines. The honest counterpart of that ask is a way to walk
 out with all of it, and to know in advance precisely what "all of it" means.
@@ -41,24 +41,24 @@ out with all of it, and to know in advance precisely what "all of it" means.
 Export. That path is real and works, but it answers a narrower question than the one being
 asked:
 
-| What happens today | Why it does not answer the question |
-| --- | --- |
-| The export runs inside the web request that asked for it, is assembled entirely in memory, is handed back through a server action, is re-serialised in the browser, and only then becomes a file. | A workspace with a few large directories, a year of runs, or any attachments is a coin-flip: the request times out, or the tab's memory does. There is no progress, no resume, and no evidence afterwards that it was ever attempted. |
-| The payload covers the account profile, the Works and their content, and installed plugin settings — plus, behind four opt-in checkboxes, Agents, Skills, Tasks and task chat. | Everything else the workspace contains is absent: missions, goals, ideas, knowledge documents and their uploads, memory folders, schedules and triggers, runs and their logs, decisions and escalations, the inbox, email, teams, connections, environments, node inventory, the activity history, and the billing/usage record. An owner reading the file cannot tell that any of it is missing. |
-| Uploaded files are referenced by id. | The bytes are not in the export. A knowledge base full of PDFs exports as a list of filenames. |
-| The shape is a versioned interface in the codebase. | Nothing user-facing documents it. There is no manifest, no checksum, no field reference. "Structured data you can keep" is only true if you can read it without our source tree. |
-| The export leaves no trace. | There is no way to answer "when did I last take a backup?" — which is the only version of this question anyone actually asks. |
-| Some data must never leave (credentials) and some must never be re-imported (money, machine identity). | That is correct, and it is invisible. The file quietly omits things, and the import quietly refuses things, and nobody is told either way. |
+| What happens today                                                                                                                                                                                | Why it does not answer the question                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The export runs inside the web request that asked for it, is assembled entirely in memory, is handed back through a server action, is re-serialised in the browser, and only then becomes a file. | A workspace with a few large directories, a year of runs, or any attachments is a coin-flip: the request times out, or the tab's memory does. There is no progress, no resume, and no evidence afterwards that it was ever attempted.                                                                                                                                                             |
+| The payload covers the account profile, the Works and their content, and installed plugin settings — plus, behind four opt-in checkboxes, Agents, Skills, Tasks and task chat.                    | Everything else the workspace contains is absent: missions, goals, ideas, knowledge documents and their uploads, memory folders, schedules and triggers, runs and their logs, decisions and escalations, the inbox, email, teams, connections, environments, node inventory, the activity history, and the billing/usage record. An owner reading the file cannot tell that any of it is missing. |
+| Uploaded files are referenced by id.                                                                                                                                                              | The bytes are not in the export. A knowledge base full of PDFs exports as a list of filenames.                                                                                                                                                                                                                                                                                                    |
+| The shape is a versioned interface in the codebase.                                                                                                                                               | Nothing user-facing documents it. There is no manifest, no checksum, no field reference. "Structured data you can keep" is only true if you can read it without our source tree.                                                                                                                                                                                                                  |
+| The export leaves no trace.                                                                                                                                                                       | There is no way to answer "when did I last take a backup?" — which is the only version of this question anyone actually asks.                                                                                                                                                                                                                                                                     |
+| Some data must never leave (credentials) and some must never be re-imported (money, machine identity).                                                                                            | That is correct, and it is invisible. The file quietly omits things, and the import quietly refuses things, and nobody is told either way.                                                                                                                                                                                                                                                        |
 
 **The costs of the gap, all of them ours.**
 
-| Gap | What it costs |
-| --- | --- |
-| No credible exit | "Can I get my data out?" is a procurement question and a trust question. A partial JSON with no documentation is a worse answer than a plain "no", because it looks like a yes until someone checks. |
+| Gap                                   | What it costs                                                                                                                                                                                                      |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No credible exit                      | "Can I get my data out?" is a procurement question and a trust question. A partial JSON with no documentation is a worse answer than a plain "no", because it looks like a yes until someone checks.               |
 | No pre-flight before destructive work | The Danger zone already renders an export button next to account deletion. That button hands you an incomplete file. The one moment we most need the backup to be complete is the moment it is least likely to be. |
-| No incident story | When an agent does something regrettable at scale, the first question is "what did it look like before?". Nothing today can answer that. |
-| Support cannot verify | "Did your export include your knowledge base?" has no answer that does not involve reading our code. |
-| Self-hosted operators are stuck | An operator moving between their own deployments has database dumps, but no supported, documented, per-workspace artefact. |
+| No incident story                     | When an agent does something regrettable at scale, the first question is "what did it look like before?". Nothing today can answer that.                                                                           |
+| Support cannot verify                 | "Did your export include your knowledge base?" has no answer that does not involve reading our code.                                                                                                               |
+| Self-hosted operators are stuck       | An operator moving between their own deployments has database dumps, but no supported, documented, per-workspace artefact.                                                                                         |
 
 **Why now, and why it is small.** The pieces exist: a working exporter for the largest domain
 (Works and their content), a pluggable storage backend that already stores user files, a
@@ -94,8 +94,8 @@ means, which parts can be restored and which are a record only,
 **S-3 · See what a restore would do, before it does it.**
 **Given** an owner holding an archive from another workspace or an earlier date,
 **When** they open **Check a backup** and drop in the archive's `manifest.json`,
-**Then** a report appears listing every domain with one of three outcomes — *restored*,
-*record only*, *not in this archive* — with row counts, without writing anything,
+**Then** a report appears listing every domain with one of three outcomes — _restored_,
+_record only_, _not in this archive_ — with row counts, without writing anything,
 **and** the report names the exact items that will need a human afterwards (every connection
 whose credential was never exported, every schedule that will resume, every node that must be
 re-enrolled).
@@ -103,7 +103,7 @@ re-enrolled).
 **S-4 · Restore what can be restored.**
 **Given** the report from S-3 against an empty workspace,
 **When** the owner continues into restore and confirms,
-**Then** the domains marked *restored* are recreated, conflicts are resolved with the same
+**Then** the domains marked _restored_ are recreated, conflicts are resolved with the same
 skip / overwrite / rename choices the existing import offers,
 **and** the result screen lists what landed, what was skipped and why, and links to the first
 thing that needs a credential re-entered.
@@ -229,7 +229,7 @@ activity record is altered.
 **S-22 · Someone tries to restore money or machines.**
 **Given** an archive containing the billing and usage record and the node inventory,
 **When** it is restored,
-**Then** those domains are reported as *record only* and are not written, with the reason stated
+**Then** those domains are reported as _record only_ and are not written, with the reason stated
 in the result screen: balances are earned in one account and cannot be minted by importing a
 file; nodes are physical machines that must enrol themselves.
 
@@ -307,40 +307,40 @@ Every number below is a default; where a deployment may change it, the requireme
   of `complete`, `trimmed`, `partial`, `failed` or `empty` — never absent, so a reader can always
   distinguish "you have none of these" from "we did not export these".
 
-| # | Domain | What it holds | Restorable? |
-| --- | --- | --- | --- |
-| D1 | Account and profile | Display name, email, avatar reference, onboarding answers, notification and privacy preferences, terms-acceptance records, API key names and prefixes (never the keys) | Yes, except key material |
-| D2 | Organizations and teams | The workspace descriptor, its vision, members and their roles, pending invitations, teams, team members and team resources, org notification defaults | Yes |
-| D3 | Agents and skills | Agents with their instructions, personality and configuration files, memberships, collaborator allow-lists, budgets, repository and connection attachments, email assignments, tool grants, skills, skill bindings, skill companion files | Yes |
-| D4 | Missions, goals and ideas | Missions and their links to goals and Works, goals with criteria and definition of done, goal event logs and metric samples, ideas with their reasoning and outcome | Yes |
-| D5 | Tasks and workflows | Tasks with status, priority, labels, hierarchy, dependencies, assignees, approvers, reviewers, watchers, task chat, task attachments, knowledge mentions, review rejections, task templates and their steps, saved workflow graphs | Yes |
-| D6 | Works and their content | Work settings, members, custom domains, advanced prompts, plugin bindings, budgets, deployment history, generation history, plus a snapshot of each Work's items, categories, tags, collections and comparisons and its `works.yml` | Yes |
-| D7 | Knowledge and memory | Knowledge documents with full body text, tags, classes, lock state and provenance, memory folders, the source uploads behind documents, other uploaded files, and the retrieval trail | Yes |
-| D8 | Schedules and triggers | Work schedules, inbound trigger definitions (without their signing secrets), recent trigger fires | Yes, secrets regenerated |
-| D9 | Runs and receipts | Agent runs with status, duration, cost, token totals and summary; run logs; terminal transcripts; autonomous build runs and their logs; workflow runs; per-call plugin usage events | Record only |
-| D10 | Decisions | Escalations, proposed actions awaiting approval, and the operator inbox with its questions and answers | Record only |
-| D11 | Communication | Email addresses (provider settings redacted), email conversations and messages, notifications, notification channels (endpoints redacted), delivery logs, notification preferences, meetings | Partly — preferences and addresses yes, message history record only |
-| D12 | Connections and environments | Installed plugins and their non-secret settings, the names of every secret field that was set, connections to external servers, repository registrations, environments, code-host installation references, outbound webhook subscriptions (without secrets), ingest bindings and cursors, external issue links | Yes, credentials re-entered |
-| D13 | Fleet | Node inventory — name, kind, platform, capabilities, last-seen — plus execution preferences and agent-to-node pinning, and recent job records | Record only; preferences yes |
-| D14 | Billing and usage record | Current plan and subscription status, invoices with their provider-hosted links, the credit ledger, the metered usage ledger, licence purchases | Record only |
-| D15 | Activity | The unified activity history | Record only |
+| #   | Domain                       | What it holds                                                                                                                                                                                                                                                                                                  | Restorable?                                                         |
+| --- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| D1  | Account and profile          | Display name, email, avatar reference, onboarding answers, notification and privacy preferences, terms-acceptance records, API key names and prefixes (never the keys)                                                                                                                                         | Yes, except key material                                            |
+| D2  | Organizations and teams      | The workspace descriptor, its vision, members and their roles, pending invitations, teams, team members and team resources, org notification defaults                                                                                                                                                          | Yes                                                                 |
+| D3  | Agents and skills            | Agents with their instructions, personality and configuration files, memberships, collaborator allow-lists, budgets, repository and connection attachments, email assignments, tool grants, skills, skill bindings, skill companion files                                                                      | Yes                                                                 |
+| D4  | Missions, goals and ideas    | Missions and their links to goals and Works, goals with criteria and definition of done, goal event logs and metric samples, ideas with their reasoning and outcome                                                                                                                                            | Yes                                                                 |
+| D5  | Tasks and workflows          | Tasks with status, priority, labels, hierarchy, dependencies, assignees, approvers, reviewers, watchers, task chat, task attachments, knowledge mentions, review rejections, task templates and their steps, saved workflow graphs                                                                             | Yes                                                                 |
+| D6  | Works and their content      | Work settings, members, custom domains, advanced prompts, plugin bindings, budgets, deployment history, generation history, plus a snapshot of each Work's items, categories, tags, collections and comparisons and its `works.yml`                                                                            | Yes                                                                 |
+| D7  | Knowledge and memory         | Knowledge documents with full body text, tags, classes, lock state and provenance, memory folders, the source uploads behind documents, other uploaded files, and the retrieval trail                                                                                                                          | Yes                                                                 |
+| D8  | Schedules and triggers       | Work schedules, inbound trigger definitions (without their signing secrets), recent trigger fires                                                                                                                                                                                                              | Yes, secrets regenerated                                            |
+| D9  | Runs and receipts            | Agent runs with status, duration, cost, token totals and summary; run logs; terminal transcripts; autonomous build runs and their logs; workflow runs; per-call plugin usage events                                                                                                                            | Record only                                                         |
+| D10 | Decisions                    | Escalations, proposed actions awaiting approval, and the operator inbox with its questions and answers                                                                                                                                                                                                         | Record only                                                         |
+| D11 | Communication                | Email addresses (provider settings redacted), email conversations and messages, notifications, notification channels (endpoints redacted), delivery logs, notification preferences, meetings                                                                                                                   | Partly — preferences and addresses yes, message history record only |
+| D12 | Connections and environments | Installed plugins and their non-secret settings, the names of every secret field that was set, connections to external servers, repository registrations, environments, code-host installation references, outbound webhook subscriptions (without secrets), ingest bindings and cursors, external issue links | Yes, credentials re-entered                                         |
+| D13 | Fleet                        | Node inventory — name, kind, platform, capabilities, last-seen — plus execution preferences and agent-to-node pinning, and recent job records                                                                                                                                                                  | Record only; preferences yes                                        |
+| D14 | Billing and usage record     | Current plan and subscription status, invoices with their provider-hosted links, the credit ledger, the metered usage ledger, licence purchases                                                                                                                                                                | Record only                                                         |
+| D15 | Activity                     | The unified activity history                                                                                                                                                                                                                                                                                   | Record only                                                         |
 
 - **FR-14** History-shaped domains are trimmed by default to bounded windows, and every trim is
   recorded in the manifest with its cutoff date and the number of rows omitted:
 
-| Data | Default window | With **Include full history** |
-| --- | --- | --- |
-| Activity history | 365 days | 1095 days |
-| Agent run logs | 90 days | 1095 days |
-| Terminal transcripts | 30 days | 365 days |
-| Notifications | 180 days | 1095 days |
-| Plugin usage events | 180 days | 1095 days |
-| Delivery logs (channels and webhooks) | 30 days | 365 days |
-| Trigger fires | 90 days | 1095 days |
-| Retrieval trail | 30 days | 365 days |
-| Fleet job records | 30 days | 365 days |
+| Data                                  | Default window | With **Include full history** |
+| ------------------------------------- | -------------- | ----------------------------- |
+| Activity history                      | 365 days       | 1095 days                     |
+| Agent run logs                        | 90 days        | 1095 days                     |
+| Terminal transcripts                  | 30 days        | 365 days                      |
+| Notifications                         | 180 days       | 1095 days                     |
+| Plugin usage events                   | 180 days       | 1095 days                     |
+| Delivery logs (channels and webhooks) | 30 days        | 365 days                      |
+| Trigger fires                         | 90 days        | 1095 days                     |
+| Retrieval trail                       | 30 days        | 365 days                      |
+| Fleet job records                     | 30 days        | 365 days                      |
 
-  Everything not in this table is exported in full regardless of age.
+Everything not in this table is exported in full regardless of age.
 
 - **FR-15** Uploaded file bytes are included up to **200 MiB per file** and **2 GiB in total per
   archive**. Files past either limit are listed in the manifest with `reason: size_limit` and are
@@ -355,17 +355,17 @@ Every number below is a default; where a deployment may change it, the requireme
 
 - **FR-18** The following never appear, in any form, at any option setting, and the manifest says
   so explicitly rather than omitting them silently:
-  1. Password hashes, password-reset tokens, magic-link tokens and email-verification tokens.
-  2. Sessions, refresh tokens and third-party auth provider access or refresh tokens.
-  3. API key material. Keys appear as name, prefix, created date and active flag only.
-  4. Any stored credential, in plaintext or ciphertext — plugin secrets, connection headers,
-     deployment secrets, webhook signing secrets, trigger signing secrets, encrypted runtime
-     credentials and their snapshots. Only the **names** of the fields that were set are exported.
-  5. Node enrolment and heartbeat secrets.
-  6. Payment-provider customer, subscription, payment-method and meter identifiers.
-  7. The platform-administrator flag.
-  8. Vector embeddings and their coordinates, because they are derived and regenerate on demand.
-  9. Internal caches and the delivery outbox.
+    1. Password hashes, password-reset tokens, magic-link tokens and email-verification tokens.
+    2. Sessions, refresh tokens and third-party auth provider access or refresh tokens.
+    3. API key material. Keys appear as name, prefix, created date and active flag only.
+    4. Any stored credential, in plaintext or ciphertext — plugin secrets, connection headers,
+       deployment secrets, webhook signing secrets, trigger signing secrets, encrypted runtime
+       credentials and their snapshots. Only the **names** of the fields that were set are exported.
+    5. Node enrolment and heartbeat secrets.
+    6. Payment-provider customer, subscription, payment-method and meter identifiers.
+    7. The platform-administrator flag.
+    8. Vector embeddings and their coordinates, because they are derived and regenerate on demand.
+    9. Internal caches and the delivery outbox.
 - **FR-19** The archive is not encrypted by Ever Works and the interface says so in one sentence
   where the download happens: "This file is not encrypted. It contains your workspace's content,
   though never your passwords, API keys or connection credentials."
@@ -456,7 +456,7 @@ Every number below is a default; where a deployment may change it, the requireme
 
 **Workspace backup** — one record of one attempt to produce an archive.
 
-*Why a new noun is required.* The existing export is stateless: it computes a payload and
+_Why a new noun is required._ The existing export is stateless: it computes a payload and
 returns it. Nothing today can answer "when was the last backup", "is one running", "how big was
 it", "what was left out" or "has it expired" — and FR-3, FR-4, FR-5, FR-28 to FR-33 all require
 those answers to be durable. No existing noun carries them: a Run is one agent's execution, an
@@ -494,16 +494,16 @@ States and transitions:
                                    (record kept 90 days, then removed)
 ```
 
-| Attribute | Meaning |
-| --- | --- |
-| Workspace and owner | Which scope it covers and who asked for it (FR-9, FR-11) |
-| Requested at, started at, finished at | The lifecycle timestamps behind history and stall detection |
-| Status | One of the nine states above |
-| Failure reason | `stalled`, `timeout`, `too_large`, `storage_unavailable`, `cancelled_by_user`, `internal` |
-| Options | Whether full history was requested; the format version targeted |
-| Progress | Percent, current domain, domains completed, last heartbeat |
-| Manifest summary | Per-domain status and counts, omissions, trims — the same content as the archive's manifest, so history stays legible after the archive is gone |
-| Artefact | Storage location, size in bytes, SHA-256, expiry date |
+| Attribute                             | Meaning                                                                                                                                         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace and owner                   | Which scope it covers and who asked for it (FR-9, FR-11)                                                                                        |
+| Requested at, started at, finished at | The lifecycle timestamps behind history and stall detection                                                                                     |
+| Status                                | One of the nine states above                                                                                                                    |
+| Failure reason                        | `stalled`, `timeout`, `too_large`, `storage_unavailable`, `cancelled_by_user`, `internal`                                                       |
+| Options                               | Whether full history was requested; the format version targeted                                                                                 |
+| Progress                              | Percent, current domain, domains completed, last heartbeat                                                                                      |
+| Manifest summary                      | Per-domain status and counts, omissions, trims — the same content as the archive's manifest, so history stays legible after the archive is gone |
+| Artefact                              | Storage location, size in bytes, SHA-256, expiry date                                                                                           |
 
 **Backup manifest** — the description of one archive. It is not a database entity in its own
 right: it exists as a file inside the archive and as a stored summary on the backup record. It
@@ -511,14 +511,14 @@ is named here because it is the contract the format publishes.
 
 ### 5.2 Existing, and how this epic touches them
 
-| Entity | How this epic touches it |
-| --- | --- |
-| Every entity in the fifteen domains of FR-13 | **Read only.** The backup never writes them. A restore writes only the restorable subset, through the existing import paths where they exist. |
-| Uploads and knowledge uploads | Read, plus their bytes are copied into the archive through the same storage abstraction that stores them. |
-| Activity history | One entry per backup created, downloaded, deleted and restored (FR-32). |
-| Notifications | One notification per finished backup (FR-33). |
-| Organization / workspace scope | Selects the rows and appears in the manifest. Unchanged. |
-| The existing JSON export, import preview/apply and config-repo sync | **Untouched.** They remain on the same page, with the same behaviour, for the narrower job they already do well. §7 explains why both exist. |
+| Entity                                                              | How this epic touches it                                                                                                                      |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every entity in the fifteen domains of FR-13                        | **Read only.** The backup never writes them. A restore writes only the restorable subset, through the existing import paths where they exist. |
+| Uploads and knowledge uploads                                       | Read, plus their bytes are copied into the archive through the same storage abstraction that stores them.                                     |
+| Activity history                                                    | One entry per backup created, downloaded, deleted and restored (FR-32).                                                                       |
+| Notifications                                                       | One notification per finished backup (FR-33).                                                                                                 |
+| Organization / workspace scope                                      | Selects the rows and appears in the manifest. Unchanged.                                                                                      |
+| The existing JSON export, import preview/apply and config-repo sync | **Untouched.** They remain on the same page, with the same behaviour, for the narrower job they already do well. §7 explains why both exist.  |
 
 ## 6. UX
 
@@ -739,66 +739,66 @@ is permanent."
 
 ### 6.11 Exact user-visible copy
 
-| Where | Copy |
-| --- | --- |
-| Card heading | Workspace backup |
-| Card subtitle | A complete copy of everything in this workspace. |
-| Primary button | Create backup |
-| Button, running | Preparing… |
-| Options toggle | Options |
-| Full-history option | Include full history |
-| Full-history help | Keeps up to three years of runs, logs, activity and notifications instead of the usual recent window. Larger file, slower to build. |
-| Empty state | You have not taken a backup yet. |
-| Nearly-empty result | Ready — your workspace is nearly empty. This backup mostly records your settings. |
-| Running headline | Preparing your backup… |
-| Running detail | {section} · section {done} of {total} · started {relativeTime} |
-| Running reassurance | You can leave this page. We will let you know when it is ready. |
-| Ready summary | {date} · {size} · all {total} sections |
-| Partial summary | {date} · {size} · {done} of {total} sections |
-| Partial headline | Ready — some things were left out |
-| Availability | Available until {date} |
-| Expired row | Expired {date} — archives are kept for {days} days |
-| Download | Download |
-| Coverage link | What's inside |
-| Delete | Delete now |
-| Delete confirmation title | Delete this backup? |
-| Delete confirmation body | The file will be removed from our servers straight away and cannot be recovered. The record of this backup stays in your history. |
-| Cancel running | Cancel |
-| Encryption notice | This file is not encrypted. It contains your workspace's content, though never your passwords, API keys or connection credentials. |
-| Retention notice | Backups cover all {total} sections of your workspace. Archives are kept for {days} days. |
-| Rate limited | You can create {limit} backups a day. The next one is available at {time}. |
-| Already running | A backup is already running — showing that one. |
-| Unavailable | Backups are not available in this deployment because no file storage is configured. You can still use Export data below. |
-| Not owner | Only the workspace owner can create or download a backup. |
-| Failure, stalled | That backup stopped responding and was cancelled. Nothing was saved. Try again. |
-| Failure, timeout | That backup took longer than an hour and was stopped. Try again, or turn off Include full history. |
-| Failure, too large | This workspace is larger than a single backup file can hold. Contact support and we will produce it in parts. |
-| Failure, storage | We could not store your backup. This is on our side; try again shortly. |
-| Notification, ready | Your workspace backup is ready |
-| Notification, partial | Your workspace backup is ready, with {n} things left out |
-| Notification, failed | Your workspace backup did not finish |
-| Check heading | Check a backup |
-| Check dropzone | Drop manifest.json here, or choose a file |
-| Check privacy note | We only read the manifest. Your archive stays on your machine. |
-| Check refusal | This does not look like an Ever Works backup manifest. We looked for “everworksBackupFormat” and “producedAt” and found neither. Nothing was uploaded beyond this file. |
-| Check, newer format | This backup was made by a newer version of Ever Works. We can describe it, but not restore it. |
-| Restore reassurance | Nothing has been changed yet. |
-| Restore result, paused | Schedules, triggers and heartbeats were restored paused. Resume the ones you want. |
-| Restore result, credentials | {n} connections need their credentials re-entered before they will work. |
-| Danger banner, has backup | Last backup: {relativeTime} · {size} · all {total} sections. Anything below is permanent. Take a backup first. |
-| Danger banner, none | You have never taken a backup of this workspace. Anything below is permanent. |
+| Where                       | Copy                                                                                                                                                                    |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Card heading                | Workspace backup                                                                                                                                                        |
+| Card subtitle               | A complete copy of everything in this workspace.                                                                                                                        |
+| Primary button              | Create backup                                                                                                                                                           |
+| Button, running             | Preparing…                                                                                                                                                              |
+| Options toggle              | Options                                                                                                                                                                 |
+| Full-history option         | Include full history                                                                                                                                                    |
+| Full-history help           | Keeps up to three years of runs, logs, activity and notifications instead of the usual recent window. Larger file, slower to build.                                     |
+| Empty state                 | You have not taken a backup yet.                                                                                                                                        |
+| Nearly-empty result         | Ready — your workspace is nearly empty. This backup mostly records your settings.                                                                                       |
+| Running headline            | Preparing your backup…                                                                                                                                                  |
+| Running detail              | {section} · section {done} of {total} · started {relativeTime}                                                                                                          |
+| Running reassurance         | You can leave this page. We will let you know when it is ready.                                                                                                         |
+| Ready summary               | {date} · {size} · all {total} sections                                                                                                                                  |
+| Partial summary             | {date} · {size} · {done} of {total} sections                                                                                                                            |
+| Partial headline            | Ready — some things were left out                                                                                                                                       |
+| Availability                | Available until {date}                                                                                                                                                  |
+| Expired row                 | Expired {date} — archives are kept for {days} days                                                                                                                      |
+| Download                    | Download                                                                                                                                                                |
+| Coverage link               | What's inside                                                                                                                                                           |
+| Delete                      | Delete now                                                                                                                                                              |
+| Delete confirmation title   | Delete this backup?                                                                                                                                                     |
+| Delete confirmation body    | The file will be removed from our servers straight away and cannot be recovered. The record of this backup stays in your history.                                       |
+| Cancel running              | Cancel                                                                                                                                                                  |
+| Encryption notice           | This file is not encrypted. It contains your workspace's content, though never your passwords, API keys or connection credentials.                                      |
+| Retention notice            | Backups cover all {total} sections of your workspace. Archives are kept for {days} days.                                                                                |
+| Rate limited                | You can create {limit} backups a day. The next one is available at {time}.                                                                                              |
+| Already running             | A backup is already running — showing that one.                                                                                                                         |
+| Unavailable                 | Backups are not available in this deployment because no file storage is configured. You can still use Export data below.                                                |
+| Not owner                   | Only the workspace owner can create or download a backup.                                                                                                               |
+| Failure, stalled            | That backup stopped responding and was cancelled. Nothing was saved. Try again.                                                                                         |
+| Failure, timeout            | That backup took longer than an hour and was stopped. Try again, or turn off Include full history.                                                                      |
+| Failure, too large          | This workspace is larger than a single backup file can hold. Contact support and we will produce it in parts.                                                           |
+| Failure, storage            | We could not store your backup. This is on our side; try again shortly.                                                                                                 |
+| Notification, ready         | Your workspace backup is ready                                                                                                                                          |
+| Notification, partial       | Your workspace backup is ready, with {n} things left out                                                                                                                |
+| Notification, failed        | Your workspace backup did not finish                                                                                                                                    |
+| Check heading               | Check a backup                                                                                                                                                          |
+| Check dropzone              | Drop manifest.json here, or choose a file                                                                                                                               |
+| Check privacy note          | We only read the manifest. Your archive stays on your machine.                                                                                                          |
+| Check refusal               | This does not look like an Ever Works backup manifest. We looked for “everworksBackupFormat” and “producedAt” and found neither. Nothing was uploaded beyond this file. |
+| Check, newer format         | This backup was made by a newer version of Ever Works. We can describe it, but not restore it.                                                                          |
+| Restore reassurance         | Nothing has been changed yet.                                                                                                                                           |
+| Restore result, paused      | Schedules, triggers and heartbeats were restored paused. Resume the ones you want.                                                                                      |
+| Restore result, credentials | {n} connections need their credentials re-entered before they will work.                                                                                                |
+| Danger banner, has backup   | Last backup: {relativeTime} · {size} · all {total} sections. Anything below is permanent. Take a backup first.                                                          |
+| Danger banner, none         | You have never taken a backup of this workspace. Anything below is permanent.                                                                                           |
 
 ### 6.12 Keyboard affordances
 
-| Key | Behaviour |
-| --- | --- |
-| `Tab` / `Shift+Tab` | Moves through Create backup → Options → Check a backup → the ready row's Download → What's inside → Delete now → each history row's action, in visual order. |
-| `Enter` / `Space` | Activates the focused control. |
-| `Esc` | Closes the coverage drawer, the check panel or the delete confirmation, returning focus to the control that opened it. |
-| `Enter` on a history row | Opens that backup's coverage drawer. |
-| Arrow keys | Move between history rows when the list has focus. |
-| Focus after action | Pressing Create backup moves focus to the running region so the state change is announced; when a backup finishes, focus is not stolen — the live region announces it and the Download button becomes the next tab stop. |
-| Confirmation dialogues | Trap focus, open on the cancelling action, and are dismissible with `Esc`. |
+| Key                      | Behaviour                                                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Tab` / `Shift+Tab`      | Moves through Create backup → Options → Check a backup → the ready row's Download → What's inside → Delete now → each history row's action, in visual order.                                                             |
+| `Enter` / `Space`        | Activates the focused control.                                                                                                                                                                                           |
+| `Esc`                    | Closes the coverage drawer, the check panel or the delete confirmation, returning focus to the control that opened it.                                                                                                   |
+| `Enter` on a history row | Opens that backup's coverage drawer.                                                                                                                                                                                     |
+| Arrow keys               | Move between history rows when the list has focus.                                                                                                                                                                       |
+| Focus after action       | Pressing Create backup moves focus to the running region so the state change is announced; when a backup finishes, focus is not stolen — the live region announces it and the Download button becomes the next tab stop. |
+| Confirmation dialogues   | Trap focus, open on the cancelling action, and are dismissible with `Esc`.                                                                                                                                               |
 
 ## 7. Out of scope
 
@@ -829,6 +829,7 @@ is permanent."
 A reviewer can run this list against a deployed build.
 
 **Producing**
+
 - [ ] Pressing Create backup returns to an interactive page in under a second and never downloads
       anything directly (FR-2).
 - [ ] Closing the tab during a backup and returning shows the same backup still running, then
@@ -843,6 +844,7 @@ A reviewer can run this list against a deployed build.
       stuck at "running" forever (FR-5, S-14).
 
 **Coverage**
+
 - [ ] The manifest lists all 15 domains with a status, never fewer (FR-13).
 - [ ] For a workspace seeded with at least one row in every domain, every domain reports a
       non-zero count and every count matches the line count of its file (FR-22, S-2).
@@ -856,12 +858,14 @@ A reviewer can run this list against a deployed build.
       (FR-7, FR-14, S-7).
 
 **Never included**
+
 - [ ] Grepping the whole archive for a known plugin API key, a session token, a password hash, a
       node enrolment secret and a payment identifier returns nothing (FR-18).
 - [ ] Fields that held a secret appear by **name** with no value, and the manifest's exclusions
       list names all nine categories (FR-18).
 
 **Shape**
+
 - [ ] The archive contains exactly `manifest.json`, `README.md`, `checksums.txt`, `data/`,
       `files/` at the top level (FR-21).
 - [ ] Every `checksums.txt` entry verifies with a standard command-line tool (FR-25).
@@ -870,6 +874,7 @@ A reviewer can run this list against a deployed build.
 - [ ] `README.md` is under 400 words and states retention, exclusions and restorability (FR-26).
 
 **Retention and record**
+
 - [ ] A ready archive downloads; after the retention window it is gone and its row reads Expired
       with a date (FR-28, S-16).
 - [ ] Delete now removes the bytes immediately and leaves the row (FR-31, S-24).
@@ -878,12 +883,14 @@ A reviewer can run this list against a deployed build.
 - [ ] The history list caps at 20 rows with a way to see the rest (FR-30).
 
 **Permission and scope**
+
 - [ ] A non-owner member sees both controls disabled with the reason (FR-10, S-8).
 - [ ] A backup taken in one organization contains no row belonging to another (FR-9).
 - [ ] A download link older than 15 minutes is transparently re-minted; a link from another
       account is refused (FR-12, S-15).
 
 **Checking and restoring**
+
 - [ ] A foreign or corrupt manifest is refused by name, not by stack trace (FR-34, S-18).
 - [ ] A newer-format manifest is described but not restorable, with that exact reason (FR-27,
       S-19); an older one restores (S-20).
@@ -896,6 +903,7 @@ A reviewer can run this list against a deployed build.
       from the result (FR-40).
 
 **Interface**
+
 - [ ] Every state in §6 renders with the copy in §6.11 and no generic error text (FR-43).
 - [ ] The whole card is operable by keyboard per §6.12, with visible focus and no traps (FR-44).
 - [ ] Progress is announced politely at most every 30 seconds (FR-42).
@@ -920,7 +928,7 @@ A reviewer can run this list against a deployed build.
   is the real distribution of upload volume per workspace?
 - **[NEEDS CLARIFICATION: trim defaults]** Are the FR-14 windows right? 365 days of activity is a
   guess that trades archive size against the "what did it look like before" question.
-- **[NEEDS CLARIFICATION: cross-deployment restore]** Restoring an archive into a *different*
+- **[NEEDS CLARIFICATION: cross-deployment restore]** Restoring an archive into a _different_
   deployment works mechanically for the restorable domains but silently drops identity mapping
   (who authored what). Do we support it, warn about it, or refuse it?
 - **[NEEDS CLARIFICATION: scheduled backups cadence]** When automatic backups land, what is the

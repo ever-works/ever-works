@@ -19,28 +19,28 @@
 
 ### 1.1 The conversation spine — what ships today
 
-| What | Where |
-| --- | --- |
+| What                | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Conversation entity | [`packages/agent/src/entities/conversation.entity.ts`](../../../../../packages/agent/src/entities/conversation.entity.ts) — `@Entity('conversations')`. Columns: `id`, `userId` (FK `users`, `CASCADE`), `title` (varchar 200, nullable), `providerId` (varchar 100, nullable), `model` (varchar 100, nullable — `string \| null` so clearing the pin persists as a real NULL), `metadata` (simple-json — carries `{ aiTitle: true }`), `tenantId` / `organizationId` (uuid, nullable, no `@ManyToOne` by the entity-cycle rule), `messages` (OneToMany, cascade), `createdAt` / `updatedAt`. Indexes: `['userId','updatedAt']` and `userId`. **No agent, no participants, no kind.** |
-| Message entity | [`packages/agent/src/entities/conversation-message.entity.ts`](../../../../../packages/agent/src/entities/conversation-message.entity.ts) — `@Entity('conversation_messages')`. `conversationId` (FK, CASCADE), `role` (`user \| assistant \| system \| tool`), `content` (text), `parts` (simple-json — the verbatim UI-message parts array so tool cards replay on reload), `model`, `usage`, `tenantId` / `organizationId`, `createdAt`. Index `['conversationId','createdAt']`. **No author, no mentions, no attachments, no status.** |
-| Repository | [`packages/agent/src/database/repositories/conversation.repository.ts`](../../../../../packages/agent/src/database/repositories/conversation.repository.ts) — `create`, `findById`, `findByUser`, `appendMessage`, `appendMessages`, `updateTitle`, `updateModel`, `delete`, `deleteAllByUser`. Barrelled from [`packages/agent/src/database/index.ts:35`](../../../../../packages/agent/src/database/index.ts). |
-| REST | [`apps/api/src/ai-conversation/conversation.controller.ts`](../../../../../apps/api/src/ai-conversation/conversation.controller.ts) — `@Controller` under `api/conversations`; `MAX_CONVERSATIONS_PAGE_SIZE = 200`; `CreateConversationDto` (`title` ≤ 200, `providerId` ≤ 100, `model` ≤ 100); the PATCH DTO deliberately omits `providerId` so `forbidNonWhitelisted` hard-400s an attempt to change it. |
-| Title generation | [`apps/api/src/ai-conversation/conversation-title.service.ts`](../../../../../apps/api/src/ai-conversation/conversation-title.service.ts) — `maybeGenerateTitle`, fired un-awaited from the append path once a Conversation reaches 4+ messages, guarded once by `metadata.aiTitle`. |
-| Model proxy | [`apps/api/src/ai-conversation/openai-compat.service.ts`](../../../../../apps/api/src/ai-conversation/openai-compat.service.ts) — the single call-out point every chat surface hits. Already does `@kb:` mention parsing + `<kb>` injection, ~15-pattern secret redaction on provider errors, and 422 (not 500) when no provider is configured. |
-| Module | [`apps/api/src/ai-conversation/ai-conversation.module.ts`](../../../../../apps/api/src/ai-conversation/ai-conversation.module.ts) — imports `FacadesModule`, `DatabaseModule`, `KnowledgeBaseModule`; exports `OpenAiCompatService` for the external chat bridge. |
+| Message entity      | [`packages/agent/src/entities/conversation-message.entity.ts`](../../../../../packages/agent/src/entities/conversation-message.entity.ts) — `@Entity('conversation_messages')`. `conversationId` (FK, CASCADE), `role` (`user \| assistant \| system \| tool`), `content` (text), `parts` (simple-json — the verbatim UI-message parts array so tool cards replay on reload), `model`, `usage`, `tenantId` / `organizationId`, `createdAt`. Index `['conversationId','createdAt']`. **No author, no mentions, no attachments, no status.**                                                                                                                                            |
+| Repository          | [`packages/agent/src/database/repositories/conversation.repository.ts`](../../../../../packages/agent/src/database/repositories/conversation.repository.ts) — `create`, `findById`, `findByUser`, `appendMessage`, `appendMessages`, `updateTitle`, `updateModel`, `delete`, `deleteAllByUser`. Barrelled from [`packages/agent/src/database/index.ts:35`](../../../../../packages/agent/src/database/index.ts).                                                                                                                                                                                                                                                                      |
+| REST                | [`apps/api/src/ai-conversation/conversation.controller.ts`](../../../../../apps/api/src/ai-conversation/conversation.controller.ts) — `@Controller` under `api/conversations`; `MAX_CONVERSATIONS_PAGE_SIZE = 200`; `CreateConversationDto` (`title` ≤ 200, `providerId` ≤ 100, `model` ≤ 100); the PATCH DTO deliberately omits `providerId` so `forbidNonWhitelisted` hard-400s an attempt to change it.                                                                                                                                                                                                                                                                            |
+| Title generation    | [`apps/api/src/ai-conversation/conversation-title.service.ts`](../../../../../apps/api/src/ai-conversation/conversation-title.service.ts) — `maybeGenerateTitle`, fired un-awaited from the append path once a Conversation reaches 4+ messages, guarded once by `metadata.aiTitle`.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Model proxy         | [`apps/api/src/ai-conversation/openai-compat.service.ts`](../../../../../apps/api/src/ai-conversation/openai-compat.service.ts) — the single call-out point every chat surface hits. Already does `@kb:` mention parsing + `<kb>` injection, ~15-pattern secret redaction on provider errors, and 422 (not 500) when no provider is configured.                                                                                                                                                                                                                                                                                                                                       |
+| Module              | [`apps/api/src/ai-conversation/ai-conversation.module.ts`](../../../../../apps/api/src/ai-conversation/ai-conversation.module.ts) — imports `FacadesModule`, `DatabaseModule`, `KnowledgeBaseModule`; exports `OpenAiCompatService` for the external chat bridge.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### 1.2 The web chat surface — what ships today
 
-| What | Where |
-| --- | --- |
-| Shell mount | [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>) — mounts `ChatProvider` + `ChatPanelProvider`, renders `ChatPanel` as a resizable desktop rail and a full-screen mobile overlay. Pointer-drag resize clamps to `Math.max(350, Math.min(maxWidth, pointerWidth))` (line ~346); width persists in `localStorage['chat-width']` (lines ~160–195, ~306); open/closed persists in the `chat-panel-open` cookie (line ~151), read server-side by [`layout.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout.tsx>) so the shell mounts without a flash. |
-| Panel body | [`apps/web/src/components/ai/ChatPanel.tsx`](../../../../../apps/web/src/components/ai/ChatPanel.tsx) → [`ChatInterface.tsx`](../../../../../apps/web/src/components/ai/ChatInterface.tsx) — toolbar, welcome/empty state or message list, an inline error banner, composer, plus the canvas overlay under [`components/ai/canvas/`](../../../../../apps/web/src/components/ai/canvas). |
-| History list | [`apps/web/src/components/ai/ChatHistory.tsx`](../../../../../apps/web/src/components/ai/ChatHistory.tsx) — **replaces the whole panel body** when the toolbar's history icon is clicked; groups by Today / Yesterday / N days ago. |
-| Composer | [`apps/web/src/components/ai/ChatInput.tsx`](../../../../../apps/web/src/components/ai/ChatInput.tsx) — an **uncontrolled** `<textarea>` (deliberate: controlling it would re-render the panel per keystroke; `hasText` state tracks emptiness only). Hosts [`ChatAttachments.tsx`](../../../../../apps/web/src/components/ai/ChatAttachments.tsx), [`ChatDictation.tsx`](../../../../../apps/web/src/components/ai/ChatDictation.tsx), [`ChatModelSelector.tsx`](../../../../../apps/web/src/components/ai/ChatModelSelector.tsx). |
-| Panel state | [`apps/web/src/lib/hooks/use-chat-panel.tsx`](../../../../../apps/web/src/lib/hooks/use-chat-panel.tsx) and [`apps/web/src/components/ai/ChatProvider.tsx`](../../../../../apps/web/src/components/ai/ChatProvider.tsx) — one fixed transport, one chat id, active conversation id in `localStorage['chat-active-conversation']`. |
-| BFF | [`apps/web/src/app/api/chat/route.ts`](../../../../../apps/web/src/app/api/chat/route.ts) — Zod-validated UI-message body (128 KB/text-part, 4 MB total, 512 messages, ≤ 20 attachment ids), streams the reply, persists via [`lib/ai/persistence.ts`](../../../../../apps/web/src/lib/ai/persistence.ts) in `onFinish`, and ingests attachments into Memory via `after()`. |
-| API client | [`apps/web/src/lib/api/conversations.ts`](../../../../../apps/web/src/lib/api/conversations.ts) — `list`, `get`, `create`, `updateTitle`, … |
-| Sidebar | [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) — a hardcoded 14-item nav array, with two inline live badges as the precedent for a live section. |
+| What         | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell mount  | [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>) — mounts `ChatProvider` + `ChatPanelProvider`, renders `ChatPanel` as a resizable desktop rail and a full-screen mobile overlay. Pointer-drag resize clamps to `Math.max(350, Math.min(maxWidth, pointerWidth))` (line ~346); width persists in `localStorage['chat-width']` (lines ~160–195, ~306); open/closed persists in the `chat-panel-open` cookie (line ~151), read server-side by [`layout.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout.tsx>) so the shell mounts without a flash. |
+| Panel body   | [`apps/web/src/components/ai/ChatPanel.tsx`](../../../../../apps/web/src/components/ai/ChatPanel.tsx) → [`ChatInterface.tsx`](../../../../../apps/web/src/components/ai/ChatInterface.tsx) — toolbar, welcome/empty state or message list, an inline error banner, composer, plus the canvas overlay under [`components/ai/canvas/`](../../../../../apps/web/src/components/ai/canvas).                                                                                                                                                                                                                                                                 |
+| History list | [`apps/web/src/components/ai/ChatHistory.tsx`](../../../../../apps/web/src/components/ai/ChatHistory.tsx) — **replaces the whole panel body** when the toolbar's history icon is clicked; groups by Today / Yesterday / N days ago.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Composer     | [`apps/web/src/components/ai/ChatInput.tsx`](../../../../../apps/web/src/components/ai/ChatInput.tsx) — an **uncontrolled** `<textarea>` (deliberate: controlling it would re-render the panel per keystroke; `hasText` state tracks emptiness only). Hosts [`ChatAttachments.tsx`](../../../../../apps/web/src/components/ai/ChatAttachments.tsx), [`ChatDictation.tsx`](../../../../../apps/web/src/components/ai/ChatDictation.tsx), [`ChatModelSelector.tsx`](../../../../../apps/web/src/components/ai/ChatModelSelector.tsx).                                                                                                                     |
+| Panel state  | [`apps/web/src/lib/hooks/use-chat-panel.tsx`](../../../../../apps/web/src/lib/hooks/use-chat-panel.tsx) and [`apps/web/src/components/ai/ChatProvider.tsx`](../../../../../apps/web/src/components/ai/ChatProvider.tsx) — one fixed transport, one chat id, active conversation id in `localStorage['chat-active-conversation']`.                                                                                                                                                                                                                                                                                                                       |
+| BFF          | [`apps/web/src/app/api/chat/route.ts`](../../../../../apps/web/src/app/api/chat/route.ts) — Zod-validated UI-message body (128 KB/text-part, 4 MB total, 512 messages, ≤ 20 attachment ids), streams the reply, persists via [`lib/ai/persistence.ts`](../../../../../apps/web/src/lib/ai/persistence.ts) in `onFinish`, and ingests attachments into Memory via `after()`.                                                                                                                                                                                                                                                                             |
+| API client   | [`apps/web/src/lib/api/conversations.ts`](../../../../../apps/web/src/lib/api/conversations.ts) — `list`, `get`, `create`, `updateTitle`, …                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Sidebar      | [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) — a hardcoded 14-item nav array, with two inline live badges as the precedent for a live section.                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 **Gaps this epic closes:** no Agent on a Conversation, no participants, no group, no broadcast, no
 in-panel navigation stack, no mention affordance, no retry, no unread.
@@ -50,34 +50,34 @@ in-panel navigation stack, no mention affordance, no retry, no unread.
 This is the single most important existing asset. It is complete, tested and running; it is simply
 scoped to one object type.
 
-| What | Where |
-| --- | --- |
-| Service | [`packages/agent/src/tasks-domain/task-chat.service.ts`](../../../../../packages/agent/src/tasks-domain/task-chat.service.ts) — `MAX_CHAT_BYTES = 16 * 1024`, `EDIT_WINDOW_MS = 5 * 60_000`, `MENTION_RE = /@([a-z0-9-]{1,80})\b/g`, `KB_LINK_RE`. `post()` runs: cross-user 404 guard → `assertNoSecrets` → size cap → `parseMentions(body, lookups)` against `MentionLookups { ownedAgentSlugs, knownUserSlugs, knownKbSlugs }` → persist the **resolved subset only** → materialize document mentions → per-mentioned-Agent dispatch. |
-| The dedupe rule | Same file, ~lines 148–275: for every `@agent` mention it builds `dedupKey = ${task.id}:${mention.id}:${row.id}`, asks `RUN_STEERING_PORT` whether that Agent already has a live run for this Task and **injects into it instead of spawning**, otherwise admits through `RunDispatchGateService` and enqueues `agent-chat-reply`. A parked admission is logged with its `queuedReason`, never swallowed. |
-| Dispatcher contract | [`packages/agent/src/tasks-domain/task-dispatcher.ts`](../../../../../packages/agent/src/tasks-domain/task-dispatcher.ts) — `AGENT_CHAT_REPLY_DISPATCHER` symbol + `AgentChatReplyDispatchPayload { agentId, userId, taskId, triggeringMessageId, dedupKey, runId? }`. Keeps `@ever-works/agent` free of a runtime job-runtime SDK dependency. |
-| Concurrency valve | [`packages/agent/src/agents/run-dispatch-gate.service.ts`](../../../../../packages/agent/src/agents/run-dispatch-gate.service.ts) — per-Work (default 10) and per-Organization (default 25) ceilings; over the cap a run is created `queued` with a recorded `queuedReason` and promoted later by `drainForWork`. |
-| Steering port | [`packages/agent/src/tasks-domain/run-steering-port.ts`](../../../../../packages/agent/src/tasks-domain/run-steering-port.ts) |
-| Secret scan | [`packages/agent/src/utils/secret-scan.ts`](../../../../../packages/agent/src/utils/secret-scan.ts) — `assertNoSecrets`, already used by Agent instruction files and Task comments. |
-| Persisted mention shape | [`packages/agent/src/entities/task-chat-message.entity.ts`](../../../../../packages/agent/src/entities/task-chat-message.entity.ts) — `TaskChatMention { type: 'user' \| 'agent' \| 'kb'; id?; slug? }` and `TaskChatAttachmentRef { uploadId }`. |
-| Job | [`packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts), registered in [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts). |
-| REST | [`apps/api/src/tasks/task-chat.controller.ts`](../../../../../apps/api/src/tasks/task-chat.controller.ts) (`api/task-chat-messages`, `@Throttle({ long: { limit: 60, ttl: 60_000 } })`). |
+| What                    | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Service                 | [`packages/agent/src/tasks-domain/task-chat.service.ts`](../../../../../packages/agent/src/tasks-domain/task-chat.service.ts) — `MAX_CHAT_BYTES = 16 * 1024`, `EDIT_WINDOW_MS = 5 * 60_000`, `MENTION_RE = /@([a-z0-9-]{1,80})\b/g`, `KB_LINK_RE`. `post()` runs: cross-user 404 guard → `assertNoSecrets` → size cap → `parseMentions(body, lookups)` against `MentionLookups { ownedAgentSlugs, knownUserSlugs, knownKbSlugs }` → persist the **resolved subset only** → materialize document mentions → per-mentioned-Agent dispatch. |
+| The dedupe rule         | Same file, ~lines 148–275: for every `@agent` mention it builds `dedupKey = ${task.id}:${mention.id}:${row.id}`, asks `RUN_STEERING_PORT` whether that Agent already has a live run for this Task and **injects into it instead of spawning**, otherwise admits through `RunDispatchGateService` and enqueues `agent-chat-reply`. A parked admission is logged with its `queuedReason`, never swallowed.                                                                                                                                 |
+| Dispatcher contract     | [`packages/agent/src/tasks-domain/task-dispatcher.ts`](../../../../../packages/agent/src/tasks-domain/task-dispatcher.ts) — `AGENT_CHAT_REPLY_DISPATCHER` symbol + `AgentChatReplyDispatchPayload { agentId, userId, taskId, triggeringMessageId, dedupKey, runId? }`. Keeps `@ever-works/agent` free of a runtime job-runtime SDK dependency.                                                                                                                                                                                           |
+| Concurrency valve       | [`packages/agent/src/agents/run-dispatch-gate.service.ts`](../../../../../packages/agent/src/agents/run-dispatch-gate.service.ts) — per-Work (default 10) and per-Organization (default 25) ceilings; over the cap a run is created `queued` with a recorded `queuedReason` and promoted later by `drainForWork`.                                                                                                                                                                                                                        |
+| Steering port           | [`packages/agent/src/tasks-domain/run-steering-port.ts`](../../../../../packages/agent/src/tasks-domain/run-steering-port.ts)                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Secret scan             | [`packages/agent/src/utils/secret-scan.ts`](../../../../../packages/agent/src/utils/secret-scan.ts) — `assertNoSecrets`, already used by Agent instruction files and Task comments.                                                                                                                                                                                                                                                                                                                                                      |
+| Persisted mention shape | [`packages/agent/src/entities/task-chat-message.entity.ts`](../../../../../packages/agent/src/entities/task-chat-message.entity.ts) — `TaskChatMention { type: 'user' \| 'agent' \| 'kb'; id?; slug? }` and `TaskChatAttachmentRef { uploadId }`.                                                                                                                                                                                                                                                                                        |
+| Job                     | [`packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts`](../../../../../packages/tasks/src/tasks/trigger/agent-chat-reply.task.ts), registered in [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts).                                                                                                                                                                                                                                                                          |
+| REST                    | [`apps/api/src/tasks/task-chat.controller.ts`](../../../../../apps/api/src/tasks/task-chat.controller.ts) (`api/task-chat-messages`, `@Throttle({ long: { limit: 60, ttl: 60_000 } })`).                                                                                                                                                                                                                                                                                                                                                 |
 
 ### 1.4 Other assets this epic reuses rather than rebuilds
 
-| What | Where | Used for |
-| --- | --- | --- |
-| Agent collaborator allow-list | [`packages/agent/src/entities/agent-collaborator.entity.ts`](../../../../../packages/agent/src/entities/agent-collaborator.entity.ts) — unique `(agentId, collaboratorAgentId)` + `enabled` | The **only** authorisation for an Agent-pair Conversation (spec FR-77). No new permission model. |
-| Agent status lifecycle | [`packages/agent/src/entities/agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts) — `AgentStatus` `draft\|active\|running\|paused\|error\|archived` | What the reach receipt reports `skipped` against. |
-| Run entity | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts) — `triggerKind`, `taskId`, `chatMessageId` (**FK to `task_chat_messages.id`**, index `idx_agent_runs_chat_message`), `costCents`, `queuedReason`, `pendingInput` | Reply executions and their receipts. `chatMessageId` is already taken by Task chat, so a Conversation reply needs its own column (§3.3). |
-| SSE precedent | [`apps/api/src/email/email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts) lines ~167–250 — poll-diff SSE, 5 s poll, 15 s heartbeat comment, 10-minute forced lifetime, prime-then-diff so the backlog is not announced as new | Exactly the transport for live Conversation delivery, copied verbatim in shape. |
-| SSE client precedent | [`apps/web/src/lib/hooks/use-inbox-stream.ts`](../../../../../apps/web/src/lib/hooks/use-inbox-stream.ts) — `EventSource` with a 30 s poll fallback when unavailable or erroring | Spec FR-22/FR-23. |
-| Document references | [`packages/agent/src/services/kb-mention-parser.ts`](../../../../../packages/agent/src/services/kb-mention-parser.ts), [`kb-mention-resolver.service.ts`](../../../../../packages/agent/src/services/kb-mention-resolver.service.ts), [`kb-prompt-formatter.ts`](../../../../../packages/agent/src/services/kb-prompt-formatter.ts) | The `#` reference target; [AW-06](../AW-06-knowledge-library/plan.md) owns the picker, this epic consumes it. |
-| Typeahead precedent | [`apps/web/src/components/skills/SlashCommandAutocomplete.tsx`](../../../../../apps/web/src/components/skills/SlashCommandAutocomplete.tsx) | The mention picker copies its keyboard model and module-level cache. |
-| Org membership gate | [`apps/api/src/organizations/organization-membership.service.ts`](../../../../../apps/api/src/organizations/organization-membership.service.ts) — `ensureMember` / `ensureAdmin`, 404-not-403 on non-membership | Channel read/write authorisation. |
-| Scope plumbing | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts), [`packages/agent/src/database/ownership-scope.ts`](../../../../../packages/agent/src/database/ownership-scope.ts) (`ownershipWhere`, `ownershipStamp`, `ownershipScopeOf`) | Spec FR-97/98. |
-| Activity record | [`packages/agent/src/activity-log/activity-log.service.ts`](../../../../../packages/agent/src/activity-log/activity-log.service.ts), enum [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts) (already has `CHAT_CONVERSATION`) | Spec FR-110. |
-| Notifications | [`packages/agent/src/notifications/notification.service.ts`](../../../../../packages/agent/src/notifications/notification.service.ts), types [`packages/agent/src/entities/notification.types.ts`](../../../../../packages/agent/src/entities/notification.types.ts) | Spec FR-104/105. |
-| Uploads | [`apps/web/src/app/api/uploads/route.ts`](../../../../../apps/web/src/app/api/uploads/route.ts) + [`apps/web/src/lib/ai/attachments.ts`](../../../../../apps/web/src/lib/ai/attachments.ts) | Attachments — unchanged. |
+| What                          | Where                                                                                                                                                                                                                                                                                                                               | Used for                                                                                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent collaborator allow-list | [`packages/agent/src/entities/agent-collaborator.entity.ts`](../../../../../packages/agent/src/entities/agent-collaborator.entity.ts) — unique `(agentId, collaboratorAgentId)` + `enabled`                                                                                                                                         | The **only** authorisation for an Agent-pair Conversation (spec FR-77). No new permission model.                                         |
+| Agent status lifecycle        | [`packages/agent/src/entities/agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts) — `AgentStatus` `draft\|active\|running\|paused\|error\|archived`                                                                                                                                                       | What the reach receipt reports `skipped` against.                                                                                        |
+| Run entity                    | [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts) — `triggerKind`, `taskId`, `chatMessageId` (**FK to `task_chat_messages.id`**, index `idx_agent_runs_chat_message`), `costCents`, `queuedReason`, `pendingInput`                                                | Reply executions and their receipts. `chatMessageId` is already taken by Task chat, so a Conversation reply needs its own column (§3.3). |
+| SSE precedent                 | [`apps/api/src/email/email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts) lines ~167–250 — poll-diff SSE, 5 s poll, 15 s heartbeat comment, 10-minute forced lifetime, prime-then-diff so the backlog is not announced as new                                                                               | Exactly the transport for live Conversation delivery, copied verbatim in shape.                                                          |
+| SSE client precedent          | [`apps/web/src/lib/hooks/use-inbox-stream.ts`](../../../../../apps/web/src/lib/hooks/use-inbox-stream.ts) — `EventSource` with a 30 s poll fallback when unavailable or erroring                                                                                                                                                    | Spec FR-22/FR-23.                                                                                                                        |
+| Document references           | [`packages/agent/src/services/kb-mention-parser.ts`](../../../../../packages/agent/src/services/kb-mention-parser.ts), [`kb-mention-resolver.service.ts`](../../../../../packages/agent/src/services/kb-mention-resolver.service.ts), [`kb-prompt-formatter.ts`](../../../../../packages/agent/src/services/kb-prompt-formatter.ts) | The `#` reference target; [AW-06](../AW-06-knowledge-library/plan.md) owns the picker, this epic consumes it.                            |
+| Typeahead precedent           | [`apps/web/src/components/skills/SlashCommandAutocomplete.tsx`](../../../../../apps/web/src/components/skills/SlashCommandAutocomplete.tsx)                                                                                                                                                                                         | The mention picker copies its keyboard model and module-level cache.                                                                     |
+| Org membership gate           | [`apps/api/src/organizations/organization-membership.service.ts`](../../../../../apps/api/src/organizations/organization-membership.service.ts) — `ensureMember` / `ensureAdmin`, 404-not-403 on non-membership                                                                                                                     | Channel read/write authorisation.                                                                                                        |
+| Scope plumbing                | [`apps/api/src/scope/scope-context.service.ts`](../../../../../apps/api/src/scope/scope-context.service.ts), [`packages/agent/src/database/ownership-scope.ts`](../../../../../packages/agent/src/database/ownership-scope.ts) (`ownershipWhere`, `ownershipStamp`, `ownershipScopeOf`)                                             | Spec FR-97/98.                                                                                                                           |
+| Activity record               | [`packages/agent/src/activity-log/activity-log.service.ts`](../../../../../packages/agent/src/activity-log/activity-log.service.ts), enum [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts) (already has `CHAT_CONVERSATION`)                                 | Spec FR-110.                                                                                                                             |
+| Notifications                 | [`packages/agent/src/notifications/notification.service.ts`](../../../../../packages/agent/src/notifications/notification.service.ts), types [`packages/agent/src/entities/notification.types.ts`](../../../../../packages/agent/src/entities/notification.types.ts)                                                                | Spec FR-104/105.                                                                                                                         |
+| Uploads                       | [`apps/web/src/app/api/uploads/route.ts`](../../../../../apps/web/src/app/api/uploads/route.ts) + [`apps/web/src/lib/ai/attachments.ts`](../../../../../apps/web/src/lib/ai/attachments.ts)                                                                                                                                         | Attachments — unchanged.                                                                                                                 |
 
 ---
 
@@ -129,7 +129,7 @@ dispatched through the job runtime, exactly like Task-chat replies.
 **D1 — A Conversation is the named unit; we do not introduce a "thread" noun.**
 The program vocabulary has no word between Conversation and message, and `Conversation` already
 carries the right cardinality (many per person, each with its own message list). "A conversation
-per job" is achieved by *creating* one per job (FR-3), not by nesting a new entity inside one.
+per job" is achieved by _creating_ one per job (FR-3), not by nesting a new entity inside one.
 
 **D2 — Participants are a table, not a JSON column.**
 Membership is queried in both directions ("who is in this Conversation" for the header; "which
@@ -195,18 +195,18 @@ stamps from its reserved block — [README §5 rule 10](../README.md#5-rules-eve
 
 Edit [`packages/agent/src/entities/conversation.entity.ts`](../../../../../packages/agent/src/entities/conversation.entity.ts). Nothing existing is renamed, retyped or dropped.
 
-| Column | Type | Null | Default | Phase | Purpose |
-| --- | --- | --- | --- | --- | --- |
-| `kind` | varchar(24) | no | `'direct'` | P1 | `direct` / `group` / `organization_channel` / `agent_pair` |
-| `agentId` | uuid | yes | — | P1 | The addressed Agent for `direct`. FK → `agents.id`, `ON DELETE SET NULL` (FR-101) |
-| `titleSource` | varchar(8) | yes | — | P1 | `user` / `auto`. `user` permanently disables auto-titling (FR-6) |
-| `contextType` | varchar(16) | yes | — | P1 | `mission` / `task` / `work` / `idea` / `agent` (FR-9) |
-| `contextId` | uuid | yes | — | P1 | No FK — the target table varies; existence is checked at write time |
-| `lastMessageAt` | timestamptz | yes | — | P1 | Activity ordering without a correlated subquery (FR-12) |
-| `archivedAt` | timestamptz | yes | — | P2 | Archive/restore (FR-57–FR-60) |
-| `linkedConversationId` | uuid | yes | — | P2 | Cross-link on promotion. FK → `conversations.id`, `ON DELETE SET NULL` (FR-51) |
-| `pausedReason` | varchar(32) | yes | — | P2 | `agent_pair_message_ceiling` (FR-82) |
-| `agentMessageStreak` | int | no | `0` | P2 | Consecutive Agent-authored messages, reset by a person's post (FR-82/83) |
+| Column                 | Type        | Null | Default    | Phase | Purpose                                                                           |
+| ---------------------- | ----------- | ---- | ---------- | ----- | --------------------------------------------------------------------------------- |
+| `kind`                 | varchar(24) | no   | `'direct'` | P1    | `direct` / `group` / `organization_channel` / `agent_pair`                        |
+| `agentId`              | uuid        | yes  | —          | P1    | The addressed Agent for `direct`. FK → `agents.id`, `ON DELETE SET NULL` (FR-101) |
+| `titleSource`          | varchar(8)  | yes  | —          | P1    | `user` / `auto`. `user` permanently disables auto-titling (FR-6)                  |
+| `contextType`          | varchar(16) | yes  | —          | P1    | `mission` / `task` / `work` / `idea` / `agent` (FR-9)                             |
+| `contextId`            | uuid        | yes  | —          | P1    | No FK — the target table varies; existence is checked at write time               |
+| `lastMessageAt`        | timestamptz | yes  | —          | P1    | Activity ordering without a correlated subquery (FR-12)                           |
+| `archivedAt`           | timestamptz | yes  | —          | P2    | Archive/restore (FR-57–FR-60)                                                     |
+| `linkedConversationId` | uuid        | yes  | —          | P2    | Cross-link on promotion. FK → `conversations.id`, `ON DELETE SET NULL` (FR-51)    |
+| `pausedReason`         | varchar(32) | yes  | —          | P2    | `agent_pair_message_ceiling` (FR-82)                                              |
+| `agentMessageStreak`   | int         | no   | `0`        | P2    | Consecutive Agent-authored messages, reset by a person's post (FR-82/83)          |
 
 New indexes:
 
@@ -224,17 +224,17 @@ service-layer check, so a concurrent first-use cannot create two channels.
 
 Edit [`packages/agent/src/entities/conversation-message.entity.ts`](../../../../../packages/agent/src/entities/conversation-message.entity.ts).
 
-| Column | Type | Null | Default | Phase | Purpose |
-| --- | --- | --- | --- | --- | --- |
-| `authorType` | varchar(8) | no | `'user'` | P1 | `user` / `agent` / `system` (FR-75) |
-| `authorId` | uuid | yes | — | P1 | User id or Agent id. Null for `system` |
-| `mentions` | simple-json | yes | — | P1 | Reuses the `TaskChatMention` shape verbatim |
-| `attachments` | simple-json | yes | — | P1 | Reuses `TaskChatAttachmentRef` (`{ uploadId }`), ≤ 10 (FR-35) |
-| `status` | varchar(8) | no | `'sent'` | P1 | `sending` / `sent` / `failed` (FR-42) |
-| `failureCode` | varchar(40) | yes | — | P1 | `rate_limited` / `provider_unavailable` / `network` / `too_large` / `secret_detected` / `forbidden` |
-| `clientMessageId` | varchar(64) | yes | — | P1 | Retry idempotency (FR-41) |
-| `replyToMessageId` | uuid | yes | — | P1 | The message an Agent reply answers |
-| `reach` | simple-json | yes | — | P3 | `ConversationReach[]` (§3.5) |
+| Column             | Type        | Null | Default  | Phase | Purpose                                                                                             |
+| ------------------ | ----------- | ---- | -------- | ----- | --------------------------------------------------------------------------------------------------- |
+| `authorType`       | varchar(8)  | no   | `'user'` | P1    | `user` / `agent` / `system` (FR-75)                                                                 |
+| `authorId`         | uuid        | yes  | —        | P1    | User id or Agent id. Null for `system`                                                              |
+| `mentions`         | simple-json | yes  | —        | P1    | Reuses the `TaskChatMention` shape verbatim                                                         |
+| `attachments`      | simple-json | yes  | —        | P1    | Reuses `TaskChatAttachmentRef` (`{ uploadId }`), ≤ 10 (FR-35)                                       |
+| `status`           | varchar(8)  | no   | `'sent'` | P1    | `sending` / `sent` / `failed` (FR-42)                                                               |
+| `failureCode`      | varchar(40) | yes  | —        | P1    | `rate_limited` / `provider_unavailable` / `network` / `too_large` / `secret_detected` / `forbidden` |
+| `clientMessageId`  | varchar(64) | yes  | —        | P1    | Retry idempotency (FR-41)                                                                           |
+| `replyToMessageId` | uuid        | yes  | —        | P1    | The message an Agent reply answers                                                                  |
+| `reach`            | simple-json | yes  | —        | P3    | `ConversationReach[]` (§3.5)                                                                        |
 
 New indexes:
 
@@ -247,16 +247,16 @@ uq_conversation_messages_client_id       UNIQUE (conversationId, clientMessageId
 The unique index **is** FR-41: a double-tapped Retry is rejected by the database, not by a race in
 the service.
 
-The existing `role` column keeps its meaning and is still written — `authorType` describes *who*,
-`role` describes *what the model sees*. Nothing reads `role` differently after this change.
+The existing `role` column keeps its meaning and is still written — `authorType` describes _who_,
+`role` describes _what the model sees_. Nothing reads `role` differently after this change.
 
 ### 3.3 `agent_runs` — one additive column (P1)
 
 Edit [`packages/agent/src/entities/agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts).
 
-| Column | Type | Null | Purpose |
-| --- | --- | --- | --- |
-| `conversationMessageId` | uuid | yes | Populated only when `triggerKind = 'conversation'`. FK → `conversation_messages.id`, `ON DELETE SET NULL` |
+| Column                  | Type | Null | Purpose                                                                                                   |
+| ----------------------- | ---- | ---- | --------------------------------------------------------------------------------------------------------- |
+| `conversationMessageId` | uuid | yes  | Populated only when `triggerKind = 'conversation'`. FK → `conversation_messages.id`, `ON DELETE SET NULL` |
 
 Index `idx_agent_runs_conversation_message (conversationMessageId)`.
 
@@ -268,20 +268,20 @@ The `AgentRunTriggerKind` TypeScript union gains `'conversation'`. The column is
 New entity at `packages/agent/src/entities/conversation-participant.entity.ts` **(new)**, exported
 from [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts).
 
-| Column | Type | Null | Notes |
-| --- | --- | --- | --- |
-| `id` | uuid PK | no | |
-| `conversationId` | uuid | no | FK → `conversations.id`, `ON DELETE CASCADE` |
-| `participantType` | varchar(8) | no | `user` / `agent` |
-| `participantId` | uuid | no | No FK — the target table varies by type |
-| `role` | varchar(12) | no | `owner` / `member` / `observer`, default `member` |
-| `joinedAt` | timestamptz | no | |
-| `leftAt` | timestamptz | yes | Departure, never deletion (FR-55, FR-101) |
-| `lastReadMessageId` | uuid | yes | Unread computation (FR-24) |
-| `lastReadAt` | timestamptz | yes | |
-| `mutedAt` | timestamptz | yes | |
-| `tenantId` / `organizationId` | uuid | yes | Tier-C denormalisation, no `@ManyToOne` (entity-cycle rule) |
-| `createdAt` / `updatedAt` | timestamptz | no | |
+| Column                        | Type        | Null | Notes                                                       |
+| ----------------------------- | ----------- | ---- | ----------------------------------------------------------- |
+| `id`                          | uuid PK     | no   |                                                             |
+| `conversationId`              | uuid        | no   | FK → `conversations.id`, `ON DELETE CASCADE`                |
+| `participantType`             | varchar(8)  | no   | `user` / `agent`                                            |
+| `participantId`               | uuid        | no   | No FK — the target table varies by type                     |
+| `role`                        | varchar(12) | no   | `owner` / `member` / `observer`, default `member`           |
+| `joinedAt`                    | timestamptz | no   |                                                             |
+| `leftAt`                      | timestamptz | yes  | Departure, never deletion (FR-55, FR-101)                   |
+| `lastReadMessageId`           | uuid        | yes  | Unread computation (FR-24)                                  |
+| `lastReadAt`                  | timestamptz | yes  |                                                             |
+| `mutedAt`                     | timestamptz | yes  |                                                             |
+| `tenantId` / `organizationId` | uuid        | yes  | Tier-C denormalisation, no `@ManyToOne` (entity-cycle rule) |
+| `createdAt` / `updatedAt`     | timestamptz | no   |                                                             |
 
 ```
 uq_conversation_participants   UNIQUE (conversationId, participantType, participantId)
@@ -310,11 +310,11 @@ existing `./tasks-domain` entry.
 
 ### 3.6 Migrations (forward-only, one per phase)
 
-| Phase | File **(new)** | Contents |
-| --- | --- | --- |
-| P1 | `apps/api/src/migrations/1791120000000-AddConversationKindAndParticipants.ts` | `ALTER TABLE conversations ADD` the six P1 columns; `ALTER TABLE conversation_messages ADD` the eight P1 columns; `ALTER TABLE agent_runs ADD conversationMessageId`; `CREATE TABLE conversation_participants`; all P1 indexes; a backfill that inserts one `owner` participant row per existing conversation from its `userId` and sets `lastMessageAt` from `MAX(conversation_messages.createdAt)` and `titleSource = 'auto'` where `metadata->>'aiTitle' = 'true'`. |
-| P2 | `apps/api/src/migrations/1791120100000-AddConversationGroupsAndPeers.ts` | `archivedAt`, `linkedConversationId`, `pausedReason`, `agentMessageStreak` + their FK and indexes. |
-| P3 | `apps/api/src/migrations/1791120200000-AddConversationChannelReach.ts` | `conversation_messages.reach`; `uq_conversations_org_channel`. |
+| Phase | File **(new)**                                                                | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1    | `apps/api/src/migrations/1791120000000-AddConversationKindAndParticipants.ts` | `ALTER TABLE conversations ADD` the six P1 columns; `ALTER TABLE conversation_messages ADD` the eight P1 columns; `ALTER TABLE agent_runs ADD conversationMessageId`; `CREATE TABLE conversation_participants`; all P1 indexes; a backfill that inserts one `owner` participant row per existing conversation from its `userId` and sets `lastMessageAt` from `MAX(conversation_messages.createdAt)` and `titleSource = 'auto'` where `metadata->>'aiTitle' = 'true'`. |
+| P2    | `apps/api/src/migrations/1791120100000-AddConversationGroupsAndPeers.ts`      | `archivedAt`, `linkedConversationId`, `pausedReason`, `agentMessageStreak` + their FK and indexes.                                                                                                                                                                                                                                                                                                                                                                     |
+| P3    | `apps/api/src/migrations/1791120200000-AddConversationChannelReach.ts`        | `conversation_messages.reach`; `uq_conversations_org_channel`.                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 Every statement is `ADD COLUMN` / `CREATE TABLE` / `CREATE INDEX`. No `DROP`, no rename, no retype.
 `down()` reverses each with `DROP COLUMN` / `DROP TABLE` in reverse order, per repo convention.
@@ -330,46 +330,46 @@ All endpoints live under `apps/api/src/ai-conversation/`, guarded exactly as the
 
 ### 4.1 Extended — `conversation.controller.ts`
 
-| Method | Path | Change | Phase |
-| --- | --- | --- | --- |
-| GET | `/api/conversations` | Additive optional query params `kind`, `agentId`, `archived` (`true\|false\|only`, default `false`), `contextType`, `contextId`. Response rows gain `kind`, `agentId`, `name`, `titleSource`, `lastMessageAt`, `unreadCount`, `participants[]`. Existing callers that pass none of the new params get today's behaviour. | P1 |
-| POST | `/api/conversations` | Body gains optional `kind`, `agentId`, `contextType`, `contextId`, `participantAgentIds[]` (≤ 8). Defaults reproduce today's behaviour exactly. | P1 |
-| PATCH | `/api/conversations/:id` | `title` becomes `string \| null`. A non-null value sets `titleSource='user'`; `null` clears the title and `titleSource`. `providerId` stays absent from the whitelist. | P1 |
-| GET | `/api/conversations/:id` | Response gains `kind`, `agentId`, `participants[]`, `linkedConversation`, `context`, `archivedAt`, `pausedReason`. | P1 |
-| DELETE | `/api/conversations` | Unchanged behaviour, now explicitly excluding `organization_channel` and `agent_pair` rows (FR-102). | P1 |
+| Method | Path                     | Change                                                                                                                                                                                                                                                                                                                   | Phase |
+| ------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| GET    | `/api/conversations`     | Additive optional query params `kind`, `agentId`, `archived` (`true\|false\|only`, default `false`), `contextType`, `contextId`. Response rows gain `kind`, `agentId`, `name`, `titleSource`, `lastMessageAt`, `unreadCount`, `participants[]`. Existing callers that pass none of the new params get today's behaviour. | P1    |
+| POST   | `/api/conversations`     | Body gains optional `kind`, `agentId`, `contextType`, `contextId`, `participantAgentIds[]` (≤ 8). Defaults reproduce today's behaviour exactly.                                                                                                                                                                          | P1    |
+| PATCH  | `/api/conversations/:id` | `title` becomes `string \| null`. A non-null value sets `titleSource='user'`; `null` clears the title and `titleSource`. `providerId` stays absent from the whitelist.                                                                                                                                                   | P1    |
+| GET    | `/api/conversations/:id` | Response gains `kind`, `agentId`, `participants[]`, `linkedConversation`, `context`, `archivedAt`, `pausedReason`.                                                                                                                                                                                                       | P1    |
+| DELETE | `/api/conversations`     | Unchanged behaviour, now explicitly excluding `organization_channel` and `agent_pair` rows (FR-102).                                                                                                                                                                                                                     | P1    |
 
 ### 4.2 New — messages, retry, read state
 
-| Method | Path | Body / query | Returns | Phase |
-| --- | --- | --- | --- | --- |
-| GET | `/api/conversations/:id/messages` | `limit` (≤ 200, default 50), `before` (message id) | Paged messages, newest-last | P1 |
-| POST | `/api/conversations/:id/messages` | **Extended**: existing batch append plus `clientMessageId`, `attachments[]` (≤ 10), `authorType` | `202` with the stored message and its dispatch outcomes | P1 |
-| POST | `/api/conversations/:id/messages/:messageId/retry` | — | `202`; `409` if the message is not `failed` | P1 |
-| DELETE | `/api/conversations/:id/messages/:messageId` | Only a `failed` message may be discarded; `409` otherwise | `204` | P1 |
-| POST | `/api/conversations/:id/read` | `{ lastReadMessageId }` | `204` | P1 |
-| GET | `/api/conversations/mention-candidates` | `q` (≤ 80 chars), `conversationId` | ≤ 8 `{ type, id, slug, name, status }` | P1 |
+| Method | Path                                               | Body / query                                                                                     | Returns                                                 | Phase |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- | ----- |
+| GET    | `/api/conversations/:id/messages`                  | `limit` (≤ 200, default 50), `before` (message id)                                               | Paged messages, newest-last                             | P1    |
+| POST   | `/api/conversations/:id/messages`                  | **Extended**: existing batch append plus `clientMessageId`, `attachments[]` (≤ 10), `authorType` | `202` with the stored message and its dispatch outcomes | P1    |
+| POST   | `/api/conversations/:id/messages/:messageId/retry` | —                                                                                                | `202`; `409` if the message is not `failed`             | P1    |
+| DELETE | `/api/conversations/:id/messages/:messageId`       | Only a `failed` message may be discarded; `409` otherwise                                        | `204`                                                   | P1    |
+| POST   | `/api/conversations/:id/read`                      | `{ lastReadMessageId }`                                                                          | `204`                                                   | P1    |
+| GET    | `/api/conversations/mention-candidates`            | `q` (≤ 80 chars), `conversationId`                                                               | ≤ 8 `{ type, id, slug, name, status }`                  | P1    |
 
 ### 4.3 New — `conversation-participants.controller.ts` **(new)**
 
-| Method | Path | Notes | Phase |
-| --- | --- | --- | --- |
-| GET | `/api/conversations/:id/participants` | | P1 |
-| POST | `/api/conversations/:id/participants` | `{ participantType, participantId }`; `409` at the 8-Agent cap (FR-54) | P2 |
-| DELETE | `/api/conversations/:id/participants/:participantType/:participantId` | Sets `leftAt`; never deletes the row (FR-55) | P2 |
-| POST | `/api/conversations/:id/promote` | `{ agentId, carryMessages? }` → `201 { conversationId }`. Idempotent on the unique participant constraint (FR-56) | P2 |
-| POST | `/api/conversations/:id/archive` | `409` for `organization_channel` and `agent_pair` (FR-65, FR-85) | P2 |
-| POST | `/api/conversations/:id/restore` | Restores to activity position — no timestamp is touched (FR-59) | P2 |
+| Method | Path                                                                  | Notes                                                                                                             | Phase |
+| ------ | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----- |
+| GET    | `/api/conversations/:id/participants`                                 |                                                                                                                   | P1    |
+| POST   | `/api/conversations/:id/participants`                                 | `{ participantType, participantId }`; `409` at the 8-Agent cap (FR-54)                                            | P2    |
+| DELETE | `/api/conversations/:id/participants/:participantType/:participantId` | Sets `leftAt`; never deletes the row (FR-55)                                                                      | P2    |
+| POST   | `/api/conversations/:id/promote`                                      | `{ agentId, carryMessages? }` → `201 { conversationId }`. Idempotent on the unique participant constraint (FR-56) | P2    |
+| POST   | `/api/conversations/:id/archive`                                      | `409` for `organization_channel` and `agent_pair` (FR-65, FR-85)                                                  | P2    |
+| POST   | `/api/conversations/:id/restore`                                      | Restores to activity position — no timestamp is touched (FR-59)                                                   | P2    |
 
 ### 4.4 New — `conversation-channel.controller.ts` **(new)**
 
-| Method | Path | Notes | Phase |
-| --- | --- | --- | --- |
-| GET | `/api/conversations/organization-channel` | Resolve-or-create the singleton for the active Organization; `404` when there is no Organization (FR-63, S-26) | P3 |
-| POST | `/api/conversations/organization-channel/messages` | `@Throttle({ long: { limit: 10, ttl: 3_600_000 } })` (FR-47). Returns `202` **before** delivery (FR-74) | P3 |
-| GET | `/api/conversations/:id/messages/:messageId/reach` | The full receipt (FR-69/70) | P3 |
-| GET | `/api/conversations/agent-pairs` | One row per pair with the latest message (FR-79) | P2 |
-| GET | `/api/conversations/agent-pairs/:pairId` | Full transcript; `404` outside the caller's Organization | P2 |
-| POST | `/api/conversations/agent-pairs/:pairId/messages` | The person stepping in (FR-81) | P2 |
+| Method | Path                                               | Notes                                                                                                          | Phase |
+| ------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----- |
+| GET    | `/api/conversations/organization-channel`          | Resolve-or-create the singleton for the active Organization; `404` when there is no Organization (FR-63, S-26) | P3    |
+| POST   | `/api/conversations/organization-channel/messages` | `@Throttle({ long: { limit: 10, ttl: 3_600_000 } })` (FR-47). Returns `202` **before** delivery (FR-74)        | P3    |
+| GET    | `/api/conversations/:id/messages/:messageId/reach` | The full receipt (FR-69/70)                                                                                    | P3    |
+| GET    | `/api/conversations/agent-pairs`                   | One row per pair with the latest message (FR-79)                                                               | P2    |
+| GET    | `/api/conversations/agent-pairs/:pairId`           | Full transcript; `404` outside the caller's Organization                                                       | P2    |
+| POST   | `/api/conversations/agent-pairs/:pairId/messages`  | The person stepping in (FR-81)                                                                                 | P2    |
 
 Both channel endpoints call `OrganizationMembershipService.ensureMember` first, which 404s rather
 than 403s — satisfying FR-95 with no new code.
@@ -399,21 +399,21 @@ with an `index.ts` barrel, alongside the existing `packages/contracts/src/inbox/
 
 ### 5.1 New components — `apps/web/src/components/ai/conversations/` **(new folder)**
 
-| File **(all new)** | Responsibility |
-| --- | --- |
-| `ConversationPanelRouter.tsx` | The three-view stack (Conversation → list → switcher) and the back control (FR-14). Owns no data. |
-| `ConversationHeader.tsx` | Back, participant name as the switcher trigger, name control, context chip, close (FR-13/14) |
-| `ConversationNameDialog.tsx` | Set / clear the name; 200-character counter (§6.5 of the spec) |
-| `ConversationListPanel.tsx` | One participant's Conversations: name-over-preview rows, unread dots, empty / loading / error states |
-| `ParticipantSwitcher.tsx` | Agents, groups, the channel, the Agent-conversations entry (FR-15) |
-| `MentionPicker.tsx` | `@` typeahead: 150 ms debounce, ≤ 8 rows, `↑↓/Enter/Tab/Esc`. Keyboard model copied from `SlashCommandAutocomplete.tsx` |
-| `ComposerHighlightLayer.tsx` | The overlay that lights up resolved mentions and references without controlling the textarea (see D6 below) |
-| `MessageRetryBar.tsx` | Failed-message row: reason text, Retry, Discard (FR-42–FR-46) |
-| `ReachReceipt.tsx` | "Reached 7 of 9" summary plus the grouped expansion (FR-69/70) |
-| `GroupMembersMenu.tsx` | Rename, add / remove an Agent, archive (FR-55/61) |
-| `AgentPairList.tsx` / `AgentPairView.tsx` | Agent-to-Agent list and transcript, with the paused state (FR-79–FR-83) |
-| `OrganizationChannelView.tsx` | The channel body, its subtitle, its composer placeholder, its over-limit and no-Agent states |
-| `ConversationsSidebarSection.tsx` | The sidebar section: channel pinned first, groups by recency, `Archived (N)` |
+| File **(all new)**                        | Responsibility                                                                                                          |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `ConversationPanelRouter.tsx`             | The three-view stack (Conversation → list → switcher) and the back control (FR-14). Owns no data.                       |
+| `ConversationHeader.tsx`                  | Back, participant name as the switcher trigger, name control, context chip, close (FR-13/14)                            |
+| `ConversationNameDialog.tsx`              | Set / clear the name; 200-character counter (§6.5 of the spec)                                                          |
+| `ConversationListPanel.tsx`               | One participant's Conversations: name-over-preview rows, unread dots, empty / loading / error states                    |
+| `ParticipantSwitcher.tsx`                 | Agents, groups, the channel, the Agent-conversations entry (FR-15)                                                      |
+| `MentionPicker.tsx`                       | `@` typeahead: 150 ms debounce, ≤ 8 rows, `↑↓/Enter/Tab/Esc`. Keyboard model copied from `SlashCommandAutocomplete.tsx` |
+| `ComposerHighlightLayer.tsx`              | The overlay that lights up resolved mentions and references without controlling the textarea (see D6 below)             |
+| `MessageRetryBar.tsx`                     | Failed-message row: reason text, Retry, Discard (FR-42–FR-46)                                                           |
+| `ReachReceipt.tsx`                        | "Reached 7 of 9" summary plus the grouped expansion (FR-69/70)                                                          |
+| `GroupMembersMenu.tsx`                    | Rename, add / remove an Agent, archive (FR-55/61)                                                                       |
+| `AgentPairList.tsx` / `AgentPairView.tsx` | Agent-to-Agent list and transcript, with the paused state (FR-79–FR-83)                                                 |
+| `OrganizationChannelView.tsx`             | The channel body, its subtitle, its composer placeholder, its over-limit and no-Agent states                            |
+| `ConversationsSidebarSection.tsx`         | The sidebar section: channel pinned first, groups by recency, `Archived (N)`                                            |
 
 **D6 — how the highlight layer keeps the textarea uncontrolled.**
 `ChatInput.tsx` is deliberately uncontrolled, and making it controlled would re-render the panel on
@@ -426,26 +426,26 @@ resolves.
 
 ### 5.2 Modified components
 
-| File | Change |
-| --- | --- |
-| [`apps/web/src/components/ai/ChatPanel.tsx`](../../../../../apps/web/src/components/ai/ChatPanel.tsx) | Renders `ConversationPanelRouter` instead of `ChatInterface` directly; `ChatInterface` becomes the Conversation view |
-| [`ChatInterface.tsx`](../../../../../apps/web/src/components/ai/ChatInterface.tsx) | Accepts a `conversationId` + `kind` and stops assuming one global Conversation |
-| [`ChatInput.tsx`](../../../../../apps/web/src/components/ai/ChatInput.tsx) | Mounts `MentionPicker` + `ComposerHighlightLayer`; adds the 16 KB pre-send guard and the placeholder per kind |
-| [`ChatProvider.tsx`](../../../../../apps/web/src/components/ai/ChatProvider.tsx) | Gains the panel view stack, the active participant, unread state and the failed-message queue |
-| [`ChatHistory.tsx`](../../../../../apps/web/src/components/ai/ChatHistory.tsx) | Kept, unchanged, as the flat all-conversations list; the new per-participant list is a sibling, not a replacement |
-| [`apps/web/src/lib/hooks/use-chat-panel.tsx`](../../../../../apps/web/src/lib/hooks/use-chat-panel.tsx) | Adds the double-click-to-reset handler (420 px) and keyboard resize on the handle |
+| File                                                                                                                                  | Change                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/web/src/components/ai/ChatPanel.tsx`](../../../../../apps/web/src/components/ai/ChatPanel.tsx)                                 | Renders `ConversationPanelRouter` instead of `ChatInterface` directly; `ChatInterface` becomes the Conversation view                                                                                      |
+| [`ChatInterface.tsx`](../../../../../apps/web/src/components/ai/ChatInterface.tsx)                                                    | Accepts a `conversationId` + `kind` and stops assuming one global Conversation                                                                                                                            |
+| [`ChatInput.tsx`](../../../../../apps/web/src/components/ai/ChatInput.tsx)                                                            | Mounts `MentionPicker` + `ComposerHighlightLayer`; adds the 16 KB pre-send guard and the placeholder per kind                                                                                             |
+| [`ChatProvider.tsx`](../../../../../apps/web/src/components/ai/ChatProvider.tsx)                                                      | Gains the panel view stack, the active participant, unread state and the failed-message queue                                                                                                             |
+| [`ChatHistory.tsx`](../../../../../apps/web/src/components/ai/ChatHistory.tsx)                                                        | Kept, unchanged, as the flat all-conversations list; the new per-participant list is a sibling, not a replacement                                                                                         |
+| [`apps/web/src/lib/hooks/use-chat-panel.tsx`](../../../../../apps/web/src/lib/hooks/use-chat-panel.tsx)                               | Adds the double-click-to-reset handler (420 px) and keyboard resize on the handle                                                                                                                         |
 | [`apps/web/src/app/[locale]/(dashboard)/layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/layout-client.tsx>) | Only the double-click reset and the handle's keyboard affordance; the existing clamp `Math.max(350, Math.min(maxWidth, …))` and the `chat-width` / `chat-panel-open` persistence stay exactly as they are |
-| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) | Mounts `ConversationsSidebarSection` beneath the fixed nav array; the array itself is untouched |
-| [`apps/web/src/lib/api/conversations.ts`](../../../../../apps/web/src/lib/api/conversations.ts) | New client methods for every §4 endpoint; existing signatures unchanged |
+| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx)     | Mounts `ConversationsSidebarSection` beneath the fixed nav array; the array itself is untouched                                                                                                           |
+| [`apps/web/src/lib/api/conversations.ts`](../../../../../apps/web/src/lib/api/conversations.ts)                                       | New client methods for every §4 endpoint; existing signatures unchanged                                                                                                                                   |
 
 ### 5.3 New hooks and data fetching
 
-| File **(new)** | Purpose |
-| --- | --- |
-| `apps/web/src/lib/hooks/use-conversation-stream.ts` | `EventSource` on the SSE endpoint with a 30 s poll fallback — same shape as `use-inbox-stream.ts` |
-| `apps/web/src/lib/hooks/use-mention-candidates.ts` | Debounced picker source with a module-level cache |
+| File **(new)**                                      | Purpose                                                                                                                     |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/hooks/use-conversation-stream.ts` | `EventSource` on the SSE endpoint with a 30 s poll fallback — same shape as `use-inbox-stream.ts`                           |
+| `apps/web/src/lib/hooks/use-mention-candidates.ts`  | Debounced picker source with a module-level cache                                                                           |
 | `apps/web/src/lib/hooks/use-conversation-outbox.ts` | Optimistic send, failed-message persistence in `localStorage['chat-outbox']`, `clientMessageId` generation, Retry / Discard |
-| `apps/web/src/app/actions/conversations.ts` | Server actions wrapping the API client, matching the existing `app/actions/*` pattern |
+| `apps/web/src/app/actions/conversations.ts`         | Server actions wrapping the API client, matching the existing `app/actions/*` pattern                                       |
 
 Reads are server actions from RSC where the surface is a page; the docked panel is a client
 component and calls the same actions. No new fetching library.
@@ -486,10 +486,10 @@ ports sit side by side; the Task path is untouched.
 
 New job-runtime tasks:
 
-| File **(new)** | Kind | Fired by | Does |
-| --- | --- | --- | --- |
-| `packages/tasks/src/tasks/trigger/agent-conversation-reply.task.ts` | one-shot | `ConversationMessageService` per dispatched Agent | Resolves the Conversation, builds the Agent's context (recent messages, resolved document references, attached context object), executes the run, appends the reply as a message with `authorType='agent'` |
-| `packages/tasks/src/tasks/trigger/conversation-broadcast.task.ts` | one-shot | `ConversationBroadcastService` on an unmentioned channel post | Enumerates addressable Agents, classifies each into a reach outcome, enqueues at most 8 reply dispatches immediately and records the rest as `queued`, then writes the `reach` column once |
+| File **(new)**                                                      | Kind     | Fired by                                                      | Does                                                                                                                                                                                                       |
+| ------------------------------------------------------------------- | -------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/tasks/src/tasks/trigger/agent-conversation-reply.task.ts` | one-shot | `ConversationMessageService` per dispatched Agent             | Resolves the Conversation, builds the Agent's context (recent messages, resolved document references, attached context object), executes the run, appends the reply as a message with `authorType='agent'` |
+| `packages/tasks/src/tasks/trigger/conversation-broadcast.task.ts`   | one-shot | `ConversationBroadcastService` on an unmentioned channel post | Enumerates addressable Agents, classifies each into a reach outcome, enqueues at most 8 reply dispatches immediately and records the rest as `queued`, then writes the `reach` column once                 |
 
 Both are registered in [`packages/tasks/src/tasks/trigger/index.ts`](../../../../../packages/tasks/src/tasks/trigger/index.ts) beside `agent-chat-reply.task.ts`, and bound in the api-side providers
 file alongside the existing dispatcher bindings.
@@ -655,18 +655,18 @@ routing, batching and suppression belong to AW-13; this epic calls
 
 ### 9.3 Failure modes and the intended behaviour
 
-| Failure | Behaviour |
-| --- | --- |
-| Model provider down | The reply run fails and is recorded on the run; the Conversation shows the Agent did not reply with the reason. The person's message is unaffected. |
-| Job runtime unconfigured | The dispatcher port throws rather than silently no-op-ing (the posture `TaskChatService` already takes); the message is stored, the reach entry reads `refused — background jobs are not configured`. |
-| Organization at its run ceiling | `queued` in the receipt with `queuedReason`; the existing drain promotes it. Never an error. |
-| Agent paused / archived / errored | `skipped` with the status named. Never a retry, never a notification. |
-| Broadcast job crashes mid-fan-out | The `reach` column is written **once, at the end**, from an idempotent classification keyed on `(messageId, agentId)`; a re-run of the job produces the same reach and re-uses the same dispatch dedup keys, so no Agent is dispatched twice. |
-| SSE connection dies | Client falls back to the 30 s poll with no user-visible error (FR-23). |
-| `clientMessageId` collision | The unique index rejects the second insert; the service returns the existing message, so Retry is idempotent by construction. |
-| Promotion race | The unique participant constraint rejects the loser; the promotion service catches it and returns the winning group. |
-| Person removed from the Organization mid-session | `ensureMember` 404s; the client shows the membership message and preserves the composer text. |
-| Agent pair runaway | The streak counter blocks the twenty-first consecutive Agent message and the daily ceiling blocks the two-hundred-and-first, both recorded against the initiating run. |
+| Failure                                          | Behaviour                                                                                                                                                                                                                                     |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model provider down                              | The reply run fails and is recorded on the run; the Conversation shows the Agent did not reply with the reason. The person's message is unaffected.                                                                                           |
+| Job runtime unconfigured                         | The dispatcher port throws rather than silently no-op-ing (the posture `TaskChatService` already takes); the message is stored, the reach entry reads `refused — background jobs are not configured`.                                         |
+| Organization at its run ceiling                  | `queued` in the receipt with `queuedReason`; the existing drain promotes it. Never an error.                                                                                                                                                  |
+| Agent paused / archived / errored                | `skipped` with the status named. Never a retry, never a notification.                                                                                                                                                                         |
+| Broadcast job crashes mid-fan-out                | The `reach` column is written **once, at the end**, from an idempotent classification keyed on `(messageId, agentId)`; a re-run of the job produces the same reach and re-uses the same dispatch dedup keys, so no Agent is dispatched twice. |
+| SSE connection dies                              | Client falls back to the 30 s poll with no user-visible error (FR-23).                                                                                                                                                                        |
+| `clientMessageId` collision                      | The unique index rejects the second insert; the service returns the existing message, so Retry is idempotent by construction.                                                                                                                 |
+| Promotion race                                   | The unique participant constraint rejects the loser; the promotion service catches it and returns the winning group.                                                                                                                          |
+| Person removed from the Organization mid-session | `ensureMember` 404s; the client shows the membership message and preserves the composer text.                                                                                                                                                 |
+| Agent pair runaway                               | The streak counter blocks the twenty-first consecutive Agent message and the daily ceiling blocks the two-hundred-and-first, both recorded against the initiating run.                                                                        |
 
 ---
 
@@ -674,27 +674,27 @@ routing, batching and suppression belong to AW-13; this epic calls
 
 ### 10.1 Unit — agent package (Jest)
 
-| File **(all new unless stated)** | Covers |
-| --- | --- |
-| `packages/agent/src/conversations/__tests__/conversation-mention.service.spec.ts` | Full-name and slug matching, case-insensitivity, two-word names, the 10-mention cap, unresolved tokens staying plain and being stripped from the agent-visible body, invisible Agents producing the same result as non-existent ones |
-| `packages/agent/src/conversations/__tests__/conversation.service.spec.ts` | Kind rules, name set/clear and `titleSource`, participant-derived group names, 200-character cap, archive/restore refusals for channel and pair |
-| `packages/agent/src/conversations/__tests__/conversation-message.service.spec.ts` | 16 KB cap, secret rejection, `clientMessageId` idempotency, retry transitions, discard restricted to `failed` |
-| `packages/agent/src/conversations/__tests__/conversation-dispatch.spec.ts` | The reply contract: mention → dispatch, no-mention group → deliver-to-all, duplicate mention → one dispatch, live-run steering, the 8-dispatch ceiling |
-| `packages/agent/src/conversations/__tests__/conversation-promotion.service.spec.ts` | History carry (20 / 7 days), cross-links both ways, original untouched, concurrent promotion → one group |
-| `packages/agent/src/conversations/__tests__/conversation-broadcast.service.spec.ts` | Reach classification for every outcome, narrowing by mention, the 200-Agent refusal, the zero-Agent receipt, idempotent re-run |
-| `packages/agent/src/conversations/__tests__/agent-peer-conversation.service.spec.ts` | Collaborator gate, one-pair uniqueness, the 20-message pause and its reset, the daily ceiling |
-| `packages/agent/src/database/repositories/conversation.repository.spec.ts` | Scoped list filters, unread computation, activity ordering |
-| `packages/agent/src/database/repositories/conversation-participant.repository.spec.ts` | Unique constraint behaviour, `leftAt` semantics |
+| File **(all new unless stated)**                                                       | Covers                                                                                                                                                                                                                               |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/conversations/__tests__/conversation-mention.service.spec.ts`      | Full-name and slug matching, case-insensitivity, two-word names, the 10-mention cap, unresolved tokens staying plain and being stripped from the agent-visible body, invisible Agents producing the same result as non-existent ones |
+| `packages/agent/src/conversations/__tests__/conversation.service.spec.ts`              | Kind rules, name set/clear and `titleSource`, participant-derived group names, 200-character cap, archive/restore refusals for channel and pair                                                                                      |
+| `packages/agent/src/conversations/__tests__/conversation-message.service.spec.ts`      | 16 KB cap, secret rejection, `clientMessageId` idempotency, retry transitions, discard restricted to `failed`                                                                                                                        |
+| `packages/agent/src/conversations/__tests__/conversation-dispatch.spec.ts`             | The reply contract: mention → dispatch, no-mention group → deliver-to-all, duplicate mention → one dispatch, live-run steering, the 8-dispatch ceiling                                                                               |
+| `packages/agent/src/conversations/__tests__/conversation-promotion.service.spec.ts`    | History carry (20 / 7 days), cross-links both ways, original untouched, concurrent promotion → one group                                                                                                                             |
+| `packages/agent/src/conversations/__tests__/conversation-broadcast.service.spec.ts`    | Reach classification for every outcome, narrowing by mention, the 200-Agent refusal, the zero-Agent receipt, idempotent re-run                                                                                                       |
+| `packages/agent/src/conversations/__tests__/agent-peer-conversation.service.spec.ts`   | Collaborator gate, one-pair uniqueness, the 20-message pause and its reset, the daily ceiling                                                                                                                                        |
+| `packages/agent/src/database/repositories/conversation.repository.spec.ts`             | Scoped list filters, unread computation, activity ordering                                                                                                                                                                           |
+| `packages/agent/src/database/repositories/conversation-participant.repository.spec.ts` | Unique constraint behaviour, `leftAt` semantics                                                                                                                                                                                      |
 
 ### 10.2 Controller specs — API (Jest)
 
-| File | Covers |
-| --- | --- |
-| [`apps/api/src/ai-conversation/conversation.controller.spec.ts`](../../../../../apps/api/src/ai-conversation/conversation.controller.spec.ts) *(existing — extended)* | New query params, `title: null`, the new response fields, unchanged legacy behaviour |
-| `apps/api/src/ai-conversation/conversation-participants.controller.spec.ts` **(new)** | Cap 409s, promote idempotency, archive refusals |
-| `apps/api/src/ai-conversation/conversation-channel.controller.spec.ts` **(new)** | Singleton resolve-or-create, no-Organization 404, membership 404-not-403, the hourly throttle, 202-before-delivery |
-| `apps/api/src/ai-conversation/conversation.controller.scope.spec.ts` **(new)** | Cross-scope reads return 404, mirroring [`apps/api/src/tasks/task-chat.controller.scope.spec.ts`](../../../../../apps/api/src/tasks/task-chat.controller.scope.spec.ts) |
-| `apps/api/src/ai-conversation/conversation-stream.controller.spec.ts` **(new)** | Headers, prime-then-diff, heartbeat, forced lifetime cleanup |
+| File                                                                                                                                                                  | Covers                                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/api/src/ai-conversation/conversation.controller.spec.ts`](../../../../../apps/api/src/ai-conversation/conversation.controller.spec.ts) _(existing — extended)_ | New query params, `title: null`, the new response fields, unchanged legacy behaviour                                                                                    |
+| `apps/api/src/ai-conversation/conversation-participants.controller.spec.ts` **(new)**                                                                                 | Cap 409s, promote idempotency, archive refusals                                                                                                                         |
+| `apps/api/src/ai-conversation/conversation-channel.controller.spec.ts` **(new)**                                                                                      | Singleton resolve-or-create, no-Organization 404, membership 404-not-403, the hourly throttle, 202-before-delivery                                                      |
+| `apps/api/src/ai-conversation/conversation.controller.scope.spec.ts` **(new)**                                                                                        | Cross-scope reads return 404, mirroring [`apps/api/src/tasks/task-chat.controller.scope.spec.ts`](../../../../../apps/api/src/tasks/task-chat.controller.scope.spec.ts) |
+| `apps/api/src/ai-conversation/conversation-stream.controller.spec.ts` **(new)**                                                                                       | Headers, prime-then-diff, heartbeat, forced lifetime cleanup                                                                                                            |
 
 ### 10.3 Web unit (Vitest)
 
@@ -706,22 +706,22 @@ routing, batching and suppression belong to AW-13; this epic calls
   mapping, double-Retry produces one send.
 - `apps/web/src/components/ai/conversations/ReachReceipt.unit.spec.tsx` **(new)** — grouping and the
   narrowed-post summary.
-- `apps/web/src/components/ai/ChatProvider.unit.spec.ts` *(existing — extended)* — the view stack.
+- `apps/web/src/components/ai/ChatProvider.unit.spec.ts` _(existing — extended)_ — the view stack.
 
 ### 10.4 E2E (Playwright, `apps/web/e2e/`)
 
-| File **(all new)** | Golden path |
-| --- | --- |
-| `flow-conversation-naming.spec.ts` | Create, name, reload, clear, confirm preview fallback |
-| `flow-conversation-panel-navigation.spec.ts` | Panel survives five navigations, back walks three views, drag + double-click reset, width survives reload |
-| `flow-conversation-mentions.spec.ts` | Picker opens, chip inserted, unmatched word stays plain, 11th mention warning |
-| `flow-conversation-send-retry.spec.ts` | Forced failure, failed row survives reload, Retry sends once |
-| `flow-conversation-group-promotion.spec.ts` | Mention promotes, history carried, both links present, original intact |
-| `flow-conversation-archive-restore.spec.ts` | Archive, Archived list, restore to activity position, archived refuses replies |
-| `flow-organization-channel-broadcast.spec.ts` | Post, receipt summary, narrowed post, no-Organization state |
-| `flow-organization-channel-reach.spec.ts` | Delivered / queued / skipped groupings and the over-limit refusal |
-| `flow-agent-peer-conversations.spec.ts` | List, read, step in with attribution, the paused state |
-| `conversations-participants-api.spec.ts` | Contract-level checks of the new endpoints, in the style of the existing `conversations-crud.spec.ts` |
+| File **(all new)**                            | Golden path                                                                                               |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `flow-conversation-naming.spec.ts`            | Create, name, reload, clear, confirm preview fallback                                                     |
+| `flow-conversation-panel-navigation.spec.ts`  | Panel survives five navigations, back walks three views, drag + double-click reset, width survives reload |
+| `flow-conversation-mentions.spec.ts`          | Picker opens, chip inserted, unmatched word stays plain, 11th mention warning                             |
+| `flow-conversation-send-retry.spec.ts`        | Forced failure, failed row survives reload, Retry sends once                                              |
+| `flow-conversation-group-promotion.spec.ts`   | Mention promotes, history carried, both links present, original intact                                    |
+| `flow-conversation-archive-restore.spec.ts`   | Archive, Archived list, restore to activity position, archived refuses replies                            |
+| `flow-organization-channel-broadcast.spec.ts` | Post, receipt summary, narrowed post, no-Organization state                                               |
+| `flow-organization-channel-reach.spec.ts`     | Delivered / queued / skipped groupings and the over-limit refusal                                         |
+| `flow-agent-peer-conversations.spec.ts`       | List, read, step in with attribution, the paused state                                                    |
+| `conversations-participants-api.spec.ts`      | Contract-level checks of the new endpoints, in the style of the existing `conversations-crud.spec.ts`     |
 
 Existing chat specs — `chat-api.spec.ts`, `chat-ui-roundtrip.spec.ts`,
 `flow-chat-conversation-lifecycle.spec.ts`, `flow-conversations-crud-deep.spec.ts` and siblings —
@@ -767,32 +767,33 @@ Organization that never posts to it sees no change.
 
 ## 12. Constitution compliance
 
-| Gate | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | No external integration is added. Everything talks to Postgres, the existing job runtime and the existing model proxy. |
-| **II — Capability-driven, no hardcoded plugin id** | ✅ | Provider and model resolution for a reply stays in `AgentRunService` and the existing facades; the Conversation layer passes an Agent id and never names a provider. |
-| **III — Source-of-truth repositories** | ✅ | Conversations are platform metadata, not Work content. Nothing in this epic writes to a user repo. Referenced Knowledge Base documents are read through the existing resolver, which reads the repo-backed source. |
-| **IV — Background work via the job runtime** | ✅ | Reply and broadcast dispatch go through `AGENT_CONVERSATION_REPLY_DISPATCHER` and `CONVERSATION_BROADCAST_DISPATCHER` DI symbols; no call site imports a runtime SDK. `POST` returns `202` and never blocks on delivery. |
-| **V — Forward-only migrations** | ✅ | Three additive migrations under `apps/api/src/migrations/`, all `ADD COLUMN` / `CREATE TABLE` / `CREATE INDEX`, each shipping in the same PR as its entity change. No drop, no rename, no retype. |
-| **VI — Tests are a prerequisite** | ✅ | Nine agent-package unit specs, five controller specs, five web unit specs and ten e2e specs, enumerated in §10 and mapped to tasks. |
-| **VII — Secret hygiene** | ✅ | `assertNoSecrets` runs on every message before storage; no body, mention or attachment name is logged; provider errors keep the existing redaction on the model proxy. |
-| **VIII — Single source of truth for plugin lists** | ✅ | No plugin is added, so no count changes. |
-| **IX — Behaviour-first spec** | ✅ | `spec.md` names no class, path or code; every implementation detail lives here. |
-| **X — Backwards compatibility** | ✅ | Every existing endpoint keeps its current shape and behaviour with no new parameters supplied; every new field is nullable or defaulted; existing chat e2e specs pass unmodified. |
+| Gate                                               | Status | Justification                                                                                                                                                                                                            |
+| -------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **I — Plugin-first**                               | ✅     | No external integration is added. Everything talks to Postgres, the existing job runtime and the existing model proxy.                                                                                                   |
+| **II — Capability-driven, no hardcoded plugin id** | ✅     | Provider and model resolution for a reply stays in `AgentRunService` and the existing facades; the Conversation layer passes an Agent id and never names a provider.                                                     |
+| **III — Source-of-truth repositories**             | ✅     | Conversations are platform metadata, not Work content. Nothing in this epic writes to a user repo. Referenced Knowledge Base documents are read through the existing resolver, which reads the repo-backed source.       |
+| **IV — Background work via the job runtime**       | ✅     | Reply and broadcast dispatch go through `AGENT_CONVERSATION_REPLY_DISPATCHER` and `CONVERSATION_BROADCAST_DISPATCHER` DI symbols; no call site imports a runtime SDK. `POST` returns `202` and never blocks on delivery. |
+| **V — Forward-only migrations**                    | ✅     | Three additive migrations under `apps/api/src/migrations/`, all `ADD COLUMN` / `CREATE TABLE` / `CREATE INDEX`, each shipping in the same PR as its entity change. No drop, no rename, no retype.                        |
+| **VI — Tests are a prerequisite**                  | ✅     | Nine agent-package unit specs, five controller specs, five web unit specs and ten e2e specs, enumerated in §10 and mapped to tasks.                                                                                      |
+| **VII — Secret hygiene**                           | ✅     | `assertNoSecrets` runs on every message before storage; no body, mention or attachment name is logged; provider errors keep the existing redaction on the model proxy.                                                   |
+| **VIII — Single source of truth for plugin lists** | ✅     | No plugin is added, so no count changes.                                                                                                                                                                                 |
+| **IX — Behaviour-first spec**                      | ✅     | `spec.md` names no class, path or code; every implementation detail lives here.                                                                                                                                          |
+| **X — Backwards compatibility**                    | ✅     | Every existing endpoint keeps its current shape and behaviour with no new parameters supplied; every new field is nullable or defaulted; existing chat e2e specs pass unmodified.                                        |
 
 ---
 
 ## 13. Cross-references
 
-| Epic | Boundary |
-| --- | --- |
-| [AW-02 Mission board](../AW-02-mission-board/spec.md) | Owns the `Chat about it` menu item and its key `dashboard.missionsPage.menu.chat`; this epic owns the handler and the context chip. AW-02 explicitly defers all chat surfaces here. |
+| Epic                                                          | Boundary                                                                                                                                                                             |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [AW-02 Mission board](../AW-02-mission-board/spec.md)         | Owns the `Chat about it` menu item and its key `dashboard.missionsPage.menu.chat`; this epic owns the handler and the context chip. AW-02 explicitly defers all chat surfaces here.  |
 | [AW-06 Knowledge library](../AW-06-knowledge-library/spec.md) | Owns the `#` picker and reference resolution (its FR-49–FR-60). This epic consumes it in every conversation composer and keeps the existing reference syntax working until it lands. |
-| [AW-01 Command palette](../AW-01-command-palette/spec.md) | Reaches Conversation **names**; full-text search over message bodies is explicitly out of scope in both epics. |
-| [AW-09 Runs & receipts](../AW-09-runs-receipts/spec.md) | Owns the receipt every Agent message links to; this epic supplies the `conversationMessageId` link. |
-| [AW-13 Attention controls](../README.md#3-epics) | Owns notification routing; this epic emits `NotificationCategory.CONVERSATION` events and implements no routing of its own. |
-| [AW-17 Costs & caps](../README.md#3-epics) | Owns the cap that refuses a reply; this epic renders the refusal in the Conversation and names the rule. |
-| [AW-18 Shared dashboards](../AW-18-shared-dashboards/spec.md) | Owns teammate access. Multi-person group Conversations are deferred to it. |
-| [AW-23 Agent identity](../README.md#3-epics) | Owns Agent display names and avatars, which the mention picker and message attribution render. |
+| [AW-01 Command palette](../AW-01-command-palette/spec.md)     | Reaches Conversation **names**; full-text search over message bodies is explicitly out of scope in both epics.                                                                       |
+| [AW-09 Runs & receipts](../AW-09-runs-receipts/spec.md)       | Owns the receipt every Agent message links to; this epic supplies the `conversationMessageId` link.                                                                                  |
+| [AW-13 Attention controls](../README.md#3-epics)              | Owns notification routing; this epic emits `NotificationCategory.CONVERSATION` events and implements no routing of its own.                                                          |
+| [AW-17 Costs & caps](../README.md#3-epics)                    | Owns the cap that refuses a reply; this epic renders the refusal in the Conversation and names the rule.                                                                             |
+| [AW-18 Shared dashboards](../AW-18-shared-dashboards/spec.md) | Owns teammate access. Multi-person group Conversations are deferred to it.                                                                                                           |
+| [AW-23 Agent identity](../README.md#3-epics)                  | Owns Agent display names and avatars, which the mention picker and message attribution render.                                                                                       |
+
 </content>
 </invoke>

@@ -2,7 +2,7 @@
 
 > Translates [`spec.md`](./spec.md) into architecture and tech choices. The plan owns
 > implementation detail; the spec owns behaviour. **Every path below was verified to exist in
-> the worktree before it was written down**; paths marked *(new)* do not exist yet and are
+> the worktree before it was written down**; paths marked _(new)_ do not exist yet and are
 > created by this epic.
 
 **Epic ID**: `AW-24-safety-rails`
@@ -16,14 +16,14 @@
 
 ### 1.1 Five refusal mechanisms, five vocabularies, one screen between them
 
-| # | Rail today | Where the decision is made | Where it is enforced | Screen |
-| --- | --- | --- | --- | --- |
-| 1 | **Platform stop flag** | [`packages/agent/src/fleet/fleet-kill-switch.service.ts`](../../../../../packages/agent/src/fleet/fleet-kill-switch.service.ts) over the single-row [`fleet-kill-switch.entity.ts`](../../../../../packages/agent/src/entities/fleet-kill-switch.entity.ts) | The `RUN_KILL_SWITCH` middleware in [`run-admission-chain.ts`](../../../../../packages/agent/src/agents/run-admission-chain.ts), the fleet router, and the job lease | [`FleetKillSwitchBanner.tsx`](../../../../../apps/web/src/components/settings/FleetKillSwitchBanner.tsx) — operator-only |
-| 2 | **Agent / Mission / Run pause** | `AgentStatus` in [`agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts), mission status, run steering | Status checks scattered across the dispatcher, the heartbeat cron and the steering service | Per-entity buttons |
-| 3 | **Tool grants** | [`packages/agent/src/policy/tool-grant.ts`](../../../../../packages/agent/src/policy/tool-grant.ts) (pure merge) + [`tool-grant.service.ts`](../../../../../packages/agent/src/policy/tool-grant.service.ts) | `resolveGrantedTools` in [`agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts) — once per Run, at descriptor-assembly time | Agent scope only, in [`AgentCapabilitiesClient.tsx`](../../../../../apps/web/src/components/agents/AgentCapabilitiesClient.tsx) |
-| 4 | **Budgets** | [`packages/agent/src/budgets/budget-guard.service.ts`](../../../../../packages/agent/src/budgets/budget-guard.service.ts) | The same guard, at the metered call | Per-Work and per-Agent surfaces |
-| 5 | **Merge policy** | [`packages/agent/src/policy/merge-policy.ts`](../../../../../packages/agent/src/policy/merge-policy.ts) + [`pull-request-gate.service.ts`](../../../../../packages/agent/src/policy/pull-request-gate.service.ts) | The merge call site and the PR-open gate | [`MergePolicyCard.tsx`](../../../../../apps/web/src/components/policy/MergePolicyCard.tsx), org scope only |
-| 6 | **Agent dispatch guardrails** | [`packages/agent/src/agents/guardrails.ts`](../../../../../packages/agent/src/agents/guardrails.ts) — `evaluateGuardrails()` | [`agent-approvals.service.ts`](../../../../../packages/agent/src/agent-approvals/agent-approvals.service.ts) `createProposal` | **None** |
+| #   | Rail today                      | Where the decision is made                                                                                                                                                                                                                                  | Where it is enforced                                                                                                                                                 | Screen                                                                                                                          |
+| --- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Platform stop flag**          | [`packages/agent/src/fleet/fleet-kill-switch.service.ts`](../../../../../packages/agent/src/fleet/fleet-kill-switch.service.ts) over the single-row [`fleet-kill-switch.entity.ts`](../../../../../packages/agent/src/entities/fleet-kill-switch.entity.ts) | The `RUN_KILL_SWITCH` middleware in [`run-admission-chain.ts`](../../../../../packages/agent/src/agents/run-admission-chain.ts), the fleet router, and the job lease | [`FleetKillSwitchBanner.tsx`](../../../../../apps/web/src/components/settings/FleetKillSwitchBanner.tsx) — operator-only        |
+| 2   | **Agent / Mission / Run pause** | `AgentStatus` in [`agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts), mission status, run steering                                                                                                                              | Status checks scattered across the dispatcher, the heartbeat cron and the steering service                                                                           | Per-entity buttons                                                                                                              |
+| 3   | **Tool grants**                 | [`packages/agent/src/policy/tool-grant.ts`](../../../../../packages/agent/src/policy/tool-grant.ts) (pure merge) + [`tool-grant.service.ts`](../../../../../packages/agent/src/policy/tool-grant.service.ts)                                                | `resolveGrantedTools` in [`agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts) — once per Run, at descriptor-assembly time       | Agent scope only, in [`AgentCapabilitiesClient.tsx`](../../../../../apps/web/src/components/agents/AgentCapabilitiesClient.tsx) |
+| 4   | **Budgets**                     | [`packages/agent/src/budgets/budget-guard.service.ts`](../../../../../packages/agent/src/budgets/budget-guard.service.ts)                                                                                                                                   | The same guard, at the metered call                                                                                                                                  | Per-Work and per-Agent surfaces                                                                                                 |
+| 5   | **Merge policy**                | [`packages/agent/src/policy/merge-policy.ts`](../../../../../packages/agent/src/policy/merge-policy.ts) + [`pull-request-gate.service.ts`](../../../../../packages/agent/src/policy/pull-request-gate.service.ts)                                           | The merge call site and the PR-open gate                                                                                                                             | [`MergePolicyCard.tsx`](../../../../../apps/web/src/components/policy/MergePolicyCard.tsx), org scope only                      |
+| 6   | **Agent dispatch guardrails**   | [`packages/agent/src/agents/guardrails.ts`](../../../../../packages/agent/src/agents/guardrails.ts) — `evaluateGuardrails()`                                                                                                                                | [`agent-approvals.service.ts`](../../../../../packages/agent/src/agent-approvals/agent-approvals.service.ts) `createProposal`                                        | **None**                                                                                                                        |
 
 Six mechanisms. Two screens, both narrow. No shared vocabulary, no shared order, no shared audit
 record, and no way for an owner to reason about the whole.
@@ -37,12 +37,12 @@ record, and no way for an owner to reason about the whole.
   [`agent.entity.ts`](../../../../../packages/agent/src/entities/agent.entity.ts) line ~331). It
   covers the four members of `AGENT_ACTION_PROPOSAL_ACTION_TYPES`
   (`spawn_agent | schedule_task | send_message | budget_override | other`). There is no
-  workspace scope, no notion of a *kind of work*, and no page that renders it.
+  workspace scope, no notion of a _kind of work_, and no page that renders it.
 
 - **Approval executes nothing.** The entity docstring on
   [`agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts)
-  states it outright: *"Actually executing / resuming the approved action is a follow-up
-  increment — this entity is the durable queue + decision record only."*
+  states it outright: _"Actually executing / resuming the approved action is a follow-up
+  increment — this entity is the durable queue + decision record only."_
   `AgentApprovalsService.decide()` flips `status`, `decidedById`, `decidedAt`, `decidedVia` and
   returns. Nothing re-dispatches.
 
@@ -98,7 +98,7 @@ record, and no way for an owner to reason about the whole.
   FR-61 reuses both; it writes no new patterns.
 - **Fail-closed single-row precedent.**
   [`fleet-kill-switch.entity.ts`](../../../../../packages/agent/src/entities/fleet-kill-switch.entity.ts)
-  documents the exact posture the workspace pause copies: a read failure resolves to *stopped*,
+  documents the exact posture the workspace pause copies: a read failure resolves to _stopped_,
   and setting the flag never cancels running work.
 - **Scope stamping.** [`apps/api/src/scope/scope-stamping.subscriber.ts`](../../../../../apps/api/src/scope/scope-stamping.subscriber.ts)
   auto-fills `tenantId`/`organizationId` on any entity that declares both columns. Every new
@@ -155,17 +155,17 @@ be assertable by a test rather than read out of control flow.
 The gate is **not** called from the model loop. It is called at the platform's own action entry
 points, all of which already exist:
 
-| Category | Entry point that calls the gate |
-| --- | --- |
-| `read.external` | The search / screenshot / content-extractor facades under `packages/agent/src/facades/` |
-| `write.internal`, `write.destructive` | Task, Mission, Memory and Knowledge-Base domain tool factories reached through `AGENT_DOMAIN_TOOL_SOURCES` in [`agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts) |
+| Category                               | Entry point that calls the gate                                                                                                                                                                                                                                              |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read.external`                        | The search / screenshot / content-extractor facades under `packages/agent/src/facades/`                                                                                                                                                                                      |
+| `write.internal`, `write.destructive`  | Task, Mission, Memory and Knowledge-Base domain tool factories reached through `AGENT_DOMAIN_TOOL_SOURCES` in [`agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts)                                                                      |
 | `message.internal`, `message.external` | The `AGENT_EMAIL_FACADE` and `AGENT_NOTIFY_CHANNEL_FACADE` adapters ([`agent-email-facade.ts`](../../../../../packages/agent/src/agents/agent-email-facade.ts), [`agent-notify-channel-facade.ts`](../../../../../packages/agent/src/agents/agent-notify-channel-facade.ts)) |
-| `publish.external` | `AGENT_GIT_FACADE` ([`agent-git-facade.ts`](../../../../../packages/agent/src/agents/agent-git-facade.ts)) + [`pull-request-gate.service.ts`](../../../../../packages/agent/src/policy/pull-request-gate.service.ts) + the deploy capability facade |
-| `spend.metered` | [`budget-guard.service.ts`](../../../../../packages/agent/src/budgets/budget-guard.service.ts) call sites |
-| `access.grant` | `AgentApprovalsService.createProposal` and the tool-grant / connection write services |
-| `machine.run`, `machine.admin` | The fleet job dispatcher and the terminal session launcher ([`terminal-session-launcher.service.ts`](../../../../../packages/agent/src/agents/terminal-session-launcher.service.ts)) |
-| `agent.fanout` | [`sub-agent-delegation.service.ts`](../../../../../packages/agent/src/agents/sub-agent-delegation.service.ts) and the schedule/trigger write services |
-| MCP / plugin tools | `descriptor.invoke(...)` in [`agent-run.service.ts`](../../../../../packages/agent/src/agents/agent-run.service.ts) — the one place every tool call converges |
+| `publish.external`                     | `AGENT_GIT_FACADE` ([`agent-git-facade.ts`](../../../../../packages/agent/src/agents/agent-git-facade.ts)) + [`pull-request-gate.service.ts`](../../../../../packages/agent/src/policy/pull-request-gate.service.ts) + the deploy capability facade                          |
+| `spend.metered`                        | [`budget-guard.service.ts`](../../../../../packages/agent/src/budgets/budget-guard.service.ts) call sites                                                                                                                                                                    |
+| `access.grant`                         | `AgentApprovalsService.createProposal` and the tool-grant / connection write services                                                                                                                                                                                        |
+| `machine.run`, `machine.admin`         | The fleet job dispatcher and the terminal session launcher ([`terminal-session-launcher.service.ts`](../../../../../packages/agent/src/agents/terminal-session-launcher.service.ts))                                                                                         |
+| `agent.fanout`                         | [`sub-agent-delegation.service.ts`](../../../../../packages/agent/src/agents/sub-agent-delegation.service.ts) and the schedule/trigger write services                                                                                                                        |
+| MCP / plugin tools                     | `descriptor.invoke(...)` in [`agent-run.service.ts`](../../../../../packages/agent/src/agents/agent-run.service.ts) — the one place every tool call converges                                                                                                                |
 
 That last row is the important one and is the reason FR-14 is satisfiable: **`invokeTool` is a
 single choke point** and today performs no per-call access check (grants are folded once at
@@ -205,7 +205,7 @@ Cache misses and store failures are the fail-closed path: a failed refresh sets
   gate before every tool call. When the workspace is paused it returns a `paused` verdict; the run
   ends cleanly at that boundary through the existing park path
   ([`agent-run-abort.ts`](../../../../../packages/agent/src/agents/agent-run-abort.ts)). A run
-  that does not reach a boundary is *not* killed — it is listed (FR-44).
+  that does not reach a boundary is _not_ killed — it is listed (FR-44).
 
 ### 2.6 Held actions ride the approval record
 
@@ -228,73 +228,73 @@ set.
 > — this repo has no `autoLoadEntities`, so a `forFeature`'d-but-unregistered entity throws
 > `EntityMetadataNotFoundError` on first query.
 
-### 3.1 `AutonomyGrant` — `packages/agent/src/entities/autonomy-grant.entity.ts` *(new)*
+### 3.1 `AutonomyGrant` — `packages/agent/src/entities/autonomy-grant.entity.ts` _(new)_
 
 Table `autonomy_grants`.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `userId` | uuid | Owner of the row; grants are user-scoped like `tool_grants` |
-| `scopeType` | varchar(16) | `workspace` \| `agent` |
-| `scopeId` | uuid | Organization id for `workspace` (nullable-sentinel `'00000000-…'` for bare-tenant, mirroring how `tool_grants` addresses the tenant scope), Agent id for `agent` |
-| `category` | varchar(24) | One of the 13 category ids |
-| `rung` | varchar(8) | `off` \| `draft` \| `ask` \| `auto` |
-| `setByUserId` | uuid | Who wrote it. Never null — FR-31 |
-| `note` | varchar(500) nullable | Optional reason |
-| `tenantId` | uuid nullable | Stamped by the scope subscriber |
-| `organizationId` | uuid nullable | Stamped by the scope subscriber |
-| `createdAt` / `updatedAt` | `@PortableDateColumn` / `@UpdateDateColumn` | |
+| Column                    | Type                                        | Notes                                                                                                                                                            |
+| ------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                      | uuid PK                                     |                                                                                                                                                                  |
+| `userId`                  | uuid                                        | Owner of the row; grants are user-scoped like `tool_grants`                                                                                                      |
+| `scopeType`               | varchar(16)                                 | `workspace` \| `agent`                                                                                                                                           |
+| `scopeId`                 | uuid                                        | Organization id for `workspace` (nullable-sentinel `'00000000-…'` for bare-tenant, mirroring how `tool_grants` addresses the tenant scope), Agent id for `agent` |
+| `category`                | varchar(24)                                 | One of the 13 category ids                                                                                                                                       |
+| `rung`                    | varchar(8)                                  | `off` \| `draft` \| `ask` \| `auto`                                                                                                                              |
+| `setByUserId`             | uuid                                        | Who wrote it. Never null — FR-31                                                                                                                                 |
+| `note`                    | varchar(500) nullable                       | Optional reason                                                                                                                                                  |
+| `tenantId`                | uuid nullable                               | Stamped by the scope subscriber                                                                                                                                  |
+| `organizationId`          | uuid nullable                               | Stamped by the scope subscriber                                                                                                                                  |
+| `createdAt` / `updatedAt` | `@PortableDateColumn` / `@UpdateDateColumn` |                                                                                                                                                                  |
 
 Indexes: `UNIQUE (userId, scopeType, scopeId, category)`,
 `idx_autonomy_grants_scope (scopeType, scopeId)`.
 No `@ManyToOne` (the EW-654 entity-cycle rule); the FKs live in the migration.
 
-### 3.2 `RailRefusal` — `packages/agent/src/entities/rail-refusal.entity.ts` *(new)*
+### 3.2 `RailRefusal` — `packages/agent/src/entities/rail-refusal.entity.ts` _(new)_
 
 Table `rail_refusals`. Append-only; nothing updates a row.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `userId` | uuid | |
-| `railId` | varchar(24) | `platform-stop` \| `workspace-pause` \| `scope-pause` \| `grants` \| `ladder` \| `caps` \| `rules` \| `taxonomy` |
-| `category` | varchar(24) nullable | Null only for `taxonomy` refusals of an unclassifiable action |
-| `verdict` | varchar(12) | `refused` \| `held` |
-| `reasonCode` | varchar(32) | The closed list of spec FR-65 |
-| `subjectType` | varchar(16) | `run` \| `agent` \| `mission` \| `task` \| `schedule` \| `trigger` |
-| `subjectId` | uuid nullable | |
-| `agentId` | uuid nullable | |
-| `runId` | uuid nullable | Backlink to the receipt |
-| `summary` | varchar(500) | Human-readable, credential-free, ≤ 500 chars (FR-70) |
-| `requested` | `simple-json` nullable | Identifying parameters only — never a body, never a credential |
-| `ceiling` | `simple-json` nullable | What the rail allowed, for the "requested vs ceiling" line |
-| `proposalId` | uuid nullable | The held `agent_action_proposals` row, when `verdict = 'held'` |
-| `collapseKey` | varchar(128) | `sha1(railId:agentId:category:yyyy-mm-dd)` — drives FR-68 |
-| `tenantId` / `organizationId` | uuid nullable | Scope-stamped |
-| `createdAt` | `@PortableDateColumn` | |
+| Column                        | Type                   | Notes                                                                                                            |
+| ----------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `id`                          | uuid PK                |                                                                                                                  |
+| `userId`                      | uuid                   |                                                                                                                  |
+| `railId`                      | varchar(24)            | `platform-stop` \| `workspace-pause` \| `scope-pause` \| `grants` \| `ladder` \| `caps` \| `rules` \| `taxonomy` |
+| `category`                    | varchar(24) nullable   | Null only for `taxonomy` refusals of an unclassifiable action                                                    |
+| `verdict`                     | varchar(12)            | `refused` \| `held`                                                                                              |
+| `reasonCode`                  | varchar(32)            | The closed list of spec FR-65                                                                                    |
+| `subjectType`                 | varchar(16)            | `run` \| `agent` \| `mission` \| `task` \| `schedule` \| `trigger`                                               |
+| `subjectId`                   | uuid nullable          |                                                                                                                  |
+| `agentId`                     | uuid nullable          |                                                                                                                  |
+| `runId`                       | uuid nullable          | Backlink to the receipt                                                                                          |
+| `summary`                     | varchar(500)           | Human-readable, credential-free, ≤ 500 chars (FR-70)                                                             |
+| `requested`                   | `simple-json` nullable | Identifying parameters only — never a body, never a credential                                                   |
+| `ceiling`                     | `simple-json` nullable | What the rail allowed, for the "requested vs ceiling" line                                                       |
+| `proposalId`                  | uuid nullable          | The held `agent_action_proposals` row, when `verdict = 'held'`                                                   |
+| `collapseKey`                 | varchar(128)           | `sha1(railId:agentId:category:yyyy-mm-dd)` — drives FR-68                                                        |
+| `tenantId` / `organizationId` | uuid nullable          | Scope-stamped                                                                                                    |
+| `createdAt`                   | `@PortableDateColumn`  |                                                                                                                  |
 
 Indexes: `idx_rail_refusals_user_created (userId, createdAt DESC)`,
 `idx_rail_refusals_collapse (collapseKey)`,
 `idx_rail_refusals_agent_category (agentId, category, createdAt DESC)`,
 `idx_rail_refusals_rail (railId, createdAt DESC)`.
 
-### 3.3 `WorkspacePause` — `packages/agent/src/entities/workspace-pause.entity.ts` *(new)*
+### 3.3 `WorkspacePause` — `packages/agent/src/entities/workspace-pause.entity.ts` _(new)_
 
 Table `workspace_pauses`. A row exists **only while paused**; delete on resume.
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `userId` | uuid | Workspace owner |
-| `tenantId` | uuid | Never null here — the pause is always tenant-anchored |
-| `organizationId` | uuid nullable | Null = the bare-tenant workspace |
-| `reason` | varchar(500) nullable | |
-| `pausedByUserId` | uuid | |
-| `pausedAt` | `@PortableDateColumn` | |
-| `refusedStarts` | int default 0 | Incremented by the rail; drives the banner count |
-| `cleanlyStopped` | int default 0 | Runs that parked at a boundary |
-| `updatedAt` | `@UpdateDateColumn` | |
+| Column           | Type                  | Notes                                                 |
+| ---------------- | --------------------- | ----------------------------------------------------- |
+| `id`             | uuid PK               |                                                       |
+| `userId`         | uuid                  | Workspace owner                                       |
+| `tenantId`       | uuid                  | Never null here — the pause is always tenant-anchored |
+| `organizationId` | uuid nullable         | Null = the bare-tenant workspace                      |
+| `reason`         | varchar(500) nullable |                                                       |
+| `pausedByUserId` | uuid                  |                                                       |
+| `pausedAt`       | `@PortableDateColumn` |                                                       |
+| `refusedStarts`  | int default 0         | Incremented by the rail; drives the banner count      |
+| `cleanlyStopped` | int default 0         | Runs that parked at a boundary                        |
+| `updatedAt`      | `@UpdateDateColumn`   |                                                       |
 
 Index: `UNIQUE (tenantId, organizationId)` — Postgres partial-unique for the NULL case, written
 by hand in the migration exactly as `work_budgets` does (a decorator-level `@Index` would make
@@ -305,18 +305,18 @@ TypeORM generate a non-partial duplicate on the SQLite test driver).
 **`agent_action_proposals`** (entity
 [`agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts)):
 
-| Column | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `category` | varchar(24) nullable | `NULL` | Null on rows written before this epic |
-| `railId` | varchar(24) nullable | `NULL` | Which rail held it |
-| `rung` | varchar(8) nullable | `NULL` | The rung in force when it was held |
-| `payloadDigest` | varchar(64) nullable | `NULL` | sha256 of the canonicalised payload (FR-22) |
-| `executionState` | varchar(16) | `'not_required'` | `not_required` \| `pending` \| `executing` \| `executed` \| `failed` \| `expired` \| `discarded` |
-| `executedAt` | timestamp nullable | | |
-| `executionRunId` | uuid nullable | | The Run that performed the execution |
-| `executionError` | text nullable | | |
-| `expiresAt` | timestamp nullable | | `createdAt + 14 days` for held rows |
-| `staleReason` | varchar(120) nullable | | Set by the staleness checker |
+| Column           | Type                  | Default          | Notes                                                                                            |
+| ---------------- | --------------------- | ---------------- | ------------------------------------------------------------------------------------------------ |
+| `category`       | varchar(24) nullable  | `NULL`           | Null on rows written before this epic                                                            |
+| `railId`         | varchar(24) nullable  | `NULL`           | Which rail held it                                                                               |
+| `rung`           | varchar(8) nullable   | `NULL`           | The rung in force when it was held                                                               |
+| `payloadDigest`  | varchar(64) nullable  | `NULL`           | sha256 of the canonicalised payload (FR-22)                                                      |
+| `executionState` | varchar(16)           | `'not_required'` | `not_required` \| `pending` \| `executing` \| `executed` \| `failed` \| `expired` \| `discarded` |
+| `executedAt`     | timestamp nullable    |                  |                                                                                                  |
+| `executionRunId` | uuid nullable         |                  | The Run that performed the execution                                                             |
+| `executionError` | text nullable         |                  |                                                                                                  |
+| `expiresAt`      | timestamp nullable    |                  | `createdAt + 14 days` for held rows                                                              |
+| `staleReason`    | varchar(120) nullable |                  | Set by the staleness checker                                                                     |
 
 `executionState` defaults to `not_required` so every pre-existing row keeps exactly its current
 behaviour (Constitution X).
@@ -328,8 +328,8 @@ Two additive `AgentActionProposalActionType` members are appended — `send_exte
 **`agent_runs`** (entity
 [`agent-run.entity.ts`](../../../../../packages/agent/src/entities/agent-run.entity.ts)):
 
-| Column | Type | Notes |
-| --- | --- | --- |
+| Column               | Type          | Notes                                                                             |
+| -------------------- | ------------- | --------------------------------------------------------------------------------- |
 | `stoppedByRefusalId` | uuid nullable | Links a stopped run to the refusal that stopped it, for the receipt's Rails block |
 
 `agent_runs.queuedReason` (existing `varchar(64)`) gains two new values —
@@ -341,37 +341,37 @@ Two additive `AgentActionProposalActionType` members are appended — `send_exte
 `accessToken`, `refreshToken`, `idToken` widen from their current types to `text` and gain the
 `EncryptedJsonColumn`-style transformer from
 [`_secret-json-column.ts`](../../../../../packages/agent/src/entities/_secret-json-column.ts).
-The transformer's read path is already legacy-plaintext-tolerant, so the backfill is *optional*
-for correctness and *required* for the guarantee — hence the one-shot job in §6.4.
+The transformer's read path is already legacy-plaintext-tolerant, so the backfill is _optional_
+for correctness and _required_ for the guarantee — hence the one-shot job in §6.4.
 
 ### 3.5 Migrations (forward-only, one per phase, shipped with their entities)
 
-| Phase | File *(new)* | Contents |
-| --- | --- | --- |
-| P1 | `apps/api/src/migrations/1791240000000-AddSafetyRailsCore.ts` | `CREATE TABLE autonomy_grants`, `rail_refusals`, `workspace_pauses` with all indexes and the hand-written partial unique on `workspace_pauses`; FK `setByUserId`/`pausedByUserId` → `users(id) ON DELETE SET NULL`. `down()` drops the three tables only. |
-| P2 | `apps/api/src/migrations/1791240100000-AddHeldActionExecution.ts` | The ten `agent_action_proposals` columns and `agent_runs.stopped_by_refusal_id`; a partial index `idx_proposals_execution_pending ON agent_action_proposals (expiresAt) WHERE executionState = 'pending'`. `down()` drops the columns. |
-| P3 | `apps/api/src/migrations/1791240200000-EncryptAuthAccountTokens.ts` | `ALTER TABLE account ALTER COLUMN "accessToken" TYPE text` (and the two siblings). **No data is transformed inside the migration** — encryption happens in the backfill job (§6.4) so a long-running crypto pass never blocks a boot-time `migrationsRun`. `down()` reverts the types. |
+| Phase | File _(new)_                                                        | Contents                                                                                                                                                                                                                                                                               |
+| ----- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1    | `apps/api/src/migrations/1791240000000-AddSafetyRailsCore.ts`       | `CREATE TABLE autonomy_grants`, `rail_refusals`, `workspace_pauses` with all indexes and the hand-written partial unique on `workspace_pauses`; FK `setByUserId`/`pausedByUserId` → `users(id) ON DELETE SET NULL`. `down()` drops the three tables only.                              |
+| P2    | `apps/api/src/migrations/1791240100000-AddHeldActionExecution.ts`   | The ten `agent_action_proposals` columns and `agent_runs.stopped_by_refusal_id`; a partial index `idx_proposals_execution_pending ON agent_action_proposals (expiresAt) WHERE executionState = 'pending'`. `down()` drops the columns.                                                 |
+| P3    | `apps/api/src/migrations/1791240200000-EncryptAuthAccountTokens.ts` | `ALTER TABLE account ALTER COLUMN "accessToken" TYPE text` (and the two siblings). **No data is transformed inside the migration** — encryption happens in the backfill job (§6.4) so a long-running crypto pass never blocks a boot-time `migrationsRun`. `down()` reverts the types. |
 
 Generate each with
 `cd apps/api && pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>`
 and hand-write the partial index and the FKs into the generated file.
 
-### 3.6 Contracts — `packages/contracts/src/safety/` *(new)*
+### 3.6 Contracts — `packages/contracts/src/safety/` _(new)_
 
 Zero-dependency value types, re-exported from
 [`packages/contracts/src/index.ts`](../../../../../packages/contracts/src/index.ts) alongside the
 existing `policy/` folder:
 
-| File | Exports |
-| --- | --- |
-| `action-category.types.ts` | `ActionCategory` (13 ids), `ACTION_CATEGORIES` (ordered), `ACTION_CATEGORY_CEILING`, `ACTION_CATEGORY_DEFAULT`, `DRAFTABLE_CATEGORIES`, `LADDERED_CATEGORIES` |
-| `trust-rung.types.ts` | `TrustRung`, `TRUST_RUNG_ORDER = ['off','draft','ask','auto']`, `compareRung`, `minRung` |
-| `safety-rail.types.ts` | `SafetyRailId`, `SAFETY_RAIL_ORDER`, `SafetyReasonCode`, `SAFETY_REASON_CODES`, `SafetyVerdict` |
-| `autonomy-grant.types.ts` | `AutonomyGrantScopeType`, `AutonomyGrantDto`, `ResolvedLadder`, `ResolvedLadderEntry` (`{ category, rung, decidedBy, ceiling, draftable }`) |
-| `rail-refusal.types.ts` | `RailRefusalDto`, `RailRefusalGroupDto`, `RAIL_REFUSAL_PAGE_SIZE = 50`, `RAIL_REFUSAL_RETENTION_DAYS = 90`, `RAIL_REFUSAL_COLLAPSE_THRESHOLD = 50` |
-| `workspace-pause.types.ts` | `WorkspacePauseState`, `WORKSPACE_PAUSE_REASON_MAX = 500`, `RESUME_BATCH_SIZE = 50`, `RESUME_BATCH_INTERVAL_MS = 10_000` |
-| `safety-readiness.types.ts` | `ReadinessDto`, `READINESS_WINDOW_DAYS = 30`, `READINESS_MIN_DECISIONS = 20`, `READINESS_MIN_APPROVAL_RATE = 0.95` |
-| `index.ts` | Barrel |
+| File                        | Exports                                                                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action-category.types.ts`  | `ActionCategory` (13 ids), `ACTION_CATEGORIES` (ordered), `ACTION_CATEGORY_CEILING`, `ACTION_CATEGORY_DEFAULT`, `DRAFTABLE_CATEGORIES`, `LADDERED_CATEGORIES` |
+| `trust-rung.types.ts`       | `TrustRung`, `TRUST_RUNG_ORDER = ['off','draft','ask','auto']`, `compareRung`, `minRung`                                                                      |
+| `safety-rail.types.ts`      | `SafetyRailId`, `SAFETY_RAIL_ORDER`, `SafetyReasonCode`, `SAFETY_REASON_CODES`, `SafetyVerdict`                                                               |
+| `autonomy-grant.types.ts`   | `AutonomyGrantScopeType`, `AutonomyGrantDto`, `ResolvedLadder`, `ResolvedLadderEntry` (`{ category, rung, decidedBy, ceiling, draftable }`)                   |
+| `rail-refusal.types.ts`     | `RailRefusalDto`, `RailRefusalGroupDto`, `RAIL_REFUSAL_PAGE_SIZE = 50`, `RAIL_REFUSAL_RETENTION_DAYS = 90`, `RAIL_REFUSAL_COLLAPSE_THRESHOLD = 50`            |
+| `workspace-pause.types.ts`  | `WorkspacePauseState`, `WORKSPACE_PAUSE_REASON_MAX = 500`, `RESUME_BATCH_SIZE = 50`, `RESUME_BATCH_INTERVAL_MS = 10_000`                                      |
+| `safety-readiness.types.ts` | `ReadinessDto`, `READINESS_WINDOW_DAYS = 30`, `READINESS_MIN_DECISIONS = 20`, `READINESS_MIN_APPROVAL_RATE = 0.95`                                            |
+| `index.ts`                  | Barrel                                                                                                                                                        |
 
 Also add to `packages/contracts/src/safety/`:
 `HELD_ACTION_EXPIRY_DAYS = 14`, `HELD_ACTION_WARN_DAYS = 7`,
@@ -380,25 +380,25 @@ Also add to `packages/contracts/src/safety/`:
 
 ---
 
-## 4. The agent-side module — `packages/agent/src/safety/` *(new)*
+## 4. The agent-side module — `packages/agent/src/safety/` _(new)_
 
-| File | Kind | Contents |
-| --- | --- | --- |
-| `action-category.ts` | pure | `classifyAction(entryPoint, hints)` — a total function over a static map from entry-point id to category, plus the plugin-declared overrides; returns `null` for unclassified. |
-| `trust-ladder.ts` | pure | `resolveLadder(rows, { workspaceScopeId, agentId })` — narrow-only merge over `TRUST_RUNG_ORDER`, returning a `ResolvedLadder` with `decidedBy` per entry. `validateRungWrite(current, next, ceiling, isPromotion)` — the one-rung-at-a-time and ceiling rules, returning the FIRST violation message or `null` (same shape as `validateGuardrails` in [`guardrails.ts`](../../../../../packages/agent/src/agents/guardrails.ts)). |
-| `safety-rails.ts` | pure | `SafetyRailContext`, `SafetyRailMiddleware`, `composeSafetyRails(order)` — a straight port of the `composeRunAdmission` idiom in [`run-admission-chain.ts`](../../../../../packages/agent/src/agents/run-admission-chain.ts), including its "called `next()` twice" guard. |
-| `rails/*.rail.ts` | pure-ish | One file per rail: `platform-stop.rail.ts`, `workspace-pause.rail.ts`, `scope-pause.rail.ts`, `grants.rail.ts`, `ladder.rail.ts`, `caps.rail.ts`, `rules.rail.ts`. Each reads only from its port. |
-| `readiness.ts` | pure | `computeReadiness(decisions, now)` → `{ ready, answered, approvalRate, withdrawn, otherRefusals }`. No model, no I/O. |
-| `payload-digest.ts` | pure | Canonical JSON (sorted keys, no undefined) → sha256. Used for FR-22. |
-| `safety-gate.port.ts` | leaf token | `SAFETY_GATE`, `SafetyGate { evaluate(input): Promise<SafetyVerdict> }`. Zero imports. **Fail-closed at the consumer** — an unbound port in a runtime that *should* have it is a boot assertion, not a silent pass. |
-| `safety-gate.service.ts` | service | Binds the rails, owns `SafetyStateCache`, writes refusals through the refusal service, creates held proposals. |
-| `safety-state.cache.ts` | service | Per-workspace ladder + pause snapshot with the 10 s TTL and the `safe` mode flag. |
-| `autonomy-grant.repository.ts` / `.service.ts` | | CRUD + resolve; write path takes an explicit `actor: { userId, isHuman: true }` it cannot fabricate. |
-| `rail-refusal.repository.ts` / `.service.ts` | | Append, list (filtered, paged, collapsed), prune. `record()` never throws — it logs and increments an unrecorded counter (FR-69). |
-| `workspace-pause.repository.ts` / `.service.ts` | | `state()`, `pause()`, `resume()`, `countRefusedStart()`. `state()` folds every read error into `{ paused: true, unverified: true }`, exactly as `FleetKillSwitchService.state()` does. |
-| `held-action.service.ts` | service | Create held proposal, mark stale, expire, and — via the dispatcher — execute. |
-| `safety.module.ts` | module | Binds `SAFETY_GATE`, exports the services. Imported by `AgentsModule` and `PolicyModule`. |
-| `index.ts` | barrel | New subpath export `@ever-works/agent/safety` in `packages/agent/package.json`. |
+| File                                            | Kind       | Contents                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `action-category.ts`                            | pure       | `classifyAction(entryPoint, hints)` — a total function over a static map from entry-point id to category, plus the plugin-declared overrides; returns `null` for unclassified.                                                                                                                                                                                                                                                     |
+| `trust-ladder.ts`                               | pure       | `resolveLadder(rows, { workspaceScopeId, agentId })` — narrow-only merge over `TRUST_RUNG_ORDER`, returning a `ResolvedLadder` with `decidedBy` per entry. `validateRungWrite(current, next, ceiling, isPromotion)` — the one-rung-at-a-time and ceiling rules, returning the FIRST violation message or `null` (same shape as `validateGuardrails` in [`guardrails.ts`](../../../../../packages/agent/src/agents/guardrails.ts)). |
+| `safety-rails.ts`                               | pure       | `SafetyRailContext`, `SafetyRailMiddleware`, `composeSafetyRails(order)` — a straight port of the `composeRunAdmission` idiom in [`run-admission-chain.ts`](../../../../../packages/agent/src/agents/run-admission-chain.ts), including its "called `next()` twice" guard.                                                                                                                                                         |
+| `rails/*.rail.ts`                               | pure-ish   | One file per rail: `platform-stop.rail.ts`, `workspace-pause.rail.ts`, `scope-pause.rail.ts`, `grants.rail.ts`, `ladder.rail.ts`, `caps.rail.ts`, `rules.rail.ts`. Each reads only from its port.                                                                                                                                                                                                                                  |
+| `readiness.ts`                                  | pure       | `computeReadiness(decisions, now)` → `{ ready, answered, approvalRate, withdrawn, otherRefusals }`. No model, no I/O.                                                                                                                                                                                                                                                                                                              |
+| `payload-digest.ts`                             | pure       | Canonical JSON (sorted keys, no undefined) → sha256. Used for FR-22.                                                                                                                                                                                                                                                                                                                                                               |
+| `safety-gate.port.ts`                           | leaf token | `SAFETY_GATE`, `SafetyGate { evaluate(input): Promise<SafetyVerdict> }`. Zero imports. **Fail-closed at the consumer** — an unbound port in a runtime that _should_ have it is a boot assertion, not a silent pass.                                                                                                                                                                                                                |
+| `safety-gate.service.ts`                        | service    | Binds the rails, owns `SafetyStateCache`, writes refusals through the refusal service, creates held proposals.                                                                                                                                                                                                                                                                                                                     |
+| `safety-state.cache.ts`                         | service    | Per-workspace ladder + pause snapshot with the 10 s TTL and the `safe` mode flag.                                                                                                                                                                                                                                                                                                                                                  |
+| `autonomy-grant.repository.ts` / `.service.ts`  |            | CRUD + resolve; write path takes an explicit `actor: { userId, isHuman: true }` it cannot fabricate.                                                                                                                                                                                                                                                                                                                               |
+| `rail-refusal.repository.ts` / `.service.ts`    |            | Append, list (filtered, paged, collapsed), prune. `record()` never throws — it logs and increments an unrecorded counter (FR-69).                                                                                                                                                                                                                                                                                                  |
+| `workspace-pause.repository.ts` / `.service.ts` |            | `state()`, `pause()`, `resume()`, `countRefusedStart()`. `state()` folds every read error into `{ paused: true, unverified: true }`, exactly as `FleetKillSwitchService.state()` does.                                                                                                                                                                                                                                             |
+| `held-action.service.ts`                        | service    | Create held proposal, mark stale, expire, and — via the dispatcher — execute.                                                                                                                                                                                                                                                                                                                                                      |
+| `safety.module.ts`                              | module     | Binds `SAFETY_GATE`, exports the services. Imported by `AgentsModule` and `PolicyModule`.                                                                                                                                                                                                                                                                                                                                          |
+| `index.ts`                                      | barrel     | New subpath export `@ever-works/agent/safety` in `packages/agent/package.json`.                                                                                                                                                                                                                                                                                                                                                    |
 
 **Where the gate is bound.** [`packages/agent/src/policy/policy.module.ts`](../../../../../packages/agent/src/policy/policy.module.ts)
 already binds `TOOL_GRANT_ENFORCER` and `MERGE_POLICY_ENFORCER`; `SafetyModule` imports
@@ -407,7 +407,7 @@ existing enforcers rather than re-implementing them.
 
 ---
 
-## 5. API surface — `apps/api/src/safety/` *(new)*
+## 5. API surface — `apps/api/src/safety/` _(new)_
 
 Registered in [`apps/api/src/api.module.ts`](../../../../../apps/api/src/api.module.ts).
 
@@ -415,35 +415,35 @@ Registered in [`apps/api/src/api.module.ts`](../../../../../apps/api/src/api.mod
 
 Class guards: `AuthSessionGuard`, `SessionScopeGuard`, `ScopeOwnershipGuard`.
 
-| Method | Path | Body / query | Returns | Auth |
-| --- | --- | --- | --- | --- |
-| GET | `/api/safety/categories` | — | `{ categories: ActionCategoryDto[] }` — id, name, ceiling, default, draftable | any member |
-| GET | `/api/safety/overview` | — | `{ pause, safeMode, ladder, guarantees, refusalCounts }` | any member |
-| GET | `/api/safety/ladder` | `?agentId=` | `ResolvedLadder` with `decidedBy` per entry | any member |
-| PUT | `/api/safety/ladder` | `{ scopeType, scopeId, category, rung, note? }` | `ResolvedLadder` | **owner + human**, `@Throttle 30/min` |
-| DELETE | `/api/safety/ladder/:id` | — | `ResolvedLadder` (reverts to inherit) | owner + human, 30/min |
-| GET | `/api/safety/readiness` | `?agentId=` | `ReadinessDto[]` | any member |
-| GET | `/api/safety/refusals` | `?railId=&category=&agentId=&from=&to=&cursor=&limit=` | `{ items, groups, nextCursor }` | any member |
-| GET | `/api/safety/refusals/:collapseKey` | `?cursor=` | Expanded rows for a collapsed group | any member |
+| Method | Path                                | Body / query                                           | Returns                                                                       | Auth                                  |
+| ------ | ----------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------- |
+| GET    | `/api/safety/categories`            | —                                                      | `{ categories: ActionCategoryDto[] }` — id, name, ceiling, default, draftable | any member                            |
+| GET    | `/api/safety/overview`              | —                                                      | `{ pause, safeMode, ladder, guarantees, refusalCounts }`                      | any member                            |
+| GET    | `/api/safety/ladder`                | `?agentId=`                                            | `ResolvedLadder` with `decidedBy` per entry                                   | any member                            |
+| PUT    | `/api/safety/ladder`                | `{ scopeType, scopeId, category, rung, note? }`        | `ResolvedLadder`                                                              | **owner + human**, `@Throttle 30/min` |
+| DELETE | `/api/safety/ladder/:id`            | —                                                      | `ResolvedLadder` (reverts to inherit)                                         | owner + human, 30/min                 |
+| GET    | `/api/safety/readiness`             | `?agentId=`                                            | `ReadinessDto[]`                                                              | any member                            |
+| GET    | `/api/safety/refusals`              | `?railId=&category=&agentId=&from=&to=&cursor=&limit=` | `{ items, groups, nextCursor }`                                               | any member                            |
+| GET    | `/api/safety/refusals/:collapseKey` | `?cursor=`                                             | Expanded rows for a collapsed group                                           | any member                            |
 
 ### 5.2 `safety-pause.controller.ts` — `@Controller('api/safety/pause')`
 
 Two verbs, never one boolean `PUT` — the same reasoning documented on
 [`fleet-kill-switch.controller.ts`](../../../../../apps/api/src/fleet/fleet-kill-switch.controller.ts).
 
-| Method | Path | Body | Returns | Auth |
-| --- | --- | --- | --- | --- |
-| GET | `/api/safety/pause` | — | `WorkspacePauseState` (`{ paused, reason, pausedBy, pausedAt, refusedStarts, cleanlyStopped, windingDown[] }`) | any member |
-| POST | `/api/safety/pause/stop` | `{ reason?: string }` (≤ 500) | `WorkspacePauseState` | owner + human, 10/min |
-| POST | `/api/safety/pause/resume` | — | `{ state, promoting: number }` | owner + human, 10/min |
-| POST | `/api/safety/pause/cancel-in-flight` | `{ confirm: true }` | `{ cancelled: number }` | owner + human, 5/min |
+| Method | Path                                 | Body                          | Returns                                                                                                        | Auth                  |
+| ------ | ------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------- |
+| GET    | `/api/safety/pause`                  | —                             | `WorkspacePauseState` (`{ paused, reason, pausedBy, pausedAt, refusedStarts, cleanlyStopped, windingDown[] }`) | any member            |
+| POST   | `/api/safety/pause/stop`             | `{ reason?: string }` (≤ 500) | `WorkspacePauseState`                                                                                          | owner + human, 10/min |
+| POST   | `/api/safety/pause/resume`           | —                             | `{ state, promoting: number }`                                                                                 | owner + human, 10/min |
+| POST   | `/api/safety/pause/cancel-in-flight` | `{ confirm: true }`           | `{ cancelled: number }`                                                                                        | owner + human, 5/min  |
 
 `cancel-in-flight` reuses `FleetPanicService.cancelInFlightForUser` for fleet-routed work
 ([`fleet-panic.service.ts`](../../../../../apps/api/src/fleet/fleet-panic.service.ts)) and the
 existing run canceller ([`agent-run-canceller.ts`](../../../../../packages/agent/src/agents/agent-run-canceller.ts))
 for cloud runs. It does **not** duplicate either.
 
-### 5.3 The human-actor guard — `apps/api/src/safety/guards/human-actor.guard.ts` *(new)*
+### 5.3 The human-actor guard — `apps/api/src/safety/guards/human-actor.guard.ts` _(new)_
 
 FR-31 and FR-47 need "a person in an interactive session". Two additive changes:
 
@@ -480,8 +480,8 @@ No call site imports a vendor SDK (Constitution IV).
 
 ### 6.1 `HELD_ACTION_EXECUTION_DISPATCHER`
 
-- Port: `packages/agent/src/tasks/held-action-execution-dispatcher.ts` *(new)* + `.types.ts`.
-- Task: `packages/tasks/src/tasks/trigger/held-action-execute.task.ts` *(new)*.
+- Port: `packages/agent/src/tasks/held-action-execution-dispatcher.ts` _(new)_ + `.types.ts`.
+- Task: `packages/tasks/src/tasks/trigger/held-action-execute.task.ts` _(new)_.
 - Behaviour: load the proposal, verify `executionState = 'pending'` with an atomic
   `UPDATE … SET executionState='executing' WHERE executionState='pending'` (this **is** the
   exactly-once guarantee, FR-23 — no advisory lock needed), recompute the digest, refuse on
@@ -491,8 +491,8 @@ No call site imports a vendor SDK (Constitution IV).
 
 ### 6.2 `WORKSPACE_PAUSE_FANOUT_DISPATCHER`
 
-- Port: `packages/agent/src/tasks/workspace-pause-fanout-dispatcher.ts` *(new)*.
-- Task: `packages/tasks/src/tasks/trigger/workspace-pause-fanout.task.ts` *(new)*.
+- Port: `packages/agent/src/tasks/workspace-pause-fanout-dispatcher.ts` _(new)_.
+- Task: `packages/tasks/src/tasks/trigger/workspace-pause-fanout.task.ts` _(new)_.
 - On **pause**: park queued runs for the workspace with `queuedReason='workspace-paused'`, count
   them into `workspace_pauses.refusedStarts`, and mark schedules due inside the window as skipped.
 - On **resume**: promote parked runs oldest-first in batches of 50 every 10 seconds
@@ -503,7 +503,7 @@ No call site imports a vendor SDK (Constitution IV).
 
 ### 6.3 `safety-refusal-prune` (scheduled)
 
-- Task: `packages/tasks/src/tasks/trigger/safety-refusal-prune.task.ts` *(new)*,
+- Task: `packages/tasks/src/tasks/trigger/safety-refusal-prune.task.ts` _(new)_,
   `schedules.task` at `20 3 * * *` UTC — deliberately away from the 00:05 credits grant, the
   04:00 plugin-usage prune and the 07:15 digest.
 - Deletes `rail_refusals` older than `RAIL_REFUSAL_RETENTION_DAYS`, in batches of 5,000, under
@@ -512,15 +512,15 @@ No call site imports a vendor SDK (Constitution IV).
 
 ### 6.4 `CREDENTIAL_ENCRYPT_BACKFILL_DISPATCHER` (one-shot, P3)
 
-- Port: `packages/agent/src/tasks/credential-encrypt-backfill-dispatcher.ts` *(new)*.
-- Task: `packages/tasks/src/tasks/trigger/credential-encrypt-backfill.task.ts` *(new)*.
+- Port: `packages/agent/src/tasks/credential-encrypt-backfill-dispatcher.ts` _(new)_.
+- Task: `packages/tasks/src/tasks/trigger/credential-encrypt-backfill.task.ts` _(new)_.
 - Walks `account` in batches of 500, re-writing any token not already carrying the `enc::v1::`
   prefix. Idempotent and resumable by `(id > cursor)`. Triggered manually by an operator after
   the P3 migration; never on boot.
 
 ### 6.5 Held-action staleness and expiry (scheduled)
 
-- Task: `packages/tasks/src/tasks/trigger/held-action-sweeper.task.ts` *(new)*,
+- Task: `packages/tasks/src/tasks/trigger/held-action-sweeper.task.ts` _(new)_,
   `schedules.task` at `*/15 * * * *`.
 - Marks `staleReason` from the four shipped triggers (FR-26), warns at 7 days, discards at 14 days
   with a notice on the decision. Uses the partial index from §3.5.
@@ -547,7 +547,7 @@ The mapping therefore comes **from the plugin's own manifest**, not from a table
 - `classifyAction` consults, in order: the platform's own entry-point map → the plugin manifest
   declaration → `null` (unclassified).
 - **Phasing the fail-closed cut-over.** In **P1** an unclassified plugin tool proceeds and is
-  counted (`rail_refusals` is *not* written; a metric is). In **P3**, after every bundled plugin
+  counted (`rail_refusals` is _not_ written; a metric is). In **P3**, after every bundled plugin
   declares, it is refused and raises a decision. The change is a single constant,
   `UNCLASSIFIED_ACTION_POLICY: 'warn' | 'refuse'`, exported from contracts and asserted by a test.
 - No plugin id appears anywhere in `packages/agent/src/safety/`. A test asserts it
@@ -647,7 +647,7 @@ do not hand-edit them.
 
 ### 9.1 Route and shell
 
-- `apps/web/src/app/[locale]/(dashboard)/settings/safety/page.tsx` *(new)* — server component,
+- `apps/web/src/app/[locale]/(dashboard)/settings/safety/page.tsx` _(new)_ — server component,
   three independent `Promise.allSettled` reads (overview, ladder, refusals) so one failure never
   blanks the page (FR-73), matching the fixed pattern documented on the Fleet and Work-Agent
   settings pages.
@@ -655,33 +655,33 @@ do not hand-edit them.
 - [`settings-layout-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/settings-layout-client.tsx>)
   — insert the **Safety** tab directly above **Danger Zone**.
 
-### 9.2 Components *(all new, under `apps/web/src/components/safety/`)*
+### 9.2 Components _(all new, under `apps/web/src/components/safety/`)_
 
-| Component | Renders |
-| --- | --- |
-| `SafetyGuarantees.tsx` | The five statements + their **Show me** links |
-| `TrustLadderTable.tsx` | The grid; owns arrow-key roving focus and the accessible-name composition (FR-81) |
-| `RungCell.tsx` | One cell: current / available / not-offered / above-ceiling, each with text |
-| `PromoteDialog.tsx` | The confirmation, the 30-day record, the typed confirmation for Auto |
-| `LadderRefusalNote.tsx` | The four inline refusal messages |
-| `WorkspacePauseCard.tsx` | Running/paused states, winding-down list, cancel-in-flight |
-| `WorkspacePauseDialog.tsx` | The pause confirmation with the two lists and the reason field |
-| `RefusalLog.tsx` | Filters, rows, collapsed groups, empty/error states, paging |
-| `RefusalRow.tsx` | One row incl. the widen-attempt callout |
+| Component                  | Renders                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `SafetyGuarantees.tsx`     | The five statements + their **Show me** links                                     |
+| `TrustLadderTable.tsx`     | The grid; owns arrow-key roving focus and the accessible-name composition (FR-81) |
+| `RungCell.tsx`             | One cell: current / available / not-offered / above-ceiling, each with text       |
+| `PromoteDialog.tsx`        | The confirmation, the 30-day record, the typed confirmation for Auto              |
+| `LadderRefusalNote.tsx`    | The four inline refusal messages                                                  |
+| `WorkspacePauseCard.tsx`   | Running/paused states, winding-down list, cancel-in-flight                        |
+| `WorkspacePauseDialog.tsx` | The pause confirmation with the two lists and the reason field                    |
+| `RefusalLog.tsx`           | Filters, rows, collapsed groups, empty/error states, paging                       |
+| `RefusalRow.tsx`           | One row incl. the widen-attempt callout                                           |
 
 Outside that folder:
 
-| Component | Where |
-| --- | --- |
-| `apps/web/src/components/safety/WorkspacePausedBanner.tsx` | Mounted in the dashboard shell, fed by `use-workspace-pause-polling` |
-| `apps/web/src/components/agents/AgentSafetyTab.tsx` | New tab registered in [`AgentDetailTabs.tsx`](../../../../../apps/web/src/components/agents/AgentDetailTabs.tsx) |
+| Component                                                  | Where                                                                                                            |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/safety/WorkspacePausedBanner.tsx` | Mounted in the dashboard shell, fed by `use-workspace-pause-polling`                                             |
+| `apps/web/src/components/agents/AgentSafetyTab.tsx`        | New tab registered in [`AgentDetailTabs.tsx`](../../../../../apps/web/src/components/agents/AgentDetailTabs.tsx) |
 
 ### 9.3 Data plumbing
 
-- `apps/web/src/lib/api/safety.ts` *(new)* — typed client, mirroring
+- `apps/web/src/lib/api/safety.ts` _(new)_ — typed client, mirroring
   [`apps/web/src/lib/api/fleet.ts`](../../../../../apps/web/src/lib/api/fleet.ts).
-- `apps/web/src/app/actions/settings/safety.ts` *(new)* — server actions for the four writes.
-- `apps/web/src/lib/hooks/use-workspace-pause-polling.ts` *(new)* — a copy of
+- `apps/web/src/app/actions/settings/safety.ts` _(new)_ — server actions for the four writes.
+- `apps/web/src/lib/hooks/use-workspace-pause-polling.ts` _(new)_ — a copy of
   [`use-kill-switch-polling.ts`](../../../../../apps/web/src/lib/hooks/use-kill-switch-polling.ts)
   at a 15-second interval, server-rendered first paint, last-known state retained on a failed poll.
 
@@ -708,10 +708,10 @@ Live Feed ([AW-04](../AW-04-live-feed/)).
 Two new event keys registered with the existing preference system
 ([`notification-preferences.controller.ts`](../../../../../apps/api/src/notifications/notification-preferences.controller.ts)):
 
-| Key | Default in-app | Default email | Fires |
-| --- | --- | --- | --- |
-| `safety.heldActionExpiring` | on | on | 7 days before a held action expires |
-| `safety.widenAttempt` | on | off | An instruction attempted to widen a rung |
+| Key                         | Default in-app | Default email | Fires                                    |
+| --------------------------- | -------------- | ------------- | ---------------------------------------- |
+| `safety.heldActionExpiring` | on             | on            | 7 days before a held action expires      |
+| `safety.widenAttempt`       | on             | off           | An instruction attempted to widen a rung |
 
 Pause and resume reuse the existing workspace-level notification path; safe mode raises an
 operational alert, not a user notification.
@@ -731,16 +731,16 @@ Alert thresholds: any `safety_digest_mismatch_total` increment pages immediately
 
 ### 10.4 Failure modes and the chosen degradation
 
-| Failure | Behaviour | Why |
-| --- | --- | --- |
-| Ladder/pause store unreachable | **Safe mode**: every laddered category behaves as `ask`; reads unaffected; banner + page | FR-18. A safety control that fails open is not one |
-| `SAFETY_GATE` port unbound in a runtime that declares it needs it | Boot assertion fails | The opposite choice — silently passing — is how a DI mistake becomes a breach |
-| `SAFETY_GATE` unbound in a unit test / non-API context | Every action passes, exactly as today | Mirrors `TOOL_GRANT_ENFORCER`'s documented posture; tests must not need the whole graph |
-| Refusal write fails | Action still refused; `safety_refusals_unrecorded_total`++ | FR-69 — the record must never be able to let an action through |
-| Held-action digest mismatch | Execution refused, proposal → `failed`, page | Something rewrote an approved payload. Never execute it |
-| Job runtime unreachable at resume | Pause row cleared, promotion retried by the existing sweeper | Resume must not be blocked by a queue outage |
-| Encryption key missing at boot | Refuse to start (outside local development) | FR-60, closing the observed silent-plaintext fallback |
-| Plugin declares an unknown category id | Manifest validation rejects the plugin at load; existing installs keep their last-good manifest | Fail loudly at install, never at call time |
+| Failure                                                           | Behaviour                                                                                       | Why                                                                                     |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Ladder/pause store unreachable                                    | **Safe mode**: every laddered category behaves as `ask`; reads unaffected; banner + page        | FR-18. A safety control that fails open is not one                                      |
+| `SAFETY_GATE` port unbound in a runtime that declares it needs it | Boot assertion fails                                                                            | The opposite choice — silently passing — is how a DI mistake becomes a breach           |
+| `SAFETY_GATE` unbound in a unit test / non-API context            | Every action passes, exactly as today                                                           | Mirrors `TOOL_GRANT_ENFORCER`'s documented posture; tests must not need the whole graph |
+| Refusal write fails                                               | Action still refused; `safety_refusals_unrecorded_total`++                                      | FR-69 — the record must never be able to let an action through                          |
+| Held-action digest mismatch                                       | Execution refused, proposal → `failed`, page                                                    | Something rewrote an approved payload. Never execute it                                 |
+| Job runtime unreachable at resume                                 | Pause row cleared, promotion retried by the existing sweeper                                    | Resume must not be blocked by a queue outage                                            |
+| Encryption key missing at boot                                    | Refuse to start (outside local development)                                                     | FR-60, closing the observed silent-plaintext fallback                                   |
+| Plugin declares an unknown category id                            | Manifest validation rejects the plugin at load; existing installs keep their last-good manifest | Fail loudly at install, never at call time                                              |
 
 ---
 
@@ -748,20 +748,20 @@ Alert thresholds: any `safety_digest_mismatch_total` increment pages immediately
 
 ### 11.1 Unit — Jest, `packages/agent` (`cd packages/agent && pnpm test`)
 
-| File *(new)* | Asserts |
-| --- | --- |
-| `src/safety/__tests__/action-category.spec.ts` | The map is total over the entry-point registry; unknown returns `null`; plugin declarations override nothing the platform owns; the most-restrictive rule of FR-6 |
-| `src/safety/__tests__/trust-ladder.resolve.spec.ts` | Narrow-only merge; `decidedBy` correctness; a raise below the workspace is refused; missing rows yield shipped defaults |
-| `src/safety/__tests__/trust-ladder.validate.spec.ts` | One-rung-at-a-time; ceilings; `spend.commitment` immovable; Draft not offered for non-draftable categories; demotion unrestricted |
-| `src/safety/__tests__/safety-rails.compose.spec.ts` | Order matches `SAFETY_RAIL_ORDER`; first refusal wins; `next()` twice throws |
-| `src/safety/__tests__/rails.each.spec.ts` | One describe per rail: verdict, reason code, and that no rail reads a model-writable field |
-| `src/safety/__tests__/readiness.spec.ts` | The four thresholds, boundary values, and that readiness never mutates a grant |
-| `src/safety/__tests__/payload-digest.spec.ts` | Key-order independence; undefined handling; a one-byte change changes the digest |
-| `src/safety/__tests__/workspace-pause.service.spec.ts` | Read error → `paused: true, unverified: true`; pause never cancels; resume batches at 50/10 s |
-| `src/safety/__tests__/rail-refusal.service.spec.ts` | `record()` never throws; collapse key; 500-char summary truncation; no credential ever lands in `requested` |
-| `src/safety/__tests__/held-action.service.spec.ts` | Exactly-once via the CAS update; digest mismatch refuses; expiry and staleness; raise-does-not-release, off-discards |
-| `src/safety/__tests__/secret-never-serialized.spec.ts` | **The invariant (FR-63):** enumerate every entity with a secret-bearing column and every DTO mapper, and assert none emits a raw value. Fails loudly when a new secret column is added without a mapper |
-| `src/agents/__tests__/guardrails.ladder-interop.spec.ts` | Where guardrails and a rung disagree, the stricter wins; a null guardrail changes nothing |
+| File _(new)_                                             | Asserts                                                                                                                                                                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/safety/__tests__/action-category.spec.ts`           | The map is total over the entry-point registry; unknown returns `null`; plugin declarations override nothing the platform owns; the most-restrictive rule of FR-6                                       |
+| `src/safety/__tests__/trust-ladder.resolve.spec.ts`      | Narrow-only merge; `decidedBy` correctness; a raise below the workspace is refused; missing rows yield shipped defaults                                                                                 |
+| `src/safety/__tests__/trust-ladder.validate.spec.ts`     | One-rung-at-a-time; ceilings; `spend.commitment` immovable; Draft not offered for non-draftable categories; demotion unrestricted                                                                       |
+| `src/safety/__tests__/safety-rails.compose.spec.ts`      | Order matches `SAFETY_RAIL_ORDER`; first refusal wins; `next()` twice throws                                                                                                                            |
+| `src/safety/__tests__/rails.each.spec.ts`                | One describe per rail: verdict, reason code, and that no rail reads a model-writable field                                                                                                              |
+| `src/safety/__tests__/readiness.spec.ts`                 | The four thresholds, boundary values, and that readiness never mutates a grant                                                                                                                          |
+| `src/safety/__tests__/payload-digest.spec.ts`            | Key-order independence; undefined handling; a one-byte change changes the digest                                                                                                                        |
+| `src/safety/__tests__/workspace-pause.service.spec.ts`   | Read error → `paused: true, unverified: true`; pause never cancels; resume batches at 50/10 s                                                                                                           |
+| `src/safety/__tests__/rail-refusal.service.spec.ts`      | `record()` never throws; collapse key; 500-char summary truncation; no credential ever lands in `requested`                                                                                             |
+| `src/safety/__tests__/held-action.service.spec.ts`       | Exactly-once via the CAS update; digest mismatch refuses; expiry and staleness; raise-does-not-release, off-discards                                                                                    |
+| `src/safety/__tests__/secret-never-serialized.spec.ts`   | **The invariant (FR-63):** enumerate every entity with a secret-bearing column and every DTO mapper, and assert none emits a raw value. Fails loudly when a new secret column is added without a mapper |
+| `src/agents/__tests__/guardrails.ladder-interop.spec.ts` | Where guardrails and a rung disagree, the stricter wins; a null guardrail changes nothing                                                                                                               |
 
 ### 11.2 Contracts — Vitest, `packages/contracts`
 
@@ -771,24 +771,24 @@ match the spec tables exactly (this is the anti-drift test NFR-10 asks for).
 
 ### 11.3 Controller specs — Jest, `apps/api`
 
-| File *(new)* | Asserts |
-| --- | --- |
-| `src/safety/safety.controller.spec.ts` | Every route's scope check; foreign id → 404 not 403; ceiling and skip refusals as 400 with the message; throttle decorators present |
-| `src/safety/safety-pause.controller.spec.ts` | Two verbs not a boolean PUT; reason length; cancel-in-flight requires `confirm: true`; owner-only |
-| `src/safety/guards/human-actor.guard.spec.ts` | `session` allowed; `api-key` refused **and recorded**; missing `authMethod` refused |
-| `src/agent-approvals/agent-approvals.controller.spec.ts` *(new — this controller has no spec today)* | Approve dispatches the executor only when `executionState = 'pending'`; approve-all skips digest failures; response shape unchanged |
-| `src/auth/guards/auth-session.guard.spec.ts` *(extend existing)* | `authMethod` stamped on both branches |
+| File _(new)_                                                                                         | Asserts                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `src/safety/safety.controller.spec.ts`                                                               | Every route's scope check; foreign id → 404 not 403; ceiling and skip refusals as 400 with the message; throttle decorators present |
+| `src/safety/safety-pause.controller.spec.ts`                                                         | Two verbs not a boolean PUT; reason length; cancel-in-flight requires `confirm: true`; owner-only                                   |
+| `src/safety/guards/human-actor.guard.spec.ts`                                                        | `session` allowed; `api-key` refused **and recorded**; missing `authMethod` refused                                                 |
+| `src/agent-approvals/agent-approvals.controller.spec.ts` _(new — this controller has no spec today)_ | Approve dispatches the executor only when `executionState = 'pending'`; approve-all skips digest failures; response shape unchanged |
+| `src/auth/guards/auth-session.guard.spec.ts` _(extend existing)_                                     | `authMethod` stamped on both branches                                                                                               |
 
 ### 11.4 End-to-end — Playwright, `apps/web/e2e/`
 
-| File *(new)* | Covers |
-| --- | --- |
-| `safety-trust-ladder.spec.ts` | Defaults render; promote one rung; skip refused; ceiling refused; money not clickable; demote instant; non-owner read-only |
-| `safety-workspace-pause.spec.ts` | Pause → banner everywhere → new work refused → winding-down list → resume → banner gone; API-key attempt refused |
-| `safety-held-send.spec.ts` | Draft rung holds a send; decision carries the exact body; approve sends once; reject sends nothing; stale double-confirm |
-| `safety-refusal-log.spec.ts` | Filters, paging at 50, collapsed group + expand, empty/never/error states |
+| File _(new)_                       | Covers                                                                                                                                 |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `safety-trust-ladder.spec.ts`      | Defaults render; promote one rung; skip refused; ceiling refused; money not clickable; demote instant; non-owner read-only             |
+| `safety-workspace-pause.spec.ts`   | Pause → banner everywhere → new work refused → winding-down list → resume → banner gone; API-key attempt refused                       |
+| `safety-held-send.spec.ts`         | Draft rung holds a send; decision carries the exact body; approve sends once; reject sends nothing; stale double-confirm               |
+| `safety-refusal-log.spec.ts`       | Filters, paging at 50, collapsed group + expand, empty/never/error states                                                              |
 | `safety-secret-write-only.spec.ts` | No surface reveals a value; the mask, last-used and revoke-at-source copy render; a pasted credential is masked with the rotate notice |
-| `safety-a11y.spec.ts` | Arrow-key grid, focus order, accessible names carry the rung in text, axe pass |
+| `safety-a11y.spec.ts`              | Arrow-key grid, focus order, accessible names carry the rung in text, axe pass                                                         |
 
 ---
 
@@ -805,7 +805,7 @@ The gate is called at the platform facades and at `invokeTool`. Held actions are
 executed — a `Draft`/`Ask` rung refuses with a clear message and files a proposal, which behaves
 exactly as approvals do today. Unclassified plugin tools **warn**.
 
-*Ships:* the ladder is real and enforced. Nothing that used to work stops working.
+_Ships:_ the ladder is real and enforced. Nothing that used to work stops working.
 
 ### P2 — Hold and execute (spec FR-21 … FR-30)
 
@@ -813,7 +813,7 @@ The `agent_action_proposals` columns and the P2 migration; the held-action servi
 staleness sweeper and expiry; `HELD_ACTION_EXECUTION_DISPATCHER` and its task; the approve path
 change; the decision card's held-action view; the run receipt's Rails block.
 
-*Ships:* approving does the thing. Closes the "approval is a note to self" gap and makes
+_Ships:_ approving does the thing. Closes the "approval is a note to self" gap and makes
 `requireHumanApproval` satisfiable on the merge path for the first time.
 
 ### P3 — Pause and the one-way mirror (spec FR-40 … FR-63)
@@ -824,38 +824,38 @@ the credential encryption backfill; the boot-time key assertion; outbound payloa
 serialisation invariant test; `UNCLASSIFIED_ACTION_POLICY` flipped to `refuse` once every bundled
 plugin declares.
 
-*Ships:* an owner can stop their own workspace, and every credential is write-only by
+_Ships:_ an owner can stop their own workspace, and every credential is write-only by
 construction rather than by convention.
 
 ---
 
 ## 13. Constitution compliance
 
-| Gate | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin package for every external integration** | ✅ | No external integration is added. The only plugin-facing change is a manifest declaration. |
-| **II — No hardcoded plugin id outside the plugin** | ✅ | Categories for plugin tools come from the plugin's own manifest; a test asserts `packages/agent/src/safety/` imports no plugin package. |
-| **III — Content lives in user repos** | ✅ | Rungs, pauses and refusals are platform metadata; no work content is touched. |
-| **IV — Background work via `*_DISPATCHER`** | ✅ | Four dispatchers (§6), all registered in `_tasks-symbols.ts` and bound by `job-runtime.providers.ts`; no call site imports a vendor SDK. |
-| **V — Forward-only migrations, same PR** | ✅ | Three migrations (§3.5), each shipped with its entities, each additive, none destructive; the credential encryption is a resumable backfill job, not a blocking DDL data pass. |
-| **VI — Tests are a prerequisite** | ✅ | 12 unit suites, 3 contracts suites, 5 controller specs, 6 end-to-end specs (§11), including the FR-63 invariant test. |
-| **VII — Secret hygiene** | ✅ | §4.7 of the spec *is* this principle, extended: encryption at rest for connected-account tokens, boot refusal without a key, outbound scanning, and an automated serialisation invariant. |
-| **VIII — Single source for plugin lists** | ✅ | No plugin count or list appears in this epic. |
-| **IX — Spec is behaviour-first** | ✅ | `spec.md` names no class, file or endpoint; every implementation detail is here. |
-| **X — Backwards compatibility** | ✅ | `authMethod` is optional; `executionState` defaults to `not_required`; new action-type and activity-type members are appended to `varchar` columns; every existing response shape is unchanged, with only additive fields. |
+| Gate                                                  | Status | Justification                                                                                                                                                                                                              |
+| ----------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin package for every external integration** | ✅     | No external integration is added. The only plugin-facing change is a manifest declaration.                                                                                                                                 |
+| **II — No hardcoded plugin id outside the plugin**    | ✅     | Categories for plugin tools come from the plugin's own manifest; a test asserts `packages/agent/src/safety/` imports no plugin package.                                                                                    |
+| **III — Content lives in user repos**                 | ✅     | Rungs, pauses and refusals are platform metadata; no work content is touched.                                                                                                                                              |
+| **IV — Background work via `*_DISPATCHER`**           | ✅     | Four dispatchers (§6), all registered in `_tasks-symbols.ts` and bound by `job-runtime.providers.ts`; no call site imports a vendor SDK.                                                                                   |
+| **V — Forward-only migrations, same PR**              | ✅     | Three migrations (§3.5), each shipped with its entities, each additive, none destructive; the credential encryption is a resumable backfill job, not a blocking DDL data pass.                                             |
+| **VI — Tests are a prerequisite**                     | ✅     | 12 unit suites, 3 contracts suites, 5 controller specs, 6 end-to-end specs (§11), including the FR-63 invariant test.                                                                                                      |
+| **VII — Secret hygiene**                              | ✅     | §4.7 of the spec _is_ this principle, extended: encryption at rest for connected-account tokens, boot refusal without a key, outbound scanning, and an automated serialisation invariant.                                  |
+| **VIII — Single source for plugin lists**             | ✅     | No plugin count or list appears in this epic.                                                                                                                                                                              |
+| **IX — Spec is behaviour-first**                      | ✅     | `spec.md` names no class, file or endpoint; every implementation detail is here.                                                                                                                                           |
+| **X — Backwards compatibility**                       | ✅     | `authMethod` is optional; `executionState` defaults to `not_required`; new action-type and activity-type members are appended to `varchar` columns; every existing response shape is unchanged, with only additive fields. |
 
 ---
 
 ## 14. Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| The gate at `invokeTool` adds latency to every tool call | 10-second cache, pure in-memory evaluation, a p95 budget in NFR-1, and a benchmark in the acceptance list |
-| Two epics both want a hook at `invokeTool` ([AW-15](../AW-15-connections-scopes/) for grants) | Whichever lands first creates the hook; the second adds a rail to `SAFETY_RAIL_ORDER`. Agreed in the plan of both epics |
-| Fail-closed safe mode could stop a healthy workspace on a transient store blip | Safe mode is `ask`, not `off`; reads and running work continue; a 60-second window pages |
-| The unclassified cut-over breaks third-party plugin installs | Warn in P1, refuse in P3, one constant, and an open question about a visible grace period |
-| Owner-only writes are enforced against a role model that does not exist yet | The check is the existing workspace-owner check, isolated in one guard, so it becomes the first real role check when roles land |
-| Encrypting connected-account tokens touches the login path | The transformer's read path is legacy-plaintext-tolerant, so the backfill can run at any time and be interrupted safely |
+| Risk                                                                                          | Mitigation                                                                                                                      |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| The gate at `invokeTool` adds latency to every tool call                                      | 10-second cache, pure in-memory evaluation, a p95 budget in NFR-1, and a benchmark in the acceptance list                       |
+| Two epics both want a hook at `invokeTool` ([AW-15](../AW-15-connections-scopes/) for grants) | Whichever lands first creates the hook; the second adds a rail to `SAFETY_RAIL_ORDER`. Agreed in the plan of both epics         |
+| Fail-closed safe mode could stop a healthy workspace on a transient store blip                | Safe mode is `ask`, not `off`; reads and running work continue; a 60-second window pages                                        |
+| The unclassified cut-over breaks third-party plugin installs                                  | Warn in P1, refuse in P3, one constant, and an open question about a visible grace period                                       |
+| Owner-only writes are enforced against a role model that does not exist yet                   | The check is the existing workspace-owner check, isolated in one guard, so it becomes the first real role check when roles land |
+| Encrypting connected-account tokens touches the login path                                    | The transformer's read path is legacy-plaintext-tolerant, so the backfill can run at any time and be interrupted safely         |
 
 ---
 

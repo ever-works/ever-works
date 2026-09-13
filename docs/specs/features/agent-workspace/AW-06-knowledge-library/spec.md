@@ -35,26 +35,26 @@ machine-written corpus legible to a human.
 
 ### 2.1 The question our users cannot answer today
 
-> *"My agents have been writing to the knowledge base for three weeks. What is worth reading, and
-> what changed since Tuesday?"*
+> _"My agents have been writing to the knowledge base for three weeks. What is worth reading, and
+> what changed since Tuesday?"_
 
 They cannot answer it. Here is what they do instead.
 
-| What the user wants | What Ever Works gives them today | What they do instead |
-| --- | --- | --- |
-| One shelf for everything the team knows | The organization-wide knowledge page is a **flat ranked list** with facet chips (type / Work / source / status). No folders, no personal ordering. | Scroll, then re-run the search they ran yesterday. |
-| Group documents the way the team thinks | Documents are organized by **document class** and a git path (`<class>/<slug>`). Folders exist in the product — but only for **uploaded files**, only per-person, and documents cannot go in them. | Encode structure in document titles (`SUPPORT — refund policy`). |
-| "These five are the ones that matter" | No pin anywhere in the Knowledge Base. | Keep a browser bookmark per document. |
-| "What is new?" | Nothing. `updatedAt` is visible, but it also moves when a background job re-mirrors or re-embeds a document, so it is not trustworthy as a "someone changed this" signal. | Re-read documents from the top, hunting for the diff. |
-| "Get this off my shelf, but keep it" | A document can be **archived** — and then it is stuck. There is no restore-to-shelf path; the only endpoint called "restore" restores a *body from an old commit*, which is a different thing. | Never archive anything. The shelf grows without bound. |
-| "Send this to someone without an account" | No export of any kind for Knowledge Base documents. | Copy-paste out of the editor. |
-| "Agent, use the voice guide" | `@kb:<reference>` works — in exactly **one** surface (the AI conversation composer), scoped to **one** Work, with **no picker**, so the reference has to be typed from memory and silently no-ops when mistyped. | Paste the whole document into the prompt every time. |
+| What the user wants                       | What Ever Works gives them today                                                                                                                                                                                 | What they do instead                                             |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| One shelf for everything the team knows   | The organization-wide knowledge page is a **flat ranked list** with facet chips (type / Work / source / status). No folders, no personal ordering.                                                               | Scroll, then re-run the search they ran yesterday.               |
+| Group documents the way the team thinks   | Documents are organized by **document class** and a git path (`<class>/<slug>`). Folders exist in the product — but only for **uploaded files**, only per-person, and documents cannot go in them.               | Encode structure in document titles (`SUPPORT — refund policy`). |
+| "These five are the ones that matter"     | No pin anywhere in the Knowledge Base.                                                                                                                                                                           | Keep a browser bookmark per document.                            |
+| "What is new?"                            | Nothing. `updatedAt` is visible, but it also moves when a background job re-mirrors or re-embeds a document, so it is not trustworthy as a "someone changed this" signal.                                        | Re-read documents from the top, hunting for the diff.            |
+| "Get this off my shelf, but keep it"      | A document can be **archived** — and then it is stuck. There is no restore-to-shelf path; the only endpoint called "restore" restores a _body from an old commit_, which is a different thing.                   | Never archive anything. The shelf grows without bound.           |
+| "Send this to someone without an account" | No export of any kind for Knowledge Base documents.                                                                                                                                                              | Copy-paste out of the editor.                                    |
+| "Agent, use the voice guide"              | `@kb:<reference>` works — in exactly **one** surface (the AI conversation composer), scoped to **one** Work, with **no picker**, so the reference has to be typed from memory and silently no-ops when mistyped. | Paste the whole document into the prompt every time.             |
 
 ### 2.2 Why this is the right moment
 
 1. **The substrate is already built.** Documents, classes, tags, locking, version history,
    citations, retrieval trail, org-level inheritance, the review queue and the two-layer
-   (row + git) persistence all ship today. The library is a *reading and curation* layer on top —
+   (row + git) persistence all ship today. The library is a _reading and curation_ layer on top —
    it adds one small table and five columns, not a new store.
 2. **Scheduled agent writing already exists.** Works run on schedules and write documents; the
    consolidation tick proposes synthesized documents weekly. The volume that makes read state
@@ -70,13 +70,13 @@ They cannot answer it. Here is what they do instead.
 
 These are the shapes our users already produce, and each implies different update semantics:
 
-| Shape | Example | Update semantics | Which badge earns its keep |
-| --- | --- | --- | --- |
-| **Refreshed on a cadence** | A market brief a scheduled Work rewrites every Monday | Rewritten in place | `UPDATED` |
+| Shape                          | Example                                                | Update semantics                                        | Which badge earns its keep    |
+| ------------------------------ | ------------------------------------------------------ | ------------------------------------------------------- | ----------------------------- |
+| **Refreshed on a cadence**     | A market brief a scheduled Work rewrites every Monday  | Rewritten in place                                      | `UPDATED`                     |
 | **Written once, read forever** | A support playbook, a voice guide, an audience profile | Human- or agent-authored, then stable and heavily cited | Neither — but pinning matters |
-| **Accumulating series** | A weekly report, one document per week, filed together | New sibling documents appear in a folder | `NEW` + the folder rollup dot |
+| **Accumulating series**        | A weekly report, one document per week, filed together | New sibling documents appear in a folder                | `NEW` + the folder rollup dot |
 
-All three must be first-class. That is why the spec ships `NEW` *and* `UPDATED` *and* folder
+All three must be first-class. That is why the spec ships `NEW` _and_ `UPDATED` _and_ folder
 rollups: the three shapes stress different parts of the same mechanism.
 
 ---
@@ -459,14 +459,14 @@ Every default, limit, threshold and permission below is a number, not an adjecti
 
 ## 5. Key entities
 
-| Concept | Status | Description |
-| --- | --- | --- |
-| **Knowledge Base document** | **Exists** | The living document. Already has a title, description, class, tags, status (`draft` / `active` / `archived`), lock, review state, decision state, version history and a source-of-truth body in the Work's repository. This epic adds: a folder, a revision counter, a normalized-body fingerprint, and who archived it and when. |
-| **Folder** | **Exists, extended** | Ever Works already has folders for uploaded files, scoped to one person. This epic adds a **shared (organization) scope** to the same concept so a folder can hold documents and be seen by the whole team. It is the *same* noun with a new scope — not a second folder concept. |
-| **Reader state** | **NEW** | One record per (person, document) capturing when they last opened it, which revision they last read, and whether they pinned it. This is the only genuinely new entity in this epic. It is justified because read state and pins are irreducibly **per person**: they cannot live on the document (which is shared), and they cannot be derived from the activity log (which is an append-only audit, not a queryable per-person cursor). It is added to the program vocabulary table in the same change. |
-| **Document reference** | **Exists, extended** | The `@kb:` reference and its parse-and-resolve behaviour already exist in one composer. This epic adds the `#` trigger, the picker, resolution in agent runs, and per-run reference accounting. No new entity. |
-| **Export job** | **Exists (pattern)** | A background job producing an archive. Uses the platform's existing background-work mechanism and notification delivery; no new user-facing noun. |
-| **Run** | **Exists** | The receipt surface (epic AW-09) gains a "documents resolved" section fed by FR-59. |
+| Concept                     | Status               | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Knowledge Base document** | **Exists**           | The living document. Already has a title, description, class, tags, status (`draft` / `active` / `archived`), lock, review state, decision state, version history and a source-of-truth body in the Work's repository. This epic adds: a folder, a revision counter, a normalized-body fingerprint, and who archived it and when.                                                                                                                                                                         |
+| **Folder**                  | **Exists, extended** | Ever Works already has folders for uploaded files, scoped to one person. This epic adds a **shared (organization) scope** to the same concept so a folder can hold documents and be seen by the whole team. It is the _same_ noun with a new scope — not a second folder concept.                                                                                                                                                                                                                         |
+| **Reader state**            | **NEW**              | One record per (person, document) capturing when they last opened it, which revision they last read, and whether they pinned it. This is the only genuinely new entity in this epic. It is justified because read state and pins are irreducibly **per person**: they cannot live on the document (which is shared), and they cannot be derived from the activity log (which is an append-only audit, not a queryable per-person cursor). It is added to the program vocabulary table in the same change. |
+| **Document reference**      | **Exists, extended** | The `@kb:` reference and its parse-and-resolve behaviour already exist in one composer. This epic adds the `#` trigger, the picker, resolution in agent runs, and per-run reference accounting. No new entity.                                                                                                                                                                                                                                                                                            |
+| **Export job**              | **Exists (pattern)** | A background job producing an archive. Uses the platform's existing background-work mechanism and notification delivery; no new user-facing noun.                                                                                                                                                                                                                                                                                                                                                         |
+| **Run**                     | **Exists**           | The receipt surface (epic AW-09) gains a "documents resolved" section fed by FR-59.                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 ### 5.1 Document read state — states and transitions
 
@@ -831,25 +831,25 @@ person's read mark at the version they actually saw.
 
 ### 6.12 Keyboard affordances
 
-| Key | Where | Action |
-| --- | --- | --- |
-| `/` | Library view | Focus the search box |
-| `↑` `↓` | Document list | Move the selection |
-| `Enter` | Document list | Open the selected document |
-| `Space` | Document list | Toggle selection for bulk actions |
-| `p` | Document list / reader | Pin or unpin |
-| `f` | Document list / reader | Open **File into folder…** |
-| `r` | Document list | Mark as read |
-| `Shift+R` | Document list / reader | Mark as unread |
-| `a` | Document list / reader | Archive (or restore, in the Archived view) |
-| `Ctrl/Cmd+E` | Document list / reader | Export as Markdown |
-| `Shift+A` | Folder rail | Mark folder as read |
-| `F2` | Folder rail | Rename folder |
-| `←` `→` | Folder rail | Collapse / expand a folder |
-| `Esc` | Anywhere | Close the dialog, picker or banner |
-| `#` | Any composer | Open the document picker |
-| `↑` `↓` `Enter` `Esc` | Reference picker | Move, insert, dismiss |
-| `Tab` | Reference picker | Insert the highlighted document |
+| Key                   | Where                  | Action                                     |
+| --------------------- | ---------------------- | ------------------------------------------ |
+| `/`                   | Library view           | Focus the search box                       |
+| `↑` `↓`               | Document list          | Move the selection                         |
+| `Enter`               | Document list          | Open the selected document                 |
+| `Space`               | Document list          | Toggle selection for bulk actions          |
+| `p`                   | Document list / reader | Pin or unpin                               |
+| `f`                   | Document list / reader | Open **File into folder…**                 |
+| `r`                   | Document list          | Mark as read                               |
+| `Shift+R`             | Document list / reader | Mark as unread                             |
+| `a`                   | Document list / reader | Archive (or restore, in the Archived view) |
+| `Ctrl/Cmd+E`          | Document list / reader | Export as Markdown                         |
+| `Shift+A`             | Folder rail            | Mark folder as read                        |
+| `F2`                  | Folder rail            | Rename folder                              |
+| `←` `→`               | Folder rail            | Collapse / expand a folder                 |
+| `Esc`                 | Anywhere               | Close the dialog, picker or banner         |
+| `#`                   | Any composer           | Open the document picker                   |
+| `↑` `↓` `Enter` `Esc` | Reference picker       | Move, insert, dismiss                      |
+| `Tab`                 | Reference picker       | Insert the highlighted document            |
 
 Every control listed above has a visible focus ring, an accessible name, and the badges expose
 their meaning to assistive technology as text (`New`, `Updated`), not colour alone.
@@ -861,7 +861,7 @@ their meaning to assistive technology as text (`New`, `Updated`), not colour alo
 - **Rich collaborative editing.** Real-time multiplayer editing of a document body. The existing
   editor and lock semantics are unchanged; this epic adds a banner when a document changes under
   you, not operational transforms.
-- **A diff view.** `UPDATED` tells you *that* something changed. Showing *what* changed is a
+- **A diff view.** `UPDATED` tells you _that_ something changed. Showing _what_ changed is a
   natural follow-up but needs a rendered diff over the version history and is not in this epic.
   See §9.
 - **Tags as a second organizing axis.** Documents already carry tags and the tag catalogue is
@@ -969,30 +969,30 @@ A reviewer should be able to run this list top to bottom against the merged chan
 ## 9. Open questions
 
 - `[NEEDS CLARIFICATION: Should the library also offer an organization-wide "featured" flag on top
-  of personal pins? Personal pins solve the "my three documents" problem; a shared flag solves the
-  "everyone should read this" problem. Shipping both at once risks two rival prominence signals
-  fighting for the top of one list.]`
+of personal pins? Personal pins solve the "my three documents" problem; a shared flag solves the
+"everyone should read this" problem. Shipping both at once risks two rival prominence signals
+fighting for the top of one list.]`
 - `[NEEDS CLARIFICATION: The UPDATED badge promises the reader will not have to hunt for what
-  changed, but a badge alone cannot deliver that. Do we (a) ship a rendered diff against the
-  reader's last-read revision, (b) ask the writing agent to append a one-line "what changed" note
-  on every rewrite, or (c) accept the badge alone in v1? Option (b) is cheap and reads better than
-  a diff for prose, but it depends on agent cooperation and cannot be enforced.]`
+changed, but a badge alone cannot deliver that. Do we (a) ship a rendered diff against the
+reader's last-read revision, (b) ask the writing agent to append a one-line "what changed" note
+on every rewrite, or (c) accept the badge alone in v1? Option (b) is cheap and reads better than
+a diff for prose, but it depends on agent cooperation and cannot be enforced.]`
 - `[NEEDS CLARIFICATION: Should a scheduled Work run be able to declare a document as its standing
-  output target from the library side (a "this document is refreshed weekly by X" affordance), or
-  does that binding stay entirely on the schedule? Owning it on the schedule keeps one source of
-  truth; showing it on the document is what makes the library legible.]`
+output target from the library side (a "this document is refreshed weekly by X" affordance), or
+does that binding stay entirely on the schedule? Owning it on the schedule keeps one source of
+truth; showing it on the document is what makes the library legible.]`
 - `[NEEDS CLARIFICATION: Should folders be able to carry a default document class, so an agent
-  filing into "Playbooks" automatically writes a playbook-class document? Attractive, but it makes
-  folders semantically load-bearing rather than purely organizational.]`
+filing into "Playbooks" automatically writes a playbook-class document? Attractive, but it makes
+folders semantically load-bearing rather than purely organizational.]`
 - `[NEEDS CLARIFICATION: Should the reference picker search document bodies as well as titles and
-  slugs? Title-only is fast and predictable; body search finds more but makes the ranking hard to
-  explain and the latency budget hard to hold.]`
+slugs? Title-only is fast and predictable; body search finds more but makes the ranking hard to
+explain and the latency budget hard to hold.]`
 - `[NEEDS CLARIFICATION: Retention for background-produced export archives. 24 hours for the link
-  is specified; how long do the bytes live in storage before a sweep removes them, and does the
-  sweep belong to this epic or to the platform-wide storage reconcile?]`
+is specified; how long do the bytes live in storage before a sweep removes them, and does the
+sweep belong to this epic or to the platform-wide storage reconcile?]`
 - `[NEEDS CLARIFICATION: When an organization has hundreds of members, is a per-person reader-state
-  record per opened document acceptable at steady state, or do we need a retention rule (for
-  example, prune reader state for documents nobody has opened in 18 months)?]`
+record per opened document acceptable at steady state, or do we need a retention rule (for
+example, prune reader state for documents nobody has opened in 18 months)?]`
 
 ---
 

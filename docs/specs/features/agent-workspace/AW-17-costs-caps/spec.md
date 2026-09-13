@@ -86,7 +86,7 @@ other. **Model usage** is paid by the owner's own provider accounts; Ever Works 
 each Run consumed and adds nothing to it. **Credits** pay for the research and tooling calls
 Ever Works makes on the owner's behalf — web searches, page fetches, content extraction,
 screenshots, enrichment lookups, ranking and listing data, page audits, ad-library lookups —
-priced from a **published credit price list** that says what each kind of call costs *before* it
+priced from a **published credit price list** that says what each kind of call costs _before_ it
 is made, with a monthly included allowance that expires and purchased packs that never do.
 **Add-ons** are flat monthly lines for provisioned units — an agent inbox, a dedicated Node, an
 extra seat — pro-rated on the day they are added or removed, and they never consume credits.
@@ -108,26 +108,26 @@ the ceiling, or leave it stopped.
 
 ### 2.1 The user's question
 
-> *"Last month cost me $340. What did I buy, which of my agents bought it, and how do I stop it
-> happening again without turning everything off?"*
+> _"Last month cost me $340. What did I buy, which of my agents bought it, and how do I stop it
+> happening again without turning everything off?"_
 
 That is three questions, and today's product answers none of them cleanly. It answers a fourth
-question the owner did not ask — *"what is your total?"* — and leaves the rest as an exercise.
+question the owner did not ask — _"what is your total?"_ — and leaves the rest as an exercise.
 
 ### 2.2 What they do today, and why it does not answer the question
 
-| To answer… | Today they must… | What breaks |
-| --- | --- | --- |
-| "How much of this was thinking, and how much was searching?" | Open **Usage → Costs**, read the per-model panel, and mentally subtract it from the total. | Everything platform-metered — model calls, searches, screenshots, extraction, email — converts into **one** credits debit at settlement. There is no stored fact saying which kind of spend a credit paid for, so the subtraction is not available even in principle. |
-| "What does a web search cost?" | Nothing. | Credits are derived after the fact from a provider's own cost multiplied by a service margin. There is no price a user can read before spending. The Usage page tells them a margin percentage exists; it cannot tell them what any single call costs. |
-| "Was that call served from cache? Did I pay for the one that failed?" | Nothing. | The Costs page carries a standing note that cached reads are not recorded at all. Failed provider calls that still returned pricing are metered like successful ones. |
-| "Which Mission ate the budget?" | Nothing. | Usage groups by day, model, Agent and Work. A usage row records the Run and the Task the call was made for, but nothing carries the Mission that Task belongs to, so spend never reaches the standing initiative that caused it. |
-| "I brought my own key — am I being charged twice?" | Trust the label. | Own-key spend is exempted from the debit, but the exemption is worked out **at settlement time** by re-resolving where each plugin's key came from. When that resolution is unavailable the platform bills the full platform rate, and the code says so in a standing TODO. The owner has no way to see which of the two happened. |
-| "Cap my Agent at $20 a month." | They cannot. | The per-Agent budget exists as a data shape with no way to set it, and the one place that reads it computes current spend as a hard-coded zero. The Agent's Budgets tab therefore always says "no cap configured", and always will. |
-| "Cap my Workspace." | Set an unrelated cap on the autonomous Work Agent's own preferences page, which governs a different engine. | There is no Workspace-wide ceiling on agent spend anywhere in Billing or Usage. |
-| "Make sure auto-recharge can never run away." | They cannot. | Auto-recharge has a trigger threshold, a fixed pack and a single-flight guard — and **no monthly maximum**. A pathological loop that burns a pack an hour is bounded only by the card. |
-| "What am I paying for that is not usage?" | Read the invoice. | Seats are a subscription quantity; everything else that is provisioned rather than called — inboxes, Nodes — has no line at all, no pro-ration, and no statement that it does not also draw credits. |
-| "What did *this* Run spend, itemised?" | Open the receipt and read one total. | AW-09 gives a Run a cost block. Without a per-call meter classification and a price list, the block can only show a sum. |
+| To answer…                                                            | Today they must…                                                                                            | What breaks                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "How much of this was thinking, and how much was searching?"          | Open **Usage → Costs**, read the per-model panel, and mentally subtract it from the total.                  | Everything platform-metered — model calls, searches, screenshots, extraction, email — converts into **one** credits debit at settlement. There is no stored fact saying which kind of spend a credit paid for, so the subtraction is not available even in principle.                                                              |
+| "What does a web search cost?"                                        | Nothing.                                                                                                    | Credits are derived after the fact from a provider's own cost multiplied by a service margin. There is no price a user can read before spending. The Usage page tells them a margin percentage exists; it cannot tell them what any single call costs.                                                                             |
+| "Was that call served from cache? Did I pay for the one that failed?" | Nothing.                                                                                                    | The Costs page carries a standing note that cached reads are not recorded at all. Failed provider calls that still returned pricing are metered like successful ones.                                                                                                                                                              |
+| "Which Mission ate the budget?"                                       | Nothing.                                                                                                    | Usage groups by day, model, Agent and Work. A usage row records the Run and the Task the call was made for, but nothing carries the Mission that Task belongs to, so spend never reaches the standing initiative that caused it.                                                                                                   |
+| "I brought my own key — am I being charged twice?"                    | Trust the label.                                                                                            | Own-key spend is exempted from the debit, but the exemption is worked out **at settlement time** by re-resolving where each plugin's key came from. When that resolution is unavailable the platform bills the full platform rate, and the code says so in a standing TODO. The owner has no way to see which of the two happened. |
+| "Cap my Agent at $20 a month."                                        | They cannot.                                                                                                | The per-Agent budget exists as a data shape with no way to set it, and the one place that reads it computes current spend as a hard-coded zero. The Agent's Budgets tab therefore always says "no cap configured", and always will.                                                                                                |
+| "Cap my Workspace."                                                   | Set an unrelated cap on the autonomous Work Agent's own preferences page, which governs a different engine. | There is no Workspace-wide ceiling on agent spend anywhere in Billing or Usage.                                                                                                                                                                                                                                                    |
+| "Make sure auto-recharge can never run away."                         | They cannot.                                                                                                | Auto-recharge has a trigger threshold, a fixed pack and a single-flight guard — and **no monthly maximum**. A pathological loop that burns a pack an hour is bounded only by the card.                                                                                                                                             |
+| "What am I paying for that is not usage?"                             | Read the invoice.                                                                                           | Seats are a subscription quantity; everything else that is provisioned rather than called — inboxes, Nodes — has no line at all, no pro-ration, and no statement that it does not also draw credits.                                                                                                                               |
+| "What did _this_ Run spend, itemised?"                                | Open the receipt and read one total.                                                                        | AW-09 gives a Run a cost block. Without a per-call meter classification and a price list, the block can only show a sum.                                                                                                                                                                                                           |
 
 ### 2.3 The four gaps this epic closes
 
@@ -151,7 +151,7 @@ is removed or renamed. The Billing page, the Usage page and its Costs tab, the c
 the packs, pay-as-you-go, invoices and seats all keep working exactly as they do. The existing
 per-Work budgets keep their shape and their optional overage switch. The Fleet's per-Node daily
 model-spend ceiling keeps its own control and is surfaced, read-only, alongside the new caps
-rather than replaced by them. What changes is that every *new* usage record carries a meter, and
+rather than replaced by them. What changes is that every _new_ usage record carries a meter, and
 that the new Workspace-level caps have no overage switch at all.
 
 ---
@@ -163,21 +163,21 @@ that the new Workspace-level caps have no overage switch at all.
 **S1 — The Monday glance.**
 **Given** an owner whose agents worked over the weekend,
 **when** they open Home,
-**then** one line reads *"This week: 412 of 1,000 credits · $18.20 on your own model accounts ·
-$30.00 in add-ons"*, with the credit figure showing a proportion bar against the included
+**then** one line reads _"This week: 412 of 1,000 credits · $18.20 on your own model accounts ·
+$30.00 in add-ons"_, with the credit figure showing a proportion bar against the included
 allowance, and choosing any of the three numbers opens Billing scrolled to that meter.
 
 **S2 — Finding out what a tool costs before using it.**
 **Given** an owner about to hand an Agent a research Task,
 **when** they open **Billing → Credit price list**,
 **then** they see every priced kind of call with its credit cost, the current price-list version,
-and the date it took effect — for example *"Web search — 2 credits per query"*, *"Page fetch —
-1 credit"*, *"Screenshot — 4 credits"*, *"Page audit — 10 credits"* — and a note that cached
+and the date it took effect — for example _"Web search — 2 credits per query"_, _"Page fetch —
+1 credit"_, _"Screenshot — 4 credits"_, _"Page audit — 10 credits"_ — and a note that cached
 results and failed calls cost nothing.
 
 **S3 — Reading where the month went.**
 **Given** a month that cost more than expected,
-**when** the owner opens **Billing** and looks at *Where the credits went*,
+**when** the owner opens **Billing** and looks at _Where the credits went_,
 **then** they see three ranked breakdowns — by tool, by Agent, by Mission — each showing credits,
 share of the period, and a jump into the filtered Run list, and the by-Mission list names the one
 Mission whose Tasks consumed 61% of the month.
@@ -187,14 +187,14 @@ Mission whose Tasks consumed 61% of the month.
 **when** the owner opens its receipt,
 **then** the cost block lists, per meter: model usage as tokens and the provider account that
 paid for it, credits as one line per priced call kind with counts and credits, and add-ons as
-*"Not applicable to a single Run"* — plus, on each credit line, how many of those calls were
+_"Not applicable to a single Run"_ — plus, on each credit line, how many of those calls were
 served from cache at no cost.
 
 **S5 — Bringing your own key stops the charge, visibly.**
 **Given** a Workspace that has connected its own model account,
 **when** a Run uses it,
-**then** the receipt reads *"Billed by your provider to your account 'Company key'. Ever Works
-adds nothing."*, the credits line for that Run is `0`, and the Workspace's credit balance is
+**then** the receipt reads _"Billed by your provider to your account 'Company key'. Ever Works
+adds nothing."_, the credits line for that Run is `0`, and the Workspace's credit balance is
 untouched.
 
 **S6 — Capping an Agent.**
@@ -207,17 +207,17 @@ the real spend against it, and no confirmation is needed to make it stricter.
 **S7 — A cap actually stops something.**
 **Given** an Agent that has consumed $20.00 of its $20.00 cap,
 **when** its next Run reaches a credit-metered call,
-**then** the call does not happen, the Run stops with the reason *"Agent spend cap reached"*, a
-**My Decisions** item appears reading *"Nova reached its $20.00 monthly cap. Raise the cap, or
-leave it stopped until 1 October?"*, and no partial debit is written.
+**then** the call does not happen, the Run stops with the reason _"Agent spend cap reached"_, a
+**My Decisions** item appears reading _"Nova reached its $20.00 monthly cap. Raise the cap, or
+leave it stopped until 1 October?"_, and no partial debit is written.
 
 **S8 — Auto-recharge stays inside its ceiling.**
 **Given** auto-recharge set to buy the 1,000-credit pack whenever the balance drops below 200,
 with a monthly maximum of $100,
 **when** the tenth pack of the month would be bought,
 **then** the purchase does not happen, the balance is allowed to fall, a **My Decisions** item
-reads *"Auto-recharge reached its $100.00 monthly maximum. Raise the maximum, or top up
-manually?"*, and no card is charged.
+reads _"Auto-recharge reached its $100.00 monthly maximum. Raise the maximum, or top up
+manually?"_, and no card is charged.
 
 **S9 — Adding an add-on.**
 **Given** an owner adding a second agent inbox on the 16th of a 30-day month,
@@ -229,8 +229,8 @@ credits balance is unchanged and stated to be unchanged.
 **S10 — Removing an add-on.**
 **Given** that inbox is deleted on the 20th,
 **when** the deletion completes,
-**then** the add-on line moves to *Removed*, the next invoice carries the pro-rated credit, and
-the Add-ons list states *"Removed 20 Sep — you are not billed for this from the next period."*
+**then** the add-on line moves to _Removed_, the next invoice carries the pro-rated credit, and
+the Add-ons list states _"Removed 20 Sep — you are not billed for this from the next period."_
 
 **S11 — The Workspace ceiling.**
 **Given** a Workspace cap of `$150 per calendar month` on the credits meter,
@@ -241,7 +241,7 @@ and the date it resets.
 
 **S12 — Raising a cap from the decision.**
 **Given** a stopped Workspace,
-**when** the owner answers the **My Decisions** item with *"Raise to $250"*,
+**when** the owner answers the **My Decisions** item with _"Raise to $250"_,
 **then** the cap is updated, the stop is lifted within 30 seconds, every Run parked on that cap
 is eligible to resume on its next dispatch, and the change is recorded in the activity log
 against the acting user.
@@ -253,34 +253,34 @@ against the acting user.
 **when** the owner opens Billing,
 **then** the three meter cards still render with real usage numbers, the price list is readable,
 caps are fully functional, and only the money-moving controls — buy a pack, auto-recharge,
-add-ons — are replaced with *"Card payments are not enabled on this deployment. Usage, caps and
-the price list still work."* No control is shown enabled that would always fail.
+add-ons — are replaced with _"Card payments are not enabled on this deployment. Usage, caps and
+the price list still work."_ No control is shown enabled that would always fail.
 
 **S14 — The balance runs out with no cap in sight.**
 **Given** a Workspace with 0 credits, no purchased packs and auto-recharge off,
 **when** an Agent reaches a credit-metered call,
-**then** the call is refused, the Run stops with *"Out of credits"*, a **My Decisions** item
-offers *"Buy credits"*, *"Turn on auto-recharge"* and *"Wait for the allowance on 1 October"*,
+**then** the call is refused, the Run stops with _"Out of credits"_, a **My Decisions** item
+offers _"Buy credits"_, _"Turn on auto-recharge"_ and _"Wait for the allowance on 1 October"_,
 and no debit is written that would take the balance below zero.
 
 **S15 — A call fails after the provider was reached.**
 **Given** a search call that reaches the provider and returns an error,
 **when** the Run continues,
-**then** the usage record is written with outcome *failed* and **0 credits**, the receipt shows
-the attempt with *"Failed — no charge"*, and the failure still counts toward the Agent's error
+**then** the usage record is written with outcome _failed_ and **0 credits**, the receipt shows
+the attempt with _"Failed — no charge"_, and the failure still counts toward the Agent's error
 budget as it does today.
 
 **S16 — A call is served from cache.**
 **Given** a page fetch whose result is already cached and inside its freshness window,
 **when** the Agent asks for it,
-**then** the usage record is written with outcome *cached* and **0 credits**, and the receipt
-line reads *"3 page fetches — 1 charged, 2 from cache"*.
+**then** the usage record is written with outcome _cached_ and **0 credits**, and the receipt
+line reads _"3 page fetches — 1 charged, 2 from cache"_.
 
 **S17 — The Agent forces a fresh pull.**
 **Given** the same page and a Skill that requires current data,
 **when** the Agent requests it with freshness forced,
 **then** the call is made live and charged at the full list price, the receipt marks the line
-*"Forced fresh"*, and the next request inside the freshness window is free again.
+_"Forced fresh"_, and the next request inside the freshness window is free again.
 
 **S18 — Two Runs cross the same cap at the same instant.**
 **Given** an Agent one credit below its cap and two Runs settling concurrently,
@@ -292,48 +292,48 @@ below the cap by two calls' worth.
 **S19 — The cap is lowered below what has already been spent.**
 **Given** an Agent that has spent $18.00 this month,
 **when** the owner lowers its cap to $10.00,
-**then** the save succeeds, the cap shows *"Already exceeded — $18.00 of $10.00"*, all further
+**then** the save succeeds, the cap shows _"Already exceeded — $18.00 of $10.00"_, all further
 credit-metered calls for that Agent stop immediately, and nothing already spent is reversed or
 re-billed.
 
 **S20 — Two people edit the same cap.**
 **Given** two people with permission open the same cap,
 **when** the second saves after the first,
-**then** the second is told *"This cap was changed to $250.00 by Dana a moment ago. Reload to see
-the current value."* and their write is refused rather than silently overwriting.
+**then** the second is told _"This cap was changed to $250.00 by Dana a moment ago. Reload to see
+the current value."_ and their write is refused rather than silently overwriting.
 
 **S21 — A cap on an Agent that has been archived.**
 **Given** a cap on an Agent that is later archived,
 **when** the owner opens Caps,
-**then** the cap is listed with the Agent labelled *Archived*, its historical spend still
-resolves, and the row offers *Remove cap* only — never an edit that would have no effect.
+**then** the cap is listed with the Agent labelled _Archived_, its historical spend still
+resolves, and the row offers _Remove cap_ only — never an edit that would have no effect.
 
 **S22 — Credential provenance cannot be determined.**
 **Given** a metered call whose paying credential cannot be resolved,
 **when** the usage record is written,
 **then** it is classified to the credits meter (the platform assumes it paid), the receipt line
-carries *"We could not confirm which account paid for this call"* with a link to raise it with
+carries _"We could not confirm which account paid for this call"_ with a link to raise it with
 support, and the platform records the event for its own alerting. It is never silently treated
 as free.
 
 **S23 — Old usage has no meter.**
 **Given** usage recorded before this epic shipped,
 **when** the owner selects a period that includes it,
-**then** breakdowns show a row labelled *"Recorded before meters were separated"* with its total,
+**then** breakdowns show a row labelled _"Recorded before meters were separated"_ with its total,
 excluded from the per-meter cards rather than guessed into one of them, and a one-line note gives
 the date meters began.
 
 **S24 — Itemised usage has aged out.**
 **Given** a Run older than the 12-month usage retention window,
 **when** the receipt is opened,
-**then** the settled total still shows and the itemisation is replaced by *"Itemised usage for
-this Run is older than 12 months and is no longer retained. The total is unchanged."*
+**then** the settled total still shows and the itemisation is replaced by _"Itemised usage for
+this Run is older than 12 months and is no longer retained. The total is unchanged."_
 
 **S25 — A teammate with read access.**
 **Given** a teammate who can view the Workspace but not change its settings,
 **when** they open Billing,
 **then** every number, breakdown and price is visible, and every control that changes money or a
-cap is disabled with *"You need billing permission to change this."* Answering a spend decision
+cap is disabled with _"You need billing permission to change this."_ Answering a spend decision
 is likewise disabled with the same explanation.
 
 **S26 — Someone else's Workspace.**
@@ -344,29 +344,29 @@ is likewise disabled with the same explanation.
 **S27 — A breakdown request fails.**
 **Given** the by-Mission breakdown request errors while the by-tool one succeeds,
 **when** Billing loads,
-**then** the meter cards and the two working breakdowns render, the failing panel shows *"We
-could not load spend by Mission"* with **Retry**, and no other panel is blanked.
+**then** the meter cards and the two working breakdowns render, the failing panel shows _"We
+could not load spend by Mission"_ with **Retry**, and no other panel is blanked.
 
 **S28 — The price list changed mid-period.**
 **Given** a price-list version that took effect on the 12th,
 **when** the owner reads a period spanning the change,
 **then** every historical line is priced at the version in force when the call happened, the
-price list states *"In effect since 12 September. Earlier calls were priced at version 3."*, and
+price list states _"In effect since 12 September. Earlier calls were priced at version 3."_, and
 no historical figure is re-priced.
 
 **S29 — Nothing has been spent yet.**
 **Given** a Workspace whose agents have never made a metered call,
 **when** the owner opens Billing,
 **then** each meter card shows a zero with an explanatory sentence rather than an empty box —
-*"No model usage yet. Connect a model account to keep this at zero on our side."*, *"No credits
-used yet. Your allowance renews on 1 October."*, *"No add-ons."* — and the price list is still
+_"No model usage yet. Connect a model account to keep this at zero on our side."_, _"No credits
+used yet. Your allowance renews on 1 October."_, _"No add-ons."_ — and the price list is still
 fully readable.
 
 **S30 — Export is too large.**
 **Given** a selected period resolving to more than 50,000 usage rows,
 **when** the owner exports,
-**then** the export is refused before it starts with *"That is more than 50,000 rows. Narrow the
-period and try again."* — never a truncated file presented as complete.
+**then** the export is refused before it starts with _"That is more than 50,000 rows. Narrow the
+period and try again."_ — never a truncated file presented as complete.
 
 ---
 
@@ -401,7 +401,7 @@ Every requirement below is testable. Every default, limit, threshold and cadence
   usage record is written, and MUST NOT be derived any other way — in particular not from the
   Agent that happened to run it, which may be scoped to a different Mission.
 - **FR-5b** Spend from a Run with no Task — a heartbeat, a chat, or a call made outside the
-  Task path — has no Mission. It MUST be reported under an explicit *"Not in a Mission"* row
+  Task path — has no Mission. It MUST be reported under an explicit _"Not in a Mission"_ row
   and MUST NOT be attributed to a Mission by inference.
 - **FR-6** Where the paying account class cannot be determined, the record MUST be classified to
   **credits**, MUST be marked as unconfirmed, and MUST be surfaced as unconfirmed on the receipt.
@@ -427,16 +427,16 @@ Every requirement below is testable. Every default, limit, threshold and cadence
   platform can determine it, labelled as the provider's figure and not the platform's charge.
 - **FR-15** The platform MUST NOT apply any margin, markup, uplift or rounding-up to a model-usage
   figure. The displayed figure MUST be the provider's own metered cost or nothing at all.
-- **FR-16** Where the platform has no cost figure for a model, the surface MUST read *"Not priced
-  by this provider"* and MUST NOT display `0`.
+- **FR-16** Where the platform has no cost figure for a model, the surface MUST read _"Not priced
+  by this provider"_ and MUST NOT display `0`.
 - **FR-17** A Run MUST record which provider account paid for each model call, by its
   user-given label, and the receipt MUST show it.
 - **FR-18** Model calls made with a **platform-supplied** credential MUST be classified to the
-  credits meter, priced from the price list, and labelled on every surface as *"Managed model
-  access"* so the two paths are never confused.
+  credits meter, priced from the price list, and labelled on every surface as _"Managed model
+  access"_ so the two paths are never confused.
 - **FR-19** A Workspace MUST be able to set **"Require my own model accounts"**. When set, a Run
   that would fall back to a platform-supplied model credential MUST stop before the call with the
-  reason *"No model account available"* rather than spending credits.
+  reason _"No model account available"_ rather than spending credits.
 
 ### 4.3 Meter 2 — credits
 
@@ -517,8 +517,8 @@ Every requirement below is testable. Every default, limit, threshold and cadence
 - **FR-48** Crossing **75%**, **90%** and **100%** of a cap MUST each produce exactly one
   notification per cap per period.
 - **FR-49** Reaching 100% of a cap MUST additionally raise exactly one item in **My Decisions**,
-  naming the cap, the amount, the period reset date, and offering at minimum *Raise the cap* and
-  *Leave it stopped*.
+  naming the cap, the amount, the period reset date, and offering at minimum _Raise the cap_ and
+  _Leave it stopped_.
 - **FR-50** Concurrent crossings of the same cap MUST result in exactly one stop, one notification
   and one decision.
 - **FR-51** Lowering a cap below current-period spend MUST be permitted, MUST take effect
@@ -571,14 +571,14 @@ Every requirement below is testable. Every default, limit, threshold and cadence
   filtered Run list.
 - **FR-70** Billing periods MUST be: the current calendar month, the previous calendar month, and
   rolling **7**, **30** and **90** days. There is no custom range in this epic.
-- **FR-71** Each breakdown MUST show at most **10** rows plus an aggregated *"Everything else"*
+- **FR-71** Each breakdown MUST show at most **10** rows plus an aggregated _"Everything else"_
   row, and MUST offer a full list on demand.
 - **FR-72** A Run receipt MUST itemise that Run's spend per meter: model usage as tokens plus the
   paying account label; credits as one line per kind of call with counts, of which cached and
   failed, and credits charged; add-ons as not applicable.
 - **FR-73** Receipt itemisation MUST reconcile exactly to the Run's settled total, and where it
   cannot the receipt MUST say so rather than showing an inconsistent sum.
-- **FR-74** Figures for a Run that has not reached a terminal state MUST be labelled *"so far"*.
+- **FR-74** Figures for a Run that has not reached a terminal state MUST be labelled _"so far"_.
 
 ### 4.8 Scope, permissions, export and retention
 
@@ -624,18 +624,18 @@ Every requirement below is testable. Every default, limit, threshold and cadence
 
 ## 5. Key entities
 
-| Concept | New or existing | What it is here |
-| --- | --- | --- |
-| **Meter** | **New — a classification, not a table** | Which of the three ways a unit of spend is paid for. Stored on every usage record. It is a property of spend, not an object anyone creates, so it gets no surface of its own beyond the three cards. |
-| **Usage record** | **Existing** (extended) | One metered call, already attributed to user, Work, Agent, Task and Run and already carrying capability, Plugin, model, units and cost. This epic adds the meter, the kind of call, the outcome, the credits charged, the price-list version, the paying account class, and the Mission of the row's Task — captured when the row is written, not joined at read time. |
-| **Credit price list** | **New — a published, versioned price table, not a stored record** | What each kind of call costs in credits. Server-authored and versioned; a price change is a shipped change, never a setting an operator can drift. Read by the pricing path and by the product surface that displays it. |
-| **Credit ledger entry** | **Existing** | The append-only record of every credit movement, with allowance buckets that expire and purchased buckets that never do. Unchanged in shape; this epic only narrows what produces a consumption entry. |
-| **Spend cap** | **Existing concept, new Workspace scope** | The user-facing name for the whole family of ceilings. Ever Works already has per-Work and per-Agent budgets; this epic adds the missing Workspace scope, adds a meter to all of them, and makes all of them refuse. "Budget" remains the name in the data model — this introduces no second word for an existing thing. |
-| **Add-on** | **New** | A flat recurring charge for a provisioned unit — an agent inbox, a dedicated Node, an extra seat — with a code, a quantity, a unit price, a reference to the unit, and a state. |
-| **Billing profile** | **Existing** (extended) | The bridge between the Workspace and the payment provider, already holding the payment-method summary and auto-recharge state. Gains the auto-recharge monthly maximum and the amount used against it this month. |
-| **Model account** | **Existing (AW-16)** | A Workspace-owned provider credential. Read here to determine the paying account class and to label the receipt. This epic never creates or edits one. |
-| **Run / Agent / Task / Mission / Work / Node** | **Existing** | Attribution and cap targets. A Run and its Task are attributed directly; the Mission, Work and Goal are reached through that Task's own owner fields (FR-5a). All read unchanged. |
-| **Approval / Escalation ("My Decisions")** | **Existing (AW-03)** | The queue a cap stop and an auto-recharge ceiling stop raise a decision into. This epic writes items; it does not change the queue. |
+| Concept                                        | New or existing                                                   | What it is here                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Meter**                                      | **New — a classification, not a table**                           | Which of the three ways a unit of spend is paid for. Stored on every usage record. It is a property of spend, not an object anyone creates, so it gets no surface of its own beyond the three cards.                                                                                                                                                                   |
+| **Usage record**                               | **Existing** (extended)                                           | One metered call, already attributed to user, Work, Agent, Task and Run and already carrying capability, Plugin, model, units and cost. This epic adds the meter, the kind of call, the outcome, the credits charged, the price-list version, the paying account class, and the Mission of the row's Task — captured when the row is written, not joined at read time. |
+| **Credit price list**                          | **New — a published, versioned price table, not a stored record** | What each kind of call costs in credits. Server-authored and versioned; a price change is a shipped change, never a setting an operator can drift. Read by the pricing path and by the product surface that displays it.                                                                                                                                               |
+| **Credit ledger entry**                        | **Existing**                                                      | The append-only record of every credit movement, with allowance buckets that expire and purchased buckets that never do. Unchanged in shape; this epic only narrows what produces a consumption entry.                                                                                                                                                                 |
+| **Spend cap**                                  | **Existing concept, new Workspace scope**                         | The user-facing name for the whole family of ceilings. Ever Works already has per-Work and per-Agent budgets; this epic adds the missing Workspace scope, adds a meter to all of them, and makes all of them refuse. "Budget" remains the name in the data model — this introduces no second word for an existing thing.                                               |
+| **Add-on**                                     | **New**                                                           | A flat recurring charge for a provisioned unit — an agent inbox, a dedicated Node, an extra seat — with a code, a quantity, a unit price, a reference to the unit, and a state.                                                                                                                                                                                        |
+| **Billing profile**                            | **Existing** (extended)                                           | The bridge between the Workspace and the payment provider, already holding the payment-method summary and auto-recharge state. Gains the auto-recharge monthly maximum and the amount used against it this month.                                                                                                                                                      |
+| **Model account**                              | **Existing (AW-16)**                                              | A Workspace-owned provider credential. Read here to determine the paying account class and to label the receipt. This epic never creates or edits one.                                                                                                                                                                                                                 |
+| **Run / Agent / Task / Mission / Work / Node** | **Existing**                                                      | Attribution and cap targets. A Run and its Task are attributed directly; the Mission, Work and Goal are reached through that Task's own owner fields (FR-5a). All read unchanged.                                                                                                                                                                                      |
+| **Approval / Escalation ("My Decisions")**     | **Existing (AW-03)**                                              | The queue a cap stop and an auto-recharge ceiling stop raise a decision into. This epic writes items; it does not change the queue.                                                                                                                                                                                                                                    |
 
 > **New nouns introduced by this epic:** **Meter**, **Credit price list**, **Add-on**. Each is a
 > thing the product genuinely did not have. Per
@@ -981,15 +981,15 @@ Denied variant for a viewer without billing permission: the buttons render disab
 
 ### 6.10 Keyboard affordances, all surfaces
 
-| Key | Where | Does |
-| --- | --- | --- |
-| `Tab` / `Shift+Tab` | everywhere | move through controls in reading order |
-| `Enter` | any row or figure | follow it |
-| `Esc` | any dialog | close it and return focus to the opener |
-| `j` / `k` | breakdown panels, caps table | next / previous row |
-| `/` | Caps, Add-ons | focus the filter box |
-| `p` | Billing | open the period selector |
-| `?` | Billing | show the shortcut sheet |
+| Key                 | Where                        | Does                                    |
+| ------------------- | ---------------------------- | --------------------------------------- |
+| `Tab` / `Shift+Tab` | everywhere                   | move through controls in reading order  |
+| `Enter`             | any row or figure            | follow it                               |
+| `Esc`               | any dialog                   | close it and return focus to the opener |
+| `j` / `k`           | breakdown panels, caps table | next / previous row                     |
+| `/`                 | Caps, Add-ons                | focus the filter box                    |
+| `p`                 | Billing                      | open the period selector                |
+| `?`                 | Billing                      | show the shortcut sheet                 |
 
 No single-key shortcut fires while a text input has focus. Every dialog traps focus while open.
 Every state change that matters — a cap stopping, a decision arriving — is announced to assistive
@@ -1038,6 +1038,7 @@ without relying on colour.
 A reviewer can run this list against the merged change.
 
 **The three meters**
+
 - [ ] Every usage record written after the cut-over carries a meter, an outcome, a credits
       charged figure, a price-list version and a paying account class.
 - [ ] A usage record's Mission is the Mission of the Task its Run served, captured when the row is
@@ -1054,6 +1055,7 @@ A reviewer can run this list against the merged change.
       credential stops before the call.
 
 **Credits**
+
 - [ ] The price list is readable by any member with no payment provider configured.
 - [ ] A cached call costs `0`; a failed call costs `0`; a forced-fresh call costs full price.
 - [ ] A second identical call inside 24 hours costs `0`.
@@ -1064,6 +1066,7 @@ A reviewer can run this list against the merged change.
 - [ ] Changing the price-list version does not change any historical figure.
 
 **Add-ons**
+
 - [ ] Adding an inbox mid-period shows the pro-rated amount before confirmation and bills it.
 - [ ] Removing it produces a pro-rated credit and stops the charge from the next period.
 - [ ] No add-on ever produces a credit-ledger movement.
@@ -1072,6 +1075,7 @@ A reviewer can run this list against the merged change.
 - [ ] Seats appear read-only with a link to the existing seat control.
 
 **Caps**
+
 - [ ] A per-Agent cap can be created, read, edited and removed from the product.
 - [ ] The Agent's Budgets tab shows real current-period spend, never zero.
 - [ ] A cap at 100% refuses the next call; the Run stops with `budget-stop` naming the cap.
@@ -1086,12 +1090,14 @@ A reviewer can run this list against the merged change.
 - [ ] Every cap change appears in the activity log with old and new values.
 
 **Auto-recharge**
+
 - [ ] Auto-recharge cannot be enabled without a monthly maximum.
 - [ ] A recharge that would cross the maximum contacts no card and raises one decision per month.
 - [ ] The maximum resets on the 1st and the amount used is displayed beside it.
 - [ ] Three consecutive failures disable it and require an explicit re-enable.
 
 **Visibility**
+
 - [ ] Home shows the week line with all three figures, each linking into Billing.
 - [ ] Billing shows three meter cards, and each states what it pays for.
 - [ ] By-tool, by-Agent and by-Mission breakdowns each render, rank, cap at 10 rows plus
@@ -1104,6 +1110,7 @@ A reviewer can run this list against the merged change.
 - [ ] A Run older than 12 months shows the retention notice and keeps its total.
 
 **Scope, permissions and honesty**
+
 - [ ] No endpoint accepts a user, Organization or tenant selector from the caller.
 - [ ] A record the caller may not read is indistinguishable from one that does not exist.
 - [ ] A read-only teammate sees every number and no enabled money or cap control.

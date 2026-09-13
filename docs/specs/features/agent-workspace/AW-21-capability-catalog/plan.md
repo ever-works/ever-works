@@ -26,54 +26,54 @@ Every path below was verified to exist in this worktree before being cited.
 
 ### 1.1 The five capability surfaces that exist today
 
-| File | What it does today | What this epic does with it |
-| --- | --- | --- |
-| `apps/web/src/app/[locale]/(dashboard)/templates/page.tsx` | The DB-backed template catalogue. Reads `?kind=` and offers exactly `['website','work','mission']`; renders `TemplatesCatalog`. Fully internationalised under `dashboard.templatesPage` / `dashboard.templates` / `dashboard.templateSelector`. | Untouched. The **Starting points** section links here with `?kind=`. |
-| `apps/web/src/app/[locale]/(dashboard)/agents/templates/page.tsx` | Repo-backed agent-template browser (`AstTemplatesBrowser`, `entity="agent"`). Self-labelled a "Phase 18.6 (scaffold)". | Untouched. Linked from the index. |
-| `apps/web/src/app/[locale]/(dashboard)/skills/templates/page.tsx` | Same browser, `entity="skill"`. | Untouched. |
-| `apps/web/src/app/[locale]/(dashboard)/tasks/templates/page.tsx` | Renders `TaskWorkflowTemplatesList` (the real multi-step templates) **above** the scaffold `AstTemplatesBrowser`. Hardcoded English. | Untouched. The **Task templates** section on the index surfaces `TaskWorkflowTemplatesList`'s data with its own i18n keys and links here for the rest. |
-| `apps/web/src/components/templates/TemplatesCatalog.tsx`, `.../AstTemplatesBrowser.tsx`, `.../CreateCustomTemplateDialog.tsx` | The three existing browse components. | Not reused. The catalogue index needs a card grid with readiness chips these components do not have; forking their markup would couple two unrelated surfaces. Their **data** is reused via the existing API clients. |
-| `apps/web/src/components/tasks/TaskWorkflowTemplatesList.tsx` | Lists the caller's `task_templates` with an instantiate control. | Its API client is reused; the index renders a compact card variant. |
+| File                                                                                                                          | What it does today                                                                                                                                                                                                                              | What this epic does with it                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/app/[locale]/(dashboard)/templates/page.tsx`                                                                    | The DB-backed template catalogue. Reads `?kind=` and offers exactly `['website','work','mission']`; renders `TemplatesCatalog`. Fully internationalised under `dashboard.templatesPage` / `dashboard.templates` / `dashboard.templateSelector`. | Untouched. The **Starting points** section links here with `?kind=`.                                                                                                                                                  |
+| `apps/web/src/app/[locale]/(dashboard)/agents/templates/page.tsx`                                                             | Repo-backed agent-template browser (`AstTemplatesBrowser`, `entity="agent"`). Self-labelled a "Phase 18.6 (scaffold)".                                                                                                                          | Untouched. Linked from the index.                                                                                                                                                                                     |
+| `apps/web/src/app/[locale]/(dashboard)/skills/templates/page.tsx`                                                             | Same browser, `entity="skill"`.                                                                                                                                                                                                                 | Untouched.                                                                                                                                                                                                            |
+| `apps/web/src/app/[locale]/(dashboard)/tasks/templates/page.tsx`                                                              | Renders `TaskWorkflowTemplatesList` (the real multi-step templates) **above** the scaffold `AstTemplatesBrowser`. Hardcoded English.                                                                                                            | Untouched. The **Task templates** section on the index surfaces `TaskWorkflowTemplatesList`'s data with its own i18n keys and links here for the rest.                                                                |
+| `apps/web/src/components/templates/TemplatesCatalog.tsx`, `.../AstTemplatesBrowser.tsx`, `.../CreateCustomTemplateDialog.tsx` | The three existing browse components.                                                                                                                                                                                                           | Not reused. The catalogue index needs a card grid with readiness chips these components do not have; forking their markup would couple two unrelated surfaces. Their **data** is reused via the existing API clients. |
+| `apps/web/src/components/tasks/TaskWorkflowTemplatesList.tsx`                                                                 | Lists the caller's `task_templates` with an instantiate control.                                                                                                                                                                                | Its API client is reused; the index renders a compact card variant.                                                                                                                                                   |
 
 ### 1.2 The backends the catalogue reads
 
-| File | Route / export | Used for |
-| --- | --- | --- |
-| `apps/api/src/skills/skills.controller.ts` | `GET api/skills/catalog`, `GET api/skills/catalog/:slug`, `POST api/skills/install`, `POST api/skills/:id/bindings` | Skills section; adoption step 2 |
-| `packages/agent/src/facades/skills.facade.ts` | `SkillsFacadeService` — fans catalogue reads across enabled `skills-provider` plugins, dedupes by slug | The pattern the playbook facade copies verbatim |
-| `packages/plugins/everworks-skills/src/everworks-skills.plugin.ts` | First-party `skills-provider` with an in-code fallback catalogue | The pattern the playbook plugin copies verbatim |
-| `apps/api/src/workflows/workflows.controller.ts` | `GET api/workflows`, `GET api/workflows/runs/:runId`, `GET api/workflows/:id`, `POST api/workflows`, `PATCH api/workflows/:id`, `POST api/workflows/:id/run` (202), `GET api/workflows/:id/runs`, `DELETE api/workflows/:id` | Workflows section — **no new API needed** |
-| `packages/agent/src/services/workflows.service.ts`, `.../workflow-runs.service.ts` | Owner-scoped list/get/create/update/remove; run start via dispatcher | Read only |
-| `apps/api/src/task-templates/task-templates.controller.ts` | `GET/POST api/task-templates`, `GET/PATCH/DELETE :id`, `POST :id/instantiate` | Task templates section; adoption step 3 |
-| `apps/api/src/agents/agents.controller.ts` | `GET api/agents/templates`, `POST api/agents/from-template/:slug`, `PATCH api/agents/:id` | Adoption steps 1 and 4 |
-| `packages/agent/src/agents/agent-templates.service.ts`, `.../agent-templates.ts` | The 6 built-in, fully-specified agent presets (`AGENT_TEMPLATES`) with `systemPrompt`, `suggestedSkills`, `defaultPermissions`, `defaultGuardrails` | Adoption step 1 resolves `agentTemplateSlug` here |
-| `packages/agent/src/agents/guardrails.ts` | `AgentGuardrails` (`mode: 'require_approval' \| 'autonomous'`, `autoApproveActionTypes`, `blockedActionTypes`), `validateGuardrails`, `AGENT_GUARDRAIL_MODES` | Adoption step 4 and the spec's escalation-point promise |
-| `packages/agent/src/entities/agent-action-proposal.entity.ts` | `AGENT_ACTION_PROPOSAL_ACTION_TYPES = ['spawn_agent','schedule_task','send_message','budget_override','other']` | The exact vocabulary the detail page's `WHAT IT MAY DO ALONE` block renders |
-| `apps/api/src/plugins/plugins.controller.ts` | `GET api/plugins`, `GET api/plugins/:pluginId/connection-status` | Readiness: does an enabled plugin provide capability X |
-| `apps/api/src/schedules/schedules.controller.ts` | `GET api/schedules` — the seven-source cadence aggregation | Adoption detail shows the created cadence; no write here |
-| `apps/api/src/triggers/inbound-triggers.controller.ts` | `POST api/inbound-triggers` (+ pause/resume/test-fire/fires). `InboundTrigger.mode` is `'single-task' \| 'template'` with `taskTemplateId` | Adoption step 5 for `inbound_trigger`-kind playbooks |
-| `packages/agent/src/entities/agent-run.entity.ts` | `costCents` (integer cents), token totals, status | The adoption's 30-day rollup |
-| `packages/agent/src/entities/agent-escalation.entity.ts` | `agent_escalations` — `reasonCode`, `summary`, `decisionNeeded`, `confidence` | Read for the adoption's "raised a decision" link |
+| File                                                                               | Route / export                                                                                                                                                                                                               | Used for                                                                    |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `apps/api/src/skills/skills.controller.ts`                                         | `GET api/skills/catalog`, `GET api/skills/catalog/:slug`, `POST api/skills/install`, `POST api/skills/:id/bindings`                                                                                                          | Skills section; adoption step 2                                             |
+| `packages/agent/src/facades/skills.facade.ts`                                      | `SkillsFacadeService` — fans catalogue reads across enabled `skills-provider` plugins, dedupes by slug                                                                                                                       | The pattern the playbook facade copies verbatim                             |
+| `packages/plugins/everworks-skills/src/everworks-skills.plugin.ts`                 | First-party `skills-provider` with an in-code fallback catalogue                                                                                                                                                             | The pattern the playbook plugin copies verbatim                             |
+| `apps/api/src/workflows/workflows.controller.ts`                                   | `GET api/workflows`, `GET api/workflows/runs/:runId`, `GET api/workflows/:id`, `POST api/workflows`, `PATCH api/workflows/:id`, `POST api/workflows/:id/run` (202), `GET api/workflows/:id/runs`, `DELETE api/workflows/:id` | Workflows section — **no new API needed**                                   |
+| `packages/agent/src/services/workflows.service.ts`, `.../workflow-runs.service.ts` | Owner-scoped list/get/create/update/remove; run start via dispatcher                                                                                                                                                         | Read only                                                                   |
+| `apps/api/src/task-templates/task-templates.controller.ts`                         | `GET/POST api/task-templates`, `GET/PATCH/DELETE :id`, `POST :id/instantiate`                                                                                                                                                | Task templates section; adoption step 3                                     |
+| `apps/api/src/agents/agents.controller.ts`                                         | `GET api/agents/templates`, `POST api/agents/from-template/:slug`, `PATCH api/agents/:id`                                                                                                                                    | Adoption steps 1 and 4                                                      |
+| `packages/agent/src/agents/agent-templates.service.ts`, `.../agent-templates.ts`   | The 6 built-in, fully-specified agent presets (`AGENT_TEMPLATES`) with `systemPrompt`, `suggestedSkills`, `defaultPermissions`, `defaultGuardrails`                                                                          | Adoption step 1 resolves `agentTemplateSlug` here                           |
+| `packages/agent/src/agents/guardrails.ts`                                          | `AgentGuardrails` (`mode: 'require_approval' \| 'autonomous'`, `autoApproveActionTypes`, `blockedActionTypes`), `validateGuardrails`, `AGENT_GUARDRAIL_MODES`                                                                | Adoption step 4 and the spec's escalation-point promise                     |
+| `packages/agent/src/entities/agent-action-proposal.entity.ts`                      | `AGENT_ACTION_PROPOSAL_ACTION_TYPES = ['spawn_agent','schedule_task','send_message','budget_override','other']`                                                                                                              | The exact vocabulary the detail page's `WHAT IT MAY DO ALONE` block renders |
+| `apps/api/src/plugins/plugins.controller.ts`                                       | `GET api/plugins`, `GET api/plugins/:pluginId/connection-status`                                                                                                                                                             | Readiness: does an enabled plugin provide capability X                      |
+| `apps/api/src/schedules/schedules.controller.ts`                                   | `GET api/schedules` — the seven-source cadence aggregation                                                                                                                                                                   | Adoption detail shows the created cadence; no write here                    |
+| `apps/api/src/triggers/inbound-triggers.controller.ts`                             | `POST api/inbound-triggers` (+ pause/resume/test-fire/fires). `InboundTrigger.mode` is `'single-task' \| 'template'` with `taskTemplateId`                                                                                   | Adoption step 5 for `inbound_trigger`-kind playbooks                        |
+| `packages/agent/src/entities/agent-run.entity.ts`                                  | `costCents` (integer cents), token totals, status                                                                                                                                                                            | The adoption's 30-day rollup                                                |
+| `packages/agent/src/entities/agent-escalation.entity.ts`                           | `agent_escalations` — `reasonCode`, `summary`, `decisionNeeded`, `confidence`                                                                                                                                                | Read for the adoption's "raised a decision" link                            |
 
 ### 1.3 The shell the new route hangs off
 
-| File | What it does today | Change |
-| --- | --- | --- |
-| `apps/web/src/app/[locale]/(dashboard)/layout.tsx` | Auth-gates the group, then one `Promise.all` of independently `.catch()`-guarded fetches into the client shell | Untouched — the catalogue is a page, not a shell concern |
-| `apps/web/src/components/dashboard/DashboardSidebar.tsx` | Hardcoded nav array; entries read from `dashboard.sidebar.navigation.*` | **One entry added**: `catalog`, placed after `templates` |
-| `apps/web/src/lib/constants.ts` | `ROUTES` is the single source of truth for paths | Gains `DASHBOARD_CATALOG`, `DASHBOARD_CATALOG_PLAYBOOK(slug)`, `DASHBOARD_CATALOG_ADOPTION(id)`, `DASHBOARD_CATALOG_WORKFLOWS`, `DASHBOARD_CATALOG_WORKFLOW(id)` |
-| `apps/web/src/components/common/EmptyState.tsx` | Shared `title`/`description`/`action`/`icon` primitive | Reused for all five section empty states |
-| `apps/web/src/lib/api/server-api.ts` | `serverFetch` / `serverMutation` | Every new API client is built on it |
-| `apps/web/src/lib/api/task-templates.ts`, `.../agent-templates.ts` | Existing typed clients | Reused as-is by the index |
+| File                                                               | What it does today                                                                                             | Change                                                                                                                                                           |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/app/[locale]/(dashboard)/layout.tsx`                 | Auth-gates the group, then one `Promise.all` of independently `.catch()`-guarded fetches into the client shell | Untouched — the catalogue is a page, not a shell concern                                                                                                         |
+| `apps/web/src/components/dashboard/DashboardSidebar.tsx`           | Hardcoded nav array; entries read from `dashboard.sidebar.navigation.*`                                        | **One entry added**: `catalog`, placed after `templates`                                                                                                         |
+| `apps/web/src/lib/constants.ts`                                    | `ROUTES` is the single source of truth for paths                                                               | Gains `DASHBOARD_CATALOG`, `DASHBOARD_CATALOG_PLAYBOOK(slug)`, `DASHBOARD_CATALOG_ADOPTION(id)`, `DASHBOARD_CATALOG_WORKFLOWS`, `DASHBOARD_CATALOG_WORKFLOW(id)` |
+| `apps/web/src/components/common/EmptyState.tsx`                    | Shared `title`/`description`/`action`/`icon` primitive                                                         | Reused for all five section empty states                                                                                                                         |
+| `apps/web/src/lib/api/server-api.ts`                               | `serverFetch` / `serverMutation`                                                                               | Every new API client is built on it                                                                                                                              |
+| `apps/web/src/lib/api/task-templates.ts`, `.../agent-templates.ts` | Existing typed clients                                                                                         | Reused as-is by the index                                                                                                                                        |
 
 ### 1.4 The plugin + facade registration surface
 
-| File | Why it is touched |
-| --- | --- |
-| `packages/plugin/src/contracts/facade-capabilities.ts` | `PLUGIN_CAPABILITIES` gains `PLAYBOOK_PROVIDER: 'playbook-provider'` |
-| `packages/plugin/src/contracts/capabilities/index.ts` | Barrel for the new interface file |
+| File                                                                                 | Why it is touched                                                          |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `packages/plugin/src/contracts/facade-capabilities.ts`                               | `PLUGIN_CAPABILITIES` gains `PLAYBOOK_PROVIDER: 'playbook-provider'`       |
+| `packages/plugin/src/contracts/capabilities/index.ts`                                | Barrel for the new interface file                                          |
 | `packages/agent/src/facades/facades.module.ts`, `.../index.ts`, `.../base.facade.ts` | The new facade is declared and exported exactly like `SkillsFacadeService` |
-| `packages/agent/src/plugins/services/plugin-registry.service.ts` | Untouched — discovery is automatic |
+| `packages/agent/src/plugins/services/plugin-registry.service.ts`                     | Untouched — discovery is automatic                                         |
 
 ### 1.5 Entity / repository registration surface
 
@@ -87,15 +87,15 @@ Adding an entity to `@ever-works/agent` touches four files, and `packages/agent/
 
 ### 1.6 The job-runtime seam
 
-| File | Pattern |
-| --- | --- |
-| `packages/agent/src/tasks/_tasks-symbols.ts` | The canonical list of `*_DISPATCHER` symbol names (`WORKFLOW_RUN_DISPATCHER`, `TEMPLATE_CUSTOMIZATION_DISPATCHER`, …). A drift spec reads it. |
-| `packages/agent/src/tasks/workflow-run-dispatcher.ts` + `workflow-run.types.ts` | The exact two-file shape a new dispatcher takes: a payload type and an interface + `Symbol()` |
-| `packages/agent/src/tasks/job-runtime.providers.ts` | The binding factory that routes every symbol to the active provider |
-| `packages/tasks/src/dispatchers/workflow-run.dispatcher.ts` | The Trigger.dev adapter; returns `null` (never throws) when the runtime is not configured |
-| `packages/tasks/src/tasks/trigger/workflow-run.task.ts` | Consumer task; ids-only payload; `withWorkerContext`; `assertUuid` on every id off the queue |
-| `packages/tasks/src/trigger/worker/modules/trigger-workflow-run.module.ts` | The per-task worker Nest module |
-| `packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts` | The `schedules.task({ id, cron })` shape for a sweeper |
+| File                                                                            | Pattern                                                                                                                                       |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/tasks/_tasks-symbols.ts`                                    | The canonical list of `*_DISPATCHER` symbol names (`WORKFLOW_RUN_DISPATCHER`, `TEMPLATE_CUSTOMIZATION_DISPATCHER`, …). A drift spec reads it. |
+| `packages/agent/src/tasks/workflow-run-dispatcher.ts` + `workflow-run.types.ts` | The exact two-file shape a new dispatcher takes: a payload type and an interface + `Symbol()`                                                 |
+| `packages/agent/src/tasks/job-runtime.providers.ts`                             | The binding factory that routes every symbol to the active provider                                                                           |
+| `packages/tasks/src/dispatchers/workflow-run.dispatcher.ts`                     | The Trigger.dev adapter; returns `null` (never throws) when the runtime is not configured                                                     |
+| `packages/tasks/src/tasks/trigger/workflow-run.task.ts`                         | Consumer task; ids-only payload; `withWorkerContext`; `assertUuid` on every id off the queue                                                  |
+| `packages/tasks/src/trigger/worker/modules/trigger-workflow-run.module.ts`      | The per-task worker Nest module                                                                                                               |
+| `packages/tasks/src/tasks/trigger/agent-run-sweeper.task.ts`                    | The `schedules.task({ id, cron })` shape for a sweeper                                                                                        |
 
 ---
 
@@ -160,8 +160,8 @@ card is lying.
 1. **Nothing it did not itemise.** The setup sheet's list and the provisioning steps are generated
    from the same function (`planAdoption(entry, input)`), so a step that creates a row the sheet
    did not show is a unit-test failure, not a review catch.
-2. **Never edit an existing row's configuration.** Reuse means *adding a skill binding to an
-   Agent*. It never rewrites instructions, guardrails, permissions or cadence on a row the user
+2. **Never edit an existing row's configuration.** Reuse means _adding a skill binding to an
+   Agent_. It never rewrites instructions, guardrails, permissions or cadence on a row the user
    already owns.
 3. **Idempotent per step, keyed by the adoption.** Each step first looks for its own artefact row.
    Resume re-enters the same function and skips what is already recorded.
@@ -188,27 +188,27 @@ nothing.
 
 `packages/agent/src/entities/playbook-adoption.entity.ts`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | `uuid` PK | |
-| `userId` | `uuid` | Owner. Every read filters on it. |
-| `playbookSlug` | `varchar(64)` | The catalogue slug. Not an FK — definitions have no table. |
-| `playbookVersion` | `varchar(32)` | The version adopted, so a later catalogue bump is visible as a diff rather than a silent change. |
-| `instanceName` | `varchar(200)` | User-editable at setup (FR-30). |
-| `status` | `varchar(16)` | `provisioning \| active \| paused \| failed \| retired \| removed`. Default `provisioning`. |
-| `stepIndex` | `int` | Highest completed provisioning step (0–6). Drives resume and the progress bar. Default `0`. |
-| `failureCode` | `varchar(64)` nullable | Short machine token (`skill_install_failed`, `agent_create_failed`, `dispatch_failed`, `timed_out`). Never a stack. |
-| `failureDetail` | `text` nullable | One human sentence. Deliberately typed as text we author, never a serialised `Error`. |
-| `plan` | `simple-json` | The itemised plan the sheet showed, frozen at confirm time. Read whole, written once — same argument as `workflows.graph`. |
-| `workId` | `uuid` nullable | Optional narrowing when the playbook is scoped to one Work. |
-| `agentId` | `uuid` nullable | Denormalised pointer to the created Agent so the adoption list needs no join. No `@ManyToOne` (cycle avoidance, same posture as `workflow.entity.ts`). |
-| `scheduleKind` | `varchar(16)` nullable | `agent_heartbeat \| inbound_trigger \| manual` — which cadence mechanism was used. |
-| `lastRunAt` | `PortableDateColumn` nullable | Mirrored from the created Agent's runs by the rollup read; nullable until the first run. |
-| `graduationDismissedUntil` | `PortableDateColumn` nullable | FR-49's 30-day suppression. |
-| `activatedAt` | `PortableDateColumn` nullable | When it first reached `active`. FR-49's 14-day clock. |
-| `tenantId` | `uuid` nullable | Tier C scope stamp. |
-| `organizationId` | `uuid` nullable | Tier C scope stamp. |
-| `createdAt` / `updatedAt` | timestamps | |
+| Column                     | Type                          | Notes                                                                                                                                                  |
+| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                       | `uuid` PK                     |                                                                                                                                                        |
+| `userId`                   | `uuid`                        | Owner. Every read filters on it.                                                                                                                       |
+| `playbookSlug`             | `varchar(64)`                 | The catalogue slug. Not an FK — definitions have no table.                                                                                             |
+| `playbookVersion`          | `varchar(32)`                 | The version adopted, so a later catalogue bump is visible as a diff rather than a silent change.                                                       |
+| `instanceName`             | `varchar(200)`                | User-editable at setup (FR-30).                                                                                                                        |
+| `status`                   | `varchar(16)`                 | `provisioning \| active \| paused \| failed \| retired \| removed`. Default `provisioning`.                                                            |
+| `stepIndex`                | `int`                         | Highest completed provisioning step (0–6). Drives resume and the progress bar. Default `0`.                                                            |
+| `failureCode`              | `varchar(64)` nullable        | Short machine token (`skill_install_failed`, `agent_create_failed`, `dispatch_failed`, `timed_out`). Never a stack.                                    |
+| `failureDetail`            | `text` nullable               | One human sentence. Deliberately typed as text we author, never a serialised `Error`.                                                                  |
+| `plan`                     | `simple-json`                 | The itemised plan the sheet showed, frozen at confirm time. Read whole, written once — same argument as `workflows.graph`.                             |
+| `workId`                   | `uuid` nullable               | Optional narrowing when the playbook is scoped to one Work.                                                                                            |
+| `agentId`                  | `uuid` nullable               | Denormalised pointer to the created Agent so the adoption list needs no join. No `@ManyToOne` (cycle avoidance, same posture as `workflow.entity.ts`). |
+| `scheduleKind`             | `varchar(16)` nullable        | `agent_heartbeat \| inbound_trigger \| manual` — which cadence mechanism was used.                                                                     |
+| `lastRunAt`                | `PortableDateColumn` nullable | Mirrored from the created Agent's runs by the rollup read; nullable until the first run.                                                               |
+| `graduationDismissedUntil` | `PortableDateColumn` nullable | FR-49's 30-day suppression.                                                                                                                            |
+| `activatedAt`              | `PortableDateColumn` nullable | When it first reached `active`. FR-49's 14-day clock.                                                                                                  |
+| `tenantId`                 | `uuid` nullable               | Tier C scope stamp.                                                                                                                                    |
+| `organizationId`           | `uuid` nullable               | Tier C scope stamp.                                                                                                                                    |
+| `createdAt` / `updatedAt`  | timestamps                    |                                                                                                                                                        |
 
 Indexes:
 
@@ -228,16 +228,16 @@ Indexes:
 
 `packages/agent/src/entities/playbook-adoption-artifact.entity.ts`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | `uuid` PK | |
-| `adoptionId` | `uuid` | `@ManyToOne(() => PlaybookAdoption, { onDelete: 'CASCADE' })` |
-| `artifactType` | `varchar(24)` | `agent \| skill \| skill_binding \| task_template \| schedule \| inbound_trigger \| workflow` |
-| `artifactId` | `uuid` | The row id in its owning table. **No FK** — the target may be deleted independently, and a hard FK would make "already gone" (FR-46) impossible to represent. |
-| `nameAtCreation` | `varchar(200)` | What it was called when we made it. Powers the `Changed since setup` flag. |
-| `state` | `varchar(16)` | `created \| removed`. `changed` and `missing` are **derived on read**, never written. |
-| `removedAt` | `PortableDateColumn` nullable | |
-| `createdAt` | timestamp | |
+| Column           | Type                          | Notes                                                                                                                                                         |
+| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | `uuid` PK                     |                                                                                                                                                               |
+| `adoptionId`     | `uuid`                        | `@ManyToOne(() => PlaybookAdoption, { onDelete: 'CASCADE' })`                                                                                                 |
+| `artifactType`   | `varchar(24)`                 | `agent \| skill \| skill_binding \| task_template \| schedule \| inbound_trigger \| workflow`                                                                 |
+| `artifactId`     | `uuid`                        | The row id in its owning table. **No FK** — the target may be deleted independently, and a hard FK would make "already gone" (FR-46) impossible to represent. |
+| `nameAtCreation` | `varchar(200)`                | What it was called when we made it. Powers the `Changed since setup` flag.                                                                                    |
+| `state`          | `varchar(16)`                 | `created \| removed`. `changed` and `missing` are **derived on read**, never written.                                                                         |
+| `removedAt`      | `PortableDateColumn` nullable |                                                                                                                                                               |
+| `createdAt`      | timestamp                     |                                                                                                                                                               |
 
 Indexes:
 
@@ -306,22 +306,22 @@ New module: `apps/api/src/catalog/`. Everything is `@UseGuards(AuthSessionGuard)
 `@CurrentUser()`-scoped. Throttles use the in-repo `@Throttle({ long: { limit, ttl: 60_000 } })`
 idiom.
 
-| Method | Path | Body / query | Response | Throttle |
-| --- | --- | --- | --- | --- |
-| `GET` | `api/catalog` | — | `{ sections: [{ key, total, items[] }] }` — 6 items per section, all five sections, per-section `error?: string` instead of a 500 | 60/min |
-| `GET` | `api/catalog/playbooks` | `category?`, `search?`, `readiness?`, `limit?` (≤50, default 24), `offset?` | `{ items: PlaybookSummary[], total, source: 'builtin'\|'remote'\|'merged', staleSince?: string }` | 60/min |
-| `GET` | `api/catalog/playbooks/:slug` | — | `PlaybookDetail` = entry + `readiness` + `adoptions: AdoptionSummary[]` | 60/min |
-| `POST` | `api/catalog/playbooks/:slug/preflight` | `{ workId?, instanceName? }` | `PreflightReport` (§4.2) | 30/min |
-| `POST` | `api/catalog/playbooks/:slug/adopt` | `AdoptPlaybookDto` | `202 { adoptionId, status: 'provisioning' }` | 10/min |
-| `GET` | `api/catalog/adoptions` | `status?`, `limit?`, `offset?` | `{ items, total }` | 60/min |
-| `GET` | `api/catalog/adoptions/:id` | — | `AdoptionDetail` = row + artefacts (with derived `changed`/`missing`) + 30-day rollup | 60/min |
-| `POST` | `api/catalog/adoptions/:id/resume` | — | `202 { adoptionId, status }` — only from `failed` | 10/min |
-| `POST` | `api/catalog/adoptions/:id/pause` | — | `200 AdoptionDetail` | 30/min |
-| `POST` | `api/catalog/adoptions/:id/resume-schedule` | — | `200 AdoptionDetail` | 30/min |
-| `POST` | `api/catalog/adoptions/:id/retire` | — | `200 AdoptionDetail` | 30/min |
-| `POST` | `api/catalog/adoptions/:id/remove-artifacts` | `{ artifactIds: string[] }` (1–50) | `200 { removed[], alreadyGone[] }` | 10/min |
-| `POST` | `api/catalog/adoptions/:id/dismiss-graduation` | — | `204` | 30/min |
-| `DELETE` | `api/catalog/adoptions/:id` | — | `204` — removes the adoption record only; artefacts are never touched | 10/min |
+| Method   | Path                                           | Body / query                                                                | Response                                                                                                                          | Throttle |
+| -------- | ---------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `GET`    | `api/catalog`                                  | —                                                                           | `{ sections: [{ key, total, items[] }] }` — 6 items per section, all five sections, per-section `error?: string` instead of a 500 | 60/min   |
+| `GET`    | `api/catalog/playbooks`                        | `category?`, `search?`, `readiness?`, `limit?` (≤50, default 24), `offset?` | `{ items: PlaybookSummary[], total, source: 'builtin'\|'remote'\|'merged', staleSince?: string }`                                 | 60/min   |
+| `GET`    | `api/catalog/playbooks/:slug`                  | —                                                                           | `PlaybookDetail` = entry + `readiness` + `adoptions: AdoptionSummary[]`                                                           | 60/min   |
+| `POST`   | `api/catalog/playbooks/:slug/preflight`        | `{ workId?, instanceName? }`                                                | `PreflightReport` (§4.2)                                                                                                          | 30/min   |
+| `POST`   | `api/catalog/playbooks/:slug/adopt`            | `AdoptPlaybookDto`                                                          | `202 { adoptionId, status: 'provisioning' }`                                                                                      | 10/min   |
+| `GET`    | `api/catalog/adoptions`                        | `status?`, `limit?`, `offset?`                                              | `{ items, total }`                                                                                                                | 60/min   |
+| `GET`    | `api/catalog/adoptions/:id`                    | —                                                                           | `AdoptionDetail` = row + artefacts (with derived `changed`/`missing`) + 30-day rollup                                             | 60/min   |
+| `POST`   | `api/catalog/adoptions/:id/resume`             | —                                                                           | `202 { adoptionId, status }` — only from `failed`                                                                                 | 10/min   |
+| `POST`   | `api/catalog/adoptions/:id/pause`              | —                                                                           | `200 AdoptionDetail`                                                                                                              | 30/min   |
+| `POST`   | `api/catalog/adoptions/:id/resume-schedule`    | —                                                                           | `200 AdoptionDetail`                                                                                                              | 30/min   |
+| `POST`   | `api/catalog/adoptions/:id/retire`             | —                                                                           | `200 AdoptionDetail`                                                                                                              | 30/min   |
+| `POST`   | `api/catalog/adoptions/:id/remove-artifacts`   | `{ artifactIds: string[] }` (1–50)                                          | `200 { removed[], alreadyGone[] }`                                                                                                | 10/min   |
+| `POST`   | `api/catalog/adoptions/:id/dismiss-graduation` | —                                                                           | `204`                                                                                                                             | 30/min   |
+| `DELETE` | `api/catalog/adoptions/:id`                    | —                                                                           | `204` — removes the adoption record only; artefacts are never touched                                                             | 10/min   |
 
 `pause` and `resume-schedule` are separate route names from the provisioning `resume` on purpose:
 one resumes a **cadence**, the other resumes a **failed setup**, and collapsing them into one verb
@@ -353,7 +353,7 @@ RemoveArtifactsDto    { artifactIds: string[] (1..50, each uuid) }
 `acknowledgedPlanHash` is the SHA-256 of the plan the sheet rendered. If the catalogue version
 changed between the sheet opening and the confirm, the hash no longer matches and the API answers
 `409 plan_changed` with the new plan rather than silently creating something the user did not
-read. This is the same "you approved *this*" property the approval queue relies on.
+read. This is the same "you approved _this_" property the approval queue relies on.
 
 ### 4.2 `PreflightReport`
 
@@ -376,17 +376,17 @@ literal (Constitution II).
 
 ### 4.3 Error codes
 
-| HTTP | Code | When |
-| --- | --- | --- |
-| `400` | `invalid_local_time` | `localTime` is not `HH:MM` |
-| `403` | `no_edit_access` | Caller may browse but not adopt |
-| `404` | `playbook_not_found` | Slug is not in the resolved catalogue |
-| `404` | `adoption_not_found` | Adoption belongs to another user |
-| `409` | `adoption_in_flight` | The partial unique index rejected the insert (FR-36) |
-| `409` | `plan_changed` | `acknowledgedPlanHash` mismatch |
-| `409` | `copy_limit_reached` | 3 non-retired copies of this slug (FR-38) |
-| `409` | `adoption_ceiling` | 25 active adoptions (FR-37) |
-| `409` | `not_failed` | `resume` called on an adoption that is not `failed` |
+| HTTP  | Code                 | When                                                          |
+| ----- | -------------------- | ------------------------------------------------------------- |
+| `400` | `invalid_local_time` | `localTime` is not `HH:MM`                                    |
+| `403` | `no_edit_access`     | Caller may browse but not adopt                               |
+| `404` | `playbook_not_found` | Slug is not in the resolved catalogue                         |
+| `404` | `adoption_not_found` | Adoption belongs to another user                              |
+| `409` | `adoption_in_flight` | The partial unique index rejected the insert (FR-36)          |
+| `409` | `plan_changed`       | `acknowledgedPlanHash` mismatch                               |
+| `409` | `copy_limit_reached` | 3 non-retired copies of this slug (FR-38)                     |
+| `409` | `adoption_ceiling`   | 25 active adoptions (FR-37)                                   |
+| `409` | `not_failed`         | `resume` called on an adoption that is not `failed`           |
 | `422` | `connection_missing` | A required capability has no enabled provider at confirm time |
 
 ---
@@ -395,33 +395,33 @@ literal (Constitution II).
 
 ### 5.1 Routes
 
-| Route | File | Kind |
-| --- | --- | --- |
-| `/catalog` | `apps/web/src/app/[locale]/(dashboard)/catalog/page.tsx` | RSC — one `Promise.all` of five independently `.catch()`-guarded fetches |
-| `/catalog/playbooks/[slug]` | `.../catalog/playbooks/[slug]/page.tsx` | RSC |
-| `/catalog/adoptions` | `.../catalog/adoptions/page.tsx` | RSC |
-| `/catalog/adoptions/[id]` | `.../catalog/adoptions/[id]/page.tsx` | RSC |
-| `/catalog/workflows` | `.../catalog/workflows/page.tsx` | RSC |
-| `/catalog/workflows/[id]` | `.../catalog/workflows/[id]/page.tsx` | RSC |
+| Route                       | File                                                     | Kind                                                                     |
+| --------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `/catalog`                  | `apps/web/src/app/[locale]/(dashboard)/catalog/page.tsx` | RSC — one `Promise.all` of five independently `.catch()`-guarded fetches |
+| `/catalog/playbooks/[slug]` | `.../catalog/playbooks/[slug]/page.tsx`                  | RSC                                                                      |
+| `/catalog/adoptions`        | `.../catalog/adoptions/page.tsx`                         | RSC                                                                      |
+| `/catalog/adoptions/[id]`   | `.../catalog/adoptions/[id]/page.tsx`                    | RSC                                                                      |
+| `/catalog/workflows`        | `.../catalog/workflows/page.tsx`                         | RSC                                                                      |
+| `/catalog/workflows/[id]`   | `.../catalog/workflows/[id]/page.tsx`                    | RSC                                                                      |
 
 ### 5.2 Components — `apps/web/src/components/catalog/`
 
-| Component | Client? | Responsibility |
-| --- | --- | --- |
-| `CatalogShell.tsx` | client | Owns the search string, the two chip rows and keyboard handling (FR-6, FR-61). Nothing else is client-side on the index. |
-| `CatalogSection.tsx` | server | Heading, `See all (N)`, empty state via `EmptyState`, per-section error slot (FR-4). |
-| `PlaybookCard.tsx` | server | Title, outcome, cadence, cost band, readiness chip. One focusable element with a composed accessible name (FR-62). |
-| `ReadinessChip.tsx` | client | `Checking…` → resolved label. Text always present; colour is decoration (FR-62). |
-| `PlaybookDetail.tsx` | server | The eight labelled blocks in §6.6 of the spec. |
-| `PlaybookSetupSheet.tsx` | client | The three editable fields, the itemised plan, the plan hash, the confirm. Headless UI `Dialog` + focus trap, following `HelpDrawer.tsx`'s prop contract. |
-| `AdoptionProgress.tsx` | client | The 5-step progress readout. Polls `GET api/catalog/adoptions/:id` at **2 s** while `provisioning`, stops on any terminal state, and hard-stops after **150** polls. |
-| `AdoptionCard.tsx` | server | Status, next run, 30-day rollup, artefact links, `Pause`/`Retire`/`⋯`. |
-| `AdoptionArtifactList.tsx` | server | Reused by the failure panel and the removal sheet. |
-| `RemoveArtifactsSheet.tsx` | client | All-unchecked-by-default, live `Remove N items` label, `Changed since setup` flags. |
-| `GraduationSuggestion.tsx` | client | The single non-blocking FR-49 prompt. |
-| `WorkflowList.tsx` / `WorkflowRunTrace.tsx` | server | The Workflows section and one run's trace. |
-| `TaskTemplateMiniCard.tsx` | server | Compact variant over the existing task-template client. |
-| `StartingPointsRow.tsx` | server | Three counted links into the existing template pages. |
+| Component                                   | Client? | Responsibility                                                                                                                                                       |
+| ------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CatalogShell.tsx`                          | client  | Owns the search string, the two chip rows and keyboard handling (FR-6, FR-61). Nothing else is client-side on the index.                                             |
+| `CatalogSection.tsx`                        | server  | Heading, `See all (N)`, empty state via `EmptyState`, per-section error slot (FR-4).                                                                                 |
+| `PlaybookCard.tsx`                          | server  | Title, outcome, cadence, cost band, readiness chip. One focusable element with a composed accessible name (FR-62).                                                   |
+| `ReadinessChip.tsx`                         | client  | `Checking…` → resolved label. Text always present; colour is decoration (FR-62).                                                                                     |
+| `PlaybookDetail.tsx`                        | server  | The eight labelled blocks in §6.6 of the spec.                                                                                                                       |
+| `PlaybookSetupSheet.tsx`                    | client  | The three editable fields, the itemised plan, the plan hash, the confirm. Headless UI `Dialog` + focus trap, following `HelpDrawer.tsx`'s prop contract.             |
+| `AdoptionProgress.tsx`                      | client  | The 5-step progress readout. Polls `GET api/catalog/adoptions/:id` at **2 s** while `provisioning`, stops on any terminal state, and hard-stops after **150** polls. |
+| `AdoptionCard.tsx`                          | server  | Status, next run, 30-day rollup, artefact links, `Pause`/`Retire`/`⋯`.                                                                                               |
+| `AdoptionArtifactList.tsx`                  | server  | Reused by the failure panel and the removal sheet.                                                                                                                   |
+| `RemoveArtifactsSheet.tsx`                  | client  | All-unchecked-by-default, live `Remove N items` label, `Changed since setup` flags.                                                                                  |
+| `GraduationSuggestion.tsx`                  | client  | The single non-blocking FR-49 prompt.                                                                                                                                |
+| `WorkflowList.tsx` / `WorkflowRunTrace.tsx` | server  | The Workflows section and one run's trace.                                                                                                                           |
+| `TaskTemplateMiniCard.tsx`                  | server  | Compact variant over the existing task-template client.                                                                                                              |
+| `StartingPointsRow.tsx`                     | server  | Three counted links into the existing template pages.                                                                                                                |
 
 ### 5.3 Data fetching
 
@@ -467,14 +467,14 @@ imports a vendor SDK.**
 
 ### 6.1 New dispatcher
 
-| File | Contents |
-| --- | --- |
-| `packages/agent/src/tasks/playbook-adoption.types.ts` | `PlaybookAdoptionPayload { adoptionId: string; userId: string }` — ids only, so an older worker silently drops nothing load-bearing |
-| `packages/agent/src/tasks/playbook-adoption-dispatcher.ts` | `PlaybookAdoptionDispatcher` interface + `export const PLAYBOOK_ADOPTION_DISPATCHER = Symbol('PLAYBOOK_ADOPTION_DISPATCHER')`; returns `Promise<string \| null>`, `null` when the runtime is unconfigured |
-| `packages/agent/src/tasks/_tasks-symbols.ts` | Name appended to the canonical symbol list |
-| `packages/agent/src/tasks/job-runtime.providers.ts` | Symbol wired through the binding factory |
-| `packages/agent/src/tasks/index.ts` | Barrel export |
-| `packages/tasks/src/dispatchers/playbook-adoption.dispatcher.ts` | Trigger.dev adapter, modelled line-for-line on `workflow-run.dispatcher.ts` |
+| File                                                             | Contents                                                                                                                                                                                                  |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/tasks/playbook-adoption.types.ts`            | `PlaybookAdoptionPayload { adoptionId: string; userId: string }` — ids only, so an older worker silently drops nothing load-bearing                                                                       |
+| `packages/agent/src/tasks/playbook-adoption-dispatcher.ts`       | `PlaybookAdoptionDispatcher` interface + `export const PLAYBOOK_ADOPTION_DISPATCHER = Symbol('PLAYBOOK_ADOPTION_DISPATCHER')`; returns `Promise<string \| null>`, `null` when the runtime is unconfigured |
+| `packages/agent/src/tasks/_tasks-symbols.ts`                     | Name appended to the canonical symbol list                                                                                                                                                                |
+| `packages/agent/src/tasks/job-runtime.providers.ts`              | Symbol wired through the binding factory                                                                                                                                                                  |
+| `packages/agent/src/tasks/index.ts`                              | Barrel export                                                                                                                                                                                             |
+| `packages/tasks/src/dispatchers/playbook-adoption.dispatcher.ts` | Trigger.dev adapter, modelled line-for-line on `workflow-run.dispatcher.ts`                                                                                                                               |
 
 When the dispatcher returns `null`, the adoption row is immediately marked `failed` with
 `failureCode: 'dispatch_failed'` — never left `provisioning` for a sweeper to find. That mirrors
@@ -483,9 +483,9 @@ job runtime configured gets an honest error instead of a spinner.
 
 ### 6.2 New tasks
 
-| Task id | File | Shape |
-| --- | --- | --- |
-| `playbook-adoption` | `packages/tasks/src/tasks/trigger/playbook-adoption.task.ts` | `task({ id, maxAttempts: 3 })`. `withWorkerContext`, `assertUuid` on both ids, then `PlaybookAdoptionExecutorService.execute(adoptionId)`. Retryable because every step is keyed off an artefact row, so a redelivery resumes rather than duplicates. |
+| Task id                     | File                                                                 | Shape                                                                                                                                                                                                                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `playbook-adoption`         | `packages/tasks/src/tasks/trigger/playbook-adoption.task.ts`         | `task({ id, maxAttempts: 3 })`. `withWorkerContext`, `assertUuid` on both ids, then `PlaybookAdoptionExecutorService.execute(adoptionId)`. Retryable because every step is keyed off an artefact row, so a redelivery resumes rather than duplicates.                                                     |
 | `playbook-adoption-sweeper` | `packages/tasks/src/tasks/trigger/playbook-adoption-sweeper.task.ts` | `schedules.task({ id, cron: '11 * * * *' })` — hourly at :11, a free slot (taken: `*/1`, `*/2`, `*/5`, `3/5`, `23 */2`, `37 * * * *`, `5 0`, `15 7`, `17 3`, `42 3`, `41 4`, `37 8`). Moves any adoption `provisioning` for more than **15 minutes** to `failed` with `failureCode: 'timed_out'` (FR-34). |
 
 Worker module: `packages/tasks/src/trigger/worker/modules/trigger-playbook-adoption.module.ts`,
@@ -520,13 +520,13 @@ nothing.
 
 **Constitution I — the catalogue source is external content, therefore it is a plugin.**
 
-| Piece | Where |
-| --- | --- |
-| Capability constant | `packages/plugin/src/contracts/facade-capabilities.ts` → `PLAYBOOK_PROVIDER: 'playbook-provider'` |
-| Capability interface | `packages/plugin/src/contracts/capabilities/playbook-provider.interface.ts` — `IPlaybookProviderPlugin { listPlaybooks(opts): Promise<{ entries, total }>; getPlaybook(slug): Promise<PlaybookCatalogEntry \| null> }`, plus the entry types re-exported from `@ever-works/contracts` |
-| Facade | `packages/agent/src/facades/playbook-catalog.facade.ts` — `PlaybookCatalogFacadeService extends BaseFacadeService`, `CAPABILITY = PLUGIN_CAPABILITIES.PLAYBOOK_PROVIDER`, fans out across enabled providers, dedupes by slug with the version rule (FR-20), page size 200, hard cap 2000 entries |
-| First-party plugin | `packages/plugins/everworks-playbooks/` — ESM, tsup, Vitest. `everworks.plugin`: `id: 'everworks-playbooks'`, `category: 'utility'`, `capabilities: ['playbook-provider']`, `autoEnable: true`, `defaultForCapabilities: ['playbook-provider']`, `distribution: 'registry'` |
-| Built-in catalogue | `packages/plugins/everworks-playbooks/src/builtin-catalog.ts` — the 8 entries, frozen, typed, with an integrity spec pinning every `agentTemplateSlug` against `AGENT_TEMPLATES` and every `skillSlugs` entry against the first-party skill catalogue |
+| Piece                | Where                                                                                                                                                                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Capability constant  | `packages/plugin/src/contracts/facade-capabilities.ts` → `PLAYBOOK_PROVIDER: 'playbook-provider'`                                                                                                                                                                                                |
+| Capability interface | `packages/plugin/src/contracts/capabilities/playbook-provider.interface.ts` — `IPlaybookProviderPlugin { listPlaybooks(opts): Promise<{ entries, total }>; getPlaybook(slug): Promise<PlaybookCatalogEntry \| null> }`, plus the entry types re-exported from `@ever-works/contracts`            |
+| Facade               | `packages/agent/src/facades/playbook-catalog.facade.ts` — `PlaybookCatalogFacadeService extends BaseFacadeService`, `CAPABILITY = PLUGIN_CAPABILITIES.PLAYBOOK_PROVIDER`, fans out across enabled providers, dedupes by slug with the version rule (FR-20), page size 200, hard cap 2000 entries |
+| First-party plugin   | `packages/plugins/everworks-playbooks/` — ESM, tsup, Vitest. `everworks.plugin`: `id: 'everworks-playbooks'`, `category: 'utility'`, `capabilities: ['playbook-provider']`, `autoEnable: true`, `defaultForCapabilities: ['playbook-provider']`, `distribution: 'registry'`                      |
+| Built-in catalogue   | `packages/plugins/everworks-playbooks/src/builtin-catalog.ts` — the 8 entries, frozen, typed, with an integrity spec pinning every `agentTemplateSlug` against `AGENT_TEMPLATES` and every `skillSlugs` entry against the first-party skill catalogue                                            |
 
 **Constitution II — no hardcoded plugin ids outside a plugin.** The readiness service asks
 `PluginRegistryService` "which enabled plugin provides capability `search` for this scope" and
@@ -536,16 +536,16 @@ part of the review checklist.
 
 **The 8 built-in playbooks** (`slug` → required capabilities):
 
-| Slug | Title | Requires |
-| --- | --- | --- |
-| `weekly-operations-report` | Weekly operations report | — |
-| `daily-decision-brief` | Morning decision brief | — |
-| `directory-freshness-sweep` | Directory freshness sweep | — |
-| `knowledge-gap-harvest` | Knowledge gap harvest | — |
-| `release-checklist` | Release checklist on deploy | — (uses an inbound trigger) |
-| `content-refresh-queue` | Content refresh queue | `search` |
-| `market-watch-brief` | Market watch brief | `search` (+ optional `content-extractor`) |
-| `inbox-triage-drafts` | Inbox triage with drafts | `email-outbound` |
+| Slug                        | Title                       | Requires                                  |
+| --------------------------- | --------------------------- | ----------------------------------------- |
+| `weekly-operations-report`  | Weekly operations report    | —                                         |
+| `daily-decision-brief`      | Morning decision brief      | —                                         |
+| `directory-freshness-sweep` | Directory freshness sweep   | —                                         |
+| `knowledge-gap-harvest`     | Knowledge gap harvest       | —                                         |
+| `release-checklist`         | Release checklist on deploy | — (uses an inbound trigger)               |
+| `content-refresh-queue`     | Content refresh queue       | `search`                                  |
+| `market-watch-brief`        | Market watch brief          | `search` (+ optional `content-extractor`) |
+| `inbox-triage-drafts`       | Inbox triage with drafts    | `email-outbound`                          |
 
 Five of eight require nothing external (FR-18).
 
@@ -699,18 +699,18 @@ merge is worse than none.
 
 ### 9.1 Events (PostHog, via the existing analytics service)
 
-| Event | Properties |
-| --- | --- |
-| `catalog.viewed` | `sectionsRendered`, `sectionsErrored`, `playbookCount`, `readyCount` |
-| `catalog.playbook_opened` | `slug`, `version`, `readiness` |
-| `catalog.preflight_run` | `slug`, `readiness`, `missingCapabilities` (names only), `durationMs`, `unknownCount` |
-| `catalog.adoption_started` | `slug`, `version`, `scheduleKind`, `plannedItemCount` |
-| `catalog.adoption_succeeded` | `slug`, `version`, `durationMs`, `createdItemCount` |
-| `catalog.adoption_failed` | `slug`, `version`, `failureCode`, `stepIndex` |
-| `catalog.adoption_paused` / `_retired` | `slug`, `daysActive`, `runCount30d` |
-| `catalog.artifacts_removed` | `slug`, `removedCount`, `alreadyGoneCount`, `changedCount` |
-| `catalog.graduation_shown` / `_accepted` / `_dismissed` | `slug`, `daysActive`, `approvalsGranted` |
-| `catalog.workflow_run_started` | `workflowId`, `nodeCount`, `status` |
+| Event                                                   | Properties                                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `catalog.viewed`                                        | `sectionsRendered`, `sectionsErrored`, `playbookCount`, `readyCount`                  |
+| `catalog.playbook_opened`                               | `slug`, `version`, `readiness`                                                        |
+| `catalog.preflight_run`                                 | `slug`, `readiness`, `missingCapabilities` (names only), `durationMs`, `unknownCount` |
+| `catalog.adoption_started`                              | `slug`, `version`, `scheduleKind`, `plannedItemCount`                                 |
+| `catalog.adoption_succeeded`                            | `slug`, `version`, `durationMs`, `createdItemCount`                                   |
+| `catalog.adoption_failed`                               | `slug`, `version`, `failureCode`, `stepIndex`                                         |
+| `catalog.adoption_paused` / `_retired`                  | `slug`, `daysActive`, `runCount30d`                                                   |
+| `catalog.artifacts_removed`                             | `slug`, `removedCount`, `alreadyGoneCount`, `changedCount`                            |
+| `catalog.graduation_shown` / `_accepted` / `_dismissed` | `slug`, `daysActive`, `approvalsGranted`                                              |
+| `catalog.workflow_run_started`                          | `workflowId`, `nodeCount`, `status`                                                   |
 
 No event carries an instance name, a Work name, a document title or any plugin credential. Slugs
 and counts only.
@@ -723,20 +723,20 @@ and id**, never its content.
 
 ### 9.3 Failure modes
 
-| Failure | Behaviour | Surfaced as |
-| --- | --- | --- |
-| Playbook provider unreachable | Built-in catalogue serves; stale-serve up to 24 h | Quiet banner (spec §6.5) |
-| Every catalogue source empty | Section empty state; the other four sections unaffected | Empty state |
-| Skills catalogue unreachable | Skills section error slot; playbook adoption fails at step 2 with `skill_install_failed` and keeps what it made | Section error / failure panel |
-| Job runtime unconfigured | `adopt` immediately marks the adoption `failed` with `dispatch_failed` | Failure panel with a plain reason |
-| Provisioning worker dies mid-step | `stepIndex` unchanged; task retries (≤3); if all fail the sweeper moves it to `failed` at 15 min | Failure panel + `Try again` |
-| Two simultaneous adopts | Partial unique index rejects the second insert | `409 adoption_in_flight` with a link |
-| Catalogue version bumped between sheet and confirm | Plan hash mismatch | `409 plan_changed`, sheet re-renders the new plan |
-| Required connection removed between preflight and confirm | Re-checked at confirm | `422 connection_missing` |
-| Artefact deleted outside this flow | Derived `missing` on read | `already gone` in the removal result |
-| Artefact renamed outside this flow | Derived `changed` on read | `Changed since setup` flag |
-| Workflow run dispatch returns `null` | Run row marked dispatch-failed by the existing service | Row shows failed, not a permanent `Queued` |
-| Readiness check exceeds 2 s | Marked `unknown` in the report | Chip reads `Checking…` then falls back to the cautious label |
+| Failure                                                   | Behaviour                                                                                                       | Surfaced as                                                  |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Playbook provider unreachable                             | Built-in catalogue serves; stale-serve up to 24 h                                                               | Quiet banner (spec §6.5)                                     |
+| Every catalogue source empty                              | Section empty state; the other four sections unaffected                                                         | Empty state                                                  |
+| Skills catalogue unreachable                              | Skills section error slot; playbook adoption fails at step 2 with `skill_install_failed` and keeps what it made | Section error / failure panel                                |
+| Job runtime unconfigured                                  | `adopt` immediately marks the adoption `failed` with `dispatch_failed`                                          | Failure panel with a plain reason                            |
+| Provisioning worker dies mid-step                         | `stepIndex` unchanged; task retries (≤3); if all fail the sweeper moves it to `failed` at 15 min                | Failure panel + `Try again`                                  |
+| Two simultaneous adopts                                   | Partial unique index rejects the second insert                                                                  | `409 adoption_in_flight` with a link                         |
+| Catalogue version bumped between sheet and confirm        | Plan hash mismatch                                                                                              | `409 plan_changed`, sheet re-renders the new plan            |
+| Required connection removed between preflight and confirm | Re-checked at confirm                                                                                           | `422 connection_missing`                                     |
+| Artefact deleted outside this flow                        | Derived `missing` on read                                                                                       | `already gone` in the removal result                         |
+| Artefact renamed outside this flow                        | Derived `changed` on read                                                                                       | `Changed since setup` flag                                   |
+| Workflow run dispatch returns `null`                      | Run row marked dispatch-failed by the existing service                                                          | Row shows failed, not a permanent `Queued`                   |
+| Readiness check exceeds 2 s                               | Marked `unknown` in the report                                                                                  | Chip reads `Checking…` then falls back to the cautious label |
 
 ### 9.4 Rate limiting and abuse
 
@@ -750,50 +750,50 @@ real backstop: a runaway client cannot create unbounded agents.
 
 ### 10.1 Unit — plugin package (Vitest)
 
-| File | Covers |
-| --- | --- |
-| `packages/plugins/everworks-playbooks/src/everworks-playbooks.plugin.spec.ts` | `listPlaybooks` paging, `getPlaybook` miss, remote-source failure falls back to built-ins, stale-serve window, sanitisation (bad slug dropped, long title truncated, HTML stripped) |
-| `packages/plugins/everworks-playbooks/src/builtin-catalog.spec.ts` | All 8 entries validate against the contract; ≥5 declare no required connection; every `agentTemplateSlug` exists in `AGENT_TEMPLATES`; every skill slug exists in the first-party skill catalogue; every `guardrailsAtAdoption` passes `validateGuardrails`; every step count is 2–8 |
+| File                                                                          | Covers                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/plugins/everworks-playbooks/src/everworks-playbooks.plugin.spec.ts` | `listPlaybooks` paging, `getPlaybook` miss, remote-source failure falls back to built-ins, stale-serve window, sanitisation (bad slug dropped, long title truncated, HTML stripped)                                                                                                  |
+| `packages/plugins/everworks-playbooks/src/builtin-catalog.spec.ts`            | All 8 entries validate against the contract; ≥5 declare no required connection; every `agentTemplateSlug` exists in `AGENT_TEMPLATES`; every skill slug exists in the first-party skill catalogue; every `guardrailsAtAdoption` passes `validateGuardrails`; every step count is 2–8 |
 
 ### 10.2 Unit — agent package (Jest)
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/facades/__tests__/playbook-catalog.facade.spec.ts` | Fan-out across two mock providers, slug dedupe, version-wins rule (FR-20), hard cap, a throwing provider does not poison the union |
-| `packages/agent/src/services/__tests__/playbook-readiness.service.spec.ts` | Each of the four readiness states, ceiling at exactly 25, copy limit at exactly 3, name collision suggestion, 2 s partial result |
-| `packages/agent/src/services/__tests__/playbook-adoption-plan.spec.ts` | `planAdoption` is the single source of both the sheet list and the executor steps; plan hash stability; hash changes when the catalogue version changes |
-| `packages/agent/src/services/__tests__/playbook-adoption-executor.service.spec.ts` | Six steps in order; each idempotent (re-run creates nothing new); failure at step 2 leaves steps 1's artefacts intact and status `failed`; resume completes without duplication; guardrails written are always `require_approval` (FR-39); an existing Agent is never reconfigured (FR-41) |
-| `packages/agent/src/services/__tests__/playbook-adoption-lifecycle.service.spec.ts` | pause/resume-schedule/retire transitions and the illegal ones; artefact removal per-item results; `already gone`; derived `changed`/`missing`; graduation eligibility at exactly 14 days / 0 rejections and the 30-day dismissal |
-| `packages/agent/src/database/database.module.spec.ts` (existing) | Extended — both new entities registered in all four inventory files |
+| File                                                                                | Covers                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/facades/__tests__/playbook-catalog.facade.spec.ts`              | Fan-out across two mock providers, slug dedupe, version-wins rule (FR-20), hard cap, a throwing provider does not poison the union                                                                                                                                                         |
+| `packages/agent/src/services/__tests__/playbook-readiness.service.spec.ts`          | Each of the four readiness states, ceiling at exactly 25, copy limit at exactly 3, name collision suggestion, 2 s partial result                                                                                                                                                           |
+| `packages/agent/src/services/__tests__/playbook-adoption-plan.spec.ts`              | `planAdoption` is the single source of both the sheet list and the executor steps; plan hash stability; hash changes when the catalogue version changes                                                                                                                                    |
+| `packages/agent/src/services/__tests__/playbook-adoption-executor.service.spec.ts`  | Six steps in order; each idempotent (re-run creates nothing new); failure at step 2 leaves steps 1's artefacts intact and status `failed`; resume completes without duplication; guardrails written are always `require_approval` (FR-39); an existing Agent is never reconfigured (FR-41) |
+| `packages/agent/src/services/__tests__/playbook-adoption-lifecycle.service.spec.ts` | pause/resume-schedule/retire transitions and the illegal ones; artefact removal per-item results; `already gone`; derived `changed`/`missing`; graduation eligibility at exactly 14 days / 0 rejections and the 30-day dismissal                                                           |
+| `packages/agent/src/database/database.module.spec.ts` (existing)                    | Extended — both new entities registered in all four inventory files                                                                                                                                                                                                                        |
 
 ### 10.3 Controller specs (Jest, `apps/api`)
 
-| File | Covers |
-| --- | --- |
-| `apps/api/src/catalog/catalog.controller.spec.ts` | Auth guard; index returns five sections; one failing source yields a per-section error not a 500; list filters and paging clamps; detail 404 on unknown slug |
+| File                                                         | Covers                                                                                                                                                                                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/catalog/catalog.controller.spec.ts`            | Auth guard; index returns five sections; one failing source yields a per-section error not a 500; list filters and paging clamps; detail 404 on unknown slug                                                                   |
 | `apps/api/src/catalog/playbook-adoptions.controller.spec.ts` | `adopt` returns 202 and never blocks; every error code in §4.3; plan-hash mismatch → 409; ceiling → 409; copy limit → 409; `resume` on a non-failed adoption → 409; cross-user adoption → 404; `remove-artifacts` clamps at 50 |
-| `apps/api/src/catalog/catalog.module.di-contract.spec.ts` | The module resolves with the facade and dispatcher symbols bound, following the existing `tasks.module.di-contract.spec.ts` |
+| `apps/api/src/catalog/catalog.module.di-contract.spec.ts`    | The module resolves with the facade and dispatcher symbols bound, following the existing `tasks.module.di-contract.spec.ts`                                                                                                    |
 
 ### 10.4 Web unit (Vitest)
 
-| File | Covers |
-| --- | --- |
-| `apps/web/src/components/catalog/PlaybookCard.unit.spec.tsx` | Accessible name composition; readiness rendered as text, not colour alone |
-| `apps/web/src/components/catalog/RemoveArtifactsSheet.unit.spec.tsx` | All-unchecked default; live count in the button label; disabled at zero |
-| `apps/web/src/components/catalog/CatalogShell.unit.spec.tsx` | `/` focus, 2-char minimum, 250 ms debounce, per-section counts, no-results copy |
+| File                                                                 | Covers                                                                          |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `apps/web/src/components/catalog/PlaybookCard.unit.spec.tsx`         | Accessible name composition; readiness rendered as text, not colour alone       |
+| `apps/web/src/components/catalog/RemoveArtifactsSheet.unit.spec.tsx` | All-unchecked default; live count in the button label; disabled at zero         |
+| `apps/web/src/components/catalog/CatalogShell.unit.spec.tsx`         | `/` focus, 2-char minimum, 250 ms debounce, per-section counts, no-results copy |
 
 ### 10.5 e2e (Playwright, `apps/web/e2e/`)
 
-| File | Golden path |
-| --- | --- |
-| `flow-capability-catalog-browse.spec.ts` | Sidebar → index; five sections; `See all` counts; search narrows all sections; category + readiness chips combine; a failing section degrades alone |
-| `flow-playbook-adoption.spec.ts` | Detail → `Set it up` → sheet lists exactly N items → `Create it` → `provisioning` → `active`; the created Agent, skills, task template and schedule exist and match the sheet; guardrails are `require_approval` |
-| `flow-playbook-preflight-blocked.spec.ts` | Playbook needing `search` shows `Not ready`, names the capability, disables the button; enabling a provider flips it to `Ready` inside 60 s; preflight created nothing |
-| `flow-playbook-adoption-failure-resume.spec.ts` | Force a step-2 failure; failure panel lists what exists; `Try again` completes without a second Agent; removal sheet defaults to unchecked and reports `already gone` |
-| `flow-playbook-limits.spec.ts` | 3-copy limit and 25-adoption ceiling both disable with their exact copy |
-| `flow-catalog-workflows-run.spec.ts` | Workflows list; `Run` returns queued in under a second; trace shows nodes, outcomes, edges and decisions; archived refuses with the reactivate message |
-| `flow-catalog-access-readonly.spec.ts` | A read-only member sees no `Set it up`, `Pause`, `Retire`, `Run`, `Use it` |
-| `accessibility` (extend the existing deep pass) | Index and detail page report no serious/critical violations; full keyboard walk incl. focus return from both sheets |
+| File                                            | Golden path                                                                                                                                                                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow-capability-catalog-browse.spec.ts`        | Sidebar → index; five sections; `See all` counts; search narrows all sections; category + readiness chips combine; a failing section degrades alone                                                              |
+| `flow-playbook-adoption.spec.ts`                | Detail → `Set it up` → sheet lists exactly N items → `Create it` → `provisioning` → `active`; the created Agent, skills, task template and schedule exist and match the sheet; guardrails are `require_approval` |
+| `flow-playbook-preflight-blocked.spec.ts`       | Playbook needing `search` shows `Not ready`, names the capability, disables the button; enabling a provider flips it to `Ready` inside 60 s; preflight created nothing                                           |
+| `flow-playbook-adoption-failure-resume.spec.ts` | Force a step-2 failure; failure panel lists what exists; `Try again` completes without a second Agent; removal sheet defaults to unchecked and reports `already gone`                                            |
+| `flow-playbook-limits.spec.ts`                  | 3-copy limit and 25-adoption ceiling both disable with their exact copy                                                                                                                                          |
+| `flow-catalog-workflows-run.spec.ts`            | Workflows list; `Run` returns queued in under a second; trace shows nodes, outcomes, edges and decisions; archived refuses with the reactivate message                                                           |
+| `flow-catalog-access-readonly.spec.ts`          | A read-only member sees no `Set it up`, `Pause`, `Retire`, `Run`, `Use it`                                                                                                                                       |
+| `accessibility` (extend the existing deep pass) | Index and detail page report no serious/critical violations; full keyboard walk incl. focus return from both sheets                                                                                              |
 
 ---
 
@@ -817,7 +817,7 @@ Each phase is independently shippable and leaves `develop` green on its own.
   `flow-capability-catalog-browse`, `flow-catalog-workflows-run`, `flow-playbook-preflight-blocked`,
   `flow-catalog-access-readonly`.
 
-*Shippable because:* browsing, readiness and the workflows surface are all useful with nothing
+_Shippable because:_ browsing, readiness and the workflows surface are all useful with nothing
 persisted. Zero schema change, zero migration, zero background work.
 
 ### P2 — Adoption
@@ -832,7 +832,7 @@ persisted. Zero schema change, zero migration, zero background work.
   DI contract), `flow-playbook-adoption`, `flow-playbook-adoption-failure-resume`,
   `flow-playbook-limits`.
 
-*Shippable because:* it strictly adds a button to a page that already works. If P2 is reverted,
+_Shippable because:_ it strictly adds a button to a page that already works. If P2 is reverted,
 P1's catalogue is unaffected.
 
 ### P3 — Living with it
@@ -846,27 +846,27 @@ P1's catalogue is unaffected.
 - "Hand the setup to an agent" for playbooks that declare free-text inputs: pre-fills the agent
   chat composer with the setup brief and sends nothing.
 
-*Shippable because:* every item is additive to an adoption that already works.
+_Shippable because:_ every item is additive to an adoption that already works.
 
 ---
 
 ## 12. Constitution compliance
 
-| Gate | Status | Why |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | The catalogue source is a new `playbook-provider` capability with a first-party plugin package (`packages/plugins/everworks-playbooks/`); core code reaches it only through `PlaybookCatalogFacadeService`. |
-| **II — Capability-driven** | ✅ | Playbooks declare **capabilities** (`search`, `email-outbound`), never provider ids. Readiness resolves them through the registry. No plugin id literal exists under `apps/api/src/catalog/**` or `apps/web/src/components/catalog/**`. |
-| **III — Source-of-truth repos** | ✅ | Nothing here writes Work content. The artefacts playbooks produce (Knowledge Base documents) go through the existing KB path, which already mirrors to the user's data repo. |
-| **IV — Job runtime** | ✅ | Provisioning and the stuck sweep both go through `PLAYBOOK_ADOPTION_DISPATCHER`; no call site imports `@trigger.dev/sdk`; `adopt` returns 202 immediately. |
-| **V — Forward-only migrations** | ✅ | `apps/api/src/migrations/1791210000000-CreatePlaybookAdoptions.ts` ships in the same PR as both entities. Creates only; alters nothing; `down()` drops in reverse. |
-| **VI — Tests first-class** | ✅ | 14 named spec files across Vitest (plugin, web unit), Jest (agent, api) and Playwright (7 e2e flows), listed in §10 and enumerated as tasks. |
-| **VII — Secrets** | ✅ | No new setting holds a credential. The optional remote-source token, if configured, is declared `x-secret: true` in the plugin's settings schema and never returned. Telemetry carries slugs and counts only. |
-| **VIII — Canonical plugin list** | ✅ | The new plugin is added to `docs/plugin-system/built-in-plugins.md` and to no other count. |
-| **IX — Behaviour-first spec** | ✅ | `spec.md` names no class, file or endpoint. Every path, DTO and symbol lives here. |
-| **X — Backwards compatibility** | ✅ | Every route is new. No existing DTO field is renamed or removed. Adding `PLAYBOOK_PROVIDER` to `PLUGIN_CAPABILITIES` is additive; existing plugins are unaffected. |
-| **Program rule #1 — additive** | ✅ | Five existing template surfaces keep their routes and behaviour. One sidebar entry added, none moved. |
-| **Program rule #2 — no duplicate nouns** | ✅ | Two new nouns, justified in spec §5.1, and added to the program vocabulary table in the same PR (tasks T041). Everything else reuses Agent, Skill, Task, Schedule, Trigger, Approval, Escalation, Run, Plugin, Workflow. |
-| **Program rule #9 — what did it cost** | ✅ | Every playbook card carries a token estimate before adoption; every adoption carries a 30-day run count and cost from run receipts after it. |
+| Gate                                     | Status | Why                                                                                                                                                                                                                                     |
+| ---------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**                     | ✅     | The catalogue source is a new `playbook-provider` capability with a first-party plugin package (`packages/plugins/everworks-playbooks/`); core code reaches it only through `PlaybookCatalogFacadeService`.                             |
+| **II — Capability-driven**               | ✅     | Playbooks declare **capabilities** (`search`, `email-outbound`), never provider ids. Readiness resolves them through the registry. No plugin id literal exists under `apps/api/src/catalog/**` or `apps/web/src/components/catalog/**`. |
+| **III — Source-of-truth repos**          | ✅     | Nothing here writes Work content. The artefacts playbooks produce (Knowledge Base documents) go through the existing KB path, which already mirrors to the user's data repo.                                                            |
+| **IV — Job runtime**                     | ✅     | Provisioning and the stuck sweep both go through `PLAYBOOK_ADOPTION_DISPATCHER`; no call site imports `@trigger.dev/sdk`; `adopt` returns 202 immediately.                                                                              |
+| **V — Forward-only migrations**          | ✅     | `apps/api/src/migrations/1791210000000-CreatePlaybookAdoptions.ts` ships in the same PR as both entities. Creates only; alters nothing; `down()` drops in reverse.                                                                      |
+| **VI — Tests first-class**               | ✅     | 14 named spec files across Vitest (plugin, web unit), Jest (agent, api) and Playwright (7 e2e flows), listed in §10 and enumerated as tasks.                                                                                            |
+| **VII — Secrets**                        | ✅     | No new setting holds a credential. The optional remote-source token, if configured, is declared `x-secret: true` in the plugin's settings schema and never returned. Telemetry carries slugs and counts only.                           |
+| **VIII — Canonical plugin list**         | ✅     | The new plugin is added to `docs/plugin-system/built-in-plugins.md` and to no other count.                                                                                                                                              |
+| **IX — Behaviour-first spec**            | ✅     | `spec.md` names no class, file or endpoint. Every path, DTO and symbol lives here.                                                                                                                                                      |
+| **X — Backwards compatibility**          | ✅     | Every route is new. No existing DTO field is renamed or removed. Adding `PLAYBOOK_PROVIDER` to `PLUGIN_CAPABILITIES` is additive; existing plugins are unaffected.                                                                      |
+| **Program rule #1 — additive**           | ✅     | Five existing template surfaces keep their routes and behaviour. One sidebar entry added, none moved.                                                                                                                                   |
+| **Program rule #2 — no duplicate nouns** | ✅     | Two new nouns, justified in spec §5.1, and added to the program vocabulary table in the same PR (tasks T041). Everything else reuses Agent, Skill, Task, Schedule, Trigger, Approval, Escalation, Run, Plugin, Workflow.                |
+| **Program rule #9 — what did it cost**   | ✅     | Every playbook card carries a token estimate before adoption; every adoption carries a 30-day run count and cost from run receipts after it.                                                                                            |
 
 ---
 

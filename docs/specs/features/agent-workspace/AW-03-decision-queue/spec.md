@@ -115,7 +115,7 @@ suspiciously little — and points at the fix in each direction.
 
 ### 2.1 The question this answers
 
-> *"What needs me — and will answering it actually make the work continue?"*
+> _"What needs me — and will answering it actually make the work continue?"_
 
 That is the second question the program's operating loop turns on, and the only
 one whose answer is supposed to be short. If the user cannot see it in one place,
@@ -123,17 +123,17 @@ they poll. If answering it does not restart anything, they stop answering.
 
 ### 2.2 What a user does today instead
 
-| To find out… | Today they must… |
-| --- | --- |
-| Whether an agent gave up on something | Nothing in the web app reads escalations. They must open a Task they already suspect, and read its escalation feed — or notice the Inbox mirror row |
-| Whether an agent is waiting on an approval | Scroll the dashboard Home page to the approval block |
-| Which of the two is more urgent | Impossible — they are two lists in two places with two orderings, and one of the two lists does not exist |
-| What the agent already tried | Open the Run's session detail and read the step log |
-| What happens after they approve | Nothing happens. The proposal's own record says executing or resuming the approved action is a later increment |
-| To actually continue the work | Find the Task, find the parked Run, and press Resume by hand — if they know that control exists |
-| Whether an agent is missing an access grant | Nothing surfaces it. The run fails, and the failure reads as a tool error |
-| Whether they are being asked too much | Nothing. There is no count, no trend, no target |
-| To stop looking at a queue they will never answer | Resolve each row one at a time, or leave them open forever — nothing ages out, and no sweeper touches them |
+| To find out…                                      | Today they must…                                                                                                                                    |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Whether an agent gave up on something             | Nothing in the web app reads escalations. They must open a Task they already suspect, and read its escalation feed — or notice the Inbox mirror row |
+| Whether an agent is waiting on an approval        | Scroll the dashboard Home page to the approval block                                                                                                |
+| Which of the two is more urgent                   | Impossible — they are two lists in two places with two orderings, and one of the two lists does not exist                                           |
+| What the agent already tried                      | Open the Run's session detail and read the step log                                                                                                 |
+| What happens after they approve                   | Nothing happens. The proposal's own record says executing or resuming the approved action is a later increment                                      |
+| To actually continue the work                     | Find the Task, find the parked Run, and press Resume by hand — if they know that control exists                                                     |
+| Whether an agent is missing an access grant       | Nothing surfaces it. The run fails, and the failure reads as a tool error                                                                           |
+| Whether they are being asked too much             | Nothing. There is no count, no trend, no target                                                                                                     |
+| To stop looking at a queue they will never answer | Resolve each row one at a time, or leave them open forever — nothing ages out, and no sweeper touches them                                          |
 
 ### 2.3 The six concrete gaps
 
@@ -148,7 +148,7 @@ they poll. If answering it does not restart anything, they stop answering.
    free-text "what must be decided". A free-text question cannot be rendered as a
    control, cannot be validated, and cannot tell the platform when it has enough
    to continue. One interruption therefore cannot carry three different shapes of
-   answer, so an agent that needs a budget approval *and* a direction *and* an
+   answer, so an agent that needs a budget approval _and_ a direction _and_ an
    access grant either asks three times or asks once and guesses twice.
 4. **Two queues, two orderings, two mental models.** Escalations rank by
    confidence then recency. Approvals rank by recency and live somewhere else
@@ -162,7 +162,7 @@ they poll. If answering it does not restart anything, they stop answering.
 
 ### 2.4 Why one queue and not two better lists
 
-Approvals and escalations are two *causes* with one *effect*: an agent stopped and
+Approvals and escalations are two _causes_ with one _effect_: an agent stopped and
 a person has to speak. The user does not care which record type produced the
 interruption; they care how long the list is and whether it drains. Two lists
 means two badges, two empty states, two orderings, two habits — and a user who
@@ -170,7 +170,7 @@ checks one and misses the other. One queue means one number to drive to zero.
 
 Keeping them as two backing records (rather than migrating one into the other) is
 deliberate: both are load-bearing today, both have their own writers, their own
-dedupe keys and their own idempotency. My Decisions is a *reader* over both, plus
+dedupe keys and their own idempotency. My Decisions is a _reader_ over both, plus
 one small new record for the typed asks. That is the smallest change that makes
 the queue real.
 
@@ -199,7 +199,7 @@ selected in the detail pane so they can answer without a second click.
 **Given** a decision whose only ask is "Approve a $240 spend on the data feed",
 **when** the user presses `y` (or clicks **Approve**),
 **then** the ask is marked answered, the decision closes, the queue header drops to
-`2 open`, a toast reads *"Answered. Researcher is picking the work back up."*, and
+`2 open`, a toast reads _"Answered. Researcher is picking the work back up."_, and
 the agent that raised it is restarted from where it stopped with the approval in
 its first message.
 
@@ -208,8 +208,8 @@ its first message.
 and an access ask for a read-only analytics connection,
 **when** the user answers the approval and the choice,
 **then** the checklist shows `2 of 3`, the decision stays open, the blocked Task
-stays blocked, and the detail pane says *"One more and Researcher picks this up
-where it stopped."*
+stays blocked, and the detail pane says _"One more and Researcher picks this up
+where it stopped."_
 **And when** they complete the access grant and mark it granted,
 **then** the decision closes and the agent restarts with all three answers folded
 into one message.
@@ -218,8 +218,8 @@ into one message.
 **Given** an approval ask for sending a customer-facing message,
 **when** the user chooses **Reject**,
 **then** a one-sentence reason field appears and is required before the rejection
-is accepted, the field's helper text reads *"One sentence is enough. This is what
-the agent learns from."*, and on submit the rejection plus the reason travel to the
+is accepted, the field's helper text reads _"One sentence is enough. This is what
+the agent learns from."_, and on submit the rejection plus the reason travel to the
 restarted agent verbatim.
 
 **S5 — Sending the agent a different way.**
@@ -234,7 +234,7 @@ begun executing,
 **when** they press **Undo** on that ask,
 **then** the ask returns to unanswered, the decision reopens, the restarted Run is
 cancelled if it is still queued, and a withdrawal note is posted so the agent sees
-*"The owner withdrew their earlier answer: …"* — and the user is shown, in plain
+_"The owner withdrew their earlier answer: …"_ — and the user is shown, in plain
 words, that undo cannot take back anything the agent already did.
 
 **S7 — Declaring bankruptcy.**
@@ -247,8 +247,8 @@ empties, the **Archived** tab shows 34, and each one can be restored individuall
 **Given** the workspace has opened a median of 11 decisions a day over the last
 seven days,
 **when** the user opens the queue,
-**then** a health line reads *"Heavy — 11 decisions a day. Your agents are asking
-things their instructions could answer."* with a link to the Agent whose
+**then** a health line reads _"Heavy — 11 decisions a day. Your agents are asking
+things their instructions could answer."_ with a link to the Agent whose
 instructions are producing the most of them.
 
 **S9 — The same question for the third time.**
@@ -256,7 +256,7 @@ instructions are producing the most of them.
 the last fourteen days,
 **when** the user opens the third one,
 **then** the decision carries a **Asked 3 times** chip and an action reading
-*"Write this into Editor's instructions"* that opens the Agent's instruction file
+_"Write this into Editor's instructions"_ that opens the Agent's instruction file
 with the answer pre-filled as a draft rule.
 
 **S10 — Answering from the Task board.**
@@ -270,8 +270,8 @@ first one selected — the same screen, not a second implementation.
 **E1 — Two people answer the same ask.**
 **Given** two members of the same workspace have the decision open,
 **when** both submit an answer to the same ask,
-**then** the first write wins, the second is refused with *"Someone else answered
-this a moment ago."*, the second user's pane refreshes to show the recorded answer
+**then** the first write wins, the second is refused with _"Someone else answered
+this a moment ago."_, the second user's pane refreshes to show the recorded answer
 and who gave it, and nothing is double-resumed.
 
 **E2 — The user answers through the old surface.**
@@ -285,41 +285,41 @@ resolution path, three doors.
 **E3 — Nothing to restart.**
 **Given** a decision whose linked Run was cancelled and whose Task was deleted,
 **when** the user answers the last ask,
-**then** the decision still closes, and the detail pane says *"Answered. There was
-no paused work left to restart."* rather than pretending something resumed.
+**then** the decision still closes, and the detail pane says _"Answered. There was
+no paused work left to restart."_ rather than pretending something resumed.
 
 **E4 — The agent already restarted on its own.**
 **Given** a decision whose linked Run is currently executing (it was never parked),
 **when** the user answers the last ask,
 **then** the answer is injected into the live Run instead of starting a new one,
-and the pane says *"Answered. Sent to the Run that is already going."*
+and the pane says _"Answered. Sent to the Run that is already going."_
 
 **E5 — The job runtime is not configured.**
 **Given** an installation with no background job runtime bound,
 **when** the user answers the last ask,
-**then** the decision still closes, and a banner reads *"Answered, but the agent
-could not be restarted automatically."* with a **Run now** button that dispatches
+**then** the decision still closes, and a banner reads _"Answered, but the agent
+could not be restarted automatically."_ with a **Run now** button that dispatches
 manually when a runtime is available. The failure is never silent and never rolls
 back the answer.
 
 **E6 — Undo after the point of no return.**
 **Given** the restarted Run has already begun executing,
 **when** the user opens the ask menu,
-**then** **Undo** is disabled with the explanation *"Researcher already acted on
-this. Undo cannot unsend or unspend."* and the only remaining lever offered is
+**then** **Undo** is disabled with the explanation _"Researcher already acted on
+this. Undo cannot unsend or unspend."_ and the only remaining lever offered is
 **Open the Run**.
 
 **E7 — Undo after the window closed.**
 **Given** the answer was given more than 10 minutes ago,
 **when** the user opens the ask menu,
-**then** **Undo** is disabled with *"The 10-minute undo window has passed."* and the
+**then** **Undo** is disabled with _"The 10-minute undo window has passed."_ and the
 decision detail still shows the answer, who gave it and when.
 
 **E8 — An access ask that was not actually granted.**
 **Given** an access ask naming a tool the agent still cannot call,
 **when** the user presses **I have granted it**,
 **then** the platform re-checks the grant, refuses the resolution, and shows
-*"That access still is not granted. Nothing was changed."* with a link straight to
+_"That access still is not granted. Nothing was changed."_ with a link straight to
 the place the grant is made — the ask stays open.
 
 **E9 — An access ask the platform cannot verify.**
@@ -332,15 +332,15 @@ self-reported rather than verified.
 **E10 — Over the ask limit.**
 **Given** an agent tries to file a decision with 14 asks,
 **when** the decision is written,
-**then** the first 10 are kept, the decision carries the note *"4 further questions
-were not recorded — this decision was too long."*, and the over-limit event is
+**then** the first 10 are kept, the decision carries the note _"4 further questions
+were not recorded — this decision was too long."_, and the over-limit event is
 logged so the agent's instructions can be corrected.
 
 **E11 — Empty queue that should not be celebrated.**
 **Given** the workspace has opened zero decisions in the last 14 days,
 **when** the user opens the queue,
-**then** the empty state reads *"Nothing needs you. That is either very good news
-or your agents are deciding things they should be asking about."* with a link to
+**then** the empty state reads _"Nothing needs you. That is either very good news
+or your agents are deciding things they should be asking about."_ with a link to
 recent Runs — not a confetti screen.
 
 **E12 — Genuinely new workspace.**
@@ -360,8 +360,8 @@ needs you" is the most expensive lie this surface can tell.
 **Given** the user confirms **Archive all** while one decision is mid-answer in
 another tab,
 **when** the bulk write lands,
-**then** already-resolved decisions are skipped and reported (*"Archived 33.
-1 was already answered."*) and no resolved decision is reopened as archived.
+**then** already-resolved decisions are skipped and reported (_"Archived 33.
+1 was already answered."_) and no resolved decision is reopened as archived.
 
 **E15 — Foreign decision id.**
 **Given** a deep link to a decision belonging to another workspace,
@@ -373,8 +373,8 @@ used to prove the decision exists.
 **Given** a Task blocked by both this decision and an unfinished dependency,
 **when** the last ask is answered,
 **then** the decision closes and the agent is restarted, but the Task stays
-`blocked` and the pane says *"Answered. This Task is still waiting on 1 other
-blocker."*
+`blocked` and the pane says _"Answered. This Task is still waiting on 1 other
+blocker."_
 
 **E17 — The queue is longer than one page.**
 **Given** 140 open decisions,
@@ -386,7 +386,7 @@ never auto-loads 140 detail payloads.
 **E18 — An answer arrives for an already-archived decision.**
 **Given** a decision archived in another tab,
 **when** the user submits an answer for it,
-**then** the write is refused with *"This decision was archived."*, the pane
+**then** the write is refused with _"This decision was archived."_, the pane
 refreshes to the archived state, and **Restore** is offered.
 
 ---
@@ -408,7 +408,7 @@ testable.
   behind them).
 - **FR-4** Open decisions MUST be ranked by, in order: (a) blocking before
   non-blocking; (b) descending confidence, where an unscored decision ranks as if
-  its confidence were **0.5** and is labelled *not scored* rather than shown a
+  its confidence were **0.5** and is labelled _not scored_ rather than shown a
   percentage; (c) ascending age — oldest first among equals.
 - **FR-5** The queue MUST support filtering by Agent, by Task, by Mission — the
   standing initiative the Task was raised under, carried as provenance — and by
@@ -427,7 +427,7 @@ testable.
 
 - **FR-10** A decision MUST display: the Agent that raised it, the Task it belongs
   to and — as provenance — the Mission that Task was raised under, where it has
-  them; its age; its confidence (or *not scored*); a one-line summary of what
+  them; its age; its confidence (or _not scored_); a one-line summary of what
   happened; and, when the source record carries one, the trail of what the agent
   already tried.
 - **FR-11** A decision MUST display whether it is blocking, and what it is blocking
@@ -450,13 +450,13 @@ testable.
   the decision (§3.2 E10).
 - **FR-16** Every ask MUST be one of exactly five kinds, each with its own control:
 
-  | Kind | What the user produces | Control |
-  | --- | --- | --- |
-  | **Decision** | A choice between the agent's enumerated options | Single-select, or multi-select when the agent asked for several |
-  | **Approval** | A yes/no on a proposed action | Approve / Reject, with the action and its risks shown |
-  | **Fact** | Information only the user has | A single- or multi-line text field |
-  | **Access** | A permission, connection or grant the agent lacks | A link to where the grant is made, plus **I have granted it** |
-  | **Action** | Something only a person can do, outside the platform | **Mark done**, with an optional note |
+    | Kind         | What the user produces                               | Control                                                         |
+    | ------------ | ---------------------------------------------------- | --------------------------------------------------------------- |
+    | **Decision** | A choice between the agent's enumerated options      | Single-select, or multi-select when the agent asked for several |
+    | **Approval** | A yes/no on a proposed action                        | Approve / Reject, with the action and its risks shown           |
+    | **Fact**     | Information only the user has                        | A single- or multi-line text field                              |
+    | **Access**   | A permission, connection or grant the agent lacks    | A link to where the grant is made, plus **I have granted it**   |
+    | **Action**   | Something only a person can do, outside the platform | **Mark done**, with an optional note                            |
 
 - **FR-17** A **Decision** ask MUST support at most **25** options, each with a
   label of at most **200** characters, and MAY mark exactly one option as
@@ -505,13 +505,13 @@ testable.
   deliver that message to the agent that raised the decision.
 - **FR-31** Delivery MUST follow this precedence, and the outcome MUST be shown to
   the user in words:
-  1. The linked Run is **live** → inject the message into it (*"Sent to the Run
-     that is already going."*).
-  2. The linked Run is **parked or resumable** → restart it as a new Run carrying
-     the same conversation, seeded with the message (*"Researcher is picking the
-     work back up."*).
-  3. Neither applies → resolve without restarting, and say so (*"There was no
-     paused work left to restart."*).
+    1. The linked Run is **live** → inject the message into it (_"Sent to the Run
+       that is already going."_).
+    2. The linked Run is **parked or resumable** → restart it as a new Run carrying
+       the same conversation, seeded with the message (_"Researcher is picking the
+       work back up."_).
+    3. Neither applies → resolve without restarting, and say so (_"There was no
+       paused work left to restart."_).
 - **FR-32** A restarted Run MUST continue the same conversation the parked Run was
   holding — it MUST NOT be a fresh start.
 - **FR-33** If the decision's Task is `blocked` and this decision was its only
@@ -524,7 +524,7 @@ testable.
 - **FR-35** The restart MUST go through the platform's normal admission path, so a
   restarted Run is subject to the same concurrency limits and budget checks as any
   other Run. A restart that is queued rather than started MUST be shown as
-  *"Queued — waiting for a free slot."*
+  _"Queued — waiting for a free slot."_
 - **FR-36** The system MUST NOT execute the proposed action itself on approval.
   Approval hands the decision back to the agent, which performs the action under
   its existing permissions and guardrails.
@@ -564,7 +564,7 @@ testable.
   in the state they were in, and MUST NOT restart anything by itself.
 - **FR-49** A decision whose backing work is gone — Run cancelled and Task deleted
   — MUST be archived automatically within **30 minutes**, with the reason recorded
-  and shown as *"Archived automatically — the work it belonged to is gone."*
+  and shown as _"Archived automatically — the work it belonged to is gone."_
 - **FR-50** A decision open for more than **30 days** with no live linked work MUST
   be flagged **dormant** in the queue. It MUST NOT be archived automatically —
   ageing out an unanswered question silently is worse than showing it.
@@ -576,12 +576,12 @@ testable.
   together with the number currently open.
 - **FR-52** The bands MUST be:
 
-  | Band | Condition | Line the user reads |
-  | --- | --- | --- |
-  | **Quiet** | 0 opened in the trailing **14 days** | "Nothing has needed you in two weeks. Worth spot-checking what your agents decided on their own." |
-  | **Healthy** | median **1–5** per day | "Healthy — about {n} decisions a day." |
-  | **Heavy** | median **6–15** per day | "Heavy — {n} decisions a day. Your agents are asking things their instructions could answer." |
-  | **Flooded** | median **> 15** per day, or **> 25** open right now | "Flooded — {n} open. Answer what matters, archive the rest, then fix the instructions." |
+    | Band        | Condition                                           | Line the user reads                                                                               |
+    | ----------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+    | **Quiet**   | 0 opened in the trailing **14 days**                | "Nothing has needed you in two weeks. Worth spot-checking what your agents decided on their own." |
+    | **Healthy** | median **1–5** per day                              | "Healthy — about {n} decisions a day."                                                            |
+    | **Heavy**   | median **6–15** per day                             | "Heavy — {n} decisions a day. Your agents are asking things their instructions could answer."     |
+    | **Flooded** | median **> 15** per day, or **> 25** open right now | "Flooded — {n} open. Answer what matters, archive the rest, then fix the instructions."           |
 
 - **FR-53** The user MUST be able to override the healthy ceiling (default **5**)
   and the quiet window (default **14** days) per workspace, within **1–100** and
@@ -635,16 +635,16 @@ testable.
 
 ### 5.1 Already in Ever Works — extended, not replaced
 
-| Concept | What it is today | What this epic adds |
-| --- | --- | --- |
-| **Approval** (an agent's proposed side-effectful action: spawn an agent, schedule a task, send a message, override a budget; with risk flags and a pending/approved/rejected state) | A durable queue and decision record. Deciding it flips a status and, by its own documentation, restarts nothing | An `archived` state · a Task link and, through it, the Mission that raised the Task, both stored for filtering · a first-viewed timestamp · one or more **Asks** · restart-on-resolution |
-| **Escalation** (the record written when an agent gives up: ten reason codes, an attempt trail, a confidence score, a dedupe key, open/resolved) | Fully built server-side, with chat tools and an Inbox mirror, and **no screen at all** | An `archived` state · the Mission that raised its Task, stored for filtering · a first-viewed timestamp · one or more **Asks** · restart-on-resolution · a queue that reads it |
-| **Run** | One agent execution; already knows how to park on a question, and already knows how to be restarted as a new Run carrying the same conversation | Nothing. This epic *uses* the park/restart behaviour that exists; it does not re-implement it |
-| **Task** | Already has a `blocked` status that remembers the status it came from | Nothing. Unblocking uses the existing restore-to-previous behaviour |
-| **Mission** | A standing initiative that keeps producing Ideas and, through them, Works and Tasks. Statuses `active` / `paused` / `completed` / `failed`; no priority; it is a *source* of work, never a unit of it | Nothing new. A decision reaches its Mission through its Task, and shows it as a provenance chip and offers it as a filter. Answering a decision never resolves, pauses or unblocks a Mission |
-| **Inbox** | The operator message center, which already mirrors escalations and approvals as messages and already routes a reply back to the record | Nothing removed. Inbox rows for a decision gain a link into My Decisions, and the two surfaces share one resolution path so their behaviour cannot drift |
-| **Agent instructions** | The Agent's own instruction files | Nothing stored. The recurring-decision action opens them with a draft rule |
-| **Activity history** | The audit trail | New entry kinds for opened / answered / resolved / withdrawn / archived / restarted |
+| Concept                                                                                                                                                                             | What it is today                                                                                                                                                                                      | What this epic adds                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Approval** (an agent's proposed side-effectful action: spawn an agent, schedule a task, send a message, override a budget; with risk flags and a pending/approved/rejected state) | A durable queue and decision record. Deciding it flips a status and, by its own documentation, restarts nothing                                                                                       | An `archived` state · a Task link and, through it, the Mission that raised the Task, both stored for filtering · a first-viewed timestamp · one or more **Asks** · restart-on-resolution     |
+| **Escalation** (the record written when an agent gives up: ten reason codes, an attempt trail, a confidence score, a dedupe key, open/resolved)                                     | Fully built server-side, with chat tools and an Inbox mirror, and **no screen at all**                                                                                                                | An `archived` state · the Mission that raised its Task, stored for filtering · a first-viewed timestamp · one or more **Asks** · restart-on-resolution · a queue that reads it               |
+| **Run**                                                                                                                                                                             | One agent execution; already knows how to park on a question, and already knows how to be restarted as a new Run carrying the same conversation                                                       | Nothing. This epic _uses_ the park/restart behaviour that exists; it does not re-implement it                                                                                                |
+| **Task**                                                                                                                                                                            | Already has a `blocked` status that remembers the status it came from                                                                                                                                 | Nothing. Unblocking uses the existing restore-to-previous behaviour                                                                                                                          |
+| **Mission**                                                                                                                                                                         | A standing initiative that keeps producing Ideas and, through them, Works and Tasks. Statuses `active` / `paused` / `completed` / `failed`; no priority; it is a _source_ of work, never a unit of it | Nothing new. A decision reaches its Mission through its Task, and shows it as a provenance chip and offers it as a filter. Answering a decision never resolves, pauses or unblocks a Mission |
+| **Inbox**                                                                                                                                                                           | The operator message center, which already mirrors escalations and approvals as messages and already routes a reply back to the record                                                                | Nothing removed. Inbox rows for a decision gain a link into My Decisions, and the two surfaces share one resolution path so their behaviour cannot drift                                     |
+| **Agent instructions**                                                                                                                                                              | The Agent's own instruction files                                                                                                                                                                     | Nothing stored. The recurring-decision action opens them with a draft rule                                                                                                                   |
+| **Activity history**                                                                                                                                                                | The audit trail                                                                                                                                                                                       | New entry kinds for opened / answered / resolved / withdrawn / archived / restarted                                                                                                          |
 
 ### 5.2 Decision — the queue row (a projection, not a table)
 
@@ -688,22 +688,22 @@ than 30 days with no live linked work.
 ### 5.3 New noun — the **Ask**
 
 **Definition.** One typed question inside a Decision, with its own control, its own
-answer, and its own resolved state. A Decision is blocked until every *required*
+answer, and its own resolved state. A Decision is blocked until every _required_
 Ask is answered.
 
 **Why this is a new stored noun and not a reuse.** Three candidates were
 considered and all three are the wrong shape:
 
-- *The escalation's free-text "what must be decided" field* is a paragraph. A
+- _The escalation's free-text "what must be decided" field_ is a paragraph. A
   paragraph cannot be rendered as a control, cannot be validated, cannot be
   half-answered, and cannot tell the platform when it has enough to restart the
   work. It is exactly the thing this epic exists to replace — and it stays, as the
   fallback prompt for the derived Ask, so nothing breaks.
-- *A second escalation per question* would multiply notifications, multiply
+- _A second escalation per question_ would multiply notifications, multiply
   dedupe keys, and split one interruption into three, which is the opposite of the
   goal. It would also make "is this Task unblocked yet?" a query over an
   unbounded set instead of a count.
-- *The Task approver record* gates a Task's review-to-done transition. It is a
+- _The Task approver record_ gates a Task's review-to-done transition. It is a
   different gate at a different point in a different lifecycle, and it is not
   attached to a run that can be restarted.
 
@@ -772,10 +772,10 @@ open decisions. The tab and the selected decision are both in the URL
 (`?tab=open|answered|archived`, `?id=<decision>`), so any state of the queue is
 linkable.
 
-Four other surfaces link *in* and none of them re-implements it:
+Four other surfaces link _in_ and none of them re-implements it:
 
-- **Home** — the existing approval block gains a footer link *"See all decisions
-  (3)"*; the block itself is unchanged.
+- **Home** — the existing approval block gains a footer link _"See all decisions
+  (3)"_; the block itself is unchanged.
 - **Task board** (AW-02) — a card's **Decision** chip opens the queue filtered to
   that Task.
 - **Inbox** — an escalation or approval message gains **Open in My Decisions**.
@@ -1175,98 +1175,98 @@ an answer so the queue can be walked one-handed.
 
 ### 6.17 Keyboard affordances
 
-| Key | Where | Does |
-| --- | --- | --- |
-| `j` / `↓` | queue | Move to the next decision |
-| `k` / `↑` | queue | Move to the previous decision |
-| `Enter` | queue | Open the focused decision's first unanswered ask |
-| `1`–`9` | detail | Focus the nth ask |
-| `y` | detail, on an approval ask | Approve |
-| `n` | detail, on an approval ask | Reject (opens the required reason field) |
-| `w` | detail | Focus the reason ("why") field |
-| `Enter` | an ask control | Submit that ask's answer |
-| `u` | detail | Undo the most recently answered ask, when undo is available |
-| `e` | detail | Archive the current decision |
-| `]` | detail | Next decision |
-| `[` | detail | Previous decision |
-| `?` | anywhere on the surface | Show this table |
-| `Esc` | detail | Return focus to the queue list |
+| Key       | Where                      | Does                                                        |
+| --------- | -------------------------- | ----------------------------------------------------------- |
+| `j` / `↓` | queue                      | Move to the next decision                                   |
+| `k` / `↑` | queue                      | Move to the previous decision                               |
+| `Enter`   | queue                      | Open the focused decision's first unanswered ask            |
+| `1`–`9`   | detail                     | Focus the nth ask                                           |
+| `y`       | detail, on an approval ask | Approve                                                     |
+| `n`       | detail, on an approval ask | Reject (opens the required reason field)                    |
+| `w`       | detail                     | Focus the reason ("why") field                              |
+| `Enter`   | an ask control             | Submit that ask's answer                                    |
+| `u`       | detail                     | Undo the most recently answered ask, when undo is available |
+| `e`       | detail                     | Archive the current decision                                |
+| `]`       | detail                     | Next decision                                               |
+| `[`       | detail                     | Previous decision                                           |
+| `?`       | anywhere on the surface    | Show this table                                             |
+| `Esc`     | detail                     | Return focus to the queue list                              |
 
 Every binding is inert while focus is inside a text field except `Esc` and
 `Enter`. The `?` sheet is the discoverability requirement of FR-64.
 
 ### 6.18 Exact user-visible copy
 
-| Where | String |
-| --- | --- |
-| Page title | `My Decisions` |
-| Page subtitle | `Everything waiting on you, and nothing else.` |
-| Header counts | `{count} open` · `{count} blocking` |
-| Tabs | `Open` · `Answered` · `Archived` |
-| Filters | `Agent` · `Task` · `Mission` · `Kind` · `Search decisions` |
-| Ask section heading | `What this needs from you` |
-| Ask progress | `{answered} of {required}` |
-| Context heading | `What happened` |
-| Attempt-trail heading | `What it tried` |
-| Blocking chip | `Blocking` |
-| Blocking detail | `Run paused` · `Task blocked` |
-| Confidence | `{percent}% sure` · `not scored` |
-| Dormant chip | `Open 30+ days` |
-| Recurring chip | `Asked {count} times` |
-| Recurring action | `Write this into {agent}'s instructions` |
-| Recommended option | `RECOMMENDED` |
-| Approval buttons | `Approve` · `Reject` · `Confirm rejection` |
-| Choice button | `Answer` |
-| Fact button | `Answer` |
-| Access buttons | `Open connections` · `I have granted it` |
-| Action button | `Mark done` |
-| Reason label (required) | `Why? (required)` |
-| Reason label (optional) | `Why? (optional)` |
-| Reason helper | `One sentence is enough. This is what the agent learns from.` |
-| Multi-select hint | `Choose {min}–{max}` |
-| Pending line, partial | `Answer all {count} and {agent} picks this up where it stopped.` |
-| Pending line, last one | `One more and {agent} picks this up where it stopped.` |
-| Restart — resumed | `{agent} is picking the work back up.` |
-| Restart — injected | `Sent to the Run that is already going.` |
-| Restart — nothing | `Answered. There was no paused work left to restart.` |
-| Restart — queued | `Queued — waiting for a free slot.` |
-| Restart — failed | `Answered, but the agent could not be restarted automatically.` |
-| Restart — other blockers | `Answered. This Task is still waiting on {count} other blocker(s).` |
-| Undo menu item | `Undo` |
-| Undo blocked — acted | `Undo — {agent} already acted on this. Undo cannot unsend or unspend.` |
-| Undo blocked — window | `Undo — the 10-minute window has passed.` |
-| Withdrawn banner | `You withdrew this {time}. {agent} has been told.` |
-| Withdrawal posted to the agent | `The owner withdrew their earlier answer to "{prompt}".` |
-| Conflict on answer | `Someone else answered this a moment ago.` |
-| Conflict on archived | `This decision was archived.` |
-| Archive button | `Archive` |
-| Archive all button | `Archive all` |
-| Archive dialog title | `Archive {count} decisions?` |
-| Archive dialog body | `They close unanswered. Nothing restarts and nothing is approved. You can restore any of them from Archived.` |
-| Archive dialog over cap | `This archives the oldest {cap}. Run it again for the rest.` |
-| Archive result | `Archived {count}.` · `Archived {count}. {skipped} were already answered.` |
-| Restore button | `Restore` |
-| Auto-archived reason | `Archived automatically — the work it belonged to is gone.` |
-| Over-limit note | `{count} further questions were not recorded — this decision was too long.` |
-| Access refused | `That access still is not granted. Nothing was changed.` |
-| Empty — quiet | `Nothing needs you right now.` / `That is either very good news, or your agents are deciding things they should be asking you about.` |
-| Empty — quiet footnote | `Nothing has needed you in {days} days.` |
-| Empty — first run title | `No decisions yet.` |
-| Empty — first run body | `When an agent hits something it should not decide alone — spending money, reaching a customer, choosing between two real directions — it stops and asks you here.` |
-| Error title | `Could not load your decisions.` |
-| Error body | `We did not show an empty queue, because we cannot tell whether it is empty.` |
-| Error last-known | `Last known: {count} open, {time} ago.` |
-| Health — healthy | `Healthy — about {n} decisions a day.` |
-| Health — heavy | `Heavy — {n} decisions a day. Your agents are asking things their instructions could answer.` |
-| Health — flooded | `Flooded — {n} open. Answer what matters, archive the rest, then fix the instructions.` |
-| Health — quiet | `Nothing has needed you in two weeks. Worth spot-checking what your agents decided on their own.` |
-| Health — culprit | `Most of them: {agent}.` |
-| Health menu | `Adjust the band` · `Hide for 30 days` |
-| Position walker | `{index} / {total}` |
-| Next / previous | `Next decision` · `Previous decision` |
-| Home link | `See all decisions ({count})` |
-| Inbox / Task link | `Open in My Decisions` |
-| Load more | `Load {count} more` |
+| Where                          | String                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Page title                     | `My Decisions`                                                                                                                                                      |
+| Page subtitle                  | `Everything waiting on you, and nothing else.`                                                                                                                      |
+| Header counts                  | `{count} open` · `{count} blocking`                                                                                                                                 |
+| Tabs                           | `Open` · `Answered` · `Archived`                                                                                                                                    |
+| Filters                        | `Agent` · `Task` · `Mission` · `Kind` · `Search decisions`                                                                                                          |
+| Ask section heading            | `What this needs from you`                                                                                                                                          |
+| Ask progress                   | `{answered} of {required}`                                                                                                                                          |
+| Context heading                | `What happened`                                                                                                                                                     |
+| Attempt-trail heading          | `What it tried`                                                                                                                                                     |
+| Blocking chip                  | `Blocking`                                                                                                                                                          |
+| Blocking detail                | `Run paused` · `Task blocked`                                                                                                                                       |
+| Confidence                     | `{percent}% sure` · `not scored`                                                                                                                                    |
+| Dormant chip                   | `Open 30+ days`                                                                                                                                                     |
+| Recurring chip                 | `Asked {count} times`                                                                                                                                               |
+| Recurring action               | `Write this into {agent}'s instructions`                                                                                                                            |
+| Recommended option             | `RECOMMENDED`                                                                                                                                                       |
+| Approval buttons               | `Approve` · `Reject` · `Confirm rejection`                                                                                                                          |
+| Choice button                  | `Answer`                                                                                                                                                            |
+| Fact button                    | `Answer`                                                                                                                                                            |
+| Access buttons                 | `Open connections` · `I have granted it`                                                                                                                            |
+| Action button                  | `Mark done`                                                                                                                                                         |
+| Reason label (required)        | `Why? (required)`                                                                                                                                                   |
+| Reason label (optional)        | `Why? (optional)`                                                                                                                                                   |
+| Reason helper                  | `One sentence is enough. This is what the agent learns from.`                                                                                                       |
+| Multi-select hint              | `Choose {min}–{max}`                                                                                                                                                |
+| Pending line, partial          | `Answer all {count} and {agent} picks this up where it stopped.`                                                                                                    |
+| Pending line, last one         | `One more and {agent} picks this up where it stopped.`                                                                                                              |
+| Restart — resumed              | `{agent} is picking the work back up.`                                                                                                                              |
+| Restart — injected             | `Sent to the Run that is already going.`                                                                                                                            |
+| Restart — nothing              | `Answered. There was no paused work left to restart.`                                                                                                               |
+| Restart — queued               | `Queued — waiting for a free slot.`                                                                                                                                 |
+| Restart — failed               | `Answered, but the agent could not be restarted automatically.`                                                                                                     |
+| Restart — other blockers       | `Answered. This Task is still waiting on {count} other blocker(s).`                                                                                                 |
+| Undo menu item                 | `Undo`                                                                                                                                                              |
+| Undo blocked — acted           | `Undo — {agent} already acted on this. Undo cannot unsend or unspend.`                                                                                              |
+| Undo blocked — window          | `Undo — the 10-minute window has passed.`                                                                                                                           |
+| Withdrawn banner               | `You withdrew this {time}. {agent} has been told.`                                                                                                                  |
+| Withdrawal posted to the agent | `The owner withdrew their earlier answer to "{prompt}".`                                                                                                            |
+| Conflict on answer             | `Someone else answered this a moment ago.`                                                                                                                          |
+| Conflict on archived           | `This decision was archived.`                                                                                                                                       |
+| Archive button                 | `Archive`                                                                                                                                                           |
+| Archive all button             | `Archive all`                                                                                                                                                       |
+| Archive dialog title           | `Archive {count} decisions?`                                                                                                                                        |
+| Archive dialog body            | `They close unanswered. Nothing restarts and nothing is approved. You can restore any of them from Archived.`                                                       |
+| Archive dialog over cap        | `This archives the oldest {cap}. Run it again for the rest.`                                                                                                        |
+| Archive result                 | `Archived {count}.` · `Archived {count}. {skipped} were already answered.`                                                                                          |
+| Restore button                 | `Restore`                                                                                                                                                           |
+| Auto-archived reason           | `Archived automatically — the work it belonged to is gone.`                                                                                                         |
+| Over-limit note                | `{count} further questions were not recorded — this decision was too long.`                                                                                         |
+| Access refused                 | `That access still is not granted. Nothing was changed.`                                                                                                            |
+| Empty — quiet                  | `Nothing needs you right now.` / `That is either very good news, or your agents are deciding things they should be asking you about.`                               |
+| Empty — quiet footnote         | `Nothing has needed you in {days} days.`                                                                                                                            |
+| Empty — first run title        | `No decisions yet.`                                                                                                                                                 |
+| Empty — first run body         | `When an agent hits something it should not decide alone — spending money, reaching a customer, choosing between two real directions — it stops and asks you here.` |
+| Error title                    | `Could not load your decisions.`                                                                                                                                    |
+| Error body                     | `We did not show an empty queue, because we cannot tell whether it is empty.`                                                                                       |
+| Error last-known               | `Last known: {count} open, {time} ago.`                                                                                                                             |
+| Health — healthy               | `Healthy — about {n} decisions a day.`                                                                                                                              |
+| Health — heavy                 | `Heavy — {n} decisions a day. Your agents are asking things their instructions could answer.`                                                                       |
+| Health — flooded               | `Flooded — {n} open. Answer what matters, archive the rest, then fix the instructions.`                                                                             |
+| Health — quiet                 | `Nothing has needed you in two weeks. Worth spot-checking what your agents decided on their own.`                                                                   |
+| Health — culprit               | `Most of them: {agent}.`                                                                                                                                            |
+| Health menu                    | `Adjust the band` · `Hide for 30 days`                                                                                                                              |
+| Position walker                | `{index} / {total}`                                                                                                                                                 |
+| Next / previous                | `Next decision` · `Previous decision`                                                                                                                               |
+| Home link                      | `See all decisions ({count})`                                                                                                                                       |
+| Inbox / Task link              | `Open in My Decisions`                                                                                                                                              |
+| Load more                      | `Load {count} more`                                                                                                                                                 |
 
 ---
 
@@ -1309,7 +1309,7 @@ Every binding is inert while focus is inside a text field except `Esc` and
 **The queue**
 
 - [ ] `/decisions` lists open Approvals and open Escalations in one list, ranked by
-      blocking → confidence (unscored at 0.5, labelled *not scored*) → age.
+      blocking → confidence (unscored at 0.5, labelled _not scored_) → age.
 - [ ] The header shows an open count and a blocking count, and neither shows `0`
       while the read is in flight.
 - [ ] Tabs `Open` / `Answered` / `Archived` are present, deep-linkable, and each
@@ -1343,7 +1343,7 @@ Every binding is inert while focus is inside a text field except `Esc` and
 - [ ] A parked Run is restarted as a new Run continuing the same conversation, and
       the user sees `{agent} is picking the work back up.`
 - [ ] A live Run receives the answers by injection, and the user sees `Sent to the
-      Run that is already going.`
+Run that is already going.`
 - [ ] A decision with no restartable work still closes, and says so.
 - [ ] A blocked Task whose only remaining blocker was this decision returns to the
       status it held before it was blocked; a Task with other blockers stays blocked
@@ -1398,33 +1398,33 @@ Every binding is inert while focus is inside a text field except `Esc` and
 ## 9. Open questions
 
 - `[NEEDS CLARIFICATION: whose queue is "My" in a multi-member workspace? Access
-  today is tenant-wide — every member of a workspace can see every organisation in
-  it — and there is no per-organisation role model, so any member can answer any
-  decision. Options: (a) ship it that way and show who decided, which is what this
-  spec assumes; (b) hold routing until the role model exists; (c) add a soft
-  "claimed by" marker with no enforcement. Recommendation: (a) now, (c) as a P3
-  follow-up.]`
+today is tenant-wide — every member of a workspace can see every organisation in
+it — and there is no per-organisation role model, so any member can answer any
+decision. Options: (a) ship it that way and show who decided, which is what this
+spec assumes; (b) hold routing until the role model exists; (c) add a soft
+"claimed by" marker with no enforcement. Recommendation: (a) now, (c) as a P3
+follow-up.]`
 - `[NEEDS CLARIFICATION: should an agent be able to withdraw its own decision when
-  it finds the answer itself? It would keep the queue honest, but it also lets a
-  prompt-injected agent silently drop a question a human should have seen.
-  Recommendation: allow it only for the agent that raised it, only while no human
-  has viewed it, and always leave a visible "the agent answered this itself" row.]`
+it finds the answer itself? It would keep the queue honest, but it also lets a
+prompt-injected agent silently drop a question a human should have seen.
+Recommendation: allow it only for the agent that raised it, only while no human
+has viewed it, and always leave a visible "the agent answered this itself" row.]`
 - `[NEEDS CLARIFICATION: can a human open a decision, addressed to an agent, from
-  this surface? It reads naturally as the inverse of the queue, but it overlaps
-  heavily with a Task and with the chat surfaces. Recommendation: out of scope
-  here; revisit after AW-12.]`
+this surface? It reads naturally as the inverse of the queue, but it overlaps
+heavily with a Task and with the chat surfaces. Recommendation: out of scope
+here; revisit after AW-12.]`
 - `[NEEDS CLARIFICATION: exact clustering key for "substantially identical".
-  Candidate: the raising Agent plus the source reason or action type plus a
-  normalised fingerprint of the first ask's prompt. Needs a sample of real
-  decisions before the threshold and the normalisation are fixed.]`
+Candidate: the raising Agent plus the source reason or action type plus a
+normalised fingerprint of the first ask's prompt. Needs a sample of real
+decisions before the threshold and the normalisation are fixed.]`
 - `[NEEDS CLARIFICATION: should the health band be per workspace or per
-  Organization? Per workspace is simpler and matches where the preference row
-  lives today; per Organization is what a multi-team account will eventually want.]`
+Organization? Per workspace is simpler and matches where the preference row
+lives today; per Organization is what a multi-team account will eventually want.]`
 - `[NEEDS CLARIFICATION: the 10-minute undo window. It is a guess. Instrument
-  time-from-answer-to-undo in P2 and revisit in P3 with real numbers.]`
+time-from-answer-to-undo in P2 and revisit in P3 with real numbers.]`
 - `[NEEDS CLARIFICATION: how much of a decision belongs on a read-only shared
-  dashboard (AW-18)? Showing the count is clearly safe; showing the prompts may
-  leak the content of the work.]`
+dashboard (AW-18)? Showing the count is clearly safe; showing the prompts may
+leak the content of the work.]`
 
 ---
 
@@ -1455,24 +1455,24 @@ Every binding is inert while focus is inside a text field except `Esc` and
 - **Degradation.** With no background job runtime configured, the queue and every
   answer still work; only the automatic restart is unavailable, and it says so.
   With the health roll-up unavailable, the line is hidden. With the confidence
-  score absent, the decision ranks at 0.5 and is labelled *not scored*.
+  score absent, the decision ranks at 0.5 and is labelled _not scored_.
 
 ---
 
 ## 11. Constitution gates
 
-| Gate | Status | Why |
-| --- | --- | --- |
-| I — Plugin-first | n/a | No external integration. The access ask links to the existing connection surfaces; it never talks to a provider |
-| II — Capability-driven resolution | ✅ | An access ask names a capability or tool pattern, never a plugin id; the link resolves through the existing plugin surfaces |
-| III — Source-of-truth repos | n/a | Decisions are platform metadata, not work content |
-| IV — Job runtime | ✅ | The restart, the orphan sweep and the daily health roll-up all run through the configured job-runtime provider |
-| V — Forward-only migrations | ✅ | One new table and additive nullable columns; no drops, no renames, no destructive change |
-| VI — Tests first-class | ✅ | Unit for the resolution and band logic, controller specs for every endpoint, e2e for the queue, the unblock, undo and archive |
-| VII — Secrets | ✅ | An access ask carries the *name* of what is needed; never a value. Nothing on this surface stores or renders a credential |
-| VIII — Plugin counts | n/a | No plugin added |
-| IX — Behaviour-first spec | ✅ | This document carries no class name, file path or code |
-| X — Backwards compatibility | ✅ | Existing endpoints unchanged; the two vocabulary additions are additive union members |
+| Gate                              | Status | Why                                                                                                                           |
+| --------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| I — Plugin-first                  | n/a    | No external integration. The access ask links to the existing connection surfaces; it never talks to a provider               |
+| II — Capability-driven resolution | ✅     | An access ask names a capability or tool pattern, never a plugin id; the link resolves through the existing plugin surfaces   |
+| III — Source-of-truth repos       | n/a    | Decisions are platform metadata, not work content                                                                             |
+| IV — Job runtime                  | ✅     | The restart, the orphan sweep and the daily health roll-up all run through the configured job-runtime provider                |
+| V — Forward-only migrations       | ✅     | One new table and additive nullable columns; no drops, no renames, no destructive change                                      |
+| VI — Tests first-class            | ✅     | Unit for the resolution and band logic, controller specs for every endpoint, e2e for the queue, the unblock, undo and archive |
+| VII — Secrets                     | ✅     | An access ask carries the _name_ of what is needed; never a value. Nothing on this surface stores or renders a credential     |
+| VIII — Plugin counts              | n/a    | No plugin added                                                                                                               |
+| IX — Behaviour-first spec         | ✅     | This document carries no class name, file path or code                                                                        |
+| X — Backwards compatibility       | ✅     | Existing endpoints unchanged; the two vocabulary additions are additive union members                                         |
 
 ---
 

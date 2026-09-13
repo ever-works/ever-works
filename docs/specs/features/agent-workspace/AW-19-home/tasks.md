@@ -398,19 +398,14 @@
 
 ### 1h. Phase 1 i18n and tests
 
-- [ ] **T26.** Add the i18n keys.
-    - Add the full `dashboard.home` namespace and the `dashboard.soon` /
+- [ ] **T26.** Add the i18n keys. - Add the full `dashboard.home` namespace and the `dashboard.soon` /
       `dashboard.attention` additions from `plan.md` §8 to
-      `apps/web/messages/en.json`.
-    - Change the two `dashboard.soon` **values** ("Coming up" → "Today") — keys
-      untouched.
-    - Mirror every key into the other 20 locale files in `apps/web/messages/`
+      `apps/web/messages/en.json`. - Change the two `dashboard.soon` **values** ("Coming up" → "Today") — keys
+      untouched. - Mirror every key into the other 20 locale files in `apps/web/messages/`
       (`ar, bg, de, es, fr, he, hi, id, it, ja, ko, nl, pl, pt, ru, th, tr, uk,
-      vi, zh`) with real translations. No half-translated locale.
-    - **Every leaf key name is camelCase and contains no literal `.`** — next-intl
+vi, zh`) with real translations. No half-translated locale. - **Every leaf key name is camelCase and contains no literal `.`** — next-intl
       rejects dotted leaf names at runtime and the hydration spec turns that into
-      a multi-shard e2e failure.
-    - **Done when**: `pnpm --filter @ever-works/web test` is green and a manual
+      a multi-shard e2e failure. - **Done when**: `pnpm --filter @ever-works/web test` is green and a manual
       locale switch shows no English fallback on Home.
 
 - [ ] **T27.** Phase 1 end-to-end coverage.
@@ -453,11 +448,11 @@
       as in `plan.md` §3.1, modelled on
       `packages/agent/src/entities/user-notification-preference.entity.ts`.
     - Register in all four places:
-      - `packages/agent/src/entities/index.ts` (re-export)
-      - `packages/agent/src/database/_entities-inventory.ts` (concrete import +
-        `ENTITIES` entry — never the barrel; the file explains why)
-      - `packages/agent/src/database/_entity-names.ts` (`'UserHomePreference'`)
-      - `packages/agent/src/database/_repository-inventory.ts` (the repository)
+        - `packages/agent/src/entities/index.ts` (re-export)
+        - `packages/agent/src/database/_entities-inventory.ts` (concrete import +
+          `ENTITIES` entry — never the barrel; the file explains why)
+        - `packages/agent/src/database/_entity-names.ts` (`'UserHomePreference'`)
+        - `packages/agent/src/database/_repository-inventory.ts` (the repository)
     - Create
       `packages/agent/src/database/repositories/user-home-preference.repository.ts`
       with `findForUser`, `upsertForUser`.

@@ -30,9 +30,9 @@ reason why, with the failing run one click away. The card carries three new thin
 **level** (Trainee → Assistant → Specialist → Lead) that states in one word how much rope
 the agent has and writes the permission and approval defaults that back that claim; a
 **Personality** file that shapes how the agent talks without touching what it may do, and
-that takes effect from the agent's *next* run so a run in flight never changes voice
-mid-sentence; and a **live status dot with a stated reason** — *Paused by you*, *Blocked
-on a credential*, *Hit an error* — that is never a bare colour. Behind the card, **Pause
+that takes effect from the agent's _next_ run so a run in flight never changes voice
+mid-sentence; and a **live status dot with a stated reason** — _Paused by you_, _Blocked
+on a credential_, _Hit an error_ — that is never a bare colour. Behind the card, **Pause
 becomes a platform-enforced brake**: a paused agent stops picking up scheduled runs,
 assigned tasks, chat replies, inbound email and delegated work, its queued work parks
 instead of failing, and resuming replays it. Pausing is safe, reversible in one click,
@@ -42,30 +42,30 @@ and — for the first time — actually total.
 
 ### 2.1 The user's question
 
-> *"Why is this one not doing anything?"*
+> _"Why is this one not doing anything?"_
 
 and, right behind it:
 
-> *"If I pause it, is it actually stopped?"*
+> _"If I pause it, is it actually stopped?"_
 
 ### 2.2 What they do today instead
 
-| The need | What Ever Works offers today | What the user actually does |
-| --- | --- | --- |
-| See at a glance whether an agent is alive | A six-value status chip on the agent card and hero, rendered from the raw enum value — the hero prints the untranslated string `paused` — with no reason, no timestamp and no next step. | Opens the Activity tab and reads run history to guess. |
-| Know *why* an agent stopped | Nothing. `status = 'error'` is reached silently once `errorCount` passes `pauseAfterFailures` (default 3). The count is shown; the cause is not. | Opens the Sessions list, finds the newest failed run, reads the raw error. |
-| Know an agent stopped because a credential died | Nothing at all. A revoked token surfaces as a generic run failure, three times, and then as a bare `error` chip. | Discovers it days later. |
-| Stop an agent completely | `Pause` exists and is honoured by exactly one dispatch path — the heartbeat claim. Assigning a task to a paused agent runs it. So does an `@mention` chat reply. So does delegation from a parent agent. | Believes the agent is stopped. It is not. |
-| Pause without losing queued work | Not a question that can be asked, because pause does not park anything. | — |
-| Say how much autonomy an agent has | Eight boolean permissions, a nullable guardrails object and a merge-policy override, spread over two tabs. All eight permissions default to `false` and guardrails default to `null` ("queue everything"), so **every agent looks identical from the outside**. | Opens Settings and Capabilities and reads eleven controls. |
-| Shape how an agent writes | The five canonical files mix identity, role, operating loop and tool notes. Voice ends up smeared across `SOUL.md` and `AGENTS.md`, where editing it risks editing the agent's job. | Edits `SOUL.md` and hopes. |
-| Change voice safely mid-flight | Nothing. A file edit is picked up by whatever assembles the next prompt, with no statement of when it takes effect. | Waits and re-reads output to check. |
-| See what an agent has been told to remember | The per-agent Notes file arrives with [AW-07](../AW-07-memory-context/spec.md), but it lives inside a file editor two clicks from anywhere a decision is made. | Opens the Instructions tab. |
+| The need                                        | What Ever Works offers today                                                                                                                                                                                                                                    | What the user actually does                                                |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| See at a glance whether an agent is alive       | A six-value status chip on the agent card and hero, rendered from the raw enum value — the hero prints the untranslated string `paused` — with no reason, no timestamp and no next step.                                                                        | Opens the Activity tab and reads run history to guess.                     |
+| Know _why_ an agent stopped                     | Nothing. `status = 'error'` is reached silently once `errorCount` passes `pauseAfterFailures` (default 3). The count is shown; the cause is not.                                                                                                                | Opens the Sessions list, finds the newest failed run, reads the raw error. |
+| Know an agent stopped because a credential died | Nothing at all. A revoked token surfaces as a generic run failure, three times, and then as a bare `error` chip.                                                                                                                                                | Discovers it days later.                                                   |
+| Stop an agent completely                        | `Pause` exists and is honoured by exactly one dispatch path — the heartbeat claim. Assigning a task to a paused agent runs it. So does an `@mention` chat reply. So does delegation from a parent agent.                                                        | Believes the agent is stopped. It is not.                                  |
+| Pause without losing queued work                | Not a question that can be asked, because pause does not park anything.                                                                                                                                                                                         | —                                                                          |
+| Say how much autonomy an agent has              | Eight boolean permissions, a nullable guardrails object and a merge-policy override, spread over two tabs. All eight permissions default to `false` and guardrails default to `null` ("queue everything"), so **every agent looks identical from the outside**. | Opens Settings and Capabilities and reads eleven controls.                 |
+| Shape how an agent writes                       | The five canonical files mix identity, role, operating loop and tool notes. Voice ends up smeared across `SOUL.md` and `AGENTS.md`, where editing it risks editing the agent's job.                                                                             | Edits `SOUL.md` and hopes.                                                 |
+| Change voice safely mid-flight                  | Nothing. A file edit is picked up by whatever assembles the next prompt, with no statement of when it takes effect.                                                                                                                                             | Waits and re-reads output to check.                                        |
+| See what an agent has been told to remember     | The per-agent Notes file arrives with [AW-07](../AW-07-memory-context/spec.md), but it lives inside a file editor two clicks from anywhere a decision is made.                                                                                                  | Opens the Instructions tab.                                                |
 
 Four gaps, all of them ours:
 
 1. **Status is a colour, not an answer.** The platform knows why an agent stopped in every
-   case — a person pressed pause, a run failed *n* times, a provider rejected a
+   case — a person pressed pause, a run failed _n_ times, a provider rejected a
    credential — and it persists none of it. The one place the reason exists is a raw error
    string on the newest failed run, which nothing links to from the agent.
 2. **Pause is a suggestion.** It binds on the heartbeat dispatcher and nothing else.
@@ -125,7 +125,7 @@ Three independently shippable phases:
   **Given** an agent whose last three runs failed,
   **when** the owner opens the agent,
   **then** the identity card shows a red dot, the headline **"Hit an error"**, the sub-line
-  *"3 runs failed in a row — last one 12 minutes ago"*, and a **See the failing run** link
+  _"3 runs failed in a row — last one 12 minutes ago"_, and a **See the failing run** link
   that opens that exact run.
 
 - **S2 — Pause actually stops everything.**
@@ -133,19 +133,19 @@ Three independently shippable phases:
   assigned to it and an unanswered `@mention` in a task chat,
   **when** the owner presses **Pause**,
   **then** the card reads **"Paused by you"** with the time, the heartbeat stops firing,
-  the two task assignments are accepted but **parked** with the reason *"Waiting — the
-  agent is paused"*, the chat reply does not run, and nothing anywhere reports a failure.
+  the two task assignments are accepted but **parked** with the reason _"Waiting — the
+  agent is paused"_, the chat reply does not run, and nothing anywhere reports a failure.
 
 - **S3 — Resume replays what was held.**
   **Given** the agent from S2, paused for two hours with three parked runs,
   **when** the owner presses **Resume**,
   **then** the status returns to **Idle** or **Working**, the reason line clears, the three
-  parked runs are released oldest-first, and a toast reads *"Resumed — 3 held runs
-  released."*
+  parked runs are released oldest-first, and a toast reads _"Resumed — 3 held runs
+  released."_
 
 - **S4 — Say why you paused it.**
   **Given** an owner about to pause an agent,
-  **when** they press **Pause** and type *"holding until the rebrand ships Friday"* into
+  **when** they press **Pause** and type _"holding until the rebrand ships Friday"_ into
   the optional note,
   **then** the card's reason line reads **"Paused by you"** with that note underneath, and
   the note appears in the activity feed entry for the pause.
@@ -161,83 +161,83 @@ Three independently shippable phases:
 - **S6 — Give an agent a level.**
   **Given** an agent with no level set,
   **when** the owner opens the level control and chooses **Specialist**,
-  **then** a preview lists exactly what will change — *"Can assign tasks: no → yes. Can
+  **then** a preview lists exactly what will change — _"Can assign tasks: no → yes. Can
   edit skills: no → yes. Can commit to a repository: no → yes. Approvals: everything
-  queues → routine work runs, money and outside actions still queue."* — and nothing is
+  queues → routine work runs, money and outside actions still queue."_ — and nothing is
   written until they confirm.
 
 - **S7 — See that an agent's settings drifted from its level.**
   **Given** a Specialist whose "can commit to a repository" permission was later switched
   off by hand,
   **when** the owner opens the card,
-  **then** the level chip carries a quiet marker and the line reads *"2 settings differ
-  from the Specialist defaults"* with a **Show the differences** link; nothing is changed
+  **then** the level chip carries a quiet marker and the line reads _"2 settings differ
+  from the Specialist defaults"_ with a **Show the differences** link; nothing is changed
   automatically and the agent keeps working.
 
 - **S8 — Learn that an agent has earned a promotion.**
   **Given** an Assistant that has completed 34 runs in the last 30 days with no rejected
   approval and one escalation,
   **when** the owner opens the card,
-  **then** a single line reads *"Ready for Specialist — 34 runs, no rejected approvals in
-  30 days"* with a **Review** link that opens the same previewed, confirmed level change
+  **then** a single line reads _"Ready for Specialist — 34 runs, no rejected approvals in
+  30 days"_ with a **Review** link that opens the same previewed, confirmed level change
   as S6. Nothing is promoted automatically, ever.
 
 - **S9 — Give an agent a voice.**
   **Given** an agent that writes in a register the owner dislikes,
-  **when** they open **Personality** and write *"Short sentences. No adjectives you would
-  not say out loud. Never open with 'Certainly'."* and save,
-  **then** the editor confirms *"Saved — takes effect on the next run"*, the identity card
+  **when** they open **Personality** and write _"Short sentences. No adjectives you would
+  not say out loud. Never open with 'Certainly'."_ and save,
+  **then** the editor confirms _"Saved — takes effect on the next run"_, the identity card
   shows the first line of the personality, and the agent's next run writes in that voice.
 
 - **S10 — Voice does not change mid-run.**
   **Given** a run that started three minutes ago,
   **when** the owner saves a new Personality while that run is still going,
-  **then** the editor says *"Saved — takes effect on the next run. 1 run in flight is
-  still using the previous version."*, and the in-flight run finishes in the old voice.
+  **then** the editor says _"Saved — takes effect on the next run. 1 run in flight is
+  still using the previous version."_, and the in-flight run finishes in the old voice.
 
 ### 3.2 Unhappy paths, races, empty states and denials
 
 - **S11 — Run now on a paused agent is refused, clearly.**
   **Given** a paused agent,
   **when** the owner presses **Run now**,
-  **then** nothing is dispatched and the message reads *"This agent is paused. Resume it
-  first."* with a **Resume** button in the message. No run row is created.
+  **then** nothing is dispatched and the message reads _"This agent is paused. Resume it
+  first."_ with a **Resume** button in the message. No run row is created.
 
 - **S12 — Pause while a run is in flight.**
   **Given** an agent with one run 40 seconds in,
   **when** the owner presses **Pause**,
-  **then** the pause takes effect immediately for everything *new*, the in-flight run is
-  left to finish, the card reads **"Paused by you"** with the sub-line *"1 run still
-  finishing"*, and a secondary **Stop it now** action is offered that requests the
+  **then** the pause takes effect immediately for everything _new_, the in-flight run is
+  left to finish, the card reads **"Paused by you"** with the sub-line _"1 run still
+  finishing"_, and a secondary **Stop it now** action is offered that requests the
   existing cooperative stop. Nothing is killed without a second, explicit action.
 
 - **S13 — Two people pause and resume at the same time.**
   **Given** two members of the same workspace on the agent at once,
   **when** one presses **Pause** and the other presses **Resume** within the same second,
   **then** exactly one wins, both clients converge on the winning state within one status
-  poll, the loser's client shows *"Someone else changed this — showing the current
-  state."*, and the activity feed records both attempts with their authors.
+  poll, the loser's client shows _"Someone else changed this — showing the current
+  state."_, and the activity feed records both attempts with their authors.
 
 - **S14 — A parent agent tries to delegate to a paused child.**
   **Given** a paused agent that a parent agent is allowed to delegate to,
   **when** the parent tries to delegate,
-  **then** the delegation is refused with the reason *"That agent is paused"*, the parent
+  **then** the delegation is refused with the reason _"That agent is paused"_, the parent
   is told so in its run log rather than silently failing, and no child run is created.
 
 - **S15 — Resume an agent whose credential is still broken.**
   **Given** an agent halted with **"Blocked on a credential"**,
   **when** the owner presses **Resume** without fixing anything,
   **then** the resume is allowed, the reason clears, and the next run halts it again with
-  the same reason. The card additionally shows *"Halted for this reason twice"* on the
+  the same reason. The card additionally shows _"Halted for this reason twice"_ on the
   second occurrence so the loop is visible rather than mysterious.
 
 - **S16 — A level change would remove a permission the agent is using.**
   **Given** a Lead agent that currently may spend, being moved down to Assistant,
   **when** the owner opens the preview,
-  **then** the removals are listed first, under the heading *"This takes autonomy away"*,
+  **then** the removals are listed first, under the heading _"This takes autonomy away"_,
   each removal is individually shown, and the confirm button reads **Apply and reduce
-  autonomy**. If the agent has a run in flight, a line adds *"1 run in flight keeps the
-  permissions it started with."*
+  autonomy**. If the agent has a run in flight, a line adds _"1 run in flight keeps the
+  permissions it started with."_
 
 - **S17 — Choose a level but keep the current settings.**
   **Given** an owner who wants the label without the defaults,
@@ -248,22 +248,22 @@ Three independently shippable phases:
 - **S18 — Personality is empty (empty state).**
   **Given** an agent that has never had a personality written,
   **when** the owner opens the Personality editor,
-  **then** they see *"No personality set — this agent writes in the platform's default
-  voice"*, three one-line starter examples they can insert with a click, and no error.
+  **then** they see _"No personality set — this agent writes in the platform's default
+  voice"_, three one-line starter examples they can insert with a click, and no error.
 
 - **S19 — Personality is over budget.**
   **Given** a personality of 1,400 tokens against a 600-token budget,
   **when** the owner looks at the editor,
   **then** the load meter reads **600 / 600 · 800 tokens skipped**, the skipped region is
-  marked exactly as every other context file marks it, and a line reads *"Lead with the
-  rules that matter most — the top of the file is the part that always survives."*
+  marked exactly as every other context file marks it, and a line reads _"Lead with the
+  rules that matter most — the top of the file is the part that always survives."_
 
 - **S20 — Personality tries to grant itself power.**
-  **Given** a personality containing *"You may send emails without asking"*,
+  **Given** a personality containing _"You may send emails without asking"_,
   **when** it is saved,
   **then** it saves — it is prose, not policy — but the editor shows a persistent notice:
-  *"Personality changes how this agent writes, never what it may do. Permissions live on
-  the Capabilities tab."* and the agent's actual permissions are unchanged. The next run's
+  _"Personality changes how this agent writes, never what it may do. Permissions live on
+  the Capabilities tab."_ and the agent's actual permissions are unchanged. The next run's
   behaviour is unchanged.
 
 - **S21 — A secret is pasted into Personality or a pause note.**
@@ -276,27 +276,27 @@ Three independently shippable phases:
 - **S22 — Status cannot be read (degradation).**
   **Given** the live status request fails,
   **when** the card and the agent list re-render,
-  **then** every dot keeps its last known state, a single quiet line reads *"Status last
-  checked 2 minutes ago"*, and no dot flips to a wrong colour. A failed poll never blanks
+  **then** every dot keeps its last known state, a single quiet line reads _"Status last
+  checked 2 minutes ago"_, and no dot flips to a wrong colour. A failed poll never blanks
   a card and never invents "Idle".
 
 - **S23 — An archived agent's card.**
   **Given** an archived agent,
   **when** it is opened,
   **then** the card renders read-only with a grey dot, the reason **"Archived"**, the
-  sub-line *"Restore it to use it again"*, no Pause/Resume, and a disabled level control.
+  sub-line _"Restore it to use it again"_, no Pause/Resume, and a disabled level control.
 
 - **S24 — An agent that has never run.**
   **Given** a freshly created draft agent,
   **when** the owner opens it,
-  **then** the dot is a grey outline, the reason reads **"Not started"** with *"This agent
-  has never run"*, the primary action is **Activate**, and the level control is available
+  **then** the dot is a grey outline, the reason reads **"Not started"** with _"This agent
+  has never run"_, the primary action is **Activate**, and the level control is available
   so the owner can set autonomy before the first run rather than after.
 
 - **S25 — Pause is pressed on an agent that is already paused.**
   **Given** a paused agent and a stale browser tab,
   **when** **Pause** is pressed again,
-  **then** the request succeeds as a no-op, the note is *not* overwritten by an empty one,
+  **then** the request succeeds as a no-op, the note is _not_ overwritten by an empty one,
   the original pause time and author are preserved, and no duplicate activity row is
   written.
 
@@ -305,8 +305,8 @@ Three independently shippable phases:
   change,
   **when** both land,
   **then** the level application is refused if the agent changed since the preview was
-  computed, the message reads *"This agent changed since the preview — here is the new
-  preview"*, and the fresh preview is shown rather than a blind overwrite.
+  computed, the message reads _"This agent changed since the preview — here is the new
+  preview"_, and the fresh preview is shown rather than a blind overwrite.
 
 ## 4. Functional requirements
 
@@ -320,11 +320,11 @@ Three independently shippable phases:
   **Personality**, **Level**.
 - **FR-3** **Working on** MUST show the current run's activity line when a run is in
   flight, the time it started, and a link to that run; otherwise it MUST show the next
-  scheduled run time, or *"No schedule set"* when there is none.
+  scheduled run time, or _"No schedule set"_ when there is none.
 - **FR-4** **Notes** MUST show the first **2** lines of the agent's Notes file (delivered
-  by [AW-07](../AW-07-memory-context/spec.md)) with an **Edit** link, or *"No notes yet"*.
+  by [AW-07](../AW-07-memory-context/spec.md)) with an **Edit** link, or _"No notes yet"_.
 - **FR-5** **Personality** MUST show the first **2** lines of the agent's Personality file
-  with an **Edit** link, or *"No personality set"*.
+  with an **Edit** link, or _"No personality set"_.
 - **FR-6** **Level** MUST show the level name, its one-sentence meaning, and — when the
   agent's settings differ from that level's defaults — a count of differences with a link
   that lists them.
@@ -365,8 +365,8 @@ Three independently shippable phases:
   when it becomes visible again.
 - **FR-19** A list of agents MUST refresh their statuses in **one** request covering up to
   **100** agents, not one request per agent.
-- **FR-20** A failed status refresh MUST keep the last known state, MUST surface *"Status
-  last checked <relative time>"*, and MUST NOT change any dot.
+- **FR-20** A failed status refresh MUST keep the last known state, MUST surface _"Status
+  last checked <relative time>"_, and MUST NOT change any dot.
 
 ### 4.3 Pause as a platform-enforced brake
 
@@ -378,10 +378,10 @@ Three independently shippable phases:
   so that any future dispatch path inherits it without a code change at the call site.
 - **FR-23** Work that arrives for a paused agent through an asynchronous path (task
   assignment, chat, email, delegation) MUST be **parked**, not failed: the run row is
-  created in a queued state carrying the reason *the agent is paused*.
+  created in a queued state carrying the reason _the agent is paused_.
 - **FR-24** Work that arrives through a **synchronous, user-initiated** path (**Run now**)
-  MUST be refused with a `409`-class response and the message *"This agent is paused.
-  Resume it first."*, and MUST NOT create a run row.
+  MUST be refused with a `409`-class response and the message _"This agent is paused.
+  Resume it first."_, and MUST NOT create a run row.
 - **FR-25** Resuming MUST release parked runs for that agent oldest-first, up to **50** per
   resume, and MUST report how many were released.
 - **FR-26** Parked runs MUST NOT be counted as failures, MUST NOT increment the agent's
@@ -414,24 +414,24 @@ Three independently shippable phases:
   level automatically.
 - **FR-36** Agents created after this ships MUST default to **Trainee**.
 - **FR-37** Each level MUST carry exactly one sentence of user-visible meaning:
-  - Trainee — *"Nothing leaves without you."*
-  - Assistant — *"Routine work runs. Anything that reaches the outside waits."*
-  - Specialist — *"Owns its lane end to end. Money and public actions still wait."*
-  - Lead — *"Coordinates other agents and can spend within its cap."*
+    - Trainee — _"Nothing leaves without you."_
+    - Assistant — _"Routine work runs. Anything that reaches the outside waits."_
+    - Specialist — _"Owns its lane end to end. Money and public actions still wait."_
+    - Lead — _"Coordinates other agents and can spend within its cap."_
 - **FR-38** Each level MUST define a complete set of defaults over the agent's existing
   permission flags and approval posture. The defaults MUST be:
 
-  | Setting | Trainee | Assistant | Specialist | Lead |
-  | --- | --- | --- | --- | --- |
-  | Create other agents | no | no | no | **yes** |
-  | Assign tasks | no | no | **yes** | **yes** |
-  | Edit skills | no | no | **yes** | **yes** |
-  | Edit its own agent files | no | **yes** | **yes** | **yes** |
-  | Spend | no | no | no | **yes** |
-  | Commit to a repository | no | no | **yes** | **yes** |
-  | Open pull requests | no | no | no | **yes** |
-  | Call external tools | no | **yes** | **yes** | **yes** |
-  | Approval posture | everything queues | routine work runs | routine work runs | routine work runs, plus may propose spawning another agent |
+    | Setting                  | Trainee           | Assistant         | Specialist        | Lead                                                       |
+    | ------------------------ | ----------------- | ----------------- | ----------------- | ---------------------------------------------------------- |
+    | Create other agents      | no                | no                | no                | **yes**                                                    |
+    | Assign tasks             | no                | no                | **yes**           | **yes**                                                    |
+    | Edit skills              | no                | no                | **yes**           | **yes**                                                    |
+    | Edit its own agent files | no                | **yes**           | **yes**           | **yes**                                                    |
+    | Spend                    | no                | no                | no                | **yes**                                                    |
+    | Commit to a repository   | no                | no                | **yes**           | **yes**                                                    |
+    | Open pull requests       | no                | no                | no                | **yes**                                                    |
+    | Call external tools      | no                | **yes**           | **yes**           | **yes**                                                    |
+    | Approval posture         | everything queues | routine work runs | routine work runs | routine work runs, plus may propose spawning another agent |
 
 - **FR-39** Sending a message outside the workspace and overriding a budget MUST queue for
   a human at **every** level, including Lead. No level auto-approves either.
@@ -439,7 +439,7 @@ Three independently shippable phases:
   that lists every field that will change, old value → new value, and MUST NOT be applied
   automatically at any time except at agent creation.
 - **FR-41** A preview that removes autonomy MUST list the removals first under the heading
-  *"This takes autonomy away"* and MUST label its confirm button **Apply and reduce
+  _"This takes autonomy away"_ and MUST label its confirm button **Apply and reduce
   autonomy**.
 - **FR-42** Setting a level without applying its defaults MUST be possible, and MUST
   immediately produce the drift indicator described in FR-43.
@@ -475,7 +475,7 @@ Three independently shippable phases:
 - **FR-55** A saved Personality MUST take effect from the agent's **next** run. A run
   already in flight MUST finish using the version it started with, and the platform MUST
   record which version each run used.
-- **FR-56** The save confirmation MUST say *"takes effect on the next run"* and MUST name
+- **FR-56** The save confirmation MUST say _"takes effect on the next run"_ and MUST name
   the number of runs in flight when that number is greater than zero.
 - **FR-57** Personality MUST be secret-scanned on write and refused when a secret is
   detected, naming the field and never echoing the value.
@@ -484,7 +484,7 @@ Three independently shippable phases:
   handling every other authored segment already receives.
 - **FR-59** Personality MUST carry the same revision history, attribution and one-click
   restore as every other context file.
-- **FR-60** An agent MUST be able to *propose* a change to its own Personality and Notes,
+- **FR-60** An agent MUST be able to _propose_ a change to its own Personality and Notes,
   and MUST NOT be able to write either without the existing "edit agent files"
   permission. An agent MUST NEVER write another agent's files.
 - **FR-61** Personality MUST be included in export and import of an agent, and an import
@@ -527,17 +527,17 @@ Three independently shippable phases:
 
 ## 5. Key entities & domain concepts
 
-| Concept | New? | Description | States → transitions |
-| --- | --- | --- | --- |
-| **Agent** | Existing (extended) | Gains a level, a personality file, and a persisted halt reason with its cause, time, author and run. | `draft → active → paused ⇄ active`, `active → error`, `* → archived` — **unchanged**. This epic adds no status member and no transition. |
-| **Agent level** | **New field on an existing noun** | A four-rung declaration of earned autonomy that seeds the agent's existing permission flags and approval posture and is displayed everywhere the agent appears. Not a new entity, not a new authorisation layer. | `unset → trainee → assistant → specialist → lead`, and freely back down. Every move is a human act with a preview. |
-| **Halt reason** | **New field on an existing noun** | Why an agent is not working, persisted at the moment it stops: one of `user`, `credential`, `failures`, `cap`, `platform`, plus an optional note, a time, an author and the run that caused it. | written on halt · cleared on resume, activate or unarchive · never edited in place |
-| **Status reason** | **New read model, not stored** | The single derived answer to "what is this agent doing and why", computed server-side from status, halt reason, in-flight runs, open decisions and schedule. Ten closed values (FR-10). | computed per request |
-| **Identity card** | **New surface, not an entity** | The composed read model behind the card: identity, level, status reason, current run, notes preview, personality preview, drift count, readiness. | computed per request |
-| **Personality** | **New agent file** | An authored file whose only job is tone. Joins the agent-file family — same endpoints, same optimistic-concurrency hash, same revision history, same secret scan. Distinct from Notes (what the agent has learned) and from the workspace's shared voice (house style for everyone). | `empty → written → written`. No delete; clearing it is a write of empty. |
-| **Notes** | Existing from AW-07 | The agent's own durable notes, loaded every run. This epic surfaces it and adds no second mechanism. | unchanged |
-| **Run** | Existing (extended) | Records which version of the agent's personality it used, so "takes effect on the next run" is checkable rather than asserted. Gains one more parked reason: *the agent is paused*. | unchanged |
-| **Approval / Escalation** | Existing (untouched) | Levels write the approval posture; they do not change how an approval is raised, queued or decided. | unchanged |
+| Concept                   | New?                              | Description                                                                                                                                                                                                                                                                          | States → transitions                                                                                                                     |
+| ------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Agent**                 | Existing (extended)               | Gains a level, a personality file, and a persisted halt reason with its cause, time, author and run.                                                                                                                                                                                 | `draft → active → paused ⇄ active`, `active → error`, `* → archived` — **unchanged**. This epic adds no status member and no transition. |
+| **Agent level**           | **New field on an existing noun** | A four-rung declaration of earned autonomy that seeds the agent's existing permission flags and approval posture and is displayed everywhere the agent appears. Not a new entity, not a new authorisation layer.                                                                     | `unset → trainee → assistant → specialist → lead`, and freely back down. Every move is a human act with a preview.                       |
+| **Halt reason**           | **New field on an existing noun** | Why an agent is not working, persisted at the moment it stops: one of `user`, `credential`, `failures`, `cap`, `platform`, plus an optional note, a time, an author and the run that caused it.                                                                                      | written on halt · cleared on resume, activate or unarchive · never edited in place                                                       |
+| **Status reason**         | **New read model, not stored**    | The single derived answer to "what is this agent doing and why", computed server-side from status, halt reason, in-flight runs, open decisions and schedule. Ten closed values (FR-10).                                                                                              | computed per request                                                                                                                     |
+| **Identity card**         | **New surface, not an entity**    | The composed read model behind the card: identity, level, status reason, current run, notes preview, personality preview, drift count, readiness.                                                                                                                                    | computed per request                                                                                                                     |
+| **Personality**           | **New agent file**                | An authored file whose only job is tone. Joins the agent-file family — same endpoints, same optimistic-concurrency hash, same revision history, same secret scan. Distinct from Notes (what the agent has learned) and from the workspace's shared voice (house style for everyone). | `empty → written → written`. No delete; clearing it is a write of empty.                                                                 |
+| **Notes**                 | Existing from AW-07               | The agent's own durable notes, loaded every run. This epic surfaces it and adds no second mechanism.                                                                                                                                                                                 | unchanged                                                                                                                                |
+| **Run**                   | Existing (extended)               | Records which version of the agent's personality it used, so "takes effect on the next run" is checkable rather than asserted. Gains one more parked reason: _the agent is paused_.                                                                                                  | unchanged                                                                                                                                |
+| **Approval / Escalation** | Existing (untouched)              | Levels write the approval posture; they do not change how an approval is raised, queued or decided.                                                                                                                                                                                  | unchanged                                                                                                                                |
 
 ### 5.1 Why "level" is not a synonym for anything we already have
 
@@ -547,20 +547,20 @@ them:
 - **`title`** is free text an owner writes for a human audience ("Senior researcher"). It
   carries no defaults and no meaning to the platform. Levels are a closed set with
   behaviour attached.
-- **`reportsToAgentId`** is the organisation chart. It answers *who coordinates whom*,
+- **`reportsToAgentId`** is the organisation chart. It answers _who coordinates whom_,
   carries no authority today, and is orthogonal: a Trainee can report to a Specialist, and
   two Leads can report to nobody.
 - **Permissions and guardrails** are the enforcement. A level does not replace them, does
-  not wrap them and does not shadow them — it *writes* them, once, with a preview, and
+  not wrap them and does not shadow them — it _writes_ them, once, with a preview, and
   then gets out of the way. That is exactly why FR-43 exists: when the two disagree, the
   permissions win and the level says so.
 
 ### 5.2 Why "personality" is not a sixth instruction file by another name
 
-The existing files answer *what the agent is for* (`SOUL.md`), *what its job is*
-(`AGENTS.md`), *what it does when it wakes up* (`HEARTBEAT.md`), *what it may reach for*
-(`TOOLS.md`) and *how it is configured* (`agent.yml`). None of them answers *how it
-sounds*. Today voice is written into the first two, which means every voice edit is also
+The existing files answer _what the agent is for_ (`SOUL.md`), _what its job is_
+(`AGENTS.md`), _what it does when it wakes up_ (`HEARTBEAT.md`), _what it may reach for_
+(`TOOLS.md`) and _how it is configured_ (`agent.yml`). None of them answers _how it
+sounds_. Today voice is written into the first two, which means every voice edit is also
 an edit to the agent's purpose or its job — the highest-risk files it has. Splitting tone
 into its own small, budgeted, revision-tracked file makes voice cheap to change and
 impossible to change by accident.
@@ -634,7 +634,7 @@ The dot before **Working** is green and animates only while a run is in flight.
 ```
 
 The sub-line names the connection and never the credential. Copy is
-*"The model provider rejected this agent's account at {time}."* — the provider's display
+_"The model provider rejected this agent's account at {time}."_ — the provider's display
 name is substituted, nothing else.
 
 ### 6.4 Identity card — hit an error
@@ -722,8 +722,8 @@ removals first, and changes the confirm button to **Apply and reduce autonomy**.
 
 With **Apply this level's defaults** cleared, the change list is replaced by:
 
-> *"Only the level is recorded. No permission or approval setting changes — the card will
-> show 4 settings differing from the Specialist defaults."*
+> _"Only the level is recorded. No permission or approval setting changes — the card will
+> show 4 settings differing from the Specialist defaults."_
 
 ### 6.8 Level drift — the difference list
 
@@ -745,7 +745,7 @@ With **Apply this level's defaults** cleared, the change list is replaced by:
 
 Rendered as a single line under the level row, never as a badge or a banner:
 
-> *"Ready for Specialist — 34 runs, no rejected approvals, 1 escalation in 30 days."*
+> _"Ready for Specialist — 34 runs, no rejected approvals, 1 escalation in 30 days."_
 > **Review**
 
 When the agent does not qualify, nothing is rendered. There is no "not ready yet" state.
@@ -817,30 +817,30 @@ Saved while a run is in flight:
 
 ### 6.12 Error and over-limit states
 
-| Situation | Exact copy |
-| --- | --- |
-| Run now on a paused agent | *"This agent is paused. Resume it first."* with an inline **Resume** |
-| Delegation to a paused agent | *"That agent is paused."* |
-| Someone else changed the state | *"Someone else changed this — showing the current state."* |
-| Level preview went stale | *"This agent changed since the preview — here is the new preview."* |
-| Secret detected in Personality | *"That looks like a secret. Personality is stored as plain text and shown to the agent — remove the value in {field} and save again."* |
-| Secret detected in a pause note | *"That looks like a secret. Remove it from the note and try again."* |
-| Personality over 8 KB | *"Personality is limited to 8 KB. This is {size} — trim it and save again."* |
-| Pause note over 200 characters | The counter turns red at 200 and the confirm button disables |
-| Status could not be read | *"Status last checked {relative time}."* |
-| Level list could not be read | *"Levels are unavailable right now. The agent's own settings are unchanged."* |
+| Situation                       | Exact copy                                                                                                                             |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Run now on a paused agent       | _"This agent is paused. Resume it first."_ with an inline **Resume**                                                                   |
+| Delegation to a paused agent    | _"That agent is paused."_                                                                                                              |
+| Someone else changed the state  | _"Someone else changed this — showing the current state."_                                                                             |
+| Level preview went stale        | _"This agent changed since the preview — here is the new preview."_                                                                    |
+| Secret detected in Personality  | _"That looks like a secret. Personality is stored as plain text and shown to the agent — remove the value in {field} and save again."_ |
+| Secret detected in a pause note | _"That looks like a secret. Remove it from the note and try again."_                                                                   |
+| Personality over 8 KB           | _"Personality is limited to 8 KB. This is {size} — trim it and save again."_                                                           |
+| Pause note over 200 characters  | The counter turns red at 200 and the confirm button disables                                                                           |
+| Status could not be read        | _"Status last checked {relative time}."_                                                                                               |
+| Level list could not be read    | _"Levels are unavailable right now. The agent's own settings are unchanged."_                                                          |
 
 ### 6.13 Keyboard affordances
 
-| Key | Where | Action |
-| --- | --- | --- |
-| `P` | Identity card focused | Open the pause dialog, or resume when paused |
-| `L` | Identity card focused | Open the level dialog |
-| `Esc` | Any dialog | Cancel without writing |
-| `Cmd/Ctrl + Enter` | Pause dialog, level dialog | Confirm |
-| `Tab` | Level dialog | Moves through the four radios, then the checkbox, then the buttons |
-| `Enter` | Reason sub-line link | Follows it (failing run, connection, decision) |
-| `Cmd/Ctrl + S` | Personality editor | Save now instead of waiting for autosave |
+| Key                | Where                      | Action                                                             |
+| ------------------ | -------------------------- | ------------------------------------------------------------------ |
+| `P`                | Identity card focused      | Open the pause dialog, or resume when paused                       |
+| `L`                | Identity card focused      | Open the level dialog                                              |
+| `Esc`              | Any dialog                 | Cancel without writing                                             |
+| `Cmd/Ctrl + Enter` | Pause dialog, level dialog | Confirm                                                            |
+| `Tab`              | Level dialog               | Moves through the four radios, then the checkbox, then the buttons |
+| `Enter`            | Reason sub-line link       | Follows it (failing run, connection, decision)                     |
+| `Cmd/Ctrl + S`     | Personality editor         | Save now instead of waiting for autosave                           |
 
 All dots expose their reason as text to assistive technology; the card's status region is
 announced politely on change, not assertively, so a background poll never interrupts.
@@ -848,10 +848,10 @@ announced politely on change, not assertively, so a background poll never interr
 ## 7. Out of scope
 
 - **Enforcement by level.** A level writes existing settings; it does not add a new
-  authorisation check. The trust ladder that makes autonomy *earned* rather than
-  *declared* — automatic promotion on evidence, level-scoped policy, level-aware approval
+  authorisation check. The trust ladder that makes autonomy _earned_ rather than
+  _declared_ — automatic promotion on evidence, level-scoped policy, level-aware approval
   routing — is [AW-24](../README.md).
-- **Connection health.** This epic derives *blocked on a credential* from a run that
+- **Connection health.** This epic derives _blocked on a credential_ from a run that
   failed on a rejected credential. Scheduled probing of every connection, the
   healthy/expired/unreachable states and the Reconnect flow are
   [AW-15](../AW-15-connections-scopes/spec.md); when they land they become a second, better
@@ -896,20 +896,20 @@ announced politely on change, not assertively, so a background poll never interr
 **The stated reason**
 
 - [ ] Every agent renders a dot **and** a sentence, in the card and in any list.
-- [ ] A paused agent shows *Paused by you*, the time, and the note when there is one.
-- [ ] Three consecutive failures show *Hit an error* with a one-click link to the newest
+- [ ] A paused agent shows _Paused by you_, the time, and the note when there is one.
+- [ ] Three consecutive failures show _Hit an error_ with a one-click link to the newest
       failed run.
-- [ ] A credential rejection halts the agent after **one** failure and shows *Blocked on a
-      credential* naming the connection.
+- [ ] A credential rejection halts the agent after **one** failure and shows _Blocked on a
+      credential_ naming the connection.
 - [ ] No credential value appears in the payload, the UI, the activity feed or the logs.
-- [ ] An agent with an open decision shows *Waiting on you* and links to it.
+- [ ] An agent with an open decision shows _Waiting on you_ and links to it.
 - [ ] A failed status refresh keeps every dot and shows when it was last checked.
 - [ ] One request refreshes up to 100 agents' statuses.
 - [ ] Polling stops when the tab is hidden.
 
 **Levels**
 
-- [ ] Existing agents render *Level not set*; none is assigned a level by the migration.
+- [ ] Existing agents render _Level not set_; none is assigned a level by the migration.
 - [ ] A new agent is created at Trainee.
 - [ ] Choosing a level shows a preview of every changing field before anything is written.
 - [ ] Reducing autonomy sorts removals first and relabels the confirm button.
@@ -925,7 +925,7 @@ announced politely on change, not assertively, so a background poll never interr
 **Personality**
 
 - [ ] Personality appears as a pill in the per-agent instructions editor next to Notes.
-- [ ] Saving confirms *takes effect on the next run* and names in-flight runs when there
+- [ ] Saving confirms _takes effect on the next run_ and names in-flight runs when there
       are any.
 - [ ] A run in flight finishes with the version it started with, and the run records which
       version it used.
@@ -1013,7 +1013,7 @@ announced politely on change, not assertively, so a background poll never interr
       dot.
 - [x] **Every new surface answers "what did it cost?"** This epic spends nothing new: it
       adds no model call, no background sweep and no scheduled job. The one place it
-      touches spend is the level's *"can spend"* default, and that is shown in the preview
+      touches spend is the level's _"can spend"_ default, and that is shown in the preview
       before it is written. "Hear its voice" is deliberately routed through chat, which
       already carries its own cost accounting and its own receipt.
 

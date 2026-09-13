@@ -73,7 +73,7 @@
       `apps/api/src/migrations/1791070000000-CreateMemoryFacts.ts`.
       Branch on `queryRunner.connection.options.type === 'postgres'` for
       `vector(1536)` vs `TEXT`, and create the `ivfflat … vector_cosine_ops WITH
-      (lists = 100)` index on Postgres only — copy the shape from
+(lists = 100)` index on Postgres only — copy the shape from
       `apps/api/src/migrations/1779975000000-CreateWorkKnowledgeChunks.ts`.
       Create `idx_memory_facts_owner_status`, `idx_memory_facts_agent`,
       `idx_memory_facts_forgotten_at`, and the partial unique
@@ -89,7 +89,7 @@
       Methods: `listForOwner`, `countByStatus`, `findOwned`, `create`,
       `update`, `setStatus`, `forgetAll`, `searchSemantic` (ANN with the score
       threshold, always `WHERE user_id = … AND organization_id IS NOT DISTINCT
-      FROM …`), `searchLiteral`, `dueForPurge`, `dueForReembed`.
+FROM …`), `searchLiteral`, `dueForPurge`, `dueForReembed`.
       **Done when**: every query is owner-scoped and there is no code path that
       can read a row outside the caller's workspace.
       **Test**: `packages/agent/src/database/repositories/__tests__/memory-fact.repository.spec.ts`
@@ -278,7 +278,7 @@
 
 - [ ] **T24. P1 gate.**
       Run from the repo root: `pnpm format && pnpm lint && pnpm type-check &&
-      pnpm test && pnpm build`.
+pnpm test && pnpm build`.
       **Done when**: green, and `docs/specs/features/agent-workspace/TRACKER.md`
       row AW-07 reads `Spec: Draft` / `Impl: In progress` with the branch link.
 
@@ -443,7 +443,7 @@
       Modify `packages/agent/src/agents/agent-run.service.ts` to write one
       `AgentRunLog` row per truncating run (level `WARN`, step
       `context-budget`, metadata `{ segment, capTokens, originalTokens,
-      truncatedTokens, skippedChars }`) and the `memory-recall` /
+truncatedTokens, skippedChars }`) and the `memory-recall` /
       `memory-capture` lines from plan §9.2. Emit the analytics events from plan
       §9.3 through `packages/monitoring`.
       **Done when**: a run with an over-budget Notes file produces exactly one
@@ -456,7 +456,7 @@
       `LoadMeter.unit.spec.tsx`). The **only** place the three states are styled.
       Renders used / budget / percentage / skipped tokens, the authoring rule
       line, and an assistive-technology text summary
-      (*"Notes: 1,500 of 1,500 tokens used, 2,600 tokens skipped"*).
+      (_"Notes: 1,500 of 1,500 tokens used, 2,600 tokens skipped"_).
 
 - [ ] **T42. `ContextFilePanel`, `ContextFileEditor`, `ContextFilePreview`.**
       Create the three components under `apps/web/src/components/memory/` (+ a
@@ -575,7 +575,7 @@
 - [ ] **T57. Proposed-fact review surface.**
       Extend `apps/web/src/components/memory/FactsPanel.tsx` with the
       **Proposed** filter body: the proposal card, its
-      *"Proposed by {agent} during run {id}"* line linking to the run, and
+      _"Proposed by {agent} during run {id}"_ line linking to the run, and
       **Accept** / **Discard**. Surface the backlog-full state.
       **Done when**: a proposed fact is provably never returned by recall
       (asserted in T35's suite).

@@ -13,34 +13,34 @@
 
 ## 1. Current state in the codebase
 
-The Fleet subsystem is mature. This epic is a *surfacing* job on top of it plus two genuinely new
+The Fleet subsystem is mature. This epic is a _surfacing_ job on top of it plus two genuinely new
 pieces: a visual channel and a demonstration-to-Skill pipeline.
 
 ### 1.1 What a Node already is
 
-| Piece | Where |
-| --- | --- |
-| Node registry, enrolment, drain, rotate, capability pinning | `apps/api/src/fleet/fleet.controller.ts`, `packages/agent/src/fleet/fleet.service.ts`, `packages/agent/src/fleet/fleet-node.repository.ts` |
-| Node entity | `packages/agent/src/entities/fleet-node.entity.ts` |
-| Job entity + lease protocol (CAS claim, capability filter, target-node filter, keep-alive, reclaim) | `packages/agent/src/entities/fleet-job.entity.ts`, `packages/agent/src/fleet/fleet-job.service.ts`, `apps/api/src/fleet/fleet-jobs.controller.ts` |
-| Node-secret authentication at the edge | `apps/api/src/fleet/guards/fleet-node-auth.guard.ts`, `packages/agent/src/fleet/fleet-node-credential.ts` |
-| Agent↔Node affinity (entity, service, enqueue snapshot, lease filter) | `packages/agent/src/entities/fleet-agent-node-affinity.entity.ts`, `packages/agent/src/fleet/fleet-agent-node-affinity.service.ts`, `apps/api/src/fleet/fleet-agent-affinity.controller.ts` |
-| Affinity UI (already shipped — the "Execution" section of the Capabilities tab) | `apps/web/src/components/agents/AgentFleetSection.tsx`, `apps/web/src/components/agents/agent-fleet.shared.ts` |
-| Runtime routing (local-wait / local-fallback / cloud, narrowest-wins) | `apps/api/src/fleet/fleet-run-router.service.ts`, `apps/api/src/fleet/fleet-agent-task.dispatcher.ts` |
-| Runner status composer behind the sidebar pill | `apps/api/src/fleet/fleet-runner-status.service.ts` |
-| Panic controls + kill switch | `apps/api/src/fleet/fleet-panic.controller.ts`, `apps/api/src/fleet/fleet-kill-switch.controller.ts`, `packages/agent/src/fleet/fleet-kill-switch.service.ts` |
-| **Fleet audit ledger — one writer, redaction-hardened** | `packages/agent/src/fleet/fleet-audit.service.ts`, `packages/agent/src/entities/fleet-audit.entity.ts`, action union in `packages/contracts/src/fleet/fleet-panic.types.ts` |
-| Node process: heartbeat, capability probe, lease loop, executors | `apps/node/src/core/heartbeat.ts`, `apps/node/src/core/capabilities.ts`, `apps/node/src/core/worker-loop.ts`, `apps/node/src/core/runtime.ts` |
-| Node's browser discovery — one probe, two consumers | `apps/node/src/core/browser-probe.ts` (`BROWSER_PATH_ENV`, `BROWSER_PATH_COMMANDS`) |
-| Node's real-Chrome executor (the precedent for driving a local browser from Node core) | `apps/node/src/core/executors/browser-check.ts` |
-| Node CLI verbs (`enroll`, `start --work`, `pause`, `status`, …) | `apps/node/src/cli/program.ts` |
-| Per-Task git worktree provisioning on the Node | `apps/node/src/core/workspaces/fleet-task-workspace.ts` |
+| Piece                                                                                               | Where                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node registry, enrolment, drain, rotate, capability pinning                                         | `apps/api/src/fleet/fleet.controller.ts`, `packages/agent/src/fleet/fleet.service.ts`, `packages/agent/src/fleet/fleet-node.repository.ts`                                                  |
+| Node entity                                                                                         | `packages/agent/src/entities/fleet-node.entity.ts`                                                                                                                                          |
+| Job entity + lease protocol (CAS claim, capability filter, target-node filter, keep-alive, reclaim) | `packages/agent/src/entities/fleet-job.entity.ts`, `packages/agent/src/fleet/fleet-job.service.ts`, `apps/api/src/fleet/fleet-jobs.controller.ts`                                           |
+| Node-secret authentication at the edge                                                              | `apps/api/src/fleet/guards/fleet-node-auth.guard.ts`, `packages/agent/src/fleet/fleet-node-credential.ts`                                                                                   |
+| Agent↔Node affinity (entity, service, enqueue snapshot, lease filter)                               | `packages/agent/src/entities/fleet-agent-node-affinity.entity.ts`, `packages/agent/src/fleet/fleet-agent-node-affinity.service.ts`, `apps/api/src/fleet/fleet-agent-affinity.controller.ts` |
+| Affinity UI (already shipped — the "Execution" section of the Capabilities tab)                     | `apps/web/src/components/agents/AgentFleetSection.tsx`, `apps/web/src/components/agents/agent-fleet.shared.ts`                                                                              |
+| Runtime routing (local-wait / local-fallback / cloud, narrowest-wins)                               | `apps/api/src/fleet/fleet-run-router.service.ts`, `apps/api/src/fleet/fleet-agent-task.dispatcher.ts`                                                                                       |
+| Runner status composer behind the sidebar pill                                                      | `apps/api/src/fleet/fleet-runner-status.service.ts`                                                                                                                                         |
+| Panic controls + kill switch                                                                        | `apps/api/src/fleet/fleet-panic.controller.ts`, `apps/api/src/fleet/fleet-kill-switch.controller.ts`, `packages/agent/src/fleet/fleet-kill-switch.service.ts`                               |
+| **Fleet audit ledger — one writer, redaction-hardened**                                             | `packages/agent/src/fleet/fleet-audit.service.ts`, `packages/agent/src/entities/fleet-audit.entity.ts`, action union in `packages/contracts/src/fleet/fleet-panic.types.ts`                 |
+| Node process: heartbeat, capability probe, lease loop, executors                                    | `apps/node/src/core/heartbeat.ts`, `apps/node/src/core/capabilities.ts`, `apps/node/src/core/worker-loop.ts`, `apps/node/src/core/runtime.ts`                                               |
+| Node's browser discovery — one probe, two consumers                                                 | `apps/node/src/core/browser-probe.ts` (`BROWSER_PATH_ENV`, `BROWSER_PATH_COMMANDS`)                                                                                                         |
+| Node's real-Chrome executor (the precedent for driving a local browser from Node core)              | `apps/node/src/core/executors/browser-check.ts`                                                                                                                                             |
+| Node CLI verbs (`enroll`, `start --work`, `pause`, `status`, …)                                     | `apps/node/src/cli/program.ts`                                                                                                                                                              |
+| Per-Task git worktree provisioning on the Node                                                      | `apps/node/src/core/workspaces/fleet-task-workspace.ts`                                                                                                                                     |
 
 Two structural facts shape everything below:
 
-1. **The channel is outbound-only.** Nothing connects *into* a Node and no port is opened on the
+1. **The channel is outbound-only.** Nothing connects _into_ a Node and no port is opened on the
    user's machine (`apps/node/src/core/worker-loop.ts` states this as a design rule). The screen
-   channel therefore has to be *published outward* by the Node exactly the way terminal frames are
+   channel therefore has to be _published outward_ by the Node exactly the way terminal frames are
    published outward by the job worker today. There is no negotiation about this.
 2. **`FleetJobKind` is a closed three-value union** —
    `packages/contracts/src/fleet/fleet-jobs.types.ts:104` — and none of the three is an interactive
@@ -48,19 +48,19 @@ Two structural facts shape everything below:
 
 ### 1.2 What the streaming terminal already is
 
-| Piece | Where |
-| --- | --- |
-| Frozen wire protocol (`auth`/`stdin`/`resize` in, `stdout`/`exit`/`error` out; 1 MiB frame cap; direction map; null-never-throw codec) | `packages/contracts/src/terminal/terminal-frame.types.ts`, `packages/contracts/src/terminal/terminal-frame.codec.ts` |
-| WebSocket gateway on the API's own HTTP upgrade, token in the first frame never in the URL, 4001 after 5 s, 30 s ping | `apps/api/src/terminal/terminal-ws.service.ts` |
-| In-memory relay: rolling scrollback, replay on attach, pinned `exit`, seq dedupe, role-checked fan-out, reclaim rule | `apps/api/src/terminal/terminal-relay.registry.ts` |
-| Attach-token minting + role downgrade (`driver` / `viewer` / `worker`) | `apps/api/src/terminal/terminal-attach.controller.ts`, `apps/api/src/terminal/terminal-attach.service.ts` |
-| Worker-facing frame publish / heartbeat / worker-token, shared-secret authenticated | `apps/api/src/terminal/terminal-internal.controller.ts` |
-| Session launcher with a CAS claim on the run's terminal slot | `packages/agent/src/agents/terminal-session-launcher.service.ts` |
-| Dispatch port + argv resolution (operator-configured, never caller-supplied) | `packages/agent/src/agents/terminal-session-dispatcher.ts` |
-| The session task | `packages/tasks/src/tasks/trigger/terminal-session.task.ts` |
-| Transcript persistence + retention GC | `packages/agent/src/entities/terminal-transcript-chunk.entity.ts`, `packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts` |
-| Browser pane (xterm.js with a dependency-free DOM floor) | `apps/web/src/components/terminal/TerminalPane.tsx`, `create-terminal-renderer.ts`, `use-terminal-attach.ts` |
-| Pluggable session host behind a capability | `packages/plugin/src/contracts/capabilities/terminal-stream.interface.ts`, `packages/plugins/pty-local/src/pty-local.plugin.ts` |
+| Piece                                                                                                                                  | Where                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Frozen wire protocol (`auth`/`stdin`/`resize` in, `stdout`/`exit`/`error` out; 1 MiB frame cap; direction map; null-never-throw codec) | `packages/contracts/src/terminal/terminal-frame.types.ts`, `packages/contracts/src/terminal/terminal-frame.codec.ts`                 |
+| WebSocket gateway on the API's own HTTP upgrade, token in the first frame never in the URL, 4001 after 5 s, 30 s ping                  | `apps/api/src/terminal/terminal-ws.service.ts`                                                                                       |
+| In-memory relay: rolling scrollback, replay on attach, pinned `exit`, seq dedupe, role-checked fan-out, reclaim rule                   | `apps/api/src/terminal/terminal-relay.registry.ts`                                                                                   |
+| Attach-token minting + role downgrade (`driver` / `viewer` / `worker`)                                                                 | `apps/api/src/terminal/terminal-attach.controller.ts`, `apps/api/src/terminal/terminal-attach.service.ts`                            |
+| Worker-facing frame publish / heartbeat / worker-token, shared-secret authenticated                                                    | `apps/api/src/terminal/terminal-internal.controller.ts`                                                                              |
+| Session launcher with a CAS claim on the run's terminal slot                                                                           | `packages/agent/src/agents/terminal-session-launcher.service.ts`                                                                     |
+| Dispatch port + argv resolution (operator-configured, never caller-supplied)                                                           | `packages/agent/src/agents/terminal-session-dispatcher.ts`                                                                           |
+| The session task                                                                                                                       | `packages/tasks/src/tasks/trigger/terminal-session.task.ts`                                                                          |
+| Transcript persistence + retention GC                                                                                                  | `packages/agent/src/entities/terminal-transcript-chunk.entity.ts`, `packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts` |
+| Browser pane (xterm.js with a dependency-free DOM floor)                                                                               | `apps/web/src/components/terminal/TerminalPane.tsx`, `create-terminal-renderer.ts`, `use-terminal-attach.ts`                         |
+| Pluggable session host behind a capability                                                                                             | `packages/plugin/src/contracts/capabilities/terminal-stream.interface.ts`, `packages/plugins/pty-local/src/pty-local.plugin.ts`      |
 
 **This is the template.** The screen channel is the same shape one level over: a frozen frame
 protocol in `@ever-works/contracts`, an outbound publish endpoint, a relay, an attach token, a
@@ -69,15 +69,15 @@ is the Node.
 
 ### 1.3 What is missing
 
-| Needed | State today |
-| --- | --- |
-| A visual channel of any kind | Nothing. No screenshot capability, job kind or endpoint exists in the fleet, node or terminal modules. |
-| Input forwarding into a machine | Nothing. |
-| A terminal that runs **on the Node** | Nothing. The Node advertises a `terminal` tag (`BASE_CAPABILITIES = ['terminal','workspace']`, `apps/node/src/core/capabilities.ts:65`) that no job kind ever exercises. |
-| Per-Agent browser profile / file root on a Node | Nothing. The Node provisions a per-**Task** git worktree; nothing is per-Agent or durable. |
-| A record of who watched or controlled a machine | Nothing — but the ledger to write it into exists and is already the one writer for every fleet action. |
-| Recording of a session | Nothing for screen. Terminal transcripts exist as a working precedent for retention + GC. |
-| Demonstration → Skill | Nothing. Skills are authored as Markdown in a plain textarea (`apps/web` Skill detail page still uses a Write/Preview textarea, per that page's own note). |
+| Needed                                          | State today                                                                                                                                                              |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A visual channel of any kind                    | Nothing. No screenshot capability, job kind or endpoint exists in the fleet, node or terminal modules.                                                                   |
+| Input forwarding into a machine                 | Nothing.                                                                                                                                                                 |
+| A terminal that runs **on the Node**            | Nothing. The Node advertises a `terminal` tag (`BASE_CAPABILITIES = ['terminal','workspace']`, `apps/node/src/core/capabilities.ts:65`) that no job kind ever exercises. |
+| Per-Agent browser profile / file root on a Node | Nothing. The Node provisions a per-**Task** git worktree; nothing is per-Agent or durable.                                                                               |
+| A record of who watched or controlled a machine | Nothing — but the ledger to write it into exists and is already the one writer for every fleet action.                                                                   |
+| Recording of a session                          | Nothing for screen. Terminal transcripts exist as a working precedent for retention + GC.                                                                                |
+| Demonstration → Skill                           | Nothing. Skills are authored as Markdown in a plain textarea (`apps/web` Skill detail page still uses a Write/Preview textarea, per that page's own note).               |
 
 ### 1.4 Adjacent pieces this epic reuses rather than rebuilds
 
@@ -152,16 +152,16 @@ terminal worker uses today (`role: 'worker'` token brokered by run id in
 
 ### 2.2 New module boundaries
 
-| Layer | New unit |
-| --- | --- |
-| Contracts | `packages/contracts/src/computer/` — frame protocol + codec + session view types; `packages/contracts/src/secret/` — the pure secret-pattern scanner extracted from the agent package |
-| Plugin SDK | `packages/plugin/src/contracts/capabilities/screen-stream.interface.ts` + `SCREEN_STREAM` in `packages/plugin/src/contracts/facade-capabilities.ts` |
-| Plugin | `packages/plugins/screen-cdp/` — the cloud-side `screen-stream` provider (P3) |
-| Agent package | `packages/agent/src/computer/` — session service, control arbiter, recording service, demonstration service, synthesis prompt builder, dispatch ports |
-| API | `apps/api/src/computer/` — public controller, internal (node-facing) controller, relay registry, attach service, WS gateway, module |
-| Node | `apps/node/src/core/screen/` — CDP capture pump, input injector, per-Agent profile manager, demonstration recorder; `apps/node/src/core/executors/computer-session.ts` |
-| Web | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/`, `apps/web/src/components/computer/` |
-| Tasks | three tasks under `packages/tasks/src/tasks/trigger/` |
+| Layer         | New unit                                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contracts     | `packages/contracts/src/computer/` — frame protocol + codec + session view types; `packages/contracts/src/secret/` — the pure secret-pattern scanner extracted from the agent package |
+| Plugin SDK    | `packages/plugin/src/contracts/capabilities/screen-stream.interface.ts` + `SCREEN_STREAM` in `packages/plugin/src/contracts/facade-capabilities.ts`                                   |
+| Plugin        | `packages/plugins/screen-cdp/` — the cloud-side `screen-stream` provider (P3)                                                                                                         |
+| Agent package | `packages/agent/src/computer/` — session service, control arbiter, recording service, demonstration service, synthesis prompt builder, dispatch ports                                 |
+| API           | `apps/api/src/computer/` — public controller, internal (node-facing) controller, relay registry, attach service, WS gateway, module                                                   |
+| Node          | `apps/node/src/core/screen/` — CDP capture pump, input injector, per-Agent profile manager, demonstration recorder; `apps/node/src/core/executors/computer-session.ts`                |
+| Web           | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/`, `apps/web/src/components/computer/`                                                                                    |
+| Tasks         | three tasks under `packages/tasks/src/tasks/trigger/`                                                                                                                                 |
 
 ### 2.3 Why the capture lives in Node core, not in a plugin
 
@@ -169,11 +169,11 @@ Constitution I requires every **external integration** to be a plugin. Driving t
 that is already on the user's machine is not an external integration, and the repository has
 already settled this case: `apps/node/src/core/executors/browser-check.ts` spawns a real Chrome
 found by `apps/node/src/core/browser-probe.ts`, in Node core, with no plugin. `apps/node` has no
-plugin runtime at all — its only `@ever-works/plugin` imports are *type-only* (see
+plugin runtime at all — its only `@ever-works/plugin` imports are _type-only_ (see
 `apps/node/src/core/workspaces/fleet-task-workspace.ts`). Introducing one to satisfy a rule that
 does not apply would be a large regression in that app's design.
 
-What *is* pluggable is the **cloud-hosted** capture path, and that ships as a real plugin behind a
+What _is_ pluggable is the **cloud-hosted** capture path, and that ships as a real plugin behind a
 real capability (`screen-stream`, mirroring `terminal-stream` exactly), so a future `screen-vnc`
 or `screen-k8s` provider drops in without touching core. No caller names a provider id: the API
 resolves through a facade, exactly as the terminal path does.
@@ -259,27 +259,27 @@ migration rather than the decorator.
 
 #### `computer-session.entity.ts` → `computer_sessions`
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | Doubles as the relay channel id and the WS path segment. |
-| `userId` | uuid | Owner scope, as every fleet row. |
-| `organizationId` | uuid? | Tier-A scope stamp. |
-| `agentId` | uuid | Whose computer this is. |
-| `nodeId` | uuid | Which machine. |
-| `openedByUserId` | uuid | Who opened it (may differ from `userId` for an org member). |
-| `runId` | uuid? | Bound at first frame when the Node is executing for this Agent. |
-| `fleetJobId` | uuid? | The `computer-session` job that carries it. |
-| `channels` | simple-json `('screen'\|'terminal')[]` | Requested channels. |
-| `activeChannel` | varchar(16) | `screen` \| `terminal`. |
-| `quality` | varchar(8) | `sharp` \| `smooth` \| `steady`. |
-| `status` | varchar(16) | `requested` \| `live` \| `stalled` \| `ended`. |
-| `closeReason` | varchar(24)? | Closed set from spec §5.2. |
-| `controlSpans` | simple-json | `{userId,startedAt,endedAt,reason}[]`, capped 50. |
-| `recorded` | boolean default false | |
-| `recordingSkippedReason` | varchar(32)? | e.g. `storage-unavailable`, `not-opted-in`. |
-| `frameCount` / `bytesOut` | int / bigint default 0 | Drives the bandwidth readout. |
-| `lastFrameAt` / `lastInputAt` | PortableDate? | Stall + idle detection. |
-| `startedAt` / `endedAt` / `createdAt` | PortableDate | |
+| Column                                | Type                                   | Notes                                                           |
+| ------------------------------------- | -------------------------------------- | --------------------------------------------------------------- |
+| `id`                                  | uuid PK                                | Doubles as the relay channel id and the WS path segment.        |
+| `userId`                              | uuid                                   | Owner scope, as every fleet row.                                |
+| `organizationId`                      | uuid?                                  | Tier-A scope stamp.                                             |
+| `agentId`                             | uuid                                   | Whose computer this is.                                         |
+| `nodeId`                              | uuid                                   | Which machine.                                                  |
+| `openedByUserId`                      | uuid                                   | Who opened it (may differ from `userId` for an org member).     |
+| `runId`                               | uuid?                                  | Bound at first frame when the Node is executing for this Agent. |
+| `fleetJobId`                          | uuid?                                  | The `computer-session` job that carries it.                     |
+| `channels`                            | simple-json `('screen'\|'terminal')[]` | Requested channels.                                             |
+| `activeChannel`                       | varchar(16)                            | `screen` \| `terminal`.                                         |
+| `quality`                             | varchar(8)                             | `sharp` \| `smooth` \| `steady`.                                |
+| `status`                              | varchar(16)                            | `requested` \| `live` \| `stalled` \| `ended`.                  |
+| `closeReason`                         | varchar(24)?                           | Closed set from spec §5.2.                                      |
+| `controlSpans`                        | simple-json                            | `{userId,startedAt,endedAt,reason}[]`, capped 50.               |
+| `recorded`                            | boolean default false                  |                                                                 |
+| `recordingSkippedReason`              | varchar(32)?                           | e.g. `storage-unavailable`, `not-opted-in`.                     |
+| `frameCount` / `bytesOut`             | int / bigint default 0                 | Drives the bandwidth readout.                                   |
+| `lastFrameAt` / `lastInputAt`         | PortableDate?                          | Stall + idle detection.                                         |
+| `startedAt` / `endedAt` / `createdAt` | PortableDate                           |                                                                 |
 
 Indexes: `(userId, status)`, `(nodeId, status)`, `(agentId, createdAt)`, `(runId)`.
 
@@ -321,27 +321,27 @@ requiredInputs, requiredSecrets) · `proposalId` uuid? · `skillId` uuid? ·
 ### 3.2 Columns added to existing entities
 
 - `packages/agent/src/entities/fleet-node.entity.ts`
-  - `controlPolicy` `varchar(24)` default `'owner'` — `owner` \| `org-admins` \| `org-members`.
-  - `recordWatchSessions` `boolean` default `false`.
-  - `recordingRetentionDays` `int` default `14` (clamped 1–90 in the service).
-  - `controlHolderUserId` `uuid` null, `controlHolderSessionId` `uuid` null,
-    `controlHeldSince` PortableDate null, `controlExpiresAt` PortableDate null — the CAS lock
-    from §2.4.
+    - `controlPolicy` `varchar(24)` default `'owner'` — `owner` \| `org-admins` \| `org-members`.
+    - `recordWatchSessions` `boolean` default `false`.
+    - `recordingRetentionDays` `int` default `14` (clamped 1–90 in the service).
+    - `controlHolderUserId` `uuid` null, `controlHolderSessionId` `uuid` null,
+      `controlHeldSince` PortableDate null, `controlExpiresAt` PortableDate null — the CAS lock
+      from §2.4.
 - `packages/agent/src/entities/agent-run.entity.ts`
-  - `computerRecordedAt` PortableDate null — set when the first recording segment for a session
-    bound to this run is written. A cheap flag so the receipt does not need a join to decide
-    whether to render *Watch the recording*.
+    - `computerRecordedAt` PortableDate null — set when the first recording segment for a session
+      bound to this run is written. A cheap flag so the receipt does not need a join to decide
+      whether to render _Watch the recording_.
 
 ### 3.3 Migrations (forward-only, `apps/api/src/migrations/`)
 
 Migrations are **authored** from `apps/api/`; nothing runs by hand on deploy — the API self-applies
 on boot. One migration per phase, additive only, `down` dropping exactly what `up` added.
 
-| Phase | File | Contents |
-| --- | --- | --- |
-| P1 | `1791110000000-CreateComputerSessions.ts` | `computer_sessions`, `node_agent_profiles`, 7 `ADD COLUMN` on `fleet_nodes`, their indexes. No `NOT NULL` without a default; no `ALTER … TYPE`. |
-| P2 | `1791110100000-CreateAgentDemonstrations.ts` | `agent_demonstrations`, `agent_demonstration_steps`, indexes. |
-| P3 | `1791110200000-CreateComputerRecordings.ts` | `computer_recording_segments`, its indexes, and `agent_runs.computerRecordedAt`. |
+| Phase | File                                         | Contents                                                                                                                                        |
+| ----- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1    | `1791110000000-CreateComputerSessions.ts`    | `computer_sessions`, `node_agent_profiles`, 7 `ADD COLUMN` on `fleet_nodes`, their indexes. No `NOT NULL` without a default; no `ALTER … TYPE`. |
+| P2    | `1791110100000-CreateAgentDemonstrations.ts` | `agent_demonstrations`, `agent_demonstration_steps`, indexes.                                                                                   |
+| P3    | `1791110200000-CreateComputerRecordings.ts`  | `computer_recording_segments`, its indexes, and `agent_runs.computerRecordedAt`.                                                                |
 
 `apps/api/src/migrations/` already holds 175 migrations; follow the neighbouring
 `1789000000000-AddFleetCredentialRotation.ts` for naming and shape. Timestamps are AW-11 slots
@@ -356,15 +356,16 @@ New: `packages/contracts/src/computer/`
   `packages/contracts/src/terminal/terminal-frame.types.ts` (size-capped **before** parse,
   null-never-throw, direction-mapped kinds, normalized field-by-field construction).
 
-  ```
-  server → client:  frame · mode · stats · error · end
-  client → server:  auth · pointer · key · text · scroll · quality · refresh · control
-  node   → server:  frame · terminal · stats · profile · step · end     (via the internal endpoint)
-  ```
+    ```
+    server → client:  frame · mode · stats · error · end
+    client → server:  auth · pointer · key · text · scroll · quality · refresh · control
+    node   → server:  frame · terminal · stats · profile · step · end     (via the internal endpoint)
+    ```
 
-  Constants: `COMPUTER_MAX_FRAME_BYTES = 512 * 1024`, `COMPUTER_MAX_BATCH_FRAMES = 8`,
-  `COMPUTER_QUALITY_PRESETS` (the three named tiers with their width / fps / keyframe interval),
-  `COMPUTER_CLOSE_REASONS`, `COMPUTER_CONTROL_RELEASE_REASONS`.
+    Constants: `COMPUTER_MAX_FRAME_BYTES = 512 * 1024`, `COMPUTER_MAX_BATCH_FRAMES = 8`,
+    `COMPUTER_QUALITY_PRESETS` (the three named tiers with their width / fps / keyframe interval),
+    `COMPUTER_CLOSE_REASONS`, `COMPUTER_CONTROL_RELEASE_REASONS`.
+
 - `computer-frame.codec.ts` — encode/decode/normalize, hand-rolled (the package is
   zero-dependency by design).
 - `computer-session.types.ts` — `ComputerSessionView`, `ComputerNodeOption` (with the closed-set
@@ -408,35 +409,35 @@ explicit widening on top, never a default.
 
 ### 4.1 Owner-facing — `@Controller('api/agents/:id/computer')`
 
-| Method | Path | Body / query | Returns | Notes |
-| --- | --- | --- | --- | --- |
-| GET | `/nodes` | — | `ComputerNodeOption[]` | Every visible Node with `watchable` and a closed-set `unwatchableReason`. Composes from `FleetService.listForUser` + `FleetJobService.loadByNodeForUser`, the same pair the settings table and the runner pill use, so three surfaces cannot disagree. |
-| POST | `/sessions` | `{ nodeId?, channels?, quality? }` | `202 { sessionId, status }` | `channels` defaults to `['screen']` when the Node can show a screen and to `['terminal']` otherwise. Refuses on kill switch (409), node state (409), session caps (429), and a requested channel the Node cannot serve (422, naming the channel and its missing capability — §2.5). Throttled 10/min. |
-| GET | `/sessions/:sessionId` | — | `ComputerSessionView` | Live relay view merged with the persisted row, exactly as the terminal status route does. |
-| PATCH | `/sessions/:sessionId` | `{ quality?, activeChannel? }` | `ComputerSessionView` | |
-| DELETE | `/sessions/:sessionId` | — | `204` | Idempotent. |
-| POST | `/sessions/:sessionId/attach-token` | `?role=viewer` | `{ token, expiresInSec }` | Short-lived signed token; role may only be **downgraded**, never upgraded — same rule as the terminal attach service. |
-| POST | `/sessions/:sessionId/control` | `{ request?: boolean }` | `200 { held, holder?, requestId? }` | CAS from §2.4. `409` with the holder when another party has it; `403` with the policy name when refused. Throttled 20/min. |
-| DELETE | `/sessions/:sessionId/control` | — | `204` | |
-| POST | `/sessions/:sessionId/control/handover` | `{ requestId, decision }` | `204` | The current holder answering a request. |
-| POST | `/sessions/:sessionId/refresh` | — | `202` | Forces a keyframe. Throttled 30/min. |
-| GET | `/sessions/:sessionId/recording` | — | `{ segments[], durationMs, controlSpans[] }` | Manifest only. |
-| GET | `/sessions/:sessionId/recording/segments/:seq` | — | bytes | `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`. |
-| GET | `/profile` | `?nodeId=` | `NodeAgentProfileView` | |
-| POST | `/profile/reset` | `{ nodeId, confirmAgentName }` | `202` | `409` when a Run is live for that Agent on that Node. |
+| Method | Path                                           | Body / query                       | Returns                                      | Notes                                                                                                                                                                                                                                                                                                 |
+| ------ | ---------------------------------------------- | ---------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/nodes`                                       | —                                  | `ComputerNodeOption[]`                       | Every visible Node with `watchable` and a closed-set `unwatchableReason`. Composes from `FleetService.listForUser` + `FleetJobService.loadByNodeForUser`, the same pair the settings table and the runner pill use, so three surfaces cannot disagree.                                                |
+| POST   | `/sessions`                                    | `{ nodeId?, channels?, quality? }` | `202 { sessionId, status }`                  | `channels` defaults to `['screen']` when the Node can show a screen and to `['terminal']` otherwise. Refuses on kill switch (409), node state (409), session caps (429), and a requested channel the Node cannot serve (422, naming the channel and its missing capability — §2.5). Throttled 10/min. |
+| GET    | `/sessions/:sessionId`                         | —                                  | `ComputerSessionView`                        | Live relay view merged with the persisted row, exactly as the terminal status route does.                                                                                                                                                                                                             |
+| PATCH  | `/sessions/:sessionId`                         | `{ quality?, activeChannel? }`     | `ComputerSessionView`                        |                                                                                                                                                                                                                                                                                                       |
+| DELETE | `/sessions/:sessionId`                         | —                                  | `204`                                        | Idempotent.                                                                                                                                                                                                                                                                                           |
+| POST   | `/sessions/:sessionId/attach-token`            | `?role=viewer`                     | `{ token, expiresInSec }`                    | Short-lived signed token; role may only be **downgraded**, never upgraded — same rule as the terminal attach service.                                                                                                                                                                                 |
+| POST   | `/sessions/:sessionId/control`                 | `{ request?: boolean }`            | `200 { held, holder?, requestId? }`          | CAS from §2.4. `409` with the holder when another party has it; `403` with the policy name when refused. Throttled 20/min.                                                                                                                                                                            |
+| DELETE | `/sessions/:sessionId/control`                 | —                                  | `204`                                        |                                                                                                                                                                                                                                                                                                       |
+| POST   | `/sessions/:sessionId/control/handover`        | `{ requestId, decision }`          | `204`                                        | The current holder answering a request.                                                                                                                                                                                                                                                               |
+| POST   | `/sessions/:sessionId/refresh`                 | —                                  | `202`                                        | Forces a keyframe. Throttled 30/min.                                                                                                                                                                                                                                                                  |
+| GET    | `/sessions/:sessionId/recording`               | —                                  | `{ segments[], durationMs, controlSpans[] }` | Manifest only.                                                                                                                                                                                                                                                                                        |
+| GET    | `/sessions/:sessionId/recording/segments/:seq` | —                                  | bytes                                        | `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`.                                                                                                                                                                                                                                 |
+| GET    | `/profile`                                     | `?nodeId=`                         | `NodeAgentProfileView`                       |                                                                                                                                                                                                                                                                                                       |
+| POST   | `/profile/reset`                               | `{ nodeId, confirmAgentName }`     | `202`                                        | `409` when a Run is live for that Agent on that Node.                                                                                                                                                                                                                                                 |
 
 ### 4.2 Demonstrations — `@Controller('api/agents/:id/demonstrations')`
 
-| Method | Path | Body | Returns |
-| --- | --- | --- | --- |
-| POST | `` | `{ sessionId, intent }` | `201 DemonstrationView` — `422` when the caller does not hold control. |
-| POST | `/:demoId/finish` | `{ keepPartial?: boolean }` | `202 DemonstrationView` |
-| POST | `/:demoId/cancel` | — | `204` |
-| GET | `/:demoId` | — | `DemonstrationView` with steps |
-| GET | `` | `?status=&limit=` | paged list |
-| PATCH | `/:demoId/steps/:seq` | `{ removed: true }` | `204` — the "remove a step" affordance in the review |
-| POST | `/:demoId/redraft` | — | `202` — re-run synthesis after step edits |
-| POST | `/from-run/:runId` | — | `202 DemonstrationView` — "make a Skill from this run"; `409` when the run has no stored steps |
+| Method | Path                  | Body                        | Returns                                                                                        |
+| ------ | --------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| POST   | ``                    | `{ sessionId, intent }`     | `201 DemonstrationView` — `422` when the caller does not hold control.                         |
+| POST   | `/:demoId/finish`     | `{ keepPartial?: boolean }` | `202 DemonstrationView`                                                                        |
+| POST   | `/:demoId/cancel`     | —                           | `204`                                                                                          |
+| GET    | `/:demoId`            | —                           | `DemonstrationView` with steps                                                                 |
+| GET    | ``                    | `?status=&limit=`           | paged list                                                                                     |
+| PATCH  | `/:demoId/steps/:seq` | `{ removed: true }`         | `204` — the "remove a step" affordance in the review                                           |
+| POST   | `/:demoId/redraft`    | —                           | `202` — re-run synthesis after step edits                                                      |
+| POST   | `/from-run/:runId`    | —                           | `202 DemonstrationView` — "make a Skill from this run"; `409` when the run has no stored steps |
 
 ### 4.3 Node-facing internal — `@Controller('api/internal/computer')`
 
@@ -444,13 +445,13 @@ explicit widening on top, never a default.
 (`apps/api/src/fleet/guards/fleet-node-auth.guard.ts`) — reused rather than re-implemented, so
 `disabled` and `enrolling` nodes are refused at the edge with the same undifferentiated 401.
 
-| Method | Path | Body | Notes |
-| --- | --- | --- | --- |
-| POST | `/:sessionId/frames` | `{ frames: ComputerFrame[] }` | Batch ≤ 8 frames / 512 KiB total. Publishes into the relay and, when recording, persists a ≤ 1 fps sample. |
-| POST | `/:sessionId/heartbeat` | `{ status, nodeLocalTime, stats }` | Enum-whitelisted lifecycle patch; carries the Node's wall clock for the identity strip. |
-| POST | `/:sessionId/worker-token` | — | Mints the Node's inbound-leg attach token, brokered by session id — never handed to a browser. |
-| POST | `/:sessionId/steps` | `{ steps: DemonstrationStep[] }` | Batch ≤ 25. Every string re-scanned server-side with `redactSecrets` before insert (belt and braces — the Node already scanned). |
-| POST | `/:sessionId/profile` | `{ profileKey, signedInSiteCount, diskBytes }` | Node's self-report for the isolation panel. |
+| Method | Path                       | Body                                           | Notes                                                                                                                            |
+| ------ | -------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/:sessionId/frames`       | `{ frames: ComputerFrame[] }`                  | Batch ≤ 8 frames / 512 KiB total. Publishes into the relay and, when recording, persists a ≤ 1 fps sample.                       |
+| POST   | `/:sessionId/heartbeat`    | `{ status, nodeLocalTime, stats }`             | Enum-whitelisted lifecycle patch; carries the Node's wall clock for the identity strip.                                          |
+| POST   | `/:sessionId/worker-token` | —                                              | Mints the Node's inbound-leg attach token, brokered by session id — never handed to a browser.                                   |
+| POST   | `/:sessionId/steps`        | `{ steps: DemonstrationStep[] }`               | Batch ≤ 25. Every string re-scanned server-side with `redactSecrets` before insert (belt and braces — the Node already scanned). |
+| POST   | `/:sessionId/profile`      | `{ profileKey, signedInSiteCount, diskBytes }` | Node's self-report for the isolation panel.                                                                                      |
 
 ### 4.4 Fleet heartbeat, extended
 
@@ -485,15 +486,15 @@ seam the terminal relay uses and is **out of scope** (spec §7).
 
 ### 5.1 Routes and navigation
 
-| Path | File |
-| --- | --- |
-| `/agents/[id]/computer` | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/page.tsx` |
+| Path                           | File                                                                                         |
+| ------------------------------ | -------------------------------------------------------------------------------------------- |
+| `/agents/[id]/computer`        | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/page.tsx`                        |
 | Recording player (modal route) | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/recordings/[sessionId]/page.tsx` |
-| Demonstration review | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/demonstrations/[demoId]/page.tsx` |
+| Demonstration review           | `apps/web/src/app/[locale]/(dashboard)/agents/[id]/demonstrations/[demoId]/page.tsx`         |
 
-- Add `DASHBOARD_AGENT_COMPUTER: (id: string) => `/agents/${id}/computer`` (and the two
-  sub-routes) to `apps/web/src/lib/constants.ts`, beside the existing
-  `DASHBOARD_AGENT_TERMINAL` at line 189.
+- Add `DASHBOARD_AGENT_COMPUTER: (id: string) => `/agents/${id}/computer``(and the two
+sub-routes) to`apps/web/src/lib/constants.ts`, beside the existing
+`DASHBOARD_AGENT_TERMINAL` at line 189.
 - Add a `computer` entry to the tab list in
   `apps/web/src/components/agents/AgentDetailTabs.tsx`, immediately after `terminal`.
 - Add the **Watch computer** button to the hero action row on
@@ -503,25 +504,25 @@ seam the terminal relay uses and is **out of scope** (spec §7).
 
 ### 5.2 Components — `apps/web/src/components/computer/`
 
-| File | Responsibility |
-| --- | --- |
-| `AgentComputerClient.tsx` | The page shell: session lifecycle, mode, channel, error states. |
-| `ComputerStage.tsx` | `<canvas>` renderer for screen frames; delegates to the terminal renderer for the terminal channel. Labelled focusable region. |
-| `ComputerIdentityStrip.tsx` | Agent · Node · Node-local clock · channel · quality · LIVE badge. |
-| `ComputerStatusLine.tsx` | The prose mode sentence + live region announcements. |
-| `ComputerControls.tsx` | Channel switch, quality menu, refresh, take over / give back, `⋯` menu. |
-| `ComputerNodePicker.tsx` | The Node list with closed-set reasons. Reuses `runnerDotClass` from `apps/web/src/components/dashboard/runner-status.shared.ts` and the node-status strings from `dashboard.runner.nodeState`, so this surface and the pill can never disagree. |
-| `ComputerBriefOverlay.tsx` | `BRIEF · <task>` + Mission, or the idle line. |
-| `ComputerWatermark.tsx` | The always-on identity watermark. |
-| `ComputerControlRequestDialog.tsx` | Both sides of the request/hand-over flow with the 60 s countdown. |
-| `ComputerProfilePanel.tsx` | Own logins and files + the typed-confirmation reset. |
-| `TeachTaskDialog.tsx` | The teach dialog, its guard state and the intent field. |
-| `TeachRecordingStrip.tsx` | `role="status"` strip, step counter, secret-skipped `role="alert"` flash. |
-| `DemonstrationReview.tsx` | Step list with thumbnails, per-step removal, re-draft. |
-| `DraftSkillCard.tsx` | The card rendered inside the conversation and in My Decisions. |
-| `ComputerRecordingPlayer.tsx` | Scrubber, control-span markers, playback rate. |
-| `use-computer-attach.ts` | The WebSocket hook — mirrors `apps/web/src/components/terminal/use-terminal-attach.ts`. |
-| `computer-session.shared.ts` | Pure policy: which Nodes are watchable and why, quality preset resolution, control-eligibility, stall thresholds. Split out for the same reason `agent-fleet.shared.ts` exists — each decision becomes a one-line test. |
+| File                               | Responsibility                                                                                                                                                                                                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AgentComputerClient.tsx`          | The page shell: session lifecycle, mode, channel, error states.                                                                                                                                                                                 |
+| `ComputerStage.tsx`                | `<canvas>` renderer for screen frames; delegates to the terminal renderer for the terminal channel. Labelled focusable region.                                                                                                                  |
+| `ComputerIdentityStrip.tsx`        | Agent · Node · Node-local clock · channel · quality · LIVE badge.                                                                                                                                                                               |
+| `ComputerStatusLine.tsx`           | The prose mode sentence + live region announcements.                                                                                                                                                                                            |
+| `ComputerControls.tsx`             | Channel switch, quality menu, refresh, take over / give back, `⋯` menu.                                                                                                                                                                         |
+| `ComputerNodePicker.tsx`           | The Node list with closed-set reasons. Reuses `runnerDotClass` from `apps/web/src/components/dashboard/runner-status.shared.ts` and the node-status strings from `dashboard.runner.nodeState`, so this surface and the pill can never disagree. |
+| `ComputerBriefOverlay.tsx`         | `BRIEF · <task>` + Mission, or the idle line.                                                                                                                                                                                                   |
+| `ComputerWatermark.tsx`            | The always-on identity watermark.                                                                                                                                                                                                               |
+| `ComputerControlRequestDialog.tsx` | Both sides of the request/hand-over flow with the 60 s countdown.                                                                                                                                                                               |
+| `ComputerProfilePanel.tsx`         | Own logins and files + the typed-confirmation reset.                                                                                                                                                                                            |
+| `TeachTaskDialog.tsx`              | The teach dialog, its guard state and the intent field.                                                                                                                                                                                         |
+| `TeachRecordingStrip.tsx`          | `role="status"` strip, step counter, secret-skipped `role="alert"` flash.                                                                                                                                                                       |
+| `DemonstrationReview.tsx`          | Step list with thumbnails, per-step removal, re-draft.                                                                                                                                                                                          |
+| `DraftSkillCard.tsx`               | The card rendered inside the conversation and in My Decisions.                                                                                                                                                                                  |
+| `ComputerRecordingPlayer.tsx`      | Scrubber, control-span markers, playback rate.                                                                                                                                                                                                  |
+| `use-computer-attach.ts`           | The WebSocket hook — mirrors `apps/web/src/components/terminal/use-terminal-attach.ts`.                                                                                                                                                         |
+| `computer-session.shared.ts`       | Pure policy: which Nodes are watchable and why, quality preset resolution, control-eligibility, stall thresholds. Split out for the same reason `agent-fleet.shared.ts` exists — each decision becomes a one-line test.                         |
 
 ### 5.3 State and data fetching
 
@@ -546,11 +547,11 @@ seam the terminal relay uses and is **out of scope** (spec §7).
 Every job is dispatched through the configured job-runtime provider via a `*_DISPATCHER` DI symbol
 (Constitution IV). No call site imports a job-runtime SDK directly (`@trigger.dev/sdk` or any equivalent).
 
-| Task | File | Trigger | Purpose |
-| --- | --- | --- | --- |
-| `demonstration-synthesis` | `packages/tasks/src/tasks/trigger/demonstration-synthesis.task.ts` | on demand | Loads the demonstration + steps, builds the prompt, calls the Agent's model through `AiFacadeService`, writes `draft`, creates the approval and the conversation message. 3 attempts, 30 s / 2 min / 10 min backoff. |
-| `computer-session-reaper` | `packages/tasks/src/tasks/trigger/computer-session-reaper.task.ts` | cron `2/2 * * * *` (every 2 min, off the minute boundary, like the fleet lease sweeper's `3/5`) | Ends abandoned, stalled, ceiling-exceeded and viewerless sessions; releases expired control locks; expires undecided drafts at 30 days. |
-| `computer-recording-gc` | `packages/tasks/src/tasks/trigger/computer-recording-gc.task.ts` | scheduled daily | Deletes segments past `expiresAt` from storage **then** the rows, mirroring `terminal-transcript-gc.task.ts`. |
+| Task                      | File                                                               | Trigger                                                                                         | Purpose                                                                                                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demonstration-synthesis` | `packages/tasks/src/tasks/trigger/demonstration-synthesis.task.ts` | on demand                                                                                       | Loads the demonstration + steps, builds the prompt, calls the Agent's model through `AiFacadeService`, writes `draft`, creates the approval and the conversation message. 3 attempts, 30 s / 2 min / 10 min backoff. |
+| `computer-session-reaper` | `packages/tasks/src/tasks/trigger/computer-session-reaper.task.ts` | cron `2/2 * * * *` (every 2 min, off the minute boundary, like the fleet lease sweeper's `3/5`) | Ends abandoned, stalled, ceiling-exceeded and viewerless sessions; releases expired control locks; expires undecided drafts at 30 days.                                                                              |
+| `computer-recording-gc`   | `packages/tasks/src/tasks/trigger/computer-recording-gc.task.ts`   | scheduled daily                                                                                 | Deletes segments past `expiresAt` from storage **then** the rows, mirroring `terminal-transcript-gc.task.ts`.                                                                                                        |
 
 Dispatch ports live in `packages/agent/src/computer/`:
 
@@ -565,7 +566,7 @@ Dispatch ports live in `packages/agent/src/computer/`:
   entry — but if any of them is ever re-exported through `/tasks`, add it alphabetically or CI
   goes red one merge late.
 
-Live control expiry is *not* left to the 2-minute cron: the relay checks `controlExpiresAt` and
+Live control expiry is _not_ left to the 2-minute cron: the relay checks `controlExpiresAt` and
 `lastInputAt` on every inbound input frame and on every 30 s socket ping, so the countdown a user
 sees is accurate to the second. The cron is the floor that covers a dead API replica, exactly as
 `fleet-job-lease-sweeper.task.ts` is the floor under inline lease reclaim.
@@ -824,20 +825,20 @@ Every act goes through `FleetAuditService.record()` / `tryRecord()`
 key-based redaction (`REDACTED_KEY_RE` drops anything whose key contains
 `secret|token|credential|password|passphrase|hash|apikey|api_key`).
 
-| Action | `details` |
-| --- | --- |
-| `computer.session-open` | agentId, nodeId, channels, quality, runId |
-| `computer.session-close` | sessionId, closeReason, durationMs, frameCount, recorded |
-| `computer.control-grant` | sessionId, agentId, nodeId |
-| `computer.control-release` | sessionId, releaseReason, heldMs |
-| `computer.control-refused` | nodeId, policy, holderPresent |
-| `computer.teach-start` | demonstrationId, intent (already length-capped at 120) |
-| `computer.teach-finish` | demonstrationId, stepCount, secretCount, stopReason |
-| `computer.profile-reset` | nodeId, agentId, signedInSiteCountBefore |
+| Action                     | `details`                                                |
+| -------------------------- | -------------------------------------------------------- |
+| `computer.session-open`    | agentId, nodeId, channels, quality, runId                |
+| `computer.session-close`   | sessionId, closeReason, durationMs, frameCount, recorded |
+| `computer.control-grant`   | sessionId, agentId, nodeId                               |
+| `computer.control-release` | sessionId, releaseReason, heldMs                         |
+| `computer.control-refused` | nodeId, policy, holderPresent                            |
+| `computer.teach-start`     | demonstrationId, intent (already length-capped at 120)   |
+| `computer.teach-finish`    | demonstrationId, stepCount, secretCount, stopReason      |
+| `computer.profile-reset`   | nodeId, agentId, signedInSiteCountBefore                 |
 
 **Naming rule that bites here:** the redactor matches on the key, so a field named
 `credentialProfileKey` would be silently replaced by `[redacted]`. Name fields for what they
-*mean* — `profileRef`, not `profileKeyHash` — exactly as that service's own header warns.
+_mean_ — `profileRef`, not `profileKeyHash` — exactly as that service's own header warns.
 
 Frame bytes, typed values, selectors carrying values and screenshot keys are **never** put in an
 audit row.
@@ -858,18 +859,18 @@ Three user-legible entries via `apps/api/src/activity-log/activity-log.listener.
 
 ### 9.4 Failure modes
 
-| Failure | Behaviour |
-| --- | --- |
-| No Node claims the session in 40 s | Session → `ended/abandoned`; the fleet job is cancelled so it cannot be claimed later by a Node that wakes up; the UI shows §6.10 of the spec. |
-| Node dies mid-session | Job lease lapses; the inline reclaim in `FleetJobService.lease` and the 2-minute reaper both end the session with `node-restarted`. |
-| Relay replica restarts | Live scrollback is lost (as with the terminal relay); the session ends with `error` and the UI offers Reconnect. Recorded segments survive — they are in storage, not memory. |
-| Storage unreachable at session start | Session opens **unrecorded** with `recordingSkippedReason='storage-unavailable'`; the receipt repeats it. Never fail the session for a recording failure. |
-| Storage fails mid-recording | Stop recording, stamp the reason, keep streaming. |
-| Model unavailable for synthesis | 3 attempts, then `synthesis-failed` with a plain conversation message. No partial Skill is ever created. |
-| Secret scanner false positive | The value is replaced by a placeholder and the step says so. Deliberately biased toward over-redaction — a lost value costs a re-demonstration; a leaked one costs a breach. |
-| Kill switch thrown mid-session | The relay checks the flag on every heartbeat tick; sessions end within 5 s with `stopped`. |
-| Two API replicas, one session | Only the replica holding the relay serves it; the other returns the persisted row with `status` and a note that live view is unavailable there. Cross-replica fan-out is explicitly out of scope. |
-| Clock skew between Node and API | The identity strip shows the **Node's** reported clock and marks it stale after 10 s without a heartbeat, rather than silently substituting the API's. |
+| Failure                              | Behaviour                                                                                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No Node claims the session in 40 s   | Session → `ended/abandoned`; the fleet job is cancelled so it cannot be claimed later by a Node that wakes up; the UI shows §6.10 of the spec.                                                    |
+| Node dies mid-session                | Job lease lapses; the inline reclaim in `FleetJobService.lease` and the 2-minute reaper both end the session with `node-restarted`.                                                               |
+| Relay replica restarts               | Live scrollback is lost (as with the terminal relay); the session ends with `error` and the UI offers Reconnect. Recorded segments survive — they are in storage, not memory.                     |
+| Storage unreachable at session start | Session opens **unrecorded** with `recordingSkippedReason='storage-unavailable'`; the receipt repeats it. Never fail the session for a recording failure.                                         |
+| Storage fails mid-recording          | Stop recording, stamp the reason, keep streaming.                                                                                                                                                 |
+| Model unavailable for synthesis      | 3 attempts, then `synthesis-failed` with a plain conversation message. No partial Skill is ever created.                                                                                          |
+| Secret scanner false positive        | The value is replaced by a placeholder and the step says so. Deliberately biased toward over-redaction — a lost value costs a re-demonstration; a leaked one costs a breach.                      |
+| Kill switch thrown mid-session       | The relay checks the flag on every heartbeat tick; sessions end within 5 s with `stopped`.                                                                                                        |
+| Two API replicas, one session        | Only the replica holding the relay serves it; the other returns the persisted row with `status` and a note that live view is unavailable there. Cross-replica fan-out is explicitly out of scope. |
+| Clock skew between Node and API      | The identity strip shows the **Node's** reported clock and marks it stale after 10 s without a heartbeat, rather than silently substituting the API's.                                            |
 
 ---
 
@@ -1036,7 +1037,7 @@ are green and the approvals queue still behaves for its existing action types.
 ### P3 — Re-watch and the terminal channel (migration C)
 
 **Ships:** recording segments and their storage path, the retention GC, the player, the Run
-receipt's *Watch the recording* and *Make a Skill from this run*, `agent_runs.computerRecordedAt`,
+receipt's _Watch the recording_ and _Make a Skill from this run_, `agent_runs.computerRecordedAt`,
 the Node-hosted terminal channel and the channel switch, the `screen-stream` plugin capability and
 the `screen-cdp` plugin for the cloud-hosted path, and Organization-member watch access under the
 Node's control policy.

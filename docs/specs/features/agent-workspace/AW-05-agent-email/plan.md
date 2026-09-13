@@ -16,22 +16,22 @@ Everything below was read, not assumed. Paths are repo-relative and verified to 
 
 ### 1.1 What already works and must not be broken
 
-| Area | Where | State |
-| --- | --- | --- |
-| Tenant address registry + CRUD + verification-token confirm | [`apps/api/src/email/email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts), [`email.service.ts`](../../../../../apps/api/src/email/email.service.ts) | Working. Owner-scoped. `verificationToken` / `verificationTokenExpiresAt` stripped at the boundary by [`email-address.projection.ts`](../../../../../apps/api/src/email/email-address.projection.ts). |
-| Outbound send through a resolved provider plugin | [`packages/agent/src/facades/email.facade.ts`](../../../../../packages/agent/src/facades/email.facade.ts) `EmailFacadeService.send()` | Working. Persists `email_messages`, emits a `PluginUsageEvent` with `capability='email'`. **This is the single choke point every send path converges on — the cap gate goes here.** |
-| Inbound webhook, signature-verified per owning tenant | `POST /api/email/inbound/:pluginId` in [`email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts) (throttled 600/60s, `@Public()`) | Working. Non-leaking ack (`{received:true}`) per EW-718. |
-| Inbound routing → Task spawn or conversation thread | [`packages/agent/src/notifications/default-inbound-email-dispatcher.service.ts`](../../../../../packages/agent/src/notifications/default-inbound-email-dispatcher.service.ts), contract in [`agent-inbound-email-dispatcher.ts`](../../../../../packages/agent/src/notifications/agent-inbound-email-dispatcher.ts) | Working. `deriveThreadKey()` already normalises `Re:`/`Fwd:` prefixes. `INBOUND_EMAIL_TASK_SPAWNER` bound in [`apps/api/src/agents/agents.module.ts`](../../../../../apps/api/src/agents/agents.module.ts). Its JSDoc already flags inbound `subject`/`bodyText`/`from` as attacker-controlled — that guidance becomes enforceable here. |
-| Delivery-event webhook folding onto `deliveryStatus` | `POST /api/email/events/:pluginId` | Working, latest-status-wins. |
-| Agent `sendEmail` / `messageAgent` tools | [`packages/agent/src/agents/agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts) (`buildSendEmailTool`, `buildMessageAgentTool`), contract [`agent-email-facade.ts`](../../../../../packages/agent/src/agents/agent-email-facade.ts) | Working. Sends immediately — this is what the draft gate intercepts. |
-| SSE stream of new messages | `GET /api/email/messages/stream` in [`email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts); BFF proxy [`apps/web/src/app/api/email/messages/stream/route.ts`](../../../../../apps/web/src/app/api/email/messages/stream/route.ts) | Working server-side (5s poll, 15s heartbeat, 10-min lifetime cap). **No client consumes it** — the hook its own JSDoc describes was never built. |
-| Per-agent message list / detail / composer | [`apps/web/src/components/agents/AgentInboxPanel.tsx`](../../../../../apps/web/src/components/agents/AgentInboxPanel.tsx), [`MessageDetail.tsx`](../../../../../apps/web/src/components/agents/MessageDetail.tsx), [`Composer.tsx`](../../../../../apps/web/src/components/agents/Composer.tsx) under `apps/web/src/app/[locale]/(dashboard)/agents/[id]/inbox/` | Working but unreachable — no tab in [`AgentDetailTabs.tsx`](../../../../../apps/web/src/components/agents/AgentDetailTabs.tsx), no `DASHBOARD_AGENT_INBOX` in [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts). |
-| Escalations | entity [`packages/agent/src/entities/agent-escalation.entity.ts`](../../../../../packages/agent/src/entities/agent-escalation.entity.ts), service [`agent-escalation.service.ts`](../../../../../packages/agent/src/agents/agent-escalation.service.ts), agent tool [`agent-escalation-tools.ts`](../../../../../packages/agent/src/agents/agent-escalation-tools.ts), controller [`apps/api/src/escalations/escalations.controller.ts`](../../../../../apps/api/src/escalations/escalations.controller.ts) (`GET /`, `GET /:id`, `POST /:id/resolve`) | Working. Reason codes are a TS union in [`packages/contracts/src/agents/escalation.types.ts`](../../../../../packages/contracts/src/agents/escalation.types.ts) over a `varchar(32)` column — adding a member needs no migration. |
-| Approvals (agent action proposals) | entity [`agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts), service [`agent-approvals.service.ts`](../../../../../packages/agent/src/agent-approvals/agent-approvals.service.ts), controller [`apps/api/src/agent-approvals/agent-approvals.controller.ts`](../../../../../apps/api/src/agent-approvals/agent-approvals.controller.ts) | Working. `actionType` already includes `'send_message'`; `decidedVia` already distinguishes `user` from `guardrail`. **A draft is exactly this shape** — no new approval concept needed. |
-| Budget/cap enforcement precedent | [`packages/agent/src/budgets/budget-guard.service.ts`](../../../../../packages/agent/src/budgets/budget-guard.service.ts) + [`budget-exceeded.exception.ts`](../../../../../packages/agent/src/budgets/budget-exceeded.exception.ts) (HTTP 402 with structured `details`) | The exact pattern the send cap copies. |
-| Job-runtime dispatch | dispatcher symbols in [`packages/agent/src/facades/index.ts`](../../../../../packages/agent/src/facades/index.ts) and per-domain modules; bindings in [`packages/tasks/src/trigger/trigger.module.ts`](../../../../../packages/tasks/src/trigger/trigger.module.ts) via `JobRuntimeProviderRegistry`; tasks in [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/) | 19 `*_DISPATCHER` symbols today. [`notification-channel-delivery.task.ts`](../../../../../packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts) already demonstrates **delayed** enqueue for quiet hours — the scheduled-send mechanism. |
-| Provider plugins | `packages/plugins/{postmark,mailgun,sendgrid,resend,mailchimp-transactional}/src/` | 5 outbound; only Postmark + Mailgun declare inbound. |
-| DNS capability | [`packages/plugin/src/contracts/capabilities/dns.interface.ts`](../../../../../packages/plugin/src/contracts/capabilities/dns.interface.ts), plugin `packages/plugins/cloudflare-dns/` | `DnsRecordType` is `'CNAME' | 'A'` only — no TXT, no MX. Relevant to the P3 one-click-publish stretch. |
+| Area                                                        | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | State                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Tenant address registry + CRUD + verification-token confirm | [`apps/api/src/email/email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts), [`email.service.ts`](../../../../../apps/api/src/email/email.service.ts)                                                                                                                                                                                                                                                                                                                                                                            | Working. Owner-scoped. `verificationToken` / `verificationTokenExpiresAt` stripped at the boundary by [`email-address.projection.ts`](../../../../../apps/api/src/email/email-address.projection.ts).                                                                                                                                    |
+| Outbound send through a resolved provider plugin            | [`packages/agent/src/facades/email.facade.ts`](../../../../../packages/agent/src/facades/email.facade.ts) `EmailFacadeService.send()`                                                                                                                                                                                                                                                                                                                                                                                                                  | Working. Persists `email_messages`, emits a `PluginUsageEvent` with `capability='email'`. **This is the single choke point every send path converges on — the cap gate goes here.**                                                                                                                                                      |
+| Inbound webhook, signature-verified per owning tenant       | `POST /api/email/inbound/:pluginId` in [`email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts) (throttled 600/60s, `@Public()`)                                                                                                                                                                                                                                                                                                                                                                                                 | Working. Non-leaking ack (`{received:true}`) per EW-718.                                                                                                                                                                                                                                                                                 |
+| Inbound routing → Task spawn or conversation thread         | [`packages/agent/src/notifications/default-inbound-email-dispatcher.service.ts`](../../../../../packages/agent/src/notifications/default-inbound-email-dispatcher.service.ts), contract in [`agent-inbound-email-dispatcher.ts`](../../../../../packages/agent/src/notifications/agent-inbound-email-dispatcher.ts)                                                                                                                                                                                                                                    | Working. `deriveThreadKey()` already normalises `Re:`/`Fwd:` prefixes. `INBOUND_EMAIL_TASK_SPAWNER` bound in [`apps/api/src/agents/agents.module.ts`](../../../../../apps/api/src/agents/agents.module.ts). Its JSDoc already flags inbound `subject`/`bodyText`/`from` as attacker-controlled — that guidance becomes enforceable here. |
+| Delivery-event webhook folding onto `deliveryStatus`        | `POST /api/email/events/:pluginId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Working, latest-status-wins.                                                                                                                                                                                                                                                                                                             |
+| Agent `sendEmail` / `messageAgent` tools                    | [`packages/agent/src/agents/agent-tool.service.ts`](../../../../../packages/agent/src/agents/agent-tool.service.ts) (`buildSendEmailTool`, `buildMessageAgentTool`), contract [`agent-email-facade.ts`](../../../../../packages/agent/src/agents/agent-email-facade.ts)                                                                                                                                                                                                                                                                                | Working. Sends immediately — this is what the draft gate intercepts.                                                                                                                                                                                                                                                                     |
+| SSE stream of new messages                                  | `GET /api/email/messages/stream` in [`email.controller.ts`](../../../../../apps/api/src/email/email.controller.ts); BFF proxy [`apps/web/src/app/api/email/messages/stream/route.ts`](../../../../../apps/web/src/app/api/email/messages/stream/route.ts)                                                                                                                                                                                                                                                                                              | Working server-side (5s poll, 15s heartbeat, 10-min lifetime cap). **No client consumes it** — the hook its own JSDoc describes was never built.                                                                                                                                                                                         |
+| Per-agent message list / detail / composer                  | [`apps/web/src/components/agents/AgentInboxPanel.tsx`](../../../../../apps/web/src/components/agents/AgentInboxPanel.tsx), [`MessageDetail.tsx`](../../../../../apps/web/src/components/agents/MessageDetail.tsx), [`Composer.tsx`](../../../../../apps/web/src/components/agents/Composer.tsx) under `apps/web/src/app/[locale]/(dashboard)/agents/[id]/inbox/`                                                                                                                                                                                       | Working but unreachable — no tab in [`AgentDetailTabs.tsx`](../../../../../apps/web/src/components/agents/AgentDetailTabs.tsx), no `DASHBOARD_AGENT_INBOX` in [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts).                                                                                           |
+| Escalations                                                 | entity [`packages/agent/src/entities/agent-escalation.entity.ts`](../../../../../packages/agent/src/entities/agent-escalation.entity.ts), service [`agent-escalation.service.ts`](../../../../../packages/agent/src/agents/agent-escalation.service.ts), agent tool [`agent-escalation-tools.ts`](../../../../../packages/agent/src/agents/agent-escalation-tools.ts), controller [`apps/api/src/escalations/escalations.controller.ts`](../../../../../apps/api/src/escalations/escalations.controller.ts) (`GET /`, `GET /:id`, `POST /:id/resolve`) | Working. Reason codes are a TS union in [`packages/contracts/src/agents/escalation.types.ts`](../../../../../packages/contracts/src/agents/escalation.types.ts) over a `varchar(32)` column — adding a member needs no migration.                                                                                                        |
+| Approvals (agent action proposals)                          | entity [`agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts), service [`agent-approvals.service.ts`](../../../../../packages/agent/src/agent-approvals/agent-approvals.service.ts), controller [`apps/api/src/agent-approvals/agent-approvals.controller.ts`](../../../../../apps/api/src/agent-approvals/agent-approvals.controller.ts)                                                                                                                                                     | Working. `actionType` already includes `'send_message'`; `decidedVia` already distinguishes `user` from `guardrail`. **A draft is exactly this shape** — no new approval concept needed.                                                                                                                                                 |
+| Budget/cap enforcement precedent                            | [`packages/agent/src/budgets/budget-guard.service.ts`](../../../../../packages/agent/src/budgets/budget-guard.service.ts) + [`budget-exceeded.exception.ts`](../../../../../packages/agent/src/budgets/budget-exceeded.exception.ts) (HTTP 402 with structured `details`)                                                                                                                                                                                                                                                                              | The exact pattern the send cap copies.                                                                                                                                                                                                                                                                                                   |
+| Job-runtime dispatch                                        | dispatcher symbols in [`packages/agent/src/facades/index.ts`](../../../../../packages/agent/src/facades/index.ts) and per-domain modules; bindings in [`packages/tasks/src/trigger/trigger.module.ts`](../../../../../packages/tasks/src/trigger/trigger.module.ts) via `JobRuntimeProviderRegistry`; tasks in [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/)                                                                                                                                                 | 19 `*_DISPATCHER` symbols today. [`notification-channel-delivery.task.ts`](../../../../../packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts) already demonstrates **delayed** enqueue for quiet hours — the scheduled-send mechanism.                                                                               |
+| Provider plugins                                            | `packages/plugins/{postmark,mailgun,sendgrid,resend,mailchimp-transactional}/src/`                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 5 outbound; only Postmark + Mailgun declare inbound.                                                                                                                                                                                                                                                                                     |
+| DNS capability                                              | [`packages/plugin/src/contracts/capabilities/dns.interface.ts`](../../../../../packages/plugin/src/contracts/capabilities/dns.interface.ts), plugin `packages/plugins/cloudflare-dns/`                                                                                                                                                                                                                                                                                                                                                                 | `DnsRecordType` is `'CNAME'                                                                                                                                                                                                                                                                                                              | 'A'` only — no TXT, no MX. Relevant to the P3 one-click-publish stretch. |
 
 ### 1.2 The gaps this epic closes
 
@@ -108,6 +108,7 @@ flowchart TB
 **Seam 1 — the send choke point.** Every outbound path (`buildSendEmailTool`, `buildMessageAgentTool`, `EmailService.sendMessage`, an approved draft, a firing schedule) already funnels into `EmailFacadeService.send()`. Both the **outbound rule check** and the **cap gate** go at the top of that method, before `resolveOutboundPlugin`. This is the only place they can be, and it is why FR-63 ("no privileged bypass") is achievable at all. `EmailFacadeService` gains two optional injected collaborators (`EmailSendCapGuard`, `EmailRuleResolver`) following the `@Optional()` pattern it already uses for its five repositories, so unit contexts that construct the facade bare keep working.
 
 **Seam 2 — the draft gate.** `AgentEmailFacadeAdapter` (bound to `AGENT_EMAIL_FACADE` in `apps/api/src/agents/agents.module.ts`) currently forwards straight to `EmailFacadeService.send`. It instead calls `EmailDraftService.submit()`, which reads the inbox mode:
+
 - `draft-review` → persist `email_messages` with `status='draft'`, create an `agent_action_proposals` row (`actionType='send_message'`, payload `{kind:'email-draft', emailMessageId, inboxId, threadId}`), return a structured "held for approval" result to the model.
 - `auto-send` → same proposal row, auto-decided (`status='approved'`, `decidedVia='guardrail'`), then straight through to `EmailFacadeService.send`. The proposal row is the audit trail either way.
 
@@ -223,25 +224,25 @@ Distinct from the website `custom_domains` concept: different provider capabilit
 
 **`email_messages`** — all nullable or defaulted, nothing dropped:
 
-| Column | Type | Why |
-| --- | --- | --- |
-| `status` | `varchar(16)`, default `'sent'` | FR-21 state machine |
-| `inboxId` | `uuid` null | which Agent Inbox owns it |
-| `threadId` | *(reuse existing `conversationId`)* | §2.2 — now always populated |
-| `approvalId` | `uuid` null | the `agent_action_proposals` row for a draft (FR-23) |
-| `escalationId` | `uuid` null | the `agent_escalations` row (FR-40) |
-| `runId` | `uuid` null | FR-16 / FR-87 — the Run that wrote it |
-| `scheduledFor` | timestamptz null | FR-41 |
-| `scheduledTimezone` | `varchar(64)` null | FR-43, the recipient timezone used |
-| `scheduleJobId` | `varchar(120)` null | the job-runtime run id, for cancellation |
-| `sendAttempts` | `int`, default 0 | FR-48 retry accounting |
-| `readAt` | timestamptz null | unread axis (FR-14) |
-| `draftHistory` | `simple-json` null | last 10 versions (FR-27), each `{body, subject, authoredBy, authoredAt, notes?}` |
-| `reviseCount` | `int`, default 0 | FR-29 ceiling of 5 |
-| `staleSince` | timestamptz null | FR-32 |
-| `attachmentsMeta` | `simple-json` null | up to 25 `{filename, contentType, sizeBytes}` (spec §7) |
-| `blockedByRuleId` | `uuid` null | FR-51 / FR-58 |
-| `failureReason` | `varchar(500)` null | FR-18 provider error text on the card |
+| Column              | Type                                | Why                                                                              |
+| ------------------- | ----------------------------------- | -------------------------------------------------------------------------------- |
+| `status`            | `varchar(16)`, default `'sent'`     | FR-21 state machine                                                              |
+| `inboxId`           | `uuid` null                         | which Agent Inbox owns it                                                        |
+| `threadId`          | _(reuse existing `conversationId`)_ | §2.2 — now always populated                                                      |
+| `approvalId`        | `uuid` null                         | the `agent_action_proposals` row for a draft (FR-23)                             |
+| `escalationId`      | `uuid` null                         | the `agent_escalations` row (FR-40)                                              |
+| `runId`             | `uuid` null                         | FR-16 / FR-87 — the Run that wrote it                                            |
+| `scheduledFor`      | timestamptz null                    | FR-41                                                                            |
+| `scheduledTimezone` | `varchar(64)` null                  | FR-43, the recipient timezone used                                               |
+| `scheduleJobId`     | `varchar(120)` null                 | the job-runtime run id, for cancellation                                         |
+| `sendAttempts`      | `int`, default 0                    | FR-48 retry accounting                                                           |
+| `readAt`            | timestamptz null                    | unread axis (FR-14)                                                              |
+| `draftHistory`      | `simple-json` null                  | last 10 versions (FR-27), each `{body, subject, authoredBy, authoredAt, notes?}` |
+| `reviseCount`       | `int`, default 0                    | FR-29 ceiling of 5                                                               |
+| `staleSince`        | timestamptz null                    | FR-32                                                                            |
+| `attachmentsMeta`   | `simple-json` null                  | up to 25 `{filename, contentType, sizeBytes}` (spec §7)                          |
+| `blockedByRuleId`   | `uuid` null                         | FR-51 / FR-58                                                                    |
+| `failureReason`     | `varchar(500)` null                 | FR-18 provider error text on the card                                            |
 
 Indices added: `idx_email_messages_inbox_status_created (inboxId, status, createdAt)`,
 `idx_email_messages_scheduled (status, scheduledFor)` — the sweeper's only query —
@@ -249,18 +250,18 @@ Indices added: `idx_email_messages_inbox_status_created (inboxId, status, create
 
 **`email_conversations`** (the thread):
 
-| Column | Type | Why |
-| --- | --- | --- |
-| `inboxId` | `uuid` null | direct thread → inbox link, avoids a join through messages |
-| `userId` | `uuid` null | owner-scoped list queries without a join |
-| `subject` | `varchar(998)` null | FR-14 row rendering |
-| `messageCount` | `int`, default 0 | FR-14 count pill |
-| `unreadCount` | `int`, default 0 | FR-11 per-inbox badge |
-| `hasAttachments` | `boolean`, default false | FR-14 indicator |
-| `dominantStatus` | `varchar(16)` null | FR-14 badge, precomputed |
-| `escalationId` | `uuid` null | FR-37 |
-| `state` | `varchar(16)`, default `'open'` | `open` / `archived` |
-| `lastInboundAt` | timestamptz null | FR-32 staleness comparison |
+| Column           | Type                            | Why                                                        |
+| ---------------- | ------------------------------- | ---------------------------------------------------------- |
+| `inboxId`        | `uuid` null                     | direct thread → inbox link, avoids a join through messages |
+| `userId`         | `uuid` null                     | owner-scoped list queries without a join                   |
+| `subject`        | `varchar(998)` null             | FR-14 row rendering                                        |
+| `messageCount`   | `int`, default 0                | FR-14 count pill                                           |
+| `unreadCount`    | `int`, default 0                | FR-11 per-inbox badge                                      |
+| `hasAttachments` | `boolean`, default false        | FR-14 indicator                                            |
+| `dominantStatus` | `varchar(16)` null              | FR-14 badge, precomputed                                   |
+| `escalationId`   | `uuid` null                     | FR-37                                                      |
+| `state`          | `varchar(16)`, default `'open'` | `open` / `archived`                                        |
+| `lastInboundAt`  | timestamptz null                | FR-32 staleness comparison                                 |
 
 Index: `idx_email_conversations_inbox_state_last (inboxId, state, lastMessageAt)`.
 
@@ -286,10 +287,10 @@ the implementing PR re-stamps them before merge if `develop` has moved past them
    `email_sending_domains`. Pure `CREATE TABLE` + indices. No data touched.
 2. **`1791050100000-AddEmailMessageLifecycle.ts`** — the additive columns on `email_messages` and
    `email_conversations`, plus the three new indices. **Backfill in the same migration:**
-   - `UPDATE email_messages SET status='received' WHERE direction='inbound' AND status IS NULL`
-   - `UPDATE email_messages SET status='sent' WHERE direction='outbound' AND status IS NULL`
-   - `UPDATE email_messages SET readAt = createdAt WHERE direction='outbound'` (own sends are read)
-   Batched at 5,000 rows so a large table does not hold a long transaction.
+    - `UPDATE email_messages SET status='received' WHERE direction='inbound' AND status IS NULL`
+    - `UPDATE email_messages SET status='sent' WHERE direction='outbound' AND status IS NULL`
+    - `UPDATE email_messages SET readAt = createdAt WHERE direction='outbound'` (own sends are read)
+      Batched at 5,000 rows so a large table does not hold a long transaction.
 3. **`1791050200000-BackfillEmailThreads.ts`** — for every `email_messages` row with a NULL
    `conversationId`, find-or-create an `email_conversations` row keyed
    `(agentId, deriveThreadKey(subject))` using the **existing** helper from
@@ -316,9 +317,9 @@ posture:
 export const EMAIL_INBOX_DEFAULT_DAILY_CAP = 100;
 export const EMAIL_INBOX_MIN_DAILY_CAP = 1;
 export const EMAIL_INBOX_MAX_DAILY_CAP = 1000;
-export const EMAIL_INBOX_BURST_SENDS = 10;              // per 60s
+export const EMAIL_INBOX_BURST_SENDS = 10; // per 60s
 export const EMAIL_INBOX_BURST_WINDOW_MS = 60_000;
-export const EMAIL_INBOX_BURST_RECIPIENTS = 20;         // per 300s
+export const EMAIL_INBOX_BURST_RECIPIENTS = 20; // per 300s
 export const EMAIL_INBOX_RECIPIENT_WINDOW_MS = 300_000;
 export const EMAIL_WORKSPACE_DAILY_CAP = 500;
 export const EMAIL_WORKSPACE_MONTHLY_CAP = 10_000;
@@ -338,10 +339,10 @@ export const EMAIL_MAX_SENDING_DOMAINS = 5;
 export const EMAIL_ADDRESS_ALIAS_GRACE_DAYS = 30;
 export const EMAIL_BLOCKED_RETENTION_DAYS = 30;
 export const EMAIL_SEND_UNDO_GRACE_MS = 5_000;
-export const EMAIL_BOUNCE_AUTO_GATE_THRESHOLD = 3;      // per 24h
+export const EMAIL_BOUNCE_AUTO_GATE_THRESHOLD = 3; // per 24h
 export const EMAIL_MAX_ATTACHMENT_META = 25;
-export const EMAIL_DOMAIN_CHECK_INTERVAL_MS = 900_000;  // 15m
-export const EMAIL_DOMAIN_MAX_CHECKS = 288;             // 72h
+export const EMAIL_DOMAIN_CHECK_INTERVAL_MS = 900_000; // 15m
+export const EMAIL_DOMAIN_MAX_CHECKS = 288; // 72h
 ```
 
 Every number in the spec appears exactly once, here.
@@ -359,14 +360,14 @@ Nothing existing changes shape (Constitution X).
 
 ### 4.1 `agent-inbox.controller.ts` — `@Controller('api/email/inboxes')`
 
-| Method | Path | Body / query | Auth | Notes |
-| --- | --- | --- | --- | --- |
-| `GET` | `/` | — | agent read | `{ inboxes: AgentInboxDto[] }` with `unreadCount` + `capMeter`. |
-| `POST` | `/` | `ProvisionInboxDto { agentId, localPart?, sendingDomainId? }` | agent write | 201. Idempotent: returns the existing inbox with 200 if one exists (FR-2). `@Throttle({ long: { limit: 10, ttl: 60_000 } })`. |
-| `GET` | `/:id` | — | agent read | |
-| `PATCH` | `/:id` | `UpdateInboxDto { localPart?, sendingDomainId?, mode?, standingInstructions?, learnFromEdits?, allowListMode?, dailySendCap? }` | `mode`/`dailySendCap`/`sendingDomainId` require workspace owner; the rest agent write | 200 |
-| `DELETE` | `/:id` | — | agent write | 204. Cancels outstanding schedules, keeps history (FR-7). |
-| `GET` | `/:id/cap` | — | agent read | `EmailCapMeterDto` — three windows, used/held/remaining, `windowClearsAt`. |
+| Method   | Path       | Body / query                                                                                                                    | Auth                                                                                  | Notes                                                                                                                         |
+| -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/`        | —                                                                                                                               | agent read                                                                            | `{ inboxes: AgentInboxDto[] }` with `unreadCount` + `capMeter`.                                                               |
+| `POST`   | `/`        | `ProvisionInboxDto { agentId, localPart?, sendingDomainId? }`                                                                   | agent write                                                                           | 201. Idempotent: returns the existing inbox with 200 if one exists (FR-2). `@Throttle({ long: { limit: 10, ttl: 60_000 } })`. |
+| `GET`    | `/:id`     | —                                                                                                                               | agent read                                                                            |                                                                                                                               |
+| `PATCH`  | `/:id`     | `UpdateInboxDto { localPart?, sendingDomainId?, mode?, standingInstructions?, learnFromEdits?, allowListMode?, dailySendCap? }` | `mode`/`dailySendCap`/`sendingDomainId` require workspace owner; the rest agent write | 200                                                                                                                           |
+| `DELETE` | `/:id`     | —                                                                                                                               | agent write                                                                           | 204. Cancels outstanding schedules, keeps history (FR-7).                                                                     |
+| `GET`    | `/:id/cap` | —                                                                                                                               | agent read                                                                            | `EmailCapMeterDto` — three windows, used/held/remaining, `windowClearsAt`.                                                    |
 
 `ProvisionInboxDto` validators: `@IsUUID() agentId`, `@IsOptional() @Matches(/^[a-z0-9][a-z0-9._-]{1,62}[a-z0-9]$/) @Length(3,64) localPart`.
 `UpdateInboxDto`: `@IsIn(['draft-review','auto-send'])`, `@IsInt() @Min(1) @Max(1000) dailySendCap`,
@@ -374,26 +375,26 @@ Nothing existing changes shape (Constitution X).
 
 ### 4.2 `email-threads.controller.ts` — `@Controller('api/email/threads')`
 
-| Method | Path | Query / body | Notes |
-| --- | --- | --- | --- |
-| `GET` | `/` | `inboxId?` (omit = all), `filter=received|sent|unread|drafts|escalations|scheduled`, `q?`, `limit` (1–50, default 50), `cursor?` | `{ threads, meta: { nextCursor, counts: Record<filter, number> } }`. Cursor is `(lastMessageAt, id)` keyset — never OFFSET, per FR-17. |
-| `GET` | `/:id` | — | Thread + ordered messages + quoted-history flags + run links. |
-| `PATCH` | `/:id` | `{ read?: boolean, archived?: boolean }` | |
+| Method  | Path   | Query / body                              | Notes                                                         |
+| ------- | ------ | ----------------------------------------- | ------------------------------------------------------------- | ------ | ------ | ----------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`   | `/`    | `inboxId?` (omit = all), `filter=received | sent                                                          | unread | drafts | escalations | scheduled`, `q?`, `limit`(1–50, default 50),`cursor?` | `{ threads, meta: { nextCursor, counts: Record<filter, number> } }`. Cursor is `(lastMessageAt, id)` keyset — never OFFSET, per FR-17. |
+| `GET`   | `/:id` | —                                         | Thread + ordered messages + quoted-history flags + run links. |
+| `PATCH` | `/:id` | `{ read?: boolean, archived?: boolean }`  |                                                               |
 
 ### 4.3 Message lifecycle — added to the existing `email.controller.ts`
 
 Declared **before** the existing `messages/:id` route, mirroring the route-order note already in
 that file for `messages/stream`.
 
-| Method | Path | Body | Notes |
-| --- | --- | --- | --- |
-| `POST` | `/api/email/messages/:id/approve` | `ApproveDraftDto { subject?, bodyText?, bodyHtml?, sendAt?, timezone? }` | Applies the inline edit, approves the linked proposal, sends (or schedules when `sendAt` is present). CAS on `status='draft'` → 409 `AlreadyDecided` with `{ decidedBy, decidedAt }` (FR-33). `@Throttle({ long: { limit: 60, ttl: 60_000 } })`. |
-| `POST` | `/api/email/messages/:id/revise` | `ReviseDraftDto { notes }` `@MaxLength(2000)` | 202. 409 when `reviseCount >= 5`. Dispatches a Run. |
-| `POST` | `/api/email/messages/:id/discard` | — | 204. CAS on `draft`/`scheduled`. |
-| `POST` | `/api/email/messages/:id/schedule` | `ScheduleSendDto { sendAt, timezone? }` | `@IsISO8601()`; rejects `< now+60s` or `> now+90d`; 429 when the inbox already holds 200. |
-| `POST` | `/api/email/messages/:id/cancel-send` | — | CAS `scheduled → draft`; **409 `TooLate`** if the row already moved to `sending`/`sent` (FR-44, S13). |
-| `POST` | `/api/email/messages/:id/retry` | — | `failed → sending` (S18). Reuses the original `messageRef` so the provider's idempotency cache prevents a duplicate. |
-| `PATCH` | `/api/email/messages/:id/read` | `{ unread?: boolean }` | Mirrors the operator-inbox convention. |
+| Method  | Path                                  | Body                                                                     | Notes                                                                                                                                                                                                                                            |
+| ------- | ------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST`  | `/api/email/messages/:id/approve`     | `ApproveDraftDto { subject?, bodyText?, bodyHtml?, sendAt?, timezone? }` | Applies the inline edit, approves the linked proposal, sends (or schedules when `sendAt` is present). CAS on `status='draft'` → 409 `AlreadyDecided` with `{ decidedBy, decidedAt }` (FR-33). `@Throttle({ long: { limit: 60, ttl: 60_000 } })`. |
+| `POST`  | `/api/email/messages/:id/revise`      | `ReviseDraftDto { notes }` `@MaxLength(2000)`                            | 202. 409 when `reviseCount >= 5`. Dispatches a Run.                                                                                                                                                                                              |
+| `POST`  | `/api/email/messages/:id/discard`     | —                                                                        | 204. CAS on `draft`/`scheduled`.                                                                                                                                                                                                                 |
+| `POST`  | `/api/email/messages/:id/schedule`    | `ScheduleSendDto { sendAt, timezone? }`                                  | `@IsISO8601()`; rejects `< now+60s` or `> now+90d`; 429 when the inbox already holds 200.                                                                                                                                                        |
+| `POST`  | `/api/email/messages/:id/cancel-send` | —                                                                        | CAS `scheduled → draft`; **409 `TooLate`** if the row already moved to `sending`/`sent` (FR-44, S13).                                                                                                                                            |
+| `POST`  | `/api/email/messages/:id/retry`       | —                                                                        | `failed → sending` (S18). Reuses the original `messageRef` so the provider's idempotency cache prevents a duplicate.                                                                                                                             |
+| `PATCH` | `/api/email/messages/:id/read`        | `{ unread?: boolean }`                                                   | Mirrors the operator-inbox convention.                                                                                                                                                                                                           |
 
 **`POST /api/email/messages` (existing compose) gains `@Throttle({ long: { ttl: 60_000, limit: 30 } })`** — closing gap §1.2.3 at the HTTP layer, independent of the cap gate at the domain layer. It also gains optional `sendAt` / `saveAsDraft` fields; every existing field keeps its meaning.
 
@@ -430,13 +431,13 @@ a readable sentence and the web client can render the banner without string-matc
 
 ### 5.1 Routes
 
-| Route | Owns |
-| --- | --- |
-| `apps/web/src/app/[locale]/(dashboard)/email/page.tsx` | The unified Email screen (spec §6.1) |
-| `.../(dashboard)/email/[threadId]/page.tsx` | Thread deep-link; on desktop it hydrates the right pane |
-| `.../(dashboard)/email/compose/page.tsx` | Compose (spec §6.7) |
-| `.../(dashboard)/settings/integrations/email-domains/page.tsx` | Sending domains (spec §6.9) |
-| `.../(dashboard)/agents/[id]/inbox/page.tsx` | **Existing route, upgraded in place** — renders the same thread list scoped to one Agent |
+| Route                                                          | Owns                                                                                     |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `apps/web/src/app/[locale]/(dashboard)/email/page.tsx`         | The unified Email screen (spec §6.1)                                                     |
+| `.../(dashboard)/email/[threadId]/page.tsx`                    | Thread deep-link; on desktop it hydrates the right pane                                  |
+| `.../(dashboard)/email/compose/page.tsx`                       | Compose (spec §6.7)                                                                      |
+| `.../(dashboard)/settings/integrations/email-domains/page.tsx` | Sending domains (spec §6.9)                                                              |
+| `.../(dashboard)/agents/[id]/inbox/page.tsx`                   | **Existing route, upgraded in place** — renders the same thread list scoped to one Agent |
 
 Route constants added to [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts):
 `DASHBOARD_EMAIL: '/email'`, `DASHBOARD_EMAIL_THREAD: (id) => '/email/' + id`,
@@ -453,26 +454,26 @@ Nothing is removed from either.
 
 ### 5.3 Components — `apps/web/src/components/email/`
 
-| Component | Responsibility |
-| --- | --- |
-| `EmailScreen.tsx` | `'use client'` shell: switcher + filter bar + list + detail pane; owns URL state (`?inbox=&filter=&thread=`) |
-| `InboxSwitcher.tsx` | All-row + per-inbox rows with unread counts; `[` / `]` navigation |
-| `EmailFilterBar.tsx` | The six filters with counts; `1`–`6` shortcuts |
-| `ThreadList.tsx` + `ThreadRow.tsx` | Keyset-paginated virtualised list; `j`/`k`/`Enter` |
-| `ThreadView.tsx` | Ordered `MessageCard`s + the sticky cap footer |
-| `MessageCard.tsx` | One card; delegates to a status-specific footer |
-| `DraftCard.tsx` | Inline editor (contenteditable-free `<textarea>` that grows), the four controls, Version history disclosure, stale banner |
-| `EscalationCard.tsx` | Reason, decision-needed, Dismiss / Instruct, My-Decisions link |
-| `ScheduledCard.tsx` | Countdown (one `setInterval` per view, not per card), Cancel send, Edit & reschedule |
-| `SendGraceToast.tsx` | The 5-second Undo (spec §6.3) |
-| `ReviseDialog.tsx` | Notes + counter + revision-of-5 indicator |
-| `ComposeSheet.tsx` | Send-as selector with the live cap line; blocked-recipient inline error |
-| `InboxSettingsSheet.tsx` | Four sections: Identity, Standing instructions, Rules & lists, Sending limits |
-| `CapMeter.tsx` | Three bars: used / held / remaining |
-| `RulesTable.tsx` | Rules + allow-list-mode radio + the precedence explainer |
-| `SendingDomainsSettings.tsx` | Domain list, add wizard, records table with copy buttons, remove-impact dialog |
-| `SanitizedHtmlBody.tsx` | Sandboxed `<iframe srcDoc>` with `sandbox=""`, remote images stripped until **Load images** — the posture the existing [`MessageDetail.tsx`](../../../../../apps/web/src/components/agents/MessageDetail.tsx) comments already demand |
-| `useEmailStream.ts` | **The hook the SSE endpoint was built for and never got** — `EventSource` on `/api/email/messages/stream`, `mutate()` on each event, exponential-backoff reconnect, plain 30s polling fallback |
+| Component                          | Responsibility                                                                                                                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EmailScreen.tsx`                  | `'use client'` shell: switcher + filter bar + list + detail pane; owns URL state (`?inbox=&filter=&thread=`)                                                                                                                          |
+| `InboxSwitcher.tsx`                | All-row + per-inbox rows with unread counts; `[` / `]` navigation                                                                                                                                                                     |
+| `EmailFilterBar.tsx`               | The six filters with counts; `1`–`6` shortcuts                                                                                                                                                                                        |
+| `ThreadList.tsx` + `ThreadRow.tsx` | Keyset-paginated virtualised list; `j`/`k`/`Enter`                                                                                                                                                                                    |
+| `ThreadView.tsx`                   | Ordered `MessageCard`s + the sticky cap footer                                                                                                                                                                                        |
+| `MessageCard.tsx`                  | One card; delegates to a status-specific footer                                                                                                                                                                                       |
+| `DraftCard.tsx`                    | Inline editor (contenteditable-free `<textarea>` that grows), the four controls, Version history disclosure, stale banner                                                                                                             |
+| `EscalationCard.tsx`               | Reason, decision-needed, Dismiss / Instruct, My-Decisions link                                                                                                                                                                        |
+| `ScheduledCard.tsx`                | Countdown (one `setInterval` per view, not per card), Cancel send, Edit & reschedule                                                                                                                                                  |
+| `SendGraceToast.tsx`               | The 5-second Undo (spec §6.3)                                                                                                                                                                                                         |
+| `ReviseDialog.tsx`                 | Notes + counter + revision-of-5 indicator                                                                                                                                                                                             |
+| `ComposeSheet.tsx`                 | Send-as selector with the live cap line; blocked-recipient inline error                                                                                                                                                               |
+| `InboxSettingsSheet.tsx`           | Four sections: Identity, Standing instructions, Rules & lists, Sending limits                                                                                                                                                         |
+| `CapMeter.tsx`                     | Three bars: used / held / remaining                                                                                                                                                                                                   |
+| `RulesTable.tsx`                   | Rules + allow-list-mode radio + the precedence explainer                                                                                                                                                                              |
+| `SendingDomainsSettings.tsx`       | Domain list, add wizard, records table with copy buttons, remove-impact dialog                                                                                                                                                        |
+| `SanitizedHtmlBody.tsx`            | Sandboxed `<iframe srcDoc>` with `sandbox=""`, remote images stripped until **Load images** — the posture the existing [`MessageDetail.tsx`](../../../../../apps/web/src/components/agents/MessageDetail.tsx) comments already demand |
+| `useEmailStream.ts`                | **The hook the SSE endpoint was built for and never got** — `EventSource` on `/api/email/messages/stream`, `mutate()` on each event, exponential-backoff reconnect, plain 30s polling fallback                                        |
 
 `EmailScreen`, `ThreadList` and `ThreadView` are the only client components that fetch; everything
 below them is presentational and takes props, per the composition rules in
@@ -495,13 +496,13 @@ Every job is dispatched through a `*_DISPATCHER` DI symbol resolved by
 the email facade in `packages/agent/src/facades/` and re-exported from
 [`packages/agent/src/facades/index.ts`](../../../../../packages/agent/src/facades/index.ts).
 
-| Symbol | Task file (`packages/tasks/src/tasks/trigger/`) | Trigger | Does | Idempotency |
-| --- | --- | --- | --- | --- |
-| `EMAIL_SCHEDULED_SEND_DISPATCHER` | `email-scheduled-send.task.ts` | enqueued with `delay` at schedule time (the pattern [`notification-channel-delivery.task.ts`](../../../../../packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts) already uses for quiet hours) | Fires one scheduled message through `EmailFacadeService.send` | CAS `UPDATE email_messages SET status='sending' WHERE id=:id AND status='scheduled'`; 0 rows → exit. Plus the provider-side `messageRef` idempotency cache. FR-49 holds even if the job runs twice. |
-| — | `email-scheduled-send-sweeper.task.ts` | cron `*/5 * * * *` | Safety net: any row `status='scheduled' AND scheduledFor <= now()` older than 2 minutes gets re-enqueued. Covers a lost delayed job (runtime switch, provider restart). | Same CAS. |
-| — | `email-domain-verify-sweeper.task.ts` | cron `*/5 * * * *` | Picks domains with `nextCheckAt <= now()`, calls the provider's `verifySendingDomain`, advances `status` / `nextCheckAt` / `checkAttempts`; also re-checks `verified` domains once every 24h (FR-75) | `DistributedTaskLockService.runExclusive('email-domain-verify')` — one sweeper at a time. |
-| — | `email-draft-staleness-sweeper.task.ts` | cron `17 3 * * *` (off-the-hour, per the `kb-reconcile` rationale) | Warns at 7 days, auto-discards at 14 (FR-31); rolls `email_rules.matchCount7d` (FR-57); expires address aliases and blocked-mail retention past 30 days | Idempotent by date comparison. |
-| `EMAIL_DRAFT_REVISE_DISPATCHER` | *(no new task)* | on `POST /:id/revise` | Reuses the existing `agent-task-execute` path via the already-bound `AGENT_TASK_EXECUTE_DISPATCHER` — a revise is a Run, not a new job kind | The Task carries the message id; a second revise while one is in flight is rejected at the controller (409). |
+| Symbol                            | Task file (`packages/tasks/src/tasks/trigger/`) | Trigger                                                                                                                                                                                                            | Does                                                                                                                                                                                                 | Idempotency                                                                                                                                                                                         |
+| --------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EMAIL_SCHEDULED_SEND_DISPATCHER` | `email-scheduled-send.task.ts`                  | enqueued with `delay` at schedule time (the pattern [`notification-channel-delivery.task.ts`](../../../../../packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts) already uses for quiet hours) | Fires one scheduled message through `EmailFacadeService.send`                                                                                                                                        | CAS `UPDATE email_messages SET status='sending' WHERE id=:id AND status='scheduled'`; 0 rows → exit. Plus the provider-side `messageRef` idempotency cache. FR-49 holds even if the job runs twice. |
+| —                                 | `email-scheduled-send-sweeper.task.ts`          | cron `*/5 * * * *`                                                                                                                                                                                                 | Safety net: any row `status='scheduled' AND scheduledFor <= now()` older than 2 minutes gets re-enqueued. Covers a lost delayed job (runtime switch, provider restart).                              | Same CAS.                                                                                                                                                                                           |
+| —                                 | `email-domain-verify-sweeper.task.ts`           | cron `*/5 * * * *`                                                                                                                                                                                                 | Picks domains with `nextCheckAt <= now()`, calls the provider's `verifySendingDomain`, advances `status` / `nextCheckAt` / `checkAttempts`; also re-checks `verified` domains once every 24h (FR-75) | `DistributedTaskLockService.runExclusive('email-domain-verify')` — one sweeper at a time.                                                                                                           |
+| —                                 | `email-draft-staleness-sweeper.task.ts`         | cron `17 3 * * *` (off-the-hour, per the `kb-reconcile` rationale)                                                                                                                                                 | Warns at 7 days, auto-discards at 14 (FR-31); rolls `email_rules.matchCount7d` (FR-57); expires address aliases and blocked-mail retention past 30 days                                              | Idempotent by date comparison.                                                                                                                                                                      |
+| `EMAIL_DRAFT_REVISE_DISPATCHER`   | _(no new task)_                                 | on `POST /:id/revise`                                                                                                                                                                                              | Reuses the existing `agent-task-execute` path via the already-bound `AGENT_TASK_EXECUTE_DISPATCHER` — a revise is a Run, not a new job kind                                                          | The Task carries the message id; a second revise while one is in flight is rejected at the controller (409).                                                                                        |
 
 The delayed-enqueue + cron-sweeper pair is deliberate: a delayed job is an optimisation for
 punctuality, the sweeper is the correctness guarantee. Neither alone is enough.
@@ -516,21 +517,21 @@ existing outbound interface in
 
 ```ts
 export interface EmailSendingDomainRecord {
-  readonly type: 'TXT' | 'MX' | 'CNAME';
-  readonly host: string;
-  readonly value: string;
-  readonly ttl: number;
-  readonly purpose: 'spf' | 'dkim' | 'dmarc' | 'mx';
+	readonly type: 'TXT' | 'MX' | 'CNAME';
+	readonly host: string;
+	readonly value: string;
+	readonly ttl: number;
+	readonly purpose: 'spf' | 'dkim' | 'dmarc' | 'mx';
 }
 export interface EmailSendingDomainStatus {
-  readonly verified: boolean;
-  readonly records: readonly EmailSendingDomainRecord[];
-  readonly failureReason?: string;
+	readonly verified: boolean;
+	readonly records: readonly EmailSendingDomainRecord[];
+	readonly failureReason?: string;
 }
 export interface IEmailOutboundPlugin extends IPlugin {
-  // …existing members unchanged…
-  describeSendingDomain?(domain: string, options: EmailOptions): Promise<EmailSendingDomainStatus>;
-  verifySendingDomain?(domain: string, options: EmailOptions): Promise<EmailSendingDomainStatus>;
+	// …existing members unchanged…
+	describeSendingDomain?(domain: string, options: EmailOptions): Promise<EmailSendingDomainStatus>;
+	verifySendingDomain?(domain: string, options: EmailOptions): Promise<EmailSendingDomainStatus>;
 }
 ```
 
@@ -714,18 +715,18 @@ local parts, no subjects, no bodies**.
 
 ### 9.4 Failure modes and the designed response
 
-| Failure | Response |
-| --- | --- |
-| Provider 5xx on an approved draft | `status='failed'`, `failureReason` on the card, **no cap consumed**, `Try again` reuses the original `messageRef` so a provider that actually accepted it deduplicates rather than double-sending |
-| Job runtime unreachable at schedule time | Schedule still persists (`status='scheduled'`, `scheduleJobId=null`); the 5-minute sweeper is the delivery guarantee |
-| Job runs twice | CAS on `status` means the second run does nothing |
-| Two approvers race | CAS on `status='draft'` → one send; the loser gets 409 with who and when |
-| Cancel races the fire | CAS ordering makes it unambiguous; whoever's `UPDATE` matches wins, the other gets 409 `TooLate` |
-| Cap counter query slow under load | `idx_email_messages_cap_window` is covering; the 60s and 300s windows read ≤ ~50 rows by construction |
-| Domain records removed at the registrar | Detected within 24h by the sweeper; inbox falls back within 1h; owner notified |
-| Inbound flood | Provider webhook stays throttled at 600/60s; rules drop before any model call; inbound creates no send capacity |
-| Prompt injection in an inbound body | Rules run upstream; the body is wrapped in the demarcated non-instruction envelope the `InboundEmailTaskSpawner` JSDoc already prescribes; caps are read from persisted rows only (FR-67), so no model output can move a counter |
-| A draft references an inbox whose agent was archived | The draft is discarded by the staleness sweeper with a visible reason; the address enters its 30-day hold |
+| Failure                                              | Response                                                                                                                                                                                                                         |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider 5xx on an approved draft                    | `status='failed'`, `failureReason` on the card, **no cap consumed**, `Try again` reuses the original `messageRef` so a provider that actually accepted it deduplicates rather than double-sending                                |
+| Job runtime unreachable at schedule time             | Schedule still persists (`status='scheduled'`, `scheduleJobId=null`); the 5-minute sweeper is the delivery guarantee                                                                                                             |
+| Job runs twice                                       | CAS on `status` means the second run does nothing                                                                                                                                                                                |
+| Two approvers race                                   | CAS on `status='draft'` → one send; the loser gets 409 with who and when                                                                                                                                                         |
+| Cancel races the fire                                | CAS ordering makes it unambiguous; whoever's `UPDATE` matches wins, the other gets 409 `TooLate`                                                                                                                                 |
+| Cap counter query slow under load                    | `idx_email_messages_cap_window` is covering; the 60s and 300s windows read ≤ ~50 rows by construction                                                                                                                            |
+| Domain records removed at the registrar              | Detected within 24h by the sweeper; inbox falls back within 1h; owner notified                                                                                                                                                   |
+| Inbound flood                                        | Provider webhook stays throttled at 600/60s; rules drop before any model call; inbound creates no send capacity                                                                                                                  |
+| Prompt injection in an inbound body                  | Rules run upstream; the body is wrapped in the demarcated non-instruction envelope the `InboundEmailTaskSpawner` JSDoc already prescribes; caps are read from persisted rows only (FR-67), so no model output can move a counter |
+| A draft references an inbox whose agent was archived | The draft is discarded by the staleness sweeper with a visible reason; the address enters its 30-day hold                                                                                                                        |
 
 ---
 
@@ -736,15 +737,15 @@ Runners per workspace: **Jest** for `packages/agent` and `apps/api`, **Vitest** 
 
 ### 10.1 Unit — `packages/agent`
 
-| File | Covers |
-| --- | --- |
-| `packages/agent/src/email/__tests__/email-rule-resolver.spec.ts` | FR-50…FR-55. Table-driven over the score function: workspace-block vs inbox-exact-allow (S12), domain-allow vs exact-block, empty allow-list in both modes, exclusive mode with a non-matching address, direction filtering, case/whitespace normalisation, no-rules default |
-| `packages/agent/src/email/__tests__/email-send-cap-guard.spec.ts` | FR-60…FR-69. Rolling-window arithmetic with a frozen clock: 100th passes / 101st refused; capacity returning as a send ages out (not at midnight); scheduled reservation held and released; 1 message → 5 recipients counts 1 send + 5 recipients; 51 recipients refused; workspace day and 30-day ceilings; the exception's `retryAfterSeconds` |
-| `packages/agent/src/email/__tests__/email-draft.service.spec.ts` | FR-21…FR-33. Every state transition and every forbidden one; the approval-race CAS; revise ceiling; version-history cap of 10; stale marking on new inbound |
-| `packages/agent/src/email/__tests__/agent-inbox.service.spec.ts` | FR-1…FR-9. Idempotent provisioning; local-part validation and uniqueness; alias retention of 5 / 30 days; delete cancels schedules |
-| `packages/agent/src/email/__tests__/email-sending-domain.service.spec.ts` | FR-70…FR-76. Verify state machine, 288-attempt give-up, fallback on removal, re-verify of a verified domain |
-| `packages/agent/src/notifications/__tests__/default-inbound-email-dispatcher.rules.spec.ts` | FR-51. Asserts that a blocked message creates **no** thread, **no** Task and makes **no** spawner call |
-| `packages/agent/src/facades/__tests__/email.facade.cap.spec.ts` | FR-63. Every send path refused identically; the guard runs before `resolveOutboundPlugin` |
+| File                                                                                        | Covers                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/agent/src/email/__tests__/email-rule-resolver.spec.ts`                            | FR-50…FR-55. Table-driven over the score function: workspace-block vs inbox-exact-allow (S12), domain-allow vs exact-block, empty allow-list in both modes, exclusive mode with a non-matching address, direction filtering, case/whitespace normalisation, no-rules default                                                                     |
+| `packages/agent/src/email/__tests__/email-send-cap-guard.spec.ts`                           | FR-60…FR-69. Rolling-window arithmetic with a frozen clock: 100th passes / 101st refused; capacity returning as a send ages out (not at midnight); scheduled reservation held and released; 1 message → 5 recipients counts 1 send + 5 recipients; 51 recipients refused; workspace day and 30-day ceilings; the exception's `retryAfterSeconds` |
+| `packages/agent/src/email/__tests__/email-draft.service.spec.ts`                            | FR-21…FR-33. Every state transition and every forbidden one; the approval-race CAS; revise ceiling; version-history cap of 10; stale marking on new inbound                                                                                                                                                                                      |
+| `packages/agent/src/email/__tests__/agent-inbox.service.spec.ts`                            | FR-1…FR-9. Idempotent provisioning; local-part validation and uniqueness; alias retention of 5 / 30 days; delete cancels schedules                                                                                                                                                                                                               |
+| `packages/agent/src/email/__tests__/email-sending-domain.service.spec.ts`                   | FR-70…FR-76. Verify state machine, 288-attempt give-up, fallback on removal, re-verify of a verified domain                                                                                                                                                                                                                                      |
+| `packages/agent/src/notifications/__tests__/default-inbound-email-dispatcher.rules.spec.ts` | FR-51. Asserts that a blocked message creates **no** thread, **no** Task and makes **no** spawner call                                                                                                                                                                                                                                           |
+| `packages/agent/src/facades/__tests__/email.facade.cap.spec.ts`                             | FR-63. Every send path refused identically; the guard runs before `resolveOutboundPlugin`                                                                                                                                                                                                                                                        |
 
 ### 10.2 Controller specs — `apps/api` (extend the existing pattern; `email.controller.spec.ts` already exists)
 
@@ -761,19 +762,19 @@ appears in any response.
 
 ### 10.3 End-to-end — `apps/web/e2e` (764 specs today; these are additive)
 
-| File | Flow |
-| --- | --- |
-| `flow-agent-inbox-provisioning.spec.ts` | S1 — provision, address appears, mode is Draft for review, meter reads 0/100 |
-| `flow-email-draft-approve.spec.ts` | S3 + S4 — approve as-is, Undo within the grace window, approve after an inline edit, version history |
-| `flow-email-draft-revise.spec.ts` | S5 + the revision ceiling |
-| `flow-email-escalation.spec.ts` | S6 + S15 — escalate, Dismiss, Instruct, cross-surface resolution with My Decisions |
-| `flow-email-scheduled-send.spec.ts` | S7 + S13 — countdown, cancel, cancel-too-late 409 |
-| `flow-email-rules-precedence.spec.ts` | S11 + S12 + the Blocked view |
-| `flow-email-send-cap.spec.ts` | S10 — 101st refused, paused banner, meter, auto-resume |
-| `flow-email-domain-verify.spec.ts` | S9 + S19 — records shown, verification, remove-impact dialog |
-| `flow-email-unified-view.spec.ts` | S2 + S20 — switcher, six filters, per-filter empty states, live arrival |
-| `sec-email-inbox-cross-tenant.spec.ts` | S16 + FR-86 — read-only collaborator blocked server-side, cross-tenant id indistinguishable from missing |
-| `accessibility-email.spec.ts` | Keyboard table from spec §6.10, focus order, badge text, axe pass |
+| File                                    | Flow                                                                                                     |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `flow-agent-inbox-provisioning.spec.ts` | S1 — provision, address appears, mode is Draft for review, meter reads 0/100                             |
+| `flow-email-draft-approve.spec.ts`      | S3 + S4 — approve as-is, Undo within the grace window, approve after an inline edit, version history     |
+| `flow-email-draft-revise.spec.ts`       | S5 + the revision ceiling                                                                                |
+| `flow-email-escalation.spec.ts`         | S6 + S15 — escalate, Dismiss, Instruct, cross-surface resolution with My Decisions                       |
+| `flow-email-scheduled-send.spec.ts`     | S7 + S13 — countdown, cancel, cancel-too-late 409                                                        |
+| `flow-email-rules-precedence.spec.ts`   | S11 + S12 + the Blocked view                                                                             |
+| `flow-email-send-cap.spec.ts`           | S10 — 101st refused, paused banner, meter, auto-resume                                                   |
+| `flow-email-domain-verify.spec.ts`      | S9 + S19 — records shown, verification, remove-impact dialog                                             |
+| `flow-email-unified-view.spec.ts`       | S2 + S20 — switcher, six filters, per-filter empty states, live arrival                                  |
+| `sec-email-inbox-cross-tenant.spec.ts`  | S16 + FR-86 — read-only collaborator blocked server-side, cross-tenant id indistinguishable from missing |
+| `accessibility-email.spec.ts`           | Keyboard table from spec §6.10, focus order, badge text, axe pass                                        |
 
 Existing email specs (`notifications-v2-inbox.spec.ts`, `flow-agent-inbox-messaging.spec.ts`,
 `flow-email-addresses-deep.spec.ts`, `email-bounce-handling.spec.ts`, `sec-pin-email-agent-ownership.spec.ts`)
@@ -844,18 +845,18 @@ disabled, so nothing half-works.
 
 ## 12. Constitution compliance
 
-| Gate | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | Sending-domain description/verification are optional methods on the existing email-provider capability, implemented inside provider plugin packages. Core gets no HTTP client for any provider. |
-| **II — Capability-driven** | ✅ | Domains and sends resolve through `EmailFacadeService`; no plugin id is written in core code. The `pluginId` columns are data, matching the existing `tenant_email_addresses.pluginId` precedent. |
-| **III — Source-of-truth repos** | ✅ (n/a) | Mail is operational data, like `activity_log` and `agent_runs`. No work content moves into the database. |
-| **IV — Job runtime** | ✅ | Four background jobs, all reached through `*_DISPATCHER` DI symbols resolved by `JobRuntimeProviderRegistry`. No call site imports `@trigger.dev/sdk`. Delayed enqueue plus a cron sweeper, matching the notification-delivery precedent. |
-| **V — Forward-only migrations** | ✅ | Three additive, existence-guarded migrations under `apps/api/src/migrations/`. No `DROP`, no rename. The two backfills are batched and idempotent. Portable `TableColumn` DDL for the sqlite CI stack. |
-| **VI — Tests** | ✅ | 7 unit suites, 5 controller suites, 11 e2e specs, 2 plugin suites — named in §10, and every FR maps to at least one. |
-| **VII — Secrets** | ✅ | Domain credentials live in plugin settings marked `x-secret`. No endpoint returns a webhook secret, verification token or credential; the existing `toPublicEmailAddress` stripping stays. Sentry captures ids, never bodies, subjects or local parts. |
-| **VIII — Plugin counts** | ✅ | No new plugin package. `docs/plugin-system/built-in-plugins.md` gains only the two new capability strings against the existing five providers. |
-| **IX — Behaviour-first spec** | ✅ | `spec.md` names no class, file or endpoint; all of that is here. |
-| **X — Backwards compatible** | ✅ | Existing endpoints keep their shapes and gain only optional fields; new plugin methods are optional; the legacy per-agent routes and their i18n namespace keep working; `email_messages.status` defaults so pre-existing rows read correctly; the superseded "one link or the other" rule populates a nullable column rather than changing a populated one, and the entity JSDoc is corrected in the same PR. |
+| Gate                            | Status   | Justification                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**            | ✅       | Sending-domain description/verification are optional methods on the existing email-provider capability, implemented inside provider plugin packages. Core gets no HTTP client for any provider.                                                                                                                                                                                                               |
+| **II — Capability-driven**      | ✅       | Domains and sends resolve through `EmailFacadeService`; no plugin id is written in core code. The `pluginId` columns are data, matching the existing `tenant_email_addresses.pluginId` precedent.                                                                                                                                                                                                             |
+| **III — Source-of-truth repos** | ✅ (n/a) | Mail is operational data, like `activity_log` and `agent_runs`. No work content moves into the database.                                                                                                                                                                                                                                                                                                      |
+| **IV — Job runtime**            | ✅       | Four background jobs, all reached through `*_DISPATCHER` DI symbols resolved by `JobRuntimeProviderRegistry`. No call site imports `@trigger.dev/sdk`. Delayed enqueue plus a cron sweeper, matching the notification-delivery precedent.                                                                                                                                                                     |
+| **V — Forward-only migrations** | ✅       | Three additive, existence-guarded migrations under `apps/api/src/migrations/`. No `DROP`, no rename. The two backfills are batched and idempotent. Portable `TableColumn` DDL for the sqlite CI stack.                                                                                                                                                                                                        |
+| **VI — Tests**                  | ✅       | 7 unit suites, 5 controller suites, 11 e2e specs, 2 plugin suites — named in §10, and every FR maps to at least one.                                                                                                                                                                                                                                                                                          |
+| **VII — Secrets**               | ✅       | Domain credentials live in plugin settings marked `x-secret`. No endpoint returns a webhook secret, verification token or credential; the existing `toPublicEmailAddress` stripping stays. Sentry captures ids, never bodies, subjects or local parts.                                                                                                                                                        |
+| **VIII — Plugin counts**        | ✅       | No new plugin package. `docs/plugin-system/built-in-plugins.md` gains only the two new capability strings against the existing five providers.                                                                                                                                                                                                                                                                |
+| **IX — Behaviour-first spec**   | ✅       | `spec.md` names no class, file or endpoint; all of that is here.                                                                                                                                                                                                                                                                                                                                              |
+| **X — Backwards compatible**    | ✅       | Existing endpoints keep their shapes and gain only optional fields; new plugin methods are optional; the legacy per-agent routes and their i18n namespace keep working; `email_messages.status` defaults so pre-existing rows read correctly; the superseded "one link or the other" rule populates a nullable column rather than changing a populated one, and the entity JSDoc is corrected in the same PR. |
 
 ## 13. References
 

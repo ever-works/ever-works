@@ -23,34 +23,34 @@ Every path below was opened before being cited.
 [`apps/web/src/components/tasks/TasksKanbanView.tsx`](../../../../../apps/web/src/components/tasks/TasksKanbanView.tsx)
 — 712 lines. This is the feature. What is in it:
 
-| Concern | What is there |
-| --- | --- |
-| Columns | A `COLUMNS: ColumnDef[]` table with one entry per `TaskStatus` — `backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled` — each with an icon, a dot class, a header class, a count class, a card-border class. **`label` is a hardcoded English string** on every entry |
-| Transition affordance | `NEXT_STATUS: Record<TaskStatus, TaskStatus[]>`, a client-side mirror of the server lattice, used for both the `Move →` menu and drop-target refusal. Its own comment says the server stays authoritative |
-| Drag and drop | Native HTML5 DnD — `draggable`, `onDragStart` (`text/x-task-id`), `onDragOver` (refuses when `NEXT_STATUS` disallows), `onDragLeave` with a bounding-rect check, `onDrop`. Optimistic move with rollback and a per-card error line |
-| Post-drop dispatch | A drop into `in_progress` calls `listTaskRunCandidatesAction` and, when the Task has neither a `task_assignees` row nor its own `agentId`, opens the agent picker rather than moving silently |
-| Per-card run | `RunWithAgentMenu` plus an `r` key handler that ignores modifiers, key repeat, text inputs and the open diff sheet |
-| Per-column batch | `Run all`, capped at `RUN_ALL_MAX = 20` to mirror the API's `RUN_BATCH_MAX_TASKS`, offered only on `todo` / `backlog` / `in_progress`, reporting `n/m started` |
-| Card chips | `TaskBranchChip`, `TaskPrPill` (with the CI dot), `TaskRunChip`, `GateChip`, and a `± N files` button opening `TaskDiffSheet` |
-| Polling | `useTaskRunPolling` merging **only** run and PR fields by id, explicitly never status or title, so a poll cannot clobber an in-flight optimistic drag |
-| Paging | `MAX_VISIBLE = 15` per column with a `Show N more` button — a client-side slice of an already-fetched array |
-| Priority | `PRIORITY_TONES: Record<TaskPriority, string>` for all five of `p0`–`p4`. Rendered. Never sorted by |
+| Concern               | What is there                                                                                                                                                                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Columns               | A `COLUMNS: ColumnDef[]` table with one entry per `TaskStatus` — `backlog`, `todo`, `in_progress`, `in_review`, `blocked`, `done`, `cancelled` — each with an icon, a dot class, a header class, a count class, a card-border class. **`label` is a hardcoded English string** on every entry |
+| Transition affordance | `NEXT_STATUS: Record<TaskStatus, TaskStatus[]>`, a client-side mirror of the server lattice, used for both the `Move →` menu and drop-target refusal. Its own comment says the server stays authoritative                                                                                     |
+| Drag and drop         | Native HTML5 DnD — `draggable`, `onDragStart` (`text/x-task-id`), `onDragOver` (refuses when `NEXT_STATUS` disallows), `onDragLeave` with a bounding-rect check, `onDrop`. Optimistic move with rollback and a per-card error line                                                            |
+| Post-drop dispatch    | A drop into `in_progress` calls `listTaskRunCandidatesAction` and, when the Task has neither a `task_assignees` row nor its own `agentId`, opens the agent picker rather than moving silently                                                                                                 |
+| Per-card run          | `RunWithAgentMenu` plus an `r` key handler that ignores modifiers, key repeat, text inputs and the open diff sheet                                                                                                                                                                            |
+| Per-column batch      | `Run all`, capped at `RUN_ALL_MAX = 20` to mirror the API's `RUN_BATCH_MAX_TASKS`, offered only on `todo` / `backlog` / `in_progress`, reporting `n/m started`                                                                                                                                |
+| Card chips            | `TaskBranchChip`, `TaskPrPill` (with the CI dot), `TaskRunChip`, `GateChip`, and a `± N files` button opening `TaskDiffSheet`                                                                                                                                                                 |
+| Polling               | `useTaskRunPolling` merging **only** run and PR fields by id, explicitly never status or title, so a poll cannot clobber an in-flight optimistic drag                                                                                                                                         |
+| Paging                | `MAX_VISIBLE = 15` per column with a `Show N more` button — a client-side slice of an already-fetched array                                                                                                                                                                                   |
+| Priority              | `PRIORITY_TONES: Record<TaskPriority, string>` for all five of `p0`–`p4`. Rendered. Never sorted by                                                                                                                                                                                           |
 
 **The interaction model is done and this plan does not touch it.** What is missing is
 a read model behind it and a card that says where its work came from.
 
 ### 1.2 How the board is reached, and what it is given
 
-| File | Today |
-| --- | --- |
-| [`apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx>) | RSC. Reads `status` / `priority` / `search` / `label` / `offset` search params, builds **one** query with `limit: 50` and `includeRun: true`, calls `tasksAPI.list`, renders `PageHeader` + `TasksTabsNav` + a filter `<form>` + `<TasksList tasks={result.data} />` + offset pagination. Its own doc comment ("Kanban + per-target tabs land in Phase 14") is stale |
-| [`apps/web/src/components/tasks/TasksList.tsx`](../../../../../apps/web/src/components/tasks/TasksList.tsx) | Client, 328 lines. `VIEW_TABS = [cards, table, kanban]` with **hardcoded labels**, `useState<ViewKey>('cards')` — not in the URL, not persisted, not defaulting to the board — plus a `STATUS_FILTERS` strip with **hardcoded labels**, and its own `STATUS_TONES` / `PRIORITY_TONES` / `STATUS_DOT` maps. Renders `<TasksKanbanView tasks={filtered} />` when the view is `kanban` |
-| [`apps/web/src/components/tasks/TasksScopedSection.tsx`](../../../../../apps/web/src/components/tasks/TasksScopedSection.tsx) | The reusable scoped list every parent entity mounts — `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks`. It wraps the same `TasksList`, so **the board is already live on all of them** |
-| [`apps/web/src/components/tasks/TasksTabsNav.tsx`](../../../../../apps/web/src/components/tasks/TasksTabsNav.tsx) | Server component, two tabs (`Tasks` / `Triggers`), i18n via `dashboard.taskTriggers.tabs`. Its comment says adding a tab is a one-line change |
-| [`apps/web/src/lib/api/tasks.ts`](../../../../../apps/web/src/lib/api/tasks.ts) | `tasksAPI` — the server-only typed client. `Task`, `TaskStatus`, `TaskPriority` types |
-| [`apps/web/src/app/actions/tasks.ts`](../../../../../apps/web/src/app/actions/tasks.ts) | `transitionTaskAction`, `runTasksBatchAction`, `listTaskRunCandidatesAction`, and the rest |
-| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts) | `DASHBOARD_TASKS: '/tasks'` (214), `DASHBOARD_TASK_NEW` (215), `DASHBOARD_TASK_TRIGGERS` (216), `DASHBOARD_TASK_TRIGGER(id)` (217), `DASHBOARD_TASK(id)` (218), `DASHBOARD_TASK_TEMPLATES` (220). **No new route constant is needed** — the board is a view on `/tasks` |
-| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) | Hardcoded nav array; "Tasks" already points at `ROUTES.DASHBOARD_TASKS`. **No sidebar change is needed** |
+| File                                                                                                                              | Today                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx>)   | RSC. Reads `status` / `priority` / `search` / `label` / `offset` search params, builds **one** query with `limit: 50` and `includeRun: true`, calls `tasksAPI.list`, renders `PageHeader` + `TasksTabsNav` + a filter `<form>` + `<TasksList tasks={result.data} />` + offset pagination. Its own doc comment ("Kanban + per-target tabs land in Phase 14") is stale                |
+| [`apps/web/src/components/tasks/TasksList.tsx`](../../../../../apps/web/src/components/tasks/TasksList.tsx)                       | Client, 328 lines. `VIEW_TABS = [cards, table, kanban]` with **hardcoded labels**, `useState<ViewKey>('cards')` — not in the URL, not persisted, not defaulting to the board — plus a `STATUS_FILTERS` strip with **hardcoded labels**, and its own `STATUS_TONES` / `PRIORITY_TONES` / `STATUS_DOT` maps. Renders `<TasksKanbanView tasks={filtered} />` when the view is `kanban` |
+| [`apps/web/src/components/tasks/TasksScopedSection.tsx`](../../../../../apps/web/src/components/tasks/TasksScopedSection.tsx)     | The reusable scoped list every parent entity mounts — `/missions/[id]/tasks`, `/works/[id]/tasks`, `/ideas/[id]/tasks`. It wraps the same `TasksList`, so **the board is already live on all of them**                                                                                                                                                                              |
+| [`apps/web/src/components/tasks/TasksTabsNav.tsx`](../../../../../apps/web/src/components/tasks/TasksTabsNav.tsx)                 | Server component, two tabs (`Tasks` / `Triggers`), i18n via `dashboard.taskTriggers.tabs`. Its comment says adding a tab is a one-line change                                                                                                                                                                                                                                       |
+| [`apps/web/src/lib/api/tasks.ts`](../../../../../apps/web/src/lib/api/tasks.ts)                                                   | `tasksAPI` — the server-only typed client. `Task`, `TaskStatus`, `TaskPriority` types                                                                                                                                                                                                                                                                                               |
+| [`apps/web/src/app/actions/tasks.ts`](../../../../../apps/web/src/app/actions/tasks.ts)                                           | `transitionTaskAction`, `runTasksBatchAction`, `listTaskRunCandidatesAction`, and the rest                                                                                                                                                                                                                                                                                          |
+| [`apps/web/src/lib/constants.ts`](../../../../../apps/web/src/lib/constants.ts)                                                   | `DASHBOARD_TASKS: '/tasks'` (214), `DASHBOARD_TASK_NEW` (215), `DASHBOARD_TASK_TRIGGERS` (216), `DASHBOARD_TASK_TRIGGER(id)` (217), `DASHBOARD_TASK(id)` (218), `DASHBOARD_TASK_TEMPLATES` (220). **No new route constant is needed** — the board is a view on `/tasks`                                                                                                             |
+| [`apps/web/src/components/dashboard/DashboardSidebar.tsx`](../../../../../apps/web/src/components/dashboard/DashboardSidebar.tsx) | Hardcoded nav array; "Tasks" already points at `ROUTES.DASHBOARD_TASKS`. **No sidebar change is needed**                                                                                                                                                                                                                                                                            |
 
 **The consequence of one 50-row fetch.** `page.tsx` asks for `limit: 50` with no
 status filter; `TasksList` slices client-side; `TasksKanbanView` groups the array by
@@ -63,22 +63,22 @@ spec §2.3 gap 1, and it is the whole reason P1 exists.
 [`packages/agent/src/entities/task.entity.ts`](../../../../../packages/agent/src/entities/task.entity.ts).
 The board needs nothing added to it. What is already there and what the board reads:
 
-| Need | Column already present |
-| --- | --- |
-| Column | `status` (`TaskStatus`, 7 values), `previousStatus` |
-| Ordering | `priority` (`TaskPriority`, **five** values `p0`–`p4`), `updatedAt`, `createdAt` |
-| Card identity | `slug` (per-user `T-n` via `UserTaskCounter`), `title`, `description`, `labels` |
-| Provenance — owners | `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` — all nullable, all independent, all separately indexed with `(ownerId, status)`, **no `@ManyToOne` by design** (entity import-cycle avoidance) |
-| Provenance — creator | `createdByType` (`'user'` or `'agent'`), `createdById` |
-| Provenance — delegation | `delegationDepth` (server-written; null reads as 0) |
-| Provenance — recurrence | `parentRecurringTaskId` (instance → its template) |
-| Provenance — scheduling | `scheduledAt`, `scheduleClaimedAt` |
-| Sub-tasks | `parentTaskId`, indexed by `idx_tasks_parent` |
-| Recurring template | `isRecurring`, `recurrenceRule` xor `recurrenceCron`, `recurrenceTimezone`, `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`, `recurrenceOccurredCount`; indexed by `idx_tasks_recurrence_due (isRecurring, nextOccurrenceAt)` |
-| Stall signal | `latestRunStatus` (`queued` / `running` / `completed` / `failed` / `cancelled`), `latestRunId`, `startedAt`, `updatedAt` |
-| Hidden work | `hiddenFromBoard` (server-written by a Trigger with `showOnBoard: false`) |
-| Existing chips | `branchRef`, `branchState`, `prNumber`, `prUrl`, `prState`, `ciState`, `prChecks`, `conflictPaths`, `linkedPullRequests` |
-| Scope | `userId`, `tenantId`, `organizationId` |
+| Need                    | Column already present                                                                                                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Column                  | `status` (`TaskStatus`, 7 values), `previousStatus`                                                                                                                                                                                              |
+| Ordering                | `priority` (`TaskPriority`, **five** values `p0`–`p4`), `updatedAt`, `createdAt`                                                                                                                                                                 |
+| Card identity           | `slug` (per-user `T-n` via `UserTaskCounter`), `title`, `description`, `labels`                                                                                                                                                                  |
+| Provenance — owners     | `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` — all nullable, all independent, all separately indexed with `(ownerId, status)`, **no `@ManyToOne` by design** (entity import-cycle avoidance)                                   |
+| Provenance — creator    | `createdByType` (`'user'` or `'agent'`), `createdById`                                                                                                                                                                                           |
+| Provenance — delegation | `delegationDepth` (server-written; null reads as 0)                                                                                                                                                                                              |
+| Provenance — recurrence | `parentRecurringTaskId` (instance → its template)                                                                                                                                                                                                |
+| Provenance — scheduling | `scheduledAt`, `scheduleClaimedAt`                                                                                                                                                                                                               |
+| Sub-tasks               | `parentTaskId`, indexed by `idx_tasks_parent`                                                                                                                                                                                                    |
+| Recurring template      | `isRecurring`, `recurrenceRule` xor `recurrenceCron`, `recurrenceTimezone`, `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`, `recurrenceOccurredCount`; indexed by `idx_tasks_recurrence_due (isRecurring, nextOccurrenceAt)` |
+| Stall signal            | `latestRunStatus` (`queued` / `running` / `completed` / `failed` / `cancelled`), `latestRunId`, `startedAt`, `updatedAt`                                                                                                                         |
+| Hidden work             | `hiddenFromBoard` (server-written by a Trigger with `showOnBoard: false`)                                                                                                                                                                        |
+| Existing chips          | `branchRef`, `branchState`, `prNumber`, `prUrl`, `prState`, `ciState`, `prChecks`, `conflictPaths`, `linkedPullRequests`                                                                                                                         |
+| Scope                   | `userId`, `tenantId`, `organizationId`                                                                                                                                                                                                           |
 
 > The established pattern in this domain, stated in the capability map §7.3, is that
 > **new Task metadata becomes a new `task_*` side table, not a new column**. This
@@ -118,14 +118,14 @@ and P2 close.
 
 ### 1.5 The signals the card flags derive from
 
-| Flag | Source | Note |
-| --- | --- | --- |
-| Decision — escalation | [`packages/agent/src/entities/agent-escalation.entity.ts`](../../../../../packages/agent/src/entities/agent-escalation.entity.ts) | `status`, `taskId`, `runId`, `userId`; index `idx_agent_escalation_task_status` — a grouped count by `taskId` is an index-only scan |
-| Decision — approval | [`packages/agent/src/entities/agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts) | `status` (`pending` default), `runId`, `agentId`, `userId`; reached from a Task through its runs |
-| Stalled | `Task.status`, `Task.latestRunStatus`, `Task.updatedAt` | All three are on the row already. No join, no new column |
-| Comment count | [`packages/agent/src/entities/task-chat-message.entity.ts`](../../../../../packages/agent/src/entities/task-chat-message.entity.ts) | `idx_task_chat_task_created (taskId, createdAt)` — a grouped count by `taskId` rides the leading column |
-| Sub-task roll-up | `Task.parentTaskId` | `idx_tasks_parent` — one grouped `(parentTaskId, status)` count |
-| Trigger provenance | [`packages/agent/src/entities/inbound-trigger.entity.ts`](../../../../../packages/agent/src/entities/inbound-trigger.entity.ts) and its fire row | The fire row records the `taskId` it produced. A reverse lookup by `taskId IN (…)` attributes the chip **without a `triggerId` column on Task** |
+| Flag                  | Source                                                                                                                                           | Note                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decision — escalation | [`packages/agent/src/entities/agent-escalation.entity.ts`](../../../../../packages/agent/src/entities/agent-escalation.entity.ts)                | `status`, `taskId`, `runId`, `userId`; index `idx_agent_escalation_task_status` — a grouped count by `taskId` is an index-only scan             |
+| Decision — approval   | [`packages/agent/src/entities/agent-action-proposal.entity.ts`](../../../../../packages/agent/src/entities/agent-action-proposal.entity.ts)      | `status` (`pending` default), `runId`, `agentId`, `userId`; reached from a Task through its runs                                                |
+| Stalled               | `Task.status`, `Task.latestRunStatus`, `Task.updatedAt`                                                                                          | All three are on the row already. No join, no new column                                                                                        |
+| Comment count         | [`packages/agent/src/entities/task-chat-message.entity.ts`](../../../../../packages/agent/src/entities/task-chat-message.entity.ts)              | `idx_task_chat_task_created (taskId, createdAt)` — a grouped count by `taskId` rides the leading column                                         |
+| Sub-task roll-up      | `Task.parentTaskId`                                                                                                                              | `idx_tasks_parent` — one grouped `(parentTaskId, status)` count                                                                                 |
+| Trigger provenance    | [`packages/agent/src/entities/inbound-trigger.entity.ts`](../../../../../packages/agent/src/entities/inbound-trigger.entity.ts) and its fire row | The fire row records the `taskId` it produced. A reverse lookup by `taskId IN (…)` attributes the chip **without a `triggerId` column on Task** |
 
 ### 1.6 The comment and steering seam — already solved at Task scope
 
@@ -134,7 +134,7 @@ and P2 close.
   parsing with unknown tokens stripped, and a fan-out to `agent-chat-reply`.
 - [`packages/agent/src/tasks-domain/run-steering-port.ts`](../../../../../packages/agent/src/tasks-domain/run-steering-port.ts)
   — `RUN_STEERING_PORT`, `steer({ runId, userId, message }) → { dispatched:
-  'injected' | 'new-run', runId, queuedCount? }`. When a chat message mentions an
+'injected' | 'new-run', runId, queuedCount? }`. When a chat message mentions an
   Agent that already has a live run, the message is **injected into that run's
   pending-input queue** rather than starting a second one. Bound by the API-side
   `@Global()` agents module; unbound in unit tests, where the service falls back to
@@ -145,16 +145,16 @@ the existing thread and posts through the existing endpoint. No new service.
 
 ### 1.7 Cross-cutting infrastructure
 
-| Concern | File | Note |
-| --- | --- | --- |
-| Migrations | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/) | Timestamp-prefixed, forward-only, self-applied by the API on boot. **Not** `packages/agent/src/migrations/`, which does not exist. **This epic adds none** |
-| Entity barrel | [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts) | Untouched — no entity is added |
-| Activity log | [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts) | `TASK_CREATED/UPDATED/DELETED/ASSIGNED/TRANSITIONED/COMMENTED/COMPLETED/RECURRENCE_FIRED/MERGED` already exist. `actionType` is a free `varchar(50)`, so appending a member needs no migration |
-| Notifications | [`packages/agent/src/entities/notification.types.ts`](../../../../../packages/agent/src/entities/notification.types.ts) + [`task-notification.service.ts`](../../../../../packages/agent/src/tasks-domain/task-notification.service.ts) | `NotificationCategory.TASK` **already exists**. The kind→severity map already holds `task_assigned`, `task_mentioned`, `task_status_changed`, `task_blocked`, `task_due_soon`, `task_recurrence_fired`, `task_run_no_agent`. Adding `task_stalled` is one map entry. `deduplicationKey` is uniquely indexed per user — the "once per stalled streak" rule rides on it |
-| Job runtime | [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/) | Shape to copy: the existing `task-recurrence-dispatcher` and `task-pr-status-sync` tasks — `schedules.task({ id, cron, run })` spinning a transient `TriggerInternalModule` Nest context |
-| Schedules read model | [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts) + [`cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts) | `sourceType: 'recurring_task'` already exists, and `describeCron` / `describeRrule` already render a cadence in plain language. **The recurring strip reads this, it does not re-derive cadence text** |
-| i18n | [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json) | `dashboard.tasksPage.status.*` already holds all seven column names; `dashboard.tasksPage.priority.*` already holds all five priority labels; both are already translated across the platform's locales. Leaf keys are camelCase and must never contain a literal `.`; a missing **parent** key collapses a whole subtree |
-| Ownership | [`packages/agent/src/database/ownership-scope.ts`](../../../../../packages/agent/src/database/ownership-scope.ts) | `OwnershipScope`, `ownershipWhere`, `ownershipSqlPredicate` — the canonical user + Organization filter every board query uses |
+| Concern              | File                                                                                                                                                                                                                                    | Note                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migrations           | [`apps/api/src/migrations/`](../../../../../apps/api/src/migrations/)                                                                                                                                                                   | Timestamp-prefixed, forward-only, self-applied by the API on boot. **Not** `packages/agent/src/migrations/`, which does not exist. **This epic adds none**                                                                                                                                                                                                            |
+| Entity barrel        | [`packages/agent/src/entities/index.ts`](../../../../../packages/agent/src/entities/index.ts)                                                                                                                                           | Untouched — no entity is added                                                                                                                                                                                                                                                                                                                                        |
+| Activity log         | [`packages/agent/src/entities/activity-log.types.ts`](../../../../../packages/agent/src/entities/activity-log.types.ts)                                                                                                                 | `TASK_CREATED/UPDATED/DELETED/ASSIGNED/TRANSITIONED/COMMENTED/COMPLETED/RECURRENCE_FIRED/MERGED` already exist. `actionType` is a free `varchar(50)`, so appending a member needs no migration                                                                                                                                                                        |
+| Notifications        | [`packages/agent/src/entities/notification.types.ts`](../../../../../packages/agent/src/entities/notification.types.ts) + [`task-notification.service.ts`](../../../../../packages/agent/src/tasks-domain/task-notification.service.ts) | `NotificationCategory.TASK` **already exists**. The kind→severity map already holds `task_assigned`, `task_mentioned`, `task_status_changed`, `task_blocked`, `task_due_soon`, `task_recurrence_fired`, `task_run_no_agent`. Adding `task_stalled` is one map entry. `deduplicationKey` is uniquely indexed per user — the "once per stalled streak" rule rides on it |
+| Job runtime          | [`packages/tasks/src/tasks/trigger/`](../../../../../packages/tasks/src/tasks/trigger/)                                                                                                                                                 | Shape to copy: the existing `task-recurrence-dispatcher` and `task-pr-status-sync` tasks — `schedules.task({ id, cron, run })` spinning a transient `TriggerInternalModule` Nest context                                                                                                                                                                              |
+| Schedules read model | [`packages/agent/src/schedules/schedule-view.types.ts`](../../../../../packages/agent/src/schedules/schedule-view.types.ts) + [`cadence.ts`](../../../../../packages/agent/src/schedules/cadence.ts)                                    | `sourceType: 'recurring_task'` already exists, and `describeCron` / `describeRrule` already render a cadence in plain language. **The recurring strip reads this, it does not re-derive cadence text**                                                                                                                                                                |
+| i18n                 | [`apps/web/messages/en.json`](../../../../../apps/web/messages/en.json)                                                                                                                                                                 | `dashboard.tasksPage.status.*` already holds all seven column names; `dashboard.tasksPage.priority.*` already holds all five priority labels; both are already translated across the platform's locales. Leaf keys are camelCase and must never contain a literal `.`; a missing **parent** key collapses a whole subtree                                             |
+| Ownership            | [`packages/agent/src/database/ownership-scope.ts`](../../../../../packages/agent/src/database/ownership-scope.ts)                                                                                                                       | `OwnershipScope`, `ownershipWhere`, `ownershipSqlPredicate` — the canonical user + Organization filter every board query uses                                                                                                                                                                                                                                         |
 
 ---
 
@@ -224,7 +224,7 @@ pure data, so client and server compute the same mapping from the same table.
 
 ### 2.3 Drop resolution in the Focus layout
 
-The existing board's `NEXT_STATUS` mirror handles the seven-column case: a column *is*
+The existing board's `NEXT_STATUS` mirror handles the seven-column case: a column _is_
 a status, so a drop is unambiguous. A grouped column needs a resolution rule:
 
 ```
@@ -285,24 +285,24 @@ needed, where it comes from instead, and what each substitution costs.
 
 ### 3.1 Every board signal, and the stored state it comes from
 
-| Board signal | Comes from | Cost of not storing it |
-| --- | --- | --- |
-| Column | `Task.status` | — |
-| Order | `Task.priority`, `Task.updatedAt` + the stall predicate | Needs an `orderBy` option on the list filter (§3.2) |
-| True column total | `COUNT(*) GROUP BY status` under the filter predicate | One extra grouped query per board read; index-only on `idx_tasks_user_status` |
-| Mission / Idea / Work / Team / Goal / Agent chip | The six owner columns + one name lookup per distinct kind | Six small `IN` queries; each is a PK read |
-| `Raised by {agent}` | `createdByType = 'agent'` + `createdById` | Shares the Agent name lookup |
-| `Delegated · depth n` | `delegationDepth` | — |
-| `⟳ {template}` on an instance | `parentRecurringTaskId` + a title lookup | One `IN` on `tasks` |
-| `Template` on a template | `isRecurring` | Needs an `isRecurring` predicate on the list filter (§3.2) |
-| `Scheduled {when}` | `scheduledAt` | — |
-| `Trigger · {name}` | Reverse lookup on the trigger fire log by `taskId` | One `IN` on the fire table. Cheaper than a `triggerId` column on `tasks`, which would need a migration, a backfill, and a writer on every fire path |
-| Sub-task roll-up | `COUNT(*) GROUP BY parentTaskId, status` | One grouped query on `idx_tasks_parent` |
-| Top-level only | `parentTaskId IS NULL` | Needs a "no parent" form on the list filter (§3.2) |
-| Decision count | Grouped counts over escalations and pending approvals | Two grouped queries, both index-backed |
-| Comment count | `COUNT(*) GROUP BY taskId` on the chat table | One grouped query on `idx_task_chat_task_created`. A denormalised counter would need a writer on post, edit and delete plus a repair job — for a chip |
-| Stalled | `status`, `latestRunStatus`, `updatedAt` | Under-reports after an unrelated edit (§2.4) |
-| Hidden | `hiddenFromBoard` | — |
+| Board signal                                     | Comes from                                                | Cost of not storing it                                                                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Column                                           | `Task.status`                                             | —                                                                                                                                                     |
+| Order                                            | `Task.priority`, `Task.updatedAt` + the stall predicate   | Needs an `orderBy` option on the list filter (§3.2)                                                                                                   |
+| True column total                                | `COUNT(*) GROUP BY status` under the filter predicate     | One extra grouped query per board read; index-only on `idx_tasks_user_status`                                                                         |
+| Mission / Idea / Work / Team / Goal / Agent chip | The six owner columns + one name lookup per distinct kind | Six small `IN` queries; each is a PK read                                                                                                             |
+| `Raised by {agent}`                              | `createdByType = 'agent'` + `createdById`                 | Shares the Agent name lookup                                                                                                                          |
+| `Delegated · depth n`                            | `delegationDepth`                                         | —                                                                                                                                                     |
+| `⟳ {template}` on an instance                    | `parentRecurringTaskId` + a title lookup                  | One `IN` on `tasks`                                                                                                                                   |
+| `Template` on a template                         | `isRecurring`                                             | Needs an `isRecurring` predicate on the list filter (§3.2)                                                                                            |
+| `Scheduled {when}`                               | `scheduledAt`                                             | —                                                                                                                                                     |
+| `Trigger · {name}`                               | Reverse lookup on the trigger fire log by `taskId`        | One `IN` on the fire table. Cheaper than a `triggerId` column on `tasks`, which would need a migration, a backfill, and a writer on every fire path   |
+| Sub-task roll-up                                 | `COUNT(*) GROUP BY parentTaskId, status`                  | One grouped query on `idx_tasks_parent`                                                                                                               |
+| Top-level only                                   | `parentTaskId IS NULL`                                    | Needs a "no parent" form on the list filter (§3.2)                                                                                                    |
+| Decision count                                   | Grouped counts over escalations and pending approvals     | Two grouped queries, both index-backed                                                                                                                |
+| Comment count                                    | `COUNT(*) GROUP BY taskId` on the chat table              | One grouped query on `idx_task_chat_task_created`. A denormalised counter would need a writer on post, edit and delete plus a repair job — for a chip |
+| Stalled                                          | `status`, `latestRunStatus`, `updatedAt`                  | Under-reports after an unrelated edit (§2.4)                                                                                                          |
+| Hidden                                           | `hiddenFromBoard`                                         | —                                                                                                                                                     |
 
 ### 3.2 Additive filter options — types only, no schema
 
@@ -310,11 +310,11 @@ Three additions to `ListTasksFilter` in
 [`packages/agent/src/database/repositories/task.repository.ts`](../../../../../packages/agent/src/database/repositories/task.repository.ts).
 All optional; omitting all three reproduces today's query byte for byte.
 
-| Field | Shape | Predicate | Default |
-| --- | --- | --- | --- |
-| `parentTaskId` | widen from `string` to `string \| 'none'` | `'none'` → `task.parentTaskId IS NULL`; a uuid keeps today's meaning | unchanged |
-| `isRecurring` | `boolean \| undefined` | `true` → `isRecurring = true`; `false` → `isRecurring = false`; `undefined` → no predicate, today's behaviour | `undefined` |
-| `orderBy` | `'updatedAt' \| 'priorityThenUpdated' \| 'stalledThenPriority'` | `'updatedAt'` is today's `ORDER BY task.updatedAt DESC` and stays the default for every existing caller | `'updatedAt'` |
+| Field          | Shape                                                           | Predicate                                                                                                     | Default       |
+| -------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------- |
+| `parentTaskId` | widen from `string` to `string \| 'none'`                       | `'none'` → `task.parentTaskId IS NULL`; a uuid keeps today's meaning                                          | unchanged     |
+| `isRecurring`  | `boolean \| undefined`                                          | `true` → `isRecurring = true`; `false` → `isRecurring = false`; `undefined` → no predicate, today's behaviour | `undefined`   |
+| `orderBy`      | `'updatedAt' \| 'priorityThenUpdated' \| 'stalledThenPriority'` | `'updatedAt'` is today's `ORDER BY task.updatedAt DESC` and stays the default for every existing caller       | `'updatedAt'` |
 
 `'stalledThenPriority'` compiles to:
 
@@ -365,34 +365,45 @@ unchanged.
 
 **`GET /api/tasks/board`** — the board read model.
 
-| Query | Type | Default | Notes |
-| --- | --- | --- | --- |
-| `layout` | `status \| focus` | `status` | Which column table to group by |
-| `columnLimit` | int 1–100 | 50 | Cards per column |
-| `terminalWindowDays` | int 1–90 | 7 | Bounds `done` and `cancelled` (spec FR-10, S25) |
-| `priority`, `label`, `search` | as the list route | — | Same parsing helpers |
-| `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` | uuid | — | Same `ParseUUIDPipe({ optional: true })` |
-| `includeSubtasks` | `'true'` | off | Off → `parentTaskId: 'none'` |
-| `includeTemplates` | `'true'` | off | Off → `isRecurring: false` |
-| `includeHidden` | `'true'` | off | Same meaning as the list route |
-| `includeCancelled` | `'true'` | layout-dependent | `focus` only; `status` always includes it |
+| Query                                                          | Type              | Default          | Notes                                           |
+| -------------------------------------------------------------- | ----------------- | ---------------- | ----------------------------------------------- |
+| `layout`                                                       | `status \| focus` | `status`         | Which column table to group by                  |
+| `columnLimit`                                                  | int 1–100         | 50               | Cards per column                                |
+| `terminalWindowDays`                                           | int 1–90          | 7                | Bounds `done` and `cancelled` (spec FR-10, S25) |
+| `priority`, `label`, `search`                                  | as the list route | —                | Same parsing helpers                            |
+| `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` | uuid              | —                | Same `ParseUUIDPipe({ optional: true })`        |
+| `includeSubtasks`                                              | `'true'`          | off              | Off → `parentTaskId: 'none'`                    |
+| `includeTemplates`                                             | `'true'`          | off              | Off → `isRecurring: false`                      |
+| `includeHidden`                                                | `'true'`          | off              | Same meaning as the list route                  |
+| `includeCancelled`                                             | `'true'`          | layout-dependent | `focus` only; `status` always includes it       |
 
 Response:
 
 ```jsonc
 {
-  "layout": "status",
-  "columns": [
-    { "key": "todo", "statuses": ["todo"], "total": 140,
-      "cards": [ /* Task rows, run-embedded, plus the enrichment block below */ ] }
-  ],
-  "recurring": [
-    { "id": "…", "title": "Weekly link sweep", "cadenceText": "Every Monday at 09:00",
-      "nextOccurrenceAt": "…", "ended": false }
-  ],
-  "counters": { "waitingOnYou": 3, "doneToday": 7 },
-  "terminalWindowDays": 7,
-  "degraded": []            // names of enrichments that failed this read
+	"layout": "status",
+	"columns": [
+		{
+			"key": "todo",
+			"statuses": ["todo"],
+			"total": 140,
+			"cards": [
+				/* Task rows, run-embedded, plus the enrichment block below */
+			]
+		}
+	],
+	"recurring": [
+		{
+			"id": "…",
+			"title": "Weekly link sweep",
+			"cadenceText": "Every Monday at 09:00",
+			"nextOccurrenceAt": "…",
+			"ended": false
+		}
+	],
+	"counters": { "waitingOnYou": 3, "doneToday": 7 },
+	"terminalWindowDays": 7,
+	"degraded": [] // names of enrichments that failed this read
 }
 ```
 
@@ -453,26 +464,26 @@ View resolution order, implemented once in a small `resolveTasksView()`:
 
 Under `apps/web/src/components/tasks/`:
 
-| File | Kind | What |
-| --- | --- | --- |
-| `board/TaskBoard.tsx` | new, client | The board shell: layout switcher, toggles, recurring strip, column strip, error panel. Owns the column state and the per-column paging |
-| `board/TaskBoardColumn.tsx` | new, client | One column. **Extracted from the existing `TaskKanbanColumn`** and given a true total, an independent `Show more`, the empty copy, and the drop rules of §2.3 |
-| `board/TaskBoardCard.tsx` | new, client | **Extracted from the existing `TaskKanbanCard`**, unchanged in behaviour, plus the flag row, the provenance row, the roll-up and the comment chip |
-| `board/TaskProvenanceChips.tsx` | new, client | Renders the `board.provenance` array; each chip is a filter link |
-| `board/TaskBoardFlags.tsx` | new, client | Stalled flag, Decision chip and its `Open decision` action, Hidden and Template chips |
-| `board/TaskRecurringStrip.tsx` | new, client | The collapsed/expanded strip of §6.5 |
-| `board/TaskBoardFilters.tsx` | new, client | The board's filter bar, writing to the URL; kept in sync with the page's existing server-rendered `<form>` |
-| `TasksKanbanView.tsx` | **kept** | Becomes a thin adapter that renders `TaskBoard` from a plain `Task[]`, so every existing caller — `TasksList`, `TasksScopedSection` and the three scoped routes — keeps compiling and keeps working with no change |
-| `TasksList.tsx` | changed | `VIEW_TABS` labels and `STATUS_FILTERS` labels move to the catalogue; the view state moves from `useState` to the URL + cookie; `kanban` renders the new board |
+| File                            | Kind        | What                                                                                                                                                                                                               |
+| ------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `board/TaskBoard.tsx`           | new, client | The board shell: layout switcher, toggles, recurring strip, column strip, error panel. Owns the column state and the per-column paging                                                                             |
+| `board/TaskBoardColumn.tsx`     | new, client | One column. **Extracted from the existing `TaskKanbanColumn`** and given a true total, an independent `Show more`, the empty copy, and the drop rules of §2.3                                                      |
+| `board/TaskBoardCard.tsx`       | new, client | **Extracted from the existing `TaskKanbanCard`**, unchanged in behaviour, plus the flag row, the provenance row, the roll-up and the comment chip                                                                  |
+| `board/TaskProvenanceChips.tsx` | new, client | Renders the `board.provenance` array; each chip is a filter link                                                                                                                                                   |
+| `board/TaskBoardFlags.tsx`      | new, client | Stalled flag, Decision chip and its `Open decision` action, Hidden and Template chips                                                                                                                              |
+| `board/TaskRecurringStrip.tsx`  | new, client | The collapsed/expanded strip of §6.5                                                                                                                                                                               |
+| `board/TaskBoardFilters.tsx`    | new, client | The board's filter bar, writing to the URL; kept in sync with the page's existing server-rendered `<form>`                                                                                                         |
+| `TasksKanbanView.tsx`           | **kept**    | Becomes a thin adapter that renders `TaskBoard` from a plain `Task[]`, so every existing caller — `TasksList`, `TasksScopedSection` and the three scoped routes — keeps compiling and keeps working with no change |
+| `TasksList.tsx`                 | changed     | `VIEW_TABS` labels and `STATUS_FILTERS` labels move to the catalogue; the view state moves from `useState` to the URL + cookie; `kanban` renders the new board                                                     |
 
 In `packages/agent/src/tasks-domain/`:
 
-| File | What |
-| --- | --- |
-| `task-board-columns.ts` | Both layout tables, `resolveDrop()`, `columnForStatus()`. Pure, no imports from TypeORM or NestJS. **Imported by both the API and the web client**, so the two cannot disagree |
-| `task-board-stall.ts` | `isStalled()`, `clampStallAfterDays()`, `stallCutoff()`. Pure |
-| `task-board-provenance.ts` | `orderProvenance()` implementing FR-28's precedence. Pure |
-| `task-board.service.ts` | The read model of §2.1. The only new service |
+| File                       | What                                                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `task-board-columns.ts`    | Both layout tables, `resolveDrop()`, `columnForStatus()`. Pure, no imports from TypeORM or NestJS. **Imported by both the API and the web client**, so the two cannot disagree |
+| `task-board-stall.ts`      | `isStalled()`, `clampStallAfterDays()`, `stallCutoff()`. Pure                                                                                                                  |
+| `task-board-provenance.ts` | `orderProvenance()` implementing FR-28's precedence. Pure                                                                                                                      |
+| `task-board.service.ts`    | The read model of §2.1. The only new service                                                                                                                                   |
 
 ### 5.3 State and data fetching
 
@@ -542,9 +553,9 @@ added in the same change so no subtree can collapse.
 **Reused, not re-declared** — these already exist and are already translated:
 
 - `dashboard.tasksPage.status.{backlog,todo,inProgress,inReview,blocked,done,cancelled}`
-  — the seven column names. *(The catalogue's existing leaves are keyed by the status
+  — the seven column names. _(The catalogue's existing leaves are keyed by the status
   value; the board must read them through the same accessor the list already uses,
-  not copy the strings.)*
+  not copy the strings.)_
 - `dashboard.tasksPage.priority.{p0,p1,p2,p3,p4}` — Urgent, High, Medium, Normal, Low.
 - `dashboard.tasksPage.list.*` — the existing filter, pagination and new-Task strings.
 - `dashboard.taskTriggers.tabs.*` — the Tasks/Triggers tab strip.
@@ -618,16 +629,16 @@ type would double-count the same event.
 
 ### 9.2 Product analytics
 
-| Event | Properties |
-| --- | --- |
-| `task_board_opened` | `layout`, `columnCount`, `totalTasks`, `filtersActive[]`, `degraded[]` |
-| `task_board_column_paged` | `status`, `offset` |
-| `task_board_filter_applied` | `filter`, `source` (`chip` / `bar` / `url`) |
-| `task_board_provenance_clicked` | `kind` |
-| `task_board_decision_opened` | — |
-| `task_board_stall_flag_shown` | `days` |
-| `task_board_layout_switched` | `from`, `to` |
-| `task_board_drop_picker_shown` | `from`, `column`, `options[]` |
+| Event                           | Properties                                                             |
+| ------------------------------- | ---------------------------------------------------------------------- |
+| `task_board_opened`             | `layout`, `columnCount`, `totalTasks`, `filtersActive[]`, `degraded[]` |
+| `task_board_column_paged`       | `status`, `offset`                                                     |
+| `task_board_filter_applied`     | `filter`, `source` (`chip` / `bar` / `url`)                            |
+| `task_board_provenance_clicked` | `kind`                                                                 |
+| `task_board_decision_opened`    | —                                                                      |
+| `task_board_stall_flag_shown`   | `days`                                                                 |
+| `task_board_layout_switched`    | `from`, `to`                                                           |
+| `task_board_drop_picker_shown`  | `from`, `column`, `options[]`                                          |
 
 `filtersActive` carries filter **names**, never values — a label or a search term is
 user content and does not belong in analytics.
@@ -641,17 +652,17 @@ train the team to ignore it.
 
 ### 9.4 Failure modes and the chosen degradation
 
-| Failure | Degradation |
-| --- | --- |
-| The whole board read fails | Column frames + the error panel of spec §6.11. Never an empty board presented as "no Tasks" |
-| One column's read fails | That column shows the panel; the others render |
-| Decision counts fail | Decision chips absent, `waiting on you` reads `—`. Board works |
-| Comment counts fail | Comment chips absent. Board works |
-| Sub-task roll-up fails | Roll-up absent; nothing is double-counted, because the top-level filter is a predicate on the card query, not on the roll-up |
-| Provenance name lookup fails | Chips absent for that kind (FR-29's rule already omits an unresolvable name) |
-| Trigger fire lookup fails | Trigger chips absent; the other provenance kinds still render |
+| Failure                        | Degradation                                                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| The whole board read fails     | Column frames + the error panel of spec §6.11. Never an empty board presented as "no Tasks"                                               |
+| One column's read fails        | That column shows the panel; the others render                                                                                            |
+| Decision counts fail           | Decision chips absent, `waiting on you` reads `—`. Board works                                                                            |
+| Comment counts fail            | Comment chips absent. Board works                                                                                                         |
+| Sub-task roll-up fails         | Roll-up absent; nothing is double-counted, because the top-level filter is a predicate on the card query, not on the roll-up              |
+| Provenance name lookup fails   | Chips absent for that kind (FR-29's rule already omits an unresolvable name)                                                              |
+| Trigger fire lookup fails      | Trigger chips absent; the other provenance kinds still render                                                                             |
 | The recurring strip read fails | The strip is hidden. Templates remain out of the columns — the exclusion is a predicate on the card query, not a consequence of the strip |
-| The stall sweep fails | Flags still render (they are computed at read time); only the notification is missed, and the next sweep sends it |
+| The stall sweep fails          | Flags still render (they are computed at read time); only the notification is missed, and the next sweep sends it                         |
 
 ---
 
@@ -671,7 +682,7 @@ train the team to ignore it.
   rest-menued split.
 - `task.repository.spec.ts` — the three new filter options: `parentTaskId: 'none'`
   emits `IS NULL`; `isRecurring: false` emits the predicate; `isRecurring:
-  undefined` emits none; each `orderBy` value emits the expected clause; **omitting
+undefined` emits none; each `orderBy` value emits the expected clause; **omitting
   all three reproduces the current SQL exactly** (the regression that matters most).
 - `task-board.service.spec.ts` — totals come from the grouped count and not from
   `cards.length`; each enrichment failure degrades only itself and names itself in
@@ -691,7 +702,7 @@ Following the existing `tasks.controller.*.spec.ts` files:
   column and every count; a provenance name the caller cannot see is omitted;
   cross-user column paging 404s in the same shape as the existing scope specs.
 - `tasks.controller.board-visibility.spec.ts` — **extend the existing file**:
-  `hiddenFromBoard` rows are absent from the board read's columns *and* its counts,
+  `hiddenFromBoard` rows are absent from the board read's columns _and_ its counts,
   and present with `includeHidden=true`.
 - Regression: the existing `GET /api/tasks` controller specs must pass untouched.
   Any diff there means the additive promise was broken.
@@ -778,18 +789,18 @@ Focus layout, the recurring strip.
 
 ## 12. Constitution compliance
 
-| Gate | How this plan satisfies it |
-| --- | --- |
-| **I — Plugin-first** | No external integration. No provider client. §7 |
-| **II — Capability-driven** | No plugin id anywhere. Runs go through the existing gated dispatch path the board already uses |
-| **III — Source-of-truth repos** | Reads platform metadata only. No Work content enters the database; no Task content leaves it |
-| **IV — Job-runtime provider** | The one scheduled job (`task-stall-sweep`) is a `schedules.task` in `packages/tasks/src/tasks/trigger/`, dispatched through the configured provider, in a transient `TriggerInternalModule` context. §6 |
+| Gate                            | How this plan satisfies it                                                                                                                                                                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I — Plugin-first**            | No external integration. No provider client. §7                                                                                                                                                                                                       |
+| **II — Capability-driven**      | No plugin id anywhere. Runs go through the existing gated dispatch path the board already uses                                                                                                                                                        |
+| **III — Source-of-truth repos** | Reads platform metadata only. No Work content enters the database; no Task content leaves it                                                                                                                                                          |
+| **IV — Job-runtime provider**   | The one scheduled job (`task-stall-sweep`) is a `schedules.task` in `packages/tasks/src/tasks/trigger/`, dispatched through the configured provider, in a transient `TriggerInternalModule` context. §6                                               |
 | **V — Forward-only migrations** | **No schema change ships.** If §3.3's threshold column is later adopted it ships as an additive forward-only migration in `apps/api/src/migrations/` in the same PR as the column. `packages/agent/src/migrations/` does not exist and is never cited |
-| **VI — Tests first-class** | Pure logic has Jest unit specs; every endpoint has a colocated controller spec; every new user-visible flow has a Playwright spec; the existing list-route specs must pass untouched. §10 |
-| **VII — Secrets** | No secret is introduced, read or logged. The Trigger provenance chip carries a trigger's **name**, never its secret |
-| **VIII — Plugin counts** | No plugin added; the canonical plugin doc is untouched |
-| **IX — Behaviour-first spec** | The spec names no class, file or library; every path in this document was opened before being cited |
-| **X — Backwards compatibility** | Every new request parameter is optional and its absence reproduces today's SQL; every new response field is additive; `TasksKanbanView` is kept as an adapter so every existing caller compiles; every changed default has a one-action toggle back |
+| **VI — Tests first-class**      | Pure logic has Jest unit specs; every endpoint has a colocated controller spec; every new user-visible flow has a Playwright spec; the existing list-route specs must pass untouched. §10                                                             |
+| **VII — Secrets**               | No secret is introduced, read or logged. The Trigger provenance chip carries a trigger's **name**, never its secret                                                                                                                                   |
+| **VIII — Plugin counts**        | No plugin added; the canonical plugin doc is untouched                                                                                                                                                                                                |
+| **IX — Behaviour-first spec**   | The spec names no class, file or library; every path in this document was opened before being cited                                                                                                                                                   |
+| **X — Backwards compatibility** | Every new request parameter is optional and its absence reproduces today's SQL; every new response field is additive; `TasksKanbanView` is kept as an adapter so every existing caller compiles; every changed default has a one-action toggle back   |
 
 ---
 

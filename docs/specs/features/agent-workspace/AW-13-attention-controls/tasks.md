@@ -95,55 +95,43 @@
 
 ### Email as a built-in delivery target
 
-- [ ] **T6 · P1.** The sender port.
-    - Create `packages/agent/src/notifications/notification-email-sender.port.ts` —
+- [ ] **T6 · P1.** The sender port. - Create `packages/agent/src/notifications/notification-email-sender.port.ts` —
       `NOTIFICATION_EMAIL_SENDER = Symbol.for('NOTIFICATION_EMAIL_SENDER')`,
       `NotificationEmailInput { userId; eventKey?; title; message; actionUrl?; actionLabel? }`,
       `NotificationEmailResult { status: 'delivered' | 'failed' | 'not-configured';
-      providerMessageId?; error? }`, `NotificationEmailSender { deliver(input): Promise<...> }`.
-    - Export from `packages/agent/src/notifications/index.ts`.
-    - **Done**: the port has no import from `apps/api` and no mail-library import.
+providerMessageId?; error? }`, `NotificationEmailSender { deliver(input): Promise<...> }`. - Export from `packages/agent/src/notifications/index.ts`. - **Done**: the port has no import from `apps/api` and no mail-library import.
 
-- [ ] **T7 · P1.** Entity changes for silent records and built-in delivery targets.
-    - `packages/agent/src/entities/notification.entity.ts` — add
+- [ ] **T7 · P1.** Entity changes for silent records and built-in delivery targets. - `packages/agent/src/entities/notification.entity.ts` — add
       `@Column({ default: false }) isSilent: boolean;` and
-      `@Index('idx_notifications_user_silent_read', ['userId', 'isSilent', 'isRead'])`.
-    - `packages/agent/src/entities/notification-channel-delivery-log.entity.ts` — make
+      `@Index('idx_notifications_user_silent_read', ['userId', 'isSilent', 'isRead'])`. - `packages/agent/src/entities/notification-channel-delivery-log.entity.ts` — make
       `channelId` `{ type: 'uuid', nullable: true }` and `string | null`; make the `@ManyToOne`
       relation optional; add `@Column({ type: 'varchar', length: 16, nullable: true })
-      builtInChannel?: string | null;` and `@Column({ type: 'uuid', nullable: true }) userId?:
-      string | null;` (**no** `@ManyToOne` on `userId` — follow the Tier-C comment already on
-      `tenantId`); add `@Index('idx_ncdl_user_created', ['userId', 'createdAt'])`.
-    - `packages/agent/src/entities/notification.types.ts` — add optional `eventKey?: string` to
+builtInChannel?: string | null;` and `@Column({ type: 'uuid', nullable: true }) userId?:
+string | null;` (**no** `@ManyToOne` on `userId` — follow the Tier-C comment already on
+      `tenantId`); add `@Index('idx_ncdl_user_created', ['userId', 'createdAt'])`. - `packages/agent/src/entities/notification.types.ts` — add optional `eventKey?: string` to
       `CreateNotificationDto` and optional `includeSilent?: boolean` to
-      `NotificationQueryOptions`.
-    - **Done**: `pnpm --filter @ever-works/agent type-check` is green and every existing
+      `NotificationQueryOptions`. - **Done**: `pnpm --filter @ever-works/agent type-check` is green and every existing
       `NotificationService.create()` call site compiles untouched.
 
-- [ ] **T8 · P1.** Ship the migration for T7 and the registry data, in the same PR.
-    - From `apps/api/`: `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AttentionMatrixFoundations`,
+- [ ] **T8 · P1.** Ship the migration for T7 and the registry data, in the same PR. - From `apps/api/`: `pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/AttentionMatrixFoundations`,
       then rename the emitted file to
-      `apps/api/src/migrations/1791130000000-AttentionMatrixFoundations.ts`.
-    - Hand-edit `up()` so it contains **only**:
+      `apps/api/src/migrations/1791130000000-AttentionMatrixFoundations.ts`. - Hand-edit `up()` so it contains **only**:
       `ALTER TABLE "notifications" ADD COLUMN "isSilent" boolean NOT NULL DEFAULT false`;
       `ALTER TABLE "notification_channel_delivery_log" ALTER COLUMN "channelId" DROP NOT NULL`;
       `ADD COLUMN "builtInChannel" varchar(16)`; `ADD COLUMN "userId" uuid`;
       two `CREATE INDEX CONCURRENTLY` statements
       (`idx_notifications_user_silent_read`, `idx_ncdl_user_created`);
       the 23 `INSERT INTO "notification_event_types" … ON CONFLICT ("key") DO UPDATE SET
-      "category" = EXCLUDED."category", "title" = …, "description" = …, "urgent" = …,
-      "defaultChannels" = …` rows (guarded to `source = 'core'`);
+"category" = EXCLUDED."category", "title" = …, "description" = …, "urgent" = …,
+"defaultChannels" = …` rows (guarded to `source = 'core'`);
       and the opt-out backfill —
       `INSERT INTO "user_notification_subscriptions" ("userId","eventTypeKey","channelIds")
-       SELECT id, 'budget_threshold_warning', '["in-app"]' FROM "users"
-       WHERE "emailBudgetAlerts" = false ON CONFLICT DO NOTHING` and the same for
-      `budget_threshold_reached`.
-    - `down()` drops the two columns, the index, restores `NOT NULL` only if no NULL rows exist,
+ SELECT id, 'budget_threshold_warning', '["in-app"]' FROM "users"
+ WHERE "emailBudgetAlerts" = false ON CONFLICT DO NOTHING` and the same for
+      `budget_threshold_reached`. - `down()` drops the two columns, the index, restores `NOT NULL` only if no NULL rows exist,
       and deletes the 8 inserted keys. It does **not** attempt to un-correct the 2 categories or
-      the 4 urgency flags.
-    - Remove the migration's implicit transaction if the driver requires it for
-      `CREATE INDEX CONCURRENTLY`.
-    - **Done**: no `DROP COLUMN` on a pre-existing column, no `NOT NULL` added to a populated
+      the 4 urgency flags. - Remove the migration's implicit transaction if the driver requires it for
+      `CREATE INDEX CONCURRENTLY`. - **Done**: no `DROP COLUMN` on a pre-existing column, no `NOT NULL` added to a populated
       column, no `UPDATE` against `users`; running the migration twice against a seeded local DB
       leaves exactly 23 core rows in `notification_event_types`.
 
@@ -166,24 +154,18 @@
       `packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts` retries it
       unchanged.
 
-- [ ] **T10 · P1.** The API-side sender and its template.
-    - Create `apps/api/src/templates/notification.hbs` — title, message, one primary action
+- [ ] **T10 · P1.** The API-side sender and its template. - Create `apps/api/src/templates/notification.hbs` — title, message, one primary action
       button, the "You get this because **{{eventTitle}}** is on for Email." line, and a link to
-      the matrix. Match the visual language of `apps/api/src/templates/budget-alert.hbs`.
-    - `apps/api/src/mail/templates.ts` — add `'notification'` to `KNOWN_EMAIL_TEMPLATES` (the
+      the matrix. Match the visual language of `apps/api/src/templates/budget-alert.hbs`. - `apps/api/src/mail/templates.ts` — add `'notification'` to `KNOWN_EMAIL_TEMPLATES` (the
       packaging spec asserts the list and the directory agree in both directions, so this is
-      required, not optional).
-    - `apps/api/src/mail/mail.service.ts` — add `sendNotificationEmail(toEmail, recipientName,
-      context)` following the shape of `sendBudgetAlertEmail`, including its `requireEmail` guard.
-    - Create `apps/api/src/notifications/notification-email-sender.service.ts` implementing
+      required, not optional). - `apps/api/src/mail/mail.service.ts` — add `sendNotificationEmail(toEmail, recipientName,
+context)` following the shape of `sendBudgetAlertEmail`, including its `requireEmail` guard. - Create `apps/api/src/notifications/notification-email-sender.service.ts` implementing
       `NotificationEmailSender`: resolve the user through `UserRepository`, skip with
       `not-configured` when the mail transport is unavailable, skip with `failed` +
       `'address-unverified'` when `emailVerified` is false, otherwise send. Never log the address
-      above `debug`.
-    - `apps/api/src/notifications/notifications.module.ts` — import `MailModule` (it exports
+      above `debug`. - `apps/api/src/notifications/notifications.module.ts` — import `MailModule` (it exports
       `MailService` and imports nothing from this tree, so there is no cycle), and bind
-      `{ provide: NOTIFICATION_EMAIL_SENDER, useExisting: NotificationEmailSenderService }`.
-    - **Done**: a real notification with `email` in its plan produces a MailHog message locally;
+      `{ provide: NOTIFICATION_EMAIL_SENDER, useExisting: NotificationEmailSenderService }`. - **Done**: a real notification with `email` in its plan produces a MailHog message locally;
       `pnpm --filter ever-works-api test -- templates.spec` is green.
 
 ### Routing correctness
@@ -392,11 +374,9 @@
     - **Done**: the entity is registered in the TypeORM entity list used by both the API and the
       test harness; `pnpm --filter @ever-works/agent type-check` is green.
 
-- [ ] **T28 · P2.** Ship the migration for T26 + T27, in the same PR.
-    - `apps/api/src/migrations/1791130100000-CreateAttentionHolds.ts` — three `ADD COLUMN … NOT
-      NULL DEFAULT` on `user_notification_preferences`, `CREATE TABLE attention_holds` with its
-      FK to `users` (`ON DELETE CASCADE`) and its two indexes.
-    - **Done**: `up()` has no `DROP`, no rename, no backfill; `down()` reverses exactly it;
+- [ ] **T28 · P2.** Ship the migration for T26 + T27, in the same PR. - `apps/api/src/migrations/1791130100000-CreateAttentionHolds.ts` — three `ADD COLUMN … NOT
+NULL DEFAULT` on `user_notification_preferences`, `CREATE TABLE attention_holds` with its
+      FK to `users` (`ON DELETE CASCADE`) and its two indexes. - **Done**: `up()` has no `DROP`, no rename, no backfill; `down()` reverses exactly it;
       running against a seeded local DB completes without locking
       `user_notification_preferences`.
 
@@ -430,19 +410,14 @@
 
 ### Release and expiry
 
-- [ ] **T31 · P2.** The digest releases holds.
-    - `packages/agent/src/digest/digest.service.ts` — in `renderMarkdown`, add a **Held for you**
+- [ ] **T31 · P2.** The digest releases holds. - `packages/agent/src/digest/digest.service.ts` — in `renderMarkdown`, add a **Held for you**
       section after the existing "Needs your decision" section, listing at most
       `MAX_ITEMS_PER_SECTION` (the constant already in that file) named holds plus a remainder
-      count, and an **Attention** one-liner with the two used/limit pairs.
-    - In `deliverDigest` (and `deliverOrgDigest` — personal holds only, never org-wide), read open
+      count, and an **Attention** one-liner with the two used/limit pairs. - In `deliverDigest` (and `deliverOrgDigest` — personal holds only, never org-wide), read open
       holds, include them, and call `markReleased` **only after** the notification producer
-      returns successfully.
-    - `packages/agent/src/digest/digest.types.ts` — extend `DigestCounts` with `heldReleased:
-      number`, and include held items in the non-quiet calculation exactly as `escalationsOpen`
-      already is, so a window whose only content is held items is not suppressed.
-    - Create `packages/agent/src/digest/__tests__/digest-holds.spec.ts`.
-    - **Done**: a held item appears by name in one digest and not the next; a compose failure
+      returns successfully. - `packages/agent/src/digest/digest.types.ts` — extend `DigestCounts` with `heldReleased:
+number`, and include held items in the non-quiet calculation exactly as `escalationsOpen`
+      already is, so a window whose only content is held items is not suppressed. - Create `packages/agent/src/digest/__tests__/digest-holds.spec.ts`. - **Done**: a held item appears by name in one digest and not the next; a compose failure
       leaves the hold open.
 
 - [ ] **T32 · P2.** Expire holds on the existing cron.

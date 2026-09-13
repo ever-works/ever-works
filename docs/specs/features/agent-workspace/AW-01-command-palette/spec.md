@@ -30,32 +30,32 @@ can open, and every **action** they can take without leaving the keyboard ("New 
 recently, so the overlay is useful the instant it opens, before a single character is typed.
 
 The capability behind it is a **workspace-wide search read model**: one request answers
-"where is anything called *X* in my workspace", scoped to exactly what the caller is allowed
+"where is anything called _X_ in my workspace", scoped to exactly what the caller is allowed
 to open, across every first-class noun the product owns.
 
 ## 2. Why now
 
-**The user's question this answers:** *"Where do I go?"* — one of the six questions the
+**The user's question this answers:** _"Where do I go?"_ — one of the six questions the
 Agent Workspace program exists to make cheap ([program overview §0](../README.md#0-why-this-program-exists)).
 
 **What they do today.** Navigation is entirely sidebar-click-driven. The left nav carries 14
 top-level entries; behind them sit well over sixty routes. To reach one specific Agent an
-owner clicks *Teams* → *Agents* → scans a grid → maybe types into that page's own filter box.
-To reach one specific Task: *Tasks* → filter box. To reach one Knowledge-Base document:
-*Works* → pick the Work → *KB* → the Work-scoped palette. Every list page has its own filter
+owner clicks _Teams_ → _Agents_ → scans a grid → maybe types into that page's own filter box.
+To reach one specific Task: _Tasks_ → filter box. To reach one Knowledge-Base document:
+_Works_ → pick the Work → _KB_ → the Work-scoped palette. Every list page has its own filter
 input; **not one of them is reachable from anywhere else**, and none of them can find
 anything outside its own page.
 
 The concrete gaps this creates:
 
-| Gap | What it costs the user today |
-| --- | --- |
-| No cross-entity search | "Find the Skill called *invoice-triage*" requires knowing that Skills live behind the Teams nav entry. |
-| No keyboard route to a named record | You cannot get to a specific Agent, Task, Mission, Team, Goal or Meeting by typing its name from anywhere. |
-| `Ctrl+K` is misleading | It is advertised in the Help drawer as "Search works" — a modal-less hard navigation to one list page. Users press it expecting an overlay. |
-| Actions need a mouse | "Create a Mission" means: find the nav entry, land on the list page, find the button. |
-| Deep routes are invisible | Roughly 20 Settings sub-pages and 14 Work sub-pages have no entry point except clicking through their parent. |
-| Nothing remembers | Returning to the Mission you were in five minutes ago is a fresh navigation every time. |
+| Gap                                 | What it costs the user today                                                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| No cross-entity search              | "Find the Skill called _invoice-triage_" requires knowing that Skills live behind the Teams nav entry.                                      |
+| No keyboard route to a named record | You cannot get to a specific Agent, Task, Mission, Team, Goal or Meeting by typing its name from anywhere.                                  |
+| `Ctrl+K` is misleading              | It is advertised in the Help drawer as "Search works" — a modal-less hard navigation to one list page. Users press it expecting an overlay. |
+| Actions need a mouse                | "Create a Mission" means: find the nav entry, land on the list page, find the button.                                                       |
+| Deep routes are invisible           | Roughly 20 Settings sub-pages and 14 Work sub-pages have no entry point except clicking through their parent.                               |
+| Nothing remembers                   | Returning to the Mission you were in five minutes ago is a fresh navigation every time.                                                     |
 
 As the product's surface area grows — every subsequent epic in this program adds screens —
 sidebar-only navigation gets **worse monotonically**. This epic is sized M, has no blocking
@@ -112,7 +112,7 @@ the first opens the Help drawer over the current screen without navigating away.
 
 **S-7 — Mouse users are not punished.**
 **Given** an owner who never learns the shortcut,
-**When** they click the "Search…  ⌘K" control in the top bar,
+**When** they click the "Search… ⌘K" control in the top bar,
 **Then** the same palette opens with the input focused, and clicking any row opens it.
 
 **S-8 — Recency beats alphabet.**
@@ -250,18 +250,19 @@ screen (the palette never paginates past 25 in one group).
   strictly below every substring match (FR-14).
 - **FR-14** Every result carries a deterministic integer score in `0..100`:
 
-  | Match quality | Score |
-  | --- | --- |
-  | Query equals the display name or identifier (case-insensitive) | 100 |
-  | Display name starts with the query | 90 |
-  | A word inside the display name starts with the query | 80 |
-  | Display name contains the query | 65 |
-  | Identifier contains the query | 60 |
-  | Secondary field contains the query | 40 |
-  | Fuzzy subsequence match on the display name | 25 |
+    | Match quality                                                  | Score |
+    | -------------------------------------------------------------- | ----- |
+    | Query equals the display name or identifier (case-insensitive) | 100   |
+    | Display name starts with the query                             | 90    |
+    | A word inside the display name starts with the query           | 80    |
+    | Display name contains the query                                | 65    |
+    | Identifier contains the query                                  | 60    |
+    | Secondary field contains the query                             | 40    |
+    | Fuzzy subsequence match on the display name                    | 25    |
 
-  Two additive boosts apply, capped at 100: **+10** if this user opened this exact record from
-  the palette within the last 7 days; **+5** if the record changed within the last 24 hours.
+    Two additive boosts apply, capped at 100: **+10** if this user opened this exact record from
+    the palette within the last 7 days; **+5** if the record changed within the last 24 hours.
+
 - **FR-15** Ties break in this order: higher score → more recently changed → kind priority
   (Commands, Screens, Missions, Tasks, Agents, Works, Ideas, Skills, Teams, Knowledge, then
   the P2 kinds in the order listed in FR-18) → display name ascending, case-insensitive.
@@ -279,25 +280,25 @@ screen (the palette never paginates past 25 in one group).
 - **FR-18** The following kinds are searchable. Every one of them is an entity Ever Works
   already owns; **none is new**:
 
-  | Phase | Kind (group label) | Matched on |
-  | --- | --- | --- |
-  | P1 | **Commands** | command label + its alias list |
-  | P1 | **Screens** | screen title + its breadcrumb path |
-  | P1 | **Missions** | title, description |
-  | P1 | **Tasks** | slug (e.g. `T-418`), title, description, labels |
-  | P1 | **Agents** | name, slug, title |
-  | P1 | **Works** | name, slug, description |
-  | P1 | **Ideas** | title, description |
-  | P1 | **Skills** | name, slug, description |
-  | P1 | **Teams** | name, slug, description |
-  | P1 | **Knowledge** | document title, path, description, tags |
-  | P2 | **Runs** | run reference, summary, owning Agent name |
-  | P2 | **My Decisions** | approval/escalation subject line |
-  | P2 | **Memory** | folder name, folder path, file name |
-  | P2 | **Goals** | title |
-  | P2 | **Meetings** | title, summary |
-  | P2 | **Computers** | node name (the Fleet node surface) |
-  | P2 | **Connections** | installed plugin name + connected account label |
+    | Phase | Kind (group label) | Matched on                                      |
+    | ----- | ------------------ | ----------------------------------------------- |
+    | P1    | **Commands**       | command label + its alias list                  |
+    | P1    | **Screens**        | screen title + its breadcrumb path              |
+    | P1    | **Missions**       | title, description                              |
+    | P1    | **Tasks**          | slug (e.g. `T-418`), title, description, labels |
+    | P1    | **Agents**         | name, slug, title                               |
+    | P1    | **Works**          | name, slug, description                         |
+    | P1    | **Ideas**          | title, description                              |
+    | P1    | **Skills**         | name, slug, description                         |
+    | P1    | **Teams**          | name, slug, description                         |
+    | P1    | **Knowledge**      | document title, path, description, tags         |
+    | P2    | **Runs**           | run reference, summary, owning Agent name       |
+    | P2    | **My Decisions**   | approval/escalation subject line                |
+    | P2    | **Memory**         | folder name, folder path, file name             |
+    | P2    | **Goals**          | title                                           |
+    | P2    | **Meetings**       | title, summary                                  |
+    | P2    | **Computers**      | node name (the Fleet node surface)              |
+    | P2    | **Connections**    | installed plugin name + connected account label |
 
 - **FR-19** Every result row carries: kind, display name, an optional secondary line
   (breadcrumb, status, owner or timestamp), an optional status badge, and a destination. A Task
@@ -315,17 +316,17 @@ screen (the palette never paginates past 25 in one group).
 
 - **FR-22** P1 ships these commands, all of which are pure navigation or pure client-side UI
   state and therefore need no confirmation:
-  1. `New Mission`, `New Idea`, `New Work`, `New Task`, `New Agent`, `New Team`, `New Skill`,
-     `New Goal`, `New Meeting` — open the matching creation screen.
-  2. `Search Works` — the preserved legacy destination (FR-4).
-  3. `Open Help`, `Keyboard shortcuts` — open the Help drawer, on its Shortcuts tab for the
-     second.
-  4. `Toggle dark mode`, `Collapse sidebar` / `Expand sidebar`, `Open AI chat` / `Close AI chat`.
-  5. `Copy link to this page` — copies the current absolute URL to the clipboard and toasts
-     "Link copied".
-  6. `Switch workspace → {organization}` — one row per Organization the user belongs to.
-  7. `Switch Work → {work}` — one row per Work, mirroring the top-bar Work switcher.
-  8. `Sign out`.
+    1. `New Mission`, `New Idea`, `New Work`, `New Task`, `New Agent`, `New Team`, `New Skill`,
+       `New Goal`, `New Meeting` — open the matching creation screen.
+    2. `Search Works` — the preserved legacy destination (FR-4).
+    3. `Open Help`, `Keyboard shortcuts` — open the Help drawer, on its Shortcuts tab for the
+       second.
+    4. `Toggle dark mode`, `Collapse sidebar` / `Expand sidebar`, `Open AI chat` / `Close AI chat`.
+    5. `Copy link to this page` — copies the current absolute URL to the clipboard and toasts
+       "Link copied".
+    6. `Switch workspace → {organization}` — one row per Organization the user belongs to.
+    7. `Switch Work → {work}` — one row per Work, mirroring the top-bar Work switcher.
+    8. `Sign out`.
 - **FR-23** P3 adds commands that change server state. Each one **must** show an inline
   confirmation before acting (S-20): `Pause Agent…`, `Resume Agent…`, `Run Agent now…`,
   `Pause Mission…`, `Resume Mission…`, `Run Work schedule now…`, `Run Task…`. Each takes a
@@ -381,17 +382,17 @@ screen (the palette never paginates past 25 in one group).
 
 - **FR-41** Keyboard model:
 
-  | Key | Behaviour |
-  | --- | --- |
-  | `↑` / `↓` | Move selection across groups, skipping disabled rows and group headers |
-  | `Home` / `End` | First / last selectable row |
-  | `Enter` | Activate the selected row |
-  | `Ctrl/Cmd + Enter` | Open the selected record in a new browser tab (records only) |
-  | `Tab` | Apply the selected row's group as a filter chip |
-  | `Shift + Tab` | Remove the filter chip |
-  | `Backspace` on an empty query | Remove the filter chip, else close |
-  | `Ctrl/Cmd + 1..9` | Activate the nth visible row |
-  | `Esc` | Dismiss confirmation → remove chip → close |
+    | Key                           | Behaviour                                                              |
+    | ----------------------------- | ---------------------------------------------------------------------- |
+    | `↑` / `↓`                     | Move selection across groups, skipping disabled rows and group headers |
+    | `Home` / `End`                | First / last selectable row                                            |
+    | `Enter`                       | Activate the selected row                                              |
+    | `Ctrl/Cmd + Enter`            | Open the selected record in a new browser tab (records only)           |
+    | `Tab`                         | Apply the selected row's group as a filter chip                        |
+    | `Shift + Tab`                 | Remove the filter chip                                                 |
+    | `Backspace` on an empty query | Remove the filter chip, else close                                     |
+    | `Ctrl/Cmd + 1..9`             | Activate the nth visible row                                           |
+    | `Esc`                         | Dismiss confirmation → remove chip → close                             |
 
 - **FR-42** The overlay is a modal dialog with a focus trap; background content is inert while
   it is open. The input/list pair follows the combobox-with-listbox pattern, with the active
@@ -409,12 +410,12 @@ screen (the palette never paginates past 25 in one group).
 
 ### 5.1 Existing — searched, never modified
 
-| Entity | Role in this epic |
-| --- | --- |
-| Mission, Task, Agent, Work, Idea, Skill, Team | P1 result kinds |
-| Knowledge Base document | P1 result kind |
-| Run, Approval / Escalation, Memory folder, Goal, Meeting, Node, Plugin + Connection | P2 result kinds |
-| Organization / Workspace scope | Scopes every query (FR-32) |
+| Entity                                                                              | Role in this epic          |
+| ----------------------------------------------------------------------------------- | -------------------------- |
+| Mission, Task, Agent, Work, Idea, Skill, Team                                       | P1 result kinds            |
+| Knowledge Base document                                                             | P1 result kind             |
+| Run, Approval / Escalation, Memory folder, Goal, Meeting, Node, Plugin + Connection | P2 result kinds            |
+| Organization / Workspace scope                                                      | Scopes every query (FR-32) |
 
 This epic **reads** all of the above and writes to none of them.
 
@@ -423,13 +424,13 @@ This epic **reads** all of the above and writes to none of them.
 Per program rule #2, both are named explicitly here and justified. Neither introduces a word
 the user ever sees; the user-facing vocabulary is unchanged.
 
-**A. Search Index Entry** *(new, internal projection — P2)*
+**A. Search Index Entry** _(new, internal projection — P2)_
 
 One denormalized row per searchable record, holding only what ranking and rendering need:
 the owning scope, the kind, the source record's identity, its display name, its identifier,
 its secondary text, its status label, its destination, and its last-changed timestamp.
 
-*Why it must exist:* P1 answers each query by fanning out across ten repositories. That is
+_Why it must exist:_ P1 answers each query by fanning out across ten repositories. That is
 correct and shippable, but it costs ten scoped queries per keystroke-batch, it cannot rank
 across kinds without materialising every candidate, and it grows linearly with every kind a
 later epic adds. A projection makes ranking one ordered read and holds FR-38's 250 ms budget.
@@ -460,19 +461,19 @@ States and transitions:
 - `TOMBSTONED` — source is gone or no longer visible; **never** returned; hard-deleted by the
   sweep 24 hours later so a resurrected record can be re-indexed cleanly.
 
-**B. Workspace Search Recent** *(new, internal, tiny — P2)*
+**B. Workspace Search Recent** _(new, internal, tiny — P2)_
 
 One row per (user, scope, target) recording the last time this user opened that target from
 the palette. Holds no content beyond the target's identity and a timestamp.
 
-*Why it must exist:* FR-14's recency boost and FR-27's empty state are what make the palette
+_Why it must exist:_ FR-14's recency boost and FR-27's empty state are what make the palette
 useful in its first 200 ms, before anything is typed. Per-browser storage cannot follow a user
 between their laptop and their desktop, and browser storage access legitimately throws in
 private/locked-down browsers — so it is the fallback, not the mechanism. States: `ACTIVE` →
 `EXPIRED` (older than 90 days, swept) or `ORPHANED` (target gone — deleted on first activation
 per FR-29).
 
-**C. Command** *(new, but not persisted)*
+**C. Command** _(new, but not persisted)_
 
 A registry entry in the web application: a stable identifier, a label, an alias list, an icon,
 a permission predicate, an optional confirmation, and a handler. Commands are code, not data —
@@ -670,32 +671,32 @@ Nothing is moved or removed. Below 768 px it collapses to the `⌕` icon alone.
 
 ### 6.11 Exact user-visible copy
 
-| Where | Copy |
-| --- | --- |
-| Top-bar trigger | `Search…` |
-| Trigger hint (mac / other) | `⌘K` / `Ctrl K` |
-| Input placeholder | `Search or type a command…` |
-| Dialog accessible name | `Search and commands` |
-| Group headers | `Recent`, `Suggested`, `Commands`, `Screens`, `Missions`, `Tasks`, `Agents`, `Works`, `Ideas`, `Skills`, `Teams`, `Knowledge`, `Runs`, `My Decisions`, `Memory`, `Goals`, `Meetings`, `Computers`, `Connections` |
-| Overflow row | `Show all {count}` |
-| Filtered header | `{group} · showing {shown} of {total}` |
-| Escape hatch under a filter | `Open the {group} screen for the full list` |
-| Loading | `Searching…` |
-| Too short | `Keep typing — 2 characters minimum.` |
-| No results title | `No matches for “{query}”` |
-| No results hint | `Try a shorter word, or one of these:` |
-| No results fallbacks | `Ask the AI chat panel about “{query}”` · `Create a Task from “{query}”` · `Open Help` |
-| Partial failure | `Some results couldn't be loaded. Showing what we have.` |
-| Timeout | `Search took too long. Press Enter to try again.` |
-| Offline | `You're offline. Showing recent items only.` |
-| Throttled | `Too many searches. Try again in a moment.` |
-| Missing target toast | `That {kind} no longer exists. It's been removed from Recent.` |
-| Disabled command note | `Needs owner access` |
-| Confirm title / body | `Pause {name}?` / `It will stop picking up work until you resume it.` |
-| Confirm buttons | `Cancel` · `Pause` |
-| Footer hints | `↑↓ Navigate` · `↵ Open` · `⌘↵ New tab` · `⇥ Filter group` · `⇧⇥ Remove filter` · `esc Close` |
-| Screen-reader announcement | `{count} results` |
-| Clipboard toast | `Link copied` |
+| Where                       | Copy                                                                                                                                                                                                             |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Top-bar trigger             | `Search…`                                                                                                                                                                                                        |
+| Trigger hint (mac / other)  | `⌘K` / `Ctrl K`                                                                                                                                                                                                  |
+| Input placeholder           | `Search or type a command…`                                                                                                                                                                                      |
+| Dialog accessible name      | `Search and commands`                                                                                                                                                                                            |
+| Group headers               | `Recent`, `Suggested`, `Commands`, `Screens`, `Missions`, `Tasks`, `Agents`, `Works`, `Ideas`, `Skills`, `Teams`, `Knowledge`, `Runs`, `My Decisions`, `Memory`, `Goals`, `Meetings`, `Computers`, `Connections` |
+| Overflow row                | `Show all {count}`                                                                                                                                                                                               |
+| Filtered header             | `{group} · showing {shown} of {total}`                                                                                                                                                                           |
+| Escape hatch under a filter | `Open the {group} screen for the full list`                                                                                                                                                                      |
+| Loading                     | `Searching…`                                                                                                                                                                                                     |
+| Too short                   | `Keep typing — 2 characters minimum.`                                                                                                                                                                            |
+| No results title            | `No matches for “{query}”`                                                                                                                                                                                       |
+| No results hint             | `Try a shorter word, or one of these:`                                                                                                                                                                           |
+| No results fallbacks        | `Ask the AI chat panel about “{query}”` · `Create a Task from “{query}”` · `Open Help`                                                                                                                           |
+| Partial failure             | `Some results couldn't be loaded. Showing what we have.`                                                                                                                                                         |
+| Timeout                     | `Search took too long. Press Enter to try again.`                                                                                                                                                                |
+| Offline                     | `You're offline. Showing recent items only.`                                                                                                                                                                     |
+| Throttled                   | `Too many searches. Try again in a moment.`                                                                                                                                                                      |
+| Missing target toast        | `That {kind} no longer exists. It's been removed from Recent.`                                                                                                                                                   |
+| Disabled command note       | `Needs owner access`                                                                                                                                                                                             |
+| Confirm title / body        | `Pause {name}?` / `It will stop picking up work until you resume it.`                                                                                                                                            |
+| Confirm buttons             | `Cancel` · `Pause`                                                                                                                                                                                               |
+| Footer hints                | `↑↓ Navigate` · `↵ Open` · `⌘↵ New tab` · `⇥ Filter group` · `⇧⇥ Remove filter` · `esc Close`                                                                                                                    |
+| Screen-reader announcement  | `{count} results`                                                                                                                                                                                                |
+| Clipboard toast             | `Link copied`                                                                                                                                                                                                    |
 
 ### 6.12 Help drawer
 
@@ -713,7 +714,7 @@ and `Keyboard shortcuts` become palette commands so the drawer is reachable by t
    palette exist. Deduplicating them is a separate cleanup; this epic neither uses nor changes
    them, and FR-7 defines how they coexist.
 4. **Removing per-page filter inputs.** Every list screen keeps its own filter. The palette is
-   a way *in*, not a replacement for filtering inside a screen.
+   a way _in_, not a replacement for filtering inside a screen.
 5. **Semantic / embedding search.** Ranking is lexical and deterministic (FR-14). Meaning-based
    retrieval over Knowledge documents already exists as its own capability and is not merged in.
 6. **Searching item content inside a Work.** A Work's generated items are content in the user's
@@ -723,7 +724,7 @@ and `Keyboard shortcuts` become palette commands so the drawer is reachable by t
    only. Full-text over conversations belongs to [AW-12](../README.md#3-epics).
 8. **Cross-Organization search.** Results never span the active scope (FR-32, S-16). A "search
    everywhere" mode is deliberately not offered.
-9. **Query history / saved searches.** Recent tracks *opened records*, not typed queries. Queries
+9. **Query history / saved searches.** Recent tracks _opened records_, not typed queries. Queries
    are never persisted (FR-36).
 10. **Command palette outside the authenticated dashboard.** Not on marketing pages, auth pages,
     the onboarding wizard, or generated Work sites.

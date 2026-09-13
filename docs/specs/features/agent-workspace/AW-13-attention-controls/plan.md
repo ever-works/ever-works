@@ -19,30 +19,30 @@ quiet hours, category mutes and multi-channel fan-out on top without changing v1
 is complete and security-reviewed. Its **UI is a stub**, its **registry is incomplete**, and
 **email is not a delivery target at all**.
 
-| Piece | Where | State |
-| --- | --- | --- |
-| In-app record | [`packages/agent/src/entities/notification.entity.ts`](../../../../../packages/agent/src/entities/notification.entity.ts) (`notifications`) | Complete. Unique `(userId, deduplicationKey)`; `isPersistent` rows refuse dismissal. |
-| Producers | [`packages/agent/src/notifications/notification.service.ts`](../../../../../packages/agent/src/notifications/notification.service.ts) | 16 typed `notify*` methods. Each writes the in-app row, then calls a private `dispatchFanout` that emits the v2 fan-out event. |
-| Event registry | [`packages/agent/src/entities/notification-event-type.entity.ts`](../../../../../packages/agent/src/entities/notification-event-type.entity.ts) (`notification_event_types`, PK `key`) | Columns: `category`, `title`, `description`, `urgent`, `defaultChannels`, `source`, `pluginId`. |
-| Registry seeding | [`apps/api/src/notifications/notification-event-type-bootstrap.service.ts`](../../../../../apps/api/src/notifications/notification-event-type-bootstrap.service.ts) + [`apps/api/src/migrations/1780000010000-SeedNotificationEventTypes.ts`](../../../../../apps/api/src/migrations/1780000010000-SeedNotificationEventTypes.ts) | `CORE_EVENTS` holds **15** rows and is upserted on every boot (idempotent). Plugin manifests contribute more, namespaced `<pluginId>:<key>`. |
-| Subscriptions | [`packages/agent/src/entities/user-notification-subscription.entity.ts`](../../../../../packages/agent/src/entities/user-notification-subscription.entity.ts) | Unique `(userId, eventTypeKey)`; `channelIds` is a JSON array of channel row ids and/or the literal `'in-app'`. |
-| Quiet hours | [`packages/agent/src/entities/user-notification-preference.entity.ts`](../../../../../packages/agent/src/entities/user-notification-preference.entity.ts) (PK `userId`) | `quietHoursStart` / `quietHoursEnd` as `varchar(8)` (deliberately not SQL `time` — the SQLite test driver), plus `timezone`. |
-| Resolver | [`packages/agent/src/notifications/user-notification-subscription.service.ts`](../../../../../packages/agent/src/notifications/user-notification-subscription.service.ts) | `resolvePlan(userId, eventKey)` → `{ immediate, deferred, deferUntil }`. Fallback chain: subscription → organization default → event default → `['in-app']`. Then category mute (drop non-in-app), then quiet hours (defer non-in-app for non-urgent). |
-| Fan-out listener | [`apps/api/src/notifications/notification-fanout.listener.ts`](../../../../../apps/api/src/notifications/notification-fanout.listener.ts) | `@OnEvent(..., { async: true, suppressErrors: true })`. Strips `'in-app'` and hands the rest to the channel facade. |
-| Channel fan-out | [`packages/agent/src/facades/notification-channel.facade.ts`](../../../../../packages/agent/src/facades/notification-channel.facade.ts) | `send()` → `dispatchOrSend()` per target. `'in-app'` is an inline **sentinel**; everything else is enqueued through the optional `NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER`, falling back to in-process delivery when unbound. `deliverToChannelOrThrow()` is the retry primitive. |
-| Delivery worker | [`packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts`](../../../../../packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts) | One run per (target, event). Retry 30s → 2m → 8m → 32m → 2h, `maxAttempts: 5`. Supports a `delay` for quiet-hours deferral. |
-| Delivery log | [`packages/agent/src/entities/notification-channel-delivery-log.entity.ts`](../../../../../packages/agent/src/entities/notification-channel-delivery-log.entity.ts) | One row per attempt. `channelId` is `uuid NOT NULL` with an FK to `notification_channels`. |
-| Channel plugins | `packages/plugins/{slack,discord,telegram,whatsapp,novu}-channel/` | Five. **No email channel plugin exists.** |
-| Preferences API | [`apps/api/src/notifications/notification-preferences.controller.ts`](../../../../../apps/api/src/notifications/notification-preferences.controller.ts) + [`notification-preferences.service.ts`](../../../../../apps/api/src/notifications/notification-preferences.service.ts) | Six routes, all working. `BUILT_IN_CHANNEL_IDS` currently holds one member, `'in-app'`. `MAX_SUBSCRIPTION_CHANNELS = 20`. |
-| Settings page | [`apps/web/src/app/[locale]/(dashboard)/settings/notifications/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/notifications/page.tsx>) | Server component; four parallel fetches; renders the optional Novu widget and the matrix. |
-| Matrix component | [`apps/web/src/components/settings/NotificationPreferencesSettings.tsx`](../../../../../apps/web/src/components/settings/NotificationPreferencesSettings.tsx) | 100 lines. Checkboxes use `defaultChecked` and have **no `onChange`**. No `useTranslations`. Its own comment says "v0". |
-| Web API clients | [`apps/web/src/lib/api/notification-preferences.ts`](../../../../../apps/web/src/lib/api/notification-preferences.ts), [`notification-channels.ts`](../../../../../apps/web/src/lib/api/notification-channels.ts) | Both complete and typed; the preferences client already has `setEventSubscription`. |
-| Bell | [`apps/web/src/components/dashboard/NotificationDropdown.tsx`](../../../../../apps/web/src/components/dashboard/NotificationDropdown.tsx) | 30 s poll of the unread count; lazy list fetch on open. No link to settings. |
-| Digest | [`packages/agent/src/digest/digest.service.ts`](../../../../../packages/agent/src/digest/digest.service.ts), [`digest.types.ts`](../../../../../packages/agent/src/digest/digest.types.ts) | Deterministic composition + optional narrative; `renderMarkdown` builds sections; `MAX_ITEMS_PER_SECTION` caps each. Delivered as an in-app notification through `notifyDigest`. |
-| Digest cron | [`packages/tasks/src/tasks/trigger/digest-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/digest-dispatcher.task.ts) | `15 7 * * *`; weekly rides Mondays in the same run. |
-| Budget alerts | [`apps/api/src/budgets/budget-alert.handler.ts`](../../../../../apps/api/src/budgets/budget-alert.handler.ts) | Writes the in-app row, tracks analytics, then sends its **own** email through `MailService`, gated only on `users.emailBudgetAlerts`. It never reaches the v2 fan-out. |
-| Transactional mail | [`apps/api/src/mail/mail.service.ts`](../../../../../apps/api/src/mail/mail.service.ts), [`mail.module.ts`](../../../../../apps/api/src/mail/mail.module.ts), [`templates.ts`](../../../../../apps/api/src/mail/templates.ts), templates in [`apps/api/src/templates/`](../../../../../apps/api/src/templates/) | 11 registered Handlebars templates (including `budget-alert.hbs`). `MailModule` exports `MailService` and imports nothing from the notifications tree — no cycle risk. |
-| Cleanup cron | [`apps/api/src/notifications/notification-cleanup.service.ts`](../../../../../apps/api/src/notifications/notification-cleanup.service.ts) | Daily 03:00, wrapped in `DistributedTaskLockService.runExclusive` (1 h TTL). |
+| Piece              | Where                                                                                                                                                                                                                                                                                                                             | State                                                                                                                                                                                                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In-app record      | [`packages/agent/src/entities/notification.entity.ts`](../../../../../packages/agent/src/entities/notification.entity.ts) (`notifications`)                                                                                                                                                                                       | Complete. Unique `(userId, deduplicationKey)`; `isPersistent` rows refuse dismissal.                                                                                                                                                                                               |
+| Producers          | [`packages/agent/src/notifications/notification.service.ts`](../../../../../packages/agent/src/notifications/notification.service.ts)                                                                                                                                                                                             | 16 typed `notify*` methods. Each writes the in-app row, then calls a private `dispatchFanout` that emits the v2 fan-out event.                                                                                                                                                     |
+| Event registry     | [`packages/agent/src/entities/notification-event-type.entity.ts`](../../../../../packages/agent/src/entities/notification-event-type.entity.ts) (`notification_event_types`, PK `key`)                                                                                                                                            | Columns: `category`, `title`, `description`, `urgent`, `defaultChannels`, `source`, `pluginId`.                                                                                                                                                                                    |
+| Registry seeding   | [`apps/api/src/notifications/notification-event-type-bootstrap.service.ts`](../../../../../apps/api/src/notifications/notification-event-type-bootstrap.service.ts) + [`apps/api/src/migrations/1780000010000-SeedNotificationEventTypes.ts`](../../../../../apps/api/src/migrations/1780000010000-SeedNotificationEventTypes.ts) | `CORE_EVENTS` holds **15** rows and is upserted on every boot (idempotent). Plugin manifests contribute more, namespaced `<pluginId>:<key>`.                                                                                                                                       |
+| Subscriptions      | [`packages/agent/src/entities/user-notification-subscription.entity.ts`](../../../../../packages/agent/src/entities/user-notification-subscription.entity.ts)                                                                                                                                                                     | Unique `(userId, eventTypeKey)`; `channelIds` is a JSON array of channel row ids and/or the literal `'in-app'`.                                                                                                                                                                    |
+| Quiet hours        | [`packages/agent/src/entities/user-notification-preference.entity.ts`](../../../../../packages/agent/src/entities/user-notification-preference.entity.ts) (PK `userId`)                                                                                                                                                           | `quietHoursStart` / `quietHoursEnd` as `varchar(8)` (deliberately not SQL `time` — the SQLite test driver), plus `timezone`.                                                                                                                                                       |
+| Resolver           | [`packages/agent/src/notifications/user-notification-subscription.service.ts`](../../../../../packages/agent/src/notifications/user-notification-subscription.service.ts)                                                                                                                                                         | `resolvePlan(userId, eventKey)` → `{ immediate, deferred, deferUntil }`. Fallback chain: subscription → organization default → event default → `['in-app']`. Then category mute (drop non-in-app), then quiet hours (defer non-in-app for non-urgent).                             |
+| Fan-out listener   | [`apps/api/src/notifications/notification-fanout.listener.ts`](../../../../../apps/api/src/notifications/notification-fanout.listener.ts)                                                                                                                                                                                         | `@OnEvent(..., { async: true, suppressErrors: true })`. Strips `'in-app'` and hands the rest to the channel facade.                                                                                                                                                                |
+| Channel fan-out    | [`packages/agent/src/facades/notification-channel.facade.ts`](../../../../../packages/agent/src/facades/notification-channel.facade.ts)                                                                                                                                                                                           | `send()` → `dispatchOrSend()` per target. `'in-app'` is an inline **sentinel**; everything else is enqueued through the optional `NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER`, falling back to in-process delivery when unbound. `deliverToChannelOrThrow()` is the retry primitive. |
+| Delivery worker    | [`packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts`](../../../../../packages/tasks/src/tasks/trigger/notification-channel-delivery.task.ts)                                                                                                                                                                 | One run per (target, event). Retry 30s → 2m → 8m → 32m → 2h, `maxAttempts: 5`. Supports a `delay` for quiet-hours deferral.                                                                                                                                                        |
+| Delivery log       | [`packages/agent/src/entities/notification-channel-delivery-log.entity.ts`](../../../../../packages/agent/src/entities/notification-channel-delivery-log.entity.ts)                                                                                                                                                               | One row per attempt. `channelId` is `uuid NOT NULL` with an FK to `notification_channels`.                                                                                                                                                                                         |
+| Channel plugins    | `packages/plugins/{slack,discord,telegram,whatsapp,novu}-channel/`                                                                                                                                                                                                                                                                | Five. **No email channel plugin exists.**                                                                                                                                                                                                                                          |
+| Preferences API    | [`apps/api/src/notifications/notification-preferences.controller.ts`](../../../../../apps/api/src/notifications/notification-preferences.controller.ts) + [`notification-preferences.service.ts`](../../../../../apps/api/src/notifications/notification-preferences.service.ts)                                                  | Six routes, all working. `BUILT_IN_CHANNEL_IDS` currently holds one member, `'in-app'`. `MAX_SUBSCRIPTION_CHANNELS = 20`.                                                                                                                                                          |
+| Settings page      | [`apps/web/src/app/[locale]/(dashboard)/settings/notifications/page.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/settings/notifications/page.tsx>)                                                                                                                                                                 | Server component; four parallel fetches; renders the optional Novu widget and the matrix.                                                                                                                                                                                          |
+| Matrix component   | [`apps/web/src/components/settings/NotificationPreferencesSettings.tsx`](../../../../../apps/web/src/components/settings/NotificationPreferencesSettings.tsx)                                                                                                                                                                     | 100 lines. Checkboxes use `defaultChecked` and have **no `onChange`**. No `useTranslations`. Its own comment says "v0".                                                                                                                                                            |
+| Web API clients    | [`apps/web/src/lib/api/notification-preferences.ts`](../../../../../apps/web/src/lib/api/notification-preferences.ts), [`notification-channels.ts`](../../../../../apps/web/src/lib/api/notification-channels.ts)                                                                                                                 | Both complete and typed; the preferences client already has `setEventSubscription`.                                                                                                                                                                                                |
+| Bell               | [`apps/web/src/components/dashboard/NotificationDropdown.tsx`](../../../../../apps/web/src/components/dashboard/NotificationDropdown.tsx)                                                                                                                                                                                         | 30 s poll of the unread count; lazy list fetch on open. No link to settings.                                                                                                                                                                                                       |
+| Digest             | [`packages/agent/src/digest/digest.service.ts`](../../../../../packages/agent/src/digest/digest.service.ts), [`digest.types.ts`](../../../../../packages/agent/src/digest/digest.types.ts)                                                                                                                                        | Deterministic composition + optional narrative; `renderMarkdown` builds sections; `MAX_ITEMS_PER_SECTION` caps each. Delivered as an in-app notification through `notifyDigest`.                                                                                                   |
+| Digest cron        | [`packages/tasks/src/tasks/trigger/digest-dispatcher.task.ts`](../../../../../packages/tasks/src/tasks/trigger/digest-dispatcher.task.ts)                                                                                                                                                                                         | `15 7 * * *`; weekly rides Mondays in the same run.                                                                                                                                                                                                                                |
+| Budget alerts      | [`apps/api/src/budgets/budget-alert.handler.ts`](../../../../../apps/api/src/budgets/budget-alert.handler.ts)                                                                                                                                                                                                                     | Writes the in-app row, tracks analytics, then sends its **own** email through `MailService`, gated only on `users.emailBudgetAlerts`. It never reaches the v2 fan-out.                                                                                                             |
+| Transactional mail | [`apps/api/src/mail/mail.service.ts`](../../../../../apps/api/src/mail/mail.service.ts), [`mail.module.ts`](../../../../../apps/api/src/mail/mail.module.ts), [`templates.ts`](../../../../../apps/api/src/mail/templates.ts), templates in [`apps/api/src/templates/`](../../../../../apps/api/src/templates/)                   | 11 registered Handlebars templates (including `budget-alert.hbs`). `MailModule` exports `MailService` and imports nothing from the notifications tree — no cycle risk.                                                                                                             |
+| Cleanup cron       | [`apps/api/src/notifications/notification-cleanup.service.ts`](../../../../../apps/api/src/notifications/notification-cleanup.service.ts)                                                                                                                                                                                         | Daily 03:00, wrapped in `DistributedTaskLockService.runExclusive` (1 h TTL).                                                                                                                                                                                                       |
 
 ### 1.2 The five concrete defects this epic fixes
 
@@ -54,7 +54,7 @@ is complete and security-reviewed. Its **UI is a stub**, its **registry is incom
    only ever `payg_cap_80` or `payg_cap_100` — the producer's `percent` is typed `80 | 100`),
    `payg_past_due`, `digest_ready`, `memory_consolidation_ready`. `notifyBudgetThresholdCrossed`
    emits no fan-out at all. `resolvePlan` returns `{ immediate: ['in-app'], deferred: [] }` for
-   an unknown key, so these are permanently in-app-only *and invisible in the matrix*, which is
+   an unknown key, so these are permanently in-app-only _and invisible in the matrix_, which is
    why nobody has noticed.
 3. **Two registry categories are not mutable.** `git_auth_expired` is registered under
    `integrations` and `agent_run_finished` under `agents`; neither string is a member of the
@@ -118,7 +118,7 @@ Everything else is configuration, data and UI.
 ### 2.2 Why email is a sentinel and not a plugin
 
 Constitution I requires a plugin package for any **external integration**. Notification email to
-the *account address* is not an integration: it is the same first-party transactional mail path
+the _account address_ is not an integration: it is the same first-party transactional mail path
 that already sends password resets, magic links, member invitations and budget alerts, behind
 `MailService` and its SMTP/Resend/faker providers. Adding a sixth channel plugin would mean the
 user has to "connect" their own account address to be emailed by the product that already emails
@@ -151,10 +151,10 @@ gives the budget card an honest thing to say when a user has no digest: turn one
 
 Two, and only two, are budgeted:
 
-| Class | Members | Default ceiling |
-| --- | --- | --- |
-| `email` | the built-in email sentinel | 10 / 24 h |
-| `channel` | every `notification_channels` row, all providers together | 20 / 24 h |
+| Class     | Members                                                   | Default ceiling |
+| --------- | --------------------------------------------------------- | --------------- |
+| `email`   | the built-in email sentinel                               | 10 / 24 h       |
+| `channel` | every `notification_channels` row, all providers together | 20 / 24 h       |
 
 `in-app` is not a class and is never counted. The spec's open question about per-channel ceilings
 is deliberately left unimplemented.
@@ -174,9 +174,9 @@ and cannot collide with another epic; re-stamp before merge if `develop` has mov
 
 `packages/agent/src/entities/notification.entity.ts`:
 
-| Column | Type | Null | Default | Why |
-| --- | --- | --- | --- | --- |
-| `isSilent` | `boolean` | no | `false` | FR-21. The row is written, but excluded from the unread count and the bell's default list. |
+| Column     | Type      | Null | Default | Why                                                                                        |
+| ---------- | --------- | ---- | ------- | ------------------------------------------------------------------------------------------ |
+| `isSilent` | `boolean` | no   | `false` | FR-21. The row is written, but excluded from the unread count and the bell's default list. |
 
 Plus an index `idx_notifications_user_silent_read` on `("userId", "isSilent", "isRead")`, created
 `CONCURRENTLY`, to keep the unread-count query on an index after the extra predicate.
@@ -185,12 +185,12 @@ Plus an index `idx_notifications_user_silent_read` on `("userId", "isSilent", "i
 
 `packages/agent/src/entities/notification-channel-delivery-log.entity.ts`:
 
-| Change | Statement shape | Why |
-| --- | --- | --- |
-| `channelId` becomes nullable | `ALTER COLUMN "channelId" DROP NOT NULL` | A built-in target has no channel row. Forward-only and non-destructive: existing rows are untouched and the FK stays. |
-| new `builtInChannel` | `varchar(16) NULL` | `'email'` (and `'in-app'` if we ever log it). Exactly one of `channelId` / `builtInChannel` is set. |
-| new `userId` | `uuid NULL` | Tier-C denormalisation, matching `tenantId`/`organizationId` already on this table. **No FK** — same cycle-avoidance convention those two columns follow. |
-| index | `idx_ncdl_user_created` on `("userId", "createdAt")`, `CONCURRENTLY` | The budget count (§2.3). |
+| Change                       | Statement shape                                                      | Why                                                                                                                                                       |
+| ---------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `channelId` becomes nullable | `ALTER COLUMN "channelId" DROP NOT NULL`                             | A built-in target has no channel row. Forward-only and non-destructive: existing rows are untouched and the FK stays.                                     |
+| new `builtInChannel`         | `varchar(16) NULL`                                                   | `'email'` (and `'in-app'` if we ever log it). Exactly one of `channelId` / `builtInChannel` is set.                                                       |
+| new `userId`                 | `uuid NULL`                                                          | Tier-C denormalisation, matching `tenantId`/`organizationId` already on this table. **No FK** — same cycle-avoidance convention those two columns follow. |
+| index                        | `idx_ncdl_user_created` on `("userId", "createdAt")`, `CONCURRENTLY` | The budget count (§2.3).                                                                                                                                  |
 
 The entity's `@ManyToOne(() => NotificationChannel)` becomes optional; `channelId` becomes
 `string | null`.
@@ -227,33 +227,33 @@ Users with the column `true` (the default) get no row and inherit the new defaul
 
 `packages/agent/src/entities/user-notification-preference.entity.ts`:
 
-| Column | Type | Null | Default |
-| --- | --- | --- | --- |
-| `attentionBudgetEnabled` | `boolean` | no | `true` |
-| `emailDailyBudget` | `int` | no | `10` |
-| `channelDailyBudget` | `int` | no | `20` |
+| Column                   | Type      | Null | Default |
+| ------------------------ | --------- | ---- | ------- |
+| `attentionBudgetEnabled` | `boolean` | no   | `true`  |
+| `emailDailyBudget`       | `int`     | no   | `10`    |
+| `channelDailyBudget`     | `int`     | no   | `20`    |
 
 Both integers are constrained `0 <= n <= 200` at the DTO layer (a CHECK constraint is avoided
 because the SQLite fallback used by CI does not carry it consistently).
 
-Because this table has one row per user *created lazily*, a user with no row uses the code-side
+Because this table has one row per user _created lazily_, a user with no row uses the code-side
 defaults — the same numbers. No backfill.
 
 **b. New table `attention_holds`** — entity
 `packages/agent/src/entities/attention-hold.entity.ts`:
 
-| Column | Type | Null | Notes |
-| --- | --- | --- | --- |
-| `id` | `uuid` PK | no | generated |
-| `userId` | `uuid` | no | FK to `users`, `ON DELETE CASCADE` |
-| `eventTypeKey` | `varchar(120)` | no | soft FK to the registry, same convention as subscriptions |
-| `targetClass` | `varchar(16)` | no | `email` \| `channel` |
-| `title` | `varchar(200)` | no | copied from the notification, already sanitised by the producer |
-| `message` | `varchar(500)` | no | copied, already capped and secret-redacted by the producer |
-| `actionUrl` | `varchar(255)` | yes | copied |
-| `heldAt` | portable timestamp | no | default now |
-| `releasedAt` | portable timestamp | yes | set when a digest lists it |
-| `expiresAt` | portable timestamp | no | `heldAt + 7 days`, written at insert |
+| Column         | Type               | Null | Notes                                                           |
+| -------------- | ------------------ | ---- | --------------------------------------------------------------- |
+| `id`           | `uuid` PK          | no   | generated                                                       |
+| `userId`       | `uuid`             | no   | FK to `users`, `ON DELETE CASCADE`                              |
+| `eventTypeKey` | `varchar(120)`     | no   | soft FK to the registry, same convention as subscriptions       |
+| `targetClass`  | `varchar(16)`      | no   | `email` \| `channel`                                            |
+| `title`        | `varchar(200)`     | no   | copied from the notification, already sanitised by the producer |
+| `message`      | `varchar(500)`     | no   | copied, already capped and secret-redacted by the producer      |
+| `actionUrl`    | `varchar(255)`     | yes  | copied                                                          |
+| `heldAt`       | portable timestamp | no   | default now                                                     |
+| `releasedAt`   | portable timestamp | yes  | set when a digest lists it                                      |
+| `expiresAt`    | portable timestamp | no   | `heldAt + 7 days`, written at insert                            |
 
 Indexes: `idx_attention_hold_user_open` on `("userId", "releasedAt", "heldAt")` for the digest
 read and the "how many held" counter; `idx_attention_hold_expires` on `("expiresAt")` for the
@@ -282,9 +282,9 @@ entry):
 - `attention.types.ts` — `AttentionTargetClass`, `ATTENTION_TARGET_CLASSES`,
   `AttentionBudgetSnapshot` (`{ class, used, limit, held, resetsAt, enabled }`).
 - `notification-matrix.dto.ts` — `MatrixColumnDto` (`{ id, kind: 'in-app'|'email'|'channel',
-  label, pluginId?, disabled, disabledReason? }`), `MatrixEventDto` (`{ key, group, category,
-  title, description, alternativeSurface?, urgent, locked, defaultTargets, selectedTargets,
-  muteUntil? }`), `MatrixGroup` (`'needsYou'|'signals'|'routine'|'digest'`), `NotificationMatrixDto`
+label, pluginId?, disabled, disabledReason? }`), `MatrixEventDto` (`{ key, group, category,
+title, description, alternativeSurface?, urgent, locked, defaultTargets, selectedTargets,
+muteUntil? }`), `MatrixGroup` (`'needsYou'|'signals'|'routine'|'digest'`), `NotificationMatrixDto`
   (columns + events + quiet hours + budget snapshots + limits).
 
 Keeping the group in the DTO (derived server-side per FR-1) means the web never re-derives the
@@ -303,14 +303,14 @@ All new routes are session-guarded, owner-scoped, and mounted on the existing
 `Controller('api/notifications')`, registered in
 `apps/api/src/notifications/notifications.module.ts`.
 
-| Method | Path | Body / query | Returns | Notes |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/notifications/matrix` | — | `NotificationMatrixDto` | FR-6. One read: registry + subscriptions + channels + quiet hours + mutes + budget snapshot. Parallel repository reads, single response. `Cache-Control: private, no-store`. |
-| `POST` | `/api/notifications/matrix/reset` | `{ eventKeys?: string[] }` | `{ changed: number }` | FR-14. Omitting `eventKeys` resets all. Deletes the user's subscription rows for those keys so the fallback chain re-applies the shipped defaults. |
-| `GET` | `/api/notifications/attention-budget` | — | `{ budgets: AttentionBudgetSnapshot[], expiringHolds: number }` | FR-36 polling target. Deliberately light — no registry read. |
-| `PUT` | `/api/notifications/attention-budget` | `{ enabled: boolean, emailDailyBudget: number, channelDailyBudget: number }` | the new snapshot | FR-30. `@IsInt() @Min(0) @Max(200)` on both integers. |
-| `GET` | `/api/notifications/held` | `?limit` (≤50) | `{ holds: [...], total }` | Powers the "N held" disclosure. |
-| `POST` | `/api/notifications/test-email` | — | `{ status, address?, error? }` | FR-20. Throttled `@Throttle({ default: { limit: 3, ttl: 600_000 } })`. Sends through the same sender as a real notification so a green test proves the real path. |
+| Method | Path                                  | Body / query                                                                 | Returns                                                         | Notes                                                                                                                                                                        |
+| ------ | ------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/api/notifications/matrix`           | —                                                                            | `NotificationMatrixDto`                                         | FR-6. One read: registry + subscriptions + channels + quiet hours + mutes + budget snapshot. Parallel repository reads, single response. `Cache-Control: private, no-store`. |
+| `POST` | `/api/notifications/matrix/reset`     | `{ eventKeys?: string[] }`                                                   | `{ changed: number }`                                           | FR-14. Omitting `eventKeys` resets all. Deletes the user's subscription rows for those keys so the fallback chain re-applies the shipped defaults.                           |
+| `GET`  | `/api/notifications/attention-budget` | —                                                                            | `{ budgets: AttentionBudgetSnapshot[], expiringHolds: number }` | FR-36 polling target. Deliberately light — no registry read.                                                                                                                 |
+| `PUT`  | `/api/notifications/attention-budget` | `{ enabled: boolean, emailDailyBudget: number, channelDailyBudget: number }` | the new snapshot                                                | FR-30. `@IsInt() @Min(0) @Max(200)` on both integers.                                                                                                                        |
+| `GET`  | `/api/notifications/held`             | `?limit` (≤50)                                                               | `{ holds: [...], total }`                                       | Powers the "N held" disclosure.                                                                                                                                              |
+| `POST` | `/api/notifications/test-email`       | —                                                                            | `{ status, address?, error? }`                                  | FR-20. Throttled `@Throttle({ default: { limit: 3, ttl: 600_000 } })`. Sends through the same sender as a real notification so a green test proves the real path.            |
 
 **Changed, not replaced:**
 
@@ -352,18 +352,18 @@ the page.
 
 ### 5.2 Components — `apps/web/src/components/settings/notifications/`
 
-| File | Type | Responsibility |
-| --- | --- | --- |
-| `NotificationMatrix.tsx` | client | The grid. Owns optimistic state, the per-row debounce map, roving-tabindex focus management, refetch-on-focus (FR-15). |
-| `MatrixGroup.tsx` | client | One of the four headings plus its rows; renders the group's explanatory line. |
-| `MatrixRow.tsx` | client | Title, description, alternative-surface line, the switches, the save-state region, the muted/quiet/locked badges. |
-| `MatrixSwitch.tsx` | client | One `role="switch"` button. Accessible name "{column} delivery for {event}". Disabled + reason for the email-unavailable cases. |
-| `MatrixColumnHeader.tsx` | client | Column label, provider label resolved from the DTO (never a local map — FR-7), the unverified / not-configured states. |
-| `MatrixOverflowPicker.tsx` | client | The `+N more` popover (FR-4), with the 20-target counter. |
-| `AttentionBudgetCard.tsx` | client | Two meters, reset countdown, 60 s poll, edit-limits dialog, off/zero/over copy. |
-| `QuietHoursRow.tsx` | client | Existing quiet-hours write, surfaced here with the 22:00–07:00 preset. |
-| `HeldItemsDisclosure.tsx` | client | "N held" → list, and the expiring-without-a-digest nudge. |
-| `ResetDefaultsDialog.tsx` | client | Counts the rows that will change client-side before confirming. |
+| File                       | Type   | Responsibility                                                                                                                  |
+| -------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `NotificationMatrix.tsx`   | client | The grid. Owns optimistic state, the per-row debounce map, roving-tabindex focus management, refetch-on-focus (FR-15).          |
+| `MatrixGroup.tsx`          | client | One of the four headings plus its rows; renders the group's explanatory line.                                                   |
+| `MatrixRow.tsx`            | client | Title, description, alternative-surface line, the switches, the save-state region, the muted/quiet/locked badges.               |
+| `MatrixSwitch.tsx`         | client | One `role="switch"` button. Accessible name "{column} delivery for {event}". Disabled + reason for the email-unavailable cases. |
+| `MatrixColumnHeader.tsx`   | client | Column label, provider label resolved from the DTO (never a local map — FR-7), the unverified / not-configured states.          |
+| `MatrixOverflowPicker.tsx` | client | The `+N more` popover (FR-4), with the 20-target counter.                                                                       |
+| `AttentionBudgetCard.tsx`  | client | Two meters, reset countdown, 60 s poll, edit-limits dialog, off/zero/over copy.                                                 |
+| `QuietHoursRow.tsx`        | client | Existing quiet-hours write, surfaced here with the 22:00–07:00 preset.                                                          |
+| `HeldItemsDisclosure.tsx`  | client | "N held" → list, and the expiring-without-a-digest nudge.                                                                       |
+| `ResetDefaultsDialog.tsx`  | client | Counts the rows that will change client-side before confirming.                                                                 |
 
 `apps/web/src/components/settings/NotificationPreferencesSettings.tsx` is **kept** as the page's
 entry component and rewritten to compose the above. Keeping the file name means no import churn
@@ -400,13 +400,13 @@ Its 30 s poll, its toast behaviour and its lazy list fetch are unchanged.
 
 **Zero new job types.** That is a design goal, not an accident.
 
-| Work | How it runs | Why not a new job |
-| --- | --- | --- |
-| Email delivery + retry | The **existing** `notification-channel-delivery` Trigger task, enqueued through the already-bound `NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER` symbol, with `channelId: 'email'`. The task calls `deliverToChannelOrThrow`, which hits the new sentinel branch. | The retry policy, the quiet-hours `delay`, the dead-letter row and the in-process fallback all already exist and are exactly what email needs. |
-| Quiet-hours deferral for email | Same path — the resolver already returns `deferUntil`, and the facade already passes it as the run `delay`. | Nothing to add. |
-| Releasing holds | Inside `DigestService` composition, which already runs on the `digest-dispatcher` schedule (`15 7 * * *`). | A separate release job would be a second interruption mechanism (§2.4). |
-| Expiring holds | Folded into the **existing** `NotificationCleanupService` daily 03:00 cron, inside the same `DistributedTaskLockService.runExclusive` block. | It is the same shape of work (delete rows past a threshold) in the same subsystem, already multi-instance safe. |
-| Counting the budget | Synchronous, one indexed aggregate, inside the fan-out listener. | Sub-millisecond on an indexed count; a job would make the decision arrive after the delivery. |
+| Work                           | How it runs                                                                                                                                                                                                                                                   | Why not a new job                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Email delivery + retry         | The **existing** `notification-channel-delivery` Trigger task, enqueued through the already-bound `NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER` symbol, with `channelId: 'email'`. The task calls `deliverToChannelOrThrow`, which hits the new sentinel branch. | The retry policy, the quiet-hours `delay`, the dead-letter row and the in-process fallback all already exist and are exactly what email needs. |
+| Quiet-hours deferral for email | Same path — the resolver already returns `deferUntil`, and the facade already passes it as the run `delay`.                                                                                                                                                   | Nothing to add.                                                                                                                                |
+| Releasing holds                | Inside `DigestService` composition, which already runs on the `digest-dispatcher` schedule (`15 7 * * *`).                                                                                                                                                    | A separate release job would be a second interruption mechanism (§2.4).                                                                        |
+| Expiring holds                 | Folded into the **existing** `NotificationCleanupService` daily 03:00 cron, inside the same `DistributedTaskLockService.runExclusive` block.                                                                                                                  | It is the same shape of work (delete rows past a threshold) in the same subsystem, already multi-instance safe.                                |
+| Counting the budget            | Synchronous, one indexed aggregate, inside the fan-out listener.                                                                                                                                                                                              | Sub-millisecond on an indexed count; a job would make the decision arrive after the delivery.                                                  |
 
 No call site imports `@trigger.dev/sdk`. The only third-party-SDK import in this epic's blast radius is
 the one that already exists inside `packages/tasks/src/tasks/trigger/`, which is where it belongs.
@@ -525,33 +525,34 @@ structurally complete in every file so next-intl does not throw.
 ## 9. Telemetry and failure modes
 
 ### 9.1 Telemetry (through `@ever-works/monitoring`'s `AnalyticsService`, as the budget alert
+
 handler already does)
 
-| Event | Properties | Answers |
-| --- | --- | --- |
-| `notifications.matrix.viewed` | `eventCount`, `channelCount` | Is anyone finding the page now that it is linked? |
-| `notifications.matrix.toggled` | `eventKey`, `targetClass`, `on` | Which defaults are wrong. |
-| `notifications.matrix.saveFailed` | `eventKey`, `reason` | Is the autosave reliable. |
-| `notifications.matrix.reset` | `changed` | How often the defaults are rejected wholesale. |
-| `notifications.budget.exceeded` | `targetClass` | How many users hit the ceiling, and at what default. |
-| `notifications.hold.created` / `.released` / `.expired` | `targetClass`, `eventKey` | Is the release valve working, or are holds dying unread. |
-| `notifications.email.delivered` / `.failed` | `eventKey`, `reason` | Email health, separate from chat health. |
-| `notifications.eventKey.unregistered` | `eventKey` | **The regression guard for the defect in §1.2 item 2.** A non-zero value means a producer shipped a key with no registry row. |
+| Event                                                   | Properties                      | Answers                                                                                                                       |
+| ------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `notifications.matrix.viewed`                           | `eventCount`, `channelCount`    | Is anyone finding the page now that it is linked?                                                                             |
+| `notifications.matrix.toggled`                          | `eventKey`, `targetClass`, `on` | Which defaults are wrong.                                                                                                     |
+| `notifications.matrix.saveFailed`                       | `eventKey`, `reason`            | Is the autosave reliable.                                                                                                     |
+| `notifications.matrix.reset`                            | `changed`                       | How often the defaults are rejected wholesale.                                                                                |
+| `notifications.budget.exceeded`                         | `targetClass`                   | How many users hit the ceiling, and at what default.                                                                          |
+| `notifications.hold.created` / `.released` / `.expired` | `targetClass`, `eventKey`       | Is the release valve working, or are holds dying unread.                                                                      |
+| `notifications.email.delivered` / `.failed`             | `eventKey`, `reason`            | Email health, separate from chat health.                                                                                      |
+| `notifications.eventKey.unregistered`                   | `eventKey`                      | **The regression guard for the defect in §1.2 item 2.** A non-zero value means a producer shipped a key with no registry row. |
 
 ### 9.2 Failure modes
 
-| Failure | Behaviour | Rationale |
-| --- | --- | --- |
-| Registry lookup misses | In-app row already written; no external delivery; counter incremented (S26) | Never lose the notification; make the gap visible. |
-| Budget count query fails | **Admit** the delivery | A metering fault must not silence an alert. Fail open, log a warning. |
-| Hold insert fails | Deliver instead of holding | Same reasoning: over-delivering is recoverable, silence is not. |
-| Email send fails | Retried by the existing task policy; terminal failure leaves a `failed` delivery-log row | Matches chat delivery exactly; the log is the dead-letter. |
-| Mail transport unconfigured | Sender reports `not-configured`; the matrix disables the column (S19); no retries are scheduled | Retrying a misconfiguration 5 times helps nobody. |
-| Digest composition fails | Holds are **not** marked released | A hold is released only when it has actually been rendered into a delivered digest. |
-| Matrix read fails | Page renders the load-error state; nothing is written | Read-only failure must never look like a preference change. |
-| Save request times out | Row reverts to last confirmed value (FR-10) | The UI must never claim a preference the server does not hold. |
-| Two tabs disagree | Last write wins; the stale tab reconciles on focus (S14) | One watermark, no merge algorithm. |
-| Novu widget fails | The matrix still renders | Existing behaviour, preserved by `Promise.allSettled`. |
+| Failure                     | Behaviour                                                                                       | Rationale                                                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Registry lookup misses      | In-app row already written; no external delivery; counter incremented (S26)                     | Never lose the notification; make the gap visible.                                  |
+| Budget count query fails    | **Admit** the delivery                                                                          | A metering fault must not silence an alert. Fail open, log a warning.               |
+| Hold insert fails           | Deliver instead of holding                                                                      | Same reasoning: over-delivering is recoverable, silence is not.                     |
+| Email send fails            | Retried by the existing task policy; terminal failure leaves a `failed` delivery-log row        | Matches chat delivery exactly; the log is the dead-letter.                          |
+| Mail transport unconfigured | Sender reports `not-configured`; the matrix disables the column (S19); no retries are scheduled | Retrying a misconfiguration 5 times helps nobody.                                   |
+| Digest composition fails    | Holds are **not** marked released                                                               | A hold is released only when it has actually been rendered into a delivered digest. |
+| Matrix read fails           | Page renders the load-error state; nothing is written                                           | Read-only failure must never look like a preference change.                         |
+| Save request times out      | Row reverts to last confirmed value (FR-10)                                                     | The UI must never claim a preference the server does not hold.                      |
+| Two tabs disagree           | Last write wins; the stale tab reconciles on focus (S14)                                        | One watermark, no merge algorithm.                                                  |
+| Novu widget fails           | The matrix still renders                                                                        | Existing behaviour, preserved by `Promise.allSettled`.                              |
 
 ---
 
@@ -677,31 +678,31 @@ Sequencing: **P1 → P2 → P3**, with no work in a later phase required for an 
 
 ## 12. Constitution compliance
 
-| Gate | Status | Justification |
-| --- | --- | --- |
-| **I — Plugin-first** | ✅ | No external integration is added. Notification email rides the platform's existing first-party transactional mail path — the same one that already sends password resets and budget alerts — and is modelled as a built-in sentinel, symmetrical with the in-app sentinel that already exists (§2.2). The five channel plugins are untouched and no sixth is needed. |
-| **II — Capability-driven, no hardcoded plugin ids** | ✅ | The matrix's columns are derived from the user's channel rows; provider labels are resolved server-side through the plugin registry and travel in the DTO. This epic adds no plugin-id branch and explicitly must not import the existing hard-coded provider array from the Channels page (§7). |
-| **III — Source-of-truth repositories** | ✅ N/A | Nothing here touches work content. Everything read and written is platform preference metadata. |
-| **IV — Job runtime via `*_DISPATCHER`** | ✅ | **Zero new job types.** Email delivery reuses the existing `notification-channel-delivery` task through the already-bound `NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER` symbol; hold release rides digest composition on its existing schedule; hold expiry folds into the existing daily cleanup cron. No call site imports a third-party job-runtime SDK (§6). |
-| **V — Forward-only migrations, same PR** | ✅ | Three migrations, each in the PR that changes the entity: `1791130000000-AttentionMatrixFoundations` (one additive boolean, one nullability relaxation, two additive columns, two concurrent indexes, idempotent registry data), `1791130100000-CreateAttentionHolds` (three additive columns + one new table), `1791130200000-DigestDefaultWeekly` (a column default only). No `DROP COLUMN`, no `NOT NULL` on an existing populated column, no rename, no `UPDATE` against `users` (§3). |
-| **VI — Tests are a prerequisite** | ✅ | Six Jest suites in the agent package, five in the API, three Vitest web units, four new Playwright specs, plus a named regression suite that must stay green — and a coverage test that fails when a producer gains an unregistered event key (§10). |
-| **VII — Privacy & secret hygiene** | ✅ | No new secret is introduced. Notification email bodies are composed from producer strings that are already sanitised and secret-redacted before storage; the sender adds no raw error text. The recipient address is never logged above debug. The encrypted channel `targetConfig` column is neither read nor rendered by the matrix — columns are labelled by `name` only. |
-| **VIII — Single source of truth for plugin lists** | ✅ N/A | No plugin is added or removed, so `docs/plugin-system/built-in-plugins.md` does not change. |
-| **IX — Behaviour-first spec** | ✅ | [spec.md](./spec.md) contains no path, class or code; every implementation decision lives in this file. |
-| **X — Backwards compatibility** | ✅ | Every existing endpoint keeps its shape; `includeSilent` and the `'email'` target are additive and default to today's behaviour. `users.emailBudgetAlerts` is retained and read once for the backfill rather than dropped, so account export/import keeps working. The dead server action is deprecated in place, not deleted. |
+| Gate                                                | Status | Justification                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **I — Plugin-first**                                | ✅     | No external integration is added. Notification email rides the platform's existing first-party transactional mail path — the same one that already sends password resets and budget alerts — and is modelled as a built-in sentinel, symmetrical with the in-app sentinel that already exists (§2.2). The five channel plugins are untouched and no sixth is needed.                                                                                                                       |
+| **II — Capability-driven, no hardcoded plugin ids** | ✅     | The matrix's columns are derived from the user's channel rows; provider labels are resolved server-side through the plugin registry and travel in the DTO. This epic adds no plugin-id branch and explicitly must not import the existing hard-coded provider array from the Channels page (§7).                                                                                                                                                                                           |
+| **III — Source-of-truth repositories**              | ✅ N/A | Nothing here touches work content. Everything read and written is platform preference metadata.                                                                                                                                                                                                                                                                                                                                                                                            |
+| **IV — Job runtime via `*_DISPATCHER`**             | ✅     | **Zero new job types.** Email delivery reuses the existing `notification-channel-delivery` task through the already-bound `NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER` symbol; hold release rides digest composition on its existing schedule; hold expiry folds into the existing daily cleanup cron. No call site imports a third-party job-runtime SDK (§6).                                                                                                                              |
+| **V — Forward-only migrations, same PR**            | ✅     | Three migrations, each in the PR that changes the entity: `1791130000000-AttentionMatrixFoundations` (one additive boolean, one nullability relaxation, two additive columns, two concurrent indexes, idempotent registry data), `1791130100000-CreateAttentionHolds` (three additive columns + one new table), `1791130200000-DigestDefaultWeekly` (a column default only). No `DROP COLUMN`, no `NOT NULL` on an existing populated column, no rename, no `UPDATE` against `users` (§3). |
+| **VI — Tests are a prerequisite**                   | ✅     | Six Jest suites in the agent package, five in the API, three Vitest web units, four new Playwright specs, plus a named regression suite that must stay green — and a coverage test that fails when a producer gains an unregistered event key (§10).                                                                                                                                                                                                                                       |
+| **VII — Privacy & secret hygiene**                  | ✅     | No new secret is introduced. Notification email bodies are composed from producer strings that are already sanitised and secret-redacted before storage; the sender adds no raw error text. The recipient address is never logged above debug. The encrypted channel `targetConfig` column is neither read nor rendered by the matrix — columns are labelled by `name` only.                                                                                                               |
+| **VIII — Single source of truth for plugin lists**  | ✅ N/A | No plugin is added or removed, so `docs/plugin-system/built-in-plugins.md` does not change.                                                                                                                                                                                                                                                                                                                                                                                                |
+| **IX — Behaviour-first spec**                       | ✅     | [spec.md](./spec.md) contains no path, class or code; every implementation decision lives in this file.                                                                                                                                                                                                                                                                                                                                                                                    |
+| **X — Backwards compatibility**                     | ✅     | Every existing endpoint keeps its shape; `includeSilent` and the `'email'` target are additive and default to today's behaviour. `users.emailBudgetAlerts` is retained and read once for the backfill rather than dropped, so account export/import keeps working. The dead server action is deprecated in place, not deleted.                                                                                                                                                             |
 
 ---
 
 ## 13. Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Turning on email defaults for eleven events makes the platform noisier for existing users overnight. | The defaults only apply to users with **no stored subscription** for that event, and the attention budget (P2) caps the result at 10 emails a day. If P1 ships before P2, the eleven default-on rows are all urgent events that are, by construction, rare. Watch `notifications.email.delivered` after P1 and hold P2 close behind it. |
-| The budget-alert email moves from an unconditional send to a matrix-governed one, so a misconfigured matrix could silence a real spend alert. | The migration backfills the existing opt-out exactly, the two budget keys ship with Email **on** by default, and the "cap reached" key is urgent, so it bypasses the budget and quiet hours. |
-| `channelId` becoming nullable weakens a constraint that has held since the table was created. | The FK stays; exactly one of `channelId` / `builtInChannel` is set, enforced in the repository write path and asserted by a unit test. Reads that assume a channel row are audited in the same task. |
-| Counting distinct `messageRef` per user gets slow for a very loud workspace. | The new `("userId", "createdAt")` index bounds it; the window is 24 h and the ceiling is ≤ 200, so the scan is small. If it ever is not, the count moves behind a 60 s memo — noted, not built. |
-| The matrix grows to hundreds of rows once many plugins contribute events. | Grouping plus per-category collapse is already in the layout; beyond 200 registry rows the page paginates by category. Called out in the spec's limits. |
-| Translating event titles on the web while the registry also holds titles invites drift. | The web prefers a translation and falls back to the registry string, and the registry is the sole source for server-rendered surfaces (email subject, digest). One direction only, stated in §8. |
+| Risk                                                                                                                                          | Mitigation                                                                                                                                                                                                                                                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Turning on email defaults for eleven events makes the platform noisier for existing users overnight.                                          | The defaults only apply to users with **no stored subscription** for that event, and the attention budget (P2) caps the result at 10 emails a day. If P1 ships before P2, the eleven default-on rows are all urgent events that are, by construction, rare. Watch `notifications.email.delivered` after P1 and hold P2 close behind it. |
+| The budget-alert email moves from an unconditional send to a matrix-governed one, so a misconfigured matrix could silence a real spend alert. | The migration backfills the existing opt-out exactly, the two budget keys ship with Email **on** by default, and the "cap reached" key is urgent, so it bypasses the budget and quiet hours.                                                                                                                                            |
+| `channelId` becoming nullable weakens a constraint that has held since the table was created.                                                 | The FK stays; exactly one of `channelId` / `builtInChannel` is set, enforced in the repository write path and asserted by a unit test. Reads that assume a channel row are audited in the same task.                                                                                                                                    |
+| Counting distinct `messageRef` per user gets slow for a very loud workspace.                                                                  | The new `("userId", "createdAt")` index bounds it; the window is 24 h and the ceiling is ≤ 200, so the scan is small. If it ever is not, the count moves behind a 60 s memo — noted, not built.                                                                                                                                         |
+| The matrix grows to hundreds of rows once many plugins contribute events.                                                                     | Grouping plus per-category collapse is already in the layout; beyond 200 registry rows the page paginates by category. Called out in the spec's limits.                                                                                                                                                                                 |
+| Translating event titles on the web while the registry also holds titles invites drift.                                                       | The web prefers a translation and falls back to the registry string, and the registry is the sole source for server-rendered surfaces (email subject, digest). One direction only, stated in §8.                                                                                                                                        |
 
 ---
 

@@ -23,11 +23,11 @@
 >
 > **Two new concepts are introduced and justified in §5:** a per-person **setup
 > checklist** (the five first-hour milestones, evaluated server-side), and a
-> **lane** — a short label naming the area of work one Agent owns. A *roster* is
+> **lane** — a short label naming the area of work one Agent owns. A _roster_ is
 > not a new entity: it is the set of Agents the platform provisions for a
 > workspace, each carrying a lane.
 
-> **Dependency posture.** This epic is a *router*: it sends people into Tasks,
+> **Dependency posture.** This epic is a _router_: it sends people into Tasks,
 > Approvals, Escalations and Schedules, all of which exist today. It therefore
 > reads those surfaces directly and must keep working before AW-02, AW-03, AW-10
 > and AW-19 land. §4.9 pins exactly what each milestone reads today and what it
@@ -117,7 +117,7 @@ duplicates an agent, and a second run only fills the gaps left by the first.
 
 When provisioning finishes, the user gets a one-screen **introduction**: each
 agent by name, its lane, one line saying what it does, and its reporting line.
-Reading it and pressing **Got it** is what marks *"met your agents"* done — the
+Reading it and pressing **Got it** is what marks _"met your agents"_ done — the
 platform does not claim the user met agents it merely created.
 
 From that point the user sees a **Get set up** card at the top of Home and a full
@@ -131,19 +131,19 @@ Because every provisioned agent is created in review-before-act mode, that first
 run reaches a point where it needs permission — to send something, to spend
 something, to pick between two directions — and stops, raising an approval or an
 escalation. That is milestone four, and it arrives on its own: the card starts
-saying *"1 waiting"* and links straight to it. Answering it lets the work
+saying _"1 waiting"_ and links straight to it. Answering it lets the work
 continue.
 
 Milestone five offers three recurring jobs the platform already knows how to run
 — a daily workspace digest, a weekly review of open work, or a cadence on the
 coordinator — and arms exactly one. Each of the three is a **Schedule** over work
 that already exists. None of them is a Mission: a Mission is a standing
-initiative that keeps generating *new* work until its owner ends it, and that is
+initiative that keeps generating _new_ work until its owner ends it, and that is
 a bigger commitment than a first hour should make on someone's behalf.
 
 The checklist is a permanent, resumable object. It survives sign-out, a device
 switch, a browser wipe and a failed provisioning run. A milestone can be marked
-*not for me* and stops asking. The card can be hidden at any time and reopened
+_not for me_ and stops asking. The card can be hidden at any time and reopened
 later from Help. Nothing in it is a gate: every surface it points at is reachable
 without it, before it, and after it.
 
@@ -153,7 +153,7 @@ without it, before it, and after it.
 
 ### 2.1 The question this answers
 
-> *"I signed up. Now what — and how do I know any of this is actually working?"*
+> _"I signed up. Now what — and how do I know any of this is actually working?"_
 
 This is the only question a new owner has, and it is asked in the ninety seconds
 after the wizard closes. If it is not answered in that window, the account goes
@@ -162,15 +162,15 @@ to use it.
 
 ### 2.2 What a user does today instead
 
-| To get to… | Today they must… |
-| --- | --- |
-| A working AI provider | Pick a card in the wizard, then discover on the first agent run — minutes or hours later, in a failed run's error message — whether the credential was any good |
-| Any agent at all | Find the optional "what do you do" step, pick roles, notice the suggestion block below the role grid, and press "create the whole kit" — or, after the wizard, go to Agents and create one by hand from a template |
+| To get to…                   | Today they must…                                                                                                                                                                                                                                                |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A working AI provider        | Pick a card in the wizard, then discover on the first agent run — minutes or hours later, in a failed run's error message — whether the credential was any good                                                                                                 |
+| Any agent at all             | Find the optional "what do you do" step, pick roles, notice the suggestion block below the role grid, and press "create the whole kit" — or, after the wizard, go to Agents and create one by hand from a template                                              |
 | A roster that works together | Create each agent by hand, then open each one's settings and set "reports to", then open the collaborators tab on the one that should delegate and enable each of the others — five screens per agent, and nothing in the product tells them this wiring exists |
-| A first task | Guess. There is no starter brief anywhere, and a brief that never says what "finished" means is exactly the brief that ends in an escalation |
-| A first decision | Wait for one to happen, and hope they are looking at the right surface when it does — approvals render in a block on Home, escalations do not render anywhere |
-| A first schedule | Know that recurring tasks, agent heartbeats and work schedules exist, and find the one that fits |
-| To resume setup tomorrow | Nothing resumes. The wizard's saved state is a step index and four provider choices; it cannot express "you have not shipped anything yet" |
+| A first task                 | Guess. There is no starter brief anywhere, and a brief that never says what "finished" means is exactly the brief that ends in an escalation                                                                                                                    |
+| A first decision             | Wait for one to happen, and hope they are looking at the right surface when it does — approvals render in a block on Home, escalations do not render anywhere                                                                                                   |
+| A first schedule             | Know that recurring tasks, agent heartbeats and work schedules exist, and find the one that fits                                                                                                                                                                |
+| To resume setup tomorrow     | Nothing resumes. The wizard's saved state is a step index and four provider choices; it cannot express "you have not shipped anything yet"                                                                                                                      |
 
 ### 2.3 The seven concrete gaps
 
@@ -178,8 +178,8 @@ to use it.
    ten steps — welcome, AI, storage, database, deployment, where-does-this-run,
    roles, chat connection, plugins, create a Work — and thirteen when the AI,
    storage and deployment choices each add their configuration step. After the
-   welcome, every one of them is about *provisioning plumbing* or the account's
-   profile; none of them is about *delegating work*. The product's whole value
+   welcome, every one of them is about _provisioning plumbing_ or the account's
+   profile; none of them is about _delegating work_. The product's whole value
    proposition begins one screen after the wizard closes, and nothing carries the
    user across that line.
 
@@ -209,7 +209,7 @@ to use it.
 6. **Completion means "the dialog closed".** The persisted onboarding state is a
    step index, four provider choices, a skipped-steps list, a plugins-reviewed
    boolean and an optional role/team-size hint. Both completion timestamps mean
-   the *wizard* ended. No signal anywhere means the *user* is operating.
+   the _wizard_ ended. No signal anywhere means the _user_ is operating.
 
 7. **Provisioning is invisible and unrecoverable.** Creating starter agents is a
    synchronous request that either returns a list or does not. If it half-fails —
@@ -250,12 +250,12 @@ What is missing is a **spine** that walks a person through them in order, and a
 > **Then** milestones 1 and 2 are marked done and the wizard continues to its
 > remaining steps unchanged
 > **And when** the wizard closes
-> **Then** Home shows a **Get set up** card reading *2 of 5*.
+> **Then** Home shows a **Get set up** card reading _2 of 5_.
 
 ### 3.2 Happy path — the first task produces the first decision
 
-> **Given** a user with a provisioned roster and the checklist at *2 of 5*
-> **When** they press **Pick a brief** on *Ship your first task*
+> **Given** a user with a provisioned roster and the checklist at _2 of 5_
+> **When** they press **Pick a brief** on _Ship your first task_
 > **Then** they see three starter briefs, each under 280 characters, each naming
 > what "finished" means, and each showing which lane will pick it up
 > **And when** they choose one and press **Send it**
@@ -266,7 +266,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 > or when the Task reaches `done`
 > **And when** the run reaches an action its guardrails will not take unattended
 > **Then** an approval or escalation is raised, the checklist card starts reading
-> *1 waiting* on *Answer your first decision*, and answering it marks milestone 4
+> _1 waiting_ on _Answer your first decision_, and answering it marks milestone 4
 > done and lets the work continue.
 
 ### 3.3 Happy path — resuming on another device
@@ -274,7 +274,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 > **Given** a user who completed milestones 1–3 on a laptop and signs in on a
 > tablet an hour later
 > **When** Home loads
-> **Then** the **Get set up** card reads *3 of 5* with the same two milestones
+> **Then** the **Get set up** card reads _3 of 5_ with the same two milestones
 > outstanding and the same next actions, because the checklist is stored against
 > the account and not the browser.
 
@@ -285,7 +285,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 > **Then** within 10 seconds the provider row shows **Couldn't reach this
 > provider** with the provider's own reason, a **Try again** button and a
 > **Continue anyway** link
-> **And** milestone 1 stays *not done*
+> **And** milestone 1 stays _not done_
 > **And if** they continue anyway and provision a roster, provisioning still
 > succeeds — agents are configuration, not inference — but the **Ship your first
 > task** milestone shows an inline warning saying work will not run until a
@@ -297,7 +297,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 > **When** provisioning runs
 > **Then** the first two lanes report **created**, the remaining two report
 > **Not enough seats**, the run finishes as **partial**, and the panel shows
-> *2 of 4 agents created* with a **See plans** link and a **Finish this later**
+> _2 of 4 agents created_ with a **See plans** link and a **Finish this later**
 > button
 > **And** milestone 2 is offered as completable on the agents that were created —
 > a partial roster is a real roster
@@ -307,11 +307,11 @@ What is missing is a **spine** that walks a person through them in order, and a
 
 ### 3.6 Unhappy path — a name is already taken
 
-> **Given** a user who already has an agent named *Research*
+> **Given** a user who already has an agent named _Research_
 > **When** provisioning reaches the research lane
-> **Then** it creates *Research 2* and reports the lane as **created** with a note
-> *Named Research 2 — you already had a Research*
-> **And if** *Research 2* … *Research 9* are all taken
+> **Then** it creates _Research 2_ and reports the lane as **created** with a note
+> _Named Research 2 — you already had a Research_
+> **And if** _Research 2_ … _Research 9_ are all taken
 > **Then** that lane alone reports **failed** with reason **Couldn't find a free
 > name**, offers a rename field, and the rest of the roster is unaffected.
 
@@ -329,7 +329,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 
 > **Given** the same user with the setup step open in two browser tabs
 > **When** they press **Create my agents** in both within a second of each other
-> **Then** the second request is rejected with *Already setting up your agents*
+> **Then** the second request is rejected with _Already setting up your agents_
 > and both tabs converge on the same single provisioning run and the same result
 > **And** exactly one set of agents exists afterwards.
 
@@ -337,7 +337,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 
 > **Given** a user who presses **Skip** on the **Your agents** step
 > **When** the wizard closes
-> **Then** no agents are created, and the **Get set up** card reads *1 of 5* with
+> **Then** no agents are created, and the **Get set up** card reads _1 of 5_ with
 > **Meet your agents** showing **Set up my agents** as its action
 > **And** pressing it opens the same roster step as a standalone panel, outside
 > the wizard, with the same blueprint and the same behaviour.
@@ -345,10 +345,10 @@ What is missing is a **spine** that walks a person through them in order, and a
 ### 3.10 Unhappy path — a milestone that will never apply
 
 > **Given** a user who does not want anything on a schedule
-> **When** they open the *…* menu on **Put something on a schedule** and choose
+> **When** they open the _…_ menu on **Put something on a schedule** and choose
 > **Not for me**
 > **Then** the milestone renders struck through and greyed, the counter reads
-> *4 of 4 · 1 skipped*, and the card completes when the remaining four are done
+> _4 of 4 · 1 skipped_, and the card completes when the remaining four are done
 > **And** the choice is reversible from the same menu.
 
 ### 3.11 Unhappy path — the checklist is opened by someone who is already set up
@@ -371,7 +371,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 > permission to add agents needs to do this** and a **Copy this to send to an
 > admin** button
 > **And** the **Create my agents** button is disabled and explains why on focus
-> **And** their checklist shows **Meet your agents** as *waiting on someone else*
+> **And** their checklist shows **Meet your agents** as _waiting on someone else_
 > rather than as an action they have failed to take.
 
 ### 3.13 Unhappy path — the decision milestone with nothing to decide
@@ -417,9 +417,9 @@ What is missing is a **spine** that walks a person through them in order, and a
 
 ### 3.18 Race — a milestone completes while the page is open
 
-> **Given** the checklist open at *3 of 5* with a run in flight
+> **Given** the checklist open at _3 of 5_ with a run in flight
 > **When** an approval is raised and answered in another tab
-> **Then** within 60 seconds the open page shows *4 of 5* without a manual
+> **Then** within 60 seconds the open page shows _4 of 5_ without a manual
 > refresh and without losing any in-progress input in the starter-brief picker.
 
 ---
@@ -531,11 +531,11 @@ What is missing is a **spine** that walks a person through them in order, and a
 ### 4.5 The checklist
 
 - **FR-34** The checklist holds exactly **five** milestones, in this order:
-  1. Connect your AI provider
-  2. Meet your agents
-  3. Ship your first task
-  4. Answer your first decision
-  5. Put something on a schedule
+    1. Connect your AI provider
+    2. Meet your agents
+    3. Ship your first task
+    4. Answer your first decision
+    5. Put something on a schedule
 - **FR-35** Each milestone is **pending**, **done**, or **skipped**. A done
   milestone records when it completed and what completed it.
 - **FR-36** A milestone is never marked done on the client's word. Every
@@ -545,7 +545,7 @@ What is missing is a **spine** that walks a person through them in order, and a
   | # | Milestone | Done when |
   | --- | --- | --- |
   | 1 | Connect your AI provider | A provider with AI capability reports a successful live check no older than **24 hours** |
-  | 2 | Meet your agents | A provisioning run reached **ready** or **partial** *and* the introduction was acknowledged |
+  | 2 | Meet your agents | A provisioning run reached **ready** or **partial** _and_ the introduction was acknowledged |
   | 3 | Ship your first task | A Task owned by this person has at least one **completed** run, or has reached `done` |
   | 4 | Answer your first decision | An approval owned by this person has been approved or rejected, or an escalation has been resolved |
   | 5 | Put something on a schedule | At least one **enabled** entry exists in the person's schedule read-model |
@@ -554,7 +554,7 @@ What is missing is a **spine** that walks a person through them in order, and a
 - **FR-39** An open checklist refreshes itself at most every **60 seconds** and
   never while a form inside it has focus or unsaved input.
 - **FR-40** A milestone may be marked **not for me**, which removes it from the
-  denominator (*4 of 4 · 1 skipped*) and is reversible.
+  denominator (_4 of 4 · 1 skipped_) and is reversible.
 - **FR-41** The checklist may be hidden. Hiding never deletes it; it is reopened
   from Help and from a direct link.
 - **FR-42** Once every applicable milestone is done, the card renders one final
@@ -573,7 +573,7 @@ and the thing that reaches `done`. A Mission is a standing initiative that keeps
 producing work; this milestone hands out one piece of work, so it creates one
 Task and no Mission.
 
-- **FR-45** *Ship your first task* offers exactly **3** starter briefs. Each
+- **FR-45** _Ship your first task_ offers exactly **3** starter briefs. Each
   brief is at most **280** characters, states what finished looks like, and names
   the lane that will pick it up.
 - **FR-46** A starter brief is offered only when a roster agent exists for its
@@ -594,7 +594,7 @@ Task and no Mission.
 
 ### 4.7 The first decision
 
-- **FR-51** *Answer your first decision* shows a live count of open approvals
+- **FR-51** _Answer your first decision_ shows a live count of open approvals
   plus open escalations for this person. When the count is zero it shows an
   explanation, not a dead action button.
 - **FR-52** Its action opens the existing decision surface; it never renders a
@@ -604,7 +604,7 @@ Task and no Mission.
 
 ### 4.8 The first schedule
 
-- **FR-54** *Put something on a schedule* offers exactly **3** options: a daily
+- **FR-54** _Put something on a schedule_ offers exactly **3** options: a daily
   workspace digest, a weekly review of open work, and a cadence on the
   coordinator. All three are **Schedules** over work that already exists — two
   recurring jobs and one agent cadence. None of them creates a Mission.
@@ -622,7 +622,7 @@ Task and no Mission.
   program epic later owns a richer surface, the action's destination changes and
   nothing else does.
 - **FR-59** A failure reading any single milestone's completion fact degrades
-  that milestone to **pending** with a quiet *couldn't check* marker. It never
+  that milestone to **pending** with a quiet _couldn't check_ marker. It never
   fails the whole checklist and never marks anything done by accident.
 - **FR-60** Nothing in this epic is a gate. Every destination is reachable
   without the checklist, and hiding, skipping or never opening it changes no
@@ -636,8 +636,8 @@ Task and no Mission.
 - **FR-62** The provider check never returns, logs or displays the credential —
   only reachable/not reachable and the provider's own reason string.
 - **FR-63** A person without permission to create Agents sees the roster preview
-  read-only, with an explanation, and their milestone 2 reads *waiting on someone
-  else*.
+  read-only, with an explanation, and their milestone 2 reads _waiting on someone
+  else_.
 - **FR-64** Provisioning spends nothing. Creating agents, attaching skills and
   wiring reporting lines are configuration writes. The first thing in this epic
   that can spend is the starter task, and its confirmation says so.
@@ -651,23 +651,23 @@ Task and no Mission.
 
 ### 5.1 Already in Ever Works — used unchanged
 
-| Entity | Role here | States it moves through |
-| --- | --- | --- |
-| **Agent** | The roster is Agents. Provisioning creates them from prebuilt templates and leaves them active. | `draft → active`, then the normal lifecycle |
-| **Agent run** | What "shipped a task" is measured by. | `queued → running → completed \| failed \| cancelled` |
-| **Task** | The unit of delegated work. Created by the starter brief, carries its definition of done, and is assigned to the lane agent. | `backlog → todo → in_progress → in_review → done`, unchanged |
-| **Mission** | **Nothing here creates one.** A Mission is a standing initiative that keeps producing work; the first hour hands out one piece of work, which is a Task. The existing Missions surface is untouched and a starter Task is filed against no Mission. | unchanged |
-| **Approval** | Raised by a roster agent's review-before-act guardrails; one of the two things milestone 4 counts. | `pending → approved \| rejected` |
-| **Escalation** | Raised when an agent gives up or refuses; the other thing milestone 4 counts. | `open → resolved` |
-| **Skill** | Attached to roster agents during the binding stage. | unchanged |
-| **Schedule** | What milestone 5 arms; read through the existing unified schedule read-model. | unchanged |
-| **Plugin / Connection** | What milestone 1 checks. | not-connected → connected → lapsed |
-| **Organization / Workspace scope** | Scopes the checklist and the roster. | unchanged |
-| **Onboarding wizard state** | Keeps its existing shape and its existing completion timestamps; gains nothing. | unchanged |
+| Entity                             | Role here                                                                                                                                                                                                                                           | States it moves through                                      |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Agent**                          | The roster is Agents. Provisioning creates them from prebuilt templates and leaves them active.                                                                                                                                                     | `draft → active`, then the normal lifecycle                  |
+| **Agent run**                      | What "shipped a task" is measured by.                                                                                                                                                                                                               | `queued → running → completed \| failed \| cancelled`        |
+| **Task**                           | The unit of delegated work. Created by the starter brief, carries its definition of done, and is assigned to the lane agent.                                                                                                                        | `backlog → todo → in_progress → in_review → done`, unchanged |
+| **Mission**                        | **Nothing here creates one.** A Mission is a standing initiative that keeps producing work; the first hour hands out one piece of work, which is a Task. The existing Missions surface is untouched and a starter Task is filed against no Mission. | unchanged                                                    |
+| **Approval**                       | Raised by a roster agent's review-before-act guardrails; one of the two things milestone 4 counts.                                                                                                                                                  | `pending → approved \| rejected`                             |
+| **Escalation**                     | Raised when an agent gives up or refuses; the other thing milestone 4 counts.                                                                                                                                                                       | `open → resolved`                                            |
+| **Skill**                          | Attached to roster agents during the binding stage.                                                                                                                                                                                                 | unchanged                                                    |
+| **Schedule**                       | What milestone 5 arms; read through the existing unified schedule read-model.                                                                                                                                                                       | unchanged                                                    |
+| **Plugin / Connection**            | What milestone 1 checks.                                                                                                                                                                                                                            | not-connected → connected → lapsed                           |
+| **Organization / Workspace scope** | Scopes the checklist and the roster.                                                                                                                                                                                                                | unchanged                                                    |
+| **Onboarding wizard state**        | Keeps its existing shape and its existing completion timestamps; gains nothing.                                                                                                                                                                     | unchanged                                                    |
 
 ### 5.2 New — and why
 
-#### 5.2.1 Setup checklist *(new, one row per person per workspace scope)*
+#### 5.2.1 Setup checklist _(new, one row per person per workspace scope)_
 
 **What it is.** The record of how far a person got through the first hour: five
 milestones, each `pending | done | skipped`, each done one carrying when it
@@ -675,8 +675,8 @@ completed and which object completed it; plus whether the card is hidden and
 whether the roster introduction has been acknowledged.
 
 **Why it cannot be the existing wizard state.** The wizard's persisted state is a
-step index plus provider choices. Its two timestamps mean *the dialog closed* and
-*the dialog was dismissed*. Four of the five milestones here are satisfied by
+step index plus provider choices. Its two timestamps mean _the dialog closed_ and
+_the dialog was dismissed_. Four of the five milestones here are satisfied by
 facts in four other subsystems — a completed run, a decided approval, a resolved
 escalation, an enabled schedule — none of which the wizard's shape can express,
 and none of which should be written into a blob whose whole contract is "the
@@ -684,15 +684,15 @@ wizard's own progress". Folding them in would also mean every wizard write and
 every milestone write contend on the same row.
 
 **Why it is not derived on the fly with no row at all.** Three pieces of state
-have no source anywhere else: *skipped*, *hidden*, and *the introduction was
-acknowledged*. All three are decisions the person made and must survive a device
+have no source anywhere else: _skipped_, _hidden_, and _the introduction was
+acknowledged_. All three are decisions the person made and must survive a device
 switch. Everything else on the row is a cache with a 60-second life.
 
 **States.** Per milestone: `pending → done` (irreversible — a shipped task
 stays shipped) and `pending ⇄ skipped`. Per row: `active → hidden`, reversible;
 `active → completed → dismissed`.
 
-#### 5.2.2 Lane *(new — an attribute of Agent, not an entity)*
+#### 5.2.2 Lane _(new — an attribute of Agent, not an entity)_
 
 **What it is.** A short, stable label naming the area of work one Agent owns:
 `coordination`, `research`, `content`, `outreach`, `visibility`, `social`,
@@ -712,7 +712,7 @@ forbids.
 **States.** None. It is set at provisioning, editable afterwards, and may be
 cleared.
 
-#### 5.2.3 Roster blueprint *(new — content that ships with the build, not data)*
+#### 5.2.3 Roster blueprint _(new — content that ships with the build, not data)_
 
 **What it is.** A named, ordered list of lanes with a default agent name and a
 prebuilt template per lane. Five blueprints ship: **general**, **growth**,
@@ -726,7 +726,7 @@ kits are already carried.
 
 **States.** None.
 
-#### 5.2.4 Provisioning run *(new — a record inside the checklist row, not a table)*
+#### 5.2.4 Provisioning run _(new — a record inside the checklist row, not a table)_
 
 **What it is.** The state of the current or last roster provisioning attempt:
 blueprint, overall state, and one row per lane with its outcome, the agent it
@@ -744,7 +744,7 @@ back to `queued` on a retry.
 ### 5.3 Nothing is renamed
 
 No existing entity, endpoint, route, message key or state value changes meaning.
-The word *roster* is descriptive prose for "the Agents provisioned for a
+The word _roster_ is descriptive prose for "the Agents provisioned for a
 workspace" and is never a stored thing.
 
 ---
@@ -973,13 +973,13 @@ agent row is a link to that agent, reachable by `Tab`.
 
 Milestone rows, exact:
 
-| Row | Title | Sub-line | Action |
-| --- | --- | --- | --- |
-| 1 | `Connect your AI provider` | `Your agents run on your own provider account.` | `Connect a provider` |
-| 2 | `Meet your agents` | `A small team, each with one area to own.` | `Set up my agents` |
-| 3 | `Ship your first task` | `Hand your agents one real piece of work.` | `Pick a brief` |
-| 4 | `Answer your first decision` | `Your agents ask before anything leaves the workspace.` | `Open decisions` / `Waiting` |
-| 5 | `Put something on a schedule` | `Something that runs tomorrow without you.` | `Choose a job` |
+| Row | Title                         | Sub-line                                                | Action                       |
+| --- | ----------------------------- | ------------------------------------------------------- | ---------------------------- |
+| 1   | `Connect your AI provider`    | `Your agents run on your own provider account.`         | `Connect a provider`         |
+| 2   | `Meet your agents`            | `A small team, each with one area to own.`              | `Set up my agents`           |
+| 3   | `Ship your first task`        | `Hand your agents one real piece of work.`              | `Pick a brief`               |
+| 4   | `Answer your first decision`  | `Your agents ask before anything leaves the workspace.` | `Open decisions` / `Waiting` |
+| 5   | `Put something on a schedule` | `Something that runs tomorrow without you.`             | `Choose a job`               |
 
 **Keyboard.** The card is one landmark. `Tab` reaches each milestone row's action
 in order; a done row's action is not focusable. `⋯` opens the row menu
@@ -1084,8 +1084,8 @@ replaced by `Close`. Nothing else differs.
 ### 6.7 Accessibility
 
 - Every lane row, milestone row and result row has an accessible name that
-  includes its state, so a screen reader hears *"Research, created"* rather than
-  *"Research, check mark"*.
+  includes its state, so a screen reader hears _"Research, created"_ rather than
+  _"Research, check mark"_.
 - The provisioning panel is a polite live region; each lane transition announces
   once. The progress bar carries the same `{done} of {total}` text.
 - Colour never carries state alone: done is a filled dot **and** the word `Done`;
@@ -1169,8 +1169,8 @@ A reviewer can run this list top to bottom against a build.
       every existing lane as **Reused** and creates nothing.
 - [ ] A second provisioning request while one is in flight is refused with
       **Already setting up your agents**.
-- [ ] With an existing agent named *Research*, the research lane produces
-      *Research 2* and says so.
+- [ ] With an existing agent named _Research_, the research lane produces
+      _Research 2_ and says so.
 - [ ] With a seat limit reached mid-run, the remaining lanes report
       **Not enough seats on your plan**, the run is **partial**, and a plans link
       is shown.
@@ -1240,7 +1240,7 @@ A reviewer can run this list top to bottom against a build.
 
 - **[NEEDS CLARIFICATION: coordinator naming]** The proposal ships a default
   name for the coordinator lane. Should it be a neutral role word
-  (*Coordinator*), a short given name (*Ada*), or an empty field the user must
+  (_Coordinator_), a short given name (_Ada_), or an empty field the user must
   fill? A name makes the roster feel like a team and makes routing instructions
   read naturally; a role word is unambiguous and avoids implying a persona we do
   not otherwise support until AW-23. The wireframes above assume a short given
@@ -1281,5 +1281,5 @@ A reviewer can run this list top to bottom against a build.
 - Constitution: [`../../../../../.specify/memory/constitution.md`](../../../../../.specify/memory/constitution.md)
 - Plan: [`./plan.md`](./plan.md) · Tasks: [`./tasks.md`](./tasks.md)
 - House-style worked example: [`../../schedules/spec.md`](../../schedules/spec.md)
-</content>
-</invoke>
+  </content>
+  </invoke>

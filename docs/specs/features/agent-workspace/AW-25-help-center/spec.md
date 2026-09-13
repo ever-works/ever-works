@@ -38,8 +38,8 @@ anywhere in the product points at an article that does not exist.
 
 ## 2. Why now
 
-**The user's question this answers:** *"How does this work — and why is this screen telling me
-this?"* The [program overview](../README.md#0-why-this-program-exists) frames the gap as
+**The user's question this answers:** _"How does this work — and why is this screen telling me
+this?"_ The [program overview](../README.md#0-why-this-program-exists) frames the gap as
 legibility. Every other epic in this program adds a surface; this epic is how a person finds out
 what a surface is for, at the moment they are looking at it.
 
@@ -47,12 +47,12 @@ what a surface is for, at the moment they are looking at it.
 
 There is one in-product help surface: a slide-over drawer with four tabs. Its total content is:
 
-| Tab | What is actually in it |
-| --- | --- |
-| Tips | Four sentences. Two of them are about creating a Work; one is about the AI generator; one explains how to reopen the drawer. |
+| Tab       | What is actually in it                                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tips      | Four sentences. Two of them are about creating a Work; one is about the AI generator; one explains how to reopen the drawer.                                 |
 | Shortcuts | Three rows. One of them, "Search works", describes a keystroke that does not open a search — it navigates to a list page and focuses that page's filter box. |
-| FAQ | Three questions and three answers. |
-| Resources | Four links that leave the product: documentation, the source repository, the issue tracker, the discussion board, plus an environment chip. |
+| FAQ       | Three questions and three answers.                                                                                                                           |
+| Resources | Four links that leave the product: documentation, the source repository, the issue tracker, the discussion board, plus an environment chip.                  |
 
 Everything else a person might need to know is on the public documentation site — off-product,
 behind a browser tab switch, organised by contributor topic rather than by "what am I looking at",
@@ -61,15 +61,15 @@ of them.
 
 ### 2.2 The concrete gaps
 
-| Gap | What it costs |
-| --- | --- |
-| **Help is not where the confusion is.** | A person staring at an empty Missions list gets an empty state with a "Create" button and no explanation of what a Mission is for. The answer exists; it is three clicks and one tab-switch away, and nothing on the screen points at it. |
-| **Error messages explain nothing.** | The degraded-background-work banner tells a person that background work is not configured. It cannot tell them what that means for the Agent they just started, or what to do. Its only link is off-product. |
-| **The manual can disagree with the build.** | We have already lived this. Constitution VIII exists *because* four different pages each carried a different plugin count. Our own testing documentation describes a CI trigger policy that changed months ago, and our testing overview omits an entire application. Documentation that ships on a different cadence to the code drifts, silently, always. |
-| **Self-hosted and air-gapped installs have no manual at all.** | Every help link we ship today points at an external origin. An operator running their own build inside a closed network has an in-product Help drawer containing four tips and four dead links. |
-| **Support answers the same question repeatedly.** | The answer is usually "yes, on the screen you are already on" — and there is nowhere in the product to point that reads better than a chat reply. |
-| **Discovery does not scale with the product.** | This program adds roughly two dozen surfaces to a product whose navigation is a sidebar with fourteen entries. A surface nobody can find out about is indistinguishable from a surface that was never built. |
-| **Translation drift makes half-help worse than no help.** | We ship 21 locales with an English deep-merge fallback. A manual that silently renders half in one language and half in another teaches people not to trust it. |
+| Gap                                                            | What it costs                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Help is not where the confusion is.**                        | A person staring at an empty Missions list gets an empty state with a "Create" button and no explanation of what a Mission is for. The answer exists; it is three clicks and one tab-switch away, and nothing on the screen points at it.                                                                                                                   |
+| **Error messages explain nothing.**                            | The degraded-background-work banner tells a person that background work is not configured. It cannot tell them what that means for the Agent they just started, or what to do. Its only link is off-product.                                                                                                                                                |
+| **The manual can disagree with the build.**                    | We have already lived this. Constitution VIII exists _because_ four different pages each carried a different plugin count. Our own testing documentation describes a CI trigger policy that changed months ago, and our testing overview omits an entire application. Documentation that ships on a different cadence to the code drifts, silently, always. |
+| **Self-hosted and air-gapped installs have no manual at all.** | Every help link we ship today points at an external origin. An operator running their own build inside a closed network has an in-product Help drawer containing four tips and four dead links.                                                                                                                                                             |
+| **Support answers the same question repeatedly.**              | The answer is usually "yes, on the screen you are already on" — and there is nowhere in the product to point that reads better than a chat reply.                                                                                                                                                                                                           |
+| **Discovery does not scale with the product.**                 | This program adds roughly two dozen surfaces to a product whose navigation is a sidebar with fourteen entries. A surface nobody can find out about is indistinguishable from a surface that was never built.                                                                                                                                                |
+| **Translation drift makes half-help worse than no help.**      | We ship 21 locales with an English deep-merge fallback. A manual that silently renders half in one language and half in another teaches people not to trust it.                                                                                                                                                                                             |
 
 ### 2.3 Why it is cheap
 
@@ -115,7 +115,7 @@ date, an "On this page" list of the article's headings, the body, a "Related" li
 **Given** a person opens the Missions list on a new workspace and it is empty,
 **When** the empty state renders,
 **Then** it carries a "How this works" link next to its primary action, and activating that link
-opens the Help panel directly at the *Missions* article — over the Missions screen, in place, with
+opens the Help panel directly at the _Missions_ article — over the Missions screen, in place, with
 no navigation and no new browser tab.
 
 **S-5 — An error message explains itself.**
@@ -189,7 +189,7 @@ that article,
 **When** the page loads,
 **Then** it renders "That article isn't in this build." with the sub-line "This deployment is
 running 0.4.2. The article you followed may have been added later, or removed." plus a "Browse
-all articles" action and up to 3 nearest-title suggestions from the articles that *are* in this
+all articles" action and up to 3 nearest-title suggestions from the articles that _are_ in this
 build. It is not a generic 404 shell, and it never redirects to a different article.
 
 **S-15 — A heading that no longer exists.**
@@ -289,33 +289,33 @@ sidebar, top bar, panel chrome and feedback control omitted.
   related articles.
 - **FR-3** Limits, all enforced at build time:
 
-  | Thing | Limit |
-  | --- | --- |
-  | Articles in the whole product | ≤ 200 |
-  | Article identifier | lowercase letters, digits and hyphens, 3–64 characters, unique across the product, never reused for a different article |
-  | Title | ≤ 70 characters |
-  | Summary | ≤ 200 characters |
-  | Body | ≤ 20 000 characters |
-  | Addressable headings per article | 1–12, each id 2–64 characters, unique within the article |
-  | Keywords | ≤ 12, each ≤ 32 characters |
-  | Screens documented per article | ≤ 8 |
-  | Related articles | ≤ 5, each must exist |
+    | Thing                            | Limit                                                                                                                   |
+    | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+    | Articles in the whole product    | ≤ 200                                                                                                                   |
+    | Article identifier               | lowercase letters, digits and hyphens, 3–64 characters, unique across the product, never reused for a different article |
+    | Title                            | ≤ 70 characters                                                                                                         |
+    | Summary                          | ≤ 200 characters                                                                                                        |
+    | Body                             | ≤ 20 000 characters                                                                                                     |
+    | Addressable headings per article | 1–12, each id 2–64 characters, unique within the article                                                                |
+    | Keywords                         | ≤ 12, each ≤ 32 characters                                                                                              |
+    | Screens documented per article   | ≤ 8                                                                                                                     |
+    | Related articles                 | ≤ 5, each must exist                                                                                                    |
 
 - **FR-4** There are exactly **6** sections, a closed set, in this order: **Start here**,
   **Running the loop**, **Your agents**, **Set-up and connections**, **Money and limits**,
   **When something goes wrong**. Adding a seventh is a deliberate change to this spec.
 - **FR-5** The release **must fail to build** when any of these is true:
-  1. Two articles share an identifier, or an article has two headings with the same id.
-  2. An article names a screen that does not exist in this build's route map, or names a route
-     the codebase already documents as dead.
-  3. A **help link** used anywhere in the product does not resolve to an article — and, when it
-     names a heading, to a heading — that exists in this build.
-  4. An article's related-article reference does not resolve.
-  5. Any limit in FR-3 is exceeded.
-  6. An article is not reachable from its section index.
-  7. A link inside an article body (FR-27) points at an article or heading this build does not
-     have, at a screen that is not in this build's route map, or at an external address that
-     is not a secure (`https`) absolute web address.
+    1. Two articles share an identifier, or an article has two headings with the same id.
+    2. An article names a screen that does not exist in this build's route map, or names a route
+       the codebase already documents as dead.
+    3. A **help link** used anywhere in the product does not resolve to an article — and, when it
+       names a heading, to a heading — that exists in this build.
+    4. An article's related-article reference does not resolve.
+    5. Any limit in FR-3 is exceeded.
+    6. An article is not reachable from its section index.
+    7. A link inside an article body (FR-27) points at an article or heading this build does not
+       have, at a screen that is not in this build's route map, or at an external address that
+       is not a secure (`https`) absolute web address.
 - **FR-6** An article may only be added in the same change that ships — or in a change after the
   one that shipped — the screen it documents. There is no state in which the manual describes a
   screen the build does not contain (guaranteed by FR-1 and FR-5.2, not by discipline).
@@ -334,15 +334,15 @@ sidebar, top bar, panel chrome and feedback control omitted.
 
 - **FR-10** The manual is reachable by all of the following, from every authenticated dashboard
   screen:
-  1. Pressing `?` when focus is not in an input, textarea, select or editable region (the
-     existing binding — its target changes, the binding does not).
-  2. The persistent Help control in the top bar.
-  3. The command palette, in two ways: a command that opens Help, and a **Help** result group
-     containing matching articles (FR-16).
-  4. The "Help & Docs" entry in the sidebar user menu, which now opens the manual; the external
-     documentation link is preserved beside it as a second row.
-  5. Any help link (FR-19).
-  6. The direct address `/help` and `/help/<article>`.
+    1. Pressing `?` when focus is not in an input, textarea, select or editable region (the
+       existing binding — its target changes, the binding does not).
+    2. The persistent Help control in the top bar.
+    3. The command palette, in two ways: a command that opens Help, and a **Help** result group
+       containing matching articles (FR-16).
+    4. The "Help & Docs" entry in the sidebar user menu, which now opens the manual; the external
+       documentation link is preserved beside it as a second row.
+    5. Any help link (FR-19).
+    6. The direct address `/help` and `/help/<article>`.
 - **FR-11** Opening Help from inside the product opens a **panel over the current screen**. It
   does not navigate, does not open a browser tab, and does not discard unsaved input on the screen
   beneath.
@@ -365,31 +365,33 @@ sidebar, top bar, panel chrome and feedback control omitted.
   the life of the page, and is **≤ 250 KB compressed**. Loading it completes within **400 ms** at
   p95 on a warm cache; until it resolves, search matches titles and summaries only.
 - **FR-18** Search behaviour:
-  1. Queries are debounced **120 ms**.
-  2. Queries shorter than **2** trimmed characters return no results and leave the browse view in
-     place.
-  3. Matching is case-insensitive and diacritic-insensitive for Latin scripts.
-  4. At most **20** results total, at most **6** per section, grouped by section in the FR-4
-     order, except that a section containing a score-100 result is promoted to the top.
-  5. Every result carries a deterministic score in `0..100`:
+    1. Queries are debounced **120 ms**.
+    2. Queries shorter than **2** trimmed characters return no results and leave the browse view in
+       place.
+    3. Matching is case-insensitive and diacritic-insensitive for Latin scripts.
+    4. At most **20** results total, at most **6** per section, grouped by section in the FR-4
+       order, except that a section containing a score-100 result is promoted to the top.
+    5. Every result carries a deterministic score in `0..100`:
 
-     | Match | Score |
-     | --- | --- |
-     | Query equals the article title | 100 |
-     | Title starts with the query | 90 |
-     | An addressable heading starts with the query | 80 |
-     | Query equals a keyword | 75 |
-     | Title contains the query | 65 |
-     | Summary contains the query | 45 |
-     | A heading contains the query | 40 |
-     | The body contains the query | 25 |
+        | Match                                        | Score |
+        | -------------------------------------------- | ----- |
+        | Query equals the article title               | 100   |
+        | Title starts with the query                  | 90    |
+        | An addressable heading starts with the query | 80    |
+        | Query equals a keyword                       | 75    |
+        | Title contains the query                     | 65    |
+        | Summary contains the query                   | 45    |
+        | A heading contains the query                 | 40    |
+        | The body contains the query                  | 25    |
 
-     One additive boost, capped at 100: **+5** when the article documents the screen the reader is
-     currently on.
-  6. Ties break by: higher score → article documents the current screen → section order → title
-     ascending, case-insensitive.
-  7. A result whose best match was in a heading opens the article at that heading; every other
-     result opens it at the top.
+        One additive boost, capped at 100: **+5** when the article documents the screen the reader is
+        currently on.
+
+    6. Ties break by: higher score → article documents the current screen → section order → title
+       ascending, case-insensitive.
+    7. A result whose best match was in a heading opens the article at that heading; every other
+       result opens it at the top.
+
 - **FR-19** Search never records the query text (FR-37).
 
 ### 4.4 Help links — the part other screens use
@@ -425,18 +427,18 @@ sidebar, top bar, panel chrome and feedback control omitted.
   links are marked as leaving the product.
 - **FR-27a** A **link** is its own block: one line holding one label and one target, nothing
   else. Its label is plain text of 1–80 characters. Its target is exactly one of:
-  1. **another article**, optionally at a heading — opens in place, in the panel or on the full
-     page, exactly as a help link does (FR-22);
-  2. **a screen in this product**, named the same way an article names the screens it documents
-     — never as a literal address — and subject to the same reachability rule as "Open the
-     screen" (FR-29);
-  3. **an external address**, which must be an absolute `https` address with no embedded
-     credentials. It opens in a new tab, never passes the current page as a referrer, and is
-     visibly and audibly marked as leaving the product.
-  A link written inside a paragraph, a link with no label, a literal in-product address, or an
-  external address using any other scheme is a build error naming the article and the line
-  (FR-5.7). If a link that passed the build somehow reaches the reader with an unsafe or
-  unresolvable target, its label renders as plain text with no link at all.
+    1. **another article**, optionally at a heading — opens in place, in the panel or on the full
+       page, exactly as a help link does (FR-22);
+    2. **a screen in this product**, named the same way an article names the screens it documents
+       — never as a literal address — and subject to the same reachability rule as "Open the
+       screen" (FR-29);
+    3. **an external address**, which must be an absolute `https` address with no embedded
+       credentials. It opens in a new tab, never passes the current page as a referrer, and is
+       visibly and audibly marked as leaving the product.
+       A link written inside a paragraph, a link with no label, a literal in-product address, or an
+       external address using any other scheme is a build error naming the article and the line
+       (FR-5.7). If a link that passed the build somehow reaches the reader with an unsafe or
+       unresolvable target, its label renders as plain text with no link at all.
 - **FR-28** Article bodies are rendered from structured content produced at build time. No article
   content is ever injected into the page as raw markup.
 - **FR-29** An article's "Open the screen" action, when present, resolves through the same route
@@ -478,15 +480,15 @@ sidebar, top bar, panel chrome and feedback control omitted.
   never machine-translated at render time.
 - **FR-40** Keyboard model:
 
-  | Key | Behaviour |
-  | --- | --- |
-  | `?` | Open Help (outside text fields) |
-  | `Esc` | In an article: back to browse or results. In browse: close and restore focus to the element that had it |
-  | `↑` / `↓` | Move the selected search result |
-  | `Enter` | Open the selected result |
-  | `Home` / `End` | First / last result |
-  | `/` | Focus the search box from anywhere inside the panel |
-  | `Tab` / `Shift+Tab` | Cycle focus within the panel; focus never escapes to the screen beneath |
+    | Key                 | Behaviour                                                                                               |
+    | ------------------- | ------------------------------------------------------------------------------------------------------- |
+    | `?`                 | Open Help (outside text fields)                                                                         |
+    | `Esc`               | In an article: back to browse or results. In browse: close and restore focus to the element that had it |
+    | `↑` / `↓`           | Move the selected search result                                                                         |
+    | `Enter`             | Open the selected result                                                                                |
+    | `Home` / `End`      | First / last result                                                                                     |
+    | `/`                 | Focus the search box from anywhere inside the panel                                                     |
+    | `Tab` / `Shift+Tab` | Cycle focus within the panel; focus never escapes to the screen beneath                                 |
 
 - **FR-41** The panel is a modal dialog with a focus trap; content beneath is inert while it is
   open. The search input and results follow the combobox-with-listbox pattern with the active
@@ -521,61 +523,61 @@ sidebar, top bar, panel chrome and feedback control omitted.
 
 ### 5.1 New — declared and justified (program rule #2)
 
-**A. Help article** *(new)*
+**A. Help article** _(new)_
 The unit a reader opens: one topic, one address, one place in the manual. It is **not** a
-Knowledge Base document — a Knowledge Base document is one of the *user's own* documents, scoped
+Knowledge Base document — a Knowledge Base document is one of the _user's own_ documents, scoped
 to one Work and living in a repository the user owns; a Help article is our product manual and
 ships in our build. It is **not** Memory — Memory is what an agent knows about this workspace. It
 is **not** a Skill — a Skill is a capability an agent can execute. It is **not** a Changelog entry
-([AW-14](../AW-14-whats-new/spec.md)) — a Changelog entry says *what changed on a date*, a Help
-article says *how the current build works*; they link to each other and neither can replace the
+([AW-14](../AW-14-whats-new/spec.md)) — a Changelog entry says _what changed on a date_, a Help
+article says _how the current build works_; they link to each other and neither can replace the
 other.
 
-*States:* an article is either **in this build** or **not in this build**. There is no draft,
+_States:_ an article is either **in this build** or **not in this build**. There is no draft,
 published, scheduled or archived state, because there is no publishing step — an article exists
 exactly when the build that contains it is running. This is the whole point of the epic.
 
-*Transitions:* `absent → in this build` when a release containing it is deployed;
+_Transitions:_ `absent → in this build` when a release containing it is deployed;
 `in this build → absent` on a rollback or a removal. A reader holding a link to an absent article
 sees S-14.
 
-**B. Help section** *(new)*
+**B. Help section** _(new)_
 One of exactly six groupings (FR-4). It has a name, an order, and the articles that belong to it.
 It is a content taxonomy, not a permission, a workspace scope, or a navigation entry in the
 sidebar. Stateless.
 
-**C. Help link** *(new, internal)*
+**C. Help link** _(new, internal)_
 A stable address (`<article>` or `<article>#<heading>`) that any screen in the product can carry
 in order to point at the manual. It exists so that a screen never encodes a URL, a title, or a
 section, and so that the release can prove every one of them resolves (FR-5.3). Readers never see
 the address itself — they see the two phrases in FR-24.
 
-*States:* **resolvable** (renders as a link) or **unresolvable** (renders as nothing, S-16). CI
+_States:_ **resolvable** (renders as a link) or **unresolvable** (renders as nothing, S-16). CI
 makes the second state unreachable in a released build.
 
-**D. Article feedback** *(new)*
+**D. Article feedback** _(new)_
 One record per person per article: helpful yes/no, an optional note, when it was given, and which
 build it was given against. It is the only thing in this epic that is stored per person, and it
 is the only reason this epic touches a database at all.
 
-*States and transitions:* `none → helpful` / `none → not helpful`; either may be replaced by the
+_States and transitions:_ `none → helpful` / `none → not helpful`; either may be replaced by the
 other or by itself with a new note (FR-32); every record is deleted 400 days after it was written
 (FR-36). There is no "resolved", "answered" or "triaged" state — feedback is a signal, not a
 queue, and specifically **not** an Approval, an Escalation, or a My Decisions item.
 
 ### 5.2 Existing — read or extended, never changed
 
-| Entity / surface | How this epic touches it |
-| --- | --- |
-| **Build identity** (version + commit, already reported to the dashboard footer) | Read, to stamp the manual (FR-8). Unchanged. |
-| **The dashboard screen map** | Read at build time to verify every screen an article names exists (FR-5.2). Unchanged. |
-| **The existing Help drawer** (Tips, Shortcuts, FAQ, Resources) | Gains a new first tab. Its four tabs, their copy and their links are untouched (FR-13). |
-| **The `?` shortcut** | Keeps its binding; its target becomes the manual (FR-10.1). |
-| **Command palette** ([AW-01](../AW-01-command-palette/spec.md)) | Gains one result group and keeps its existing "Open Help" command. This epic adds a client-side result source; it changes nothing about how the palette queries anything else. |
-| **Empty states on list screens** | Gain one help link each (FR-23). Their titles, descriptions and primary actions are unchanged. |
-| **The degraded-background-work banner and home attention items** | Gain one help link each (FR-23). Their existing copy, severity and dismissal behaviour are unchanged. |
-| **What's new** ([AW-14](../AW-14-whats-new/spec.md)) | Cross-linked: a changelog entry may point at an article, and the manual points at What's new for "what changed recently". Neither owns the other. |
-| **Organization / Workspace scope** | Determines only whether an article's "Open the screen" action is enabled (FR-29). Article *content* is identical for every reader in every workspace. |
+| Entity / surface                                                                | How this epic touches it                                                                                                                                                       |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Build identity** (version + commit, already reported to the dashboard footer) | Read, to stamp the manual (FR-8). Unchanged.                                                                                                                                   |
+| **The dashboard screen map**                                                    | Read at build time to verify every screen an article names exists (FR-5.2). Unchanged.                                                                                         |
+| **The existing Help drawer** (Tips, Shortcuts, FAQ, Resources)                  | Gains a new first tab. Its four tabs, their copy and their links are untouched (FR-13).                                                                                        |
+| **The `?` shortcut**                                                            | Keeps its binding; its target becomes the manual (FR-10.1).                                                                                                                    |
+| **Command palette** ([AW-01](../AW-01-command-palette/spec.md))                 | Gains one result group and keeps its existing "Open Help" command. This epic adds a client-side result source; it changes nothing about how the palette queries anything else. |
+| **Empty states on list screens**                                                | Gain one help link each (FR-23). Their titles, descriptions and primary actions are unchanged.                                                                                 |
+| **The degraded-background-work banner and home attention items**                | Gain one help link each (FR-23). Their existing copy, severity and dismissal behaviour are unchanged.                                                                          |
+| **What's new** ([AW-14](../AW-14-whats-new/spec.md))                            | Cross-linked: a changelog entry may point at an article, and the manual points at What's new for "what changed recently". Neither owns the other.                              |
+| **Organization / Workspace scope**                                              | Determines only whether an article's "Open the screen" action is enabled (FR-29). Article _content_ is identical for every reader in every workspace.                          |
 
 ## 6. UX
 
@@ -827,65 +829,65 @@ signed out     Sign in to send feedback.
 
 ### 6.11 Exact user-visible copy
 
-| Where | Copy |
-| --- | --- |
-| Panel title | `Help` |
-| Top-bar control tooltip | `Help — press ?` |
-| Search placeholder | `Search the manual…` |
-| Group heading | `On this screen` |
-| Group heading | `Recently opened` |
-| Group heading | `Browse` |
-| Section names | `Start here` · `Running the loop` · `Your agents` · `Set-up and connections` · `Money and limits` · `When something goes wrong` |
-| Article count | `{count} articles` / `1 article` |
-| Result count | `{count} results` / `1 result` |
-| Back control | `Back to Help` |
-| Article meta | `Reviewed {date}` |
-| Article headings list | `On this page` |
-| Related list | `Related` |
-| Screen action | `Open {screen}` |
-| Screen action, blocked | `Needs owner access` |
-| Copy link | `Copy link` → toast `Link copied` |
-| Build stamp | `Manual for build {version} · {commit}` |
-| Full-page link | `Open full page` |
-| Full-page subtitle | `The manual for the build you're running.` |
-| English-only notice | `This article is available in English only.` |
-| Moved heading notice | `That section has moved. Here's the whole article.` |
-| No results | `No results for “{query}”.` |
-| No-results actions | `Browse all articles` · `Ask the assistant about this` · `Contact support` |
-| No-results report control | `Tell us what you were looking for` |
-| Report placeholder | `What were you trying to do?` |
-| Report sent | `Thanks — we'll use this to fill the gap.` |
-| Degraded search | `Search is limited right now — matching titles only.` |
-| Index loading | `preparing search…` |
-| Feedback prompt | `Was this helpful?` · `Yes` · `No` |
-| Feedback note prompt | `What was missing? (optional)` |
-| Feedback sent | `Thanks — that helps.` |
-| Feedback offline | `Sending feedback needs a connection.` |
-| Feedback rate-limited | `That's a lot of feedback in one go. Try again in a few minutes.` |
-| Feedback credential | `Please remove any keys or tokens from your note before sending.` |
-| Feedback signed out | `Sign in to send feedback.` |
-| Not in this build — title | `That article isn't in this build.` |
-| Not in this build — body | `This deployment is running {version}. The article you followed may have been added later, or removed.` |
-| Not in this build — suggestions | `Did you mean?` |
-| Not in this build — action | `Browse all articles` |
-| Help link — empty state | `How this works` |
-| Help link — error/warning | `Why am I seeing this?` |
-| Send / Skip | `Send` · `Skip` |
+| Where                           | Copy                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Panel title                     | `Help`                                                                                                                          |
+| Top-bar control tooltip         | `Help — press ?`                                                                                                                |
+| Search placeholder              | `Search the manual…`                                                                                                            |
+| Group heading                   | `On this screen`                                                                                                                |
+| Group heading                   | `Recently opened`                                                                                                               |
+| Group heading                   | `Browse`                                                                                                                        |
+| Section names                   | `Start here` · `Running the loop` · `Your agents` · `Set-up and connections` · `Money and limits` · `When something goes wrong` |
+| Article count                   | `{count} articles` / `1 article`                                                                                                |
+| Result count                    | `{count} results` / `1 result`                                                                                                  |
+| Back control                    | `Back to Help`                                                                                                                  |
+| Article meta                    | `Reviewed {date}`                                                                                                               |
+| Article headings list           | `On this page`                                                                                                                  |
+| Related list                    | `Related`                                                                                                                       |
+| Screen action                   | `Open {screen}`                                                                                                                 |
+| Screen action, blocked          | `Needs owner access`                                                                                                            |
+| Copy link                       | `Copy link` → toast `Link copied`                                                                                               |
+| Build stamp                     | `Manual for build {version} · {commit}`                                                                                         |
+| Full-page link                  | `Open full page`                                                                                                                |
+| Full-page subtitle              | `The manual for the build you're running.`                                                                                      |
+| English-only notice             | `This article is available in English only.`                                                                                    |
+| Moved heading notice            | `That section has moved. Here's the whole article.`                                                                             |
+| No results                      | `No results for “{query}”.`                                                                                                     |
+| No-results actions              | `Browse all articles` · `Ask the assistant about this` · `Contact support`                                                      |
+| No-results report control       | `Tell us what you were looking for`                                                                                             |
+| Report placeholder              | `What were you trying to do?`                                                                                                   |
+| Report sent                     | `Thanks — we'll use this to fill the gap.`                                                                                      |
+| Degraded search                 | `Search is limited right now — matching titles only.`                                                                           |
+| Index loading                   | `preparing search…`                                                                                                             |
+| Feedback prompt                 | `Was this helpful?` · `Yes` · `No`                                                                                              |
+| Feedback note prompt            | `What was missing? (optional)`                                                                                                  |
+| Feedback sent                   | `Thanks — that helps.`                                                                                                          |
+| Feedback offline                | `Sending feedback needs a connection.`                                                                                          |
+| Feedback rate-limited           | `That's a lot of feedback in one go. Try again in a few minutes.`                                                               |
+| Feedback credential             | `Please remove any keys or tokens from your note before sending.`                                                               |
+| Feedback signed out             | `Sign in to send feedback.`                                                                                                     |
+| Not in this build — title       | `That article isn't in this build.`                                                                                             |
+| Not in this build — body        | `This deployment is running {version}. The article you followed may have been added later, or removed.`                         |
+| Not in this build — suggestions | `Did you mean?`                                                                                                                 |
+| Not in this build — action      | `Browse all articles`                                                                                                           |
+| Help link — empty state         | `How this works`                                                                                                                |
+| Help link — error/warning       | `Why am I seeing this?`                                                                                                         |
+| Send / Skip                     | `Send` · `Skip`                                                                                                                 |
 
 ### 6.12 Keyboard affordances
 
-| Context | Key | Behaviour |
-| --- | --- | --- |
-| Anywhere in the dashboard | `?` | Open Help (outside text fields) |
-| Anywhere in the dashboard | palette shortcut | Open the palette; the **Help** group is one of its result groups |
-| Panel, browse or results | `/` | Focus the search box |
-| Panel, results | `↑` `↓` | Move the selection, skipping section headings |
-| Panel, results | `Home` `End` | First / last result |
-| Panel, results | `Enter` | Open the selected article |
-| Panel, article | `Esc` | Back to results, or to browse when there was no query |
-| Panel, browse | `Esc` | Close and return focus to the element that opened it |
-| Panel, anywhere | `Tab` `Shift+Tab` | Cycle focus inside the panel only |
-| Full page | standard document navigation | — |
+| Context                   | Key                          | Behaviour                                                        |
+| ------------------------- | ---------------------------- | ---------------------------------------------------------------- |
+| Anywhere in the dashboard | `?`                          | Open Help (outside text fields)                                  |
+| Anywhere in the dashboard | palette shortcut             | Open the palette; the **Help** group is one of its result groups |
+| Panel, browse or results  | `/`                          | Focus the search box                                             |
+| Panel, results            | `↑` `↓`                      | Move the selection, skipping section headings                    |
+| Panel, results            | `Home` `End`                 | First / last result                                              |
+| Panel, results            | `Enter`                      | Open the selected article                                        |
+| Panel, article            | `Esc`                        | Back to results, or to browse when there was no query            |
+| Panel, browse             | `Esc`                        | Close and return focus to the element that opened it             |
+| Panel, anywhere           | `Tab` `Shift+Tab`            | Cycle focus inside the panel only                                |
+| Full page                 | standard document navigation | —                                                                |
 
 ## 7. Out of scope
 
@@ -919,6 +921,7 @@ signed out     Sign in to send feedback.
 A reviewer can run this list against a build.
 
 **Reaching it**
+
 - [ ] `?` opens the Help panel from the home screen, a list screen, a detail screen and a settings
       screen, and does nothing while the caret is in a text field.
 - [ ] The top-bar Help control opens the same panel; its tooltip reads `Help — press ?`.
@@ -930,6 +933,7 @@ A reviewer can run this list against a build.
 - [ ] Opening Help while Help is open changes nothing.
 
 **Not disagreeing with the build**
+
 - [ ] Adding an article that names a screen which does not exist fails the build with a message
       naming the article and the screen.
 - [ ] Adding a help link to a screen for an article identifier that does not exist fails the
@@ -944,6 +948,7 @@ A reviewer can run this list against a build.
       message naming the article and the line.
 
 **Searching**
+
 - [ ] Typing 1 character produces no results and leaves browse in place; 2 characters searches.
 - [ ] Searching produces zero network requests (verify in the network panel).
 - [ ] A term that matches an article title outranks a term that matches only a body paragraph.
@@ -952,6 +957,7 @@ A reviewer can run this list against a build.
 - [ ] With the browser offline, the panel opens, searches and renders an article normally.
 
 **Deep links**
+
 - [ ] At least 14 surfaces carry a help link; each opens the panel in place at the right article
       and heading, without navigating.
 - [ ] Every help link uses exactly one of the two approved phrases.
@@ -964,6 +970,7 @@ A reviewer can run this list against a build.
       running version, never a generic 404 and never a redirect.
 
 **Reading**
+
 - [ ] An article renders section, title, reviewed date, "On this page", body and related list.
 - [ ] A link block to another article opens it in place; a link block to a screen navigates there
       and is disabled with `Needs owner access` when unreachable; a link block to an external
@@ -975,6 +982,7 @@ A reviewer can run this list against a build.
       disabled, the group is simply absent and nothing throws.
 
 **Feedback**
+
 - [ ] Yes and No each record one response; choosing the other replaces it rather than adding one.
 - [ ] The note field appears only after No, and caps at 500 characters.
 - [ ] The 21st response in an hour is rejected with the rate-limit copy.
@@ -983,6 +991,7 @@ A reviewer can run this list against a build.
 - [ ] Offline, the control reports it needs a connection and queues nothing.
 
 **Language, accessibility, layout**
+
 - [ ] Every string in §6.11 comes from the message catalogue in every shipped locale; no key name
       contains a literal dot.
 - [ ] A non-English locale shows translated chrome and the English-only notice above the body.
@@ -995,6 +1004,7 @@ A reviewer can run this list against a build.
 - [ ] Printing an article page produces the article without shell or feedback chrome.
 
 **Content health**
+
 - [ ] The weekly summary reports per-article response counts, negative share, staleness, the
       zero-result search count and any submitted notes.
 - [ ] An article with 10+ responses and ≥ 40% negative is flagged in that summary and nowhere in

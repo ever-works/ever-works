@@ -75,6 +75,7 @@ FR-5, FR-28 and FR-29 there.
 
 **Phase:** P1
 **Modify:**
+
 - `packages/agent/src/entities/index.ts` — `export * from './workspace-backup.entity';`
 - `packages/agent/src/database/_entity-names.ts` — add `'WorkspaceBackup'` in alphabetical order
 - `packages/agent/src/database/_entities-inventory.ts` — import the class and add it to `ENTITIES`
@@ -155,6 +156,7 @@ coverage drawer render the same list.
 **Create:** `packages/agent/src/account-transfer/backup/redaction.spec.ts`
 
 Two halves:
+
 1. Fixture rows for `Work`, `UserPlugin`, `McpServerConnection`, `InboundTrigger`,
    `WebhookSubscription`, `FleetNode`, `User`, `ApiKey`, `BillingProfile`,
    `TenantJobRuntimeConfig` — assert no secret value survives and that the field **name** does.
@@ -174,8 +176,9 @@ temporarily adding a fake `fooSecretEncrypted` column to a fixture entity makes 
 reuse `jszip`, which buffers the whole archive — see [plan.md §7](./plan.md#7-plugin-boundaries))
 
 Responsibilities:
+
 - Open a zip stream and expose `addJsonlEntry(path, asyncIterable)`, `addFileEntry(path, stream,
-  size)` and `addTextEntry(path, string)`.
+size)` and `addTextEntry(path, string)`.
 - Maintain a running SHA-256 per entry and for the archive, and running byte counters for the
   attachment budget (2 GiB) and the archive ceiling (5 GiB, or 512 MiB with a non-streaming
   backend) — spec FR-15, FR-16.
@@ -212,6 +215,7 @@ manifest (asserted in T-19).
 
 **Phase:** P1
 **Create:**
+
 - `packages/agent/src/account-transfer/backup/collectors/collector.types.ts` — the
   `BackupCollector` interface: `key`, `collect(ctx): AsyncIterable<{ file, row }>`, `pageSize`
 - `packages/agent/src/account-transfer/backup/collectors/account.collector.ts`
@@ -232,6 +236,7 @@ repositories in T-18.
 
 **Phase:** P1
 **Create:**
+
 - `.../collectors/missions.collector.ts`
 - `.../collectors/tasks.collector.ts`
 - `.../collectors/works.collector.ts`
@@ -253,6 +258,7 @@ data-repo read.
 
 **Phase:** P1
 **Create:**
+
 - `.../collectors/runs.collector.ts`
 - `.../collectors/decisions.collector.ts`
 - `.../collectors/communication.collector.ts`
@@ -347,6 +353,7 @@ is crossed (spec FR-16); on any storage error retry 3 times with backoff then fa
 
 **Phase:** P1
 **Create:**
+
 - `packages/agent/src/account-transfer/backup/workspace-backup-runner.spec.ts`
 - `packages/agent/src/account-transfer/backup/collectors/collectors.spec.ts`
 
@@ -364,6 +371,7 @@ never cross a workspace scope.
 
 **Phase:** P1
 **Create:**
+
 - `packages/agent/src/account-transfer/backup/backup-archive-writer.spec.ts`
 - `packages/agent/src/account-transfer/backup/backup-manifest.spec.ts`
 
@@ -768,7 +776,7 @@ domain table from `BACKUP_DOMAINS` rather than hand-maintaining it.
 ### T-46 · Program bookkeeping
 
 **Phase:** P1
-**Modify:** `docs/specs/features/agent-workspace/README.md` (add *Workspace backup* to the
+**Modify:** `docs/specs/features/agent-workspace/README.md` (add _Workspace backup_ to the
 vocabulary table in §1, per program rule #2),
 `docs/specs/features/agent-workspace/TRACKER.md` (AW-22 spec + P1 status, and the capabilities
 this phase delivered). TRACKER.md is the program's only progress record — do not create another.
