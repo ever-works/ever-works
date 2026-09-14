@@ -186,6 +186,91 @@ describe('useChangelogReadTracker', () => {
         expect(flush.mock.calls[1][0]).toHaveLength(5);
     });
 
+    /** Make every write wait until the test settles it, in the order the writes were made. */
+    function deferWrites() {
+        const pending: ((result: ChangelogReadFlushResult) => void)[] = [];
+        flush.mockImplementation(
+            () => new Promise<ChangelogReadFlushResult>((resolve) => pending.push(resolve)),
+        );
+        return async (index: number, result: ChangelogReadFlushResult) => {
+            await act(async () => {
+                pending[index](result);
+                await vi.advanceTimersByTimeAsync(0);
+            });
+        };
+    }
+
+    it('FR-17: a batch due while a write is outstanding waits for it, then goes out at once', async () => {
+        const settleWrite = deferWrites();
+        const { result } = mount();
+        const cards = makeCards(2);
+        trackAll(result, cards);
+
+        setVisibility(cards[0], 1);
+        await advance(READ_DWELL_MS);
+        await advance(READ_BATCH_WINDOW_MS);
+        expect(flush).toHaveBeenCalledTimes(1);
+
+        setVisibility(cards[1], 1);
+        await advance(READ_DWELL_MS);
+        await advance(READ_BATCH_WINDOW_MS * 3);
+        expect(flush, 'no second write while the first is outstanding').toHaveBeenCalledTimes(1);
+
+        await settleWrite(0, { success: true, unreadCount: 5 });
+        expect(flush).toHaveBeenCalledTimes(2);
+        expect(flush.mock.calls[1][0]).toEqual(['entry-1']);
+
+        await settleWrite(1, { success: true, unreadCount: 4 });
+        expect(onUnreadCount.mock.calls.map(([count]) => count)).toEqual([5, 4]);
+    });
+
+    it('unmount with more than 25 pending sends the batches one after another, so the last count wins', async () => {
+        const settleWrite = deferWrites();
+        const { result, unmount } = mount();
+        const cards = makeCards(30);
+        trackAll(result, cards);
+
+        for (const card of cards) setVisibility(card, 1);
+        await advance(READ_DWELL_MS);
+
+        unmount();
+        expect(flush, 'only one write outstanding at a time').toHaveBeenCalledTimes(1);
+        expect(flush.mock.calls[0][0]).toHaveLength(25);
+
+        await settleWrite(0, { success: true, unreadCount: 5 });
+        expect(flush, 'the rest goes out without waiting for a window').toHaveBeenCalledTimes(2);
+        expect(flush.mock.calls[1][0]).toHaveLength(5);
+
+        await settleWrite(1, { success: true, unreadCount: 0 });
+        expect(onUnreadCount.mock.calls.map(([count]) => count)).toEqual([5, 0]);
+        expect(onUnreadCount).toHaveBeenLastCalledWith(0);
+    });
+
+    it('FR-48: a failed write is retried after it settles, never alongside a newer write', async () => {
+        const settleWrite = deferWrites();
+        const { result } = mount();
+        const cards = makeCards(2);
+        trackAll(result, cards);
+
+        setVisibility(cards[0], 1);
+        await advance(READ_DWELL_MS);
+        await advance(READ_BATCH_WINDOW_MS);
+        setVisibility(cards[1], 1);
+        await advance(READ_DWELL_MS);
+        await advance(READ_BATCH_WINDOW_MS);
+        expect(flush).toHaveBeenCalledTimes(1);
+
+        await settleWrite(0, { success: false });
+        expect(flush).toHaveBeenCalledTimes(2);
+        expect(flush.mock.calls[1][0].sort()).toEqual(['entry-0', 'entry-1']);
+
+        await advance(READ_BATCH_WINDOW_MS * 3);
+        expect(flush).toHaveBeenCalledTimes(2);
+        await settleWrite(1, { success: true, unreadCount: 0 });
+        expect(onUnreadCount).toHaveBeenCalledTimes(1);
+        expect(onUnreadCount).toHaveBeenCalledWith(0);
+    });
+
     it('FR-18: an entry already marked is never written twice', async () => {
         const { result } = mount();
         const [card] = makeCards(1);

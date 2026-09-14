@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { X } from 'lucide-react';
@@ -12,6 +11,9 @@ import type {
 } from '@ever-works/contracts/api';
 import { isSafeInAppPath } from '@ever-works/contracts/api';
 import { cn } from '@/lib/utils/cn';
+// Workspace-aware: an in-product call-to-action keeps the reader in the
+// Organization they are viewing.
+import { useRouter } from '@/i18n/navigation';
 import { getChangelog, markAllChangelogRead, markChangelogRead } from '@/app/actions/changelog';
 import { ChangelogList, type ChangelogListStatus } from './ChangelogList';
 import { ChangelogFilterChips } from './ChangelogFilterChips';
@@ -225,8 +227,23 @@ function WhatsNewPanelBody({ onClose, unreadCount, onUnreadCountChange }: WhatsN
         return () => clearTimeout(timer);
     }, [markedAll]);
 
+    /**
+     * Bumped each time "Mark all as read" succeeds. Its response already
+     * accounts for every entry, so a per-entry write that was sent before it
+     * arrived carries a count that is at best equal and at worst stale — that
+     * count is dropped rather than put back on the badge.
+     */
+    const markAllGenerationRef = useRef(0);
+
     const tracker = useChangelogReadTracker({
-        flush: markChangelogRead,
+        flush: async (slugs) => {
+            const generation = markAllGenerationRef.current;
+            const result = await markChangelogRead(slugs);
+            if (result.success && generation !== markAllGenerationRef.current) {
+                return { success: true };
+            }
+            return result;
+        },
         onRead: (slugs) =>
             setReadSlugs((previous) => {
                 const next = new Set(previous);
@@ -250,6 +267,7 @@ function WhatsNewPanelBody({ onClose, unreadCount, onUnreadCountChange }: WhatsN
             setStatus('error');
             return;
         }
+        markAllGenerationRef.current += 1;
         setReadSlugs(
             (previous) =>
                 new Set([...previous, ...(page?.entries ?? []).map((entry) => entry.slug)]),

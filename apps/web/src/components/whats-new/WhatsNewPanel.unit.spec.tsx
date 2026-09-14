@@ -9,9 +9,30 @@ vi.mock('next-intl', () => ({
     useLocale: () => 'en',
 }));
 
-const push = vi.fn();
-vi.mock('next/navigation', () => ({
-    useRouter: () => ({ push }),
+// The panel navigates through the workspace-aware router; only next-intl's
+// primitives underneath it are replaced, so Organization scoping runs for real.
+const navigation = vi.hoisted(() => ({ pathname: '/dashboard', push: vi.fn() }));
+const push = navigation.push;
+vi.mock('next-intl/navigation', () => ({
+    createNavigation: () => ({
+        Link: () => null,
+        getPathname: vi.fn(),
+        redirect: vi.fn(),
+        usePathname: () => navigation.pathname,
+        useRouter: () => ({
+            back: vi.fn(),
+            forward: vi.fn(),
+            refresh: vi.fn(),
+            // The wrapper always forwards an options slot; record it only when set.
+            push: (href: unknown, options?: unknown) =>
+                options === undefined ? navigation.push(href) : navigation.push(href, options),
+            replace: vi.fn(),
+            prefetch: vi.fn(),
+        }),
+    }),
+}));
+vi.mock('next-intl/routing', () => ({
+    defineRouting: (value: unknown) => value,
 }));
 
 const getChangelog = vi.fn();
@@ -24,6 +45,45 @@ vi.mock('@/app/actions/changelog', () => ({
 }));
 
 import { WhatsNewPanel } from './WhatsNewPanel';
+import { READ_BATCH_WINDOW_MS, READ_DWELL_MS } from './use-changelog-read-tracker';
+
+/** Replace IntersectionObserver with one the test drives by hand; returns a restore function. */
+function recordIntersections() {
+    const original = window.IntersectionObserver;
+    const observers: { callback: IntersectionObserverCallback; targets: Element[] }[] = [];
+    class RecordingObserver {
+        targets: Element[] = [];
+        constructor(readonly callback: IntersectionObserverCallback) {
+            observers.push(this);
+        }
+        observe(target: Element) {
+            this.targets.push(target);
+        }
+        unobserve() {}
+        disconnect() {}
+    }
+    // @ts-expect-error — test double
+    window.IntersectionObserver = RecordingObserver;
+    return {
+        showFully(target: Element) {
+            const observer = observers.find((candidate) => candidate.targets.includes(target));
+            if (!observer) throw new Error('card is not watched');
+            observer.callback(
+                [
+                    {
+                        target,
+                        isIntersecting: true,
+                        intersectionRatio: 1,
+                    } as unknown as IntersectionObserverEntry,
+                ],
+                observer as unknown as IntersectionObserver,
+            );
+        },
+        restore() {
+            window.IntersectionObserver = original;
+        },
+    };
+}
 
 function entry(overrides: Partial<ChangelogEntryDto> = {}): ChangelogEntryDto {
     return {
@@ -87,6 +147,7 @@ async function openPanel() {
  */
 describe('WhatsNewPanel', () => {
     beforeEach(() => {
+        navigation.pathname = '/dashboard';
         push.mockReset();
         getChangelog.mockReset();
         markChangelogRead.mockReset();
@@ -280,6 +341,74 @@ describe('WhatsNewPanel', () => {
         expect(push).toHaveBeenCalledWith('/settings/fleet');
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
         expect(markChangelogRead).toHaveBeenCalledWith(['stop-the-whole-fleet']);
+    });
+
+    it('FR-42: a call-to-action followed inside an Organization stays in that Organization', async () => {
+        navigation.pathname = '/org/acme/dashboard';
+        getChangelog.mockResolvedValue({
+            success: true,
+            data: page({
+                entries: [entry({ cta: { label: 'Open fleet', href: '/settings/fleet' } })],
+            }),
+        });
+        render(<Harness />);
+        const dialog = await openPanel();
+
+        fireEvent.click(await within(dialog).findByTestId('whats-new-entry-cta'));
+
+        expect(push).toHaveBeenCalledTimes(1);
+        expect(push).toHaveBeenCalledWith('/org/acme/settings/fleet');
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(markChangelogRead).toHaveBeenCalledWith(['stop-the-whole-fleet']);
+    });
+
+    it('S-2: a read write still outstanding when "Mark all as read" succeeds cannot put a stale count back on the badge', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const observers = recordIntersections();
+        try {
+            getChangelog.mockResolvedValue({
+                success: true,
+                data: page({
+                    entries: [
+                        entry(),
+                        entry({ slug: 'approve-agent-merges-in-inbox', title: 'Approve' }),
+                    ],
+                    unreadCount: 2,
+                }),
+            });
+            let settleWrite: (result: { success: boolean; unreadCount?: number }) => void = () =>
+                undefined;
+            markChangelogRead.mockImplementation(
+                () =>
+                    new Promise((resolve) => {
+                        settleWrite = resolve;
+                    }),
+            );
+            render(<Harness initialCount={2} />);
+            const dialog = await openPanel();
+            await within(dialog).findByTestId('whats-new-list');
+
+            const [first] = within(dialog).getAllByTestId('whats-new-entry');
+            act(() => observers.showFully(first));
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(READ_DWELL_MS + READ_BATCH_WINDOW_MS);
+            });
+            expect(markChangelogRead).toHaveBeenCalledWith(['stop-the-whole-fleet']);
+
+            await act(async () => {
+                fireEvent.click(within(dialog).getByTestId('whats-new-mark-all'));
+            });
+            await waitFor(() => expect(screen.getByTestId('count')).toHaveTextContent('0'));
+
+            // The per-entry write was counted before "Mark all" landed.
+            await act(async () => {
+                settleWrite({ success: true, unreadCount: 1 });
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            expect(screen.getByTestId('count')).toHaveTextContent('0');
+        } finally {
+            observers.restore();
+        }
     });
 
     it('S-2: an entry seen for a second loses its dot in place, and the write lands in the badge', async () => {

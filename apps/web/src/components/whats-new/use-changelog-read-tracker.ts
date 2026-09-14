@@ -54,6 +54,17 @@ function createReadTrackerEngine(initialOptions: ChangelogReadTrackerOptions) {
     let observer: IntersectionObserver | null = null;
     let batchTimer: Timer | null = null;
     let active = false;
+    /**
+     * At most one write is ever outstanding. Each response's unread count is
+     * computed by the server after every earlier write from this panel has
+     * landed, so counts arrive in the order the writes were made and a slow
+     * older response can never overwrite a newer, lower count.
+     */
+    let inFlight = false;
+    /** A batch window elapsed while a write was outstanding — send as soon as it settles. */
+    let windowDue = false;
+    /** Unmount or tab hide asked for everything now — send batches back to back. */
+    let draining = false;
     const elementsBySlug = new Map<string, Element>();
     const slugsByElement = new Map<Element, string>();
     const dwellTimers = new Map<string, Timer>();
@@ -69,52 +80,74 @@ function createReadTrackerEngine(initialOptions: ChangelogReadTrackerOptions) {
         }
     };
 
+    /** Put a failed batch back in the queue, bounded by the attempt count. */
+    const requeue = (batch: PendingSlug[]) => {
+        const again = batch
+            .filter((item) => item.attempts < READ_MAX_RETRIES)
+            .map((item) => ({ slug: item.slug, attempts: item.attempts + 1 }));
+        // Anything left out is dropped silently (spec FR-48): the entry
+        // re-marks next time it is seen.
+        queue.push(...again);
+    };
+
     const send = (batch: PendingSlug[]) => {
         if (batch.length === 0) {
             return;
         }
-        const retry = () => {
-            const again = batch
-                .filter((item) => item.attempts < READ_MAX_RETRIES)
-                .map((item) => ({ slug: item.slug, attempts: item.attempts + 1 }));
-            if (again.length === 0) {
-                // Dropped silently (spec FR-48): the entry re-marks next time it is seen.
-                return;
+        inFlight = true;
+        const settle = (result: ChangelogReadFlushResult | undefined) => {
+            inFlight = false;
+            try {
+                if (!result?.success) {
+                    requeue(batch);
+                } else if (typeof result.unreadCount === 'number') {
+                    getOptions().onUnreadCount?.(result.unreadCount);
+                }
+            } finally {
+                pump();
             }
-            if (!active) {
-                // The panel is gone, so there is no window to wait for; retry
-                // now, still bounded by the attempt count.
-                send(again);
-                return;
-            }
-            queue.push(...again);
-            schedule();
         };
         let request: Promise<ChangelogReadFlushResult>;
         try {
             request = getOptions().flush(batch.map((item) => item.slug));
         } catch {
-            retry();
+            settle(undefined);
             return;
         }
         void Promise.resolve(request)
-            .then((result) => {
-                if (!result?.success) {
-                    retry();
-                    return;
-                }
-                if (typeof result.unreadCount === 'number') {
-                    getOptions().onUnreadCount?.(result.unreadCount);
-                }
-            })
-            .catch(retry);
+            .then(settle, () => settle(undefined))
+            // A throwing callback must not surface to the reader (spec FR-48);
+            // `settle` has already released the slot and moved the queue on.
+            .catch(() => undefined);
     };
 
-    /** Send one window's worth (at most 25) and schedule the rest. */
+    /**
+     * Move the queue on after a write settles or a window elapses: send the
+     * next batch now when a window is already due, the panel is gone or a
+     * flush-everything is under way; otherwise wait for the next window.
+     */
+    function pump() {
+        if (inFlight) {
+            return;
+        }
+        if (queue.length === 0) {
+            draining = false;
+            windowDue = false;
+            return;
+        }
+        if (windowDue || draining || !active) {
+            windowDue = false;
+            send(queue.splice(0, CHANGELOG_LIMITS.markReadBatchMax));
+            return;
+        }
+        schedule();
+    }
+
+    /** One window has passed: send at most 25, or wait for the outstanding write. */
     const drainWindow = () => {
         batchTimer = null;
-        send(queue.splice(0, CHANGELOG_LIMITS.markReadBatchMax));
-        schedule();
+        windowDue = true;
+        pump();
     };
 
     function schedule() {
@@ -124,15 +157,18 @@ function createReadTrackerEngine(initialOptions: ChangelogReadTrackerOptions) {
         batchTimer = setTimeout(drainWindow, READ_BATCH_WINDOW_MS);
     }
 
-    /** Send everything pending now, 25 at a time — on unmount and on tab hide. */
+    /**
+     * Send everything pending now, 25 at a time — on unmount and on tab hide.
+     * Batches still go one after another, each as soon as the previous one
+     * settles, so the unread count stays in order.
+     */
     const flushAll = () => {
         if (batchTimer !== null) {
             clearTimeout(batchTimer);
             batchTimer = null;
         }
-        while (queue.length > 0) {
-            send(queue.splice(0, CHANGELOG_LIMITS.markReadBatchMax));
-        }
+        draining = true;
+        pump();
     };
 
     const markRead = (slugs: string[]) => {
@@ -238,6 +274,8 @@ function createReadTrackerEngine(initialOptions: ChangelogReadTrackerOptions) {
  *   clock.
  * - Read marks are batched: at most one write every 2000 ms, carrying at
  *   most 25 slugs (spec FR-17). Anything left over goes in the next window.
+ * - Writes never overlap: the next batch waits for the previous one to
+ *   settle, so the unread counts they return reach the badge in order.
  * - Pending marks are flushed immediately when the panel unmounts and when
  *   the tab is hidden, so closing the panel never loses a read.
  * - A failed write is retried at most twice, then dropped silently. Nothing
