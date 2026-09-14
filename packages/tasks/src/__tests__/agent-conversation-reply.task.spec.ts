@@ -362,6 +362,26 @@ describe('agentConversationReplyTask', () => {
         expect(createApplicationContextMock).not.toHaveBeenCalled();
     });
 
+    it('on failure, still surfaces the message when the run cannot be read', async () => {
+        runs.findById.mockRejectedValue(new Error('db timeout'));
+        await expect(
+            config.onFailure({ payload, error: new Error('worker crashed') }),
+        ).resolves.toBeUndefined();
+        expect(messages.markReplyRefused).toHaveBeenCalledWith({
+            conversationId: CONVERSATION_ID,
+            messageId: MESSAGE_ID,
+            failureCode: 'provider_unavailable',
+        });
+    });
+
+    it('on failure, still surfaces the message when the run cannot be marked failed', async () => {
+        runs.markFailed.mockRejectedValue(new Error('db timeout'));
+        await expect(
+            config.onFailure({ payload, error: new Error('worker crashed') }),
+        ).resolves.toBeUndefined();
+        expect(messages.markReplyRefused).toHaveBeenCalledTimes(1);
+    });
+
     it('on failure, a message that cannot be marked does not throw', async () => {
         messages.markReplyRefused.mockRejectedValue(new Error('db down'));
         await expect(

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { UserUpload } from '../../entities/user-upload.entity';
 import { ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 
@@ -21,6 +21,24 @@ export interface RecordUploadInput {
     originalFilename?: string | null;
     mimeType?: string | null;
     fileSize?: number | null;
+}
+
+/**
+ * The same-origin URL that opens `upload` for its owner — the one
+ * `UploadsService.saveFile` returned at upload time. The storage key ends with
+ * the served filename (`<sha256>.<ext>`); it is sliced off at the hash, so
+ * per-Work keys such as `dr:<workId>:<name>` resolve too, and a Work upload
+ * keeps its `?workId=` round-trip. `null` when the key does not carry the hash.
+ */
+export function uploadServeUrl(
+    userId: string,
+    upload: Pick<UserUpload, 'sha256' | 'storagePath' | 'workId'>,
+): string | null {
+    const nameAt = upload.storagePath.lastIndexOf(upload.sha256);
+    if (nameAt < 0) return null;
+    const servedName = upload.storagePath.slice(nameAt);
+    const base = `/api/uploads/${encodeURIComponent(userId)}/${servedName}`;
+    return upload.workId ? `${base}?workId=${encodeURIComponent(upload.workId)}` : base;
 }
 
 /**
@@ -88,6 +106,23 @@ export class UserUploadRepository {
         };
         return this.repo.findOne({
             where: ownershipWhereWith<UserUpload>(userId, scope, relation),
+        });
+    }
+
+    /**
+     * The uploads among `sha256s` owned by `userId` in `scope`, in one query —
+     * for surfaces that show several attachments at once. An id with no such
+     * upload is simply absent.
+     */
+    async findOwnedBySha256s(
+        sha256s: readonly string[],
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<UserUpload[]> {
+        const wanted = [...new Set(sha256s.map(normalizeUploadSha256))];
+        if (wanted.length === 0) return [];
+        return this.repo.find({
+            where: ownershipWhereWith<UserUpload>(userId, scope, { sha256: In(wanted) }),
         });
     }
 

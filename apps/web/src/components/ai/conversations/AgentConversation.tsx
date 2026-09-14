@@ -10,7 +10,6 @@ import {
     markConversationRead,
     type ConversationActionResult,
 } from '@/app/actions/dashboard/conversations';
-import { attachmentUploadIds } from '@/lib/ai/attachments';
 import { useChatPanelVisible } from '@/lib/hooks/use-chat-panel';
 import { useConversationOutbox, type OutboxRow } from '@/lib/hooks/use-conversation-outbox';
 import { useConversationStream } from '@/lib/hooks/use-conversation-stream';
@@ -18,6 +17,11 @@ import { cn } from '@/lib/utils/cn';
 import { ChatInput } from '../ChatInput';
 import { ChatMessage } from '../ChatMessage';
 import { useChatContext } from '../ChatProvider';
+import {
+    ConversationAttachmentList,
+    composerAttachmentsToConversation,
+    outboxRowAttachments,
+} from './ConversationAttachmentList';
 import { MessageRetryBar } from './MessageRetryBar';
 
 /** The bubble a row renders through the assistant's own message component. */
@@ -202,6 +206,10 @@ export function AgentConversation() {
                                             isLastMessage={false}
                                         />
                                     </div>
+                                    <ConversationAttachmentList
+                                        attachments={outboxRowAttachments(row)}
+                                        align={fromPerson ? 'end' : 'start'}
+                                    />
                                     {(failed || sending) && (
                                         <MessageRetryBar
                                             failureCode={failureCode}
@@ -235,9 +243,7 @@ export function AgentConversation() {
                 isStreaming={false}
                 onStop={() => undefined}
                 onSubmit={(text, attachments) => {
-                    const uploads = attachmentUploadIds(attachments).map((uploadId) => ({
-                        uploadId,
-                    }));
+                    const uploads = composerAttachmentsToConversation(attachments);
                     // A message may be only files ("here, look at this"); its
                     // body then names them, since a body cannot be empty.
                     const body =

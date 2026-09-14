@@ -8239,7 +8239,10 @@
                 "messagesLoadError": "Could not load this conversation.",
                 "startHint": "Send a message to start a conversation with {agent}.",
                 "placeholder": "Message {agent}…",
-                "you": "You"
+                "you": "You",
+                "attachments": "Attached files",
+                "attachmentFallbackName": "Attachment",
+                "openAttachment": "Open {name}"
             },
             "panel": {
                 "back": "Back",

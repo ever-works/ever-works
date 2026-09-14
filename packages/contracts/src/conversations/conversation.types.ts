@@ -112,6 +112,21 @@ export interface ConversationAttachmentRef {
 	uploadId: string;
 }
 
+/**
+ * An attachment as a message is read back: the stored reference plus what a
+ * person needs to see and reopen the file. The details are resolved from the
+ * upload when the message is read — never stored on the message — and are
+ * `null` when the upload is no longer readable in this workspace. Optional:
+ * older API builds send the bare reference.
+ */
+export interface ConversationAttachmentView extends ConversationAttachmentRef {
+	/** The file's original name. */
+	filename?: string | null;
+	mimeType?: string | null;
+	/** Same-origin, owner-gated URL that opens the file (`/api/uploads/…`). */
+	url?: string | null;
+}
+
 /** One entry of a message's delivery record. */
 export interface ConversationReach {
 	agentId: string;
@@ -146,7 +161,7 @@ export interface ConversationMessageView {
 	authorType: ConversationAuthorType;
 	authorId: string | null;
 	mentions: ConversationMention[] | null;
-	attachments: ConversationAttachmentRef[] | null;
+	attachments: ConversationAttachmentView[] | null;
 	status: ConversationMessageStatus;
 	failureCode: ConversationFailureCode | null;
 	clientMessageId: string | null;

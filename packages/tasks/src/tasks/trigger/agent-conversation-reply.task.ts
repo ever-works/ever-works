@@ -79,24 +79,32 @@ export const agentConversationReplyTask = task<
             const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
             appContext.useLogger(createTriggerLogger('AgentConversationReply:Failure'));
             try {
+                // Two independent repairs, each best-effort on its own: a run
+                // lookup or write that throws must never cost the person's
+                // message its failed state (and with it, Retry).
                 if (runId) {
-                    const runs = appContext.get(AgentRunRepository);
-                    const run = await runs.findById(runId);
-                    if (run && (run.status === 'queued' || run.status === 'running')) {
-                        await runs.markFailed(
-                            run.id,
-                            error instanceof Error ? error.message : String(error),
-                        );
-                    }
+                    await (async () => {
+                        const runs = appContext.get(AgentRunRepository);
+                        const run = await runs.findById(runId);
+                        if (run && (run.status === 'queued' || run.status === 'running')) {
+                            await runs.markFailed(
+                                run.id,
+                                error instanceof Error ? error.message : String(error),
+                            );
+                        }
+                    })().catch(() => undefined);
                 }
                 if (refused) {
                     // Guarded inside the service: only a person's message that
                     // is still `sent` moves to `failed`, so a message already
                     // failed (or answered and retried) is left as it is.
-                    const messages = appContext.get(ConversationMessageService);
-                    await messages
-                        .markReplyRefused({ ...refused, failureCode: 'provider_unavailable' })
-                        .catch(() => false);
+                    await (async () => {
+                        const messages = appContext.get(ConversationMessageService);
+                        await messages.markReplyRefused({
+                            ...refused,
+                            failureCode: 'provider_unavailable',
+                        });
+                    })().catch(() => undefined);
                 }
             } finally {
                 await appContext.close();

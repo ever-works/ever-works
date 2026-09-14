@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-    ConversationAttachmentRef,
+    ConversationAttachmentView,
     ConversationFailureCode,
     ConversationMessageView,
 } from '@ever-works/contracts';
@@ -28,7 +28,12 @@ export type OutboxFailureCode = ConversationFailureCode | 'offline';
 export interface OutboxEntry {
     clientMessageId: string;
     body: string;
-    attachments: ConversationAttachmentRef[];
+    /**
+     * The files sent with it, with the name and URL the composer already had,
+     * so a message still on its way (or refused) shows what it carries. Only
+     * the upload ids are sent.
+     */
+    attachments: ConversationAttachmentView[];
     status: 'sending' | 'failed';
     failureCode: OutboxFailureCode | null;
     details?: { size?: number; max?: number };
@@ -57,7 +62,7 @@ export interface ConversationOutboxOptions {
 export interface ConversationOutbox {
     rows: OutboxRow[];
     loadState: 'idle' | 'loading' | 'ready' | 'error';
-    send: (body: string, attachments?: ConversationAttachmentRef[]) => Promise<void>;
+    send: (body: string, attachments?: ConversationAttachmentView[]) => Promise<void>;
     retry: (row: OutboxRow) => Promise<void>;
     discard: (row: OutboxRow) => Promise<void>;
     /** Merge one message pushed by the live stream. */
@@ -115,14 +120,22 @@ export function newClientMessageId(): string {
     return `cm_${random}`;
 }
 
-/** Insert or replace `message`, keeping the list oldest-first. */
+/**
+ * Insert or replace `message`, keeping the list oldest-first. Messages that
+ * share a timestamp keep the server's order — `createdAt`, then `id` — so the
+ * thread, the stream and the list preview agree on which came first.
+ */
 export function mergeMessage(
     messages: readonly ConversationMessageView[],
     message: ConversationMessageView,
 ): ConversationMessageView[] {
     const next = messages.filter((existing) => existing.id !== message.id);
     next.push(message);
-    return next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return next.sort(
+        (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() ||
+            (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
 }
 
 /** The reason a failed action should be shown with. */
@@ -178,16 +191,32 @@ export function useConversationOutbox({
         latest.current = { ensureConversation, onGone, storageKey };
     });
 
+    // The Conversation on screen. Every answer the server gives after an
+    // await — a load, a Retry, a discard — is committed only while the
+    // Conversation it was asked for is still this one, so a slow answer for
+    // the previous Conversation never lands in the next (or in a fresh one).
+    const openConversation = useRef(conversationId);
+    // Loads are numbered, so an older load that answers after a newer one
+    // has already been shown cannot roll the view back.
+    const loadSeq = useRef(0);
+    const shownLoad = useRef(0);
+
     const reload = useCallback(async () => {
         if (!conversationId) return;
+        const seq = (loadSeq.current += 1);
+        const stillOpen = () => openConversation.current === conversationId;
         let result: Awaited<ReturnType<typeof listConversationMessages>>;
         try {
             result = await listConversationMessages(conversationId, { limit: 100 });
         } catch {
+            if (!stillOpen()) return;
             setLoadState((prev) => (prev === 'ready' ? prev : 'error'));
             return;
         }
+        if (!stillOpen()) return;
         if (result.ok) {
+            if (seq < shownLoad.current) return;
+            shownLoad.current = seq;
             setMessages(result.data.messages);
             setLoadState('ready');
             return;
@@ -197,6 +226,7 @@ export function useConversationOutbox({
     }, [conversationId]);
 
     useEffect(() => {
+        openConversation.current = conversationId;
         // A send still on its way stays visible across the switch from the
         // draft to the Conversation its first message just created.
         const pending = entriesRef.current.filter(
@@ -263,10 +293,13 @@ export function useConversationOutbox({
                 if (carried.length > 0) writeOutbox(key, [...readOutbox(key), ...carried]);
             }
 
+            // The API stores references only; names and URLs are read back
+            // from the upload, never taken from the client.
+            const attachments = (entry.attachments ?? []).map(({ uploadId }) => ({ uploadId }));
             const result = await sendConversationMessage(key, {
                 body: entry.body,
                 clientMessageId: entry.clientMessageId,
-                ...(entry.attachments.length > 0 ? { attachments: entry.attachments } : {}),
+                ...(attachments.length > 0 ? { attachments } : {}),
             }).catch(() => thrownFailure());
 
             if (result.ok) {
@@ -289,7 +322,7 @@ export function useConversationOutbox({
     );
 
     const send = useCallback(
-        async (body: string, attachments: ConversationAttachmentRef[] = []) => {
+        async (body: string, attachments: ConversationAttachmentView[] = []) => {
             const entry: OutboxEntry = {
                 clientMessageId: newClientMessageId(),
                 body,
@@ -337,9 +370,16 @@ export function useConversationOutbox({
                 const result = await retryConversationMessage(conversationId, message.id).catch(
                     () => thrownFailure(),
                 );
-                if (result.ok) {
+                // The view may have moved on while the Retry was out: its
+                // answer then belongs to a Conversation no longer on screen.
+                const stillOpen = openConversation.current === conversationId;
+                if (stillOpen && result.ok) {
                     receive(result.data.message);
-                } else if (result.status === 409 || result.status === 404) {
+                } else if (
+                    stillOpen &&
+                    !result.ok &&
+                    (result.status === 409 || result.status === 404)
+                ) {
                     // Already retried elsewhere, or discarded: show what is true.
                     await reload();
                 }
@@ -367,6 +407,7 @@ export function useConversationOutbox({
             const result = await discardConversationMessage(conversationId, row.message.id).catch(
                 () => thrownFailure(),
             );
+            if (openConversation.current !== conversationId) return;
             if (result.ok || result.status === 404) {
                 setMessages((prev) => prev.filter((message) => message.id !== row.message.id));
             } else if (result.status === 409) {

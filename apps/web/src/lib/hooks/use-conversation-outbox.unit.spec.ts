@@ -114,6 +114,33 @@ describe('useConversationOutbox', () => {
         );
     });
 
+    it('sends only upload ids, and keeps a refused message’s files by name across a reload', async () => {
+        actions.sendConversationMessage.mockResolvedValue({
+            ok: false,
+            status: 503,
+            failureCode: 'provider_unavailable',
+            details: {},
+        });
+        const file = {
+            uploadId: 'a'.repeat(64),
+            filename: 'pricing.pdf',
+            mimeType: 'application/pdf',
+            url: `/api/uploads/u-1/${'a'.repeat(64)}.pdf`,
+        };
+        const first = renderOutbox();
+        await waitFor(() => expect(first.result.current.loadState).toBe('ready'));
+        await act(() => first.result.current.send('pricing.pdf', [file]));
+
+        const [, sent] = actions.sendConversationMessage.mock.calls[0];
+        expect(sent.attachments).toEqual([{ uploadId: file.uploadId }]);
+        first.unmount();
+
+        const reloaded = renderOutbox();
+        await waitFor(() => expect(localRow(reloaded.result.current.rows)).toBeDefined());
+        const restored = localRow(reloaded.result.current.rows);
+        expect(restored?.source === 'local' && restored.entry.attachments).toEqual([file]);
+    });
+
     it('never retries on its own', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         try {
@@ -264,6 +291,128 @@ describe('useConversationOutbox', () => {
         expect(actions.sendConversationMessage).not.toHaveBeenCalled();
     });
 
+    /** A load of `c-old` that answers only when the test says so. */
+    function holdOldLoad(messages: ConversationMessageView[]) {
+        const held = { release: () => undefined as void };
+        actions.listConversationMessages.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    held.release = () => resolve({ ok: true, data: { messages } });
+                }),
+        );
+        return held;
+    }
+
+    const oldMessage = message({
+        id: 'm-old',
+        conversationId: 'c-old',
+        content: 'From the previous conversation',
+    });
+
+    it('never shows a slow load of the previous Conversation in a fresh one', async () => {
+        const held = holdOldLoad([oldMessage]);
+        const { result, rerender } = renderOutbox('c-old');
+        await waitFor(() =>
+            expect(actions.listConversationMessages).toHaveBeenCalledWith('c-old', { limit: 100 }),
+        );
+
+        rerender({ conversationId: null });
+        await waitFor(() => expect(result.current.loadState).toBe('ready'));
+        await act(async () => {
+            held.release();
+        });
+
+        expect(result.current.rows).toEqual([]);
+        expect(result.current.loadState).toBe('ready');
+    });
+
+    it('never shows a slow load of the previous Conversation in the next one', async () => {
+        const held = holdOldLoad([oldMessage]);
+        const { result, rerender } = renderOutbox('c-old');
+        await waitFor(() => expect(actions.listConversationMessages).toHaveBeenCalledTimes(1));
+
+        actions.listConversationMessages.mockResolvedValue({
+            ok: true,
+            data: { messages: [message({ id: 'm-2', conversationId: 'c-2' })] },
+        });
+        rerender({ conversationId: 'c-2' });
+        await waitFor(() => expect(result.current.rows).toHaveLength(1));
+        await act(async () => {
+            held.release();
+        });
+
+        expect(result.current.rows.map((row) => row.source === 'server' && row.message.id)).toEqual(
+            ['m-2'],
+        );
+    });
+
+    it('never lets an older load of the same Conversation roll back a newer one', async () => {
+        const held = holdOldLoad([message({ id: 'm-1' })]);
+        const { result } = renderOutbox();
+        await waitFor(() => expect(actions.listConversationMessages).toHaveBeenCalledTimes(1));
+
+        actions.listConversationMessages.mockResolvedValue({
+            ok: true,
+            data: {
+                messages: [
+                    message({ id: 'm-1' }),
+                    message({ id: 'm-2', createdAt: '2026-09-14T09:01:00.000Z' }),
+                ],
+            },
+        });
+        await act(() => result.current.reload());
+        expect(result.current.rows).toHaveLength(2);
+        await act(async () => {
+            held.release();
+        });
+
+        expect(result.current.rows).toHaveLength(2);
+    });
+
+    it('never merges a Retry answered after the view moved to another Conversation', async () => {
+        const stored = message({
+            id: 'm-old',
+            conversationId: 'c-old',
+            status: 'failed',
+            failureCode: 'capacity_limited',
+        });
+        actions.listConversationMessages.mockResolvedValueOnce({
+            ok: true,
+            data: { messages: [stored] },
+        });
+        let release: () => void = () => undefined;
+        actions.retryConversationMessage.mockImplementation(
+            () =>
+                new Promise((resolve) => {
+                    release = () =>
+                        resolve({
+                            ok: true,
+                            data: {
+                                message: { ...stored, status: 'sent', failureCode: null },
+                                reach: [],
+                                duplicate: false,
+                            },
+                        });
+                }),
+        );
+        const { result, rerender } = renderOutbox('c-old');
+        await waitFor(() => expect(result.current.rows).toHaveLength(1));
+        const row = result.current.rows[0];
+
+        let tap: Promise<void> = Promise.resolve();
+        act(() => {
+            tap = result.current.retry(row);
+        });
+        rerender({ conversationId: null });
+        await waitFor(() => expect(result.current.rows).toEqual([]));
+        await act(async () => {
+            release();
+            await tap;
+        });
+
+        expect(result.current.rows).toEqual([]);
+    });
+
     it('asks to leave a Conversation that is gone', async () => {
         actions.listConversationMessages.mockResolvedValue({
             ok: false,
@@ -298,6 +447,14 @@ describe('outbox helpers', () => {
         const merged = mergeMessage([later], earlier);
         expect(merged.map((row) => row.id)).toEqual(['m-1', 'm-2']);
         expect(mergeMessage(merged, { ...later, status: 'failed' })).toHaveLength(2);
+    });
+
+    it('orders messages that share a timestamp by id, as the server does', () => {
+        const at = '2026-09-14T09:00:00.000Z';
+        const high = message({ id: 'f0000000-0000-4000-8000-000000000000', createdAt: at });
+        const low = message({ id: '10000000-0000-4000-8000-000000000000', createdAt: at });
+        expect(mergeMessage([high], low).map((row) => row.id)).toEqual([low.id, high.id]);
+        expect(mergeMessage([low], high).map((row) => row.id)).toEqual([low.id, high.id]);
     });
 
     it('tells offline apart from a dropped connection', () => {

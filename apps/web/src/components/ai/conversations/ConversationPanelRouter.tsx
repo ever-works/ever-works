@@ -77,9 +77,9 @@ export function ConversationPanelRouter({ onClose }: ConversationPanelRouterProp
                     // Keyed by Agent only: the first message turning a fresh
                     // Conversation into a stored one must not remount the view
                     // (and drop the message still on its way).
+                    // The Conversation's id is read from `ChatProvider` inside.
                     key={participant.agentId}
                     kind="direct"
-                    conversationId={conversationId}
                 />
                 {naming && conversationId && (
                     <ConversationNameDialog

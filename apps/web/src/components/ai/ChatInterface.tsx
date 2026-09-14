@@ -19,7 +19,6 @@ export interface ChatInterfaceProps {
      * this is the AI assistant's thread, rendered exactly as before.
      */
     kind?: ConversationKind;
-    conversationId?: string | null;
     /** Opens the docked panel's participant switcher from the assistant's toolbar. */
     onSwitch?: () => void;
 }

@@ -446,7 +446,14 @@ export class ConversationRepository {
             .andWhere(
                 'm.createdAt = (SELECT MIN(earliest."createdAt") FROM conversation_messages earliest WHERE earliest."conversationId" = m."conversationId" AND earliest."authorType" = :authorType)',
             )
-            .orderBy('m.id', 'ASC')
+            // Messages stored in the same millisecond keep no record of which
+            // landed first, so a tie is settled by the Conversation's one
+            // message order — `createdAt`, then `id` — the order the thread
+            // pages in (`findMessagesPaged`) and the live stream walks
+            // (`findMessagesAfter`). The preview is therefore always the
+            // first message the thread itself shows.
+            .orderBy('m.createdAt', 'ASC')
+            .addOrderBy('m.id', 'ASC')
             .getRawMany<{ conversationId: string; preview: string | null }>();
         for (const row of rows) {
             const preview = (row.preview ?? '').replace(/\s+/g, ' ').trim();
@@ -460,6 +467,11 @@ export class ConversationRepository {
     /**
      * A page of messages, returned oldest-first. `before` is a message id: the
      * page holds the `limit` messages written just before it.
+     *
+     * Ordered by `createdAt`, then `id` — the same order as
+     * {@link findMessagesAfter} and {@link firstMessagePreviews} — so messages
+     * that share a timestamp read in one fixed order everywhere, and a page
+     * boundary that falls between them skips none.
      */
     async findMessagesPaged(
         conversationId: string,
@@ -481,11 +493,15 @@ export class ConversationRepository {
             // as a parameter is formatted differently from the stored value
             // on some drivers, which silently disables the bound.
             query.andWhere(
-                'm.createdAt < (SELECT anchor."createdAt" FROM conversation_messages anchor WHERE anchor.id = :before)',
+                '(m.createdAt < (SELECT anchor."createdAt" FROM conversation_messages anchor WHERE anchor.id = :before) OR (m.createdAt = (SELECT tied."createdAt" FROM conversation_messages tied WHERE tied.id = :before) AND m.id < :before))',
                 { before },
             );
         }
-        const rows = await query.orderBy('m.createdAt', 'DESC').take(limit).getMany();
+        const rows = await query
+            .orderBy('m.createdAt', 'DESC')
+            .addOrderBy('m.id', 'DESC')
+            .take(limit)
+            .getMany();
         return rows.reverse();
     }
 

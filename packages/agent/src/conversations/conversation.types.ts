@@ -42,6 +42,7 @@ export {
     isConversationContextType,
     isConversationKind,
     type ConversationAttachmentRef,
+    type ConversationAttachmentView,
     type ConversationAuthorType,
     type ConversationContextType,
     type ConversationFailureCode,
