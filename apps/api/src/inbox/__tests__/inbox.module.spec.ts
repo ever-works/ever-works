@@ -99,6 +99,36 @@ describe('InboxApiModule — INBOX_PRODUCER binding', () => {
         );
     });
 
+    it('delegates the My Decisions close hooks through the same lazy pass-through', async () => {
+        const provider = producerProvider();
+        const inbox = {
+            escalationResolved: jest.fn(async () => undefined),
+            proposalDecided: jest.fn(async () => undefined),
+        };
+        const get = jest.fn(() => inbox);
+        const producer = (provider.useFactory as (ref: unknown) => InboxProducer)({ get });
+        expect(get).not.toHaveBeenCalled();
+
+        await producer.escalationResolved?.({
+            escalationId: 'e1',
+            resolvedByUserId: 'u1',
+            note: 'done',
+        });
+        await producer.proposalDecided?.({
+            proposalId: 'p1',
+            decision: 'approved',
+            decidedByUserId: 'u1',
+        });
+
+        expect(get).toHaveBeenCalledWith(InboxService, { strict: false });
+        expect(inbox.escalationResolved).toHaveBeenCalledWith(
+            expect.objectContaining({ escalationId: 'e1' }),
+        );
+        expect(inbox.proposalDecided).toHaveBeenCalledWith(
+            expect.objectContaining({ proposalId: 'p1', decision: 'approved' }),
+        );
+    });
+
     it('the cyclic graph shape boots (this hangs with useExisting)', async () => {
         const TOKEN = 'PROBE_INBOX_PRODUCER';
 

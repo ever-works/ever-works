@@ -15,6 +15,7 @@ import {
     CommandPaletteProvider,
     useCommandPalette,
 } from '@/components/command-palette/CommandPaletteProvider';
+import { WhatsNewPanel } from '@/components/whats-new/WhatsNewPanel';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
 import {
@@ -60,6 +61,8 @@ interface DashboardLayoutClientProps {
     /** health `job_runtime.configured` — false = agent runs cannot execute
      *  on this install (loud-degradation banner); null = unknown. */
     jobRuntimeConfigured?: boolean | null;
+    /** What's new (AW-14) — unread product changelog entries; null = unknown (no badge). */
+    changelogUnreadCount?: number | null;
 }
 
 /**
@@ -96,6 +99,7 @@ export function DashboardLayoutClient({
     initialOnboardingCatalog,
     apiVersion,
     jobRuntimeConfigured = null,
+    changelogUnreadCount = null,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const DEFAULT_CHAT_WIDTH = 380;
@@ -103,6 +107,11 @@ export function DashboardLayoutClient({
     const [helpOpen, setHelpOpen] = useState(false);
     // Tab the Help drawer opens on when a palette command asks for one.
     const [helpTab, setHelpTab] = useState<HelpDrawerTab | undefined>(undefined);
+    // What's new (AW-14): the panel's open state mirrors `helpOpen`; the count
+    // is seeded once from the server layout and then only updated from the
+    // panel's own responses — no polling (spec FR-31).
+    const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+    const [whatsNewUnread, setWhatsNewUnread] = useState<number | null>(changelogUnreadCount);
     const [onboardingOpenManually, setOnboardingOpenManually] = useState(false);
     const [chatOpen, setChatOpenRaw] = useState(initialChatOpen);
     const [sidebarCollapsed, setSidebarCollapsedRaw] = useState(initialSidebarCollapsed);
@@ -297,6 +306,8 @@ export function DashboardLayoutClient({
         setHelpOpen(true);
     }, []);
     const closeHelp = useCallback(() => setHelpOpen(false), []);
+    const openWhatsNew = useCallback(() => setWhatsNewOpen(true), []);
+    const closeWhatsNew = useCallback(() => setWhatsNewOpen(false), []);
     const toggleChat = useCallback(() => setChatOpen(!chatOpen), [chatOpen, setChatOpen]);
     const openOnboarding = useCallback(() => setOnboardingOpenManually(true), []);
     const closeOnboarding = useCallback(() => {
@@ -563,6 +574,11 @@ export function DashboardLayoutClient({
                                           }
                                         : undefined
                                 }
+                                whatsNew={{
+                                    unreadCount: whatsNewUnread,
+                                    onOpen: openWhatsNew,
+                                    isOpen: whatsNewOpen,
+                                }}
                             />
 
                             <main
@@ -595,6 +611,12 @@ export function DashboardLayoutClient({
                             totalSteps: onboardingTotalSteps,
                             onOpen: openOnboarding,
                         }}
+                    />
+                    <WhatsNewPanel
+                        open={whatsNewOpen}
+                        onClose={closeWhatsNew}
+                        unreadCount={whatsNewUnread}
+                        onUnreadCountChange={setWhatsNewUnread}
                     />
 
                     <CommandPalette

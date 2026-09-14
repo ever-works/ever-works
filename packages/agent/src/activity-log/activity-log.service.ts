@@ -2,7 +2,9 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { WorkGenerationHistoryRepository } from '../database/repositories/work-generation-history.repository';
 import { ActivityLogRepository } from '../database/repositories/activity-log.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { AgentRepository } from '../database/repositories/agent.repository';
 import { formatGenerationCountsSummary, formatStoredActivitySummary } from './activity-log-summary';
+import { isUuid, storableActorLabel, withDerivedActor } from './feed-actor';
 import {
     ActivityActionType,
     ActivityStatus,
@@ -28,6 +30,13 @@ export class ActivityLogService {
         @Optional()
         @Inject(ACTIVITY_LOG_ANALYTICS_DISPATCHER)
         private readonly analyticsDispatcher?: ActivityLogAnalyticsDispatcher,
+        /**
+         * Live Feed — reads the acting agent's name so the record keeps the
+         * name it had when it happened. Optional so a context without it
+         * still writes every record, just without that captured name.
+         */
+        @Optional()
+        private readonly agentRepository?: AgentRepository,
     ) {}
 
     formatGenerationSummary(counts?: {
@@ -93,12 +102,46 @@ export class ActivityLogService {
     }
 
     async log(entry: CreateActivityLogDto, overrides?: { createdAt?: Date }): Promise<ActivityLog> {
-        const activity = await this.repository.create(entry, overrides);
+        // Live Feed: stamp the acting agent from the reference the writer
+        // already put in `details` when it passed no actor of its own, so
+        // the per-agent filter reads an indexed column, and capture that
+        // agent's name as it is now, so a later rename or deletion does not
+        // rewrite what already happened. A payload with nothing to derive is
+        // passed through as the same object.
+        const withActor = await this.withActorLabel(withDerivedActor(entry));
+        const activity = await this.repository.create(withActor, overrides);
         this.dispatchAnalytics(activity);
         this.logger.debug(
             `Activity logged: [${entry.actionType}] ${entry.summary} (user: ${entry.userId})`,
         );
         return activity;
+    }
+
+    /**
+     * Capture the acting agent's current name on a record about to be
+     * written. A label the caller passed wins (cut to the column's length);
+     * a failed lookup never fails the write — the record is kept, and the
+     * feed falls back to the agent's name at read time.
+     */
+    private async withActorLabel(entry: CreateActivityLogDto): Promise<CreateActivityLogDto> {
+        const passed = storableActorLabel(entry.actorLabel);
+        if (passed) {
+            return passed === entry.actorLabel ? entry : { ...entry, actorLabel: passed };
+        }
+        if (entry.actorKind !== 'agent' || !isUuid(entry.actorAgentId) || !this.agentRepository) {
+            return entry;
+        }
+        try {
+            const [agent] = await this.agentRepository.findManyByIdsForUser(entry.userId, [
+                entry.actorAgentId,
+            ]);
+            const label = storableActorLabel(agent?.name);
+            return label ? { ...entry, actorLabel: label } : entry;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Could not capture the acting agent's name: ${message}`);
+            return entry;
+        }
     }
 
     /**

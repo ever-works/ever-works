@@ -890,3 +890,128 @@ describe('installShutdownHandlers', () => {
 		expect(shutdown).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('createNodeRuntime — the attended live-view lane (Agent computers)', () => {
+	const config = (): NodeConfig => ({
+		apiUrl: 'https://api.ever.works',
+		nodeId: NODE_ID,
+		secret: SECRET,
+		kind: 'node',
+		capabilities: ['os:linux'],
+		heartbeatIntervalMs: 30_000,
+		enrolledAt: '2026-07-25T10:00:00.000Z'
+	});
+
+	function recording(pending: string[] = []) {
+		const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			const body = JSON.parse(init.body) as Record<string, unknown>;
+			calls.push({ url, body });
+			if (url.endsWith('/api/fleet/heartbeat')) {
+				const response: Record<string, unknown> = { ok: true, node: nodeFromApi };
+				if (pending.length > 0) response.pendingComputerSessions = pending;
+				return { ok: true, status: 200, text: async () => JSON.stringify(response) };
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+		};
+		return { calls, fetchFn };
+	}
+
+	it('has no attended lane and advertises no live-view tag without --attend', async () => {
+		const { calls, fetchFn } = recording();
+		const { io: deps } = io(fetchFn);
+		const runtime = createNodeRuntime(config(), deps, { workerEnabled: true });
+		expect(runtime.attended).toBeUndefined();
+		await runtime.loop.start();
+		runtime.loop.stop();
+		expect(calls[0].body.capabilities).not.toContain('attended');
+	});
+
+	it('leases only live views on the attended lane, keeps them out of the work lane, and advertises `attended`', async () => {
+		const { calls, fetchFn } = recording();
+		const { io: deps } = io(fetchFn);
+		const runtime = createNodeRuntime(config(), deps, {
+			workerEnabled: true,
+			attendEnabled: true,
+			terminalHost: null
+		});
+		expect(runtime.attended?.worker.registeredKinds).toEqual(['computer-session']);
+		expect(runtime.worker?.registeredKinds).not.toContain('computer-session');
+
+		await runtime.loop.start();
+		runtime.loop.stop();
+		await runtime.worker?.start();
+		await runtime.attended?.worker.start();
+		await runtime.worker?.stop();
+		await runtime.attended?.worker.stop();
+
+		const beat = calls.find((call) => call.url.endsWith('/api/fleet/heartbeat'));
+		expect(beat?.body.capabilities).toContain('attended');
+		const leases = calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).map((call) => call.body);
+		expect(leases).toContainEqual(expect.objectContaining({ kinds: ['computer-session'] }));
+		expect(leases).toContainEqual(expect.objectContaining({ excludeKinds: ['computer-session'] }));
+	});
+
+	it('serves live views on a machine started with --attend but without --work', () => {
+		const { fetchFn } = recording();
+		const { io: deps } = io(fetchFn);
+		const runtime = createNodeRuntime(config(), deps, { attendEnabled: true, terminalHost: null });
+		expect(runtime.worker).toBeUndefined();
+		expect(runtime.attended?.worker.registeredKinds).toEqual(['computer-session']);
+		// No browser resolved here: terminal-only views, no capture backend.
+		expect(runtime.attended?.captureBackend).toBeNull();
+	});
+
+	it('advertises `screen` exactly when the lane has a capture backend to serve it', async () => {
+		const withBrowser = { ...environment, browserPath: '/usr/bin/chromium' };
+
+		// A browser was resolved, but the lane was configured with no backend.
+		const noBackend = recording();
+		const bare = createNodeRuntime(
+			config(),
+			{ ...io(noBackend.fetchFn).io, environment: withBrowser },
+			{ attendEnabled: true, terminalHost: null, captureBackends: [], webSocketFactory: null }
+		);
+		await bare.loop.start();
+		bare.loop.stop();
+		expect(bare.attended?.captureBackend).toBeNull();
+		const bareBeat = noBackend.calls.find((call) => call.url.endsWith('/api/fleet/heartbeat'));
+		expect(bareBeat?.body.capabilities).toContain('attended');
+		expect(bareBeat?.body.capabilities).not.toContain('screen');
+
+		// No browser at all, but a custom backend that can take a picture here.
+		const custom = {
+			id: 'custom',
+			isAvailable: () => true,
+			start: vi.fn(async () => {
+				throw new Error('not started in this test');
+			})
+		};
+		const customBackend = recording();
+		const served = createNodeRuntime(config(), io(customBackend.fetchFn).io, {
+			attendEnabled: true,
+			terminalHost: null,
+			captureBackends: [custom],
+			webSocketFactory: null
+		});
+		await served.loop.start();
+		served.loop.stop();
+		expect(served.attended?.captureBackend).toBe(custom);
+		const servedBeat = customBackend.calls.find((call) => call.url.endsWith('/api/fleet/heartbeat'));
+		expect(servedBeat?.body.capabilities).toEqual(expect.arrayContaining(['attended', 'screen']));
+	});
+
+	it('wakes the attended lane when a heartbeat says a live view is waiting', async () => {
+		const { calls, fetchFn } = recording(['55555555-5555-4555-8555-555555555555']);
+		const { io: deps } = io(fetchFn);
+		const runtime = createNodeRuntime(config(), deps, { attendEnabled: true, terminalHost: null });
+		await runtime.attended?.worker.start();
+		const before = calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).length;
+		await runtime.loop.start();
+		runtime.loop.stop();
+		await vi.waitFor(() =>
+			expect(calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).length).toBeGreaterThan(before)
+		);
+		await runtime.attended?.worker.stop();
+	});
+});

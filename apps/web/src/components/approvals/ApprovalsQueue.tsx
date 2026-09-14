@@ -46,8 +46,18 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
     // per-pull-request act. It is excluded from the ids we SEND, so it
     // also stays in the list below rather than being cleared as though it
     // had been handled.
+    //
+    // Agent email (AW-05): a held email draft is excluded the same way —
+    // approving one SENDS it, and the server refuses it in bulk too.
     const bulkIds = useMemo(
-        () => proposals.filter((p) => p.actionType !== 'merge_pull_request').map((p) => p.id),
+        () =>
+            proposals
+                .filter(
+                    (p) =>
+                        p.actionType !== 'merge_pull_request' &&
+                        !(p.actionType === 'send_message' && p.payload?.kind === 'email-draft'),
+                )
+                .map((p) => p.id),
         [proposals],
     );
     const excludedFromBulk = proposals.length - bulkIds.length;
