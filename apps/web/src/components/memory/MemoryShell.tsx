@@ -22,6 +22,8 @@ import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
 import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
 import { MemoryMeetingsPanel, type MemoryMeetingsData } from './MemoryMeetingsPanel';
+import { FactsPanel } from './FactsPanel';
+import type { MemoryFactListDto } from '@/lib/api/memory-facts-types';
 import {
     buildMemoryQuery,
     type MemoryConsolidationReport,
@@ -38,6 +40,12 @@ interface MemoryShellProps {
      * without it — the block is simply absent.
      */
     meetings?: MemoryMeetingsData;
+    /**
+     * First page of memory facts (AW-07), server-fetched by the page. Optional
+     * for the same reason as `meetings`: the shell still renders standalone
+     * (and in specs) without it — the Facts block is simply absent.
+     */
+    facts?: MemoryFactListDto;
 }
 
 /** Facet kinds that map to a filter chip group. */
@@ -70,7 +78,7 @@ function formatDate(iso: string): string {
  * (they depend on cross-feature prerequisites — see the Memory spec
  * §2.4 / §4.3).
  */
-export function MemoryShell({ initial, meetings }: MemoryShellProps) {
+export function MemoryShell({ initial, meetings, facts }: MemoryShellProps) {
     const t = useTranslations('dashboard.memoryPage');
 
     const [data, setData] = useState<MemoryResponse>(initial);
@@ -275,6 +283,11 @@ export function MemoryShell({ initial, meetings }: MemoryShellProps) {
                     {t('consolidation.action')}
                 </button>
             </div>
+
+            {/* Facts (AW-07) — the atomic tier of Memory, with the section rail
+                that jumps to every panel below. Additive: nothing below moved.
+                "Tidy up" reuses the existing consolidation pass. */}
+            {facts && <FactsPanel initial={facts} onTidyUp={() => void runConsolidation(false)} />}
 
             {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
             <MemoryReviewPanel />
