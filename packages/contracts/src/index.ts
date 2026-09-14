@@ -32,3 +32,6 @@ export * from './release/index.js';
 // Conversations — kinds, participants, send status and delivery outcomes for
 // named conversations with Agents.
 export * from './conversations/index.js';
+// Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
+// Agent run and the itemised receipt of one run, over the existing run rows.
+export * from './runs/index.js';

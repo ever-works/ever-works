@@ -4,6 +4,10 @@ import { In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
+import { Agent, AgentStatus } from '../../entities/agent.entity';
+import { Mission } from '../../entities/mission.entity';
+import { Task } from '../../entities/task.entity';
+import { Work } from '../../entities/work.entity';
 import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 import type { SubAgentScope } from '@ever-works/contracts';
@@ -1596,6 +1600,311 @@ export class AgentRunRepository {
             .take(take)
             .getMany();
     }
+
+    // ── Runs ledger (AW-09) ─────────────────────────────────────────
+    // Window-shaped reads over the SAME rows the Sessions list reads. A
+    // run's ledger instant is when it started, or when it was created if
+    // it never started, so a queued run sits where it will appear once
+    // picked up. Every method applies `userId` plus the active ownership
+    // scope inside the repository, exactly like `listSessionsForUser`.
+
+    /**
+     * Base query for one user's runs inside `[from, to)` narrowed by the
+     * ledger filters. Private so no caller can obtain an unscoped builder.
+     */
+    private ledgerQuery(
+        userId: string,
+        window: { from: Date; to: Date },
+        filters: RunLedgerQueryFilters,
+        ownershipScope?: OwnershipScope,
+    ) {
+        const qb = this.repository
+            .createQueryBuilder('run')
+            .where('run.userId = :userId', { userId })
+            .andWhere(`${LEDGER_INSTANT} >= :ledgerFrom`, { ledgerFrom: window.from })
+            .andWhere(`${LEDGER_INSTANT} < :ledgerTo`, { ledgerTo: window.to });
+        const ownership = ownershipSqlPredicate('run', ownershipScope, 'ledger');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        if (filters.agentIds && filters.agentIds.length > 0) {
+            qb.andWhere('run.agentId IN (:...ledgerAgentIds)', {
+                ledgerAgentIds: filters.agentIds,
+            });
+        }
+        if (filters.triggerKinds && filters.triggerKinds.length > 0) {
+            qb.andWhere('run.triggerKind IN (:...ledgerTriggerKinds)', {
+                ledgerTriggerKinds: filters.triggerKinds,
+            });
+        }
+        if (filters.statuses && filters.statuses.length > 0) {
+            qb.andWhere('run.status IN (:...ledgerStatuses)', { ledgerStatuses: filters.statuses });
+        }
+        if (filters.workId) {
+            qb.andWhere('run.workId = :ledgerWorkId', { ledgerWorkId: filters.workId });
+        }
+        if (filters.missionId) {
+            // Runs carry no mission column — a run belongs to a Mission
+            // through its Task. A sub-select keeps this one portable query.
+            const missionTasks = qb
+                .subQuery()
+                .select('ledgerTask.id')
+                .from(Task, 'ledgerTask')
+                .where('ledgerTask.missionId = :ledgerMissionId')
+                .getQuery();
+            qb.andWhere(`run.taskId IN ${missionTasks}`, { ledgerMissionId: filters.missionId });
+        }
+        const search = filters.search?.trim();
+        if (search) {
+            const pattern = `%${escapeLikePattern(search.toLowerCase())}%`;
+            qb.andWhere(
+                `(LOWER(run.summary) LIKE :ledgerSearch ESCAPE '\\' OR LOWER(run.errorMessage) LIKE :ledgerSearch ESCAPE '\\')`,
+                { ledgerSearch: pattern },
+            );
+        }
+        return qb;
+    }
+
+    /**
+     * One cursor page of the ledger, newest first. Returns up to `limit`
+     * rows; the caller asks for one extra to learn whether a next page
+     * exists. The cursor is `(instant, id)`, so rows inserted above the
+     * cursor while someone pages never shift the pages below it.
+     */
+    async listLedgerPage(
+        userId: string,
+        window: { from: Date; to: Date },
+        filters: RunLedgerQueryFilters,
+        limit: number,
+        cursor?: { at: Date; id: string },
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentRun[]> {
+        const qb = this.ledgerQuery(userId, window, filters, ownershipScope);
+        if (cursor) {
+            qb.andWhere(
+                `(${LEDGER_INSTANT} < :ledgerCursorAt OR (${LEDGER_INSTANT} = :ledgerCursorAt AND run.id < :ledgerCursorId))`,
+                { ledgerCursorAt: cursor.at, ledgerCursorId: cursor.id },
+            );
+        }
+        const take = Math.min(Math.max(Math.trunc(limit), 1), 201);
+        return qb
+            .orderBy(LEDGER_INSTANT, 'DESC')
+            .addOrderBy('run.id', 'DESC')
+            .limit(take)
+            .getMany();
+    }
+
+    /**
+     * Has this user ever had a run in the active scope? One indexed probe
+     * (`idx_agent_runs_user_created`), used only to tell "nothing ran in
+     * this window" apart from "no runs yet".
+     */
+    async hasAnyRunForUser(userId: string, ownershipScope?: OwnershipScope): Promise<boolean> {
+        const qb = this.repository
+            .createQueryBuilder('run')
+            .select('run.id', 'id')
+            .where('run.userId = :userId', { userId });
+        const ownership = ownershipSqlPredicate('run', ownershipScope, 'ledgerAny');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        const row = await qb.limit(1).getRawOne<{ id: string }>();
+        return Boolean(row);
+    }
+
+    /** How many runs the window + filters match, across every page. */
+    async countLedger(
+        userId: string,
+        window: { from: Date; to: Date },
+        filters: RunLedgerQueryFilters,
+        ownershipScope?: OwnershipScope,
+    ): Promise<number> {
+        return this.ledgerQuery(userId, window, filters, ownershipScope).getCount();
+    }
+
+    /**
+     * The window's runs grouped by `(status, triggerKind)` with duration,
+     * settled cost and token sums — ONE grouped scan behind the rail. The
+     * "how many runs carry a value" counts are what let the caller tell a
+     * genuine zero from "nothing was measured".
+     */
+    async aggregateLedger(
+        userId: string,
+        window: { from: Date; to: Date },
+        filters: RunLedgerQueryFilters,
+        ownershipScope?: OwnershipScope,
+    ): Promise<RunLedgerAggregateRow[]> {
+        const rows = await this.ledgerQuery(userId, window, filters, ownershipScope)
+            .select('run.status', 'status')
+            .addSelect('run.triggerKind', 'triggerKind')
+            .addSelect('COUNT(run.id)', 'runs')
+            .addSelect('SUM(COALESCE(run.durationMs, 0))', 'durationMs')
+            .addSelect('SUM(COALESCE(run.costCents, 0))', 'costCents')
+            .addSelect('SUM(CASE WHEN run.costCents IS NULL THEN 0 ELSE 1 END)', 'costedRuns')
+            .addSelect('SUM(COALESCE(run.totalTokens, 0))', 'tokens')
+            .addSelect('SUM(CASE WHEN run.totalTokens IS NULL THEN 0 ELSE 1 END)', 'tokenRuns')
+            .groupBy('run.status')
+            .addGroupBy('run.triggerKind')
+            .getRawMany<Record<string, string | number | null>>();
+        return rows.map((row) => ({
+            status: String(row.status),
+            triggerKind: String(row.triggerKind),
+            runs: Number(row.runs ?? 0) || 0,
+            durationMs: Number(row.durationMs ?? 0) || 0,
+            costCents: Number(row.costCents ?? 0) || 0,
+            costedRuns: Number(row.costedRuns ?? 0) || 0,
+            tokens: Number(row.tokens ?? 0) || 0,
+            tokenRuns: Number(row.tokenRuns ?? 0) || 0,
+        }));
+    }
+
+    /**
+     * Failed scheduled (heartbeat) runs grouped by Agent — the input to the
+     * "same schedule failed repeatedly" signal. Groups below `minFailures`
+     * are dropped in SQL.
+     */
+    async countScheduledFailuresByAgent(
+        userId: string,
+        window: { from: Date; to: Date },
+        filters: RunLedgerQueryFilters,
+        minFailures: number,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Array<{ agentId: string; failures: number }>> {
+        const rows = await this.ledgerQuery(userId, window, filters, ownershipScope)
+            .andWhere('run.status = :ledgerFailed', { ledgerFailed: 'failed' })
+            .andWhere('run.triggerKind = :ledgerHeartbeat', { ledgerHeartbeat: 'heartbeat' })
+            .select('run.agentId', 'agentId')
+            .addSelect('COUNT(run.id)', 'failures')
+            .groupBy('run.agentId')
+            .having('COUNT(run.id) >= :ledgerMinFailures', { ledgerMinFailures: minFailures })
+            .getRawMany<{ agentId: string; failures: string | number }>();
+        return rows.map((row) => ({ agentId: row.agentId, failures: Number(row.failures) || 0 }));
+    }
+
+    /**
+     * The instant + status of every run in the window, capped at `cap`
+     * rows. Day bucketing happens in the caller because "which calendar
+     * day in the viewer's timezone" has no portable SQL form across the
+     * Postgres + SQLite driver pair; two narrow columns keep the scan cheap.
+     */
+    async listLedgerInstants(
+        userId: string,
+        window: { from: Date; to: Date },
+        filters: RunLedgerQueryFilters,
+        cap: number,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Array<{ at: Date; status: AgentRunStatus }>> {
+        const rows = await this.ledgerQuery(userId, window, filters, ownershipScope)
+            .select(['run.id', 'run.status', 'run.startedAt', 'run.createdAt'])
+            .orderBy('run.createdAt', 'ASC')
+            .limit(Math.max(1, Math.trunc(cap)))
+            .getMany();
+        return rows.map((row) => ({ at: row.startedAt ?? row.createdAt, status: row.status }));
+    }
+
+    /**
+     * Display labels for a page of ledger rows: Agent name + archived flag,
+     * Task title + its Mission, Mission title and Work name — ONE `IN`
+     * query per entity kind, never one per row. Unknown ids are simply
+     * absent from the maps; the caller labels them honestly.
+     */
+    async resolveLedgerLabels(ids: {
+        agentIds: string[];
+        taskIds: string[];
+        workIds: string[];
+    }): Promise<RunLedgerLabels> {
+        const manager = this.repository.manager;
+        const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
+        const agentIds = unique(ids.agentIds);
+        const taskIds = unique(ids.taskIds);
+        const workIds = unique(ids.workIds);
+
+        const [agents, tasks, works] = await Promise.all([
+            agentIds.length > 0
+                ? manager.find(Agent, {
+                      where: { id: In(agentIds) },
+                      select: ['id', 'name', 'status'],
+                  })
+                : Promise.resolve([] as Agent[]),
+            taskIds.length > 0
+                ? manager.find(Task, {
+                      where: { id: In(taskIds) },
+                      select: ['id', 'title', 'missionId'],
+                  })
+                : Promise.resolve([] as Task[]),
+            workIds.length > 0
+                ? manager.find(Work, { where: { id: In(workIds) }, select: ['id', 'name'] })
+                : Promise.resolve([] as Work[]),
+        ]);
+
+        const missionIds = unique(tasks.map((task) => task.missionId ?? ''));
+        const missions =
+            missionIds.length > 0
+                ? await manager.find(Mission, {
+                      where: { id: In(missionIds) },
+                      select: ['id', 'title'],
+                  })
+                : [];
+
+        return {
+            agents: new Map(
+                agents.map((agent) => [
+                    agent.id,
+                    { name: agent.name, archived: agent.status === AgentStatus.ARCHIVED },
+                ]),
+            ),
+            tasks: new Map(
+                tasks.map((task) => [
+                    task.id,
+                    { title: task.title, missionId: task.missionId ?? null },
+                ]),
+            ),
+            missions: new Map(missions.map((mission) => [mission.id, mission.title])),
+            works: new Map(works.map((work) => [work.id, work.name])),
+        };
+    }
+}
+
+/**
+ * The instant a run is placed at on the ledger: when it started, or when
+ * it was created if it has not started. Property paths are rewritten to
+ * quoted column names by the query builder on every driver.
+ */
+const LEDGER_INSTANT = 'COALESCE(run.startedAt, run.createdAt)';
+
+/** Escape `%`, `_` and the escape character itself for a LIKE pattern. */
+function escapeLikePattern(value: string): string {
+    return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
+/** Runs ledger (AW-09) — the filters every ledger read accepts. */
+export interface RunLedgerQueryFilters {
+    agentIds?: string[];
+    triggerKinds?: string[];
+    statuses?: string[];
+    workId?: string;
+    missionId?: string;
+    search?: string;
+}
+
+/** Runs ledger (AW-09) — one `(status, triggerKind)` aggregate group. */
+export interface RunLedgerAggregateRow {
+    status: string;
+    triggerKind: string;
+    runs: number;
+    durationMs: number;
+    costCents: number;
+    costedRuns: number;
+    tokens: number;
+    tokenRuns: number;
+}
+
+/** Runs ledger (AW-09) — batched display labels for a page of rows. */
+export interface RunLedgerLabels {
+    agents: Map<string, { name: string; archived: boolean }>;
+    tasks: Map<string, { title: string; missionId: string | null }>;
+    missions: Map<string, string>;
+    works: Map<string, string>;
 }
 
 /** Costs dashboard — one Agent's run count inside an aggregation window. */
