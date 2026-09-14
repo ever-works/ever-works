@@ -65,6 +65,10 @@ function recordIntersections() {
     // @ts-expect-error — test double
     window.IntersectionObserver = RecordingObserver;
     return {
+        /** True once some observer is watching `target`. */
+        isWatching(target: Element) {
+            return observers.some((candidate) => candidate.targets.includes(target));
+        },
         showFully(target: Element) {
             const observer = observers.find((candidate) => candidate.targets.includes(target));
             if (!observer) throw new Error('card is not watched');
@@ -389,6 +393,8 @@ describe('WhatsNewPanel', () => {
             await within(dialog).findByTestId('whats-new-list');
 
             const [first] = within(dialog).getAllByTestId('whats-new-entry');
+            // Registration happens in a passive effect after the list commits.
+            await waitFor(() => expect(observers.isWatching(first)).toBe(true));
             act(() => observers.showFully(first));
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(READ_DWELL_MS + READ_BATCH_WINDOW_MS);
@@ -444,9 +450,19 @@ describe('WhatsNewPanel', () => {
             await within(dialog).findByTestId('whats-new-list');
 
             const [unread, older] = within(dialog).getAllByTestId('whats-new-entry');
-            const observer = observers.find((candidate) => candidate.targets.includes(unread));
-            expect(observer, 'the unread card is watched').toBeDefined();
+            // A card registers with the read tracker in a passive effect, which
+            // React may flush in a later scheduler task than the commit that put
+            // the list in the DOM. Wait for the registration itself.
+            const observer = await waitFor(() => {
+                const watching = observers.find((candidate) => candidate.targets.includes(unread));
+                expect(watching, 'the unread card is watched').toBeDefined();
+                return watching;
+            });
             expect(observer?.targets).not.toContain(older);
+            expect(
+                observers.some((candidate) => candidate.targets.includes(older)),
+                'the read card is not watched',
+            ).toBe(false);
 
             act(() => {
                 observer?.callback(
