@@ -311,3 +311,326 @@ describe('SchedulesService', () => {
         expect(views[0].cadenceHuman.toLowerCase()).toContain('week');
     });
 });
+
+// ── Schedules workspace — paging, attribution, health, controls ──────────
+
+function emptyService(
+    over: {
+        tasks?: unknown[];
+        agents?: unknown[];
+        agentRepo?: { find: jest.Mock };
+        missions?: unknown[];
+        triggers?: unknown[];
+        assignees?: unknown[];
+    } = {},
+) {
+    return new SchedulesService(
+        makeRepo(over.tasks ?? []) as never,
+        (over.agentRepo ?? makeRepo(over.agents ?? [])) as never,
+        makeWorkScheduleRepo([]) as never,
+        makeRepo(over.missions ?? []) as never,
+        { find: jest.fn().mockResolvedValue([]) } as never,
+        makeRepo(over.triggers ?? []) as never,
+        over.assignees ? (makeRepo(over.assignees) as never) : undefined,
+    );
+}
+
+function recurringTask(id: string, over: Record<string, unknown> = {}) {
+    return {
+        id,
+        title: id,
+        recurrenceCron: '0 7 * * *',
+        recurrenceRule: null,
+        nextOccurrenceAt: new Date('2026-09-15T07:00:00.000Z'),
+        recurrenceEndsAt: null,
+        recurrenceMaxOccurrences: null,
+        recurrenceOccurredCount: 0,
+        agentId: null,
+        ...over,
+    };
+}
+
+function manyTriggers(count: number) {
+    return Array.from({ length: count }, (_, index) => {
+        const n = String(index).padStart(3, '0');
+        return {
+            id: 'trigger-' + n,
+            name: 'Hook ' + n,
+            status: index % 3 === 0 ? 'paused' : 'active',
+            targetAgentId: null,
+            lastFiredAt: null,
+        };
+    });
+}
+
+describe('SchedulesService — workspace additions', () => {
+    const now = new Date('2026-09-14T08:00:00.000Z');
+    beforeEach(() => jest.useFakeTimers().setSystemTime(now));
+    afterEach(() => jest.useRealTimers());
+
+    it('getSchedules still returns a bare array whose original keys are all present', async () => {
+        const service = emptyService({ triggers: manyTriggers(1) });
+        const views = await service.getSchedules(SCOPE);
+        expect(Array.isArray(views)).toBe(true);
+        for (const key of [
+            'id',
+            'sourceType',
+            'ownerType',
+            'ownerId',
+            'ownerName',
+            'ownerLink',
+            'cadenceRaw',
+            'cadenceHuman',
+            'nextRunAt',
+            'lastRunAt',
+            'lastRunStatus',
+            'status',
+            'enabled',
+        ]) {
+            expect(views[0]).toHaveProperty(key);
+        }
+        // …plus the additive fields.
+        expect(views[0].health).toMatchObject({ ok: true });
+        expect(views[0].controls).toMatchObject({ runNow: false, resume: true });
+    });
+
+    it('a paused recurring Task keeps its cadence, reads paused, and is not flagged', async () => {
+        const service = emptyService({
+            tasks: [
+                recurringTask('task-p', {
+                    title: 'Morning inbox scan',
+                    recurrenceOccurredCount: 4,
+                    recurrencePausedAt: new Date('2026-09-13T12:00:00.000Z'),
+                }),
+            ],
+        });
+        const [view] = await service.getSchedules(SCOPE);
+        expect(view).toMatchObject({
+            status: 'paused',
+            enabled: false,
+            cadenceRaw: '0 7 * * *',
+            cadenceHuman: 'Every day at 07:00',
+            nextRunAt: null,
+            nextRunReasonKey: 'paused',
+            pausedAt: '2026-09-13T12:00:00.000Z',
+        });
+        // Paused is a choice, not a defect — even with no Agent.
+        expect(view.health?.ok).toBe(true);
+        expect(view.controls).toMatchObject({ pause: false, resume: true });
+        // …and Home's enabledOnly read drops it like any other inactive row.
+        expect(await service.getSchedules(SCOPE, { enabledOnly: true })).toHaveLength(0);
+    });
+
+    it('attributes a recurring Task to its agent assignee, then to its own agentId', async () => {
+        const agentRepo = {
+            find: jest.fn().mockResolvedValue([
+                { id: 'agent-a', name: 'Inbox agent', status: 'active' },
+                { id: 'agent-b', name: 'Analyst agent', status: 'active' },
+            ]),
+        };
+        const service = emptyService({
+            tasks: [
+                recurringTask('assigned', { agentId: 'agent-b' }),
+                recurringTask('own', { agentId: 'agent-b' }),
+                recurringTask('none'),
+            ],
+            agentRepo,
+            assignees: [{ taskId: 'assigned', assigneeType: 'agent', assigneeId: 'agent-a' }],
+        });
+        const views = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        const byId = Object.fromEntries(views.map((v) => [v.ownerId, v]));
+        expect(byId.assigned).toMatchObject({ agentId: 'agent-a', agentName: 'Inbox agent' });
+        expect(byId.own).toMatchObject({ agentId: 'agent-b', agentName: 'Analyst agent' });
+        expect(byId.none).toMatchObject({ agentId: null });
+        expect(byId.none.health).toMatchObject({ ok: false, reason: 'no-agent' });
+        expect(byId.none.controls?.disabledReasons.runNow).toBe('noAgent');
+        // The Agent lookup is always scoped to the caller.
+        const lookup = agentRepo.find.mock.calls.find((call) => call[0]?.where?.id);
+        expect(lookup?.[0].where.userId).toBe('user-1');
+    });
+
+    it('flags a recurring Task whose only Agent is archived as owner-archived', async () => {
+        const service = emptyService({
+            tasks: [recurringTask('task-a', { agentId: 'agent-z' })],
+            agents: [{ id: 'agent-z', name: 'Old agent', status: 'archived' }],
+        });
+        const [view] = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        expect(view.health).toMatchObject({ ok: false, reason: 'owner-archived' });
+    });
+
+    it('does not flag the Agent as gone when the Agent lookup itself fails', async () => {
+        const agentRepo = {
+            find: jest
+                .fn()
+                .mockImplementation((opts: { where?: { id?: unknown } }) =>
+                    opts?.where?.id ? Promise.reject(new Error('db down')) : Promise.resolve([]),
+                ),
+        };
+        const service = emptyService({
+            tasks: [recurringTask('task-u', { agentId: 'agent-q' })],
+            agentRepo,
+        });
+        const [view] = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        expect(view.health?.ok).toBe(true);
+    });
+
+    it('a paused heartbeat reads paused while its Agent stays active', async () => {
+        const service = emptyService({
+            agents: [
+                {
+                    id: 'agent-h',
+                    name: 'Analyst',
+                    heartbeatCadence: '*/15 * * * *',
+                    nextHeartbeatAt: new Date('2026-09-14T08:15:00.000Z'),
+                    heartbeatPausedAt: new Date('2026-09-14T07:00:00.000Z'),
+                    lastRunAt: null,
+                    lastRunStatus: null,
+                    status: AgentStatus.ACTIVE,
+                },
+            ],
+        });
+        const [view] = await service.getSchedules(SCOPE);
+        expect(view).toMatchObject({
+            sourceType: 'agent_heartbeat',
+            status: 'paused',
+            enabled: false,
+            nextRunAt: null,
+            cadenceRaw: '*/15 * * * *',
+            agentId: 'agent-h',
+            pausedAt: '2026-09-14T07:00:00.000Z',
+        });
+        expect(view.controls).toMatchObject({ runNow: true, pause: false, resume: true });
+    });
+
+    it('a completed Mission tick is Ended, never NEVER RUNS', async () => {
+        const service = emptyService({
+            missions: [
+                {
+                    id: 'mission-done',
+                    title: 'Launch',
+                    schedule: '0 9 * * *',
+                    type: MissionType.SCHEDULED,
+                    status: MissionStatus.COMPLETED,
+                },
+            ],
+        });
+        const [view] = await service.getSchedules(SCOPE);
+        expect(view.status).toBe('ended');
+        expect(view.health?.ok).toBe(true);
+    });
+
+    it('pages every row exactly once, 50 at a time, in a stable order', async () => {
+        const service = emptyService({ triggers: manyTriggers(120) });
+        const seen: string[] = [];
+        let cursor: string | null = null;
+        let pages = 0;
+        do {
+            const page = await service.getPage(SCOPE, {}, cursor);
+            expect(page.items.length).toBeLessThanOrEqual(50);
+            expect(page.total).toBe(120);
+            seen.push(...page.items.map((item) => item.id));
+            cursor = page.nextCursor;
+            pages += 1;
+        } while (cursor && pages < 10);
+        expect(pages).toBe(3);
+        expect(seen).toHaveLength(120);
+        expect(new Set(seen).size).toBe(120);
+    });
+
+    it('caps a requested page size at 50 and treats a garbage cursor as the first page', async () => {
+        const service = emptyService({ triggers: manyTriggers(60) });
+        const page = await service.getPage(SCOPE, {}, 'not-a-cursor', 500);
+        expect(page.items).toHaveLength(50);
+        expect(page.items[0].ownerName).toBe('Hook 000');
+    });
+
+    it('applies status, health, agent and text filters and reports counts', async () => {
+        const service = emptyService({ triggers: manyTriggers(9) });
+        const paused = await service.getPage(SCOPE, { status: 'paused' });
+        expect(paused.total).toBe(3);
+        expect(paused.unfilteredTotal).toBe(9);
+        expect(paused.countsByStatus.paused).toBe(3);
+        expect(paused.countsBySourceType.inbound_trigger).toBe(3);
+
+        const text = await service.getPage(SCOPE, { q: 'hook 004' });
+        expect(text.items.map((item) => item.id)).toEqual(['inbound_trigger:trigger-004']);
+
+        const neverRuns = await service.getPage(SCOPE, { health: 'never-runs' });
+        expect(neverRuns.total).toBe(0);
+        expect(neverRuns.healthCounts).toEqual({ ok: 0, neverRuns: 0 });
+
+        const byAgent = await service.getPage(SCOPE, { agentId: 'agent-x' });
+        expect(byAgent.total).toBe(0);
+    });
+
+    it('names a source whose query failed instead of blanking the page', async () => {
+        const service = new SchedulesService(
+            makeRepo([]) as never,
+            makeRepo([]) as never,
+            makeWorkScheduleRepo([]) as never,
+            { find: jest.fn().mockRejectedValue(new Error('mission table down')) } as never,
+            { find: jest.fn().mockResolvedValue([]) } as never,
+            makeRepo(manyTriggers(2)) as never,
+        );
+        const page = await service.getPage(SCOPE);
+        expect(page.degradedSources).toEqual(['mission_tick']);
+        expect(page.items).toHaveLength(2);
+        expect(page.generatedAt).toBe(now.toISOString());
+    });
+
+    it('health summary is a dry run listing every flagged row with its proposed repair', async () => {
+        const taskRepo = makeRepo([
+            recurringTask('feb30', {
+                title: 'Month-end rollup',
+                recurrenceCron: '0 18 30 2 *',
+                nextOccurrenceAt: null,
+                agentId: 'agent-a',
+            }),
+        ]);
+        const service = new SchedulesService(
+            taskRepo as never,
+            {
+                // Only the id lookup finds the Agent; the heartbeat query finds none.
+                find: jest
+                    .fn()
+                    .mockImplementation((opts: { where?: { id?: unknown } }) =>
+                        Promise.resolve(
+                            opts?.where?.id
+                                ? [{ id: 'agent-a', name: 'Finance', status: 'active' }]
+                                : [],
+                        ),
+                    ),
+            } as never,
+            makeWorkScheduleRepo([]) as never,
+            makeRepo([]) as never,
+            { find: jest.fn().mockResolvedValue([]) } as never,
+            makeRepo([]) as never,
+        );
+        const summary = await service.getHealthSummary(SCOPE);
+        expect(summary.counts).toMatchObject({ neverRuns: 1, byReason: { 'impossible-date': 1 } });
+        expect(summary.flagged).toEqual([
+            expect.objectContaining({
+                id: 'recurring_task:feb30',
+                reason: 'impossible-date',
+                reasonKey: 'impossibleDate',
+                repair: 'automatic',
+                before: '0 18 30 2 *',
+                after: '0 18 28 2 *',
+            }),
+        ]);
+        // Read-only: the only repository method the summary can reach is find.
+        expect(Object.keys(taskRepo)).toEqual(['find']);
+
+        const clean = await emptyService().getHealthSummary(SCOPE);
+        expect(clean.counts.neverRuns).toBe(0);
+        expect(clean.flagged).toEqual([]);
+    });
+
+    it('findOne resolves only the caller rows and returns null for anything else', async () => {
+        const service = emptyService({ triggers: manyTriggers(1) });
+        expect((await service.findOne(SCOPE, 'inbound_trigger:trigger-000'))?.ownerName).toBe(
+            'Hook 000',
+        );
+        expect(await service.findOne(SCOPE, 'inbound_trigger:someone-else')).toBeNull();
+    });
+});
