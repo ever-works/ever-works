@@ -117,6 +117,7 @@ export {
     NotificationChannelFacadeService,
     NotificationChannelFacadeError,
     NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
+    type NotificationFanoutContent,
     type NotificationChannelFanoutInput,
     type NotificationChannelFanoutResult,
     type NotificationChannelDeliveryPayload,

@@ -10,8 +10,9 @@ import {
 /**
  * Channel ids that are not rows in `notification_channels` — always
  * available to every user and therefore exempt from the ownership check.
+ * `email` (AW-13) delivers to the account's own address.
  */
-const BUILT_IN_CHANNEL_IDS = new Set<string>(['in-app']);
+const BUILT_IN_CHANNEL_IDS = new Set<string>(['in-app', 'email']);
 
 /**
  * Security (DoS / storage amplification): cap the number of channel ids a

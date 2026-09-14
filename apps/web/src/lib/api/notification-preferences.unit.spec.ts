@@ -29,6 +29,28 @@ beforeEach(() => {
 afterEach(() => vi.resetModules());
 
 describe('notificationPreferencesAPI — endpoint URL shape (no /api double-prefix)', () => {
+    it('getMatrix GETs /notifications/matrix', async () => {
+        const { notificationPreferencesAPI } = await importApi();
+        await notificationPreferencesAPI.getMatrix();
+        expect(serverFetchMock).toHaveBeenCalledWith('/notifications/matrix');
+    });
+
+    it('resetMatrix POSTs /notifications/matrix/reset with the named keys, or none', async () => {
+        const { notificationPreferencesAPI } = await importApi();
+        await notificationPreferencesAPI.resetMatrix(['generation_error']);
+        expect(serverMutationMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                method: 'POST',
+                endpoint: '/notifications/matrix/reset',
+                data: { eventKeys: ['generation_error'] },
+            }),
+        );
+        await notificationPreferencesAPI.resetMatrix();
+        expect(serverMutationMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({ endpoint: '/notifications/matrix/reset', data: {} }),
+        );
+    });
+
     it('listEventTypes GETs /notifications/event-types', async () => {
         const { notificationPreferencesAPI } = await importApi();
         await notificationPreferencesAPI.listEventTypes();

@@ -510,6 +510,58 @@ export class MailService {
     }
 
     /**
+     * Attention controls (AW-13) — one notification email to the account's
+     * own address, for the built-in `email` delivery target of the
+     * notification matrix.
+     *
+     * Unlike the other senders here this one THROWS on failure: it runs under
+     * the notification delivery retry policy, which can only retry an attempt
+     * that fails loudly. Returns false (sending nothing) when the recipient
+     * has no address.
+     *
+     * The message and title come from notification producers, which already
+     * sanitise and secret-redact them before storage; Handlebars double-brace
+     * output escapes them again. `actionUrl` is a relative in-app path and is
+     * joined onto the web app origin here, so an email never links elsewhere.
+     */
+    async sendNotificationEmail(
+        toEmail: string | null,
+        recipientName: string,
+        context: {
+            title: string;
+            message: string;
+            eventTitle: string;
+            actionUrl?: string | null;
+            actionLabel?: string | null;
+            settingsPath: string;
+        },
+    ): Promise<boolean> {
+        const recipient = this.requireEmail(toEmail, 'notification email');
+        if (!recipient) {
+            return false;
+        }
+        const appName = config.branding.appName();
+        const webAppUrl = config.webAppUrl().replace(/\/+$/, '');
+        const actionUrl = toWebAppLink(webAppUrl, context.actionUrl);
+        await this.mailerService.sendMail({
+            to: recipient,
+            subject: `[${appName}] ${this.stripHtmlTags(context.title)}`,
+            template: 'notification',
+            context: {
+                ...this.getBrandingContext(),
+                firstName: recipientName,
+                title: context.title,
+                message: context.message,
+                eventTitle: context.eventTitle,
+                actionUrl,
+                actionLabel: context.actionLabel || 'Open',
+                settingsUrl: toWebAppLink(webAppUrl, context.settingsPath) ?? webAppUrl,
+            },
+        });
+        return true;
+    }
+
+    /**
      * Security: strip HTML tags from a value derived from untrusted HTTP
      * request headers (User-Agent, X-Forwarded-For, geo-lookup strings)
      * before placing it in a Handlebars email context.  Handlebars
@@ -546,4 +598,19 @@ export class MailService {
             timeZoneName: 'short',
         }).format(date);
     }
+}
+
+/**
+ * Join a relative in-app path onto the web app origin. Anything that is not a
+ * single-leading-slash path (an absolute URL, a protocol-relative `//host`, a
+ * backslash-obfuscated `/\host`) is refused and yields null, so a notification
+ * email can only ever link back into the product.
+ */
+export function toWebAppLink(webAppUrl: string, path: string | null | undefined): string | null {
+    if (!path) return null;
+    const trimmed = path.trim();
+    if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.startsWith('/\\')) {
+        return null;
+    }
+    return `${webAppUrl.replace(/\/+$/, '')}${trimmed}`;
 }

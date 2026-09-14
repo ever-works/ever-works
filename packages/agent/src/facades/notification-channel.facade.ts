@@ -18,6 +18,12 @@ import { NotificationChannelDeliveryLogRepository } from '../database/repositori
 import { PluginUsageService } from '../usage/plugin-usage.service';
 import { redactSecrets } from '../utils/secret-scan';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
+import {
+    NOTIFICATION_EMAIL_SENDER,
+    isTerminalNotificationEmailError,
+    type NotificationEmailSender,
+} from '../notifications/notification-email-sender.port';
+import { NOTIFICATION_TARGET_EMAIL } from '@ever-works/contracts';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class NotificationChannelFacadeError extends FacadeError {
@@ -35,12 +41,33 @@ export class NotificationChannelFacadeError extends FacadeError {
  */
 const MAX_DELIVERY_ERROR_MESSAGE_LENGTH = 500;
 
+/**
+ * Attention controls (AW-13) — reserved id of the built-in email target.
+ * Like `in-app`, it is not a `notification_channels` row: it delivers to the
+ * account's own address through the bound {@link NotificationEmailSender}.
+ */
+export const BUILT_IN_EMAIL_CHANNEL_ID = NOTIFICATION_TARGET_EMAIL;
+
+/**
+ * The structured notification behind a fan-out, for targets that render more
+ * than one line of text (the built-in email target). Channel plugins keep
+ * receiving `text`.
+ */
+export interface NotificationFanoutContent {
+    readonly title: string;
+    readonly message: string;
+    readonly actionUrl?: string;
+    readonly actionLabel?: string;
+}
+
 export interface NotificationChannelFanoutInput {
     readonly text: string;
     readonly rich?: ChannelRichPayload;
     readonly messageRef: string;
     /** From event-subscriptions resolver; NULL for ad-hoc / "Test" button sends. */
     readonly eventType?: string;
+    /** Attention controls (AW-13) — structured content for the built-in email target. */
+    readonly content?: NotificationFanoutContent;
 }
 
 export interface NotificationChannelFanoutResult {
@@ -64,6 +91,8 @@ export interface NotificationChannelDeliveryPayload {
     readonly rich?: ChannelRichPayload;
     readonly messageRef: string;
     readonly eventType?: string;
+    /** Attention controls (AW-13) — structured content for the built-in email target. */
+    readonly content?: NotificationFanoutContent;
     readonly options: FacadeOptions;
     /**
      * ISO-8601 timestamp. When set, the dispatcher schedules the run
@@ -135,6 +164,12 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         @Optional()
         @Inject(NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER)
         private readonly deliveryDispatcher?: NotificationChannelDeliveryDispatcher,
+        // Attention controls (AW-13) — the built-in email target. Unbound in
+        // contexts without transactional mail; an email delivery then fails
+        // with a stated reason instead of pretending to succeed.
+        @Optional()
+        @Inject(NOTIFICATION_EMAIL_SENDER)
+        private readonly emailSender?: NotificationEmailSender,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -200,6 +235,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
                     rich: payload.rich,
                     messageRef: payload.messageRef,
                     eventType,
+                    content: payload.content,
                     options,
                     deferUntil,
                 });
@@ -301,6 +337,16 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
             );
         }
         const result = await this.sendOne(channelId, payload, options, eventType);
+        // Attention controls (AW-13): an email that cannot be sent without a
+        // change of configuration (no mail transport, unverified address) is
+        // recorded as failed but not retried — re-running it cannot succeed.
+        if (
+            result.status === 'failed' &&
+            channelId === BUILT_IN_EMAIL_CHANNEL_ID &&
+            isTerminalNotificationEmailError(result.error)
+        ) {
+            return result;
+        }
         if (result.status === 'failed') {
             throw new NotificationChannelFacadeError(
                 result.error ?? 'channel delivery failed',
@@ -321,6 +367,9 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         if (channelId === 'in-app') {
             this.logger.debug(`in-app channel — handled by notifications v1, no-op here`);
             return { channelId, pluginId: 'in-app', status: 'delivered' };
+        }
+        if (channelId === BUILT_IN_EMAIL_CHANNEL_ID) {
+            return this.sendEmail(payload, options, eventType);
         }
         if (!this.channels) {
             return {
@@ -381,7 +430,13 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
             };
             const result: ChannelSendResult = await plugin.send(sendInput, channelOpts);
 
-            await this.logDelivery(channelId, payload.messageRef, eventType, 'delivered', result);
+            await this.logDelivery(
+                { channelId, userId: options.userId ?? channel.userId },
+                payload.messageRef,
+                eventType,
+                'delivered',
+                result,
+            );
             await this.recordUsage(channel.pluginId, 'send', options);
 
             return {
@@ -410,7 +465,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
                     : rawErrorMessage;
             this.logger.warn(`channel ${channelId} send failed: ${errorMessage}`);
             await this.logDelivery(
-                channelId,
+                { channelId, userId: options.userId ?? channel.userId },
                 payload.messageRef,
                 eventType,
                 'failed',
@@ -424,6 +479,102 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
                 error: errorMessage,
             };
         }
+    }
+
+    /**
+     * Attention controls (AW-13) — one attempt at the built-in email target.
+     *
+     * Same posture as a channel send: the recipient is only ever the calling
+     * user's own account address (so a userId is required), every attempt
+     * leaves one delivery-log row with `builtInChannel = 'email'`, and a
+     * failure is returned, never thrown, so one target cannot sink its
+     * siblings. The target never touches `notification_channels`.
+     */
+    private async sendEmail(
+        payload: NotificationChannelFanoutInput,
+        options: FacadeOptions,
+        eventType?: string,
+    ): Promise<NotificationChannelFanoutResult> {
+        const channelId = BUILT_IN_EMAIL_CHANNEL_ID;
+        const pluginId = BUILT_IN_EMAIL_CHANNEL_ID;
+        if (!options.userId) {
+            return {
+                channelId,
+                pluginId,
+                status: 'failed',
+                error: 'email delivery requires a userId',
+            };
+        }
+        if (!this.emailSender) {
+            const error = 'email sender not configured';
+            await this.logDelivery(
+                { builtInChannel: channelId, userId: options.userId },
+                payload.messageRef,
+                eventType,
+                'failed',
+                undefined,
+                error,
+            );
+            return { channelId, pluginId, status: 'failed', error };
+        }
+        const content = payload.content ?? { title: payload.text, message: payload.text };
+        try {
+            const result = await this.emailSender.deliver({
+                userId: options.userId,
+                eventKey: eventType,
+                title: content.title,
+                message: content.message,
+                actionUrl: content.actionUrl,
+                actionLabel: content.actionLabel,
+            });
+            if (result.status === 'delivered') {
+                await this.logDelivery(
+                    { builtInChannel: channelId, userId: options.userId },
+                    payload.messageRef,
+                    eventType,
+                    'delivered',
+                    { providerMessageId: result.providerMessageId, deliveredAt: new Date() },
+                );
+                return {
+                    channelId,
+                    pluginId,
+                    status: 'delivered',
+                    providerMessageId: result.providerMessageId,
+                };
+            }
+            const error = this.boundError(
+                result.status === 'not-configured' ? 'not-configured' : (result.error ?? 'failed'),
+            );
+            await this.logDelivery(
+                { builtInChannel: channelId, userId: options.userId },
+                payload.messageRef,
+                eventType,
+                'failed',
+                undefined,
+                error,
+            );
+            return { channelId, pluginId, status: 'failed', error };
+        } catch (err) {
+            const error = this.boundError(err instanceof Error ? err.message : String(err));
+            this.logger.warn(`email delivery failed: ${error}`);
+            await this.logDelivery(
+                { builtInChannel: channelId, userId: options.userId },
+                payload.messageRef,
+                eventType,
+                'failed',
+                undefined,
+                error,
+            );
+            return { channelId, pluginId, status: 'failed', error };
+        }
+    }
+
+    /** Redact credential-shaped tokens, then cap the length (see MAX_DELIVERY_ERROR_MESSAGE_LENGTH). */
+    private boundError(raw: string): string {
+        const cleaned = redactSecrets(raw).cleaned;
+        return cleaned.length > MAX_DELIVERY_ERROR_MESSAGE_LENGTH
+            ? `${cleaned.slice(0, MAX_DELIVERY_ERROR_MESSAGE_LENGTH)}… [truncated]`
+            : cleaned;
     }
 
     private getChannelPluginById(pluginId: string): INotificationChannelPlugin {
@@ -453,17 +604,20 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
     }
 
     private async logDelivery(
-        channelId: string,
+        target: { channelId?: string; builtInChannel?: string; userId?: string | null },
         messageRef: string,
         eventType: string | undefined,
         status: 'delivered' | 'failed',
-        result?: ChannelSendResult,
+        result?: Pick<ChannelSendResult, 'providerMessageId' | 'deliveredAt'>,
         errorMessage?: string,
     ): Promise<void> {
         if (!this.deliveryLog) return;
         try {
             await this.deliveryLog.save({
-                channelId,
+                // Exactly one of channelId / builtInChannel is set.
+                channelId: target.channelId ?? null,
+                builtInChannel: target.builtInChannel ?? null,
+                userId: target.userId ?? null,
                 messageRef,
                 eventType: eventType ?? null,
                 status,

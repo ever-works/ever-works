@@ -87,6 +87,44 @@ describe('NotificationPreferencesService.setEventSubscription validation', () =>
         expect(subscriptions.upsert).toHaveBeenCalledWith('user-1', 'ai.credits.depleted', atCap);
     });
 
+    // AW-13: email to the account's own address is a built-in target, like
+    // in-app — it is not a channel row and needs no ownership lookup.
+    it('accepts the built-in email target without an ownership lookup', async () => {
+        await service.setEventSubscription('user-1', 'ai.credits.depleted', ['in-app', 'email']);
+        expect(channels.findByIdForUser).not.toHaveBeenCalled();
+        expect(subscriptions.upsert).toHaveBeenCalledWith('user-1', 'ai.credits.depleted', [
+            'in-app',
+            'email',
+        ]);
+    });
+
+    it('still refuses a foreign channel next to the built-in targets, with the same message as an unknown one', async () => {
+        channels.findByIdForUser.mockResolvedValue(null);
+        const foreign = service.setEventSubscription('user-1', 'ai.credits.depleted', [
+            'email',
+            'ch-foreign',
+        ]);
+        await expect(foreign).rejects.toThrow(
+            'Unknown or unauthorized notification channel: ch-foreign',
+        );
+        await expect(
+            service.setEventSubscription('user-1', 'ai.credits.depleted', ['ch-missing']),
+        ).rejects.toThrow('Unknown or unauthorized notification channel: ch-missing');
+        expect(subscriptions.upsert).not.toHaveBeenCalled();
+    });
+
+    it('persists an explicit empty selection', async () => {
+        await service.setEventSubscription('user-1', 'ai.credits.depleted', []);
+        expect(subscriptions.upsert).toHaveBeenCalledWith('user-1', 'ai.credits.depleted', []);
+    });
+
+    it('states the limit as a number when a 21st target is named', async () => {
+        const tooMany = ['in-app', 'email', ...Array.from({ length: 19 }, (_, i) => `ch-${i}`)];
+        await expect(
+            service.setEventSubscription('user-1', 'ai.credits.depleted', tooMany),
+        ).rejects.toThrow(/maximum 20/);
+    });
+
     it('accepts an owned channel id and dedupes the list', async () => {
         await service.setEventSubscription('user-1', 'ai.credits.depleted', [
             'in-app',

@@ -1,4 +1,8 @@
 import 'server-only';
+import type {
+    NotificationMatrixDto,
+    NotificationMatrixResetResultDto,
+} from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -45,6 +49,22 @@ export const notificationPreferencesAPI = {
     },
     getPreferences: async () => {
         return serverFetch<PreferencesView>('/notifications/preferences');
+    },
+    /**
+     * AW-13 — the whole notification matrix (events, delivery targets, quiet
+     * hours, mutes) in one read.
+     */
+    getMatrix: async () => {
+        return serverFetch<NotificationMatrixDto>('/notifications/matrix');
+    },
+    /** AW-13 — drop stored choices (for `eventKeys`, or all) so rows follow their defaults. */
+    resetMatrix: async (eventKeys?: string[]) => {
+        return serverMutation<NotificationMatrixResetResultDto>({
+            method: 'POST',
+            endpoint: '/notifications/matrix/reset',
+            data: eventKeys ? { eventKeys } : {},
+            wrapInData: false,
+        });
     },
     setEventSubscription: async (eventKey: string, channelIds: string[]) => {
         return serverMutation<{ subscription: NotificationSubscription }>({

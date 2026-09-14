@@ -8,6 +8,7 @@ import {
     OrganizationRepository,
     UserRepository,
 } from '@src/database';
+import { resolveMuteCategory } from './core-event-catalogue';
 
 /**
  * Notifications v2 (EW-664 / EW-677 / T22).
@@ -56,6 +57,14 @@ export interface ResolvedChannelPlan {
 export class UserNotificationSubscriptionService {
     private readonly logger = new Logger(UserNotificationSubscriptionService.name);
 
+    /**
+     * Attention controls (AW-13) — how many times each unregistered event key
+     * was resolved by this process. A non-zero entry means a producer emits a
+     * key with no registry row: the notification is still written in-app, but
+     * it can never be routed anywhere else until the key is registered.
+     */
+    private readonly unregisteredEventKeys = new Map<string, number>();
+
     constructor(
         private readonly eventTypes: NotificationEventTypeRepository,
         private readonly subscriptions: UserNotificationSubscriptionRepository,
@@ -93,7 +102,7 @@ export class UserNotificationSubscriptionService {
     async resolvePlan(userId: string, eventTypeKey: string): Promise<ResolvedChannelPlan> {
         const eventType = await this.eventTypes.findByKey(eventTypeKey);
         if (!eventType) {
-            this.logger.debug(`Unknown event type ${eventTypeKey}; defaulting to in-app only`);
+            this.recordUnregisteredEventKey(eventTypeKey);
             return { immediate: ['in-app'], deferred: [] };
         }
 
@@ -106,7 +115,11 @@ export class UserNotificationSubscriptionService {
         // Category mute (drops non-in-app). `isMuted` already accounts
         // for mutedUntil expiry semantics.
         if (this.mutes) {
-            const muted = await this.mutes.isMuted(userId, eventType.category);
+            // Attention controls (AW-13): a registry category that is not
+            // itself a mutable category (e.g. `agents`) is muted through the
+            // category it names, so every registered event can be muted.
+            const muteCategory = resolveMuteCategory(eventType.category) ?? eventType.category;
+            const muted = await this.mutes.isMuted(userId, muteCategory);
             if (muted) {
                 channels = channels.filter((c) => c === 'in-app');
             }
@@ -134,14 +147,56 @@ export class UserNotificationSubscriptionService {
         return { immediate: channels, deferred: [] };
     }
 
+    /**
+     * Attention controls (AW-13) — does the user's own choice for this event
+     * keep the in-app notification interrupting?
+     *
+     * Only an explicit per-user subscription that leaves `in-app` out answers
+     * no. No subscription, an organisation default or an event default all
+     * answer yes, so a user who never opened the matrix keeps today's
+     * behaviour. An unknown event key also answers yes.
+     */
+    async isInAppSelected(userId: string, eventTypeKey: string): Promise<boolean> {
+        const eventType = await this.eventTypes.findByKey(eventTypeKey);
+        if (!eventType) return true;
+        const sub = await this.subscriptions.findForEvent(userId, eventTypeKey);
+        if (!sub) return true;
+        return (sub.channelIds ?? []).includes('in-app');
+    }
+
+    /**
+     * Snapshot of unregistered event keys resolved by this process, with the
+     * number of times each was seen (see {@link resolvePlan}).
+     */
+    getUnregisteredEventKeyCounts(): ReadonlyMap<string, number> {
+        return new Map(this.unregisteredEventKeys);
+    }
+
+    private recordUnregisteredEventKey(eventTypeKey: string): void {
+        const seen = (this.unregisteredEventKeys.get(eventTypeKey) ?? 0) + 1;
+        this.unregisteredEventKeys.set(eventTypeKey, seen);
+        if (seen === 1) {
+            // Loud once per key per process: an unregistered key silently
+            // degrades to in-app forever unless someone notices.
+            this.logger.warn(
+                `Unregistered notification event key "${eventTypeKey}": delivered in-app only. Register it in the core event catalogue.`,
+            );
+        }
+    }
+
     private async loadInitialChannels(
         userId: string,
         eventTypeKey: string,
         eventDefaults: string[] | undefined,
     ): Promise<string[]> {
         const sub = await this.subscriptions.findForEvent(userId, eventTypeKey);
-        if (sub?.channelIds && sub.channelIds.length > 0) {
-            return [...sub.channelIds];
+        // Attention controls (AW-13, "turning everything off for one row
+        // sticks"): a stored subscription wins even when it is EMPTY. An
+        // explicit "nothing" must never fall back to the organisation or
+        // event defaults, or the one gesture a user reaches for to silence an
+        // event would quietly re-enable it. Do not restore a length check.
+        if (sub) {
+            return [...(sub.channelIds ?? [])];
         }
         // Organisation defaults sit between the per-user subscription and
         // the event-type defaults: a user with no explicit subscription
@@ -172,14 +227,9 @@ export class UserNotificationSubscriptionService {
         userId: string,
         eventTypeKey: string,
     ): Promise<string[] | undefined> {
-        if (!this.orgDefaults || !this.organizations || !this.users) return undefined;
         try {
-            const user = await this.users.findById(userId);
-            if (!user?.tenantId) return undefined;
-            const orgs = await this.organizations.findByTenantId(user.tenantId);
-            if (orgs.length !== 1) return undefined;
-            const def = await this.orgDefaults.findByOrg(orgs[0].id);
-            const channels = def?.defaults?.[eventTypeKey];
+            const defaults = await this.loadOrgDefaultMap(userId);
+            const channels = defaults?.[eventTypeKey];
             return Array.isArray(channels) && channels.length > 0 ? channels : undefined;
         } catch (err) {
             this.logger.debug(
@@ -189,6 +239,24 @@ export class UserNotificationSubscriptionService {
             );
             return undefined;
         }
+    }
+
+    /**
+     * The organisation default channel map that applies to `userId` — same
+     * rule as {@link resolveOrgDefaultChannels}: only when the user's tenant
+     * owns exactly one organisation. Undefined when no map applies or the org
+     * stack is not wired. Exposed so a reader composing many events at once
+     * (the notification matrix) resolves the map once instead of per event.
+     * Throws on repository failure; callers decide how to degrade.
+     */
+    async loadOrgDefaultMap(userId: string): Promise<Record<string, string[]> | undefined> {
+        if (!this.orgDefaults || !this.organizations || !this.users) return undefined;
+        const user = await this.users.findById(userId);
+        if (!user?.tenantId) return undefined;
+        const orgs = await this.organizations.findByTenantId(user.tenantId);
+        if (orgs.length !== 1) return undefined;
+        const def = await this.orgDefaults.findByOrg(orgs[0].id);
+        return def?.defaults ?? undefined;
     }
 }
 
