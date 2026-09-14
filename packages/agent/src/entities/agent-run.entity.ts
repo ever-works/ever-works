@@ -343,6 +343,38 @@ export class AgentRun {
     @Column({ type: 'boolean', default: false })
     interruptRequested: boolean;
 
+    // ── Resume single-flight. Both additive; NULL on every pre-existing
+    // row. Written only by `RunSteeringService.resume` through the
+    // repository's claim / release / consume trio, and only ever on the
+    // SOURCE run — the successor a resume creates never carries them.
+    // Migration: `1791110030000-AddAgentRunResumeClaim`.
+
+    /**
+     * Fencing token of the most recent resume claim taken on this run.
+     *
+     * `resume` compare-and-sets it against the value it READ when it
+     * loaded the run, so two requests that both saw the same parked run
+     * cannot both win — the first claim changes the token under the
+     * second. It is deliberately KEPT when a resume succeeds (only
+     * {@link resumeClaimedAt} clears): a request that read the run before
+     * that resume must still lose, while a request that loads the run
+     * afterwards reads the new token and is judged on the run's state
+     * exactly as before. A failed resume puts back the token it replaced.
+     *
+     * An opaque random id, not a user id and not a foreign key.
+     */
+    @Column({ type: 'varchar', length: 36, nullable: true })
+    resumeClaimToken?: string | null;
+
+    /**
+     * When the in-flight resume claim was taken. NULL = no resume in
+     * flight. A claim older than the stuck-run sweeper cutoff is treated
+     * as abandoned (its process died between claim and release) and may
+     * be taken over, so a crash can never park a run as "resuming" forever.
+     */
+    @PortableDateColumn({ nullable: true })
+    resumeClaimedAt?: Date | null;
+
     /**
      * The effective scope a DELEGATED run executes under (judgment layer
      * G9). `null` for every ordinary run — which is the overwhelmingly
