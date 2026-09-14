@@ -35,6 +35,7 @@ import { ComputerWatermark } from './ComputerWatermark';
 import {
     buildComputerViewHref,
     closeReasonKey,
+    computerStallAgeMs,
     computerStallStateForAge,
     connectingPhase,
     formatBandwidth,
@@ -145,8 +146,12 @@ export function AgentComputerClient({
         return () => clearInterval(timer);
     }, [ticking]);
 
-    const frameAge =
-        attach.state === 'live' && attach.lastFrameAt !== null ? now - attach.lastFrameAt : null;
+    const frameAge = computerStallAgeMs({
+        channel,
+        live: attach.state === 'live',
+        lastFrameAt: attach.lastFrameAt,
+        now,
+    });
     const stall = computerStallStateForAge(frameAge);
     const autoRefreshedFor = useRef<number | null>(null);
     const {

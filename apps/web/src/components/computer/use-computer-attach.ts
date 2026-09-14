@@ -103,6 +103,8 @@ export function useComputerAttach(
     const [nonce, setNonce] = useState(0);
     const callbacksRef = useRef(callbacks);
     const sessionRef = useRef<string | null>(null);
+    /** Sessions already ended from here (the owner's End session, or a release below). */
+    const endedRef = useRef<Set<string>>(new Set());
     const depsRef = useRef(deps);
     // Synced after render, never during it. Declared before the session
     // effect below, so that effect always reads this render's seams.
@@ -122,6 +124,33 @@ export function useComputerAttach(
         const now = depsRef.current.now ?? (() => Date.now());
         let cancelled = false;
         let socket: WebSocket | null = null;
+        let openedId: string | null = null;
+        // True once any frame arrived over the socket: the relay authenticated
+        // this viewer, so the platform's last-viewer grace ends the session
+        // when the viewer goes. Before that the platform has no viewer to wait
+        // for, and a session opened here would hold a slot on the machine
+        // until it expired.
+        let attached = false;
+        const ended = endedRef.current;
+        /**
+         * End the session this run opened when the view cannot (or will no
+         * longer) attach to it. Once per session; never after the view
+         * attached (see `attached`) or after it was already ended.
+         */
+        const release = () => {
+            const id = openedId;
+            if (!id || attached || ended.has(id)) return;
+            ended.add(id);
+            try {
+                void doFetch(`/api/agents/${agentId}/computer/sessions/${id}`, {
+                    method: 'DELETE',
+                    // Survives the page being navigated away from.
+                    keepalive: true,
+                }).catch(() => undefined);
+            } catch {
+                // no transport (the page is going away): expiry is the floor
+            }
+        };
 
         setSessionId(null);
         sessionRef.current = null;
@@ -140,7 +169,7 @@ export function useComputerAttach(
         setOpenedAt(now());
 
         void (async () => {
-            let openedId: string;
+            let sessionIdOpened: string;
             try {
                 const res = await doFetch(`/api/agents/${agentId}/computer/sessions`, {
                     method: 'POST',
@@ -152,8 +181,13 @@ export function useComputerAttach(
                     }),
                 });
                 const body = (await res.json().catch(() => null)) as { sessionId?: string } | null;
-                if (cancelled) return;
-                if (!res.ok || typeof body?.sessionId !== 'string') {
+                if (res.ok && typeof body?.sessionId === 'string') openedId = body.sessionId;
+                if (cancelled) {
+                    // Opened after this view was abandoned: nobody will attach to it.
+                    release();
+                    return;
+                }
+                if (!openedId) {
                     const described = res.ok
                         ? ({ kind: 'cannot-connect' } as const)
                         : describeOpenRefusal(res.status, body);
@@ -161,24 +195,27 @@ export function useComputerAttach(
                     setState(described.kind === 'cannot-connect' ? 'cannot-connect' : 'refused');
                     return;
                 }
-                openedId = body.sessionId;
+                sessionIdOpened = openedId;
             } catch {
                 if (!cancelled) setState('cannot-connect');
                 return;
             }
-            sessionRef.current = openedId;
-            setSessionId(openedId);
+            sessionRef.current = sessionIdOpened;
+            setSessionId(sessionIdOpened);
 
             let token: string;
             let wsUrl: string;
             try {
                 const res = await doFetch(
-                    `/api/agents/${agentId}/computer/sessions/${openedId}/attach-token`,
+                    `/api/agents/${agentId}/computer/sessions/${sessionIdOpened}/attach-token`,
                     {
                         method: 'POST',
                     },
                 );
-                if (cancelled) return;
+                if (cancelled) {
+                    release();
+                    return;
+                }
                 if (!res.ok) {
                     setRefusal(describeOpenRefusal(res.status, await res.json().catch(() => null)));
                     setState(
@@ -186,6 +223,7 @@ export function useComputerAttach(
                             ? 'refused'
                             : 'cannot-connect',
                     );
+                    release();
                     return;
                 }
                 const body = (await res.json()) as { token: string; wsUrl: string };
@@ -193,10 +231,12 @@ export function useComputerAttach(
                 wsUrl = body.wsUrl;
             } catch {
                 if (!cancelled) setState('cannot-connect');
+                release();
                 return;
             }
             if (cancelled || !WS) {
                 if (!WS && !cancelled) setState('cannot-connect');
+                release();
                 return;
             }
 
@@ -204,6 +244,7 @@ export function useComputerAttach(
                 socket = new WS(wsUrl);
             } catch {
                 setState('cannot-connect');
+                release();
                 return;
             }
             socket.onopen = () => {
@@ -214,6 +255,7 @@ export function useComputerAttach(
                 if (cancelled || typeof event.data !== 'string') return;
                 const frame = decodeComputerFrame(event.data);
                 if (!frame) return;
+                attached = true;
                 switch (frame.kind) {
                     case 'frame':
                         setLastFrameAt(now());
@@ -246,6 +288,9 @@ export function useComputerAttach(
                     if (prev === 'ended' || prev === 'refused') return prev;
                     return event.code === 4001 ? 'refused' : 'cannot-connect';
                 });
+                // Closed before the relay accepted this viewer (a refused token,
+                // a dropped connection): Reconnect opens a fresh session.
+                release();
             };
             socket.onerror = () => {
                 if (!cancelled) setState((prev) => (prev === 'ended' ? prev : 'cannot-connect'));
@@ -259,6 +304,7 @@ export function useComputerAttach(
             } catch {
                 // already gone
             }
+            release();
         };
     }, [agentId, nodeId, channel, enabled, nonce]);
 
@@ -287,6 +333,7 @@ export function useComputerAttach(
         [call],
     );
     const endSession = useCallback(() => {
+        if (sessionRef.current) endedRef.current.add(sessionRef.current);
         call('', { method: 'DELETE' });
         setEndReason('closed-by-user');
         setState('ended');

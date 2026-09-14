@@ -5,6 +5,7 @@ import {
     closeReasonKey,
     COMPUTER_CLOCK_STALE_AFTER_MS,
     COMPUTER_CONNECTING_SLOW_AFTER_MS,
+    computerStallAgeMs,
     computerStallStateForAge,
     connectingPhase,
     describeOpenRefusal,
@@ -265,6 +266,25 @@ describe('stall, clock and connecting thresholds', () => {
         expect(computerStallStateForAge(6000)).toBe('stalled');
         expect(computerStallStateForAge(20_000)).toBe('auto-refresh');
         expect(computerStallStateForAge(45_000)).toBe('dead');
+    });
+
+    it('runs the stall ladder for a live screen only — a quiet terminal is a healthy prompt', () => {
+        const at = { lastFrameAt: 1000, now: 1000 + 50_000 };
+        expect(computerStallAgeMs({ channel: 'screen', live: true, ...at })).toBe(50_000);
+        expect(
+            computerStallStateForAge(computerStallAgeMs({ channel: 'screen', live: true, ...at })),
+        ).toBe('dead');
+        expect(computerStallAgeMs({ channel: 'terminal', live: true, ...at })).toBeNull();
+        expect(
+            computerStallStateForAge(
+                computerStallAgeMs({ channel: 'terminal', live: true, ...at }),
+            ),
+        ).toBe('ok');
+        expect(computerStallAgeMs({ channel: 'screen', live: false, ...at })).toBeNull();
+        expect(
+            computerStallAgeMs({ channel: 'screen', live: true, lastFrameAt: null, now: 5 }),
+        ).toBeNull();
+        expect(computerStallAgeMs({ channel: null, live: true, ...at })).toBeNull();
     });
 
     it('shows the machine’s own clock and marks it stale after ten silent seconds', () => {

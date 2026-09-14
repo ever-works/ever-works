@@ -291,6 +291,23 @@ export function nodeClockDisplay(nodeLocalTime: string | null | undefined): stri
     return match ? match[1] : null;
 }
 
+/**
+ * How long the stall ladder has been waiting on a live view, or null when no
+ * ladder applies. Only a screen promises a steady stream of pictures: a
+ * healthy shell sits silent at its prompt for as long as nobody types, and a
+ * refresh cannot make it print, so a quiet terminal is never "stalled" or
+ * "stopped". A terminal that really drops is caught by its socket closing.
+ */
+export function computerStallAgeMs(input: {
+    channel: ComputerChannel | null;
+    live: boolean;
+    lastFrameAt: number | null;
+    now: number;
+}): number | null {
+    if (input.channel !== 'screen' || !input.live || input.lastFrameAt === null) return null;
+    return input.now - input.lastFrameAt;
+}
+
 export function isNodeClockStale(lastStatsAtMs: number | null, nowMs: number): boolean {
     return lastStatsAtMs === null || nowMs - lastStatsAtMs > COMPUTER_CLOCK_STALE_AFTER_MS;
 }

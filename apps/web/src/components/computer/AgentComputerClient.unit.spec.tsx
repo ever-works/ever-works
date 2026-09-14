@@ -300,6 +300,57 @@ describe('AgentComputerClient — a live view', () => {
         );
     });
 
+    it('never marks a quiet terminal as stalled or stopped, while a quiet screen is', async () => {
+        const fetchImpl = vi.fn(async (url: string) =>
+            url.endsWith('/computer/sessions')
+                ? jsonResponse(202, { sessionId: SESSION })
+                : jsonResponse(200, { token: 'tok', wsUrl: 'ws://api/ws/computer/x' }),
+        );
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            const { unmount } = renderClient(
+                { initialChannel: 'terminal' },
+                fetchImpl as unknown as typeof fetch,
+            );
+            await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+            const terminal = FakeSocket.last as FakeSocket;
+            act(() => {
+                terminal.onopen?.();
+                terminal.emit({
+                    kind: 'terminal',
+                    frame: { kind: 'stdout', seq: 0, data: 'JCA=' },
+                });
+            });
+            expect(await screen.findByTestId('computer-terminal')).toBeInTheDocument();
+            // A shell waiting at its prompt: fifty silent seconds.
+            act(() => vi.advanceTimersByTime(50_000));
+            expect(screen.queryByText('computer.stall.stopped')).not.toBeInTheDocument();
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+            unmount();
+
+            renderClient({ initialChannel: 'screen' }, fetchImpl as unknown as typeof fetch);
+            await waitFor(() => expect(FakeSocket.last).not.toBe(terminal));
+            const screenSocket = FakeSocket.last as unknown as FakeSocket;
+            act(() => {
+                screenSocket.onopen?.();
+                screenSocket.emit({
+                    kind: 'frame',
+                    seq: 1,
+                    keyframe: true,
+                    width: 800,
+                    height: 600,
+                    mime: 'image/jpeg',
+                    data: 'QUJD',
+                });
+            });
+            expect(await screen.findByTestId('computer-canvas')).toBeInTheDocument();
+            act(() => vi.advanceTimersByTime(50_000));
+            expect(screen.getByText('computer.stall.stopped')).toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('renders the over-limit refusal with its count, and never opens a socket', async () => {
         const fetchImpl = vi.fn(async () =>
             jsonResponse(429, {
