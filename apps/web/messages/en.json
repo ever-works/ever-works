@@ -1084,6 +1084,9 @@
                 "minLength": "Description must be at least 10 characters.",
                 "error": "Couldn't create the Mission. Please try again.",
                 "chatUnavailable": "Chat is unavailable right now — use \"Create manually\" instead."
+            },
+            "menu": {
+                "chat": "Chat about it"
             }
         },
         "memoryPage": {
@@ -1614,7 +1617,8 @@
                     "bytes": "{used} / {max} KB",
                     "tooLong": "Init script exceeds 16 KB."
                 }
-            }
+            },
+            "messageAgent": "Message {agent}"
         },
         "tasksPage": {
             "title": "Tasks",
@@ -8045,6 +8049,74 @@
                 "loadError": "Could not load models",
                 "noModels": "No models available",
                 "context": "{value} context"
+            },
+            "conversations": {
+                "newConversation": "New conversation",
+                "nameThis": "Name this conversation",
+                "nameHint": "Clearing the name shows the first message instead.",
+                "nameTooLong": "Names are at most {max} characters. This one is {count}.",
+                "nameLabel": "Conversation name",
+                "nameCount": "{count} / {max}",
+                "nameFailed": "Could not save the name. Try again.",
+                "save": "Save",
+                "cancel": "Cancel",
+                "emptyTitle": "No conversations with {agent} yet.",
+                "emptyBody": "Send a message to start one.",
+                "emptyAction": "Message {agent}",
+                "loadError": "Could not load conversations.",
+                "tryAgain": "Try again",
+                "contextChip": "{type}: {name}",
+                "contextTypes": {
+                    "mission": "Mission",
+                    "task": "Task",
+                    "work": "Work",
+                    "idea": "Idea",
+                    "agent": "Agent"
+                },
+                "messagesLoadError": "Could not load this conversation.",
+                "startHint": "Send a message to start a conversation with {agent}.",
+                "placeholder": "Message {agent}…",
+                "you": "You"
+            },
+            "panel": {
+                "back": "Back",
+                "switch": "Switch",
+                "switchPlaceholder": "Search agents and conversations…",
+                "agents": "Agents",
+                "assistant": "AI Assistant",
+                "assistantHint": "Works, content and your data",
+                "noAgents": "No agents match.",
+                "agentsLoadError": "Could not load your agents.",
+                "close": "Close chat",
+                "resetWidth": "Reset width",
+                "resizeHint": "Drag, or use the arrow keys, to resize. Double-click or press Home to reset.",
+                "unread": "Unread",
+                "aboutContext": "Choose an agent to talk about {name}.",
+                "notAddressable": "Not currently addressable"
+            },
+            "mentions": {
+                "noMatch": "No agent or teammate matches \"{query}\".",
+                "noMatchHint": "Keep typing, or press esc to leave it as text.",
+                "pickerHint": "↑↓ move · ↵ insert · esc ✕",
+                "pickerLabel": "Agents and teammates to mention",
+                "loading": "Looking…",
+                "overLimit": "Only {max} mentions land in one message. The rest stay as plain text."
+            },
+            "sendFailure": {
+                "rateLimited": "Not sent — you are sending faster than the rate limit allows. Nothing was lost.",
+                "providerUnavailable": "Not sent — the model provider is unavailable right now.",
+                "offline": "Not sent — you are offline.",
+                "network": "Not sent — the connection dropped before the message arrived.",
+                "secretDetected": "Not sent — this message looks like it contains a credential. Store it in the connection's settings instead.",
+                "tooLong": "Not sent — this message is too long ({size} of {max}).",
+                "capacityLimited": "Not sent — too many agent runs are in progress right now. Retry when one finishes.",
+                "forbidden": "Not sent — you no longer have access to this conversation.",
+                "attachInstead": "Attach as a file",
+                "retry": "Retry",
+                "discard": "Discard",
+                "sending": "Sending…",
+                "budgetRefused": "{agent} did not reply — the agent's spend cap for this period was reached.",
+                "openCaps": "Open caps"
             }
         },
         "plugins": {

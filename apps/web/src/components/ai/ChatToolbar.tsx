@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import { Plus, History } from 'lucide-react';
+import { Plus, History, Users } from 'lucide-react';
 import { ChatProviderSelector } from './ChatProviderSelector';
 import type { ProviderOption } from '@/lib/api/types-only';
 
@@ -13,6 +13,8 @@ interface ChatToolbarProps {
     onSelectProvider: (id: string) => void;
     onNewChat: () => void;
     onOpenHistory: () => void;
+    /** Opens the participant switcher — talk to one of your Agents instead. */
+    onSwitch?: () => void;
 }
 
 const toolbarButtonClass = cn(
@@ -30,12 +32,25 @@ export function ChatToolbar({
     onSelectProvider,
     onNewChat,
     onOpenHistory,
+    onSwitch,
 }: ChatToolbarProps) {
     const t = useTranslations('dashboard.aiChat');
 
     return (
         <div className="flex items-center justify-between px-4 h-16 shrink-0">
             <div className="flex items-center gap-1">
+                {onSwitch && (
+                    <button
+                        type="button"
+                        onClick={onSwitch}
+                        aria-label={t('panel.switch')}
+                        title={t('panel.switch')}
+                        data-testid="chat-panel-switch"
+                        className={toolbarButtonClass}
+                    >
+                        <Users className="w-3 h-3" />
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={onNewChat}

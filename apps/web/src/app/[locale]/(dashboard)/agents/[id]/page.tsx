@@ -4,6 +4,7 @@ import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { AgentAttachmentsPanel } from '@/components/agents/AgentAttachmentsPanel';
 import { AgentGuardrailsCard } from '@/components/agents/AgentGuardrailsCard';
 import { ShowDateTime } from '@/components/ui/show-datetime';
+import { MessageAgentButton } from '@/components/ai/conversations/ConversationEntryButtons';
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 5. Dashboard tab is the
@@ -98,6 +99,11 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
                                 <span className="w-1.5 h-1.5 rounded-full bg-current" />
                                 {agent.status}
                             </span>
+                            {/* Opens a Conversation with this Agent in the docked panel, in place. */}
+                            <MessageAgentButton
+                                agent={{ id: agent.id, name: agent.name, status: agent.status }}
+                                className="ml-auto"
+                            />
                         </div>
                         <p className="mt-0.5 text-sm text-text-muted dark:text-text-muted-dark truncate">
                             {agent.title ?? 'No title set'}

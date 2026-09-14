@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DefaultChatTransport } from 'ai';
 import { BROWSER_WORKSPACE_SCOPE_HEADER } from '@/lib/workspace-scope';
-import { prepareChatRequest, transport } from './ChatProvider';
+import {
+    INITIAL_CHAT_PANEL_STATE,
+    panelBackTarget,
+    parseChatPanelState,
+    prepareChatRequest,
+    transport,
+    type ChatPanelState,
+} from './ChatProvider';
 
 /**
  * The chat transport must stamp the per-tab workspace selector on every send.
@@ -153,5 +160,66 @@ describe('chat transport workspace selector', () => {
         expect(Array.isArray(sentBody?.messages)).toBe(true);
         expect((sentBody?.messages as unknown[]).length).toBe(1);
         expect(sentHeaders?.get(BROWSER_WORKSPACE_SCOPE_HEADER)).toBe('org:ever');
+    });
+});
+
+/**
+ * The docked panel's view stack (FR-14, FR-20). A person talking to an Agent
+ * walks Conversation → that Agent's list → the switcher; the assistant has no
+ * per-participant list, so its Back goes straight to the switcher. The stack is
+ * persisted, so a reload restores it — and anything unreadable must fall back
+ * to the assistant exactly as the panel behaved before named Conversations.
+ */
+describe('chat panel view stack', () => {
+    const agentPanel = (view: ChatPanelState['view']): ChatPanelState => ({
+        view,
+        participant: { kind: 'agent', agentId: 'a-1', name: 'Nova', status: 'active' },
+        conversation: { id: 'c-1', title: 'Q4 pricing', context: null },
+        pendingContext: null,
+    });
+
+    it('starts on the assistant Conversation, as the panel always has', () => {
+        expect(INITIAL_CHAT_PANEL_STATE.view).toBe('conversation');
+        expect(INITIAL_CHAT_PANEL_STATE.participant).toEqual({ kind: 'assistant' });
+    });
+
+    it('walks an Agent Conversation back to its list, then to the switcher, then stops', () => {
+        expect(panelBackTarget(agentPanel('conversation'))).toBe('list');
+        expect(panelBackTarget(agentPanel('list'))).toBe('switcher');
+        expect(panelBackTarget(agentPanel('switcher'))).toBeNull();
+    });
+
+    it('walks the assistant straight back to the switcher', () => {
+        expect(panelBackTarget(INITIAL_CHAT_PANEL_STATE)).toBe('switcher');
+    });
+
+    it('restores the last open Agent Conversation from storage', () => {
+        const restored = parseChatPanelState(JSON.stringify(agentPanel('conversation')));
+        expect(restored.participant).toEqual({
+            kind: 'agent',
+            agentId: 'a-1',
+            name: 'Nova',
+            status: 'active',
+        });
+        expect(restored.conversation).toEqual({ id: 'c-1', title: 'Q4 pricing', context: null });
+    });
+
+    it('never restores a one-off pending context', () => {
+        const stored = {
+            ...agentPanel('switcher'),
+            pendingContext: { contextType: 'mission', contextId: 'm-1', label: 'Launch' },
+        };
+        expect(parseChatPanelState(JSON.stringify(stored)).pendingContext).toBeNull();
+    });
+
+    it('falls back to the assistant for missing, malformed or assistant state', () => {
+        expect(parseChatPanelState(null)).toBe(INITIAL_CHAT_PANEL_STATE);
+        expect(parseChatPanelState('{not json')).toBe(INITIAL_CHAT_PANEL_STATE);
+        expect(parseChatPanelState(JSON.stringify({ participant: { kind: 'agent' } }))).toBe(
+            INITIAL_CHAT_PANEL_STATE,
+        );
+        expect(parseChatPanelState(JSON.stringify(INITIAL_CHAT_PANEL_STATE))).toBe(
+            INITIAL_CHAT_PANEL_STATE,
+        );
     });
 });
