@@ -81,5 +81,9 @@ export * from './memory-fact-vector-index.service';
 export * from './memory-fact-embed.service';
 export * from './memory-fact-sweep.service';
 export * from './memory-facts.module';
+// AW-07 — publishes the platform vector chunk tables (Work KB chunks + non-Work
+// namespaces) to row-filter vector stores through the plugin host.
+export * from './vector-store-host-chunk-tables.service';
+export * from './vector-store-host-chunk-tables.module';
 // Repository registry (Feature G) — registry CRUD + agent grants + resolver.
 export * from './repo-registry.service';

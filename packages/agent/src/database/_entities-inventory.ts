@@ -66,6 +66,7 @@ import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import { WorkKnowledgeCitation } from '../entities/work-knowledge-citation.entity';
 import { KbRetrievalLog } from '../entities/kb-retrieval-log.entity';
 import { WorkKnowledgeChunk } from '../entities/work-knowledge-chunk.entity';
+import { VectorNamespaceChunk } from '../entities/vector-namespace-chunk.entity';
 import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
 import { Mission } from '../entities/mission.entity';
 import { Goal } from '../entities/goal.entity';
@@ -284,6 +285,9 @@ export const ENTITIES = [
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
+    // AW-07 — pgvector chunks for vector namespaces that are not a Work
+    // (a workspace's memory facts); `work_knowledge_chunks` FKs to works.
+    VectorNamespaceChunk,
     // Memory eval loop (memory upgrades M10) — append-only retrieval log
     // joined against citation rows to compute the recall-hit rate and
     // the zero-result gap topics that feed consolidation synthesis.

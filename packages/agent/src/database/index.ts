@@ -49,6 +49,8 @@ export * from './repositories/work-knowledge-citation.repository';
 export * from './repositories/kb-retrieval-log.repository';
 export * from './repositories/work-knowledge-chunk.repository';
 export * from './repositories/work-knowledge-chunk-coordinate.repository';
+// AW-07 — pgvector chunks for vector namespaces that are not a Work.
+export * from './repositories/vector-namespace-chunk.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 6. Export Agent repositories
 // so the heartbeat worker can resolve remote-proxy versions through
 // `TriggerInternalModule`.

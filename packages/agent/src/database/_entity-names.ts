@@ -209,6 +209,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'UserTaskCounter',
     'UserTemplatePreference',
     'UserUpload',
+    // AW-07 — pgvector chunks for vector namespaces that are not a Work
+    'VectorNamespaceChunk',
     'WebhookDelivery',
     'WebhookSubscription',
     'Work',

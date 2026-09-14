@@ -53,6 +53,8 @@ export * from './work-knowledge-tag.entity';
 export * from './work-knowledge-citation.entity';
 export * from './work-knowledge-chunk.entity';
 export * from './work-knowledge-chunk-coordinate.entity';
+// AW-07 — pgvector chunks for vector namespaces that are not a Work.
+export * from './vector-namespace-chunk.entity';
 export * from './kb-retrieval-log.entity';
 export * from './kb-types';
 export * from './types';

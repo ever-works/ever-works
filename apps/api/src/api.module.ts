@@ -84,6 +84,7 @@ import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-bindi
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
 import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
+import { VectorStoreHostChunkTablesModule } from '@ever-works/agent/services';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -305,8 +306,14 @@ import { DatabaseModule } from '@ever-works/agent/database';
         MemoryFilesApiModule,
         // Memory facts (AW-07) — /api/memory/facts: the atomic tier of
         // Memory (list / search by meaning / edit / forget / restore).
-        // @Global so the embed dispatcher reaches MemoryFactService.
+        // The embed dispatcher resolves through the job-runtime provider
+        // registry (TriggerModule), so any configured runtime runs it.
         MemoryFactsApiModule,
+        // AW-07 — publishes the platform vector chunk tables to the plugin
+        // host, so the bundled pgvector store actually serves the Knowledge
+        // Base (work_knowledge_chunks) and memory facts
+        // (vector_namespace_chunks) instead of failing "not wired".
+        VectorStoreHostChunkTablesModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,
