@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { CheckCircle2, Plug, Plus, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Plug, Plus, Trash2, XCircle } from 'lucide-react';
 import {
     createMcpConnectionAction,
     deleteMcpConnectionAction,
@@ -14,6 +14,21 @@ import type { McpConnection, McpManualTransport } from '@/lib/api/mcp-connection
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import {
+    countNeedingAttention,
+    healthHintKey,
+    healthTone,
+    rowHealth,
+    type HealthTone,
+} from './mcp-connection-health.shared';
+
+/** Pill colours per health tone — the palette the row's other status text already uses. */
+const HEALTH_TONE_CLASS: Record<HealthTone, string> = {
+    success: 'border-success/30 text-success',
+    warning: 'border-warning/30 text-warning',
+    danger: 'border-danger/30 text-danger',
+    muted: 'border-border/60 dark:border-border-dark/60 text-text-muted dark:text-text-muted-dark',
+};
 
 interface Props {
     initial: McpConnection[];
@@ -29,6 +44,10 @@ interface TestState {
  * MCP connections with enable/disable, Test, and Delete; the Add form
  * takes name / url / transport / one auth header (name + value). Header
  * VALUES are write-only: the API returns names only.
+ *
+ * AW-15 — each row also shows its health (derived from every real
+ * connection attempt) and a banner counts the connections that need the
+ * owner. Additive: every existing control, string and test id is unchanged.
  */
 export function McpConnectionsClient({ initial }: Props) {
     const t = useTranslations('dashboard.settings.connections');
@@ -44,6 +63,7 @@ export function McpConnectionsClient({ initial }: Props) {
     const [transport, setTransport] = useState<McpManualTransport>('streamable-http');
     const [headerName, setHeaderName] = useState('');
     const [headerValue, setHeaderValue] = useState('');
+    const attentionCount = countNeedingAttention(rows);
 
     const refresh = async () => {
         const next = await listMcpConnectionsAction();
@@ -149,6 +169,17 @@ export function McpConnectionsClient({ initial }: Props) {
                 </Button>
             </header>
 
+            {attentionCount > 0 && (
+                <div
+                    role="status"
+                    className="flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger"
+                    data-testid="mcp-connections-attention-banner"
+                >
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    {t('banner.needsAttention', { count: attentionCount })}
+                </div>
+            )}
+
             {showForm && (
                 <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -178,6 +209,7 @@ export function McpConnectionsClient({ initial }: Props) {
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="https://mcp.example.com/mcp"
+                        helperText={t('form.urlHelp')}
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Input
@@ -221,6 +253,8 @@ export function McpConnectionsClient({ initial }: Props) {
                 ) : (
                     rows.map((row) => {
                         const test = testResults[row.id];
+                        const health = rowHealth(row);
+                        const hintKey = healthHintKey(row);
                         return (
                             <article key={row.id} className="p-4 flex items-start gap-3">
                                 <Plug className="w-4 h-4 mt-0.5 text-primary shrink-0" />
@@ -229,6 +263,13 @@ export function McpConnectionsClient({ initial }: Props) {
                                         {row.name}{' '}
                                         <span className="text-text-muted dark:text-text-muted-dark text-xs font-mono">
                                             {row.transport}
+                                        </span>{' '}
+                                        <span
+                                            className={`ml-1 inline-flex items-center rounded-full border px-1.5 py-px text-[10px] ${HEALTH_TONE_CLASS[healthTone(health)]}`}
+                                            data-testid={`mcp-connection-health-${row.name}`}
+                                            data-health={health}
+                                        >
+                                            {t(`health.${health}`)}
                                         </span>
                                     </div>
                                     <div className="mt-0.5 text-[11px] font-mono text-text-muted dark:text-text-muted-dark truncate">
@@ -257,6 +298,14 @@ export function McpConnectionsClient({ initial }: Props) {
                                             </span>
                                         )}
                                     </div>
+                                    {row.lastError && hintKey && (
+                                        <p
+                                            className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark"
+                                            data-testid={`mcp-connection-health-hint-${row.name}`}
+                                        >
+                                            {t(`health.${hintKey}`)}
+                                        </p>
+                                    )}
                                     {test && (
                                         <p
                                             className={

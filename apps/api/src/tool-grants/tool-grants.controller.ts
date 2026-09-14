@@ -7,12 +7,21 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Optional,
     Param,
     Put,
     Query,
+    ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { ResolvedToolGrants, ToolGrantDecision, ToolGrantScope } from '@ever-works/contracts';
+import { Throttle } from '@nestjs/throttler';
+import type {
+    ConnectionScopePresetProviderDto,
+    ConnectionScopePresetStateDto,
+    ResolvedToolGrants,
+    ToolGrantDecision,
+    ToolGrantScope,
+} from '@ever-works/contracts';
 import { ToolGrantService } from '@ever-works/agent/policy';
 import type { ToolGrant } from '@ever-works/agent/entities';
 import {
@@ -24,10 +33,13 @@ import { WorkOwnershipService } from '@ever-works/agent/services';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
+    ApplyToolGrantPresetDto,
     CheckToolGrantQueryDto,
     ResolveToolGrantsQueryDto,
+    ToolGrantPresetStateQueryDto,
     UpsertToolGrantDto,
 } from './dto/tool-grant.dto';
+import { ToolGrantPresetsService } from './tool-grant-presets.service';
 
 /**
  * Tool-grant matrix (audit item G4) — the customer-facing surface.
@@ -37,6 +49,15 @@ import {
  *   GET    /api/tool-grants
  *   PUT    /api/tool-grants
  *   DELETE /api/tool-grants/:id
+ *   GET    /api/tool-grants/presets                (AW-15)
+ *   GET    /api/tool-grants/presets/state          (AW-15)
+ *   PUT    /api/tool-grants/presets                (AW-15)
+ *
+ * The three `presets` routes put plain-English access levels ("Read only" /
+ * "Read and write") that a provider plugin declares ON this same lattice: a
+ * level is written as ordinary deny patterns on one scope's row, behind the
+ * SAME ownership checks as a raw write below. There is no second permission
+ * model to keep in step with this one.
  *
  * `resolve` deliberately returns the whole `chain` (least → most specific,
  * starting at the platform default) including each layer's REJECTED
@@ -67,7 +88,71 @@ export class ToolGrantsController {
         private readonly agents: AgentRepository,
         private readonly organizations: OrganizationRepository,
         private readonly users: UserRepository,
+        @Optional() private readonly presets?: ToolGrantPresetsService,
     ) {}
+
+    // ── access-level presets (AW-15) ──────────────────────────────────
+
+    @Get('presets')
+    @ApiOperation({
+        summary:
+            'List the providers whose plugins declare plain-English access levels ("read" / "write"), with the agent tools each level unlocks.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async listPresets(): Promise<{ providers: ConnectionScopePresetProviderDto[] }> {
+        return { providers: await this.requirePresets().listProviders() };
+    }
+
+    @Get('presets/state')
+    @ApiOperation({
+        summary:
+            'The access level one scope selects for one provider, the level in effect after the whole chain, and which scope narrowed it.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async presetState(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ToolGrantPresetStateQueryDto,
+    ): Promise<ConnectionScopePresetStateDto> {
+        const service = this.requirePresets();
+        await this.assertWritableScope(auth, query.scopeType, query.scopeId);
+        return service.getState({
+            userId: auth.userId,
+            providerId: query.providerId,
+            scopeType: query.scopeType,
+            scopeId: query.scopeId,
+        });
+    }
+
+    @Put('presets')
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @ApiOperation({
+        summary:
+            'Choose an access level for one provider at one scope. Written as deny patterns on that scope’s tool-grant row, so it only ever narrows; widening that needs the connected account re-approved returns 409 preset_requires_reapproval and changes nothing.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async applyPreset(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: ApplyToolGrantPresetDto,
+    ): Promise<ConnectionScopePresetStateDto> {
+        const service = this.requirePresets();
+        await this.assertWritableScope(auth, body.scopeType, body.scopeId);
+        return service.apply(
+            {
+                userId: auth.userId,
+                providerId: body.providerId,
+                scopeType: body.scopeType,
+                scopeId: body.scopeId,
+            },
+            body.preset,
+        );
+    }
+
+    private requirePresets(): ToolGrantPresetsService {
+        if (!this.presets) {
+            throw new ServiceUnavailableException('Access-level presets are not available.');
+        }
+        return this.presets;
+    }
 
     @Get('resolve')
     @ApiOperation({

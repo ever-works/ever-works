@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { ConnectionHealthErrorCode } from '@ever-works/contracts';
 import { McpServerConnection } from '../../entities/mcp-server-connection.entity';
+import { classifyProbeResult } from '../../connections/connection-health';
+import { mcpHealthErrorCode } from '../../mcp/mcp-connection-health';
 
 /**
  * Agent Plugins MCP slice — data surface for the manual/global MCP
@@ -51,15 +54,50 @@ export class McpServerConnectionRepository {
     /**
      * Stamp the outcome of a connect/list/call attempt. `lastError` is a
      * CLASSIFIED message (never raw header material); success clears it.
+     *
+     * AW-15: the same write also records connection health. The failure
+     * counter is read first so `classifyProbeResult` can tell `degraded`
+     * from `unreachable`; under two concurrent failed attempts one increment
+     * can be lost, which only delays `unreachable` by one attempt and never
+     * flips a working connection. `errorCode` is optional — when absent it is
+     * derived from the classified message the MCP client already produced.
      */
     async stampConnectionResult(
         id: string,
-        result: { ok: boolean; error?: string | null },
+        result: {
+            ok: boolean;
+            error?: string | null;
+            errorCode?: ConnectionHealthErrorCode | null;
+        },
     ): Promise<void> {
+        const now = new Date();
         if (result.ok) {
-            await this.repository.update(id, { lastConnectedAt: new Date(), lastError: null });
-        } else {
-            await this.repository.update(id, { lastError: result.error ?? 'Unknown error' });
+            await this.repository.update(id, {
+                lastConnectedAt: now,
+                lastError: null,
+                health: 'healthy',
+                healthCheckedAt: now,
+                healthFailureCount: 0,
+                lastErrorCode: null,
+            });
+            return;
         }
+
+        const error = result.error ?? 'Unknown error';
+        const current = await this.repository.findOne({
+            where: { id },
+            select: { id: true, healthFailureCount: true },
+        });
+        const classified = classifyProbeResult(
+            { ok: false, errorCode: result.errorCode ?? mcpHealthErrorCode(error) },
+            current?.healthFailureCount ?? 0,
+        );
+        await this.repository.update(id, {
+            lastError: error,
+            health: classified.health,
+            healthCheckedAt: now,
+            healthFailureCount: classified.failureCount,
+            lastErrorCode: classified.errorCode,
+        });
     }
 }

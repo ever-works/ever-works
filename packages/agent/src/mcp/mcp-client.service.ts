@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import { McpServerConnectionRepository } from '../database/repositories/mcp-server-connection.repository';
+import { CREDENTIAL_RESOLVER, type CredentialResolver } from '../policy/credential-resolver';
+import { redactCredentialValues } from '../policy/credential-interpolation';
 import {
     MCP_CLIENT_FACTORY,
     createSdkMcpClientFactory,
@@ -8,6 +10,15 @@ import {
     type McpSdkClient,
     type McpSdkTool,
 } from './mcp-sdk';
+import {
+    McpHeaderCredentialMissingError,
+    McpInsecureCredentialTransportError,
+    MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
+    collectHeaderCredentialRefs,
+    credentialTransportAllowed,
+    resolveHeaderCredentials,
+} from './mcp-header-credentials';
+import { MCP_ERROR_MESSAGES } from './mcp-connection-health';
 
 /** Default per-call timeout (ms) — the spec's 30s default. */
 export const MCP_CALL_TIMEOUT_MS = 30_000;
@@ -17,6 +28,16 @@ export const MCP_LIST_TIMEOUT_MS = 10_000;
 export const MCP_RESULT_SIZE_CAP = 100_000;
 /** listTools TTL cache per connection (ms). */
 export const MCP_TOOLS_CACHE_TTL_MS = 60_000;
+
+/**
+ * Per-attempt holder for the credential values resolved into this attempt's
+ * headers. Declared in the calling method's own stack frame and handed to
+ * `connect()` so the error path can redact them — never stored on the
+ * service, the entity or the tools cache.
+ */
+interface ResolvedSecretsSink {
+    secrets?: ReadonlyMap<string, string>;
+}
 
 export interface McpToolInfo {
     name: string;
@@ -38,6 +59,13 @@ export interface McpToolInfo {
  *   - Clients are connect-per-operation and closed in `finally` — MCP
  *     servers are external and long-lived pooling is not worth the
  *     stale-socket failure modes in v1.
+ *   - `{{cred.key}}` references in a stored header are resolved through the
+ *     `CREDENTIAL_RESOLVER` port immediately before EVERY connection attempt
+ *     (listing tools, calling a tool, a Settings test alike). The resolved
+ *     values exist only inside that attempt; a key the resolver cannot
+ *     supply refuses the attempt before any request is sent, and a
+ *     connection carrying credentials is refused unless its endpoint is
+ *     `https:`.
  */
 @Injectable()
 export class McpClientService {
@@ -50,6 +78,16 @@ export class McpClientService {
         @Optional()
         @Inject(MCP_CLIENT_FACTORY)
         factory?: McpClientFactory,
+        /**
+         * Resolves `{{cred.key}}` header references. Optional so a runtime
+         * that has not bound the port keeps working for every connection
+         * whose headers hold literal values — but a header that DOES
+         * reference a key then fails closed (the key counts as missing),
+         * never forwarded verbatim.
+         */
+        @Optional()
+        @Inject(CREDENTIAL_RESOLVER)
+        private readonly credentials?: CredentialResolver,
     ) {
         this.factory = factory ?? createSdkMcpClientFactory();
     }
@@ -120,15 +158,16 @@ export class McpClientService {
         }
 
         let client: McpSdkClient | undefined;
+        const resolved: ResolvedSecretsSink = {};
         try {
-            client = await this.connect(connection);
+            client = await this.connect(connection, resolved);
             const result = await client.listTools(undefined, { timeout: MCP_LIST_TIMEOUT_MS });
             const tools = (result.tools ?? []).map((tool) => this.normalizeTool(tool));
             this.toolsCache.set(connection.id, { at: Date.now(), tools });
             await this.stamp(connection, { ok: true });
             return tools;
         } catch (err) {
-            const message = this.classifyError(err, connection);
+            const message = this.classifyError(err, connection, resolved.secrets);
             await this.stamp(connection, { ok: false, error: message });
             throw new Error(message);
         } finally {
@@ -149,17 +188,24 @@ export class McpClientService {
     ): Promise<unknown | { error: string }> {
         const timeout = options.timeoutMs ?? MCP_CALL_TIMEOUT_MS;
         let client: McpSdkClient | undefined;
+        const resolved: ResolvedSecretsSink = {};
         try {
-            client = await this.connect(connection);
+            client = await this.connect(connection, resolved);
             const result = await this.withTimeout(
                 client.callTool({ name: toolName, arguments: args }, undefined, { timeout }),
                 timeout,
                 `MCP tool "${toolName}" timed out after ${timeout}ms.`,
             );
             await this.stamp(connection, { ok: true });
-            return this.capResultSize(result);
+            // A server that reflects its own auth header in a RESULT must
+            // not hand a resolved credential to the model.
+            return this.capResultSize(
+                resolved.secrets && resolved.secrets.size > 0
+                    ? redactCredentialValues(result, resolved.secrets)
+                    : result,
+            );
         } catch (err) {
-            const message = this.classifyError(err, connection);
+            const message = this.classifyError(err, connection, resolved.secrets);
             await this.stamp(connection, { ok: false, error: message });
             return { error: `MCP server "${connection.name}": ${message}` };
         } finally {
@@ -189,11 +235,17 @@ export class McpClientService {
      * A late-arriving success is closed rather than leaked — otherwise a
      * slow server would strand an open socket per attempt.
      */
-    private async connect(connection: McpServerConnection): Promise<McpSdkClient> {
+    private async connect(
+        connection: McpServerConnection,
+        sink?: ResolvedSecretsSink,
+    ): Promise<McpSdkClient> {
+        // Resolved BEFORE the factory is called: a refusal here means no
+        // request has left the platform.
+        const headers = await this.resolveConnectHeaders(connection, sink);
         const pending = this.factory.connect({
             url: connection.url,
             transport: connection.transport,
-            headers: connection.authHeaders ?? {},
+            headers,
         });
         try {
             return await this.withTimeout(
@@ -205,6 +257,70 @@ export class McpClientService {
             void pending.then((client) => this.closeQuietly(client)).catch(() => undefined);
             throw err;
         }
+    }
+
+    /**
+     * Build the headers for ONE connection attempt.
+     *
+     *  1. Scheme re-check. A row carrying credentials whose endpoint is not
+     *     `https:` (written before the create/update rule, or edited out of
+     *     band) is refused here, before any credential is looked up.
+     *  2. No `{{cred.key}}` reference ⇒ the stored headers are used exactly
+     *     as today.
+     *  3. Otherwise the keys are resolved for the connection's owner, a
+     *     missing key refuses the attempt naming the key, and the
+     *     substituted headers are a NEW object handed only to the factory.
+     *     They are never assigned to the entity, the tools cache, a log line
+     *     or an error message; the values reach `sink` solely so the error
+     *     path can scrub them.
+     */
+    private async resolveConnectHeaders(
+        connection: McpServerConnection,
+        sink?: ResolvedSecretsSink,
+    ): Promise<Record<string, string>> {
+        const stored = connection.authHeaders ?? {};
+        if (
+            !credentialTransportAllowed({
+                url: connection.url,
+                transport: connection.transport,
+                headers: stored,
+            })
+        ) {
+            throw new McpInsecureCredentialTransportError();
+        }
+
+        const keys = collectHeaderCredentialRefs(stored);
+        if (keys.length === 0) return stored;
+
+        let available: ReadonlyMap<string, string> = new Map();
+        if (this.credentials) {
+            try {
+                available = await this.credentials.resolve(
+                    {
+                        userId: connection.userId,
+                        organizationId: connection.organizationId ?? null,
+                        tenantId: connection.tenantId ?? null,
+                    },
+                    keys,
+                );
+            } catch (err) {
+                // Fail closed. The resolver's own message is not trusted to
+                // be value-free, so only the error class is logged.
+                this.logger.warn(
+                    `Credential lookup failed for MCP connection ${connection.id} (${
+                        err instanceof Error ? err.name : 'unknown error'
+                    }); refusing to connect.`,
+                );
+                throw new McpHeaderCredentialMissingError(keys);
+            }
+        }
+
+        const result = resolveHeaderCredentials(stored, available);
+        if (result.missing.length > 0) {
+            throw new McpHeaderCredentialMissingError(result.missing);
+        }
+        if (sink) sink.secrets = result.secrets;
+        return result.headers;
     }
 
     private normalizeTool(tool: McpSdkTool): McpToolInfo {
@@ -264,8 +380,23 @@ export class McpClientService {
      * Runs on the RAW message so no later transform (whitespace collapse,
      * truncation) can reconstitute a partial value.
      */
-    private redactHeaderValues(message: string, connection: McpServerConnection): string {
+    private redactHeaderValues(
+        message: string,
+        connection: McpServerConnection,
+        secrets?: ReadonlyMap<string, string>,
+    ): string {
         let out = message;
+        // Values resolved from `{{cred.key}}` references are what was
+        // actually SENT, so they are what a header-echoing error can quote.
+        // Plausible-length secrets become `[redacted:cred.<key>]`; anything
+        // shorter is scrubbed the same way a stored value is.
+        if (secrets && secrets.size > 0) {
+            out = redactCredentialValues(out, secrets);
+            for (const value of secrets.values()) {
+                if (typeof value !== 'string' || value.length === 0) continue;
+                out = out.split(value).join('***');
+            }
+        }
         for (const value of Object.values(connection.authHeaders ?? {})) {
             if (typeof value !== 'string' || value.length === 0) continue;
             out = out.split(value).join('***');
@@ -278,23 +409,34 @@ export class McpClientService {
      * NEVER passes the raw error through: fetch errors can echo request
      * headers (i.e. credentials) in their message chains.
      */
-    private classifyError(err: unknown, connection: McpServerConnection): string {
+    private classifyError(
+        err: unknown,
+        connection: McpServerConnection,
+        secrets?: ReadonlyMap<string, string>,
+    ): string {
+        // Refusals raised before any request was sent carry their own fixed,
+        // value-free message (key names only).
+        if (err instanceof McpHeaderCredentialMissingError) return err.message;
+        if (err instanceof McpInsecureCredentialTransportError) {
+            return MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE;
+        }
         const raw = this.redactHeaderValues(
             err instanceof Error ? err.message : String(err),
             connection,
+            secrets,
         );
         const lower = raw.toLowerCase();
         if (lower.includes('timed out') || lower.includes('timeout')) {
-            return raw.length <= 120 ? raw : 'Request timed out.';
+            return raw.length <= 120 ? raw : MCP_ERROR_MESSAGES.timeout;
         }
         if (lower.includes('401') || lower.includes('unauthorized')) {
-            return 'Authentication failed (401). Check the auth header.';
+            return MCP_ERROR_MESSAGES.unauthorized;
         }
         if (lower.includes('403') || lower.includes('forbidden')) {
-            return 'Access forbidden (403).';
+            return MCP_ERROR_MESSAGES.forbidden;
         }
         if (lower.includes('404') || lower.includes('not found')) {
-            return 'Endpoint not found (404). Check the URL.';
+            return MCP_ERROR_MESSAGES.notFound;
         }
         if (
             lower.includes('econnrefused') ||
@@ -302,12 +444,12 @@ export class McpClientService {
             lower.includes('fetch failed') ||
             lower.includes('network')
         ) {
-            return 'Server unreachable (connection failed).';
+            return MCP_ERROR_MESSAGES.unreachable;
         }
         // Unknown class: keep it short and strip anything that could carry
         // a header value (very long messages / obvious token shapes).
         const compact = raw.replace(/\s+/g, ' ').trim();
-        return compact.length > 0 && compact.length <= 200 ? compact : 'MCP request failed.';
+        return compact.length > 0 && compact.length <= 200 ? compact : MCP_ERROR_MESSAGES.failed;
     }
 
     private async stamp(

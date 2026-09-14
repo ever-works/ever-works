@@ -7,6 +7,12 @@ import {
     Optional,
 } from '@nestjs/common';
 import {
+    isConnectionHealth,
+    isConnectionHealthErrorCode,
+    type ConnectionHealth,
+    type ConnectionHealthErrorCode,
+} from '@ever-works/contracts';
+import {
     MCP_CONNECTION_NAME_PATTERN,
     type McpConnectionTransport,
     type McpServerConnection,
@@ -18,6 +24,10 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 import { McpClientService } from './mcp-client.service';
+import {
+    MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
+    credentialTransportAllowed,
+} from './mcp-header-credentials';
 
 /** Masked API view — auth header VALUES never leave the service. */
 export interface McpConnectionView {
@@ -30,6 +40,12 @@ export interface McpConnectionView {
     authHeaderNames: string[];
     lastConnectedAt: Date | null;
     lastError: string | null;
+    /** AW-15 — health derived from every connection attempt; `unknown` until the first. */
+    health: ConnectionHealth;
+    /** When `health` was last written. */
+    healthCheckedAt: Date | null;
+    /** Classified code for `lastError` (e.g. `credential_missing`). Never a value. */
+    lastErrorCode: ConnectionHealthErrorCode | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -98,6 +114,7 @@ export class McpConnectionsService {
         this.assertValidName(input.name);
         this.assertValidUrl(input.url);
         this.assertValidHeaders(input.authHeaders);
+        this.assertCredentialTransport(input.url, input.transport, input.authHeaders);
 
         const existing = await this.connections.findByUserAndName(userId, input.name);
         if (existing) {
@@ -157,6 +174,20 @@ export class McpConnectionsService {
         if (patch.authHeaders !== undefined) {
             this.assertValidHeaders(patch.authHeaders ?? undefined);
             row.authHeaders = patch.authHeaders;
+        }
+        // Checked on the RESULTING endpoint + headers whenever the patch
+        // touches either, so neither "add a key to an http row" nor "move a
+        // keyed row to http" can store a connection that would send
+        // credentials in cleartext. A patch that only renames or toggles
+        // `enabled` is not blocked on a row written before this rule — the
+        // connect-time re-check in McpClientService refuses such a row
+        // before any credential is sent.
+        if (
+            patch.url !== undefined ||
+            patch.authHeaders !== undefined ||
+            patch.transport !== undefined
+        ) {
+            this.assertCredentialTransport(row.url, row.transport, row.authHeaders);
         }
         if (patch.enabled !== undefined) row.enabled = patch.enabled;
 
@@ -324,6 +355,25 @@ export class McpConnectionsService {
         }
     }
 
+    /**
+     * Credentials never travel over plain HTTP. Runs AFTER the SSRF check,
+     * so it only ever narrows what that guard already admits: a connection
+     * whose headers carry any value — a literal token or a `{{cred.key}}`
+     * reference — must use an `https:` endpoint. A plain-HTTP connection
+     * with no headers is accepted exactly as before.
+     */
+    private assertCredentialTransport(
+        url: string,
+        transport: McpConnectionTransport | undefined,
+        headers: Record<string, string> | null | undefined,
+    ): void {
+        if (!credentialTransportAllowed({ url, transport, headers })) {
+            throw new BadRequestException(
+                `${MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE}. Use an https:// URL, or remove the auth headers.`,
+            );
+        }
+    }
+
     private assertValidHeaders(headers?: Record<string, string>): void {
         if (!headers) return;
         const entries = Object.entries(headers);
@@ -365,6 +415,13 @@ export class McpConnectionsService {
             authHeaderNames: row.authHeaders ? Object.keys(row.authHeaders) : [],
             lastConnectedAt: row.lastConnectedAt ?? null,
             lastError: row.lastError ?? null,
+            // A row read before the health columns existed (or a partial
+            // fixture) reports "not checked yet" rather than guessing.
+            health: isConnectionHealth(row.health) ? row.health : 'unknown',
+            healthCheckedAt: row.healthCheckedAt ?? null,
+            lastErrorCode: isConnectionHealthErrorCode(row.lastErrorCode)
+                ? row.lastErrorCode
+                : null,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
         };

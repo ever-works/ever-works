@@ -1605,6 +1605,33 @@
                     "routingUnavailable": "Execution routing could not be loaded right now.",
                     "routingChange": "Change in Settings → Fleet"
                 },
+                "accessLevels": {
+                    "title": "Access levels",
+                    "description": "Choose what this agent may do through each provider that offers access levels. Start narrow — you can widen it later without reconnecting.",
+                    "pickerLabel": "Access level for {provider}",
+                    "levels": {
+                        "read": "Read only",
+                        "write": "Read and write"
+                    },
+                    "levelHints": {
+                        "read": "Look things up. Never changes anything.",
+                        "write": "Look things up and make changes."
+                    },
+                    "narrowed": "In effect: {level} — narrowed by the {scope} setting.",
+                    "none": "No access",
+                    "scopes": {
+                        "default": "platform",
+                        "tenant": "tenant",
+                        "organization": "organization",
+                        "work": "Work",
+                        "agent": "agent"
+                    },
+                    "unavailable": "The current access level couldn't be loaded.",
+                    "reapproval": "{provider} needs one more approval before agents can make changes with it.",
+                    "reapprovalLink": "Reconnect it in Plugins",
+                    "saved": "Access level for {provider} saved",
+                    "appliesNext": "Changes apply on this agent's next tool call. Nothing restarts."
+                },
                 "initScript": {
                     "title": "Init Script",
                     "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
@@ -4002,7 +4029,21 @@
                     "headerValue": "Auth header value",
                     "headerValueHelp": "Stored encrypted. Never shown again.",
                     "cancel": "Cancel",
-                    "save": "Save"
+                    "save": "Save",
+                    "urlHelp": "Auth headers are only ever sent to an https:// address."
+                },
+                "banner": {
+                    "needsAttention": "{count, plural, one {# connection needs attention.} other {# connections need attention.}}"
+                },
+                "health": {
+                    "unknown": "Not checked yet",
+                    "healthy": "Healthy",
+                    "degraded": "Having trouble",
+                    "expired": "Expired",
+                    "unreachable": "Unreachable",
+                    "credentialMissingHint": "This connection refers to a credential that isn't available. Make the credential available or replace the auth header, then test again.",
+                    "insecureTransportHint": "Auth headers are only sent over https://. Change the server URL to https:// or remove the auth header.",
+                    "credentialRejectedHint": "The server rejected this credential. Replace the auth header, then test again."
                 }
             },
             "repositories": {

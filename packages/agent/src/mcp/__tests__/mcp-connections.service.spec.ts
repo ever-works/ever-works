@@ -84,6 +84,39 @@ describe('McpConnectionsService', () => {
             expect(view.authHeaderNames).toEqual(['Authorization']);
             expect(JSON.stringify(view)).not.toContain('secret-value');
         });
+
+        it('carries health, reporting "unknown" for a row that was never checked', async () => {
+            const checkedAt = new Date('2026-09-10T10:00:00Z');
+            const { service } = makeHarness([
+                makeRow(),
+                makeRow({
+                    id: 'c2',
+                    name: 'docs',
+                    health: 'expired',
+                    healthCheckedAt: checkedAt,
+                    lastErrorCode: 'credential_missing',
+                    lastError: 'Missing credential `docs_token`',
+                }),
+                makeRow({ id: 'c3', name: 'junk', lastErrorCode: 'not-a-code' as never }),
+            ]);
+            const [fresh, expired, junk] = await service.list('u1');
+
+            expect(fresh).toEqual(
+                expect.objectContaining({
+                    health: 'unknown',
+                    healthCheckedAt: null,
+                    lastErrorCode: null,
+                }),
+            );
+            expect(expired).toEqual(
+                expect.objectContaining({
+                    health: 'expired',
+                    healthCheckedAt: checkedAt,
+                    lastErrorCode: 'credential_missing',
+                }),
+            );
+            expect(junk.lastErrorCode).toBeNull();
+        });
     });
 
     describe('create', () => {
@@ -205,6 +238,91 @@ describe('McpConnectionsService', () => {
             const { service, client } = makeHarness();
             await service.update('u1', 'c1', { url: 'https://mcp2.example.com/mcp' });
             expect(client.invalidate).toHaveBeenCalledWith('c1');
+        });
+    });
+
+    describe('credentials require https', () => {
+        it('create rejects http + a credential reference', async () => {
+            const { service, connectionsRepo } = makeHarness([]);
+            await expect(
+                service.create('u1', {
+                    name: 'docs',
+                    url: 'http://mcp.example.com/mcp',
+                    transport: 'streamable-http',
+                    authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+                }),
+            ).rejects.toThrow(/Credentials require an https:\/\/ endpoint/);
+            expect(connectionsRepo.create).not.toHaveBeenCalled();
+        });
+
+        it('create rejects http + a literal header value', async () => {
+            const { service } = makeHarness([]);
+            await expect(
+                service.create('u1', {
+                    name: 'docs',
+                    url: 'http://mcp.example.com/mcp',
+                    transport: 'sse',
+                    authHeaders: { 'X-Api-Key': 'literal-key' },
+                }),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('create still accepts plain http with no headers', async () => {
+            const { service, connectionsRepo } = makeHarness([]);
+            const view = await service.create('u1', {
+                name: 'docs',
+                url: 'http://mcp.example.com/mcp',
+                transport: 'streamable-http',
+            });
+            expect(view.name).toBe('docs');
+            expect(connectionsRepo.create).toHaveBeenCalled();
+        });
+
+        it('create accepts https + a credential reference', async () => {
+            const { service } = makeHarness([]);
+            const view = await service.create('u1', {
+                name: 'docs',
+                url: 'https://mcp.example.com/mcp',
+                transport: 'streamable-http',
+                authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+            });
+            expect(view.authHeaderNames).toEqual(['Authorization']);
+        });
+
+        it('update rejects moving a keyed connection to http', async () => {
+            const { service, connectionsRepo } = makeHarness();
+            await expect(
+                service.update('u1', 'c1', { url: 'http://mcp.example.com/mcp' }),
+            ).rejects.toThrow(/Credentials require an https:\/\/ endpoint/);
+            expect(connectionsRepo.save).not.toHaveBeenCalled();
+        });
+
+        it('update rejects adding a credential reference to an http connection', async () => {
+            const { service, connectionsRepo } = makeHarness([
+                makeRow({ url: 'http://mcp.example.com/mcp', authHeaders: null }),
+            ]);
+            await expect(
+                service.update('u1', 'c1', {
+                    authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+                }),
+            ).rejects.toThrow(BadRequestException);
+            expect(connectionsRepo.save).not.toHaveBeenCalled();
+        });
+
+        it('update accepts clearing the headers on an http connection', async () => {
+            const { service, connectionsRepo } = makeHarness([
+                makeRow({ url: 'http://mcp.example.com/mcp' }),
+            ]);
+            await service.update('u1', 'c1', { authHeaders: null });
+            expect(connectionsRepo.save).toHaveBeenCalled();
+        });
+
+        it('update keeps an unauthenticated http connection editable', async () => {
+            const { service, connectionsRepo } = makeHarness([
+                makeRow({ url: 'http://mcp.example.com/mcp', authHeaders: null }),
+            ]);
+            await service.update('u1', 'c1', { url: 'http://mcp2.example.com/mcp' });
+            expect(connectionsRepo.save).toHaveBeenCalled();
         });
     });
 

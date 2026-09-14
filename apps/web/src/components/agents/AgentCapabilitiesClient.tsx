@@ -42,6 +42,8 @@ import {
 } from './agent-capabilities.shared';
 import { AgentFleetSection } from './AgentFleetSection';
 import type { AgentFleetData } from './agent-fleet.shared';
+import { AgentAccessLevelsSection } from './AgentAccessLevelsSection';
+import type { AgentAccessLevelRow } from './agent-access-levels.shared';
 import {
     bindSkillToAgentAction,
     installAndBindSkillAction,
@@ -56,7 +58,10 @@ import {
  * use. The sibling features that shipped on parallel branches now each
  * own a section here:
  *
- *   1. Agent tools   — the tool-grant matrix's first web UI.
+ *   1. Agent tools   — the tool-grant matrix's first web UI, followed by
+ *                      Access levels (`AgentAccessLevelsSection`, AW-15):
+ *                      "Read only" / "Read and write" per provider that
+ *                      declares them, written onto the same grant row.
  *   2. Permissions   — read-only summary; edited in Settings.
  *   3. Skills        — agent-scope bindings + inherited, read-only.
  *   4. MCP           — per-agent MCP connection state + inherited badge.
@@ -132,6 +137,11 @@ interface Props {
      * there anything true to show.
      */
     fleet?: AgentFleetData | null;
+    /**
+     * AW-15 — providers whose plugins declare access levels, with this
+     * agent's current level each. Absent or empty hides the section.
+     */
+    accessLevels?: AgentAccessLevelRow[] | null;
 }
 
 /** Same labels the Settings tab uses for the 8 flags. */
@@ -165,6 +175,7 @@ export function AgentCapabilitiesClient({
     initialRepos = [],
     environments = [],
     fleet = null,
+    accessLevels = null,
 }: Props) {
     const t = useTranslations('dashboard.agentsPage.capabilities');
     const [caps, setCaps] = useState(initialCapabilities);
@@ -543,6 +554,21 @@ export function AgentCapabilitiesClient({
                     </div>
                 )}
             </section>
+
+            {/* ── Section: Access levels (AW-15) ──
+                Plain-English "Read only" / "Read and write" per provider
+                that declares the levels. Writes the SAME agent grant row as
+                the tool switches above, so it hands the refreshed payload
+                back. Rendered only when at least one provider declares
+                levels. */}
+            {accessLevels && accessLevels.length > 0 && (
+                <AgentAccessLevelsSection
+                    agentId={agent.id}
+                    rows={accessLevels}
+                    onCapabilitiesChange={setCaps}
+                    className={sectionClass}
+                />
+            )}
 
             {/* ── Section: Permissions summary (read-only) ── */}
             <section className={sectionClass} data-testid="capabilities-permissions-section">

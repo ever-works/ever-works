@@ -16,6 +16,8 @@ export {
     type McpBindingTargetType,
 } from '../entities/agent-mcp-server-binding.entity';
 export * from './mcp-client.service';
+export * from './mcp-header-credentials';
+export * from './mcp-connection-health';
 export * from './mcp-connections.service';
 export * from './mcp-tool-source';
 export * from './mcp-stdio-launcher';

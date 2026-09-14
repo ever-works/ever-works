@@ -4,6 +4,7 @@ import * as root from '../index.js';
 
 import * as agents from '../agents/index.js';
 import * as computer from '../computer/index.js';
+import * as connections from '../connections/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
@@ -43,6 +44,7 @@ import * as workflow from '../workflow/index.js';
 const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
 	['computer', computer],
+	['connections', connections],
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
@@ -68,7 +70,7 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(20);
+		expect(exportLines).toBe(21);
 	});
 
 	it('has no name exported by two different areas', () => {
