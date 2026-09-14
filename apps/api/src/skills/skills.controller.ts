@@ -8,6 +8,7 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -21,11 +22,22 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     MAX_SKILL_FILE_BYTES,
+    SkillBindingRepository,
     SkillFilesService,
+    SkillReadinessService,
     SkillRepository,
     SkillsService,
+    SkillTagRepository,
     type ListSkillsFilter,
+    type Skill,
 } from '@ever-works/agent/skills';
+import { PluginRegistryService } from '@ever-works/agent/plugins';
+import {
+    SKILL_TAG_FACET_LIMIT,
+    deriveSkillCardState,
+    normalizeSkillTags,
+    type SkillCardState,
+} from '@ever-works/contracts';
 import { isTextLikeMime } from '@ever-works/agent/agents';
 import { SkillsFacadeService } from '@ever-works/agent/facades';
 import type { SkillCatalogEntry, SkillCatalogListResult } from '@ever-works/plugin';
@@ -39,9 +51,20 @@ import {
     InstallCatalogSkillDto,
     ListSkillCatalogQueryDto,
     ListSkillsQueryDto,
+    ListSkillTagsQueryDto,
     UpdateSkillDto,
     UploadSkillFileDto,
 } from './dto/skill.dto';
+import type {
+    SkillReadinessDto,
+    SkillShelfRowDto,
+    SkillSwitchDto,
+    SkillTagFacetsDto,
+} from './dto/skill-shelf.dto';
+import { provenanceOf, resolveSkillProvenanceSources } from './skill-provenance';
+
+/** How long an on-demand re-check may take before the cached verdict is returned (FR-28). */
+export const SKILL_READINESS_REFRESH_BUDGET_MS = 3_000;
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 8.7. Read-only Skills API.
@@ -68,6 +91,13 @@ export class SkillsController {
         private readonly files: SkillFilesService,
         private readonly uploads: UploadsService,
         private readonly fileContent: SkillFileContentReaderService,
+        // Skills shelf. APPENDED LAST + `@Optional()` so every existing
+        // positional construction keeps compiling; unbound, the list answers
+        // exactly as it did before and the shelf endpoints 404.
+        @Optional() private readonly readiness?: SkillReadinessService,
+        @Optional() private readonly skillTags?: SkillTagRepository,
+        @Optional() private readonly skillBindings?: SkillBindingRepository,
+        @Optional() private readonly pluginRegistry?: PluginRegistryService,
     ) {}
 
     @Get('catalog')
@@ -108,9 +138,13 @@ export class SkillsController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'List my installed Skills (filterable by ownerType / search).' })
+    @ApiOperation({
+        summary:
+            'List my installed Skills (filterable by ownerType / search / tags / readiness / provenance / enabled; sortable).',
+    })
     @HttpCode(HttpStatus.OK)
     async list(@CurrentUser() auth: AuthenticatedUser, @Query() query: ListSkillsQueryDto) {
+        const provenanceSources = resolveSkillProvenanceSources(this.pluginRegistry);
         const filter: ListSkillsFilter = {
             ownerType: query.ownerType,
             ownerId: query.ownerId,
@@ -118,8 +152,58 @@ export class SkillsController {
             limit: query.limit ?? 50,
             offset: query.offset ?? 0,
         };
+        // Skills shelf filters — only set when asked for, so a request with
+        // none of them builds exactly the query it built before.
+        if (query.tags?.length) filter.tags = query.tags;
+        if (query.readiness) filter.readiness = query.readiness;
+        if (query.provenance) {
+            filter.provenance = query.provenance;
+            filter.provenanceSources = provenanceSources;
+        }
+        if (query.enabled !== undefined) filter.enabled = query.enabled;
+        if (query.sort) filter.sort = query.sort;
+
         const { rows, total } = await this.skills.findByUserIdFiltered(auth.userId, filter);
-        return { data: rows, meta: { total, limit: filter.limit, offset: filter.offset } };
+        const ids = rows.map((row) => row.id);
+        const [tagsBySkill, bindingCounts, counts] = await Promise.all([
+            this.skillTags?.findBySkillIds(ids, auth.userId) ?? new Map<string, string[]>(),
+            this.skillBindings?.countBySkillIds(ids, auth.userId) ?? new Map<string, number>(),
+            this.skills.countsByCardState(auth.userId, {
+                ownerType: query.ownerType,
+                ownerId: query.ownerId,
+            }),
+        ]);
+        const data: SkillShelfRowDto[] = rows.map((row) =>
+            Object.assign(row, {
+                tags: tagsBySkill.get(row.id) ?? [],
+                cardState: deriveSkillCardState(row),
+                provenance: provenanceOf(row, provenanceSources),
+                boundTargetCount: bindingCounts.get(row.id) ?? 0,
+            }),
+        );
+        return {
+            data,
+            meta: { total, limit: filter.limit, offset: filter.offset },
+            // Skills shelf — per-card-state counts for the summary line, over
+            // the whole shelf (not the current search/tag narrowing).
+            counts,
+        };
+    }
+
+    // NOTE: declared BEFORE `:id` so the literal segment wins route
+    // matching (`:id` runs ParseUUIDPipe and would 400 on "tags").
+    @Get('tags')
+    @ApiOperation({
+        summary:
+            'Skills shelf: tags across my Skills with how many Skills carry each, most-used first (at most 200).',
+    })
+    @HttpCode(HttpStatus.OK)
+    async tags(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ListSkillTagsQueryDto,
+    ): Promise<SkillTagFacetsDto> {
+        if (!this.skillTags) return { tags: [], total: 0 };
+        return this.skillTags.facets(auth.userId, query.limit ?? SKILL_TAG_FACET_LIMIT);
     }
 
     // NOTE: declared BEFORE `:id` so the literal segment wins route
@@ -160,23 +244,25 @@ export class SkillsController {
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateSkillDto) {
-        return this.service.create(auth.userId, {
-            ownerType: body.ownerType,
-            ownerId: body.ownerId,
-            title: body.title,
-            description: body.description,
-            instructionsMd: body.instructionsMd,
-            frontmatter: body.frontmatter
-                ? ({
-                      name: String(body.frontmatter.name ?? body.slug ?? body.title),
-                      description: String(body.frontmatter.description ?? body.description),
-                      ...body.frontmatter,
-                  } as any)
-                : undefined,
-            slug: body.slug,
-            version: body.version,
-            invocationSlug: body.invocationSlug,
-        });
+        return withTagsDropped(
+            await this.service.create(auth.userId, {
+                ownerType: body.ownerType,
+                ownerId: body.ownerId,
+                title: body.title,
+                description: body.description,
+                instructionsMd: body.instructionsMd,
+                frontmatter: body.frontmatter
+                    ? ({
+                          name: String(body.frontmatter.name ?? body.slug ?? body.title),
+                          description: String(body.frontmatter.description ?? body.description),
+                          ...body.frontmatter,
+                      } as any)
+                    : undefined,
+                slug: body.slug,
+                version: body.version,
+                invocationSlug: body.invocationSlug,
+            }),
+        );
     }
 
     @Patch(':id')
@@ -188,14 +274,16 @@ export class SkillsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateSkillDto,
     ) {
-        return this.service.update(auth.userId, id, {
-            title: body.title,
-            description: body.description,
-            instructionsMd: body.instructionsMd,
-            frontmatter: body.frontmatter as any,
-            version: body.version,
-            invocationSlug: body.invocationSlug,
-        });
+        return withTagsDropped(
+            await this.service.update(auth.userId, id, {
+                title: body.title,
+                description: body.description,
+                instructionsMd: body.instructionsMd,
+                frontmatter: body.frontmatter as any,
+                version: body.version,
+                invocationSlug: body.invocationSlug,
+            }),
+        );
     }
 
     @Delete(':id')
@@ -354,6 +442,82 @@ export class SkillsController {
         return this.files.remove(auth.userId, id, fileId);
     }
 
+    // ── Skills shelf — on/off switch and readiness ─────────────────
+
+    @Post(':id/enable')
+    @ApiOperation({
+        summary:
+            'Switch a Skill back on. Idempotent. Its bindings are untouched; takes effect on the next run.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async enable(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<SkillSwitchDto> {
+        return this.switchResult(auth.userId, await this.service.enable(auth.userId, id));
+    }
+
+    @Post(':id/disable')
+    @ApiOperation({
+        summary:
+            'Switch a Skill off for every run started from now on. Idempotent. Its bindings are untouched.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async disable(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<SkillSwitchDto> {
+        return this.switchResult(auth.userId, await this.service.disable(auth.userId, id));
+    }
+
+    @Get(':id/readiness')
+    @ApiOperation({
+        summary:
+            "A Skill's cached readiness verdict and the requirements behind it (identifiers only).",
+    })
+    @HttpCode(HttpStatus.OK)
+    async getReadiness(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<SkillReadinessDto> {
+        return readinessDto(await this.service.getOne(auth.userId, id));
+    }
+
+    @Post(':id/readiness/refresh')
+    @ApiOperation({
+        summary:
+            "Re-check a Skill's readiness now. Answers within 3 seconds; past that, the cached verdict comes back marked stale while the re-check finishes.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async refreshReadiness(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<SkillReadinessDto> {
+        const skill = await this.service.getOne(auth.userId, id);
+        if (!this.readiness) return readinessDto(skill);
+
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const budget = new Promise<'timeout'>((resolve) => {
+            timer = setTimeout(() => resolve('timeout'), SKILL_READINESS_REFRESH_BUDGET_MS);
+        });
+        const work = this.readiness.refreshSkill(skill).then(
+            () => 'done' as const,
+            () => 'failed' as const,
+        );
+        const outcome = await Promise.race([work, budget]);
+        if (timer) clearTimeout(timer);
+        if (outcome === 'done') return readinessDto(skill);
+        // Over budget or failed: the previous verdict, honestly labelled.
+        return {
+            ...readinessDto(skill),
+            cardState: stateOrUnknown(skill),
+            stale: true,
+        };
+    }
+
     // ── Phase 9 — Bindings CRUD ──────────────────────────────────
 
     @Get(':id/bindings')
@@ -384,4 +548,50 @@ export class SkillsController {
             injectIntoGenerator: body.injectIntoGenerator,
         });
     }
+
+    private async switchResult(
+        userId: string,
+        result: {
+            id: string;
+            cardState: SkillCardState;
+            disabledAt: Date | null;
+            changed: boolean;
+        },
+    ): Promise<SkillSwitchDto> {
+        const skill = await this.skills.findByIdAndUser(result.id, userId);
+        return {
+            id: result.id,
+            cardState: result.cardState,
+            readiness: skill?.readiness ?? 'unknown',
+            disabledAt: result.disabledAt,
+            changed: result.changed,
+        };
+    }
+}
+
+function readinessDto(skill: Skill): SkillReadinessDto {
+    return {
+        id: skill.id,
+        readiness: skill.readiness ?? 'unknown',
+        readinessDetail: skill.readinessDetail ?? null,
+        readinessCheckedAt: skill.readinessCheckedAt ?? null,
+        cardState: deriveSkillCardState(skill),
+    };
+}
+
+/** A re-check that did not land: the switches still win, everything else reads "Couldn't check". */
+function stateOrUnknown(skill: Skill): SkillCardState {
+    const state = deriveSkillCardState(skill);
+    return state === 'disabled' || state === 'needs_review' ? state : 'unknown';
+}
+
+/**
+ * FR-10 — when a Skill declares more than 12 tags, the extra ones are not
+ * indexed; say which. Added only when something was dropped, so the common
+ * response is exactly the Skill as before.
+ */
+function withTagsDropped<T extends { frontmatter?: { tags?: unknown } }>(skill: T): T {
+    const { dropped } = normalizeSkillTags(skill?.frontmatter?.tags);
+    if (dropped.length === 0) return skill;
+    return Object.assign(skill, { tagsDropped: dropped });
 }

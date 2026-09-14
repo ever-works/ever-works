@@ -39,6 +39,7 @@ import {
     PaygService,
 } from '@ever-works/agent/subscriptions';
 import { FleetJobService } from '@ever-works/agent/fleet';
+import { SkillReadinessService } from '@ever-works/agent/skills';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -396,6 +397,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TerminalTranscriptService'),
             inject: [TriggerInternalApiClient],
         },
+        // Skills shelf — the skill-readiness-sweep cron calls `sweepStale()`
+        // on this proxy, which RPCs to the live API where the Skill, binding
+        // and connection repositories, the tool-grant matrix and the
+        // credential port are wired. Same shape as TerminalTranscriptService.
+        {
+            provide: SkillReadinessService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'SkillReadinessService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -435,6 +446,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         PaygService,
         MemoryConsolidationScheduleService,
         TerminalTranscriptService,
+        SkillReadinessService,
     ],
 })
 export class TriggerInternalModule {}

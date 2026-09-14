@@ -84,6 +84,9 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Skills shelf — the workspace-level on/off switch.
+            ['SKILL_ENABLED', 'skill_enabled'],
+            ['SKILL_DISABLED', 'skill_disabled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -144,6 +147,7 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
+            // +2 skill_enabled / skill_disabled (Skills shelf on/off switch) -> 159.
             //
             // 🛑 157 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
@@ -151,7 +155,7 @@ describe('activity-log.types', () => {
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(157);
+            expect(literals).toHaveLength(159);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

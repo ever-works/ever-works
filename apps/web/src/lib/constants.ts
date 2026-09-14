@@ -248,6 +248,10 @@ export const ROUTES = {
     // Sits beside Connections: both are about capabilities the platform
     // consumes from outside rather than code it ships.
     DASHBOARD_SETTINGS_AGENT_PLUGINS: '/settings/agent-plugins',
+    // Connections (Settings → Connections) — the MCP server registry. The page
+    // has existed since the MCP slice; the Skills shelf links a Skill's
+    // missing connection here, so it gets a constant instead of a literal.
+    DASHBOARD_SETTINGS_CONNECTIONS: '/settings/connections',
     // Fleet — enrolled local runners. The page has existed since Wave 12;
     // it simply had no route constant, so every link to it was a literal.
     DASHBOARD_SETTINGS_FLEET: '/settings/fleet',
