@@ -633,6 +633,62 @@ describe('NotificationService', () => {
         });
     });
 
+    describe('notifySharedViewFirstView', () => {
+        function makeSharedViewService() {
+            const repository = makeRepository({
+                findByDeduplicationKey: jest.fn().mockResolvedValue(null),
+                create: jest.fn().mockResolvedValue({ id: 'n1' }),
+            });
+            const emitter = { emit: jest.fn() };
+            const service = new NotificationService(repository as any, emitter as any);
+            return { service, repository, emitter };
+        }
+
+        it('files one informational row and fans out under the registered event key', async () => {
+            const { service, repository, emitter } = makeSharedViewService();
+
+            await service.notifySharedViewFirstView({
+                userId: 'owner-1',
+                sharedViewId: 'view-1',
+                rotationCount: 2,
+            });
+
+            expect(repository.create).toHaveBeenCalledTimes(1);
+            const args = (repository.create as jest.Mock).mock.calls[0][0];
+            expect(args.userId).toBe('owner-1');
+            expect(args.type).toBe(NotificationType.INFO);
+            expect(args.message).toBe('Your shared view was opened for the first time.');
+            expect(args.actionUrl).toBe('/settings/sharing');
+            expect(args.metadata).toEqual({ sharedViewId: 'view-1' });
+            expect(args.deduplicationKey).toBe('shared_view_first_view_view-1_2');
+
+            const [eventName, payload] = (emitter.emit as jest.Mock).mock.calls[0];
+            expect(eventName).toBe(NOTIFICATION_FANOUT_EVENT);
+            expect(payload.eventKey).toBe('shared_view_first_view');
+            expect(payload.urgent).toBe(false);
+        });
+
+        it('does not file a second row for the same link when the producer is retried', async () => {
+            const { service, repository } = makeSharedViewService();
+            (repository.findByDeduplicationKey as jest.Mock).mockResolvedValueOnce(null);
+            await service.notifySharedViewFirstView({
+                userId: 'owner-1',
+                sharedViewId: 'view-1',
+                rotationCount: 0,
+            });
+            (repository.findByDeduplicationKey as jest.Mock).mockResolvedValue({
+                id: 'n1',
+                isDismissed: false,
+            });
+            await service.notifySharedViewFirstView({
+                userId: 'owner-1',
+                sharedViewId: 'view-1',
+                rotationCount: 0,
+            });
+            expect(repository.create).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('notifyInboxItem', () => {
         function makeInboxService() {
             const repository = makeRepository({

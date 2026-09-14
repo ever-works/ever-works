@@ -317,6 +317,16 @@ export enum ActivityActionType {
     AGENT_RUN_STARTED = 'agent_run_started',
     AGENT_RUN_COMPLETED = 'agent_run_completed',
     AGENT_RUN_FAILED = 'agent_run_failed',
+    // Shared view (AW-18) — the Workspace owner turning sharing on or off,
+    // regenerating the link, and changing what it publishes or whether
+    // crawlers may index it. One row per changed facet. `details` never
+    // carries the share token. Additive members — `activity_log.actionType`
+    // is a plain varchar, so no migration is needed.
+    SHARED_VIEW_ENABLED = 'shared_view_enabled',
+    SHARED_VIEW_DISABLED = 'shared_view_disabled',
+    SHARED_VIEW_REGENERATED = 'shared_view_regenerated',
+    SHARED_VIEW_SECTIONS_CHANGED = 'shared_view_sections_changed',
+    SHARED_VIEW_INDEXING_CHANGED = 'shared_view_indexing_changed',
 }
 
 /**
@@ -354,6 +364,14 @@ export interface CreateActivityLogDto {
     actorAgentId?: string | null;
     /** The actor's display name at the moment the record is written. */
     actorLabel?: string | null;
+    /**
+     * Explicit ownership stamp. Optional: when omitted the scope-stamping
+     * subscriber fills both from the request scope, as it always has. A
+     * writer acting on a Workspace named in the route (rather than the
+     * request's active scope) passes it so the row lands in that Workspace.
+     */
+    tenantId?: string | null;
+    organizationId?: string | null;
 }
 
 /**

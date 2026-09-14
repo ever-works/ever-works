@@ -912,6 +912,47 @@ export class NotificationService {
     }
 
     /**
+     * Shared view (AW-18) — the first time a freshly generated share link is
+     * opened, tell the Workspace owner once. The caller has already claimed
+     * the first view atomically, and the deduplication key carries the link's
+     * rotation count, so a retried producer cannot ring twice for one link
+     * while a regenerated link still notifies once more.
+     *
+     * Registered as `shared_view_first_view` (in-app by default) so the
+     * owner can route it to a channel from the preference matrix. The share
+     * token is never part of the payload.
+     */
+    async notifySharedViewFirstView(args: {
+        userId: string;
+        sharedViewId: string;
+        rotationCount: number;
+    }): Promise<void> {
+        const title = 'Shared view opened';
+        const message = 'Your shared view was opened for the first time.';
+        const actionUrl = '/settings/sharing';
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.SYSTEM,
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'Open sharing',
+            metadata: { sharedViewId: args.sharedViewId },
+            deduplicationKey: `shared_view_first_view_${args.sharedViewId}_${args.rotationCount}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'shared_view_first_view',
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'Open sharing',
+            urgent: false,
+        });
+    }
+
+    /**
      * Delete expired and old notifications
      * Should be called periodically by a cleanup job
      */
