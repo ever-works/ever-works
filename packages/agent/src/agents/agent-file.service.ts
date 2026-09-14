@@ -9,7 +9,12 @@ import {
 import { Agent, AgentScope } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { ActivityLogService } from '../activity-log/activity-log.service';
-import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
+import { isUuid } from '../activity-log/feed-actor';
+import {
+    ActivityActionType,
+    ActivityStatus,
+    type CreateActivityLogDto,
+} from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
 
 /**
@@ -101,6 +106,18 @@ export class AgentFileService {
         name: AgentFileName;
         body: string;
         expectedHash?: string;
+        /**
+         * Who is saving. Omitted, it is the signed-in user (the Instructions
+         * tab, agent templates, company import). The agent's own
+         * `editAgentFile` tool passes `'agent'`, so the activity record names
+         * the agent as the actor rather than the user who owns it.
+         */
+        actor?: 'user' | 'agent';
+        /**
+         * The run an agent-authored save happened in. Recorded as
+         * `details.runId` when it is a uuid, so the record opens that run.
+         */
+        runId?: string;
     }): Promise<{ newHash: string }> {
         const { userId, agentId, name, body, expectedHash } = args;
         this.assertValidName(name);
@@ -108,6 +125,7 @@ export class AgentFileService {
         assertNoSecrets(body, `Agent file ${name}`);
 
         const agent = await this.requireOwned(userId, agentId);
+        const actor = this.activityActor(agent, args.actor, args.runId);
 
         // Optimistic concurrency: only enforce if caller supplied a hash.
         if (expectedHash !== undefined && (agent.contentHash ?? '') !== expectedHash) {
@@ -117,11 +135,13 @@ export class AgentFileService {
                 action: 'agent_file_reverted',
                 status: ActivityStatus.FAILED,
                 summary: `Concurrent edit on ${name} for agent ${agent.slug}`,
+                ...actor.fields,
                 details: {
                     agentId: agent.id,
                     name,
                     expectedHash,
                     currentHash: agent.contentHash ?? null,
+                    ...actor.details,
                 },
             });
             throw new BadRequestException(
@@ -157,12 +177,14 @@ export class AgentFileService {
                 action: 'agent_file_edited',
                 status: ActivityStatus.COMPLETED,
                 summary: `Edited ${name} for agent ${agent.slug}`,
+                ...actor.fields,
                 details: {
                     agentId: agent.id,
                     name,
                     prevHash,
                     newHash,
                     diff: this.makeDiffSummary(this.readInline(agent, name) ?? '', body),
+                    ...actor.details,
                 },
             });
         } catch (err) {
@@ -177,6 +199,28 @@ export class AgentFileService {
     }
 
     // ── helpers ───────────────────────────────────────────────────
+
+    /**
+     * The actor stamped on this save's activity records. `details.agentId`
+     * is the agent whose files changed either way; only an agent-authored
+     * save makes that agent the actor too.
+     */
+    private activityActor(
+        agent: Agent,
+        actor: 'user' | 'agent' | undefined,
+        runId: string | undefined,
+    ): {
+        fields: Pick<CreateActivityLogDto, 'actorKind' | 'actorAgentId'>;
+        details: { runId?: string };
+    } {
+        if (actor !== 'agent') {
+            return { fields: { actorKind: 'user' }, details: {} };
+        }
+        return {
+            fields: { actorKind: 'agent', actorAgentId: agent.id },
+            details: isUuid(runId) ? { runId } : {},
+        };
+    }
 
     private assertValidName(name: string): asserts name is AgentFileName {
         if (!AGENT_FILE_NAMES.includes(name as AgentFileName)) {
