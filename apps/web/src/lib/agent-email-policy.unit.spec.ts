@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import type { EmailCapMeterDto, EmailCapWindowDto } from '@ever-works/contracts';
 import {
+    RECOMMENDED_AGENT_INBOX_CAPS,
     describeEmailSendRefusal,
     formatCapInput,
+    hasNoConfiguredAgentLimits,
+    initialCapInputs,
     isDecidableDraft,
     minutesUntil,
     parseCapInput,
+    unconfiguredAgentCapFields,
 } from './agent-email-policy';
 
 describe('parseCapInput', () => {
@@ -62,6 +67,104 @@ describe('describeEmailSendRefusal', () => {
         expect(
             describeEmailSendRefusal({ details: { error: 'EmailSendCapExceeded', details: {} } }),
         ).toBeNull();
+    });
+});
+
+describe('unconfigured limits', () => {
+    const meter = (
+        sources: Partial<Record<string, EmailCapWindowDto['source']>>,
+        enforced = true,
+    ): EmailCapMeterDto => ({
+        agentId: 'agent-1',
+        enforced,
+        mode: 'auto-send',
+        modeSource: 'platform',
+        pausedUntil: null,
+        windows: Object.entries(sources).map(([kind, source]) => ({
+            kind: kind as EmailCapWindowDto['kind'],
+            scope: 'inbox',
+            used: 0,
+            cap: source === 'unconfigured' ? null : 5,
+            windowSeconds: 60,
+            source: source as EmailCapWindowDto['source'],
+        })),
+    });
+
+    it('keeps the recommended per-Agent numbers in one place', () => {
+        expect(RECOMMENDED_AGENT_INBOX_CAPS).toEqual({
+            dailySendCap: 100,
+            burstSendCap: 10,
+            recipientBurstCap: 20,
+            recipientsPerMessageCap: 50,
+        });
+    });
+
+    it('reports "no limits" only when every per-Agent window is unconfigured', () => {
+        const none = meter({
+            recipientsPerMessage: 'unconfigured',
+            inboxBurst: 'unconfigured',
+            inboxRecipients: 'unconfigured',
+            inboxDaily: 'unconfigured',
+            workspaceDaily: 'platform',
+        });
+        expect(hasNoConfiguredAgentLimits(none)).toBe(true);
+        expect(unconfiguredAgentCapFields(none)).toEqual([
+            'dailySendCap',
+            'burstSendCap',
+            'recipientBurstCap',
+            'recipientsPerMessageCap',
+        ]);
+        expect(
+            hasNoConfiguredAgentLimits(
+                meter({ inboxDaily: 'organization', inboxBurst: 'unconfigured' }),
+            ),
+        ).toBe(false);
+        expect(hasNoConfiguredAgentLimits(meter({ inboxDaily: 'recommended' }))).toBe(false);
+        expect(hasNoConfiguredAgentLimits(meter({ inboxDaily: 'unconfigured' }, false))).toBe(
+            false,
+        );
+        expect(hasNoConfiguredAgentLimits(meter({}))).toBe(false);
+    });
+
+    it('pre-fills only limits nothing configures, and only before the Agent has settings', () => {
+        const partly = meter({ inboxDaily: 'organization', inboxBurst: 'unconfigured' });
+        expect(initialCapInputs({ inbox: null, meter: partly })).toEqual({
+            dailySendCap: '',
+            burstSendCap: '10',
+            recipientBurstCap: '',
+            recipientsPerMessageCap: '',
+        });
+        const withSettings = initialCapInputs({
+            inbox: {
+                id: 'inbox-1',
+                agentId: 'agent-1',
+                emailAddressId: null,
+                mode: 'auto-send',
+                state: 'active',
+                caps: {
+                    inboxDailySends: 7,
+                    inboxBurstSends: null,
+                    inboxBurstRecipients: null,
+                    recipientsPerMessage: 0,
+                },
+                capPausedUntil: null,
+                createdAt: '2026-09-14T00:00:00.000Z',
+                updatedAt: '2026-09-14T00:00:00.000Z',
+            },
+            meter: partly,
+        });
+        expect(withSettings).toEqual({
+            dailySendCap: '7',
+            burstSendCap: '',
+            recipientBurstCap: '',
+            recipientsPerMessageCap: '0',
+        });
+        expect(initialCapInputs(null)).toEqual({
+            dailySendCap: '',
+            burstSendCap: '',
+            recipientBurstCap: '',
+            recipientsPerMessageCap: '',
+        });
     });
 });
 

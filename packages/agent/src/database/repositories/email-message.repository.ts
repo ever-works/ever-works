@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThanOrEqual, Repository, type FindOptionsWhere } from 'typeorm';
 import type { EmailMessageStatus } from '@ever-works/contracts';
 import { EmailMessage, EmailMessageDirection } from '../../entities/email-message.entity';
+import { advisoryLockObjectId } from './agent-run.repository';
 
 /**
  * AW-05 — which sends a ceiling window counts: one Agent's (`agentId`) or a
@@ -11,6 +12,25 @@ import { EmailMessage, EmailMessageDirection } from '../../entities/email-messag
 export interface EmailSendWindowFilter {
     agentId?: string;
     userId?: string;
+}
+
+/**
+ * AW-05 — advisory-lock namespaces (`classid`) for send admission: one for
+ * an Agent's per-Agent windows, one for an account's windows. Apart from
+ * each other and from run admission (`0x6577_0001`) and live-view admission
+ * (`0x6577_000b` / `0x6577_000c`). Arbitrary but STABLE: changing one would
+ * make an old and a new replica lock on different keys during a rolling
+ * restart — exactly the window the lock exists for.
+ */
+export const EMAIL_SEND_AGENT_ADMISSION_LOCK_CLASS_ID = 0x6577_0e01 | 0;
+export const EMAIL_SEND_ACCOUNT_ADMISSION_LOCK_CLASS_ID = 0x6577_0e02 | 0;
+
+/** What one send admission serializes on. Omit a key whose windows the send does not count. */
+export interface EmailSendAdmissionLockKeys {
+    /** The Agent whose per-Agent windows (minute, 5 minutes, 24 hours) are counted. */
+    agentId?: string | null;
+    /** The account whose account-wide windows (24 hours, 30 days) are counted. */
+    userId?: string | null;
 }
 
 export interface EmailMessageQueryOptions {
@@ -32,10 +52,84 @@ export interface EmailMessageQueryOptions {
  */
 @Injectable()
 export class EmailMessageRepository {
+    private readonly logger = new Logger(EmailMessageRepository.name);
+
     constructor(
         @InjectRepository(EmailMessage)
         private readonly repository: Repository<EmailMessage>,
     ) {}
+
+    /**
+     * AW-05 — serialize a send's count-then-reserve against every other send
+     * counting the same windows, so a burst cannot walk past a hard ceiling.
+     * The run-admission lock's pattern (`AgentRunRepository.withAdmissionLock`)
+     * in its own namespaces.
+     *
+     * POSTGRES: opens ONE transaction, takes `pg_advisory_xact_lock` on the
+     * Agent key and then the account key (fixed order, so two admissions can
+     * never hold one key each while waiting for the other's), and runs `fn`
+     * with a repository bound to THAT transaction. The count and the
+     * reservation row `fn` writes therefore commit together, and the lock is
+     * released by that same commit: the next waiter's count starts after it
+     * and sees the reservation. Doing the work on the transaction's own
+     * connection (not the pool's) also means a burst of waiters, each holding
+     * a connection, can never starve the lock holder of one.
+     *
+     * EVERY OTHER DRIVER (better-sqlite3 — the e2e/CI stack): advisory locks
+     * do not exist, so this is a documented no-op that calls `fn` with this
+     * repository. No keys = nothing to serialize = the same.
+     *
+     * A failure to TAKE the lock degrades to running `fn` unlocked (logged),
+     * like the run-admission lock: a broken safety valve must never stop
+     * legitimate mail. A failure INSIDE `fn` (or its commit) is re-raised and
+     * `fn` is never re-run, since it may already have reserved capacity.
+     */
+    async withSendAdmissionLock<T>(
+        keys: EmailSendAdmissionLockKeys,
+        fn: (messages: EmailMessageRepository) => Promise<T>,
+    ): Promise<T> {
+        const connection = this.repository.manager.connection;
+        if (connection.options.type !== 'postgres') {
+            return fn(this);
+        }
+        const locks: Array<[number, number]> = [];
+        if (keys.agentId) {
+            locks.push([
+                EMAIL_SEND_AGENT_ADMISSION_LOCK_CLASS_ID,
+                advisoryLockObjectId(`agent:${keys.agentId}`),
+            ]);
+        }
+        if (keys.userId) {
+            locks.push([
+                EMAIL_SEND_ACCOUNT_ADMISSION_LOCK_CLASS_ID,
+                advisoryLockObjectId(`user:${keys.userId}`),
+            ]);
+        }
+        if (locks.length === 0) {
+            return fn(this);
+        }
+        let entered = false;
+        try {
+            return await connection.transaction(async (manager) => {
+                for (const [classId, objectId] of locks) {
+                    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+                        classId,
+                        objectId,
+                    ]);
+                }
+                entered = true;
+                return fn(new EmailMessageRepository(manager.getRepository(EmailMessage)));
+            });
+        } catch (error) {
+            if (entered) throw error;
+            this.logger.warn(
+                `Send admission lock unavailable (${locks.length} key(s)) — admitting unlocked: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return fn(this);
+        }
+    }
 
     create(entry: Partial<EmailMessage>): EmailMessage {
         return this.repository.create(entry);

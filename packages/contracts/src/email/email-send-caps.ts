@@ -3,7 +3,8 @@ import {
 	EMAIL_INBOX_BURST_WINDOW_MS,
 	EMAIL_INBOX_RECIPIENT_WINDOW_MS,
 	EMAIL_MONTH_WINDOW_MS,
-	EMAIL_SEND_CAP_MAX_CONFIGURABLE
+	EMAIL_SEND_CAP_MAX_CONFIGURABLE,
+	EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS
 } from './email.constants.js';
 import {
 	EMAIL_INBOX_CAP_FIELDS,
@@ -11,7 +12,7 @@ import {
 	type EmailSendCapField,
 	type EmailSendCapLimitKind,
 	type EmailSendCapScope,
-	type EmailSendCapSource,
+	type EmailSendCapValueSource,
 	type EmailSendCapsOverride,
 	type ResolvedEmailSendCaps
 } from './email.types.js';
@@ -21,12 +22,23 @@ import {
  *
  * Three scopes, least to most specific:
  *
- *     platform (constants, replaceable by the operator)  <  organization  <  Agent inbox
+ *     platform (operator env)  <  organization  <  Agent inbox
  *
  * Most specific wins, field by field. An inbox may only speak about the
  * per-inbox ceilings; the workspace ceilings are decided by the platform and
  * the organization alone, so no Agent's own settings can widen the total an
  * account sends.
+ *
+ * # Unconfigured = unchanged
+ *
+ * Every ceiling is OPT-IN. A field no scope configures resolves to `null`
+ * with source `'unconfigured'` — no ceiling, exactly as before ceilings
+ * existed — never to a hidden default. The recommended numbers
+ * (`EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS`) apply in exactly one implicit
+ * case: the Agent HAS a settings row (someone chose to configure it), and
+ * one of its per-Agent limits is left to inherit with nothing above it — it
+ * then resolves to the recommended number (source `'recommended'`), so a
+ * newly configured Agent is protected by default.
  *
  * Nothing here touches a database, the clock or a request, so the precedence
  * and the arithmetic can be tested on their own and the same functions run
@@ -60,25 +72,49 @@ export function normalizeEmailSendCapsOverride(
 }
 
 export interface ResolveEmailSendCapsInput {
-	/** Platform ceilings, already carrying any operator replacement. `0` = none. */
-	platform: Record<EmailSendCapField, number>;
+	/**
+	 * Platform ceilings THE OPERATOR CONFIGURED (one per `EMAIL_SEND_CAP_*`
+	 * env var that is set). A field that is absent, `null` or `undefined` is
+	 * NOT configured and enforces nothing; `0` is an explicit "no ceiling".
+	 * A full record (every field a number) behaves as before: every field is
+	 * then configured.
+	 */
+	platform: Partial<Record<EmailSendCapField, number | null>>;
 	organization?: EmailSendCapsOverride | null;
 	inbox?: EmailSendCapsOverride | null;
+	/**
+	 * The Agent has a settings row of its own. Its per-Agent limits that no
+	 * scope configures then fall back to the recommended numbers instead of
+	 * "no ceiling". Defaults to "an `inbox` override was passed".
+	 */
+	inboxConfigured?: boolean;
 }
 
 export interface ResolvedEmailSendCapsWithSources {
 	caps: ResolvedEmailSendCaps;
-	sources: Record<EmailSendCapField, EmailSendCapSource>;
+	sources: Record<EmailSendCapField, EmailSendCapValueSource>;
+	/** `true` when at least one ceiling has a source — `false` = nothing configured, nothing enforced. */
+	configured: boolean;
 }
+
+const INBOX_CAP_FIELD_SET: ReadonlySet<EmailSendCapField> = new Set(EMAIL_INBOX_CAP_FIELDS);
 
 export function resolveEmailSendCaps(input: ResolveEmailSendCapsInput): ResolvedEmailSendCapsWithSources {
 	const organization = normalizeEmailSendCapsOverride(input.organization);
 	const inbox = normalizeEmailSendCapsOverride(input.inbox, EMAIL_INBOX_CAP_FIELDS);
+	const inboxConfigured = input.inboxConfigured ?? (input.inbox !== undefined && input.inbox !== null);
 	const caps = {} as ResolvedEmailSendCaps;
-	const sources = {} as Record<EmailSendCapField, EmailSendCapSource>;
+	const sources = {} as Record<EmailSendCapField, EmailSendCapValueSource>;
+	let configured = false;
 	for (const field of EMAIL_SEND_CAP_FIELDS) {
-		let value = normalizeEmailSendCapValue(input.platform[field]) ?? 0;
-		let source: EmailSendCapSource = 'platform';
+		// `undefined` = nobody has spoken about this ceiling yet.
+		let value: number | undefined;
+		let source: EmailSendCapValueSource = 'unconfigured';
+		const platformValue = normalizeEmailSendCapValue(input.platform?.[field]);
+		if (platformValue !== undefined) {
+			value = platformValue;
+			source = 'platform';
+		}
 		const orgValue = organization[field];
 		if (orgValue !== undefined && orgValue !== null) {
 			value = orgValue;
@@ -89,10 +125,34 @@ export function resolveEmailSendCaps(input: ResolveEmailSendCapsInput): Resolved
 			value = inboxValue;
 			source = 'inbox';
 		}
-		caps[field] = value === 0 ? null : value;
+		if (value === undefined && inboxConfigured && INBOX_CAP_FIELD_SET.has(field)) {
+			value = EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS[field];
+			source = 'recommended';
+		}
+		caps[field] = value === undefined || value === 0 ? null : value;
 		sources[field] = source;
+		if (source !== 'unconfigured') configured = true;
 	}
-	return { caps, sources };
+	return { caps, sources, configured };
+}
+
+/**
+ * Which rolling windows a send has to COUNT before it may go out — and so
+ * which advisory locks serialize it. `inbox` when the send is attributed to
+ * an Agent and one of its windowed per-Agent ceilings is set; `workspace`
+ * when an account-level ceiling is set. The per-message recipient ceiling is
+ * not a window: it needs no count and no lock.
+ */
+export function emailSendCapWindowsInForce(
+	caps: ResolvedEmailSendCaps,
+	hasInbox: boolean
+): { inbox: boolean; workspace: boolean } {
+	return {
+		inbox:
+			hasInbox &&
+			(caps.inboxBurstSends !== null || caps.inboxBurstRecipients !== null || caps.inboxDailySends !== null),
+		workspace: caps.workspaceDailySends !== null || caps.workspaceMonthlySends !== null
+	};
 }
 
 /** Lower-case, trim and strip a display name (`Ada <ada@x.io>` → `ada@x.io`). */

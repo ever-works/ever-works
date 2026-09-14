@@ -1,11 +1,16 @@
+import type { EmailSendCapField } from './email.types.js';
+
 /**
  * Agent email (AW-05) — every numeric limit the agent email loop uses, in
  * one place.
  *
- * The send ceilings below are the PLATFORM DEFAULTS. They are not the only
- * word: an operator can replace any of them per deployment (environment),
- * an organization can replace them for its own agents, and an Agent's inbox
- * can replace the per-inbox ones for itself. See `email-send-caps.ts` for the
+ * The send ceilings below are the RECOMMENDED limits. They are never applied
+ * on their own: a deployment where nobody configured anything sends exactly
+ * as it did before ceilings existed. They take effect only when a source
+ * opts in — an operator setting `EMAIL_SEND_CAP_*` (per limit, platform-wide),
+ * an organization's email sending policy (its own Agents), or an Agent's own
+ * settings row (whose unset per-Agent limits fall back to these numbers, and
+ * which the product pre-fills with them). See `email-send-caps.ts` for the
  * override shape, where `0` means "no ceiling for this limit" and
  * `null`/absent means "inherit from the scope above".
  */
@@ -24,6 +29,21 @@ export const EMAIL_WORKSPACE_DAILY_CAP = 500;
 export const EMAIL_WORKSPACE_MONTHLY_CAP = 10_000;
 /** to + cc + bcc on one message. */
 export const EMAIL_MAX_RECIPIENTS_PER_MESSAGE = 50;
+
+/**
+ * The recommended ceilings as one record, keyed like every other cap map.
+ * Documentation and a starting point (the product pre-fills new Agent
+ * settings with them) — applied only when a source opts in, never as a
+ * silent platform default.
+ */
+export const EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS: Readonly<Record<EmailSendCapField, number>> = Object.freeze({
+	inboxDailySends: EMAIL_INBOX_DEFAULT_DAILY_CAP,
+	inboxBurstSends: EMAIL_INBOX_BURST_SENDS,
+	inboxBurstRecipients: EMAIL_INBOX_BURST_RECIPIENTS,
+	recipientsPerMessage: EMAIL_MAX_RECIPIENTS_PER_MESSAGE,
+	workspaceDailySends: EMAIL_WORKSPACE_DAILY_CAP,
+	workspaceMonthlySends: EMAIL_WORKSPACE_MONTHLY_CAP
+});
 
 export const EMAIL_DAY_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const EMAIL_MONTH_WINDOW_MS = 30 * EMAIL_DAY_WINDOW_MS;

@@ -17,9 +17,13 @@ import {
  *   - 1…1,000,000 → that ceiling
  *
  * `@IsOptional()` lets `null` through untouched, which is exactly "inherit".
+ *
+ * Ceilings are opt-in: a value set here turns that ceiling on for its
+ * scope. An Agent's settings, once they exist, keep its per-Agent limits on —
+ * a limit left to inherit with nothing above it takes the recommended number.
  */
 const CAP_DESCRIPTION =
-    'null = inherit from the organization / platform, 0 = no ceiling, a positive integer = that ceiling.';
+    'null = inherit from the organization / platform (for an Agent with settings, the recommended limit when nothing else is set), 0 = no ceiling, a positive integer = that ceiling.';
 
 export class UpdateAgentInboxDto {
     @ApiPropertyOptional({

@@ -1335,7 +1335,7 @@
                     "keepGate": "Keep the gate",
                     "turnItOff": "Turn it off",
                     "limitsTitle": "Send limits",
-                    "limitsHint": "Leave a field blank to inherit it. 0 means no limit for this agent.",
+                    "limitsHint": "Leave a field blank to inherit it — once this agent has settings, a limit nothing else sets uses the recommended number. 0 means no limit for this agent.",
                     "enforcedOff": "Send limits are turned off for this deployment.",
                     "pausedUntil": "Paused — the daily limit is reached. Sending resumes on its own at {time}.",
                     "usage": "{used} of {cap}",
@@ -1344,8 +1344,16 @@
                     "source": {
                         "platform": "the platform",
                         "organization": "your organization",
-                        "inbox": "this agent"
+                        "inbox": "this agent",
+                        "recommended": "the recommended limits",
+                        "unconfigured": "nothing configured"
                     },
+                    "noLimitsTitle": "No send limits are configured for this agent",
+                    "noLimitsConfigured": "Nothing sets a limit for this agent — not its own settings, its organization or this deployment — so it keeps sending exactly as before, with no limit of its own. Apply the recommended limits to protect it: {daily} sends per 24 hours, {perMinute} per minute, {recipients} recipients per 5 minutes and {perMessage} recipients per message.",
+                    "applyRecommended": "Apply recommended limits",
+                    "recommendedApplied": "Recommended limits applied",
+                    "notConfigured": "No limit — not configured",
+                    "usageNotConfigured": "{used} · no limit — not configured",
                     "windows": {
                         "recipientsPerMessage": "Recipients per message",
                         "inboxBurst": "Sends in the last minute",

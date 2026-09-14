@@ -27,15 +27,18 @@ import { PortableDateColumn } from './_types';
  *
  * An Agent with no row keeps behaving as it did before this table existed:
  * its sends are not held (unless its organization's policy says otherwise)
- * and the platform / organization ceilings apply. A row is created only
- * when a person asks for one, and a created row starts in
- * `draft-review` — nothing it writes leaves without approval.
+ * and only ceilings someone explicitly configured apply (an operator's
+ * `EMAIL_SEND_CAP_*`, its organization's caps) — with neither, none. A row
+ * is created only when a person asks for one, and a created row starts in
+ * `draft-review` — nothing it writes leaves without approval — with its
+ * per-Agent limits in force.
  *
  * # Ceilings
  *
  * Each `*Cap` column is `NULL` = inherit (organization policy, then the
- * platform), `0` = explicitly no ceiling, a positive integer = that
- * ceiling. Resolution is the pure `resolveEmailSendCaps` in
+ * operator's platform value, then — because this row exists — the
+ * recommended number), `0` = explicitly no ceiling, a positive integer =
+ * that ceiling. Resolution is the pure `resolveEmailSendCaps` in
  * `@ever-works/contracts`. Counts are never stored here — they are read
  * from `email_messages` at send time, so nothing a model writes can move
  * them.

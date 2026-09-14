@@ -16,7 +16,10 @@ import {
     type AgentInboxSettingsPatch,
 } from '@ever-works/agent/email';
 import { config } from '@ever-works/agent/config';
-import type { EmailSendPolicyOverride } from '@ever-works/contracts';
+import {
+    EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS,
+    type EmailSendPolicyOverride,
+} from '@ever-works/contracts';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { OrganizationMembershipService } from '../organizations/organization-membership.service';
@@ -132,6 +135,13 @@ export class EmailSendPolicyController {
                 enforced: config.email.sendCaps.isEnforced(),
                 caps: config.email.sendCaps.getPlatformCaps(),
                 defaultMode: config.email.getDefaultAgentMode(),
+                // AW-05 — ceilings are opt-in. `configuredCaps` is what the
+                // operator actually turned on (enforced platform-wide); a
+                // limit absent from it is enforced only where this
+                // organization's policy or an Agent's settings set it.
+                // `recommendedCaps` are the suggested numbers.
+                configuredCaps: config.email.sendCaps.getConfiguredPlatformCaps(),
+                recommendedCaps: EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS,
             },
         };
     }

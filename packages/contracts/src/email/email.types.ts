@@ -123,15 +123,34 @@ export const EMAIL_SEND_CAP_FIELDS = [
 
 export type EmailSendCapField = (typeof EMAIL_SEND_CAP_FIELDS)[number];
 
-/** Resolved ceilings. `null` = no ceiling. */
+/**
+ * Resolved ceilings. `null` = no ceiling — either because a scope said so
+ * explicitly (`0`) or because nothing is configured; the matching
+ * {@link EmailSendCapValueSource} (`'unconfigured'`) tells the two apart.
+ */
 export type ResolvedEmailSendCaps = Record<EmailSendCapField, number | null>;
 
 /** Which scope decided each resolved ceiling. */
 export type EmailSendCapSource = 'platform' | 'organization' | 'inbox';
 
 /**
+ * Where ONE resolved ceiling came from — a scope, or one of the two ways no
+ * scope decided it:
+ *
+ * - `recommended`  — the Agent has settings of its own, so a per-Agent limit
+ *   nobody set falls back to the recommended number
+ *   (`EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS`).
+ * - `unconfigured` — no source applies: no operator env var, no organization
+ *   policy, no Agent settings. The ceiling is `null` and the send is
+ *   unrestricted, exactly as before ceilings existed.
+ */
+export type EmailSendCapValueSource = EmailSendCapSource | 'recommended' | 'unconfigured';
+
+/**
  * Organization-level email sending policy (stored on the organization).
- * Every field is optional; absence inherits the platform default.
+ * Every field is optional; absence inherits the platform default. A ceiling
+ * set here is an opt-in: it is enforced for this organization's Agents even
+ * when the operator configured nothing.
  */
 export interface EmailSendPolicyOverride {
 	/**
@@ -151,7 +170,8 @@ export interface EmailCapWindowDto {
 	cap: number | null;
 	/** `0` for `recipientsPerMessage`, which is not a time window. */
 	windowSeconds: number;
-	source: EmailSendCapSource;
+	/** `'unconfigured'` = no limit because nothing is configured (see {@link EmailSendCapValueSource}). */
+	source: EmailSendCapValueSource;
 }
 
 /**
@@ -168,6 +188,12 @@ export interface EmailCapMeterDto {
 	windows: EmailCapWindowDto[];
 	/** ISO time the inbox's rolling-24h ceiling frees up again, when it is currently full. */
 	pausedUntil: string | null;
+	/**
+	 * `false` when no ceiling source applies to this Agent at all (every
+	 * window is `unconfigured`), so it sends without limits exactly as before.
+	 * Optional only so older readers of the DTO keep type-checking.
+	 */
+	limitsConfigured?: boolean;
 }
 
 export interface AgentInboxDto {

@@ -11,13 +11,16 @@ import {
     AGENT_INBOX_MODES,
     computeEmailCapRetryAfterSeconds,
     distinctEmailRecipients,
+    emailSendCapWindowsInForce,
     evaluateEmailSendCaps,
     normalizeEmailSendCapsOverride,
     resolveEmailSendCaps,
     type AgentInboxMode,
     type EmailCapMeterDto,
     type EmailSendCapField,
+    type EmailSendCapRefusal,
     type EmailSendCapSource,
+    type EmailSendCapValueSource,
     type EmailSendPolicyOverride,
     type EmailSendWindowUsage,
     type ResolvedEmailSendCaps,
@@ -30,11 +33,17 @@ import { Organization } from '../entities/organization.entity';
 import { AgentInboxRepository } from '../database/repositories/agent-inbox.repository';
 import {
     EmailMessageRepository,
+    type EmailSendAdmissionLockKeys,
     type EmailSendWindowFilter,
 } from '../database/repositories/email-message.repository';
 import { EmailApprovalRequiredException } from './email-approval-required.exception';
 import { EmailSendCapExceededException } from './email-send-cap-exceeded.exception';
-import type { EmailSendAttempt, EmailSendPolicyGate } from './email-send-policy.port';
+import type {
+    EmailSendAdmission,
+    EmailSendAttempt,
+    EmailSendPolicyGate,
+    EmailSendReservation,
+} from './email-send-policy.port';
 
 /** The effective policy for one send: who decided the mode and every ceiling. */
 export interface EffectiveEmailSendPolicy {
@@ -42,10 +51,27 @@ export interface EffectiveEmailSendPolicy {
     mode: AgentInboxMode;
     modeSource: EmailSendCapSource;
     caps: ResolvedEmailSendCaps;
-    sources: Record<EmailSendCapField, EmailSendCapSource>;
+    /** Per ceiling: the scope that set it, `recommended`, or `unconfigured` (no limit, nothing set). */
+    sources: Record<EmailSendCapField, EmailSendCapValueSource>;
+    /**
+     * `false` = no source configured any ceiling for this send (no operator
+     * env var, no organization caps, no Agent settings): nothing is counted
+     * or enforced, exactly as before ceilings existed.
+     */
+    configured: boolean;
     inbox: AgentInbox | null;
     organizationId: string | null;
 }
+
+/** Usage for a send whose only applicable ceiling is per message (no window is read). */
+const NO_USAGE: EmailSendWindowUsage = {
+    hasInbox: false,
+    inboxBurstSends: 0,
+    inboxDailySends: 0,
+    inboxRecentRecipients: [],
+    workspaceDailySends: 0,
+    workspaceMonthlySends: 0,
+};
 
 /**
  * Agent email (AW-05) — the approve-before-send gate and the send ceilings,
@@ -66,11 +92,28 @@ export interface EffectiveEmailSendPolicy {
  *
  * # Where the numbers come from
  *
- * Platform defaults (operator env) < organization policy < the Agent's inbox
- * row, resolved by the pure `resolveEmailSendCaps`. `0` at any scope means
- * explicitly unrestricted, and `EMAIL_SEND_CAPS_ENFORCEMENT=off` restores the
- * pre-ceiling behaviour for a whole deployment. Counts are never read from
- * anything a model can write.
+ * Platform (operator env) < organization policy < the Agent's inbox row,
+ * resolved by the pure `resolveEmailSendCaps`. Every ceiling is OPT-IN:
+ *
+ * - no `EMAIL_SEND_CAP_*` env var, no organization caps and no Agent
+ *   settings row → nothing is counted, locked or refused; the send behaves
+ *   exactly as it did before this gate existed;
+ * - an operator env var enforces that ceiling platform-wide;
+ * - an organization's caps are enforced for that organization's Agents;
+ * - an Agent's settings row enforces its per-Agent limits, taking the
+ *   recommended numbers for any it leaves unset.
+ *
+ * `0` at any scope means explicitly unrestricted, and
+ * `EMAIL_SEND_CAPS_ENFORCEMENT=off` restores the pre-ceiling behaviour for a
+ * whole deployment. Counts are never read from anything a model can write.
+ *
+ * # Hard stops under concurrency
+ *
+ * A windowed ceiling is a count followed by a send, so it is only a hard
+ * stop if the count and a reservation of capacity are serialized.
+ * `admitSend` does both inside `EmailMessageRepository.withSendAdmissionLock`
+ * (Postgres advisory locks on the Agent and/or the account) and writes the
+ * reservation before the lock is released; the facade then settles it.
  *
  * # What "workspace" counts
  *
@@ -97,11 +140,37 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
     }
 
     async assertSendAllowed(attempt: EmailSendAttempt): Promise<void> {
+        await this.admit(attempt, null);
+    }
+
+    /**
+     * {@link assertSendAllowed} with an atomic reservation (see the port).
+     *
+     * When no ceiling window applies — the unconfigured case above all —
+     * nothing is counted, nothing is locked and nothing is reserved: the send
+     * proceeds exactly as it did before ceilings existed. When one does, the
+     * count and the reservation run inside
+     * `EmailMessageRepository.withSendAdmissionLock`, keyed on the Agent
+     * (per-Agent windows) and/or the account (account windows).
+     */
+    async admitSend(
+        attempt: EmailSendAttempt,
+        reservation?: EmailSendReservation | null,
+    ): Promise<EmailSendAdmission> {
+        return this.admit(attempt, reservation ?? null);
+    }
+
+    private async admit(
+        attempt: EmailSendAttempt,
+        reservation: EmailSendReservation | null,
+    ): Promise<EmailSendAdmission> {
+        const admitted: EmailSendAdmission = { reservedMessageId: null };
+        let reservedMessageId: string | null = null;
         const userId = attempt.userId;
         if (!userId) {
             // Unattributed platform mail: there is no owner to count against
             // and no Agent to gate. Unchanged from before the gate existed.
-            return;
+            return admitted;
         }
         const agentId = attempt.agentId;
         const policy = await this.resolvePolicy(userId, agentId);
@@ -114,13 +183,50 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
             }
         }
 
-        if (!policy.enforced) return;
+        // Ceilings off for the deployment, or no source configured any
+        // ceiling for this send: nothing to count, exactly as before.
+        if (!policy.enforced || !policy.configured) return admitted;
 
         const recipients = distinctEmailRecipients(attempt.to, attempt.cc, attempt.bcc);
-        const now = this.now();
-        const usage = await this.readUsage(userId, agentId, now);
-        const refusal = evaluateEmailSendCaps(policy.caps, usage, recipients);
-        if (!refusal) return;
+        const windows = emailSendCapWindowsInForce(policy.caps, !!agentId);
+        let refusal: EmailSendCapRefusal | null;
+        let now: Date;
+        if (!windows.inbox && !windows.workspace) {
+            // Only the per-message recipient ceiling can apply: no window to
+            // count, so no lock and no reservation.
+            now = this.now();
+            refusal = evaluateEmailSendCaps(policy.caps, NO_USAGE, recipients);
+        } else {
+            const keys: EmailSendAdmissionLockKeys = {
+                agentId: windows.inbox ? agentId : null,
+                userId: windows.workspace ? userId : null,
+            };
+            const outcome = await this.withAdmissionLock(keys, async (messages) => {
+                // Read the clock only once the lock is held: a waiter's
+                // windows end when it is admitted, not when it started waiting.
+                const lockedNow = this.now();
+                const usage = await this.readUsage(userId, agentId, lockedNow, messages);
+                const lockedRefusal = evaluateEmailSendCaps(policy.caps, usage, recipients);
+                if (lockedRefusal || !reservation) {
+                    return { refusal: lockedRefusal, now: lockedNow, reservedMessageId: null };
+                }
+                return {
+                    refusal: null,
+                    now: lockedNow,
+                    reservedMessageId: await this.reserve(
+                        messages,
+                        reservation,
+                        attempt,
+                        userId,
+                        lockedNow,
+                    ),
+                };
+            });
+            refusal = outcome.refusal;
+            now = outcome.now;
+            reservedMessageId = outcome.reservedMessageId;
+        }
+        if (!refusal) return reservedMessageId ? { reservedMessageId } : admitted;
 
         const retryAfterSeconds = await this.retryAfterSeconds(
             refusal.limitKind,
@@ -170,10 +276,16 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
         const organizationId = agent?.organizationId ?? null;
         const orgPolicy = organizationId ? await this.readOrganizationPolicy(organizationId) : null;
 
-        const { caps, sources } = resolveEmailSendCaps({
-            platform: config.email.sendCaps.getPlatformCaps(),
+        // Opt-in resolution: only the ceilings the operator set, the
+        // organization set, or the Agent's own settings row carries (whose
+        // unset per-Agent limits take the recommended numbers). With none of
+        // them, every ceiling is `null` / 'unconfigured' and nothing is
+        // enforced — the pre-ceiling behaviour.
+        const { caps, sources, configured } = resolveEmailSendCaps({
+            platform: config.email.sendCaps.getConfiguredPlatformCaps(),
             organization: orgPolicy?.caps ?? null,
             inbox: inbox ? inboxCapsOverride(inbox) : null,
+            inboxConfigured: !!inbox,
         });
 
         let mode: AgentInboxMode = config.email.getDefaultAgentMode();
@@ -193,6 +305,7 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
             modeSource,
             caps,
             sources,
+            configured,
             inbox,
             organizationId,
         };
@@ -233,6 +346,7 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
                 };
             }),
             pausedUntil,
+            limitsConfigured: policy.configured,
         };
     }
 
@@ -317,16 +431,81 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
         }
     }
 
+    /**
+     * Run a send's count-then-reserve under the repository's admission lock.
+     * `withSendAdmissionLock` is optional on the repository type so hand-built
+     * test doubles keep working; without it the section runs directly (the
+     * documented unlocked posture).
+     */
+    private withAdmissionLock<T>(
+        keys: EmailSendAdmissionLockKeys,
+        fn: (messages: EmailMessageRepository) => Promise<T>,
+    ): Promise<T> {
+        const messages = this.messages as EmailMessageRepository & {
+            withSendAdmissionLock?: EmailMessageRepository['withSendAdmissionLock'];
+        };
+        return typeof messages.withSendAdmissionLock === 'function'
+            ? messages.withSendAdmissionLock(keys, fn)
+            : fn(this.messages);
+    }
+
+    /**
+     * Take capacity for an admitted send, on the locked transaction's
+     * repository: a direct send gets its audit row now (`sending`, `sentAt`
+     * = admission time — so it counts), a released draft gets its own row
+     * stamped. Both are settled by the facade once the provider answers.
+     */
+    private async reserve(
+        messages: EmailMessageRepository,
+        reservation: EmailSendReservation,
+        attempt: EmailSendAttempt,
+        userId: string,
+        now: Date,
+    ): Promise<string | null> {
+        if (reservation.kind === 'draft') {
+            const draftId = attempt.draftMessageId;
+            if (!draftId) return null;
+            const moved = await messages.transitionStatus(draftId, ['sending'], 'sending', {
+                sentAt: now,
+            });
+            if (moved === 0) {
+                // The approved row changed hands after it was checked — do
+                // not send something nobody is holding the approval for.
+                throw new EmailApprovalRequiredException(
+                    'draft-not-approved',
+                    attempt.agentId ?? '',
+                );
+            }
+            return draftId;
+        }
+        const row = reservation.row;
+        const saved = await messages.save({
+            ...row,
+            userId,
+            direction: 'outbound',
+            conversationId: null,
+            providerMessageId: null,
+            toAddresses: [...row.toAddresses],
+            ccAddresses: row.ccAddresses ? [...row.ccAddresses] : null,
+            bccAddresses: row.bccAddresses ? [...row.bccAddresses] : null,
+            sentAt: now,
+            deliveryStatus: null,
+            status: 'sending',
+        } as Parameters<EmailMessageRepository['save']>[0]);
+        return saved?.id ?? null;
+    }
+
     private async readUsage(
         userId: string,
         agentId: string | undefined,
         now: Date,
+        messages: EmailMessageRepository = this.messages,
     ): Promise<EmailSendWindowUsage> {
         const since = (windowMs: number) => new Date(now.getTime() - windowMs);
         const workspace: EmailSendWindowFilter = { userId };
         const [workspaceDailySends, workspaceMonthlySends] = await Promise.all([
-            this.messages.countOutboundSentSince(workspace, since(EMAIL_DAY_WINDOW_MS)),
-            this.messages.countOutboundSentSince(workspace, since(EMAIL_MONTH_WINDOW_MS)),
+            messages.countOutboundSentSince(workspace, since(EMAIL_DAY_WINDOW_MS)),
+            messages.countOutboundSentSince(workspace, since(EMAIL_MONTH_WINDOW_MS)),
         ]);
         if (!agentId) {
             return {
@@ -340,12 +519,9 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
         }
         const inbox: EmailSendWindowFilter = { agentId };
         const [inboxBurstSends, inboxDailySends, inboxRecentRecipients] = await Promise.all([
-            this.messages.countOutboundSentSince(inbox, since(EMAIL_INBOX_BURST_WINDOW_MS)),
-            this.messages.countOutboundSentSince(inbox, since(EMAIL_DAY_WINDOW_MS)),
-            this.messages.listOutboundRecipientsSince(
-                agentId,
-                since(EMAIL_INBOX_RECIPIENT_WINDOW_MS),
-            ),
+            messages.countOutboundSentSince(inbox, since(EMAIL_INBOX_BURST_WINDOW_MS)),
+            messages.countOutboundSentSince(inbox, since(EMAIL_DAY_WINDOW_MS)),
+            messages.listOutboundRecipientsSince(agentId, since(EMAIL_INBOX_RECIPIENT_WINDOW_MS)),
         ]);
         return {
             hasInbox: true,

@@ -230,10 +230,13 @@ export class EmailDraftService {
                     failureReason: reason,
                     approvedById: null,
                     approvedAt: null,
+                    // Never spends capacity it did not use (see the facade's reservation).
+                    sentAt: null,
                 });
             } else {
                 await this.messages.transitionStatus(messageId, ['sending'], 'failed', {
                     failureReason: reason,
+                    sentAt: null,
                 });
             }
             throw error;

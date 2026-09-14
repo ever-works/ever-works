@@ -16,6 +16,12 @@ const ENV_KEYS = [
     'EMAIL_SEND_CAPS_ENFORCEMENT',
     'EMAIL_SEND_CAP_INBOX_DAILY',
     'EMAIL_DEFAULT_AGENT_SEND_MODE',
+    // Ceilings are opt-in: every operator switch starts unset in each test.
+    'EMAIL_SEND_CAP_INBOX_PER_MINUTE',
+    'EMAIL_SEND_CAP_INBOX_RECIPIENTS_PER_5_MINUTES',
+    'EMAIL_SEND_CAP_RECIPIENTS_PER_MESSAGE',
+    'EMAIL_SEND_CAP_WORKSPACE_DAILY',
+    'EMAIL_SEND_CAP_WORKSPACE_MONTHLY',
 ];
 
 function makeHarness() {
@@ -265,6 +271,8 @@ describe('EmailSendPolicyService', () => {
         });
 
         it('applies the ceilings to a person composing too — there is no privileged bypass', async () => {
+            // The operator turned the account-wide daily ceiling on.
+            process.env.EMAIL_SEND_CAP_WORKSPACE_DAILY = '500';
             const { service, messages } = makeHarness();
             messages.countOutboundSentSince.mockImplementation(async (filter) =>
                 filter.userId ? 500 : 0,
@@ -334,7 +342,10 @@ describe('EmailSendPolicyService', () => {
         });
 
         it('refuses a message with too many recipients and says waiting will not help', async () => {
-            const { service } = makeHarness();
+            const { service, inboxes } = makeHarness();
+            // The Agent has settings, so its per-message limit is in force
+            // (the recommended 50, nothing else being set).
+            inboxes.findByAgentForUser.mockResolvedValue({ id: 'inbox-1', mode: 'auto-send' });
             const to = Array.from({ length: 51 }, (_, i) => `r${i}@example.com`);
             const error = await service.assertSendAllowed(attempt({ to })).catch((e) => e);
             expect(error.getResponse()).toMatchObject({
@@ -358,8 +369,303 @@ describe('EmailSendPolicyService', () => {
         });
     });
 
+    describe('opt-in ceilings — unconfigured = unchanged', () => {
+        const DAY_MS = 24 * 3600 * 1000;
+
+        it('enforces and counts nothing when no source is configured, however much was sent', async () => {
+            const { service, messages } = makeHarness();
+            messages.countOutboundSentSince.mockResolvedValue(1_000_000);
+            const to = Array.from({ length: 500 }, (_, i) => `r${i}@example.com`);
+
+            await expect(service.assertSendAllowed(attempt({ to }))).resolves.toBeUndefined();
+            await expect(
+                service.assertSendAllowed(attempt({ origin: 'human', to })),
+            ).resolves.toBeUndefined();
+            await expect(service.admitSend(attempt({ to }))).resolves.toEqual({
+                reservedMessageId: null,
+            });
+            // Not a large sentinel compared against a count: no count at all.
+            expect(messages.countOutboundSentSince).not.toHaveBeenCalled();
+        });
+
+        it('treats an organization policy that sets no caps as no ceiling source', async () => {
+            const { service, agents, organizations, messages } = makeHarness();
+            agents.findOne.mockResolvedValue({
+                id: 'agent-1',
+                userId: 'user-1',
+                organizationId: 'org-1',
+            });
+            organizations.findOne.mockResolvedValue({
+                id: 'org-1',
+                emailSendPolicy: { defaultMode: 'auto-send', caps: {} },
+            });
+            messages.countOutboundSentSince.mockResolvedValue(1_000_000);
+            await expect(service.assertSendAllowed(attempt())).resolves.toBeUndefined();
+            const policy = await service.resolvePolicy('user-1', 'agent-1');
+            expect(policy.configured).toBe(false);
+            expect(Object.values(policy.caps).every((cap) => cap === null)).toBe(true);
+            expect(Object.values(policy.sources).every((s) => s === 'unconfigured')).toBe(true);
+        });
+
+        it('OPERATOR: an EMAIL_SEND_CAP_* variable turns that ceiling on platform-wide', async () => {
+            process.env.EMAIL_SEND_CAP_INBOX_DAILY = '40';
+            const { service, messages } = makeHarness();
+            messages.countOutboundSentSince.mockImplementation(async (filter, since: Date) =>
+                filter.agentId && NOW.getTime() - since.getTime() === DAY_MS ? 40 : 0,
+            );
+            await expect(service.assertSendAllowed(attempt())).rejects.toMatchObject({
+                details: { limitKind: 'inboxDaily', cap: 40, scope: 'inbox' },
+            });
+            const policy = await service.resolvePolicy('user-1', 'agent-1');
+            expect(policy.sources.inboxDailySends).toBe('platform');
+            expect(policy.sources.workspaceDailySends).toBe('unconfigured');
+        });
+
+        it('ORGANIZATION: its caps are enforced for its Agents with nothing set by the operator', async () => {
+            const { service, agents, organizations, messages } = makeHarness();
+            agents.findOne.mockResolvedValue({
+                id: 'agent-1',
+                userId: 'user-1',
+                organizationId: 'org-1',
+            });
+            organizations.findOne.mockResolvedValue({
+                id: 'org-1',
+                emailSendPolicy: { caps: { workspaceDailySends: 12 } },
+            });
+            messages.countOutboundSentSince.mockImplementation(async (filter, since: Date) =>
+                filter.userId && NOW.getTime() - since.getTime() === DAY_MS ? 12 : 0,
+            );
+            await expect(service.assertSendAllowed(attempt())).rejects.toMatchObject({
+                details: { limitKind: 'workspaceDaily', cap: 12, scope: 'workspace' },
+            });
+        });
+
+        it('AGENT SETTINGS: a settings row enforces the recommended per-Agent limits it leaves unset', async () => {
+            const { service, inboxes, messages } = makeHarness();
+            inboxes.findByAgentForUser.mockResolvedValue({ id: 'inbox-1', mode: 'auto-send' });
+            messages.countOutboundSentSince.mockImplementation(async (filter, since: Date) =>
+                filter.agentId && NOW.getTime() - since.getTime() === 60_000 ? 10 : 0,
+            );
+            await expect(service.assertSendAllowed(attempt())).rejects.toMatchObject({
+                details: { limitKind: 'inboxBurst', cap: 10 },
+            });
+            const policy = await service.resolvePolicy('user-1', 'agent-1');
+            expect(policy.sources.inboxBurstSends).toBe('recommended');
+            // An Agent's settings never switch the account-wide ceilings on.
+            expect(policy.caps.workspaceDailySends).toBeNull();
+            expect(policy.sources.workspaceDailySends).toBe('unconfigured');
+        });
+
+        it('reports an unconfigured Agent on the meter: no caps, every window unconfigured', async () => {
+            const { service, messages } = makeHarness();
+            messages.countOutboundSentSince.mockResolvedValue(3);
+            const meter = await service.getMeter('user-1', 'agent-1');
+            expect(meter.enforced).toBe(true);
+            expect(meter.limitsConfigured).toBe(false);
+            expect(meter.windows.every((w) => w.cap === null && w.source === 'unconfigured')).toBe(
+                true,
+            );
+            // Usage is still shown.
+            expect(meter.windows.find((w) => w.kind === 'inboxDaily')?.used).toBe(3);
+        });
+    });
+
+    describe('admitSend — count and reservation under one lock', () => {
+        const ROW = {
+            userId: 'user-1',
+            agentId: 'agent-1',
+            taskId: null,
+            emailAddressId: 'addr-1',
+            pluginId: 'pending',
+            from: 'nova@agents.example.com',
+            toAddresses: ['ada@example.com'],
+            ccAddresses: null,
+            bccAddresses: null,
+            subject: 'Quarterly numbers',
+            bodyText: 'Attached.',
+            bodyHtml: null,
+            metadata: null,
+            messageRef: 'ref-1',
+        };
+
+        function withLock(harness: ReturnType<typeof makeHarness>) {
+            const scoped = {
+                countOutboundSentSince: jest.fn().mockResolvedValue(0),
+                listOutboundRecipientsSince: jest.fn().mockResolvedValue([]),
+                save: jest.fn(async (row: Record<string, unknown>) => ({ id: 'res-1', ...row })),
+                transitionStatus: jest.fn().mockResolvedValue(1),
+            };
+            const events: string[] = [];
+            const lock = jest.fn(async (keys: unknown, fn: (m: unknown) => Promise<unknown>) => {
+                events.push('lock');
+                try {
+                    return await fn(scoped);
+                } finally {
+                    events.push('release');
+                }
+            });
+            Object.assign(harness.messages, { withSendAdmissionLock: lock });
+            return { scoped, lock, events };
+        }
+
+        it('does not lock or reserve when no source is configured', async () => {
+            const harness = makeHarness();
+            const { lock, scoped } = withLock(harness);
+            await expect(
+                harness.service.admitSend(attempt(), { kind: 'message', row: ROW }),
+            ).resolves.toEqual({ reservedMessageId: null });
+            expect(lock).not.toHaveBeenCalled();
+            expect(scoped.save).not.toHaveBeenCalled();
+        });
+
+        it('counts on the locked transaction and writes the reservation before the lock is released', async () => {
+            const harness = makeHarness();
+            harness.inboxes.findByAgentForUser.mockResolvedValue({
+                id: 'inbox-1',
+                mode: 'auto-send',
+            });
+            const { lock, scoped, events } = withLock(harness);
+            scoped.save.mockImplementation(async (row: Record<string, unknown>) => {
+                events.push('reserve');
+                return { id: 'res-1', ...row };
+            });
+
+            const admission = await harness.service.admitSend(attempt(), {
+                kind: 'message',
+                row: ROW,
+            });
+
+            expect(admission).toEqual({ reservedMessageId: 'res-1' });
+            // Per-Agent windows only — no account ceiling is configured.
+            expect(lock).toHaveBeenCalledWith(
+                { agentId: 'agent-1', userId: null },
+                expect.any(Function),
+            );
+            expect(events).toEqual(['lock', 'reserve', 'release']);
+            expect(scoped.countOutboundSentSince).toHaveBeenCalled();
+            expect(harness.messages.countOutboundSentSince).not.toHaveBeenCalled();
+            expect(scoped.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    direction: 'outbound',
+                    status: 'sending',
+                    sentAt: NOW,
+                    providerMessageId: null,
+                    toAddresses: ['ada@example.com'],
+                }),
+            );
+        });
+
+        it('takes the account key too when an account-wide ceiling applies', async () => {
+            process.env.EMAIL_SEND_CAP_WORKSPACE_MONTHLY = '900';
+            const harness = makeHarness();
+            harness.inboxes.findByAgentForUser.mockResolvedValue({
+                id: 'inbox-1',
+                mode: 'auto-send',
+            });
+            const { lock } = withLock(harness);
+            await harness.service.admitSend(attempt(), { kind: 'message', row: ROW });
+            expect(lock).toHaveBeenCalledWith(
+                { agentId: 'agent-1', userId: 'user-1' },
+                expect.any(Function),
+            );
+        });
+
+        it('reserves nothing and refuses with the structured 429 when the locked count is at the cap', async () => {
+            const harness = makeHarness();
+            harness.inboxes.findByAgentForUser.mockResolvedValue({
+                id: 'inbox-1',
+                mode: 'auto-send',
+                dailySendCap: 2,
+            });
+            const { scoped } = withLock(harness);
+            scoped.countOutboundSentSince.mockImplementation(async (filter, since: Date) =>
+                filter.agentId && NOW.getTime() - since.getTime() === 24 * 3600 * 1000 ? 2 : 0,
+            );
+
+            const error = await harness.service
+                .admitSend(attempt(), { kind: 'message', row: ROW })
+                .catch((e) => e);
+
+            expect(error).toBeInstanceOf(EmailSendCapExceededException);
+            expect(error.getStatus()).toBe(429);
+            expect(error.getResponse()).toMatchObject({
+                details: { limitKind: 'inboxDaily', used: 2, cap: 2 },
+            });
+            expect(scoped.save).not.toHaveBeenCalled();
+        });
+
+        it('stamps an approved draft as the reservation, and refuses if it changed hands', async () => {
+            const harness = makeHarness();
+            harness.inboxes.findByAgentForUser.mockResolvedValue({
+                id: 'inbox-1',
+                mode: 'draft-review',
+            });
+            harness.messages.findByIdAndUserId.mockResolvedValue({
+                id: 'draft-1',
+                direction: 'outbound',
+                agentId: 'agent-1',
+                status: 'sending',
+                approvedById: 'user-1',
+                approvalId: null,
+                subject: 'Quarterly numbers',
+                toAddresses: ['ada@example.com'],
+            });
+            const { scoped } = withLock(harness);
+
+            await expect(
+                harness.service.admitSend(attempt({ draftMessageId: 'draft-1' }), {
+                    kind: 'draft',
+                }),
+            ).resolves.toEqual({ reservedMessageId: 'draft-1' });
+            expect(scoped.transitionStatus).toHaveBeenCalledWith(
+                'draft-1',
+                ['sending'],
+                'sending',
+                {
+                    sentAt: NOW,
+                },
+            );
+            expect(scoped.save).not.toHaveBeenCalled();
+
+            scoped.transitionStatus.mockResolvedValue(0);
+            await expect(
+                harness.service.admitSend(attempt({ draftMessageId: 'draft-1' }), {
+                    kind: 'draft',
+                }),
+            ).rejects.toMatchObject({ code: 'draft-not-approved' });
+        });
+
+        it('checks a per-message-only ceiling without counting or locking', async () => {
+            const harness = makeHarness();
+            harness.agents.findOne.mockResolvedValue({
+                id: 'agent-1',
+                userId: 'user-1',
+                organizationId: 'org-1',
+            });
+            harness.organizations.findOne.mockResolvedValue({
+                id: 'org-1',
+                emailSendPolicy: { caps: { recipientsPerMessage: 3 } },
+            });
+            const { lock } = withLock(harness);
+            const to = ['a@x.io', 'b@x.io', 'c@x.io', 'd@x.io'];
+            await expect(
+                harness.service.admitSend(attempt({ to }), { kind: 'message', row: ROW }),
+            ).rejects.toMatchObject({ details: { limitKind: 'recipientsPerMessage', cap: 3 } });
+            await expect(
+                harness.service.admitSend(attempt({ to: ['a@x.io'] }), {
+                    kind: 'message',
+                    row: ROW,
+                }),
+            ).resolves.toEqual({ reservedMessageId: null });
+            expect(lock).not.toHaveBeenCalled();
+        });
+    });
+
     describe('meter', () => {
         it('reports every window with its ceiling, source and live pause', async () => {
+            // Operator-configured platform ceilings, beside the Agent's own.
+            process.env.EMAIL_SEND_CAP_INBOX_RECIPIENTS_PER_5_MINUTES = '20';
+            process.env.EMAIL_SEND_CAP_WORKSPACE_MONTHLY = '10000';
             const { service, inboxes, messages } = makeHarness();
             inboxes.findByAgentForUser.mockResolvedValue({
                 id: 'inbox-1',

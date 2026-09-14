@@ -26,12 +26,17 @@ import {
  * hence `uq_agent_inboxes_agent`).
  *
  * Absence of a row is meaningful: the Agent keeps sending exactly as it did
- * before this table existed, under the organization / platform ceilings. A
- * created row defaults to `draft-review`.
+ * before this table existed, bounded only by ceilings someone explicitly
+ * configured (operator env, organization policy) — with none, unbounded. A
+ * created row defaults to `draft-review` and turns the Agent's per-Agent
+ * limits on.
  *
- * Each `*Cap` column: NULL = inherit (organization, then platform), `0` =
- * explicitly no ceiling, positive = that ceiling. Counts are never stored —
- * they are read from `email_messages` at send time.
+ * Each `*Cap` column: NULL = inherit (organization, then the operator's
+ * platform value, then the recommended number), `0` = explicitly no ceiling,
+ * positive = that ceiling. Counts are never stored — they are read from
+ * `email_messages` at send time. No policy is written here: every existing
+ * deployment starts with no inbox rows and no organization policy, so no
+ * ceiling is enforced until someone configures one.
  *
  * FKs: `userId` / `agentId` CASCADE (the policy has no meaning without
  * either); `emailAddressId` SET NULL (deleting a pinned address falls back

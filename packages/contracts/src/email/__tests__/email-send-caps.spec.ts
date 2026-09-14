@@ -5,19 +5,26 @@ import {
 	EMAIL_INBOX_DEFAULT_DAILY_CAP,
 	EMAIL_MAX_RECIPIENTS_PER_MESSAGE,
 	EMAIL_SEND_CAP_MAX_CONFIGURABLE,
+	EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS,
 	EMAIL_WORKSPACE_DAILY_CAP,
 	EMAIL_WORKSPACE_MONTHLY_CAP
 } from '../email.constants.js';
 import {
 	computeEmailCapRetryAfterSeconds,
 	distinctEmailRecipients,
+	emailSendCapWindowsInForce,
 	evaluateEmailSendCaps,
 	normalizeEmailRecipient,
 	normalizeEmailSendCapsOverride,
 	resolveEmailSendCaps,
 	type EmailSendWindowUsage
 } from '../email-send-caps.js';
-import { AGENT_INBOX_DEFAULT_MODE, EMAIL_MESSAGE_STATUSES, EMAIL_SEND_CAP_LIMIT_KINDS } from '../email.types.js';
+import {
+	AGENT_INBOX_DEFAULT_MODE,
+	EMAIL_MESSAGE_STATUSES,
+	EMAIL_SEND_CAP_FIELDS,
+	EMAIL_SEND_CAP_LIMIT_KINDS
+} from '../email.types.js';
 
 const PLATFORM = {
 	inboxDailySends: EMAIL_INBOX_DEFAULT_DAILY_CAP,
@@ -118,6 +125,122 @@ describe('resolveEmailSendCaps', () => {
 		});
 		expect(caps.inboxBurstSends).toBe(3);
 		expect(sources.inboxBurstSends).toBe('organization');
+	});
+});
+
+describe('resolveEmailSendCaps — unconfigured = unchanged, every source opts in', () => {
+	const HEAVY: EmailSendWindowUsage = {
+		hasInbox: true,
+		inboxBurstSends: 5_000,
+		inboxDailySends: 1_000_000,
+		inboxRecentRecipients: Array.from({ length: 2_000 }, (_, i) => `r${i}@x.io`),
+		workspaceDailySends: 1_000_000,
+		workspaceMonthlySends: 1_000_000
+	};
+	const MANY = Array.from({ length: 1_000 }, (_, i) => `n${i}@x.io`);
+
+	it('enforces nothing when no source is configured — no env, no organization, no Agent settings', () => {
+		const resolved = resolveEmailSendCaps({ platform: {} });
+		expect(resolved.configured).toBe(false);
+		for (const field of EMAIL_SEND_CAP_FIELDS) {
+			expect(resolved.caps[field]).toBeNull();
+			expect(resolved.sources[field]).toBe('unconfigured');
+		}
+		expect(evaluateEmailSendCaps(resolved.caps, HEAVY, MANY)).toBeNull();
+		expect(emailSendCapWindowsInForce(resolved.caps, true)).toEqual({ inbox: false, workspace: false });
+	});
+
+	it('treats an empty organization policy like no policy', () => {
+		const resolved = resolveEmailSendCaps({ platform: {}, organization: {}, inbox: null });
+		expect(resolved.configured).toBe(false);
+		expect(evaluateEmailSendCaps(resolved.caps, HEAVY, MANY)).toBeNull();
+	});
+
+	it('is not a large sentinel: the recommended numbers are documented but not applied', () => {
+		expect(EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS).toEqual(PLATFORM);
+		const { caps } = resolveEmailSendCaps({ platform: {} });
+		expect(Object.values(caps).every((value) => value === null)).toBe(true);
+	});
+
+	it('OPERATOR: an env-configured platform ceiling is enforced for that limit only', () => {
+		const resolved = resolveEmailSendCaps({ platform: { workspaceDailySends: 300 } });
+		expect(resolved.configured).toBe(true);
+		expect(resolved.caps.workspaceDailySends).toBe(300);
+		expect(resolved.sources.workspaceDailySends).toBe('platform');
+		expect(resolved.caps.inboxDailySends).toBeNull();
+		expect(resolved.sources.inboxDailySends).toBe('unconfigured');
+		expect(
+			evaluateEmailSendCaps(resolved.caps, { ...EMPTY_USAGE, workspaceDailySends: 300 }, ['a@x.io'])
+		).toMatchObject({ limitKind: 'workspaceDaily', cap: 300 });
+		expect(emailSendCapWindowsInForce(resolved.caps, true)).toEqual({ inbox: false, workspace: true });
+	});
+
+	it('OPERATOR: an explicit 0 is configured-as-unlimited, and beats the recommended fallback', () => {
+		const resolved = resolveEmailSendCaps({ platform: { inboxDailySends: 0 }, inbox: {} });
+		expect(resolved.caps.inboxDailySends).toBeNull();
+		expect(resolved.sources.inboxDailySends).toBe('platform');
+	});
+
+	it('ORGANIZATION: its caps are enforced for its Agents with nothing configured by the operator', () => {
+		const resolved = resolveEmailSendCaps({
+			platform: {},
+			organization: { inboxDailySends: 25, workspaceMonthlySends: 900 }
+		});
+		expect(resolved.configured).toBe(true);
+		expect(resolved.caps.inboxDailySends).toBe(25);
+		expect(resolved.sources.inboxDailySends).toBe('organization');
+		expect(resolved.caps.workspaceMonthlySends).toBe(900);
+		// …and nothing it did not set.
+		expect(resolved.caps.inboxBurstSends).toBeNull();
+		expect(resolved.sources.inboxBurstSends).toBe('unconfigured');
+		expect(evaluateEmailSendCaps(resolved.caps, { ...EMPTY_USAGE, inboxDailySends: 25 }, ['a@x.io'])).toMatchObject(
+			{
+				limitKind: 'inboxDaily',
+				cap: 25
+			}
+		);
+	});
+
+	it('AGENT SETTINGS: a settings row turns on the per-Agent limits, at the recommended numbers when unset', () => {
+		const resolved = resolveEmailSendCaps({ platform: {}, inbox: { inboxDailySends: 7 } });
+		expect(resolved.configured).toBe(true);
+		expect(resolved.caps.inboxDailySends).toBe(7);
+		expect(resolved.sources.inboxDailySends).toBe('inbox');
+		expect(resolved.caps.inboxBurstSends).toBe(EMAIL_INBOX_BURST_SENDS);
+		expect(resolved.sources.inboxBurstSends).toBe('recommended');
+		expect(resolved.caps.inboxBurstRecipients).toBe(EMAIL_INBOX_BURST_RECIPIENTS);
+		expect(resolved.caps.recipientsPerMessage).toBe(EMAIL_MAX_RECIPIENTS_PER_MESSAGE);
+		// An Agent's settings never switch on the account-wide ceilings.
+		expect(resolved.caps.workspaceDailySends).toBeNull();
+		expect(resolved.sources.workspaceDailySends).toBe('unconfigured');
+		expect(emailSendCapWindowsInForce(resolved.caps, true)).toEqual({ inbox: true, workspace: false });
+	});
+
+	it('AGENT SETTINGS: a row with every limit left to inherit is still protected', () => {
+		const resolved = resolveEmailSendCaps({
+			platform: {},
+			inbox: { inboxDailySends: null, inboxBurstSends: null },
+			inboxConfigured: true
+		});
+		expect(resolved.caps.inboxDailySends).toBe(EMAIL_INBOX_DEFAULT_DAILY_CAP);
+		expect(resolved.sources.inboxDailySends).toBe('recommended');
+	});
+
+	it('AGENT SETTINGS: the recommended fallback yields to an organization or operator value above it', () => {
+		const resolved = resolveEmailSendCaps({
+			platform: { inboxBurstSends: 4 },
+			organization: { inboxDailySends: 30 },
+			inbox: {}
+		});
+		expect(resolved.caps.inboxBurstSends).toBe(4);
+		expect(resolved.sources.inboxBurstSends).toBe('platform');
+		expect(resolved.caps.inboxDailySends).toBe(30);
+		expect(resolved.sources.inboxDailySends).toBe('organization');
+	});
+
+	it('does not count inbox windows for a send that is not attributed to an Agent', () => {
+		const { caps } = resolveEmailSendCaps({ platform: PLATFORM });
+		expect(emailSendCapWindowsInForce(caps, false)).toEqual({ inbox: false, workspace: true });
 	});
 });
 

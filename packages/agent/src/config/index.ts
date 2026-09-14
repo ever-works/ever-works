@@ -36,6 +36,7 @@ import {
     EMAIL_INBOX_DEFAULT_DAILY_CAP,
     EMAIL_MAX_RECIPIENTS_PER_MESSAGE,
     EMAIL_SEND_CAP_MAX_CONFIGURABLE,
+    EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS,
     EMAIL_WORKSPACE_DAILY_CAP,
     EMAIL_WORKSPACE_MONTHLY_CAP,
     type AgentInboxMode,
@@ -1900,6 +1901,10 @@ export const config = {
      * and the send ceilings. Organizations and individual Agent inboxes can
      * refine these from the product; these are the deployment-wide defaults
      * underneath.
+     *
+     * Send ceilings are opt-in: with no `EMAIL_SEND_CAP_*` variable set (and
+     * no organization policy or Agent settings) nothing is enforced. Setting
+     * one turns that ceiling on for every account on the deployment.
      */
     email: {
         sendCaps: {
@@ -1915,9 +1920,35 @@ export const config = {
                 return raw !== 'off' && raw !== 'false' && raw !== '0';
             },
             /**
-             * Platform ceilings, each replaceable by an env var. `0` = no
-             * ceiling for that limit; an unparseable or out-of-range value
-             * falls back to the documented default rather than to "none".
+             * The platform ceilings the OPERATOR turned on — one entry per
+             * `EMAIL_SEND_CAP_*` env var that is set, nothing else. This is
+             * what the send path enforces: a deployment that sets none of
+             * them enforces no platform ceiling, so it sends exactly as it did
+             * before ceilings existed.
+             *
+             * `0` = explicitly no ceiling for that limit. A variable that is
+             * set but unparseable or out of range still counts as "the
+             * operator asked for a ceiling" and takes the recommended number,
+             * so a typo can never silently lift a limit.
+             */
+            getConfiguredPlatformCaps(): Partial<Record<EmailSendCapField, number>> {
+                const configured: Partial<Record<EmailSendCapField, number>> = {};
+                for (const [field, envName] of EMAIL_SEND_CAP_ENV) {
+                    const raw = process.env[envName];
+                    if (typeof raw !== 'string' || raw.trim() === '') continue;
+                    configured[field] = emailCapEnv(
+                        raw,
+                        EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS[field],
+                    );
+                }
+                return configured;
+            },
+            /**
+             * The recommended ceilings with any operator replacement applied
+             * — a REFERENCE record (what each limit would be once turned on),
+             * not what is enforced; see {@link getConfiguredPlatformCaps}.
+             * `0` = no ceiling for that limit; an unparseable or out-of-range
+             * value falls back to the documented default rather than to "none".
              */
             getPlatformCaps(): Record<EmailSendCapField, number> {
                 return {
@@ -1960,6 +1991,16 @@ export const config = {
         },
     },
 };
+
+/** AW-05 — the operator env var that turns on each send ceiling platform-wide. */
+const EMAIL_SEND_CAP_ENV: ReadonlyArray<readonly [EmailSendCapField, string]> = [
+    ['inboxDailySends', 'EMAIL_SEND_CAP_INBOX_DAILY'],
+    ['inboxBurstSends', 'EMAIL_SEND_CAP_INBOX_PER_MINUTE'],
+    ['inboxBurstRecipients', 'EMAIL_SEND_CAP_INBOX_RECIPIENTS_PER_5_MINUTES'],
+    ['recipientsPerMessage', 'EMAIL_SEND_CAP_RECIPIENTS_PER_MESSAGE'],
+    ['workspaceDailySends', 'EMAIL_SEND_CAP_WORKSPACE_DAILY'],
+    ['workspaceMonthlySends', 'EMAIL_SEND_CAP_WORKSPACE_MONTHLY'],
+];
 
 /** AW-05 — one send-ceiling env var: a non-negative integer, `0` = no ceiling. */
 function emailCapEnv(raw: string | undefined, fallback: number): number {

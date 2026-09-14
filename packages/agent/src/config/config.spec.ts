@@ -1232,6 +1232,23 @@ describe('agent/config', () => {
             expect(caps.workspaceDailySends).toBe(500);
         });
 
+        it('turns on NO platform ceiling until the operator sets one — unconfigured = unchanged', () => {
+            expect(config.email.sendCaps.getConfiguredPlatformCaps()).toEqual({});
+            process.env.EMAIL_SEND_CAP_INBOX_DAILY = '   ';
+            expect(config.email.sendCaps.getConfiguredPlatformCaps()).toEqual({});
+        });
+
+        it('enforces exactly the ceilings the operator sets, 0 as none and garbage as the recommended number', () => {
+            process.env.EMAIL_SEND_CAP_WORKSPACE_DAILY = '300';
+            process.env.EMAIL_SEND_CAP_WORKSPACE_MONTHLY = '0';
+            process.env.EMAIL_SEND_CAP_INBOX_PER_MINUTE = 'lots';
+            expect(config.email.sendCaps.getConfiguredPlatformCaps()).toEqual({
+                workspaceDailySends: 300,
+                workspaceMonthlySends: 0,
+                inboxBurstSends: 10,
+            });
+        });
+
         it('keeps Agents without inbox settings sending unless the operator holds them', () => {
             expect(config.email.getDefaultAgentMode()).toBe('auto-send');
             process.env.EMAIL_DEFAULT_AGENT_SEND_MODE = 'draft-review';

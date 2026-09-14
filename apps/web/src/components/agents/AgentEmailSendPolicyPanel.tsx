@@ -8,7 +8,9 @@ import { ROUTES } from '@/lib/constants';
 import {
     AGENT_INBOX_CAP_FIELDS,
     AGENT_INBOX_CAP_FIELD_TO_CAP,
-    formatCapInput,
+    RECOMMENDED_AGENT_INBOX_CAPS,
+    hasNoConfiguredAgentLimits,
+    initialCapInputs,
     parseCapInput,
     type AgentEmailSendPolicyView,
     type AgentInboxCapField,
@@ -113,6 +115,30 @@ export function AgentEmailSendPolicyPanel({
             }
         });
     };
+
+    /**
+     * Turn on the recommended per-Agent limits in one step. Names the mode
+     * the Agent has today, so creating its settings never changes whether
+     * its mail waits for review.
+     */
+    const applyRecommended = () => {
+        const input: AgentInboxSettingsInput = { ...RECOMMENDED_AGENT_INBOX_CAPS };
+        if (!inbox || meter.modeSource !== 'inbox') input.mode = meter.mode;
+        startSaving(async () => {
+            const result = await saveAgentInboxSettingsAction(agentId, input);
+            if (result.ok) {
+                setPolicy(result.policy);
+                setMode(result.policy.meter.mode);
+                setCaps(capsToInputs(result.policy));
+                setConfirmingAutoSend(false);
+                setPolicyNotice({ tone: 'ok', text: t('policy.recommendedApplied') });
+            } else {
+                setPolicyNotice({ tone: 'error', text: t('policy.saveFailed') });
+            }
+        });
+    };
+
+    const noConfiguredLimits = hasNoConfiguredAgentLimits(meter);
 
     const assign = () => {
         if (!newAddressId) return;
@@ -228,6 +254,32 @@ export function AgentEmailSendPolicyPanel({
                     ) : (
                         <p className="text-xs text-amber-700">{t('policy.enforcedOff')}</p>
                     )}
+                    {noConfiguredLimits ? (
+                        <div
+                            role="status"
+                            className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+                            data-testid="email-no-limits-notice"
+                        >
+                            <p className="font-medium">{t('policy.noLimitsTitle')}</p>
+                            <p>
+                                {t('policy.noLimitsConfigured', {
+                                    daily: RECOMMENDED_AGENT_INBOX_CAPS.dailySendCap,
+                                    perMinute: RECOMMENDED_AGENT_INBOX_CAPS.burstSendCap,
+                                    recipients: RECOMMENDED_AGENT_INBOX_CAPS.recipientBurstCap,
+                                    perMessage:
+                                        RECOMMENDED_AGENT_INBOX_CAPS.recipientsPerMessageCap,
+                                })}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={applyRecommended}
+                                disabled={isSaving}
+                                className="rounded-md border border-amber-400 bg-white px-2 py-1 text-sm font-medium disabled:opacity-50"
+                            >
+                                {t('policy.applyRecommended')}
+                            </button>
+                        </div>
+                    ) : null}
                     <div className="grid gap-3 sm:grid-cols-2">
                         {AGENT_INBOX_CAP_FIELDS.map((field) => (
                             <label key={field} className="space-y-1 text-sm">
@@ -250,22 +302,33 @@ export function AgentEmailSendPolicyPanel({
                         {meter.windows.map((window) => (
                             <li key={window.kind} className="flex flex-wrap justify-between gap-2">
                                 <span>{t(`policy.windows.${window.kind}`)}</span>
-                                <span className="text-muted-foreground">
-                                    {window.kind === 'recipientsPerMessage'
-                                        ? window.cap === null
-                                            ? '—'
-                                            : window.cap
-                                        : window.cap === null
-                                          ? t('policy.usageUnlimited', { used: window.used })
-                                          : t('policy.usage', {
-                                                used: window.used,
-                                                cap: window.cap,
-                                            })}{' '}
-                                    ·{' '}
-                                    {t('policy.sourceLabel', {
-                                        source: t(`policy.source.${window.source}`),
-                                    })}
-                                </span>
+                                {window.source === 'unconfigured' ? (
+                                    <span
+                                        className="text-muted-foreground"
+                                        data-testid={`email-cap-unconfigured-${window.kind}`}
+                                    >
+                                        {window.kind === 'recipientsPerMessage'
+                                            ? t('policy.notConfigured')
+                                            : t('policy.usageNotConfigured', { used: window.used })}
+                                    </span>
+                                ) : (
+                                    <span className="text-muted-foreground">
+                                        {window.kind === 'recipientsPerMessage'
+                                            ? window.cap === null
+                                                ? '—'
+                                                : window.cap
+                                            : window.cap === null
+                                              ? t('policy.usageUnlimited', { used: window.used })
+                                              : t('policy.usage', {
+                                                    used: window.used,
+                                                    cap: window.cap,
+                                                })}{' '}
+                                        ·{' '}
+                                        {t('policy.sourceLabel', {
+                                            source: t(`policy.source.${window.source}`),
+                                        })}
+                                    </span>
+                                )}
                             </li>
                         ))}
                     </ul>
@@ -384,9 +447,7 @@ export function AgentEmailSendPolicyPanel({
 }
 
 function capsToInputs(policy: AgentEmailSendPolicyView | null): Record<AgentInboxCapField, string> {
-    const out = {} as Record<AgentInboxCapField, string>;
-    for (const field of AGENT_INBOX_CAP_FIELDS) {
-        out[field] = formatCapInput(policy?.inbox?.caps[AGENT_INBOX_CAP_FIELD_TO_CAP[field]]);
-    }
-    return out;
+    // Stored values for existing settings; for an Agent with none yet, the
+    // recommended numbers pre-filled for every limit nothing configures.
+    return initialCapInputs(policy);
 }

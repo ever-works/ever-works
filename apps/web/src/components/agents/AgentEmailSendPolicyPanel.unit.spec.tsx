@@ -202,6 +202,113 @@ describe('AgentEmailSendPolicyPanel', () => {
         );
     });
 
+    describe('an Agent with no limits configured', () => {
+        const unconfigured = (): AgentEmailSendPolicyView =>
+            policy({
+                meter: {
+                    ...policy().meter,
+                    limitsConfigured: false,
+                    windows: [
+                        {
+                            kind: 'recipientsPerMessage',
+                            scope: 'message',
+                            used: 0,
+                            cap: null,
+                            windowSeconds: 0,
+                            source: 'unconfigured',
+                        },
+                        {
+                            kind: 'inboxBurst',
+                            scope: 'inbox',
+                            used: 1,
+                            cap: null,
+                            windowSeconds: 60,
+                            source: 'unconfigured',
+                        },
+                        {
+                            kind: 'inboxRecipients',
+                            scope: 'inbox',
+                            used: 1,
+                            cap: null,
+                            windowSeconds: 300,
+                            source: 'unconfigured',
+                        },
+                        {
+                            kind: 'inboxDaily',
+                            scope: 'inbox',
+                            used: 240,
+                            cap: null,
+                            windowSeconds: 86_400,
+                            source: 'unconfigured',
+                        },
+                        {
+                            kind: 'workspaceDaily',
+                            scope: 'workspace',
+                            used: 240,
+                            cap: null,
+                            windowSeconds: 86_400,
+                            source: 'unconfigured',
+                        },
+                    ],
+                },
+            });
+
+        it('says clearly that nothing is configured, on the panel and on the meter', () => {
+            renderPanel(unconfigured());
+            const notice = screen.getByTestId('email-no-limits-notice');
+            expect(notice).toHaveTextContent('policy.noLimitsTitle');
+            expect(notice).toHaveTextContent(
+                'policy.noLimitsConfigured:{"daily":100,"perMinute":10,"recipients":20,"perMessage":50}',
+            );
+            const meter = screen.getByTestId('email-cap-meter');
+            expect(meter.textContent).toContain('policy.usageNotConfigured:{"used":240}');
+            expect(meter.textContent).toContain('policy.notConfigured');
+            // Never presented as a number it does not enforce.
+            expect(meter.textContent).not.toContain('policy.usage:');
+        });
+
+        it('offers the recommended limits and keeps the mode the Agent has today', async () => {
+            renderPanel(unconfigured());
+            fireEvent.click(screen.getByRole('button', { name: 'policy.applyRecommended' }));
+            await waitFor(() =>
+                expect(saveMock).toHaveBeenCalledWith('agent-1', {
+                    mode: 'auto-send',
+                    dailySendCap: 100,
+                    burstSendCap: 10,
+                    recipientBurstCap: 20,
+                    recipientsPerMessageCap: 50,
+                }),
+            );
+            expect(await screen.findByText('policy.recommendedApplied')).toBeInTheDocument();
+        });
+
+        it('pre-fills the recommended numbers, so a first save protects the Agent by default', async () => {
+            renderPanel(unconfigured());
+            expect(screen.getByTestId('email-cap-dailySendCap')).toHaveValue('100');
+            expect(screen.getByTestId('email-cap-burstSendCap')).toHaveValue('10');
+            expect(screen.getByTestId('email-cap-recipientBurstCap')).toHaveValue('20');
+            expect(screen.getByTestId('email-cap-recipientsPerMessageCap')).toHaveValue('50');
+
+            fireEvent.click(screen.getByRole('button', { name: 'policy.save' }));
+            await waitFor(() =>
+                expect(saveMock).toHaveBeenCalledWith('agent-1', {
+                    mode: 'auto-send',
+                    dailySendCap: 100,
+                    burstSendCap: 10,
+                    recipientBurstCap: 20,
+                    recipientsPerMessageCap: 50,
+                }),
+            );
+        });
+
+        it('does not claim "no limits" once any source configures a per-Agent limit', () => {
+            renderPanel();
+            expect(screen.queryByTestId('email-no-limits-notice')).not.toBeInTheDocument();
+            // …and leaves a limit someone else sets blank, to keep inheriting it.
+            expect(screen.getByTestId('email-cap-dailySendCap')).toHaveValue('');
+        });
+    });
+
     it('only offers addresses that can be used the chosen way, and assigns one', async () => {
         assignMock.mockResolvedValue({
             ok: true,

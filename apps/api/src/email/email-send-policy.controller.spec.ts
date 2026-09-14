@@ -15,6 +15,7 @@ jest.mock('@ever-works/agent/config', () => ({
             sendCaps: {
                 isEnforced: () => true,
                 getPlatformCaps: () => ({ inboxDailySends: 100 }),
+                getConfiguredPlatformCaps: () => ({}),
             },
             getDefaultAgentMode: () => 'auto-send',
         },
@@ -150,6 +151,17 @@ describe('EmailSendPolicyController', () => {
                     enforced: true,
                     caps: { inboxDailySends: 100 },
                     defaultMode: 'auto-send',
+                    // Opt-in: the operator configured nothing, so nothing is
+                    // enforced platform-wide; the recommended numbers ride along.
+                    configuredCaps: {},
+                    recommendedCaps: {
+                        inboxDailySends: 100,
+                        inboxBurstSends: 10,
+                        inboxBurstRecipients: 20,
+                        recipientsPerMessage: 50,
+                        workspaceDailySends: 500,
+                        workspaceMonthlySends: 10_000,
+                    },
                 },
             });
         });

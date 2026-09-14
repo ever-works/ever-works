@@ -1,5 +1,6 @@
 import {
     EMAIL_SEND_CAP_MAX_CONFIGURABLE,
+    EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS,
     type AgentInboxDto,
     type EmailCapMeterDto,
     type EmailSendCapLimitKind,
@@ -37,6 +38,72 @@ export const AGENT_INBOX_CAP_FIELD_TO_CAP: Record<AgentInboxCapField, keyof Agen
         recipientBurstCap: 'inboxBurstRecipients',
         recipientsPerMessageCap: 'recipientsPerMessage',
     };
+
+/** The meter window each per-Agent field is read from. */
+export const AGENT_INBOX_CAP_FIELD_TO_WINDOW: Record<AgentInboxCapField, EmailSendCapLimitKind> = {
+    dailySendCap: 'inboxDaily',
+    burstSendCap: 'inboxBurst',
+    recipientBurstCap: 'inboxRecipients',
+    recipientsPerMessageCap: 'recipientsPerMessage',
+};
+
+/** The recommended per-Agent limits — what "apply the recommended limits" saves. */
+export const RECOMMENDED_AGENT_INBOX_CAPS: Record<AgentInboxCapField, number> = {
+    dailySendCap: EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS.inboxDailySends,
+    burstSendCap: EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS.inboxBurstSends,
+    recipientBurstCap: EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS.inboxBurstRecipients,
+    recipientsPerMessageCap: EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS.recipientsPerMessage,
+};
+
+/**
+ * Per-Agent fields for which NOTHING is configured right now — no operator
+ * env var, no organization cap, no Agent settings — read from the meter's
+ * window sources. A field whose window the meter does not report is not
+ * listed (nothing is known about it).
+ */
+export function unconfiguredAgentCapFields(meter: EmailCapMeterDto): AgentInboxCapField[] {
+    const sourceByKind = new Map(meter.windows.map((window) => [window.kind, window.source]));
+    return AGENT_INBOX_CAP_FIELDS.filter(
+        (field) => sourceByKind.get(AGENT_INBOX_CAP_FIELD_TO_WINDOW[field]) === 'unconfigured',
+    );
+}
+
+/**
+ * `true` when the Agent currently has no send limits of its own because
+ * nothing is configured — every per-Agent window the meter reports is
+ * `unconfigured` — while limits are not switched off for the deployment.
+ * The panel says so and offers the recommended limits.
+ */
+export function hasNoConfiguredAgentLimits(meter: EmailCapMeterDto): boolean {
+    if (!meter.enforced) return false;
+    const agentWindows = meter.windows.filter((window) =>
+        (Object.values(AGENT_INBOX_CAP_FIELD_TO_WINDOW) as string[]).includes(window.kind),
+    );
+    return (
+        agentWindows.length > 0 && agentWindows.every((window) => window.source === 'unconfigured')
+    );
+}
+
+/**
+ * The text each limit field starts with. Existing settings show what is
+ * stored. With no settings yet, a limit nobody configured is pre-filled with
+ * the recommended number — so the first save protects the Agent by default,
+ * visibly — while a limit an organization or the operator already sets is
+ * left blank to keep inheriting it.
+ */
+export function initialCapInputs(
+    view: AgentEmailSendPolicyView | null,
+): Record<AgentInboxCapField, string> {
+    const out = {} as Record<AgentInboxCapField, string>;
+    const prefill = view && !view.inbox ? new Set(unconfiguredAgentCapFields(view.meter)) : null;
+    for (const field of AGENT_INBOX_CAP_FIELDS) {
+        const stored = view?.inbox?.caps[AGENT_INBOX_CAP_FIELD_TO_CAP[field]];
+        out[field] = prefill?.has(field)
+            ? String(RECOMMENDED_AGENT_INBOX_CAPS[field])
+            : formatCapInput(stored);
+    }
+    return out;
+}
 
 /**
  * A limit field's text → the value the API takes.
