@@ -222,6 +222,46 @@ export class MemoryFolderRepository {
         await this.deleteOwned(organizationOwner(organizationId), ids);
     }
 
+    /**
+     * The Organizations in which `userId` created at least one shared
+     * folder. A shared folder records its creator in `userId`, whose FK is
+     * `ON DELETE CASCADE`, so these are the Organizations that would lose
+     * folders if that account were deleted.
+     */
+    async listOrganizationIdsWithFoldersCreatedBy(userId: string): Promise<string[]> {
+        const rows = await this.repo
+            .createQueryBuilder('folder')
+            .select('folder.organizationId', 'organizationId')
+            .distinct(true)
+            .where('folder.userId = :userId', { userId })
+            .andWhere('folder.scope = :scope', { scope: MemoryFolderScope.ORGANIZATION })
+            .andWhere('folder.organizationId IS NOT NULL')
+            .getRawMany<{ organizationId: string }>();
+        return rows.map((row) => row.organizationId);
+    }
+
+    /**
+     * Record `toUserId` as the creator of every shared folder `fromUserId`
+     * created in the Organization. Only the creator column moves — names,
+     * paths, parents and filed documents stay exactly as they are, and
+     * personal folders are never touched. Returns how many folders moved.
+     */
+    async reassignOrganizationFolders(
+        organizationId: string,
+        fromUserId: string,
+        toUserId: string,
+    ): Promise<number> {
+        const result = await this.repo
+            .createQueryBuilder()
+            .update(MemoryFolder)
+            .set({ userId: toUserId })
+            .where('organizationId = :organizationId', { organizationId })
+            .andWhere('userId = :fromUserId', { fromUserId })
+            .andWhere('scope = :scope', { scope: MemoryFolderScope.ORGANIZATION })
+            .execute();
+        return result.affected ?? 0;
+    }
+
     // ─── internal ────────────────────────────────────────────────────────
 
     private subtree(owner: FolderOwner, path: string): Promise<MemoryFolder[]> {

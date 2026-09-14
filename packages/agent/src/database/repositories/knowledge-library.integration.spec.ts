@@ -6,9 +6,15 @@ import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.en
 import { MemoryFolder, MemoryFolderScope } from '../../entities/memory-folder.entity';
 import { KnowledgeDocumentReaderState } from '../../entities/knowledge-document-reader-state.entity';
 import { KbDocumentClass, KbDocumentStatus } from '../../entities/kb-types';
+import { Tenant } from '../../entities/tenant.entity';
+import { Organization } from '../../entities/organization.entity';
 import { WorkKnowledgeDocumentRepository } from './work-knowledge-document.repository';
 import { MemoryFolderRepository } from './memory-folder.repository';
 import { KnowledgeDocumentReaderStateRepository } from './knowledge-document-reader-state.repository';
+import { UserRepository } from './user.repository';
+import { OrganizationRepository } from './organization.repository';
+import { TenantRepository } from './tenant.repository';
+import { AnonymousUserCleanupService } from '../../services/anonymous-user-cleanup.service';
 
 /**
  * Knowledge library persistence, executed against a REAL SQL engine
@@ -415,6 +421,124 @@ describe('Knowledge library repositories (integration)', () => {
             expect(await documents.clearFolders([folder.id])).toBe(2);
             expect((await docs.findOneByOrFail({ id: a.id })).folderId).toBeNull();
             expect(await documents.clearFolders([folder.id])).toBe(0);
+        });
+    });
+
+    describe('shared folders outlive their creator’s account', () => {
+        const makeTenantWithOrganization = async (ownerUserId: string, slug: string) => {
+            const tenants = dataSource.getRepository(Tenant);
+            const tenant = await tenants.save(
+                tenants.create({ ownerUserId, slug, displayName: slug } as Partial<Tenant>),
+            );
+            const organizations = dataSource.getRepository(Organization);
+            const organization = await organizations.save(
+                organizations.create({
+                    tenantId: tenant.id,
+                    slug: `${slug}-org`,
+                    displayName: slug,
+                } as Partial<Organization>),
+            );
+            return { tenant, organization };
+        };
+
+        const makeMember = async (
+            name: string,
+            tenantId: string | null,
+            extra: Partial<User> = {},
+        ) => {
+            const users = dataSource.getRepository(User);
+            return users.save(
+                users.create({
+                    username: name,
+                    email: `${name}@example.com`,
+                    password: 'x',
+                    tenantId,
+                    ...extra,
+                } as Partial<User>),
+            );
+        };
+
+        const cleanupService = () =>
+            new AnonymousUserCleanupService(
+                new UserRepository(dataSource.getRepository(User)),
+                undefined,
+                folders,
+                new OrganizationRepository(dataSource.getRepository(Organization)),
+                new TenantRepository(dataSource.getRepository(Tenant)),
+            );
+
+        it('hands an expired anonymous member’s shared folders to the Organization before the account goes', async () => {
+            const { tenant, organization } = await makeTenantWithOrganization(userId, 'acme');
+            await dataSource.getRepository(User).update({ id: userId }, { tenantId: tenant.id });
+            const anon = await makeMember('anon-1', tenant.id, {
+                isAnonymous: true,
+                anonymousExpiresAt: new Date('2026-01-01T00:00:00Z'),
+            });
+            const shared = await folders.create({
+                userId: anon.id,
+                name: 'Playbooks',
+                path: '/Playbooks',
+                scope: MemoryFolderScope.ORGANIZATION,
+                organizationId: organization.id,
+            });
+            const personal = await folders.create({ userId: anon.id, name: 'Mine', path: '/Mine' });
+
+            const summary = await cleanupService().purgeExpired(new Date('2026-09-14T00:00:00Z'));
+
+            expect(summary).toMatchObject({ deleted: 1, failed: 0 });
+            expect(await dataSource.getRepository(User).findOneBy({ id: anon.id })).toBeNull();
+            const kept = await folders.findOrganizationFolder(organization.id, shared.id);
+            expect(kept?.userId).toBe(userId);
+            expect(kept?.path).toBe('/Playbooks');
+            // Personal folders are the account's own and are never re-attributed.
+            expect(
+                (await dataSource.getRepository(MemoryFolder).findOneBy({ id: personal.id }))
+                    ?.userId,
+            ).toBe(anon.id);
+        });
+
+        it('prefers a registered member over another anonymous one when the Tenant owner is the one leaving', async () => {
+            const anonOwner = await makeMember('anon-owner', null, {
+                isAnonymous: true,
+            });
+            const { tenant, organization } = await makeTenantWithOrganization(anonOwner.id, 'solo');
+            await dataSource
+                .getRepository(User)
+                .update({ id: anonOwner.id }, { tenantId: tenant.id });
+            await makeMember('anon-peer', tenant.id, { isAnonymous: true });
+            const registered = await makeMember('registered', tenant.id);
+            await folders.create({
+                userId: anonOwner.id,
+                name: 'Docs',
+                path: '/Docs',
+                scope: MemoryFolderScope.ORGANIZATION,
+                organizationId: organization.id,
+            });
+
+            const users = new UserRepository(dataSource.getRepository(User));
+            expect((await users.findOtherTenantMember(tenant.id, anonOwner.id))?.id).toBe(
+                registered.id,
+            );
+            expect(await folders.listOrganizationIdsWithFoldersCreatedBy(anonOwner.id)).toEqual([
+                organization.id,
+            ]);
+            expect(
+                await folders.reassignOrganizationFolders(
+                    organization.id,
+                    anonOwner.id,
+                    registered.id,
+                ),
+            ).toBe(1);
+            expect(await folders.listOrganizationIdsWithFoldersCreatedBy(anonOwner.id)).toEqual([]);
+        });
+
+        it('finds no successor for the last member of a Tenant', async () => {
+            const { tenant } = await makeTenantWithOrganization(otherUserId, 'lonely');
+            await dataSource
+                .getRepository(User)
+                .update({ id: otherUserId }, { tenantId: tenant.id });
+            const users = new UserRepository(dataSource.getRepository(User));
+            expect(await users.findOtherTenantMember(tenant.id, otherUserId)).toBeNull();
         });
     });
 
