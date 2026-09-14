@@ -28,7 +28,7 @@ jest.mock('../../integrations/github-app/github-app-sync.service', () => ({
 
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ENTITIES } from '@ever-works/agent/database';
 import { AgentRun, User } from '@ever-works/agent/entities';
 import { Task, TaskStatus, Work } from '@ever-works/agent/entities';
@@ -100,6 +100,52 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
     let resumes: RunResumeRequest[];
     /** Inbox notices filed. */
     let notices: Array<{ userId: string; title: string; body: string; taskId?: string | null }>;
+    /** The run row each recorded resume inserted, in order. */
+    let resumedRunIds: string[];
+    /** The fixture clock every `agent_runs.createdAt` is pinned to — see {@link pinRunCreatedAt}. */
+    let runClock: number;
+
+    /**
+     * Give a run row a `createdAt` strictly after every run written before it.
+     *
+     * `agent_runs.createdAt` is a `CreateDateColumn`, which better-sqlite3
+     * fills with `datetime('now')` — SECOND resolution. The evaluator picks
+     * the run to resume with `AgentRunRepository.findLatestForTask`, which
+     * orders by `createdAt` alone, so two runs inserted inside the same
+     * wall-clock second TIE, and sqlite then hands back the one it scanned
+     * first: the OLDER row.
+     *
+     * Left to the database clock that made this suite's answer depend on
+     * how fast it ran. A fast run put the seeded run and the resumed run in
+     * the same second, `findLatestForTask` returned the seeded COMPLETED run,
+     * and a second resume went out while the first resumed run was still
+     * queued. A loaded CI runner crossed a second boundary in between, the
+     * resumed QUEUED run was correctly the latest, the evaluator refused
+     * with `run-in-flight`, and "exactly two resumes" received one. On
+     * Postgres (`timestamptz`, microseconds) a resumed run is always
+     * strictly newer than the run it resumes; this pins the fixture to that
+     * same ordering instead of to the wall clock.
+     */
+    async function pinRunCreatedAt(id: string): Promise<void> {
+        runClock += 1000;
+        await runRows.update({ id }, { createdAt: new Date(runClock) } as never);
+    }
+
+    /**
+     * The resumed run does its work, pushes the next head and finishes —
+     * which is what produces the NEXT push's check results at all.
+     *
+     * The steering recorder only QUEUES the run a real resume inserts, so a
+     * scenario that spans several pushes has to let that run finish, exactly
+     * as the real one would before its own push is checked. Without this
+     * the next red delivery is (correctly) refused as `run-in-flight`.
+     */
+    async function finishResumedRuns(): Promise<void> {
+        if (resumedRunIds.length === 0) return;
+        await runRows.update({ id: In(resumedRunIds), status: 'queued' }, {
+            status: 'completed',
+        } as never);
+    }
 
     const spine = {
         ingest: jest.fn(async (userId: string, envelopes: unknown[]): Promise<IngestResult> => {
@@ -143,6 +189,8 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
                     status: 'queued',
                 }),
             );
+            await pinRunCreatedAt(next.id);
+            resumedRunIds.push(next.id);
             return {
                 runId: next.id,
                 resumedFromRunId: request.runId,
@@ -226,6 +274,11 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         seen = new Set();
         resumes = [];
         notices = [];
+        resumedRunIds = [];
+        // Whole seconds, an hour back: the seeded run predates the CI
+        // results that arrive for it, as the run that opened a pull
+        // request always does.
+        runClock = Math.floor(Date.now() / 1000) * 1000 - 60 * 60 * 1000;
         await attemptRows.clear();
         await rejectionRows.clear();
         await runRows.clear();
@@ -294,6 +347,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
                 awaitingInput: overrides.awaitingInput ?? false,
             } as Partial<AgentRun>),
         );
+        await pinRunCreatedAt(run.id);
         return { work, task, run };
     }
 
@@ -699,6 +753,47 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         expect(resumes).toHaveLength(0);
     });
 
+    /**
+     * The loop's OWN resumed run is in flight too.
+     *
+     * This is the path the suite used to reach only by the wall clock: when
+     * the seeded run and the resumed run shared a `createdAt` second,
+     * sqlite ranked the older COMPLETED run as the latest, and a red on the
+     * next head stacked a second resume on top of a fix that had not even
+     * started. With run ordering pinned (see `pinRunCreatedAt`) it is
+     * decided by run state, and only by run state.
+     */
+    it('refuses the next red while the run it resumed is still queued, then resumes THAT run once it finishes', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        const service = buildService();
+
+        await service.handle(BINDING, 'check_run', checkRun({ id: 80 }) as never);
+        expect(resumes).toHaveLength(1);
+        expect(resumes[0].runId).toBe(run.id);
+
+        const nextRed = (id: number) =>
+            checkRun({
+                id,
+                headSha: '6'.repeat(40),
+                summary: 'a different failure on the next head',
+                completedAt: '2026-09-06T11:00:00Z',
+            });
+        const whileQueued = await service.handle(BINDING, 'check_run', nextRed(81) as never);
+        expect(whileQueued.autoResume).toMatchObject({ reason: 'run-in-flight' });
+        expect(resumes).toHaveLength(1);
+        expect(await attempts.countForTask(task.id)).toBe(1);
+
+        // The refusal claimed nothing, so once the resumed run has finished
+        // the next red result on that head (a re-run of the job) is still
+        // the loop's to act on — against the resumed run, not the original.
+        await finishResumedRuns();
+        const afterFinish = await service.handle(BINDING, 'check_run', nextRed(82) as never);
+        expect(afterFinish.autoResume).toMatchObject({ reason: 'resumed' });
+        expect(resumes).toHaveLength(2);
+        expect(resumes[1].runId).toBe(resumedRunIds[0]);
+        expect(await attempts.countForTask(task.id)).toBe(2);
+    });
+
     it('refuses a cancelled run', async () => {
         await seedWorkTaskAndRun({ runStatus: 'cancelled' });
         const service = buildService();
@@ -719,11 +814,13 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
     // ── the budget ──────────────────────────────────────────────────
 
     it('spends exactly the budget across many pushes, then files exactly ONE notice however many events arrive', async () => {
-        const { task } = await seedWorkTaskAndRun();
+        const { task, run } = await seedWorkTaskAndRun();
         const service = buildService();
 
         // Three separate pushes, each with its own head and its own
-        // distinct failure. The default budget is two.
+        // distinct failure. The default budget is two. Each push after the
+        // first is the resumed run's own, so that run has finished by the
+        // time its checks report.
         const heads = ['1'.repeat(40), '2'.repeat(40), '3'.repeat(40)];
         for (const [index, headSha] of heads.entries()) {
             await service.handle(
@@ -736,9 +833,13 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
                     completedAt: `2026-09-06T1${index}:00:00Z`,
                 }) as never,
             );
+            await finishResumedRuns();
         }
 
         expect(resumes).toHaveLength(2);
+        // Each resume continued the LATEST run: the second one resumed the
+        // run the first one produced, never the original a second time.
+        expect(resumes.map((request) => request.runId)).toEqual([run.id, resumedRunIds[0]]);
         expect(await attempts.countForTask(task.id)).toBe(2);
         expect(notices).toHaveLength(1);
         expect(notices[0].title).toContain('automatic retries stopped');
@@ -835,12 +936,21 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             // settle, which sees the truth — that is the guard under test.
             return reads % 2 === 1 ? 0 : realCount.call(racing, id);
         });
+        // …and every racer read the Task's latest run before EITHER had
+        // dispatched, so both see the original completed run rather than
+        // the run the first one queued. Without this the second delivery
+        // is refused as `run-in-flight` before it ever claims, and the
+        // post-claim settle under test is never reached.
+        const beforeEitherDispatched = await runs.findLatestForTask(task.id);
+        expect(beforeEitherDispatched?.status).toBe('completed');
+        const racingRuns = new AgentRunRepository(runRows);
+        jest.spyOn(racingRuns, 'findLatestForTask').mockResolvedValue(beforeEitherDispatched);
         const service = buildService({
             autoResume: new TaskCiAutoResumeService(
                 tasks,
                 racing,
                 new TaskGitLinkService(tasks, works),
-                runs,
+                racingRuns,
                 rejections,
                 steering,
                 inbox,
@@ -1154,7 +1264,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
     });
 
     it('shares ONE budget between the CI half and the reviewer half', async () => {
-        const { task } = await seedWorkTaskAndRun();
+        const { task, run } = await seedWorkTaskAndRun();
         await rejections.record({
             taskId: task.id,
             source: 'pull-request',
@@ -1165,12 +1275,15 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         const service = buildService();
 
         await service.handle(BINDING, 'check_run', checkRun({ id: 40 }) as never);
+        // The CI fix run finishes before the reviewer's verdict lands.
+        await finishResumedRuns();
         await service.handle(BINDING, 'pull_request_review', {
             action: 'submitted',
             repository: { full_name: 'octo/site', owner: { login: 'octo' } },
             pull_request: { number: 42 },
             review: { id: 4, state: 'changes_requested' },
         } as never);
+        await finishResumedRuns();
         await service.handle(
             BINDING,
             'check_run',
@@ -1183,6 +1296,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         );
 
         expect(resumes).toHaveLength(2);
+        expect(resumes.map((request) => request.runId)).toEqual([run.id, resumedRunIds[0]]);
         expect(await attempts.countForTask(task.id)).toBe(2);
     });
 });
