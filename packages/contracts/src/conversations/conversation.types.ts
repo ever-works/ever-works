@@ -50,6 +50,12 @@ export type ConversationContextType = (typeof CONVERSATION_CONTEXT_TYPES)[number
 /**
  * Why a person's message did not send. Stable machine tokens — the composer
  * maps each to plain-language copy, never shows the token itself.
+ *
+ * `capacity_limited` — the run dispatch gate would not start a reply right now
+ * (too many runs in flight, or runs are paused); nothing retries it on its
+ * own, so the person can Retry once capacity frees. `budget_exceeded` — a
+ * spending limit refused the reply: the Agent's budget, or the account's
+ * credits.
  */
 export const CONVERSATION_FAILURE_CODES = [
 	'rate_limited',
@@ -57,7 +63,9 @@ export const CONVERSATION_FAILURE_CODES = [
 	'network',
 	'too_large',
 	'secret_detected',
-	'forbidden'
+	'forbidden',
+	'capacity_limited',
+	'budget_exceeded'
 ] as const;
 export type ConversationFailureCode = (typeof CONVERSATION_FAILURE_CODES)[number];
 
@@ -110,8 +118,10 @@ export interface ConversationReach {
 	outcome: ConversationReachOutcome;
 	/**
 	 * Why, as a short machine token: the queue reason for `queued`, the Agent
-	 * status for `skipped`, the refusing rule for `refused`, and `steered` when
-	 * a `delivered` message went into a run that was already in progress.
+	 * status for `skipped`, the refusing rule for `refused` (including the run
+	 * dispatch gate's own reason when it would not start the reply), and
+	 * `steered` when a `delivered` message went into a run that was already in
+	 * progress.
 	 */
 	reason?: string | null;
 	/** The run that will answer, when one was created or steered. */

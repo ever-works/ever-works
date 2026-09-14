@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
+import { RunDispatchGateService } from '../../agents/run-dispatch-gate.service';
+import { ConversationDispatchService } from '../conversation-dispatch.service';
 import { ConversationMessageService } from '../conversation-message.service';
 import { ConversationMentionService } from '../conversation-mention.service';
 import { MAX_CONVERSATION_BODY_BYTES } from '../conversation.types';
@@ -190,6 +192,48 @@ describe('ConversationMessageService', () => {
             });
         });
 
+        it('marks the message failed with the reason when the dispatch gate would not start the reply', async () => {
+            const cases: Array<[string, string]> = [
+                ['concurrency-limit', 'capacity_limited'],
+                ['kill-switch', 'capacity_limited'],
+                ['insufficient-credits', 'budget_exceeded'],
+            ];
+            for (const [reason, failureCode] of cases) {
+                conversations.updateMessageStatus.mockClear();
+                dispatch.dispatch.mockResolvedValueOnce([
+                    { agentId: 'a1', outcome: 'refused', reason },
+                ]);
+
+                const result = await service.send('u1', 'c1', { body: 'hi' });
+
+                expect(conversations.updateMessageStatus).toHaveBeenCalledWith(
+                    'm1',
+                    'failed',
+                    failureCode,
+                );
+                expect(result.message).toMatchObject({ status: 'failed', failureCode });
+                expect(result.reach).toEqual([{ agentId: 'a1', outcome: 'refused', reason }]);
+            }
+        });
+
+        it('keeps the message sent when another Agent did get it, or no job runtime exists', async () => {
+            dispatch.dispatch.mockResolvedValueOnce([
+                { agentId: 'a1', outcome: 'delivered', runId: 'r1' },
+                { agentId: 'a2', outcome: 'refused', reason: 'concurrency-limit' },
+            ]);
+            await expect(service.send('u1', 'c1', { body: 'hi' })).resolves.toMatchObject({
+                message: { status: 'sent' },
+            });
+
+            dispatch.dispatch.mockResolvedValueOnce([
+                { agentId: 'a1', outcome: 'refused', reason: 'job-runtime-not-configured' },
+            ]);
+            await expect(service.send('u1', 'c1', { body: 'hi' })).resolves.toMatchObject({
+                message: { status: 'sent' },
+            });
+            expect(conversations.updateMessageStatus).not.toHaveBeenCalled();
+        });
+
         it('keeps the message sent when a reply was only queued or skipped', async () => {
             dispatch.dispatch.mockResolvedValue([
                 { agentId: 'a1', outcome: 'queued', reason: 'concurrency-limit' },
@@ -242,6 +286,110 @@ describe('ConversationMessageService', () => {
             await expect(service.retry('u1', 'c1', 'm1')).rejects.toThrow(NotFoundException);
             conversations.findMessageById.mockResolvedValueOnce({ ...failed, authorType: 'agent' });
             await expect(service.discard('u1', 'c1', 'm1')).rejects.toThrow(NotFoundException);
+        });
+    });
+
+    describe('a reply the dispatch gate refused', () => {
+        const ORG_LIMIT_KEY = 'AGENT_MAX_CONCURRENT_RUNS_PER_ORG';
+        let savedLimit: string | undefined;
+        let runs: Record<string, jest.Mock>;
+        let dispatcher: { enqueue: jest.Mock };
+        let stored: Map<string, any>;
+        let realService: ConversationMessageService;
+
+        beforeEach(() => {
+            savedLimit = process.env[ORG_LIMIT_KEY];
+            process.env[ORG_LIMIT_KEY] = '2';
+
+            // A Conversation store that remembers what was written, so the
+            // Retry reads the status the send left behind.
+            stored = new Map();
+            conversations.insertMessage.mockImplementation(async (input) => {
+                const row = { id: 'm1', createdAt: new Date(), ...input };
+                stored.set(row.id, row);
+                return row;
+            });
+            conversations.updateMessageStatus.mockImplementation(
+                async (id: string, status: string, failureCode: string | null) => {
+                    Object.assign(stored.get(id), { status, failureCode });
+                },
+            );
+            conversations.findMessageById.mockImplementation(async (_c: string, id: string) =>
+                stored.has(id) ? { ...stored.get(id) } : null,
+            );
+
+            runs = {
+                // Two replies in flight at the org's limit of two, then one finishes.
+                countInFlightForOrganization: jest
+                    .fn()
+                    .mockResolvedValueOnce(2)
+                    .mockResolvedValue(1),
+                countInFlightForUser: jest.fn().mockResolvedValue(0),
+                countInFlightForWork: jest.fn().mockResolvedValue(0),
+                findInFlightForConversationAgent: jest.fn().mockResolvedValue(null),
+                createQueued: jest.fn().mockResolvedValue({ id: 'run-1' }),
+                setTriggerRunId: jest.fn().mockResolvedValue(undefined),
+                markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            };
+            dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'job-1' }) };
+            const replies = new ConversationDispatchService(
+                {
+                    findByIdAndUser: jest.fn().mockResolvedValue({ id: 'a1', status: 'active' }),
+                } as any,
+                runs as any,
+                dispatcher,
+                undefined,
+                new RunDispatchGateService(runs as any),
+            );
+            realService = new ConversationMessageService(
+                conversations as any,
+                conversationService as any,
+                mentions,
+                replies,
+            );
+        });
+
+        afterEach(() => {
+            if (savedLimit === undefined) delete process.env[ORG_LIMIT_KEY];
+            else process.env[ORG_LIMIT_KEY] = savedLimit;
+        });
+
+        it('is not reported as sent, and Retry dispatches it exactly once when capacity exists', async () => {
+            const sent = await realService.send('u1', 'c1', {
+                body: 'hi',
+                clientMessageId: 'client-1',
+            });
+
+            expect(sent.reach).toEqual([
+                { agentId: 'a1', outcome: 'refused', reason: 'concurrency-limit' },
+            ]);
+            expect(sent.message).toMatchObject({
+                status: 'failed',
+                failureCode: 'capacity_limited',
+            });
+            expect(stored.get('m1')).toMatchObject({
+                status: 'failed',
+                failureCode: 'capacity_limited',
+            });
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+
+            const retried = await realService.retry('u1', 'c1', 'm1');
+
+            expect(retried.reach).toEqual([
+                { agentId: 'a1', outcome: 'delivered', runId: 'run-1' },
+            ]);
+            expect(retried.message).toMatchObject({ status: 'sent', failureCode: null });
+            expect(stored.get('m1')).toMatchObject({ status: 'sent', failureCode: null });
+            expect(runs.createQueued).toHaveBeenCalledTimes(1);
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            expect(dispatcher.enqueue).toHaveBeenCalledWith(
+                expect.objectContaining({ triggeringMessageId: 'm1', runId: 'run-1' }),
+            );
+
+            // The message is sent now: a second Retry is refused and starts nothing.
+            await expect(realService.retry('u1', 'c1', 'm1')).rejects.toThrow(ConflictException);
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
         });
     });
 

@@ -159,12 +159,14 @@ describe('ConversationDispatchService — the reply contract', () => {
         ]);
     });
 
-    it('records queued with the gate’s reason, and creates no run nothing could drain', async () => {
-        gate.admit.mockResolvedValue({ admitted: false, queuedReason: 'concurrency-limit' });
+    it('reports a gate refusal as not sent with the gate’s reason, never queued, and creates no run nothing could drain', async () => {
+        for (const queuedReason of ['concurrency-limit', 'insufficient-credits', 'kill-switch']) {
+            gate.admit.mockResolvedValueOnce({ admitted: false, queuedReason });
 
-        const reach = await service.dispatch(request());
+            const reach = await service.dispatch(request());
 
-        expect(reach).toEqual([{ agentId: 'a1', outcome: 'queued', reason: 'concurrency-limit' }]);
+            expect(reach).toEqual([{ agentId: 'a1', outcome: 'refused', reason: queuedReason }]);
+        }
         expect(runs.createQueued).not.toHaveBeenCalled();
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
     });

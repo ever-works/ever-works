@@ -6,10 +6,12 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
+import { QUEUED_REASON_INSUFFICIENT_CREDITS } from '../agents/run-admission-chain';
 import { ConversationRepository } from '../database/repositories/conversation.repository';
 import type { OwnershipScope } from '../database/ownership-scope';
 import type { Conversation } from '../entities/conversation.entity';
 import type { ConversationMessage } from '../entities/conversation-message.entity';
+import { JOB_RUNTIME_NOT_CONFIGURED_REASON } from '../tasks-domain/task-dispatcher';
 import { isUniqueConstraintError } from '../utils/db-error.utils';
 import { redactSecrets, scanForSecrets } from '../utils/secret-scan';
 import { ConversationDispatchService } from './conversation-dispatch.service';
@@ -79,9 +81,10 @@ const REPLY_CONTEXT_MESSAGES = 20;
  *      ten attachments (FR-35);
  *   4. mentions resolved against what the sender can see (FR-27, FR-96);
  *   5. the message is stored `sent`, then dispatched (the reply contract);
- *   6. if every dispatch failed for an unexpected reason the message is
- *      marked `failed` so the sender can Retry it (FR-42) — nothing retries
- *      on its own (FR-45).
+ *   6. if no addressed Agent got it — every enqueue failed, or the run
+ *      dispatch gate would not start a reply (no capacity right now, or out
+ *      of credits) — the message is marked `failed` with that reason so the
+ *      sender can Retry it (FR-42) — nothing retries on its own (FR-45).
  *
  * Refusals carry a stable `failureCode` so the composer can say why in plain
  * language and keep the text (FR-39, FR-46). No message body, mention or
@@ -316,17 +319,18 @@ export class ConversationMessageService {
             return reach;
         }
 
-        const failed =
-            reach.length > 0 &&
-            reach.every(
-                (entry) =>
-                    entry.outcome === 'refused' &&
-                    entry.reason === CONVERSATION_REACH_REASON_DISPATCH_FAILED,
-            );
-        if (failed) {
-            await this.markFailed(message, 'provider_unavailable');
+        // Failed only when NO addressed Agent got the message and every refusal
+        // is one a Retry can overcome. A partial delivery stays `sent` (a Retry
+        // would answer twice), and a missing job runtime is not retryable.
+        const failureCodes = reach.map(retryableFailureCode);
+        const failureCode =
+            failureCodes.length > 0 && failureCodes.every((code) => code !== null)
+                ? failureCodes[0]
+                : null;
+        if (failureCode) {
+            await this.markFailed(message, failureCode);
             message.status = 'failed';
-            message.failureCode = 'provider_unavailable';
+            message.failureCode = failureCode;
         }
         return reach;
     }
@@ -402,6 +406,20 @@ function refusal(
     extra: Record<string, unknown> = {},
 ): HttpException {
     return new BadRequestException({ statusCode: status, message, failureCode, ...extra });
+}
+
+/**
+ * The failure code for one Agent's reach, or `null` when that outcome is not
+ * a failure a Retry can overcome: the enqueue failed, or the run dispatch gate
+ * would not start the reply (out of credits, or no capacity right now).
+ */
+function retryableFailureCode(entry: ConversationReach): ConversationFailureCode | null {
+    if (entry.outcome !== 'refused') return null;
+    if (entry.reason === JOB_RUNTIME_NOT_CONFIGURED_REASON) return null;
+    if (entry.reason === CONVERSATION_REACH_REASON_DISPATCH_FAILED) return 'provider_unavailable';
+    if (entry.reason === QUEUED_REASON_INSUFFICIENT_CREDITS) return 'budget_exceeded';
+    // `concurrency-limit`, `kill-switch`, or any future gate reason.
+    return 'capacity_limited';
 }
 
 function describe(err: unknown): string {

@@ -51,19 +51,22 @@ export interface ConversationDispatchRequest {
  *  - `skipped` — the Agent is paused, a draft, errored or archived;
  *  - `delivered` + `steered` — it already had a live run answering this
  *    Conversation, and the message went into that run (FR-92);
- *  - `queued` — the dispatch gate's concurrency / credits valve refused it
- *    right now, with the gate's reason;
  *  - `delivered` — a run was created and handed to the job runtime;
- *  - `refused` — no job runtime is configured, or the enqueue failed.
+ *  - `refused` — the dispatch gate would not start the reply right now (the
+ *    reason is the gate's own: `concurrency-limit`, `insufficient-credits`,
+ *    `kill-switch`), no job runtime is configured, or the enqueue failed.
  *
  * Background work goes out ONLY through {@link AGENT_CONVERSATION_REPLY_DISPATCHER}
  * — this file imports no job-runtime SDK.
  *
- * A refused admission does NOT park a run row: the gate's drain is keyed on a
- * Work, a Conversation reply has none, and a parked row nothing can promote
- * would sit queued until the sweeper flags it. This is the same posture the
- * heartbeat dispatcher takes for Work-less runs; the sender sees `queued`
- * with the reason and can send again.
+ * A gate refusal is reported as NOT sent, never as `queued`, and parks no
+ * run row: the gate's drain promotes parked runs per Work and per Task, a
+ * Conversation reply has neither, so nothing would ever offer it again and
+ * the person would wait for a reply that is not coming. Instead
+ * `ConversationMessageService` marks the message `failed` with a failure code
+ * for the reason, and Retry — the existing retry route — dispatches it again
+ * through this same gate once capacity exists. This is the posture the
+ * heartbeat dispatcher takes for Work-less runs, made visible to the sender.
  */
 @Injectable()
 export class ConversationDispatchService {
@@ -154,9 +157,10 @@ export class ConversationDispatchService {
             this.logger.log(
                 `Conversation ${conversation.id}: reply by Agent ${agentId} not started (${admission.queuedReason}).`,
             );
+            // Not sent — see the class note on why this is never `queued`.
             return {
                 agentId,
-                outcome: 'queued',
+                outcome: 'refused',
                 reason: admission.queuedReason ?? null,
             };
         }

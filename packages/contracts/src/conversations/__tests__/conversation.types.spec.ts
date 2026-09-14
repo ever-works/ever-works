@@ -61,6 +61,8 @@ describe('conversation guards', () => {
 		expect(isConversationContextType('mission')).toBe(true);
 		expect(isConversationContextType('workspace')).toBe(false);
 		expect(isConversationFailureCode('rate_limited')).toBe(true);
+		expect(isConversationFailureCode('capacity_limited')).toBe(true);
+		expect(isConversationFailureCode('budget_exceeded')).toBe(true);
 		expect(isConversationFailureCode('500')).toBe(false);
 	});
 
