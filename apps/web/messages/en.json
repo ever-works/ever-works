@@ -840,7 +840,8 @@
                 "bulkApprovedSkipped": "Approved {approved} actions, {skipped} already decided",
                 "bulkApprovedExcluded": "Approved {approved} actions, {excluded} still need a decision one at a time",
                 "error": "Something went wrong. Please try again."
-            }
+            },
+            "seeAll": "See all decisions"
         },
         "inbox": {
             "title": "Inbox",
@@ -849,7 +850,8 @@
             "unreadDot": "Unread",
             "tabs": {
                 "active": "Active",
-                "archived": "Archived"
+                "archived": "Archived",
+                "decisions": "My Decisions"
             },
             "kind": {
                 "question": "Question",
@@ -880,7 +882,8 @@
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
                 "yourReply": "Your reply",
-                "noReplyText": "No reply text was recorded."
+                "noReplyText": "No reply text was recorded.",
+                "openInDecisions": "Open in My Decisions"
             },
             "reply": {
                 "chooseOption": "Choose an answer",
@@ -889,7 +892,11 @@
                 "placeholder": "Write your reply…",
                 "send": "Send Reply",
                 "hint": "Your reply goes straight back to the agent.",
-                "needsAnswer": "Pick an option or write a reply first."
+                "needsAnswer": "Pick an option or write a reply first.",
+                "reasonRequired": "Why? (required)",
+                "reasonOptional": "Why? (optional)",
+                "reasonHelper": "One sentence is enough. This is what the agent learns from.",
+                "reasonMissing": "Add one sentence explaining why."
             },
             "routed": {
                 "steered": "Reply delivered — the running agent picked it up.",
@@ -905,6 +912,85 @@
                 "unarchived": "Message moved back to Active.",
                 "deleted": "Message deleted.",
                 "error": "Something went wrong. Please try again."
+            },
+            "decisions": {
+                "title": "My Decisions",
+                "subtitle": "Everything waiting on you, and nothing else.",
+                "counts": {
+                    "open": "{count} open",
+                    "blocking": "{count} blocking"
+                },
+                "tabs": {
+                    "open": "Open",
+                    "answered": "Answered",
+                    "archived": "Archived"
+                },
+                "filters": {
+                    "label": "Filter decisions",
+                    "kind": "Kind",
+                    "allKinds": "All kinds",
+                    "search": "Search decisions",
+                    "clear": "Clear filters",
+                    "remove": "remove filter",
+                    "agentId": "Agent",
+                    "taskId": "Task",
+                    "missionId": "Mission"
+                },
+                "card": {
+                    "blocking": "Blocking",
+                    "blockingRunParked": "Run paused",
+                    "blockingTaskBlocked": "Task blocked",
+                    "dormant": "Open 30+ days",
+                    "confidence": "{percent}% sure",
+                    "notScored": "not scored"
+                },
+                "detail": {
+                    "none": "Select a decision to answer it.",
+                    "whatHappened": "What happened",
+                    "whatItTried": "What it tried",
+                    "risks": "Risks",
+                    "positionWalker": "{index} / {total}",
+                    "nextDecision": "Next decision",
+                    "previousDecision": "Previous decision",
+                    "openTask": "Open Task",
+                    "openMission": "Open Mission",
+                    "openAgent": "Open Agent",
+                    "pendingOne": "Answer this and {agent} picks this up where it stopped.",
+                    "pendingOneUnnamed": "Answer this and the agent picks this up where it stopped.",
+                    "archivedNote": "This decision was archived. Move it back to Active from the Archived tab to answer it.",
+                    "keyboardHint": "Press j or k to move between decisions."
+                },
+                "resolution": {
+                    "resumed": "{agent} is picking the work back up.",
+                    "resumedUnnamed": "The agent is picking the work back up.",
+                    "injected": "Sent to the Run that is already going.",
+                    "none": "Answered. There was no paused work left to restart.",
+                    "queued": "Queued — waiting for a free slot.",
+                    "failed": "Answered, but the agent could not be restarted automatically.",
+                    "alreadyDecided": "This was already decided elsewhere.",
+                    "runNow": "Open the Task to run it now"
+                },
+                "empty": {
+                    "quietTitle": "Nothing needs you right now.",
+                    "quietBody": "That is either very good news, or your agents are deciding things they should be asking you about.",
+                    "quietFootnote": "Nothing has needed you in {days} days.",
+                    "firstRunTitle": "No decisions yet.",
+                    "firstRunBody": "When an agent hits something it should not decide alone — spending money, reaching a customer, choosing between two real directions — it stops and asks you here.",
+                    "firstRunHint": "Tell an agent when to ask by writing it into its instructions.",
+                    "openAgents": "Open Agents",
+                    "reviewActivity": "Review recent activity",
+                    "filteredTitle": "No decisions match these filters.",
+                    "answeredTitle": "Nothing answered yet.",
+                    "archivedTitle": "Nothing archived."
+                },
+                "error": {
+                    "title": "Could not load your decisions.",
+                    "body": "We did not show an empty queue, because we cannot tell whether it is empty.",
+                    "retry": "Try again",
+                    "lastKnown": "Last known: {count} open."
+                },
+                "loadMore": "Load {count} more",
+                "loadMoreError": "Could not load more decisions."
             }
         },
         "connectGithub": {
@@ -2061,7 +2147,8 @@
                     "interruptRequested": "Interrupt requested — the agent will stop after its current step.",
                     "resumeDispatched": "Resumed — a new run is picking up the same session.",
                     "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
-                    "genericError": "That run control could not be applied."
+                    "genericError": "That run control could not be applied.",
+                    "allDecisions": "See every decision for this Task"
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
