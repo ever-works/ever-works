@@ -13,9 +13,11 @@ import { AgentRunRepository } from './agent-run.repository';
  * the wrong run. These specs seed real ties and pin every reader to
  * insertion order.
  *
- * Every seeded burst gets ids in REVERSE lexical order of insertion, so an
- * id tie-break (deterministic, but not chronological for uuid v4 ids) would
- * fail here just like no tie-break at all.
+ * A seeded burst gets ids in REVERSE lexical order of insertion by default,
+ * and in lexical order of insertion with `ascendingIds`. Readers are
+ * exercised under both, so an id tie-break (deterministic, but not
+ * chronological for uuid v4 ids) fails here in EITHER direction, just like
+ * no tie-break at all.
  */
 describe('AgentRunRepository — same-second ties follow insertion order (integration)', () => {
     let dataSource: DataSource;
@@ -67,18 +69,20 @@ describe('AgentRunRepository — same-second ties follow insertion order (integr
 
     /**
      * Insert rows one after another, all with one `createdAt`, ids in
-     * reverse lexical order of insertion. `text` rewrites the shared stamp
-     * as raw `'YYYY-MM-DD HH:MM:SS'` TEXT — what the column default writes.
+     * reverse lexical order of insertion — or in lexical order of insertion
+     * with `ascendingIds`. `text` rewrites the shared stamp as raw
+     * `'YYYY-MM-DD HH:MM:SS'` TEXT — what the column default writes.
      */
     async function seedBurst(
         rows: Array<Partial<AgentRun>>,
-        options: { text?: boolean } = {},
+        options: { text?: boolean; ascendingIds?: boolean } = {},
     ): Promise<AgentRun[]> {
         burst += 1;
         const repository = dataSource.getRepository(AgentRun);
         const saved: AgentRun[] = [];
         for (const [index, overrides] of rows.entries()) {
-            const prefix = PREFIXES[index].repeat(8);
+            const prefixIndex = options.ascendingIds ? PREFIXES.length - 1 - index : index;
+            const prefix = PREFIXES[prefixIndex].repeat(8);
             saved.push(
                 await repository.save(
                     repository.create({
@@ -120,6 +124,8 @@ describe('AgentRunRepository — same-second ties follow insertion order (integr
     describe.each([
         ['a Date stamp', {}],
         ["datetime('now') TEXT", { text: true }],
+        ['a Date stamp, ids ascending with insertion', { ascendingIds: true }],
+        ["datetime('now') TEXT, ids ascending with insertion", { text: true, ascendingIds: true }],
     ])('with runs tied on %s', (_label, options) => {
         it('findLatestForTask returns the run inserted last, the newer one queued', async () => {
             const [, newer] = await seedBurst(
@@ -327,6 +333,58 @@ describe('AgentRunRepository — same-second ties follow insertion order (integr
             ]);
             const instants = await runs.listLedgerInstants(USER, WINDOW, {}, 2);
             expect(instants.map((row) => row.status)).toEqual(['failed', 'cancelled']);
+        });
+    });
+
+    /**
+     * The two blocks above seed ids that DESCEND with insertion, which an id
+     * tie-break running the "wrong" way would also satisfy. The same readers
+     * again, ids ascending with insertion, so only insertion order passes both.
+     */
+    describe('with ids ascending with insertion', () => {
+        it('list readers keep tied runs newest first', async () => {
+            const seeded = await seedBurst(
+                [
+                    { organizationId: ORG, status: 'completed' },
+                    { organizationId: ORG, status: 'queued', startedAt: null },
+                    { organizationId: ORG, status: 'running' },
+                    { organizationId: ORG, status: 'queued', startedAt: null },
+                ],
+                { ascendingIds: true },
+            );
+            expect(seeded[0].id < seeded[3].id).toBe(true);
+
+            expect(ids(await runs.findByAgent(AGENT_A))).toEqual(newestFirst(seeded));
+            expect(ids(await runs.findByAgentAndUser(AGENT_A, USER))).toEqual(newestFirst(seeded));
+            const [all] = await runs.listSessionsForUser(USER, {});
+            expect(ids(all)).toEqual(newestFirst(seeded));
+            const [firstPage] = await runs.listSessionsForUser(USER, { taskId: TASK }, 2, 0);
+            expect(ids(firstPage)).toEqual(newestFirst(seeded).slice(0, 2));
+            expect(ids(await runs.listRecentForOrganization(ORG))).toEqual(newestFirst(seeded));
+            expect((await runs.findLatestForTask(TASK))?.id).toBe(seeded[3].id);
+        });
+
+        it('oldest-first readers take the first-inserted runs', async () => {
+            const parked = await seedBurst(
+                [1, 2, 3].map(() => ({
+                    workId: WORK,
+                    status: 'queued' as const,
+                    startedAt: null,
+                    queuedReason: 'concurrency-limit',
+                })),
+                { ascendingIds: true },
+            );
+            expect(parked[0].id < parked[2].id).toBe(true);
+            expect((await runs.findOldestQueuedForConcurrency(WORK, 'concurrency-limit'))?.id).toBe(
+                parked[0].id,
+            );
+            await dataSource.getRepository(AgentRun).clear();
+
+            const stuck = await seedBurst(
+                [1, 2, 3].map(() => ({ status: 'running' as const, workId: WORK })),
+                { ascendingIds: true },
+            );
+            expect(ids(await runs.findStuckNonTerminal(LATER, 2))).toEqual(ids(stuck.slice(0, 2)));
         });
     });
 

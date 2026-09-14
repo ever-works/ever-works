@@ -17,7 +17,9 @@ import { GoalOrchestratorService } from '../goal-orchestrator.service';
  * (every queued run) sorted FIRST in ascending order, and runs sharing a
  * whole-second `createdAt` came back in index order. Against a real
  * in-memory schema this pins both reads, breaking ties by insertion order.
- * One case drives the non-SQLite path with a stubbed repository returning
+ * Each same-second latest case runs once with the newer run holding the
+ * smaller id and once with it holding the larger one, so an id tie-break
+ * in either direction fails too. One case drives the non-SQLite path with a stubbed repository returning
  * rows in Postgres's order, NULLs last.
  */
 describe('GoalOrchestratorService — iteration run order (better-sqlite3 integration)', () => {
@@ -126,6 +128,37 @@ describe('GoalOrchestratorService — iteration run order (better-sqlite3 integr
         expect(sessions[0].runStatus).toBe('queued');
     });
 
+    it('listSessions reports the last-inserted queued run as the iteration latest when it holds the larger id', async () => {
+        const { goal, task } = await seedGoalAndTask();
+        await seedRun(task.id, {
+            id: '11111111-0000-4000-8000-000000000001',
+            status: 'completed',
+            startedAt: new Date('2026-09-14T09:00:00.000Z'),
+            createdAt: new Date('2026-09-14T08:59:00.000Z'),
+        });
+        // Two queued runs in one second; this time the newer one has the
+        // LARGER id, so an id tie-break in either direction fails one of the
+        // two cases.
+        const older = await seedRun(task.id, {
+            id: '00000000-0000-4000-8000-000000000002',
+            status: 'queued',
+            startedAt: null,
+        });
+        const newest = await seedRun(task.id, {
+            id: 'ffffffff-0000-4000-8000-000000000003',
+            status: 'queued',
+            startedAt: null,
+        });
+        expect(older.id < newest.id).toBe(true);
+
+        const service = new GoalOrchestratorService(goals, events, tasks, runs);
+        const sessions = await service.listSessions(USER, goal.id);
+
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0].runId).toBe(newest.id);
+        expect(sessions[0].runStatus).toBe('queued');
+    });
+
     it('treats the running run as the active head, ahead of a queued one', async () => {
         const { goal, task } = await seedGoalAndTask();
         const running = await seedRun(task.id, {
@@ -218,6 +251,29 @@ describe('GoalOrchestratorService — iteration run order (better-sqlite3 integr
         // Same createdAt, inserted later, SMALLER id, and it did start.
         const newest = await seedRun(task.id, {
             id: '00000000-0000-4000-8000-000000000002',
+            status: 'completed',
+            startedAt: new Date('2026-09-14T10:00:00.500Z'),
+        });
+        const stamps = await runs.find({ where: { taskId: task.id } });
+        expect(new Set(stamps.map((run) => run.createdAt.getTime())).size).toBe(1);
+
+        const service = new GoalOrchestratorService(goals, events, tasks, runs);
+        const [session] = await service.listSessions(USER, goal.id);
+
+        expect(session.runId).toBe(newest.id);
+        expect(session.runStatus).toBe('completed');
+    });
+
+    it('listSessions picks the last-inserted run when a never-started failed run shares its second and the newer run holds the larger id', async () => {
+        const { goal, task } = await seedGoalAndTask();
+        await seedRun(task.id, {
+            id: '00000000-0000-4000-8000-000000000001',
+            status: 'failed',
+            startedAt: null,
+        });
+        // Same createdAt, inserted later, LARGER id, and it did start.
+        const newest = await seedRun(task.id, {
+            id: 'ffffffff-0000-4000-8000-000000000002',
             status: 'completed',
             startedAt: new Date('2026-09-14T10:00:00.500Z'),
         });
