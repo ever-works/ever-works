@@ -3023,6 +3023,49 @@
                 }
             }
         },
+        "whatsNew": {
+            "title": "What's new",
+            "controlLabel": "What's new",
+            "controlLabelUnread": "What's new — {count} unread",
+            "close": "Close what's new",
+            "subtitleUnread": "{count} updates you haven't read",
+            "subtitleUnreadOne": "1 update you haven't read",
+            "subtitleCaughtUp": "All caught up",
+            "markAllRead": "Mark all as read",
+            "markedAllRead": "All caught up",
+            "unread": "Unread",
+            "pinned": "Pinned",
+            "filters": {
+                "label": "Filter updates by area",
+                "all": "All",
+                "agents": "Agents & Missions",
+                "decisions": "Decisions & Safety",
+                "knowledge": "Knowledge & Memory",
+                "connections": "Connections & Computers",
+                "costs": "Runs & Costs",
+                "platform": "Platform",
+                "emptyTooltip": "No updates in this area yet"
+            },
+            "kinds": {
+                "new": "New",
+                "improved": "Improved",
+                "fixed": "Fixed",
+                "security": "Security"
+            },
+            "empty": {
+                "title": "No updates yet",
+                "description": "New releases will show up here."
+            },
+            "emptyFiltered": {
+                "title": "Nothing here yet",
+                "description": "No updates in {category}.",
+                "action": "Show all updates"
+            },
+            "error": {
+                "title": "Couldn't load updates.",
+                "retry": "Try again"
+            }
+        },
         "commandPalette": {
             "trigger": "Search…",
             "triggerHintMac": "⌘K",
