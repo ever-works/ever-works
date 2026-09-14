@@ -258,6 +258,16 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // Inbox — the decisions only a person can make
     [ActivityActionType.INBOX_ITEM_CREATED]: 'decision',
     [ActivityActionType.INBOX_ITEM_ANSWERED]: 'decision',
+
+    // Model Accounts and model policies — workspace configuration.
+    [ActivityActionType.MODEL_ACCOUNT_ADDED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_UPDATED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_REMOVED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_PAUSED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_RESUMED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_RECONNECTED]: 'system',
+    [ActivityActionType.MODEL_ACCOUNT_REORDERED]: 'system',
+    [ActivityActionType.MODEL_POLICY_UPDATED]: 'system',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */
