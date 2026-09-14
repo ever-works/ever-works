@@ -77,6 +77,8 @@ export * from './repositories/tenant-email-address.repository';
 export * from './repositories/agent-email-assignment.repository';
 export * from './repositories/email-conversation.repository';
 export * from './repositories/email-message.repository';
+// Agent email (AW-05) — per-Agent approval mode + send ceilings
+export * from './repositories/agent-inbox.repository';
 export * from './repositories/notification-channel.repository';
 export * from './repositories/notification-channel-delivery-log.repository';
 export * from './repositories/notification-event-type.repository';

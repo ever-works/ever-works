@@ -25,6 +25,9 @@ export * from './delegation/index.js';
 // Inbox (operator message center) — one surface for questions /
 // approvals / escalations / notices addressed to the human.
 export * from './inbox/index.js';
+// Agent email (AW-05) — approve-before-send statuses and modes, plus the
+// per-inbox / per-workspace send ceilings and their pure resolution.
+export * from './email/index.js';
 // Release promotion lane (self-build slice AI, EW-808) — develop -> stage
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.

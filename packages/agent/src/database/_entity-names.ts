@@ -54,6 +54,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentCollaborator',
     'AgentEmailAssignment',
     'AgentEscalation',
+    // Agent email (AW-05) — per-Agent approval mode + send ceilings.
+    'AgentInbox',
     // Agent Plugins MCP slice — per-agent/tenant MCP server bindings.
     'AgentMcpServerBinding',
     'AgentMembership',

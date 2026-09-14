@@ -64,6 +64,11 @@ export class AgentEmailAssignmentRepository {
         return rows[0] ?? null;
     }
 
+    /** AW-05 — single assignment by id (callers owner-check through the Agent). */
+    async findById(id: string): Promise<AgentEmailAssignment | null> {
+        return this.repository.findOne({ where: { id }, relations: ['emailAddress'] });
+    }
+
     async delete(id: string): Promise<void> {
         await this.repository.delete({ id });
     }
