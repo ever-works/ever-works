@@ -228,7 +228,16 @@ export async function runComputerSessionJob(
 					: null;
 				const inputs = new ComputerInputInjector({
 					target: () => capture.captureSource,
-					...(marker ? { onControlChange: (controlled: boolean) => marker.set(controlled) } : {}),
+					...(marker
+						? {
+								onControlChange: (controlled: boolean) => marker.set(controlled),
+								// Input fails closed until the Agent is paused: tell the person why.
+								onPauseFailed: () =>
+									banner(
+										'The Agent could not be paused on this computer, so your input is not being sent yet. Give control back, or keep trying in a moment.'
+									)
+							}
+						: {}),
 					...(logger ? { logger } : {})
 				});
 				injector = inputs;

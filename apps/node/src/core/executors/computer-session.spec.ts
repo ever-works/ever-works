@@ -303,6 +303,59 @@ describe('runComputerSessionJob', () => {
 		expect(files.size).toBe(0);
 	});
 
+	it('sends no input and tells the person why when the Agent cannot be paused', async () => {
+		const dispatched: unknown[] = [];
+		const backend: CaptureBackend = {
+			id: 'fake-driveable',
+			isAvailable: () => true,
+			start: async () => ({
+				capture: async () => ({ mime: 'image/jpeg' as const, width: 800, height: 600, data: 'QUJD' }),
+				dispatchInput: async (frame) => {
+					dispatched.push(frame);
+				},
+				stop: async () => undefined
+			})
+		};
+		const { deps, published } = harness({ backend });
+		let leg: WebSocketLike | null = null;
+		deps.profileFs = {
+			writeTextFile: vi.fn(async () => {
+				throw new Error('read-only file system');
+			}),
+			rm: vi.fn(async () => undefined)
+		};
+		deps.webSocketFactory = () => {
+			leg = {
+				readyState: 1,
+				onopen: null,
+				onmessage: null,
+				onerror: null,
+				onclose: null,
+				send: () => undefined,
+				close: () => undefined
+			};
+			return leg;
+		};
+		const controller = new AbortController();
+		const running = runComputerSessionJob(job(payload(['screen'])), deps, controller.signal);
+		await vi.waitFor(() => expect(leg).not.toBeNull());
+		const socket = leg as unknown as WebSocketLike;
+		socket.onopen?.({});
+		const send = (frame: Record<string, unknown>) => socket.onmessage?.({ data: JSON.stringify(frame) });
+
+		send({ kind: 'mode', mode: 'controlling' });
+		send({ kind: 'text', text: 'invoice 42' });
+		await vi.waitFor(() =>
+			expect(
+				published.some((frame) => frame.kind === 'error' && frame.message.includes('could not be paused'))
+			).toBe(true)
+		);
+		expect(dispatched).toEqual([]);
+		controller.abort(new Error('draining'));
+		await running;
+		expect(dispatched).toEqual([]);
+	});
+
 	it('refuses a job for another machine before touching any profile', async () => {
 		const { deps, profiles } = harness({ backend: screenBackend() });
 		await expect(

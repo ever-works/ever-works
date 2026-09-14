@@ -33,12 +33,23 @@ import type { CaptureSource } from './capture-backend';
  * control this module calls `onControlChange`, which the executor turns into
  * a marker in the Agent's own profile directory (see `agent-control-marker.ts`)
  * — the file the Agent's own tooling on this machine is told to respect.
+ *
+ * That pause fails CLOSED: while control is held, nothing is injected until
+ * telling the Agent to pause has succeeded for this stretch of control. A
+ * failure is reported through `onPauseFailed` (once per stretch) and retried
+ * at most every {@link INPUT_INJECTOR_PAUSE_RETRY_MS} as input keeps arriving,
+ * so the Agent and a person never drive the same browser at once.
  */
+
+/** How often a failed pause is retried while control is held and input keeps arriving. */
+export const INPUT_INJECTOR_PAUSE_RETRY_MS = 2000;
 
 export type InputInjectionOutcome =
 	| 'injected'
 	/** Nobody in this view holds control. */
 	| 'not-controlled'
+	/** Control is held, but the Agent could not be told to pause yet: nothing is injected until it is. */
+	| 'agent-not-paused'
 	/** Not an input frame (or not a valid one). */
 	| 'refused-kind'
 	/** A blocked shortcut. */
@@ -51,14 +62,32 @@ export type InputInjectionOutcome =
 export interface InputInjectorOptions {
 	/** The surface being shown now (the capture pump's source may be restarted). */
 	target: () => Pick<CaptureSource, 'dispatchInput'> | null;
-	/** Told every time control is taken (true) or given back (false). Its failure is logged, never thrown. */
+	/**
+	 * Told every time control is taken (true) or given back (false). Its
+	 * failure is logged, never thrown — and while control is held, input is
+	 * refused until taking it (true) has succeeded.
+	 */
 	onControlChange?: (controlled: boolean) => void | Promise<void>;
+	/**
+	 * The Agent could not be told to pause while control is held, so input is
+	 * refused for now. Called once per stretch of control; never thrown into.
+	 */
+	onPauseFailed?: (error: unknown) => void;
 	logger?: Logger;
+	/** Clock for the pause retry interval; defaults to `Date.now`. */
+	now?: () => number;
 }
 
 export class ComputerInputInjector {
 	private held = false;
 	private tail: Promise<unknown> = Promise.resolve();
+	/** Bumped on every change of control: a pause counts only for the stretch it was made in. */
+	private stretch = 0;
+	/** The stretch of control the Agent was last paused for. */
+	private pausedStretch = -1;
+	/** The stretch whose failed pause was already reported. */
+	private reportedStretch = -1;
+	private lastPauseAttemptAt = Number.NEGATIVE_INFINITY;
 
 	constructor(private readonly options: InputInjectorOptions) {}
 
@@ -70,10 +99,12 @@ export class ComputerInputInjector {
 	setControlled(controlled: boolean): void {
 		if (controlled === this.held) return;
 		this.held = controlled;
+		this.stretch += 1;
+		const stretch = this.stretch;
 		const hook = this.options.onControlChange;
 		if (!hook) return;
 		this.tail = this.tail
-			.then(() => hook(controlled))
+			.then(() => (controlled ? this.pause(stretch) : hook(false)))
 			.catch((error: unknown) =>
 				this.options.logger?.warn(`Live view: could not record the change of control: ${describe(error)}`)
 			);
@@ -108,6 +139,7 @@ export class ComputerInputInjector {
 		if (!frame) return 'refused-kind';
 		if (!heldOnArrival || !this.held) return 'not-controlled';
 		if (frame.kind === 'key' && isComputerShortcutBlocked(frame)) return 'refused-shortcut';
+		if (!(await this.agentPaused())) return 'agent-not-paused';
 		let target: Pick<CaptureSource, 'dispatchInput'> | null = null;
 		try {
 			target = this.options.target();
@@ -123,6 +155,46 @@ export class ComputerInputInjector {
 			this.options.logger?.warn(`Live view: the browser refused a ${frame.kind} input: ${describe(error)}`);
 			return 'failed';
 		}
+	}
+
+	/**
+	 * True when the Agent has been told to pause for the current stretch of
+	 * control (or there is no Agent to tell). A failed pause is retried here,
+	 * in the injection queue, at most every {@link INPUT_INJECTOR_PAUSE_RETRY_MS}.
+	 */
+	private async agentPaused(): Promise<boolean> {
+		if (!this.options.onControlChange) return true;
+		if (this.pausedStretch === this.stretch) return true;
+		if (this.now() - this.lastPauseAttemptAt < INPUT_INJECTOR_PAUSE_RETRY_MS) return false;
+		await this.pause(this.stretch);
+		return this.held && this.pausedStretch === this.stretch;
+	}
+
+	/** Tell the Agent to pause for `stretch`. Never throws: a failure is reported and leaves input refused. */
+	private async pause(stretch: number): Promise<void> {
+		const hook = this.options.onControlChange;
+		if (!hook) return;
+		this.lastPauseAttemptAt = this.now();
+		try {
+			await hook(true);
+			if (stretch === this.stretch) this.pausedStretch = stretch;
+		} catch (error) {
+			this.options.logger?.warn(
+				`Live view: could not tell the Agent to pause, so input is not injected: ${describe(error)}`
+			);
+			if (stretch === this.stretch && this.reportedStretch !== stretch) {
+				this.reportedStretch = stretch;
+				try {
+					this.options.onPauseFailed?.(error);
+				} catch {
+					// the listener's failure is its own
+				}
+			}
+		}
+	}
+
+	private now(): number {
+		return (this.options.now ?? Date.now)();
 	}
 }
 

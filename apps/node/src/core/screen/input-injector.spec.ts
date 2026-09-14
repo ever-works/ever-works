@@ -5,7 +5,7 @@ import {
 	AGENT_CONTROL_MARKER_MESSAGE,
 	createAgentControlMarker
 } from './agent-control-marker';
-import { ComputerInputInjector } from './input-injector';
+import { ComputerInputInjector, INPUT_INJECTOR_PAUSE_RETRY_MS } from './input-injector';
 
 /**
  * The last gate before a person's input reaches the Agent's browser. Pinned:
@@ -142,8 +142,13 @@ describe('ComputerInputInjector', () => {
 
 	it('survives a control-change hook that fails', async () => {
 		const warn = vi.fn();
+		const dispatched: ComputerInputFrame[] = [];
 		const injector = new ComputerInputInjector({
-			target: () => ({ dispatchInput: async () => undefined }),
+			target: () => ({
+				dispatchInput: async (frame: ComputerInputFrame) => {
+					dispatched.push(frame);
+				}
+			}),
 			onControlChange: async () => {
 				throw new Error('disk full');
 			},
@@ -151,8 +156,65 @@ describe('ComputerInputInjector', () => {
 		});
 		injector.setControlled(true);
 		await injector.idle();
-		expect(await injector.inject(pointer)).toBe('injected');
+		// Survives — nothing thrown — and fails closed: the Agent was not told to
+		// pause, so the person's input does not reach the browser it shares.
+		expect(await injector.inject(pointer)).toBe('agent-not-paused');
+		expect(dispatched).toEqual([]);
 		expect(warn).toHaveBeenCalled();
+		injector.setControlled(false);
+		await injector.idle();
+	});
+
+	it('refuses input until the Agent is paused, reports it once, and injects once a retry pauses it', async () => {
+		let clock = 1_000;
+		let failing = true;
+		const pauses: boolean[] = [];
+		const failures: unknown[] = [];
+		const dispatched: ComputerInputFrame[] = [];
+		const injector = new ComputerInputInjector({
+			target: () => ({
+				dispatchInput: async (frame: ComputerInputFrame) => {
+					dispatched.push(frame);
+				}
+			}),
+			onControlChange: async (controlled) => {
+				pauses.push(controlled);
+				if (controlled && failing) throw new Error('read-only profile');
+			},
+			onPauseFailed: (error) => failures.push(error),
+			logger: { warn: vi.fn() } as never,
+			now: () => clock
+		});
+
+		injector.setControlled(true);
+		expect(await injector.inject(key)).toBe('agent-not-paused');
+		// Within the retry interval: refused without hammering the disk.
+		clock += INPUT_INJECTOR_PAUSE_RETRY_MS - 1;
+		expect(await injector.inject(key)).toBe('agent-not-paused');
+		expect(pauses).toEqual([true]);
+		expect(failures).toHaveLength(1);
+
+		// Past it: retried, still failing — refused, and not reported again.
+		clock += 1;
+		expect(await injector.inject(key)).toBe('agent-not-paused');
+		expect(pauses).toEqual([true, true]);
+		expect(failures).toHaveLength(1);
+
+		// The disk recovers: the next retry pauses the Agent, and input flows.
+		failing = false;
+		clock += INPUT_INJECTOR_PAUSE_RETRY_MS;
+		expect(await injector.inject(key)).toBe('injected');
+		expect(await injector.inject(text)).toBe('injected');
+		expect(pauses).toEqual([true, true, true]);
+		expect(dispatched).toEqual([key, text]);
+
+		// A new stretch of control needs its own pause.
+		injector.setControlled(false);
+		failing = true;
+		injector.setControlled(true);
+		expect(await injector.inject(key)).toBe('agent-not-paused');
+		expect(failures).toHaveLength(2);
+		expect(dispatched).toEqual([key, text]);
 	});
 });
 
@@ -183,6 +245,61 @@ describe('createAgentControlMarker', () => {
 		});
 
 		await marker.set(false);
+		expect(files.size).toBe(0);
+	});
+
+	function slowFs() {
+		const files = new Map<string, string>();
+		const ops: string[] = [];
+		const later = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+		// A write is slower than a removal, so anything not serialized finishes out of order.
+		return {
+			files,
+			ops,
+			fs: {
+				writeTextFile: vi.fn(async (path: string, content: string) => {
+					await later(10);
+					files.set(path, content);
+					ops.push('write');
+				}),
+				rm: vi.fn(async (path: string) => {
+					await later(1);
+					files.delete(path);
+					ops.push('rm');
+				})
+			}
+		};
+	}
+
+	it('never removes the marker a newer holder wrote when control is handed over between two views', async () => {
+		const { files, fs } = slowFs();
+		const oldView = createAgentControlMarker({ profileDir: '/profiles/handover', fs });
+		const newView = createAgentControlMarker({ profileDir: '/profiles/handover', fs });
+
+		await oldView.set(true);
+		// The hand-over reaches the new view's leg before the old view's.
+		await Promise.all([newView.set(true), oldView.set(false)]);
+		expect(files.size).toBe(1);
+		expect(fs.rm).not.toHaveBeenCalled();
+
+		// Only the view that wrote it last removes it.
+		await oldView.set(false);
+		expect(files.size).toBe(1);
+		await newView.set(false);
+		expect(files.size).toBe(0);
+	});
+
+	it('applies changes to one marker file in the order they were made, never interleaved', async () => {
+		const { files, ops, fs } = slowFs();
+		const first = createAgentControlMarker({ profileDir: '/profiles/ordered', fs });
+		const second = createAgentControlMarker({ profileDir: '/profiles/ordered', fs });
+
+		// Fired without waiting, as two legs hearing their `mode` frames would.
+		const done = Promise.all([first.set(true), first.set(false), second.set(true)]);
+		await done;
+		expect(ops).toEqual(['write', 'rm', 'write']);
+		expect(files.size).toBe(1);
+		await second.set(false);
 		expect(files.size).toBe(0);
 	});
 });
