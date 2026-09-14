@@ -43,7 +43,37 @@ export interface InboxProposalPendingInput {
     riskFlags?: readonly string[];
     agentId?: string | null;
     runId?: string | null;
+    /**
+     * The Task the proposal is about, when the producer knows it (a merge
+     * approval always does). Optional: absent, the Inbox falls back to the
+     * linked run's Task, and to nothing.
+     */
+    taskId?: string | null;
     organizationId?: string | null;
+}
+
+/**
+ * My Decisions — an escalation was resolved through a door OTHER than the
+ * Inbox reply (the escalation endpoint, the Task page, the chat tool).
+ * The mirrored Inbox item closes and the same restart runs, so every door
+ * leaves the queue and the work in the same state.
+ */
+export interface InboxEscalationResolvedInput {
+    escalationId: string;
+    /** The human who resolved it (recorded in the activity trail). */
+    resolvedByUserId: string;
+    note?: string | null;
+}
+
+/**
+ * My Decisions — a pending proposal was approved or rejected through a
+ * door OTHER than the Inbox reply (the approvals endpoints, approve-all).
+ */
+export interface InboxProposalDecidedInput {
+    proposalId: string;
+    decision: 'approved' | 'rejected';
+    /** The human who decided it (recorded in the activity trail). */
+    decidedByUserId: string;
 }
 
 export interface InboxNoticeInput {
@@ -107,6 +137,16 @@ export interface InboxProducer {
      * while an open question exists for `agentRunId` files nothing.
      */
     questionRaised(input: InboxQuestionRaisedInput): Promise<void>;
+    /**
+     * My Decisions: close the item mirroring an escalation that was just
+     * resolved elsewhere, and hand the answer to the parked run. Optional
+     * so every existing implementation and test double keeps compiling;
+     * callers invoke it as `inbox.escalationResolved?.(...)`. A no-op when
+     * the mirror is already closed (the Inbox reply itself got there first).
+     */
+    escalationResolved?(input: InboxEscalationResolvedInput): Promise<void>;
+    /** My Decisions: the proposal twin of {@link escalationResolved}. */
+    proposalDecided?(input: InboxProposalDecidedInput): Promise<void>;
 }
 
 export const INBOX_PRODUCER = 'INBOX_PRODUCER' as const;

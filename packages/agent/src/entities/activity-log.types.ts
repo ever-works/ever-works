@@ -320,7 +320,22 @@ export enum ActivityActionType {
     // varchar, so no migration is needed.
     INBOX_ITEM_CREATED = 'inbox_item_created',
     INBOX_ITEM_ANSWERED = 'inbox_item_answered',
+    // Live Feed — a run starting and a run reaching a terminal state, for
+    // every trigger kind other than `heartbeat` (heartbeat runs keep the
+    // three `agent_heartbeat_*` members above, unchanged). Declared here so
+    // the feed's kind map and narration cover them; the run lifecycle
+    // emits them. Additive members — `activity_log.actionType` is a plain
+    // varchar, so no migration is needed.
+    AGENT_RUN_STARTED = 'agent_run_started',
+    AGENT_RUN_COMPLETED = 'agent_run_completed',
+    AGENT_RUN_FAILED = 'agent_run_failed',
 }
+
+/**
+ * Who performed an activity. `NULL` on rows written before the actor
+ * columns existed; the Live Feed resolves those at read time.
+ */
+export type ActivityActorKind = 'agent' | 'user' | 'external' | 'system';
 
 export enum ActivityStatus {
     PENDING = 'pending',
@@ -342,6 +357,63 @@ export interface CreateActivityLogDto {
     ipAddress?: string;
     userAgent?: string;
     ingestEventId?: string;
+    /**
+     * Live Feed actor. All three are optional: a caller that knows the
+     * acting agent passes them; `ActivityLogService.log()` derives
+     * `actorKind`/`actorAgentId` from `details` when a caller does not.
+     */
+    actorKind?: ActivityActorKind | null;
+    actorAgentId?: string | null;
+    /** The actor's display name at the moment the record is written. */
+    actorLabel?: string | null;
+}
+
+/**
+ * Live Feed page query. Deliberately separate from
+ * {@link ActivityLogQueryOptions}: the feed pages by a keyset cursor and
+ * filters by actor and by derived kind, none of which the offset-paged
+ * Activity log query understands. Ownership scope is passed alongside, never
+ * inside, so no caller can widen it through a filter object.
+ */
+export interface ActivityFeedQueryOptions {
+    userId: string;
+    /**
+     * Agent ids to restrict to. Matched on `actorAgentId` and, for rows
+     * written before that column existed, on the agent reference the writer
+     * put in `details` (`resourceType: 'agent'` + `resourceId`, or `agentId`).
+     */
+    agentIds?: string[];
+    /** Restrict to rows that classify into one of these kinds. */
+    kindFilter?: ActivityFeedKindFilter;
+    /** Keyset cursor: rows strictly older than this `(createdAt, id)` pair. */
+    cursor?: { createdAt: string; id: string };
+    /** Oldest row the feed may return. */
+    since: Date;
+    limit: number;
+}
+
+/** The feed buckets, as the repository sees them. */
+export type ActivityFeedKind = 'work' | 'decision' | 'delivery' | 'problem' | 'system';
+
+/**
+ * The action-type sets a kind filter is evaluated against. Built once by the
+ * feed kind map so SQL filtering and in-memory classification cannot drift.
+ */
+export interface ActivityFeedKindSets {
+    /** Any row with one of these statuses is a `problem`. */
+    problemStatuses: string[];
+    /** Any row with one of these action types is a `problem`. */
+    problemActionTypes: string[];
+    decisionActionTypes: string[];
+    systemActionTypes: string[];
+    deliveryActionTypes: string[];
+    /** `delivery` when the row completed, otherwise `work`. */
+    deliveryWhenCompletedActionTypes: string[];
+}
+
+export interface ActivityFeedKindFilter {
+    kinds: ActivityFeedKind[];
+    sets: ActivityFeedKindSets;
 }
 
 export interface ActivityLogQueryOptions {

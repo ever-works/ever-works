@@ -77,6 +77,8 @@ export * from './repositories/tenant-email-address.repository';
 export * from './repositories/agent-email-assignment.repository';
 export * from './repositories/email-conversation.repository';
 export * from './repositories/email-message.repository';
+// Agent email (AW-05) — per-Agent approval mode + send ceilings
+export * from './repositories/agent-inbox.repository';
 export * from './repositories/notification-channel.repository';
 export * from './repositories/notification-channel-delivery-log.repository';
 export * from './repositories/notification-event-type.repository';
@@ -94,6 +96,8 @@ export * from './repositories/agent-repo-attachment.repository';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './repositories/memory-folder.repository';
 export * from './repositories/knowledge-document-reader-state.repository';
+// AW-14 What's new — per-person product changelog read state.
+export * from './repositories/product-changelog-read.repository';
 // Repository registry (Feature G) — repo connections + agent grants.
 export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';

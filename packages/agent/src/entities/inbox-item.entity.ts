@@ -140,6 +140,16 @@ export class InboxItem {
     @Column({ type: 'varchar', length: 64, nullable: true })
     answerOptionId?: string | null;
 
+    /**
+     * My Decisions — when a human first opened this item: stamped once, by
+     * the first read flip or the answer, whichever came first, and never
+     * moved again. With `createdAt` and `answeredAt` it makes
+     * time-to-decide measurable. NULL = nobody has looked yet.
+     * Written by `InboxService` through `InboxItemRepository.stampFirstViewed`.
+     */
+    @PortableDateColumn({ nullable: true })
+    firstViewedAt?: Date | null;
+
     // Tier C scope denormalization (EW-657). No @ManyToOne — cycle
     // avoidance, see user.entity.ts EW-654 comment.
     @Column({ type: 'uuid', nullable: true })

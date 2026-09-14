@@ -405,3 +405,97 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
         expect(git.createPullRequest).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * Agent email (AW-05) — the `sendEmail` / `messageAgent` tools are the
+ * Agent writing, so the adapter marks them `origin: 'agent'` (the send path
+ * then applies the Agent's approve-before-send mode) and turns a held draft
+ * into a result the model can read instead of a provider id.
+ */
+describe('api-side AgentsModule — AGENT_EMAIL_FACADE approve-before-send', () => {
+    type EmailFacade = {
+        sendEmail: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
+        messageAgent: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    };
+
+    const build = (sendMessage: jest.Mock) =>
+        findProvider('AGENT_EMAIL_FACADE')?.useFactory?.(
+            { sendMessage },
+            { findByAgent: jest.fn().mockResolvedValue([{ emailAddressId: 'addr-2' }]) },
+            { findById: jest.fn().mockResolvedValue({ id: 'addr-2', address: 'peer@x.com' }) },
+            { findByIdAndUser: jest.fn().mockResolvedValue({ id: 'agent-2' }) },
+        ) as EmailFacade;
+
+    it('sends as the Agent and passes a real send through unchanged', async () => {
+        const sendMessage = jest.fn().mockResolvedValue({
+            messageRef: 'ref',
+            providerMessageId: 'pm-1',
+            accepted: ['ada@x.com'],
+            rejected: [],
+        });
+        const result = await build(sendMessage).sendEmail({
+            userId: 'user-1',
+            agentId: 'agent-1',
+            to: ['ada@x.com'],
+            subject: 'Hi',
+            bodyText: 'Hello',
+        });
+        expect(sendMessage).toHaveBeenCalledWith(
+            'user-1',
+            expect.objectContaining({ agentId: 'agent-1', to: ['ada@x.com'] }),
+            { origin: 'agent' },
+        );
+        expect(result).toEqual({
+            providerMessageId: 'pm-1',
+            accepted: ['ada@x.com'],
+            rejected: [],
+        });
+    });
+
+    it('tells the model a held message was not sent and must not be resent', async () => {
+        const sendMessage = jest.fn().mockResolvedValue({
+            messageRef: 'ref',
+            providerMessageId: '',
+            accepted: [],
+            rejected: [],
+            held: true,
+            messageId: 'm-1',
+        });
+        const result = await build(sendMessage).sendEmail({
+            userId: 'user-1',
+            agentId: 'agent-1',
+            to: ['ada@x.com'],
+            subject: 'Hi',
+            bodyText: 'Hello',
+        });
+        expect(result).toMatchObject({ held: true, messageId: 'm-1', providerMessageId: '' });
+        expect(String(result.note)).toMatch(/Do not send it again/);
+        // Approval does not guarantee delivery — a send limit can still refuse it.
+        expect(String(result.note)).toMatch(/subject to send limits/);
+        expect(String(result.note)).not.toMatch(/will go out/);
+    });
+
+    it('holds an agent-to-agent message the same way', async () => {
+        const sendMessage = jest.fn().mockResolvedValue({
+            messageRef: 'ref',
+            providerMessageId: '',
+            accepted: [],
+            rejected: [],
+            held: true,
+            messageId: 'm-2',
+        });
+        const result = await build(sendMessage).messageAgent({
+            userId: 'user-1',
+            fromAgentId: 'agent-1',
+            targetAgentId: 'agent-2',
+            subject: 'Sync',
+            body: 'Ready?',
+        });
+        expect(sendMessage).toHaveBeenCalledWith(
+            'user-1',
+            expect.objectContaining({ agentId: 'agent-1', to: ['peer@x.com'] }),
+            { origin: 'agent' },
+        );
+        expect(result).toMatchObject({ held: true, messageId: 'm-2', targetAddress: 'peer@x.com' });
+    });
+});

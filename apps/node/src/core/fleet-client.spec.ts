@@ -4,6 +4,7 @@ import {
 	FleetClientError,
 	joinUrl,
 	normalizeApiUrl,
+	readPendingComputerSessions,
 	type FetchLike,
 	type FetchRequestInit
 } from './fleet-client';
@@ -370,5 +371,16 @@ describe('heartbeat', () => {
 		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
 		await client(fetchFn, 'https://self-hosted.example/platform/').heartbeat({ nodeId: NODE_ID, secret: SECRET });
 		expect(calls[0].url).toBe('https://self-hosted.example/platform/api/fleet/heartbeat');
+	});
+});
+
+describe('readPendingComputerSessions (Agent computers — heartbeat hint)', () => {
+	it('keeps well-formed session ids only, capped, and ignores anything else', () => {
+		const id = '55555555-5555-4555-8555-555555555555';
+		expect(readPendingComputerSessions({ pendingComputerSessions: [id, 'nope', 42] })).toEqual([id]);
+		expect(readPendingComputerSessions({ pendingComputerSessions: 'nope' })).toEqual([]);
+		expect(readPendingComputerSessions({})).toEqual([]);
+		expect(readPendingComputerSessions(null)).toEqual([]);
+		expect(readPendingComputerSessions({ pendingComputerSessions: Array(40).fill(id) })).toHaveLength(16);
 	});
 });

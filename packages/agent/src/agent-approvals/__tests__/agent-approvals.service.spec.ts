@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AgentApprovalsService } from '../agent-approvals.service';
+import { AgentActionProposalDecidedEvent } from '../agent-action-proposal-decided.event';
 import type { AgentActionProposal } from '../../entities/agent-action-proposal.entity';
 
 /**
@@ -14,10 +15,21 @@ function makeProposalsRepo() {
         save: jest.fn(
             async (v: AgentActionProposal) => ({ id: 'p1', ...v }) as AgentActionProposal,
         ),
+        // Decisions are a compare-and-set UPDATE … WHERE status = 'pending'.
+        update: jest.fn(async (_where: object, _patch: object) => ({ affected: 1 })),
         find: jest.fn(),
         findOne: jest.fn(),
         findAndCount: jest.fn(),
     };
+}
+
+/** The proposal ids a decision UPDATE was issued for, in order, with the fields it wrote. */
+function decidedRows(
+    repo: ReturnType<typeof makeProposalsRepo>,
+): Array<{ id: string } & Partial<AgentActionProposal>> {
+    return (
+        repo.update.mock.calls as unknown as Array<[{ id: string }, Partial<AgentActionProposal>]>
+    ).map(([where, patch]) => ({ ...patch, id: where.id }));
 }
 
 function makeAgentsRepo() {
@@ -159,6 +171,40 @@ describe('AgentApprovalsService', () => {
             expect(dto.decidedVia).toBeNull();
         });
 
+        it('keeps an action that needs a person pending even when the guardrails would auto-approve it (AW-05)', async () => {
+            agents.findOne.mockResolvedValue({
+                id: 'a1',
+                userId: 'u1',
+                guardrails: { mode: 'autonomous' },
+            });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'send_message',
+                title: 'Send email to ada@example.com: Quarterly numbers',
+                payload: { kind: 'email-draft', emailMessageId: 'm1' },
+                humanDecisionRequired: true,
+            });
+            expect(dto.status).toBe('pending');
+            expect(dto.decidedVia).toBeNull();
+            expect(dto.decidedAt).toBeNull();
+        });
+
+        it('still lets the guardrails block an action that needs a person', async () => {
+            agents.findOne.mockResolvedValue({
+                id: 'a1',
+                userId: 'u1',
+                guardrails: { mode: 'autonomous', blockedActionTypes: ['send_message'] },
+            });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'send_message',
+                title: 'Send email',
+                humanDecisionRequired: true,
+            });
+            expect(dto.status).toBe('rejected');
+            expect(dto.decidedVia).toBe('guardrail');
+        });
+
         it('queues an autonomous action outside the autoApproveActionTypes narrowing', async () => {
             agents.findOne.mockResolvedValue({
                 id: 'a1',
@@ -198,6 +244,7 @@ describe('AgentApprovalsService', () => {
                 ConflictException,
             );
             expect(proposals.save).not.toHaveBeenCalled();
+            expect(proposals.update).not.toHaveBeenCalled();
         });
 
         it("404s (not 403) for another user's proposal", async () => {
@@ -221,8 +268,8 @@ describe('AgentApprovalsService', () => {
             expect(proposals.find).toHaveBeenCalledWith({
                 where: expect.objectContaining({ userId: 'u1' }),
             });
-            expect(proposals.save).toHaveBeenCalledTimes(1);
-            const saved = proposals.save.mock.calls[0][0] as unknown as AgentActionProposal[];
+            expect(proposals.update).toHaveBeenCalledTimes(2);
+            const saved = decidedRows(proposals);
             expect(saved.map((r) => r.id)).toEqual(['p1', 'p2']);
             for (const row of saved) {
                 expect(row.status).toBe('approved');
@@ -250,6 +297,7 @@ describe('AgentApprovalsService', () => {
 
             expect(result).toEqual({ approved: 0, skipped: 1, excluded: 0 });
             expect(proposals.save).not.toHaveBeenCalled();
+            expect(proposals.update).not.toHaveBeenCalled();
         });
 
         it('short-circuits on an explicit empty subset', async () => {
@@ -289,7 +337,7 @@ describe('AgentApprovalsService', () => {
             const result = await svc.approveAll('u1');
 
             expect(result).toEqual({ approved: 1, skipped: 0, excluded: 1 });
-            const saved = proposals.save.mock.calls[0][0] as unknown as Array<{ id: string }>;
+            const saved = decidedRows(proposals);
             expect(saved.map((row) => row.id)).toEqual(['p1']);
         });
 
@@ -303,6 +351,7 @@ describe('AgentApprovalsService', () => {
                 excluded: 1,
             });
             expect(proposals.save).not.toHaveBeenCalled();
+            expect(proposals.update).not.toHaveBeenCalled();
         });
 
         it('keeps `skipped` for genuinely already-decided rows, alongside an exclusion', async () => {
@@ -356,6 +405,154 @@ describe('AgentApprovalsService', () => {
                     where: { userId: 'u1', status: 'pending', organizationId: 'org-9' },
                 }),
             );
+        });
+    });
+    describe('approveAll — held email drafts (AW-05)', () => {
+        it('never bulk-approves an email draft, because approving one sends it', async () => {
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'spawn_agent' }),
+                makeProposal({
+                    id: 'p2',
+                    actionType: 'send_message',
+                    payload: { kind: 'email-draft', emailMessageId: 'm1' },
+                }),
+                // A send_message proposal that is NOT an email draft keeps
+                // its pre-existing bulk behaviour.
+                makeProposal({ id: 'p3', actionType: 'send_message', payload: {} }),
+            ]);
+
+            await expect(svc.approveAll('u1')).resolves.toEqual({
+                approved: 2,
+                skipped: 0,
+                excluded: 1,
+            });
+            const saved = decidedRows(proposals);
+            expect(saved.map((row) => row.id)).toEqual(['p1', 'p3']);
+        });
+    });
+
+    describe('decision event (AW-05)', () => {
+        let events: { emit: jest.Mock };
+
+        beforeEach(() => {
+            events = { emit: jest.fn() };
+            svc = new AgentApprovalsService(
+                proposals as any,
+                agents as any,
+                undefined,
+                events as any,
+            );
+        });
+
+        it('emits one event after a person decides, carrying the payload', async () => {
+            proposals.findOne.mockResolvedValue(
+                makeProposal({ payload: { kind: 'email-draft', emailMessageId: 'm1' } }),
+            );
+
+            await svc.decide('u1', 'p1', 'approved');
+
+            expect(events.emit).toHaveBeenCalledTimes(1);
+            const [name, event] = events.emit.mock.calls[0];
+            expect(name).toBe(AgentActionProposalDecidedEvent.EVENT_NAME);
+            expect(event).toMatchObject({
+                proposalId: 'p1',
+                userId: 'u1',
+                agentId: 'a1',
+                actionType: 'send_message',
+                status: 'approved',
+                decidedById: 'u1',
+                decidedVia: 'user',
+                payload: { kind: 'email-draft', emailMessageId: 'm1' },
+            });
+        });
+
+        it('emits nothing when the decision is refused (already decided)', async () => {
+            proposals.findOne.mockResolvedValue(makeProposal({ status: 'rejected' }));
+            await expect(svc.decide('u1', 'p1', 'approved')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(events.emit).not.toHaveBeenCalled();
+        });
+
+        it('emits once per row bulk approval decides', async () => {
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'spawn_agent' }),
+                makeProposal({ id: 'p2', actionType: 'spawn_agent' }),
+            ]);
+            await svc.approveAll('u1');
+            expect(events.emit).toHaveBeenCalledTimes(2);
+        });
+
+        it('records exactly one decision, and emits exactly one event, when two people decide at once', async () => {
+            // An in-memory row with a real compare-and-set, and reads that
+            // yield — so both requests genuinely see `pending` first.
+            const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+            const stored = makeProposal({ payload: { kind: 'email-draft', emailMessageId: 'm1' } });
+            proposals.findOne.mockImplementation(async () => {
+                await tick();
+                return { ...stored };
+            });
+            proposals.update.mockImplementation(async (criteria: object, patch: object) => {
+                const where = criteria as Partial<AgentActionProposal>;
+                await tick();
+                if (stored.id !== where.id || stored.status !== where.status) {
+                    return { affected: 0 };
+                }
+                Object.assign(stored, patch);
+                return { affected: 1 };
+            });
+
+            const outcomes = await Promise.allSettled([
+                svc.decide('u1', 'p1', 'approved'),
+                svc.decide('u1', 'p1', 'rejected'),
+            ]);
+
+            const won = outcomes.filter((o) => o.status === 'fulfilled');
+            const lost = outcomes.filter(
+                (o): o is PromiseRejectedResult => o.status === 'rejected',
+            );
+            expect(won).toHaveLength(1);
+            expect(lost).toHaveLength(1);
+            expect(lost[0].reason).toBeInstanceOf(ConflictException);
+            expect(events.emit).toHaveBeenCalledTimes(1);
+            // The event carries the decision the row actually records.
+            expect(events.emit.mock.calls[0][1].status).toBe(stored.status);
+            expect((won[0] as PromiseFulfilledResult<{ status: string }>).value.status).toBe(
+                stored.status,
+            );
+        });
+
+        it('bulk approval never overwrites, or announces, a row decided after it was read', async () => {
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'spawn_agent' }),
+                makeProposal({ id: 'p2', actionType: 'spawn_agent' }),
+            ]);
+            // p2 was rejected by somebody else between the read and the write.
+            proposals.update.mockImplementation(async (where: object) => ({
+                affected: (where as { id: string }).id === 'p2' ? 0 : 1,
+            }));
+
+            await expect(svc.approveAll('u1')).resolves.toEqual({
+                approved: 1,
+                skipped: 1,
+                excluded: 0,
+            });
+            expect(proposals.update).toHaveBeenCalledWith(
+                { id: 'p2', userId: 'u1', status: 'pending' },
+                expect.objectContaining({ status: 'approved' }),
+            );
+            expect(events.emit).toHaveBeenCalledTimes(1);
+            expect(events.emit.mock.calls[0][1].proposalId).toBe('p1');
+        });
+
+        it('never fails the decision when a listener throws', async () => {
+            events.emit.mockImplementation(() => {
+                throw new Error('listener exploded');
+            });
+            proposals.findOne.mockResolvedValue(makeProposal());
+            await expect(svc.decide('u1', 'p1', 'rejected')).resolves.toMatchObject({
+                status: 'rejected',
+            });
         });
     });
 });

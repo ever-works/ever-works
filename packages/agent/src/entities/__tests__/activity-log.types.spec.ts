@@ -91,6 +91,11 @@ describe('activity-log.types', () => {
             ['KB_DOCUMENT_FILED', 'kb_document_filed'],
             ['KB_DOCUMENT_EXPORTED', 'kb_document_exported'],
             ['MEMORY_FOLDER_RENAMED', 'memory_folder_renamed'],
+            // Live Feed — a run starting / finishing / failing for every
+            // trigger kind other than heartbeat.
+            ['AGENT_RUN_STARTED', 'agent_run_started'],
+            ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
+            ['AGENT_RUN_FAILED', 'agent_run_failed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -160,7 +165,11 @@ describe('activity-log.types', () => {
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(162);
+            //
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) and +5 knowledge
+            //    library literals -> 165.
+            expect(literals).toHaveLength(165);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

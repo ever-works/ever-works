@@ -893,6 +893,10 @@ export class AgentToolService {
                         name: args.name as any,
                         body: args.body,
                         expectedHash: args.expectedHash,
+                        // The agent edits its own file from a run: the
+                        // activity record names the agent, not its owner.
+                        actor: 'agent',
+                        runId: runContext.runId,
                     });
                     runContext.editsThisRunByFile.add(key);
                     return result;
@@ -1418,7 +1422,7 @@ export class AgentToolService {
         return {
             name: 'sendEmail',
             description:
-                "Send an email from one of this agent's assigned outbound addresses. Requires canCallExternalTools AND at least one outbound email address assigned to the agent (Settings → Integrations → Emails). Provide either bodyText (optionally bodyHtml) OR a template to render. Returns the provider message id plus accepted/rejected recipient lists. Use for agent-authored outbound mail; for messaging a peer agent prefer messageAgent.",
+                "Send an email from one of this agent's assigned outbound addresses. Requires canCallExternalTools AND at least one outbound email address assigned to the agent (Settings → Integrations → Emails). Provide either bodyText (optionally bodyHtml) OR a template to render. Returns the provider message id plus accepted/rejected recipient lists. When this agent's inbox holds mail for review the message is NOT sent: the result has held=true and a messageId, and a person approves it before it goes out — do not retry or resend it. Sends are also bounded by send limits; a refused send says which limit and when capacity returns. Use for agent-authored outbound mail; for messaging a peer agent prefer messageAgent.",
             parameters: {
                 type: 'object',
                 properties: {

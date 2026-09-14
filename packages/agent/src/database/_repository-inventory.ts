@@ -40,6 +40,7 @@ import { ConversationRepository } from './repositories/conversation.repository';
 import { CreditLedgerRepository } from './repositories/credit-ledger.repository';
 import { EmailConversationRepository } from './repositories/email-conversation.repository';
 import { EmailMessageRepository } from './repositories/email-message.repository';
+import { AgentInboxRepository } from './repositories/agent-inbox.repository';
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
@@ -57,6 +58,7 @@ import { OrganizationOnboardingProfileRepository } from './repositories/organiza
 import { OrganizationRepository } from './repositories/organization.repository';
 import { PlanEntitlementRepository } from './repositories/plan-entitlement.repository';
 import { PluginUsageRepository } from './repositories/plugin-usage.repository';
+import { ProductChangelogReadRepository } from './repositories/product-changelog-read.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { RepoConnectionRepository } from './repositories/repo-connection.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
@@ -90,6 +92,7 @@ import { WorkScheduleRepository } from './repositories/work-schedule.repository'
 export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ActivityLogRepository,
     AgentEmailAssignmentRepository,
+    AgentInboxRepository,
     AgentRepoAttachmentRepository,
     ApiKeyRepository,
     AuthAccountRepository,
@@ -115,6 +118,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     OrganizationRepository,
     PlanEntitlementRepository,
     PluginUsageRepository,
+    ProductChangelogReadRepository,
     RefreshTokenRepository,
     RepoConnectionRepository,
     SubscriptionPlanRepository,
