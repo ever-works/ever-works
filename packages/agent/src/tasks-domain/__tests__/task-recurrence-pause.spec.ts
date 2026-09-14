@@ -87,7 +87,7 @@ describe('TaskRepository.findDueRecurringTemplates — the due-scan honours the 
 });
 
 describe('TasksService — recurrence pause / resume / run-now', () => {
-    function build(task: Task) {
+    function build(task: Task, runNowLock?: unknown) {
         let current = task;
         const repos = {
             tasks: {
@@ -140,6 +140,11 @@ describe('TasksService — recurrence pause / resume / run-now', () => {
             undefined,
             undefined,
             repos.agentRuns as never,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            runNowLock as never,
         );
         return { service, repos, current: () => current };
     }
@@ -323,6 +328,126 @@ describe('TasksService — recurrence pause / resume / run-now', () => {
         expect(result.runs[0]).toMatchObject({
             parked: true,
             queuedReason: 'insufficient-credits',
+        });
+    });
+
+    describe('run-now claim — two simultaneous requests never fire one template twice', () => {
+        function deferred<T>() {
+            let resolve!: (value: T) => void;
+            const promise = new Promise<T>((settle) => {
+                resolve = settle;
+            });
+            return { promise, resolve };
+        }
+
+        /** Let every pending request advance as far as it can. */
+        const settle = () => new Promise((done) => setImmediate(done));
+
+        /** The DB lock's contract: INSERT-as-lock, refuse (never wait) while held. */
+        function lockStub() {
+            const held = new Set<string>();
+            return {
+                held,
+                runExclusive: jest.fn(async (key: string, fn: () => Promise<unknown>) => {
+                    if (held.has(key)) return { acquired: false };
+                    held.add(key);
+                    try {
+                        return { acquired: true, result: await fn() };
+                    } finally {
+                        held.delete(key);
+                    }
+                }),
+            };
+        }
+
+        /**
+         * Both requests are held at the in-flight read — the exact point
+         * where, unclaimed, each sees "nothing running" and goes on to
+         * spawn its own instance.
+         */
+        async function race(runNowLock?: ReturnType<typeof lockStub>) {
+            const { service, repos } = build(template(), runNowLock);
+            const gate = deferred<null>();
+            repos.tasks.findLatestRecurrenceInstance.mockImplementation(() => gate.promise);
+            const first = service.runRecurringNow('user-1', 'tpl-1').catch((err) => err);
+            const second = service.runRecurringNow('user-1', 'tpl-1').catch((err) => err);
+            await settle();
+            gate.resolve(null);
+            return { repos, results: await Promise.all([first, second]) };
+        }
+
+        function expectOneFire(repos: ReturnType<typeof build>['repos'], results: unknown[]): void {
+            const refused = results.filter((result) => result instanceof ConflictException);
+            const fired = results.filter((result) => !(result instanceof Error));
+            expect(fired).toHaveLength(1);
+            expect(refused).toHaveLength(1);
+            expect((refused[0] as ConflictException).getResponse()).toMatchObject({
+                code: 'SCHEDULE_ALREADY_RUNNING',
+                runId: null,
+            });
+            expect(repos.tasks.create).toHaveBeenCalledTimes(1);
+            expect(repos.transitions.dispatchAgentRun).toHaveBeenCalledTimes(1);
+        }
+
+        it('under the shared DB lock, keyed per template', async () => {
+            const lock = lockStub();
+            const { repos, results } = await race(lock);
+            expectOneFire(repos, results);
+            expect(lock.runExclusive).toHaveBeenCalledWith(
+                'schedule-run-now:tpl-1',
+                expect.any(Function),
+                expect.objectContaining({ ttlMs: expect.any(Number) }),
+            );
+            expect(lock.held.size).toBe(0);
+        });
+
+        it('under the per-process claim when no lock is bound', async () => {
+            const { repos, results } = await race();
+            expectOneFire(repos, results);
+        });
+
+        it('a request refused by a held lock touches nothing', async () => {
+            const lock = { runExclusive: jest.fn().mockResolvedValue({ acquired: false }) };
+            const { service, repos } = build(template(), lock);
+            const error = await service.runRecurringNow('user-1', 'tpl-1').catch((err) => err);
+            expect(error).toBeInstanceOf(ConflictException);
+            expect(error.getResponse()).toMatchObject({ code: 'SCHEDULE_ALREADY_RUNNING' });
+            expect(repos.tasks.findLatestRecurrenceInstance).not.toHaveBeenCalled();
+            expect(repos.tasks.create).not.toHaveBeenCalled();
+        });
+
+        it('releases the claim after a fire, and after a fire that failed', async () => {
+            for (const runNowLock of [lockStub(), undefined]) {
+                const { service, repos } = build(template(), runNowLock);
+                repos.transitions.dispatchAgentRun.mockRejectedValueOnce(new Error('queue down'));
+                await expect(service.runRecurringNow('user-1', 'tpl-1')).rejects.toThrow(
+                    'queue down',
+                );
+                await expect(service.runRecurringNow('user-1', 'tpl-1')).resolves.toMatchObject({
+                    templateId: 'tpl-1',
+                });
+                await expect(service.runRecurringNow('user-1', 'tpl-1')).resolves.toMatchObject({
+                    templateId: 'tpl-1',
+                });
+                expect(repos.tasks.create).toHaveBeenCalledTimes(3);
+            }
+        });
+
+        it('claims per template — a different template is not refused', async () => {
+            const lock = lockStub();
+            const { service, repos } = build(template(), lock);
+            const gate = deferred<null>();
+            repos.tasks.findLatestRecurrenceInstance.mockImplementation(() => gate.promise);
+            (repos.tasks.findByIdAndUser as jest.Mock).mockImplementation(async (id: string) =>
+                template({ id }),
+            );
+            const first = service.runRecurringNow('user-1', 'tpl-1');
+            const second = service.runRecurringNow('user-1', 'tpl-2');
+            await settle();
+            gate.resolve(null);
+            const results = await Promise.all([first, second]);
+            expect(results.map((result) => result.templateId)).toEqual(['tpl-1', 'tpl-2']);
+            expect(repos.tasks.create).toHaveBeenCalledTimes(2);
         });
     });
 });

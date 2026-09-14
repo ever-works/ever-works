@@ -42,6 +42,7 @@ import {
     SCHEDULE_NOT_RECURRING,
     SCHEDULE_OWNER_ARCHIVED,
 } from '../schedules/schedule-control.codes';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentStatus, type Agent } from '../entities/agent.entity';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -233,6 +234,15 @@ export const RUN_AGENT_NOT_FOUND = 'RUN_AGENT_NOT_FOUND' as const;
 /** Hard cap on `runTasksBatch` — a board action, not a bulk job runner. */
 export const RUN_BATCH_MAX_TASKS = 20;
 
+/**
+ * Schedules run-now claim lease. Refreshed while the claim is held, so it
+ * only bounds how long a claim left behind by a crashed process blocks the
+ * next run-now of that template.
+ */
+const RUN_NOW_CLAIM_TTL_MS = 60_000;
+/** Hard ceiling on one run-now holding its claim (spawn + dispatch). */
+const RUN_NOW_CLAIM_MAX_LIFETIME_MS = 10 * 60_000;
+
 /** One row of the board's agent picker. */
 export interface RunCandidateAgent {
     id: string;
@@ -338,7 +348,14 @@ export class TasksService {
         // positional-spec arity rule; absent means extra repositories are
         // refused (never silently accepted unchecked).
         @Optional() private readonly repoConnections?: RepoConnectionRepository,
+        // Schedules — the per-template run-now claim (see
+        // `withRunNowClaim`). Appended LAST + @Optional per the
+        // positional-spec arity rule.
+        @Optional() private readonly runNowLock?: DistributedTaskLockService,
     ) {}
+
+    /** Per-process run-now claims, used only when `runNowLock` is unbound. */
+    private readonly runNowInFlight = new Set<string>();
 
     /**
      * Review-fix I4: shared validator for assignee / reviewer / approver
@@ -1120,9 +1137,16 @@ export class TasksService {
      *
      * Refusals (409, body `{ code, message }`):
      *  - `SCHEDULE_ALREADY_RUNNING` — the latest instance still has a
-     *    queued / running run (`runId` + `startedAt` in the body);
+     *    queued / running run (`runId` + `startedAt` in the body), or another
+     *    run-now of the same template holds the claim right now (`runId`
+     *    null — its run row does not exist yet);
      *  - `SCHEDULE_OWNER_ARCHIVED` — the only resolvable Agent is archived;
      *  - `SCHEDULE_NO_AGENT` — no Agent assignee and no `agentId`.
+     *
+     * The in-flight check, the instance insert and the dispatch (which
+     * writes the queued run row the check reads) run under ONE per-template
+     * claim, so two simultaneous requests can never both pass the check —
+     * the second is refused instead of spawning a second instance.
      */
     async runRecurringNow(
         userId: string,
@@ -1130,7 +1154,57 @@ export class TasksService {
         ownershipScope?: OwnershipScope,
     ): Promise<RecurringRunNowResult> {
         const template = await this.getRecurringTemplate(userId, id, ownershipScope);
+        return this.withRunNowClaim(template.id, () =>
+            this.fireRecurringTemplate(userId, template, ownershipScope),
+        );
+    }
 
+    /**
+     * Hold the per-template run-now claim for the duration of `fire`, or
+     * refuse with `SCHEDULE_ALREADY_RUNNING` when another request holds it.
+     *
+     * The claim is the shared DB-backed `DistributedTaskLockService` (an
+     * INSERT on a primary-keyed row, so it serialises across API replicas).
+     * A graph without it — positional unit fixtures — falls back to a
+     * per-process claim with the same refuse-don't-wait semantics.
+     */
+    private async withRunNowClaim<T>(templateId: string, fire: () => Promise<T>): Promise<T> {
+        const refuse = () =>
+            new ConflictException({
+                code: SCHEDULE_ALREADY_RUNNING,
+                message: 'This schedule is already running.',
+                runId: null,
+                taskId: null,
+                startedAt: null,
+            });
+
+        if (this.runNowLock) {
+            const outcome = await this.runNowLock.runExclusive(
+                `schedule-run-now:${templateId}`,
+                fire,
+                {
+                    ttlMs: RUN_NOW_CLAIM_TTL_MS,
+                    maxLifetimeMs: RUN_NOW_CLAIM_MAX_LIFETIME_MS,
+                },
+            );
+            if (!outcome.acquired) throw refuse();
+            return outcome.result as T;
+        }
+
+        if (this.runNowInFlight.has(templateId)) throw refuse();
+        this.runNowInFlight.add(templateId);
+        try {
+            return await fire();
+        } finally {
+            this.runNowInFlight.delete(templateId);
+        }
+    }
+
+    private async fireRecurringTemplate(
+        userId: string,
+        template: Task,
+        ownershipScope?: OwnershipScope,
+    ): Promise<RecurringRunNowResult> {
         if (this.agentRuns) {
             const latest = await this.tasks
                 .findLatestRecurrenceInstance(template.id)

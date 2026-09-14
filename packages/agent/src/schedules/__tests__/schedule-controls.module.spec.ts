@@ -25,6 +25,7 @@ import { WorkPluginRepository } from '@src/plugins/repositories/work-plugin.repo
 import { WorkCustomDomainRepository } from '@src/database/repositories/work-custom-domain.repository';
 import { EverWorksK8sDeployProvider } from '@src/ever-works-providers/ever-works-k8s-deploy.provider';
 import { TasksService } from '@src/tasks-domain/tasks.service';
+import { DistributedTaskLockService } from '@src/cache/distributed-task-lock.service';
 import { AgentsService } from '@src/agents/agents.service';
 import { AgentScheduleDispatcherService } from '@src/agents/agent-schedule-dispatcher.service';
 import { MissionsService } from '@src/missions/missions.service';
@@ -156,6 +157,28 @@ describe('ScheduleControlsModule — dependency injection', () => {
             taskAssigneeRepo?: unknown;
         };
         expect(projection.taskAssigneeRepo).toBeDefined();
+    });
+
+    it('gives TasksService the shared run-now claim, and the claim refuses a second holder on the real DataSource', async () => {
+        // Unbound, run-now falls back to a per-process claim — correct on one
+        // replica, silently not across several. So require the DB lock here.
+        const tasks = moduleRef.get(TasksService, { strict: false }) as unknown as {
+            runNowLock?: unknown;
+        };
+        expect(tasks.runNowLock).toBeInstanceOf(DistributedTaskLockService);
+
+        const lock = tasks.runNowLock as DistributedTaskLockService;
+        const key = 'schedule-run-now:tpl-module-spec';
+        const outer = await lock.runExclusive(key, async () => {
+            const inner = await lock.runExclusive(key, async () => 'second fire');
+            return inner.acquired;
+        });
+        expect(outer).toEqual({ acquired: true, result: false });
+        // Released: the next run-now of the template may claim it again.
+        await expect(lock.runExclusive(key, async () => 'next fire')).resolves.toEqual({
+            acquired: true,
+            result: 'next fire',
+        });
     });
 
     it('reads the projection end to end on the real DataSource — every entity is registered', async () => {
