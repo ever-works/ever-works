@@ -360,7 +360,7 @@ export class KbController {
     @ApiOperation({
         summary: 'Restore an archived KB document to the shelf (the inverse of archive)',
         description:
-            'Flips an archived document back to active, clears who archived it and when, and returns it to the folder it was archived from (Unfiled when that folder no longer exists, reported as `restoredToUnfiled`). Version history, folder and read state are untouched. This is NOT `/restore`, which restores a body from a Git commit. Requires edit access. Idempotent.',
+            'Flips an archived document back to active, clears who archived it and when, and returns it to the folder it was archived from (Unfiled when that folder no longer exists, reported as `restoredToUnfiled`). A decision document gets back the decision status it had before it was archived. Version history, folder and read state are untouched. This is NOT `/restore`, which restores a body from a Git commit. Requires edit access. Idempotent.',
     })
     @ApiResponse({ status: 200, description: '{ document, restoredToUnfiled, changed }' })
     @ApiResponse({ status: 403, description: 'No edit access to the Work' })

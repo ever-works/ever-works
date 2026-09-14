@@ -988,7 +988,18 @@ export class KnowledgeBaseService {
      */
     async resolveContext(
         workId: string,
-        opts: { query?: string; limit?: number; consumerKind?: string } = {},
+        opts: {
+            query?: string;
+            limit?: number;
+            consumerKind?: string;
+            /**
+             * Knowledge library — opt in to dropping archived documents from
+             * `queryRetrieved`. Omitted (the default) keeps the long-standing
+             * behaviour: a direct query hit on an archived document still
+             * surfaces, demoted and labelled historical.
+             */
+            excludeArchived?: boolean;
+        } = {},
     ): Promise<KbContextBundle> {
         const alwaysInjected = await this.fetchAlwaysInjectedDocs(workId);
 
@@ -1003,7 +1014,9 @@ export class KnowledgeBaseService {
         const trimmedQuery = opts.query?.trim() ?? '';
         const queryRetrieved =
             trimmedQuery.length > 0
-                ? await this.fetchQueryRetrievedDocs(workId, trimmedQuery, opts.limit ?? 8)
+                ? await this.fetchQueryRetrievedDocs(workId, trimmedQuery, opts.limit ?? 8, {
+                      excludeArchived: opts.excludeArchived,
+                  })
                 : [];
 
         // Memory upgrades M10 — record what we just injected, for which
@@ -1180,6 +1193,7 @@ export class KnowledgeBaseService {
         workId: string,
         query: string,
         limit: number,
+        opts: { excludeArchived?: boolean } = {},
     ): Promise<KbDocumentBodyDto[]> {
         // Over-fetch chunk hits: supersession substitution below can
         // CONVERGE several hits onto one survivor (and dead chains drop
@@ -1203,11 +1217,12 @@ export class KnowledgeBaseService {
             if (results.length >= limit) break;
             const doc = await this.resolveCurrentDocument(workId, docId);
             if (!doc || included.has(doc.id)) continue;
-            // Knowledge library — an archived document stays readable but is
-            // never injected, not even through a direct semantic hit. (The
-            // always-injected and decision slots already filter to
-            // `status = active`; this makes the query path say so too.)
-            if (doc.status === KbDocumentStatus.ARCHIVED) continue;
+            // Knowledge library — archived documents are skipped ONLY when
+            // the caller opts in. By default a direct semantic hit on an
+            // archived document still reaches the bundle as historical
+            // context (a decision archived through the review action relies
+            // on that), exactly as before the library existed.
+            if (opts.excludeArchived === true && doc.status === KbDocumentStatus.ARCHIVED) continue;
             // M7 — unreviewed (`proposed`) docs never reach a prompt, not
             // even via a direct semantic hit. They stay retrievable through
             // the normal list/get endpoints (the review queue), only the

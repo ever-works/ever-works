@@ -403,7 +403,7 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
     });
 
     describe('context injection', () => {
-        it('never injects an archived document, even on a direct semantic hit', async () => {
+        beforeEach(() => {
             docRepo.findById.mockImplementation(async (_workId: string, id: string) =>
                 id === 'archived'
                     ? buildDocument({ id: 'archived', status: KbDocumentStatus.ARCHIVED })
@@ -413,7 +413,33 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
                 { documentId: 'archived' },
                 { documentId: 'live' },
             ] as never);
+        });
+
+        it('still returns an archived document from query retrieval by default', async () => {
             const bundle = await service.resolveContext(WORK_ID, { query: 'refunds' });
+            expect(bundle.queryRetrieved.map((d) => d.id)).toEqual(['archived', 'live']);
+        });
+
+        it('keeps an archived decision (archived through the review action) as a demoted historical hit', async () => {
+            docRepo.findById.mockImplementation(async (_workId: string, id: string) =>
+                id === 'archived'
+                    ? buildDocument({
+                          id: 'archived',
+                          kbDocumentClass: KbDocumentClass.DECISION,
+                          status: KbDocumentStatus.ARCHIVED,
+                          decision: { status: KbDecisionStatus.ARCHIVED },
+                      })
+                    : buildDocument({ id: 'live' }),
+            );
+            const bundle = await service.resolveContext(WORK_ID, { query: 'refunds' });
+            expect(bundle.queryRetrieved.map((d) => d.id)).toEqual(['live', 'archived']);
+        });
+
+        it('never injects an archived document, even on a direct semantic hit, when the caller opts in', async () => {
+            const bundle = await service.resolveContext(WORK_ID, {
+                query: 'refunds',
+                excludeArchived: true,
+            });
             expect(bundle.queryRetrieved.map((d) => d.id)).toEqual(['live']);
         });
     });

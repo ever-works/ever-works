@@ -235,7 +235,7 @@ The knowledge library is the organization's shelf over the Knowledge Base: every
 - **Shared folders** nest up to 5 levels, hold at most 500 per Organization, and refuse two sibling names that differ only by case. Personal Files folders are untouched: a shared folder never shows up in anyone's Files tree, and a personal folder never shows up on the shelf.
 - **Filing** moves up to 100 documents into one folder of the same Organization in a single action, or back to **Unfiled**. Moving a document is not a change to what it says, so it never counts as an edit.
 - **Deleting a shared folder never deletes a document.** Every document in its subtree moves to Unfiled.
-- **Archive and restore.** An archived document leaves the default shelf and agent context but stays readable. Restoring returns it to the folder it was archived from, or to Unfiled when that folder is gone — and says which.
+- **Archive and restore.** An archived document leaves the default shelf and the context agents always receive, but stays readable; a direct search hit can still bring it to an agent as historical context. Restoring returns it to the folder it was archived from, or to Unfiled when that folder is gone — and says which. A decision gets back the decision status it had before it was archived.
 - **Recently changed** means the last _substantive_ change: title, description, tags, class, or the body ignoring whitespace. Background writes (Git mirroring, re-embedding) and reformatting never move a document up the shelf.
 - **Export** any document you can view as a single `<slug>.md` file with its metadata as YAML front matter.
 
