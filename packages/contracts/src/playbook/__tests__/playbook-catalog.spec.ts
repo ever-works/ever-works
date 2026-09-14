@@ -135,6 +135,18 @@ describe('validatePlaybookEntry', () => {
 		['escalations that are not a list', { escalations: 'x' }, /^escalations must/],
 		['an unknown escalation target', { escalations: [{ when: 'w', becomes: 'email' }] }, /^escalations\[0\]/],
 		['missing caps', { caps: null }, /^caps/],
+		['a negative cap', { caps: { maxPerRun: -1 } }, /^caps\.maxPerRun/],
+		['a fractional cap', { caps: { maxWordCount: 2.5 } }, /^caps\.maxWordCount/],
+		['a NaN cap', { caps: { maxSourcesTracked: Number.NaN } }, /^caps\.maxSourcesTracked/],
+		['an infinite cap', { caps: { maxDecisionsPerRun: Number.POSITIVE_INFINITY } }, /^caps\.maxDecisionsPerRun/],
+		['a cap above the ceiling', { caps: { maxPerRun: 100_001 } }, /^caps\.maxPerRun/],
+		['a string cap', { caps: { maxPerRun: '5' } }, /^caps\.maxPerRun/],
+		['a NaN token estimate', { estimatedTokensPerRun: { min: Number.NaN, max: 5 } }, /^estimatedTokensPerRun/],
+		[
+			'an infinite token estimate',
+			{ estimatedTokensPerRun: { min: 1, max: Number.POSITIVE_INFINITY } },
+			/^estimatedTokensPerRun/
+		],
 		['non-string tags', { tags: [1] }, /^tags/]
 	])('rejects %s', (_label, overrides, message) => {
 		expect(validatePlaybookEntry(entry(overrides))).toMatch(message);
@@ -152,7 +164,28 @@ describe('validatePlaybookEntry', () => {
 			{ guardrailsAtAdoption: { mode: 'require_approval', blockedActionTypes: [3] } },
 			/blockedActionTypes/
 		],
-		['a malformed graduated posture', { graduatedGuardrails: 'autonomous' }, /graduatedGuardrails/]
+		['a malformed graduated posture', { graduatedGuardrails: 'autonomous' }, /graduatedGuardrails/],
+		['a workflow graph that is not an object', { workflowGraph: 'graph' }, /^provision\.workflowGraph must/],
+		[
+			'a workflow graph without nodes',
+			{ workflowGraph: { id: 'g', entryNodeId: 'a', edges: [] } },
+			/^provision\.workflowGraph\.nodes/
+		],
+		[
+			'a workflow graph whose nodes are not a list',
+			{ workflowGraph: { id: 'g', entryNodeId: 'a', nodes: 5, edges: [] } },
+			/^provision\.workflowGraph\.nodes/
+		],
+		[
+			'a workflow graph without edges',
+			{ workflowGraph: { id: 'g', entryNodeId: 'a', nodes: [{ id: 'a', kind: 'noop' }] } },
+			/^provision\.workflowGraph\.edges/
+		],
+		[
+			'a workflow graph whose entry node does not exist',
+			{ workflowGraph: { id: 'g', entryNodeId: 'missing', nodes: [{ id: 'a', kind: 'noop' }], edges: [] } },
+			/^provision\.workflowGraph is invalid: entryNodeId "missing"/
+		]
 	])('rejects a provision with %s', (_label, overrides, message) => {
 		const base = entry();
 		const provision = overrides.provision === null ? null : { ...base.provision, ...overrides };
@@ -169,6 +202,28 @@ describe('validatePlaybookEntry', () => {
 			}));
 		expect(validatePlaybookEntry(entry({ steps: steps(2) }))).toBeNull();
 		expect(validatePlaybookEntry(entry({ steps: steps(8) }))).toBeNull();
+	});
+
+	it('accepts whole-number caps from 0 to the ceiling', () => {
+		expect(
+			validatePlaybookEntry(
+				entry({ caps: { maxPerRun: 0, maxWordCount: 100_000, maxSourcesTracked: 8, maxDecisionsPerRun: 1 } })
+			)
+		).toBeNull();
+	});
+
+	it('accepts a provision with a well-formed workflow graph', () => {
+		const base = entry();
+		const workflowGraph = {
+			id: 'g',
+			entryNodeId: 'a',
+			nodes: [
+				{ id: 'a', kind: 'noop' },
+				{ id: 'b', kind: 'noop' }
+			],
+			edges: [{ id: 'a-b', kind: 'sequential', from: 'a', to: 'b' }]
+		};
+		expect(validatePlaybookEntry({ ...base, provision: { ...base.provision, workflowGraph } })).toBeNull();
 	});
 
 	it('accepts a 64-character slug and a 120-character title', () => {
@@ -245,6 +300,16 @@ describe('acceptPlaybookEntry', () => {
 		expect(acceptPlaybookEntry({ slug: 'ok' }).violation).toMatch(/^title/);
 		expect(acceptPlaybookEntry(entry({ steps: 'nope' })).violation).toMatch(/^steps/);
 		expect(acceptPlaybookEntry(entry({ title: 42 })).violation).toMatch(/^title/);
+	});
+
+	it('drops a provider entry whose provisioned graph has no nodes, so nothing downstream reads nodes.length', () => {
+		const base = entry();
+		const result = acceptPlaybookEntry({
+			...base,
+			provision: { ...base.provision, workflowGraph: { id: 'g', entryNodeId: 'a', edges: [] } }
+		});
+		expect(result.entry).toBeNull();
+		expect(result.violation).toMatch(/^provision\.workflowGraph\.nodes/);
 	});
 });
 

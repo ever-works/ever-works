@@ -15,7 +15,7 @@
  * capability is resolved at read time through the plugin registry.
  */
 
-import type { WorkflowGraph } from '../workflow/workflow-graph.types.js';
+import { validateWorkflowGraph, type WorkflowGraph } from '../workflow/workflow-graph.types.js';
 
 /** The four ways a playbook can be started. */
 export const PLAYBOOK_TRIGGER_KINDS = ['schedule', 'inbound_trigger', 'event', 'manual'] as const;
@@ -118,6 +118,13 @@ export interface PlaybookEscalationPoint {
 	readonly carriesRecommendation: boolean;
 }
 
+/** The resource limits a playbook may declare, each a whole number when present. */
+export const PLAYBOOK_CAP_KEYS = ['maxPerRun', 'maxSourcesTracked', 'maxWordCount', 'maxDecisionsPerRun'] as const;
+export type PlaybookCapKey = (typeof PLAYBOOK_CAP_KEYS)[number];
+
+/** Largest value any declared cap may hold. */
+export const PLAYBOOK_CAP_MAX = 100_000;
+
 export interface PlaybookCaps {
 	readonly maxPerRun?: number;
 	readonly maxSourcesTracked?: number;
@@ -211,6 +218,36 @@ function validateGuardrailsShape(value: unknown, path: string): string | null {
 	return null;
 }
 
+function isFiniteNonNegative(value: unknown): value is number {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function validateCapsShape(value: unknown): string | null {
+	if (!isRecord(value)) return 'caps must be an object';
+	for (const key of PLAYBOOK_CAP_KEYS) {
+		const cap = value[key];
+		if (cap === undefined) continue;
+		if (!isFiniteNonNegative(cap) || !Number.isInteger(cap) || cap > PLAYBOOK_CAP_MAX) {
+			return `caps.${key} must be a whole number from 0 to ${PLAYBOOK_CAP_MAX}`;
+		}
+	}
+	return null;
+}
+
+/**
+ * A provisioned graph must be one the workflow executor can run: an object
+ * with a list of nodes and (when present) a list of edges that passes the
+ * same structural validation a saved workflow does. Anything else would
+ * surface later as a crash while planning or running the adoption.
+ */
+function validateProvisionGraph(value: unknown): string | null {
+	if (!isRecord(value)) return 'provision.workflowGraph must be an object';
+	if (!Array.isArray(value.nodes)) return 'provision.workflowGraph.nodes must be a list';
+	if (!Array.isArray(value.edges)) return 'provision.workflowGraph.edges must be a list';
+	const { valid, errors } = validateWorkflowGraph(value as unknown as WorkflowGraph);
+	return valid ? null : `provision.workflowGraph is invalid: ${errors[0] ?? 'unknown error'}`;
+}
+
 /**
  * Validate one catalogue entry and return the FIRST violation, or `null` when
  * the entry is well-formed. Never throws: a provider's malformed entry is a
@@ -236,9 +273,8 @@ export function validatePlaybookEntry(value: unknown): string | null {
 	const estimate = value.estimatedTokensPerRun;
 	if (
 		!isRecord(estimate) ||
-		typeof estimate.min !== 'number' ||
-		typeof estimate.max !== 'number' ||
-		estimate.min < 0 ||
+		!isFiniteNonNegative(estimate.min) ||
+		!isFiniteNonNegative(estimate.max) ||
 		estimate.max < estimate.min
 	) {
 		return 'estimatedTokensPerRun must be { min, max } with 0 <= min <= max';
@@ -293,7 +329,8 @@ export function validatePlaybookEntry(value: unknown): string | null {
 		}
 	}
 
-	if (!isRecord(value.caps)) return 'caps must be an object';
+	const capsError = validateCapsShape(value.caps);
+	if (capsError) return capsError;
 	if (!Array.isArray(value.tags) || value.tags.some((tag) => typeof tag !== 'string')) {
 		return 'tags must be a list of strings';
 	}
@@ -317,6 +354,10 @@ export function validatePlaybookEntry(value: unknown): string | null {
 	if (provision.graduatedGuardrails !== undefined) {
 		const graduatedError = validateGuardrailsShape(provision.graduatedGuardrails, 'provision.graduatedGuardrails');
 		if (graduatedError) return graduatedError;
+	}
+	if (provision.workflowGraph !== undefined) {
+		const graphError = validateProvisionGraph(provision.workflowGraph);
+		if (graphError) return graphError;
 	}
 	return null;
 }
