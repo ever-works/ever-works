@@ -89,6 +89,9 @@ export interface TaskLinkedPullRequest {
 @Index('idx_tasks_branch_state', ['workId', 'branchState'])
 // Phase 17 hot path — dispatcher walks rows where (isRecurring, nextOccurrenceAt <= now).
 @Index('idx_tasks_recurrence_due', ['isRecurring', 'nextOccurrenceAt'])
+// Schedules — the due-scan also filters `recurrencePausedAt IS NULL`. Added
+// BESIDE the index above, never in place of it.
+@Index('idx_tasks_recurrence_due_active', ['isRecurring', 'recurrencePausedAt', 'nextOccurrenceAt'])
 // Schedule-modes hot path — the one-shot dispatcher walks rows where
 // (scheduledAt <= now AND scheduleClaimedAt IS NULL). A composite index
 // keeps the claim-filter cheap on both drivers (a partial index would
@@ -494,6 +497,18 @@ export class Task {
 
     @Column({ type: 'uuid', nullable: true })
     parentRecurringTaskId?: string | null;
+
+    /**
+     * Schedules — a reversible pause for a recurring template. Non-null
+     * means paused: the recurrence dispatcher's due-scan skips the row.
+     * Pausing touches NOTHING else — `recurrenceRule` / `recurrenceCron`,
+     * `nextOccurrenceAt`, `recurrenceEndsAt`, `recurrenceMaxOccurrences`
+     * and the occurred count all survive exactly, so resuming restores
+     * firing without the owner re-entering the cadence. `null` (every row
+     * that predates the column) reads as "not paused".
+     */
+    @PortableDateColumn({ nullable: true })
+    recurrencePausedAt?: Date | null;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs.
     // Both NULL until the owning user creates their first Organization

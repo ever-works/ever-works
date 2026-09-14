@@ -50,6 +50,8 @@ describe('activity-log.types', () => {
             ['SCHEDULE_UPDATED', 'schedule_updated'],
             ['SCHEDULE_DELETED', 'schedule_deleted'],
             ['SCHEDULE_EXECUTED', 'schedule_executed'],
+            ['SCHEDULE_PAUSED', 'schedule_paused'],
+            ['SCHEDULE_RESUMED', 'schedule_resumed'],
             // Import / Export
             ['IMPORT', 'import'],
             ['EXPORT', 'export'],
@@ -144,14 +146,16 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
+            // +2 schedule_paused / schedule_resumed (Schedules workspace
+            //    pause that keeps the cadence) -> 159.
             //
-            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // 🛑 159 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(157);
+            expect(literals).toHaveLength(159);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
