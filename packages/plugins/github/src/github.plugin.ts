@@ -2,6 +2,8 @@ import type {
 	IPlugin,
 	IGitProviderPlugin,
 	IOAuthPlugin,
+	IConnectionScopesPlugin,
+	ConnectionScopePreset,
 	PluginContext,
 	PluginCategory,
 	PluginManifest,
@@ -50,13 +52,14 @@ import { GitOperations } from '@ever-works/plugin/git';
 import { GitHubApiService } from './github-api.service.js';
 import { GitHubActionsService } from './github-actions.service.js';
 import type { GitHubSettings, GitHubPublicKey } from './types.js';
+import { GITHUB_CONNECTION_SCOPE_PRESETS } from './github.connection-scopes.js';
 
-export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
+export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, IConnectionScopesPlugin {
 	readonly id = 'github';
 	readonly name = 'GitHub';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'git-provider';
-	readonly capabilities: readonly string[] = ['git-provider', 'oauth'];
+	readonly capabilities: readonly string[] = ['git-provider', 'oauth', 'connection-scopes'];
 	readonly providerName = 'github';
 
 	readonly settingsSchema: JsonSchema = {
@@ -136,6 +139,12 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	private gitOps?: GitOperations;
 	private apiService = new GitHubApiService();
 	private actionsService = new GitHubActionsService();
+
+	// IConnectionScopesPlugin - plain-English access levels (AW-15)
+
+	getConnectionScopePresets(): readonly ConnectionScopePreset[] {
+		return GITHUB_CONNECTION_SCOPE_PRESETS;
+	}
 
 	// IGitProviderPlugin - Authentication
 

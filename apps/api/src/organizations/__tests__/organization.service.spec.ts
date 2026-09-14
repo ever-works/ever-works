@@ -712,6 +712,32 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
                 service.update('u-1', 'o-1', { displayName: 'New' }),
             ).rejects.toBeInstanceOf(NotFoundException);
         });
+
+        it('AW-15: stores "Require https for connection credentials" sanitized, and null resets to defaults', async () => {
+            const org = { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' };
+            const { service, organizationRepository } = makeService({
+                user: { id: 'u-1', tenantId: 't-1' },
+                organizationById: org,
+            });
+
+            await service.update('u-1', 'o-1', {
+                connectionPolicy: { requireHttpsForCredentials: true, extra: 'x' } as never,
+            });
+            expect(organizationRepository.update).toHaveBeenLastCalledWith('o-1', {
+                connectionPolicy: { requireHttpsForCredentials: true },
+            });
+
+            await service.update('u-1', 'o-1', { connectionPolicy: null });
+            expect(organizationRepository.update).toHaveBeenLastCalledWith('o-1', {
+                connectionPolicy: null,
+            });
+
+            // Omitted = unchanged: the setting is never touched by another edit.
+            await service.update('u-1', 'o-1', { displayName: 'New' });
+            expect(organizationRepository.update).toHaveBeenLastCalledWith('o-1', {
+                displayName: 'New',
+            });
+        });
     });
 
     describe('checkSlugAvailability', () => {
