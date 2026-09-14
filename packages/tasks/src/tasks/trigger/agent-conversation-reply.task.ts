@@ -36,8 +36,9 @@ export interface AgentConversationReplyPayload {
  *     (budget, tools, memory, cost);
  *  5. record the reply as an Agent-authored message that answers the
  *     triggering one, so the run and the message point at each other — or,
- *     when the Agent's budget refused the run, mark the triggering message
- *     `failed` with `budget_exceeded` so the refusal is visible and retryable.
+ *     when the Agent's budget refused the run (`budget_exceeded`) or the
+ *     model call failed (`provider_unavailable`), mark the triggering message
+ *     `failed` so the failure is visible and retryable.
  *
  * `maxDuration` matches the chat reply job.
  */
@@ -175,14 +176,18 @@ export const agentConversationReplyTask = task<
                 );
             } else if (result.status === 'agent-not-found') {
                 await runs.markFailed(run.id, 'Agent not found');
-            } else if (result.status === 'budget-blocked') {
-                // The runner already failed the run. Without this the person
-                // would see nothing: their message moves to `failed` with the
-                // reason, so the Conversation can say why and offer Retry.
+            } else if (result.status === 'budget-blocked' || result.status === 'dispatch-failed') {
+                // The runner already failed the run — the budget refused it, or
+                // the model call errored. Without this the person would see
+                // nothing: their message moves to `failed` with the reason, so
+                // the Conversation can say why and offer Retry.
                 await messages.markReplyRefused({
                     conversationId: payload.conversationId,
                     messageId: payload.triggeringMessageId,
-                    failureCode: 'budget_exceeded',
+                    failureCode:
+                        result.status === 'budget-blocked'
+                            ? 'budget_exceeded'
+                            : 'provider_unavailable',
                 });
             }
 

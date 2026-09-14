@@ -10,8 +10,9 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
  *    stripped) and the recent history, through the shared runner;
  *  - a reply is recorded as the Agent's message answering the triggering one,
  *    and nothing is recorded when the run produced no reply;
- *  - a reply the Agent's budget refused leaves a trace: the triggering
- *    message is marked failed with `budget_exceeded`.
+ *  - a reply the Agent's budget refused, or whose model call failed, leaves a
+ *    trace: the triggering message is marked failed with `budget_exceeded` or
+ *    `provider_unavailable`.
  */
 const {
     taskMock,
@@ -218,6 +219,24 @@ describe('agentConversationReplyTask', () => {
         });
         expect(messages.appendAgentMessage).not.toHaveBeenCalled();
         expect(result).toMatchObject({ status: 'budget-blocked', runId: RUN_ID });
+    });
+
+    it('surfaces a reply whose model call failed on the person’s message so it can be retried', async () => {
+        runner.execute.mockResolvedValue({
+            status: 'dispatch-failed',
+            finalizeResult: { status: 'failed' },
+        });
+
+        const result = await config.run(payload);
+
+        expect(messages.markReplyRefused).toHaveBeenCalledTimes(1);
+        expect(messages.markReplyRefused).toHaveBeenCalledWith({
+            conversationId: CONVERSATION_ID,
+            messageId: MESSAGE_ID,
+            failureCode: 'provider_unavailable',
+        });
+        expect(messages.appendAgentMessage).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ status: 'dispatch-failed', runId: RUN_ID });
     });
 
     it('marks nothing failed when the reply ran', async () => {

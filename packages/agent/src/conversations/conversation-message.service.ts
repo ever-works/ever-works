@@ -93,8 +93,8 @@ const REPLY_CONTEXT_MESSAGES = 20;
  *      of credits) — the message is marked `failed` with that reason so the
  *      sender can Retry it (FR-42) — nothing retries on its own (FR-45).
  *
- * A reply the Agent's budget refuses after dispatch is surfaced the same way
- * by the reply job, through {@link markReplyRefused}.
+ * A reply the Agent's budget refuses after dispatch, or whose model call fails,
+ * is surfaced the same way by the reply job, through {@link markReplyRefused}.
  *
  * Refusals carry a stable `failureCode` so the composer can say why in plain
  * language and keep the text (FR-39, FR-46). No message body, mention or
@@ -263,8 +263,9 @@ export class ConversationMessageService {
     }
 
     /**
-     * Surface a reply that was dispatched but refused before it could run —
-     * the Agent's budget stopped it. The run is already failed; without this
+     * Surface a reply that was dispatched but never answered — the Agent's
+     * budget refused the run (`budget_exceeded`), or its model call failed
+     * (`provider_unavailable`). The run is already failed; without this
      * the Conversation would show nothing. The person's message moves to
      * `failed` with the reason, so the composer can say why and offer Retry,
      * and the live stream pushes the change.

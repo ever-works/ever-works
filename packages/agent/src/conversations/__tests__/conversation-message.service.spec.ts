@@ -418,6 +418,30 @@ describe('ConversationMessageService', () => {
             );
         });
 
+        it('marks a failed model call provider_unavailable, once, while the message is still sent', async () => {
+            const row = { id: 'm1', authorType: 'user', authorId: 'u1', status: 'sent' };
+            conversations.findMessageById.mockImplementation(async () => ({ ...row }));
+            conversations.updateMessageStatus.mockImplementation(async (_id, status) => {
+                row.status = status;
+            });
+            const input = {
+                conversationId: 'c1',
+                messageId: 'm1',
+                failureCode: 'provider_unavailable' as const,
+            };
+
+            await expect(service.markReplyRefused(input)).resolves.toBe(true);
+            // A second report (a redelivered job) finds the message failed already.
+            await expect(service.markReplyRefused(input)).resolves.toBe(false);
+
+            expect(conversations.updateMessageStatus).toHaveBeenCalledTimes(1);
+            expect(conversations.updateMessageStatus).toHaveBeenCalledWith(
+                'm1',
+                'failed',
+                'provider_unavailable',
+            );
+        });
+
         it('leaves a missing, already failed, or non-person message alone', async () => {
             const input = {
                 conversationId: 'c1',
