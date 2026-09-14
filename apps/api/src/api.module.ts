@@ -61,6 +61,7 @@ import { ReleaseModule } from './release/release.module';
 import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
+import { ComputerApiModule } from './computer/computer.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
@@ -228,6 +229,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Streaming-terminal M3 — relay registry + WS gateway on this
         // process's HTTP server + attach-token/internal-publish endpoints.
         TerminalModule,
+        // Agent computers (watch) — live views of the machine an Agent works
+        // on: owner session routes, node publish routes, a relay and a WS
+        // gateway sharing this process's HTTP server with the terminal's.
+        // Rides the terminal's attach-token signer and the fleet's node
+        // auth and job runtime; dark with FLEET_ENABLED=false.
+        ComputerApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,

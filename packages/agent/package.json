@@ -217,6 +217,10 @@
             "types": "./dist/fleet/index.d.ts",
             "default": "./dist/fleet/index.js"
         },
+        "./computer": {
+            "types": "./dist/computer/index.d.ts",
+            "default": "./dist/computer/index.js"
+        },
         "./pr-review": {
             "types": "./dist/pr-review/index.d.ts",
             "default": "./dist/pr-review/index.js"

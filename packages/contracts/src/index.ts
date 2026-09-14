@@ -4,6 +4,11 @@ export * from './form/index.js';
 export * from './github/index.js';
 export * from './kb/index.js';
 export * from './terminal/index.js';
+// Agent computers — the live-view wire protocol and session views, riding
+// the same relay, attach tokens and gateway as the streaming terminal.
+export * from './computer/index.js';
+// The pure secret-pattern scanner, shared by the server and the node app.
+export * from './secret/index.js';
 export * from './tasks/index.js';
 export * from './policy/index.js';
 export * from './ingest/index.js';
