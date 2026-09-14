@@ -189,6 +189,17 @@ describe('AgentRunService — slash invocation (invocation slugs)', () => {
         expect(invocationRows()).toHaveLength(0);
     });
 
+    it.each([
+        ['switched off', { disabledAt: new Date('2026-09-01') }],
+        ['drafted and not yet accepted', { reviewState: 'proposed' }],
+    ])('does not inject a Skill that is %s, even when invoked by name', async (_label, over) => {
+        skillRepo.findByUserAndInvocationSlug.mockResolvedValue(makeInvokedSkill(over));
+        const result = await makeSvc().execute(chatContext('/plan go'));
+        expect(result.status).toBe('dispatched');
+        expect(result.prompt?.systemMessage).not.toContain('# INVOKED SKILL');
+        expect(invocationRows()).toHaveLength(0);
+    });
+
     it('requires the slash at the very start with a word boundary', async () => {
         await makeSvc().execute(chatContext('see /plan for details'));
         expect(skillRepo.findByUserAndInvocationSlug).not.toHaveBeenCalled();

@@ -1,4 +1,12 @@
 import 'server-only';
+import type {
+    SkillCardState,
+    SkillProvenance,
+    SkillReadinessDetail,
+    SkillReadinessFilter,
+    SkillReadinessState,
+    SkillShelfSort,
+} from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -59,6 +67,38 @@ export interface Skill {
     version: string;
     createdAt: string;
     updatedAt: string;
+    // ── Skills shelf (optional: older payloads and fixtures omit them) ──
+    disabledAt?: string | null;
+    readiness?: SkillReadinessState;
+    readinessDetail?: SkillReadinessDetail | null;
+    readinessCheckedAt?: string | null;
+    reviewState?: 'proposed' | null;
+    capturedFromRunId?: string | null;
+    /** List rows only: normalised tags, alphabetical. */
+    tags?: string[];
+    /** List rows only: the one badge the card shows. */
+    cardState?: SkillCardState;
+    /** List rows only: where the Skill came from. */
+    provenance?: SkillProvenance;
+    /** List rows only: how many bindings the Skill has. */
+    boundTargetCount?: number;
+}
+
+/** Skills shelf — how many Skills sit in each card state. */
+export type SkillCardStateCounts = Record<SkillCardState, number>;
+
+export interface SkillTagFacet {
+    tag: string;
+    count: number;
+}
+
+export interface SkillReadiness {
+    id: string;
+    readiness: SkillReadinessState;
+    readinessDetail: SkillReadinessDetail | null;
+    readinessCheckedAt: string | null;
+    cardState: SkillCardState;
+    stale?: boolean;
 }
 
 export interface SkillBinding {
@@ -113,6 +153,12 @@ export const skillsAPI = {
             search?: string;
             limit?: number;
             offset?: number;
+            // Skills shelf
+            tags?: string[];
+            readiness?: SkillReadinessFilter;
+            provenance?: SkillProvenance;
+            enabled?: boolean;
+            sort?: SkillShelfSort;
         } = {},
     ) {
         const params = new URLSearchParams();
@@ -120,11 +166,35 @@ export const skillsAPI = {
         if (query.search) params.set('search', query.search);
         if (query.limit !== undefined) params.set('limit', String(query.limit));
         if (query.offset !== undefined) params.set('offset', String(query.offset));
+        if (query.tags?.length) params.set('tags', query.tags.join(','));
+        if (query.readiness) params.set('readiness', query.readiness);
+        if (query.provenance) params.set('provenance', query.provenance);
+        if (query.enabled !== undefined) params.set('enabled', String(query.enabled));
+        if (query.sort) params.set('sort', query.sort);
         const qs = params.toString();
         return serverFetch<{
             data: Skill[];
             meta: { total: number; limit: number; offset: number };
+            /** Skills shelf — per-card-state counts over the whole shelf. */
+            counts?: SkillCardStateCounts;
         }>(`/skills${qs ? `?${qs}` : ''}`, { method: 'GET' });
+    },
+
+    /** Skills shelf — tag chips with counts, most-used first. */
+    async listTags(limit?: number) {
+        const qs = limit !== undefined ? `?limit=${limit}` : '';
+        return serverFetch<{ tags: SkillTagFacet[]; total: number }>(`/skills/tags${qs}`, {
+            method: 'GET',
+        });
+    },
+
+    /** Skills shelf — the cached readiness verdict for one Skill. */
+    async readiness(id: string) {
+        try {
+            return await serverFetch<SkillReadiness>(`/skills/${id}/readiness`, { method: 'GET' });
+        } catch {
+            return null;
+        }
     },
 
     async listCatalog(

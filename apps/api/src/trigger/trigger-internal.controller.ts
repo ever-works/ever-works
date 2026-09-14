@@ -79,6 +79,7 @@ import {
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
+import { SkillReadinessService } from '@ever-works/agent/skills';
 import {
     CreditLedgerService,
     CreditsSweepService,
@@ -387,6 +388,13 @@ export class TriggerInternalController implements OnModuleInit {
         // channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly paygService?: PaygService,
+        // Skills shelf — backs the `skill-readiness-sweep` cron: the worker
+        // proxy calls `sweepStale()` over the internal RPC channel, landing
+        // here where the Skill repositories, the tool-grant matrix and the
+        // credential port are wired. Appended LAST + @Optional() per the
+        // arity rule above.
+        @Optional()
+        private readonly skillReadinessService?: SkillReadinessService,
     ) {}
 
     onModuleInit() {
@@ -499,6 +507,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
             // calls `syncDuePrStatuses()` here (allow-list auto-derived).
             TaskPrStatusService: this.taskPrStatusService,
+            // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
+            // here (allow-list auto-derived).
+            SkillReadinessService: this.skillReadinessService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

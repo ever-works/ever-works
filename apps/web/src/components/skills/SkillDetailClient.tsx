@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { SkillMarkdownEditor } from '@/components/skills/SkillMarkdownEditor';
+import { SkillReadinessPanel } from '@/components/skills/SkillReadinessPanel';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { browserApiFetch } from '@/lib/api/browser-api';
@@ -116,6 +117,9 @@ export function SkillDetailClient({
                 </div>
             </header>
 
+            {/* Skills shelf — readiness, requirements and provenance, added
+                above every pre-existing section; nothing below moves. */}
+            <SkillReadinessPanel skill={skill} />
             <InvocationSlugSection skill={skill} />
             <BodyEditor skill={skill} />
             <FilesSection skillId={skill.id} initialFiles={initialFiles} />
@@ -577,7 +581,11 @@ function BindingsPanel({
     const TargetTypeIcon = TARGET_TYPE_ICONS[targetType];
 
     return (
-        <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
+        // `id` is the Skills shelf's "Attach it" anchor (additive).
+        <section
+            id="skill-bindings"
+            className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3 scroll-mt-6"
+        >
             <div className="flex items-center gap-2">
                 <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
                     <Link2 className="w-4 h-4 text-info" />

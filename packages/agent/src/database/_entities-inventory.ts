@@ -88,6 +88,7 @@ import { TeamResource } from '../entities/team-resource.entity';
 import { Skill } from '../entities/skill.entity';
 import { SkillBinding } from '../entities/skill-binding.entity';
 import { SkillFile } from '../entities/skill-file.entity';
+import { SkillTag } from '../entities/skill-tag.entity';
 import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
@@ -253,6 +254,7 @@ export const ENTITIES = [
     Skill,
     SkillBinding,
     SkillFile,
+    SkillTag,
     // Phase 11 — Tasks family
     Task,
     TaskAssignee,

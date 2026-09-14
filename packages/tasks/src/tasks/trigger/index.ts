@@ -52,3 +52,5 @@ export * from './credits-meter-flush.task';
 // Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
 // dry-run by default, never auto-applied).
 export * from './memory-consolidation-tick.task';
+// Skills shelf — hourly readiness sweep.
+export * from './skill-readiness-sweep.task';

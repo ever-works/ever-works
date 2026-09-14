@@ -84,6 +84,9 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Skills shelf — the workspace-level on/off switch.
+            ['SKILL_ENABLED', 'skill_enabled'],
+            ['SKILL_DISABLED', 'skill_disabled'],
             // Live Feed — a run starting / finishing / failing for every
             // trigger kind other than heartbeat.
             ['AGENT_RUN_STARTED', 'agent_run_started'],
@@ -149,6 +152,7 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
+            // +2 skill_enabled / skill_disabled (Skills shelf on/off switch) -> 159.
             //
             // 🛑 157 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
@@ -159,7 +163,11 @@ describe('activity-log.types', () => {
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
-            expect(literals).toHaveLength(160);
+            //
+            // Merging develop's Live Feed run lifecycle (+3, develop said 160)
+            // into the Skills shelf branch (+2 skill_enabled / skill_disabled,
+            // this branch said 159) -> 162, COUNTED from the merged enum.
+            expect(literals).toHaveLength(162);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
