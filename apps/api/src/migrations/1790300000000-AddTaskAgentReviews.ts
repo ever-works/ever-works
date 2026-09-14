@@ -14,6 +14,15 @@ import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex } from 
  * and exactly one model run on one of six fleet PCs. Counting rows for a
  * Task is counting runs, never transitions.
  *
+ * The lifetime budget is a SECOND unique index, `(taskId, slot)`: every
+ * review holds a slot number in `[0, maxRuns)`, so the database — not a
+ * count read beforehand — refuses the run past the budget. A count read
+ * before the insert let two concurrent planners each see the last slot
+ * free and dispatch two runs with `TASK_AGENT_REVIEW_MAX_RUNS=1` (Greptile
+ * P1-C on PR #2419, reproduced by execution). A plain INSERT against a
+ * unique index is atomic on both engines this migration serves, so the
+ * bound needs no lock and no engine-specific SQL.
+ *
  * The row is also the only durable link between a review run and the
  * `task_approvers` row that run may write: `runId` is bound before the run
  * is enqueued, and the verdict tool is handed the speaking run's id from
@@ -77,6 +86,10 @@ export class AddTaskAgentReviews1790300000000 implements MigrationInterface {
                         { name: 'approverId', type: 'uuid' },
                         { name: 'claimKey', type: 'varchar', length: '200' },
                         { name: 'headSha', type: 'varchar', length: '64' },
+                        // The lifetime budget slot, in [0, maxRuns). NOT
+                        // NULL: a review that holds no slot would be a run
+                        // the budget cannot see. See the class doc.
+                        { name: 'slot', type: 'int' },
                         { name: 'prNumber', type: 'int', isNullable: true },
                         { name: 'ciState', type: 'varchar', length: '16', isNullable: true },
                         { name: 'runId', type: 'uuid', isNullable: true },
@@ -97,6 +110,46 @@ export class AddTaskAgentReviews1790300000000 implements MigrationInterface {
                 }),
                 true,
             );
+        }
+
+        // Converge a ledger that exists WITHOUT `slot` — created by this
+        // migration's earlier revision on this unmerged branch, or by
+        // `synchronize` from the earlier entity — before anything below
+        // indexes the column. `createTable` above only runs for a missing
+        // table, so without this the `(taskId, slot)` index would be created
+        // on a column that is not there and `up()` would throw instead of
+        // converging.
+        //
+        // Added nullable, backfilled, THEN made NOT NULL: a NOT NULL column
+        // cannot be added to a populated table without a default, and a
+        // default would leave this path with a different schema from the
+        // `createTable` one. The backfill numbers each Task's existing rows
+        // 0, 1, 2… in claim order (`createdAt`, then `id`), so they are
+        // distinct per Task — which the unique index below requires — and
+        // form the same dense prefix the claim path produces. One correlated
+        // UPDATE, the same SQL on both engines.
+        const beforeSlot = await queryRunner.getTable('task_agent_reviews');
+        if (beforeSlot && !beforeSlot.findColumnByName('slot')) {
+            await queryRunner.addColumn(
+                'task_agent_reviews',
+                new TableColumn({ name: 'slot', type: 'int', isNullable: true }),
+            );
+            await queryRunner.query(
+                `UPDATE "task_agent_reviews" SET "slot" = (` +
+                    `SELECT COUNT(*) FROM "task_agent_reviews" "prior" ` +
+                    `WHERE "prior"."taskId" = "task_agent_reviews"."taskId" ` +
+                    `AND ("prior"."createdAt" < "task_agent_reviews"."createdAt" ` +
+                    `OR ("prior"."createdAt" = "task_agent_reviews"."createdAt" ` +
+                    `AND "prior"."id" < "task_agent_reviews"."id")))`,
+            );
+            // Re-read: on sqlite `addColumn` rebuilt the table.
+            const withSlot = await queryRunner.getTable('task_agent_reviews');
+            const nullableSlot = withSlot?.findColumnByName('slot');
+            if (nullableSlot) {
+                const requiredSlot = nullableSlot.clone();
+                requiredSlot.isNullable = false;
+                await queryRunner.changeColumn('task_agent_reviews', nullableSlot, requiredSlot);
+            }
         }
 
         const reviews = await queryRunner.getTable('task_agent_reviews');
@@ -145,6 +198,20 @@ export class AddTaskAgentReviews1790300000000 implements MigrationInterface {
                 new TableIndex({
                     name: 'uq_task_agent_review_claim',
                     columnNames: ['taskId', 'claimKey'],
+                    isUnique: true,
+                }),
+            );
+        }
+        if (
+            reviews &&
+            !reviews.indices.some((index) => index.name === 'uq_task_agent_review_slot')
+        ) {
+            // THE budget. See the class doc.
+            await queryRunner.createIndex(
+                'task_agent_reviews',
+                new TableIndex({
+                    name: 'uq_task_agent_review_slot',
+                    columnNames: ['taskId', 'slot'],
                     isUnique: true,
                 }),
             );

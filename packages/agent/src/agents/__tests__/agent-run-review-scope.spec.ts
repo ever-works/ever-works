@@ -507,6 +507,33 @@ describe('AgentRunService — a review run reaches the model ONLY with its brief
                 ]),
                 setState: jest.fn(async () => undefined),
             };
+            // Greptile P1-B on PR #2419: the verdict is ONE transactional
+            // write, `reviews.recordVerdict` (settle the review AND write the
+            // approver row, or neither). Modelled on the stateful ledger
+            // double above so `review.state` and `approvers.setState` keep
+            // describing what that write did. The `decidedVia` literal below
+            // is this double's, not production's (the repository stamps it),
+            // so an assertion naming it proves only that the verdict reached
+            // `recordVerdict`; the real stamp is pinned on a real database in
+            // `task-agent-review.verdict-atomicity.spec.ts`.
+            Object.assign(reviews, {
+                recordVerdict: jest.fn(async (write: any) => {
+                    if (!(await reviews.casSettle(write.reviewId, write.state))) {
+                        return 'review-not-open';
+                    }
+                    await (approvers.setState as (...args: unknown[]) => Promise<void>)(
+                        write.approver.id,
+                        write.approver.approvalState,
+                        write.approver.taskId,
+                        {
+                            decidedVia: 'agent-review',
+                            decidedByRunId: write.approver.decidedByRunId,
+                            decidedHeadSha: write.approver.decidedHeadSha,
+                        },
+                    );
+                    return 'recorded';
+                }),
+            });
             const reviewService = new TaskAgentReviewService(
                 {
                     findById: jest.fn(async () => ({

@@ -1,4 +1,4 @@
-import type { SubAgentScope } from '@ever-works/contracts';
+import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
 import type { GitDiffResult } from '@ever-works/plugin';
 
 /**
@@ -146,6 +146,109 @@ export const TASK_APPROVER_DECIDED_VIA_VALUES: readonly TaskApproverDecidedVia[]
     'user',
     'agent-review',
 ];
+
+// ── which approver decisions still speak for the current commit ─────
+
+/** The approver-row fields the commit-binding rules below read. */
+export interface ApproverDecisionShape {
+    approverType: string;
+    approvalState: string;
+    decidedVia?: string | null;
+    decidedHeadSha?: string | null;
+}
+
+/**
+ * The pull request head the `in_review → done` gate binds agent decisions
+ * to, from the Task row only — or `null` when the platform does not know
+ * it.
+ *
+ * `prHeadSha` is the pull request's own answer (the provider's head, as
+ * the PR-status poll last recorded it). `ciHeadSha` is what a check
+ * delivery or the same poll recorded. They normally agree; when both are
+ * present and DISAGREE, one of them has seen a push the other has not, and
+ * the platform cannot say which commit is current. That is `null`, not a
+ * guess — and `null` makes every commit-bound decision uncountable
+ * ({@link approverDecisionCountsTowardDone}). The next poll realigns the
+ * two (`TaskPrStatusService.refreshTask` writes the provider head into
+ * both), so the refusal lasts one poll interval at most.
+ *
+ * Reviewer agent stage, Greptile P1-A on PR #2419: the gate used to read
+ * `approvalState` alone, so an agent approval for head A let the Task reach
+ * `done` after the pull request had moved to head B.
+ */
+export function resolveCompletionGateHead(task: {
+    prHeadSha?: string | null;
+    ciHeadSha?: string | null;
+}): string | null {
+    const pr = normalizeHead(task.prHeadSha);
+    if (!pr) return null;
+    const ci = normalizeHead(task.ciHeadSha);
+    if (ci && ci !== pr) return null;
+    return pr;
+}
+
+/**
+ * Is this approver row's decision a statement about ONE commit?
+ *
+ * Every AGENT approver row is, and so is any row stamped `agent-review`:
+ * the only writer of an agent approver's state is the review verdict,
+ * which is rendered against a specific head. A USER approver row is not —
+ * no route in this platform binds a human's approver decision to a commit
+ * (there is no approve route at all today), and the human sign-off a MERGE
+ * needs is a different, already head-bound record (`agent_action_proposals`,
+ * slice AE). Human approver semantics are therefore left exactly as they
+ * were; see {@link approverDecisionCountsTowardDone}.
+ */
+export function isCommitBoundApproverDecision(row: ApproverDecisionShape): boolean {
+    return row.approverType === 'agent' || row.decidedVia === 'agent-review';
+}
+
+/**
+ * Does this approver row count toward `in_review → done` when the Task's
+ * pull request is at `currentHead`?
+ *
+ *  - not `approved`                → never.
+ *  - commit-bound ({@link isCommitBoundApproverDecision}) → only an
+ *    `agent-review` decision rendered against `currentHead`. An unknown
+ *    head (`null`) counts NOTHING commit-bound — fail closed. An agent row
+ *    that is `approved` without that provenance has no commit to check and
+ *    does not count either.
+ *  - anything else (a user approver) → `approved` counts, unchanged.
+ */
+export function approverDecisionCountsTowardDone(
+    row: ApproverDecisionShape,
+    currentHead: string | null | undefined,
+): boolean {
+    if (row.approvalState !== 'approved') return false;
+    if (!isCommitBoundApproverDecision(row)) return true;
+    const head = normalizeHead(currentHead);
+    if (!head || row.decidedVia !== 'agent-review') return false;
+    return normalizeHead(row.decidedHeadSha) === head;
+}
+
+/**
+ * Does this AGENT approver need a review for `headSha`?
+ *
+ * `pending` always does. A decided agent row does unless it is an
+ * `agent-review` decision about exactly `headSha` — an approval OR a
+ * request for changes about another commit says nothing about this one.
+ * `headSha` null (not known yet) treats every decided row as possibly
+ * stale; callers only WRITE on a live head. A user approver never does.
+ */
+export function agentApproverNeedsReview(
+    row: ApproverDecisionShape,
+    headSha: string | null | undefined,
+): boolean {
+    if (row.approverType !== 'agent') return false;
+    if (row.approvalState === 'pending') return true;
+    const head = normalizeHead(headSha);
+    if (!head || row.decidedVia !== 'agent-review') return true;
+    return normalizeHead(row.decidedHeadSha) !== head;
+}
+
+function normalizeHead(sha: string | null | undefined): string | null {
+    return normalizeCommitSha(sha ?? null);
+}
 
 /**
  * The name of the ONE tool that records a review verdict.
@@ -559,7 +662,18 @@ export type AgentReviewVerdictReason =
     | 'unreadable-verdict'
     /** The approver row is gone — the reviewer was detached mid-review. */
     | 'approver-missing'
-    /** Something unexpected threw. */
+    /**
+     * The approver row was read, but the write to it affected no row (it
+     * was removed or re-typed between the read and the write). Nothing was
+     * recorded: the review ledger transition and the approver write commit
+     * together or not at all, so the review stays OPEN and a retry re-reads
+     * — Greptile P1-B on PR #2419.
+     */
+    | 'approver-not-written'
+    /**
+     * Something unexpected threw. When it threw inside the verdict write,
+     * that write rolled back as a whole and the review is still open.
+     */
     | 'error';
 
 export interface AgentReviewVerdictResult {

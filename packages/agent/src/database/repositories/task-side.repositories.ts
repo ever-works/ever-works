@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, LessThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Repository } from 'typeorm';
+import {
+    approverDecisionCountsTowardDone,
+    isCommitBoundApproverDecision,
+} from '../../tasks-domain/task-agent-review';
+import { serializeOnSingleConnection } from './single-connection-write-queue';
 import { TaskAssignee } from '../../entities/task-assignee.entity';
 import { TaskReviewer } from '../../entities/task-reviewer.entity';
 import { TaskApprover } from '../../entities/task-approver.entity';
@@ -125,9 +130,11 @@ export class TaskApproverRepository {
      * `provenance` (reviewer agent stage, slice AD, EW-811) is APPENDED
      * LAST and optional so every existing positional call keeps its
      * meaning. When omitted the three provenance columns are left exactly
-     * as they were — this method has one production caller today
-     * (`TaskAgentReviewService`) and it always supplies them; a future
-     * human-decision route should supply `decidedVia: 'user'`.
+     * as they were. An AGENT verdict does not come through here: it is
+     * written by `TaskAgentReviewRepository.recordVerdict`, in the same
+     * transaction as the review ledger transition it depends on (Greptile
+     * P1-B on PR #2419). A future human-decision route should supply
+     * `decidedVia: 'user'`.
      *
      * These columns are provenance, never authorization: `task_approvers`
      * gates `in_review → done` and nothing else, and the merge gate reads
@@ -165,7 +172,34 @@ export class TaskApproverRepository {
         const result = await this.repo.delete({ id, taskId });
         return (result.affected ?? 0) > 0;
     }
-    async allApproved(taskId: string): Promise<boolean> {
+    /**
+     * THE `in_review → done` approver gate.
+     *
+     * `currentHead` (reviewer agent stage, Greptile P1-A on PR #2419) is
+     * APPENDED LAST: the Task's current pull request head. A commit-bound
+     * decision — every AGENT approver row, and anything stamped
+     * `agent-review` — counts only when it was rendered against exactly that
+     * head. Before this, the gate read `approvalState` alone, so an agent
+     * approval for head A satisfied it after the pull request had moved to
+     * head B that nobody reviewed.
+     *
+     * It may be a value or a RESOLVER. The resolver is called at most once,
+     * and only when the answer depends on it — every row is `approved` and at
+     * least one of them is commit-bound — so a Task gated by people alone, or
+     * one that is refused anyway, never costs the provider read
+     * `TaskTransitionService` makes to answer it.
+     *
+     * Omitted, `null`, unparseable, or a resolver that throws = the head is
+     * unknown = NO commit-bound decision counts. Fail closed: a caller that
+     * cannot say which commit is current cannot have an agent approval
+     * checked against it.
+     *
+     * USER approver rows are deliberately unchanged — `approved` counts —
+     * because nothing binds a human's approver decision to a commit and
+     * silently reinterpreting one would change what a person's approval
+     * means. See `approverDecisionCountsTowardDone`.
+     */
+    async allApproved(taskId: string, currentHead?: CompletionGateHead): Promise<boolean> {
         const rows = await this.repo.find({ where: { taskId } });
         // Review-fix I2: spec FR-11 phrases the gate as "if any
         // approvers are configured" — a Task with NO approvers should
@@ -173,7 +207,118 @@ export class TaskApproverRepository {
         // previous behavior locked any approver-less Task out of
         // `done` permanently unless force=true was used.
         if (rows.length === 0) return true;
-        return rows.every((r) => r.approvalState === 'approved');
+        if (rows.some((row) => row.approvalState !== 'approved')) return false;
+        const head = rows.some((row) => isCommitBoundApproverDecision(row))
+            ? await resolveGateHead(currentHead)
+            : null;
+        return rows.every((r) => approverDecisionCountsTowardDone(r, head));
+    }
+
+    /**
+     * Put ONE stale agent decision back to `pending` so it is reviewed
+     * again (reviewer agent stage, Greptile P1-A on PR #2419).
+     *
+     * Compare-and-set on EXACTLY the decision the caller read — state,
+     * provenance and head — so a verdict that lands between that read and
+     * this write (a fresh decision about the live head) is never clobbered:
+     * it no longer matches, and this affects zero rows. Only an AGENT row is
+     * ever touched. The provenance columns go back to NULL, which is what a
+     * `pending` row carries (see the entity).
+     *
+     * Returns whether the row was reset.
+     */
+    async resetAgentDecisionToPending(observed: {
+        id: string;
+        taskId: string;
+        approvalState: 'approved' | 'rejected';
+        decidedVia?: string | null;
+        decidedHeadSha?: string | null;
+    }): Promise<boolean> {
+        const result = await serializeOnSingleConnection(this.repo.manager, () =>
+            this.repo.update(
+                {
+                    id: observed.id,
+                    taskId: observed.taskId,
+                    approverType: 'agent',
+                    approvalState: observed.approvalState,
+                    decidedVia: observed.decidedVia ?? IsNull(),
+                    decidedHeadSha: observed.decidedHeadSha ?? IsNull(),
+                },
+                {
+                    approvalState: 'pending',
+                    approvedAt: null,
+                    decidedVia: null,
+                    decidedByRunId: null,
+                    decidedHeadSha: null,
+                },
+            ),
+        );
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Put a verdict the review LEDGER already holds for exactly this head
+     * back onto a `pending` agent approver row (reviewer agent stage, review
+     * of Greptile P1-A on PR #2419).
+     *
+     * Head-bound decisions plus one review per (reviewer, head) meant a
+     * verdict could be lost for good: approve A, push B (the approval is
+     * reset to pending and B is reviewed), force-push back to A — the
+     * `(reviewer, A)` claim already exists, so nothing could ever buy A a
+     * review again, and the approver stayed `pending` at a commit its
+     * reviewer had approved. `TaskAgentReviewService.planReviews` calls this
+     * when the LIVE head's claim already exists and that ledger row is a
+     * terminal verdict for this very approver row.
+     *
+     * Compare-and-set from `pending` only, on an AGENT row naming this
+     * reviewer: a decision that landed since the caller looked (a fresh
+     * verdict, or a human's) is never overwritten. Returns whether the row
+     * took the decision.
+     */
+    async restoreAgentDecisionFromReview(input: {
+        id: string;
+        taskId: string;
+        reviewerAgentId: string;
+        approvalState: 'approved' | 'rejected';
+        decidedByRunId: string | null;
+        decidedHeadSha: string;
+    }): Promise<boolean> {
+        const result = await serializeOnSingleConnection(this.repo.manager, () =>
+            this.repo.update(
+                {
+                    id: input.id,
+                    taskId: input.taskId,
+                    approverType: 'agent',
+                    approverId: input.reviewerAgentId,
+                    approvalState: 'pending',
+                },
+                {
+                    approvalState: input.approvalState,
+                    approvedAt: new Date(),
+                    decidedVia: 'agent-review',
+                    decidedByRunId: input.decidedByRunId,
+                    decidedHeadSha: input.decidedHeadSha,
+                },
+            ),
+        );
+        return (result.affected ?? 0) > 0;
+    }
+}
+
+/**
+ * What `TaskApproverRepository.allApproved` is told about the current pull
+ * request head: the head itself, or a resolver it calls only when a
+ * commit-bound decision needs checking.
+ */
+export type CompletionGateHead = string | null | (() => Promise<string | null>);
+
+async function resolveGateHead(head: CompletionGateHead | undefined): Promise<string | null> {
+    if (typeof head !== 'function') return head ?? null;
+    try {
+        return (await head()) ?? null;
+    } catch {
+        // A head nobody could read is an unknown head. Fail closed.
+        return null;
     }
 }
 

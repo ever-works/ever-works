@@ -111,10 +111,14 @@ function build(over: Partial<Record<string, any>> = {}): Harness {
     const tasks = { findById: jest.fn(async () => makeTask()) };
     const reviews = {
         countForTask: jest.fn(async () => 0),
+        // `claim` reports WHAT it did since Greptile P1-C (the budget slot
+        // is allocated inside it): `claimed` with the row, `already-claimed`,
+        // or `budget-spent`. It used to return the row or `null`, which had
+        // no way to say "the database refused the budget".
         claim: jest.fn(async (input: any) => {
             const row = { id: `rev-${claimed.length + 1}`, ...input, state: 'dispatched' };
             claimed.push(row);
-            return row;
+            return { outcome: 'claimed', review: row };
         }),
         findOpenForReviewer: jest.fn(async () => null),
         listRunIdsForTask: jest.fn(async () => []),
@@ -135,6 +139,7 @@ function build(over: Partial<Record<string, any>> = {}): Harness {
             },
         ]),
         setState: jest.fn(async () => undefined),
+        resetAgentDecisionToPending: jest.fn(async () => true),
     };
     const works = {
         findById: jest.fn(async () => ({
@@ -198,6 +203,9 @@ describe('TaskAgentReviewService.planReviews — the happy path', () => {
             approverId: 'app-1',
             claimKey: `agent-review:reviewer-1:${HEAD}`,
             headSha: HEAD,
+            // The lifetime budget travels INTO the claim, where the unique
+            // slot enforces it (Greptile P1-C).
+            maxRuns: expect.any(Number),
             // Tenancy rides from platform state, never a request.
             tenantId: 'tenant-1',
             workId: 'w1',
@@ -221,6 +229,14 @@ describe('TaskAgentReviewService.planReviews — the happy path', () => {
     });
 
     it('ignores non-agent approvers and already-decided ones', async () => {
+        // REVERSED CONTRACT (Greptile P1-A on PR #2419): "already decided"
+        // used to mean `approvalState !== 'pending'`, full stop — so an agent
+        // that approved commit A was never asked about commit B, and that
+        // approval passed the `→ done` gate for B. Already decided now means
+        // an `agent-review` verdict about the head under review, which is
+        // what this fixture carries. A decision about another commit, or one
+        // without that provenance, is re-reviewed — pinned in the
+        // "A DECISION ABOUT ANOTHER COMMIT" block below.
         const h = build({
             approvers: {
                 findByTaskId: jest.fn(async () => [
@@ -230,6 +246,8 @@ describe('TaskAgentReviewService.planReviews — the happy path', () => {
                         approverType: 'agent',
                         approverId: 'reviewer-1',
                         approvalState: 'approved',
+                        decidedVia: 'agent-review',
+                        decidedHeadSha: HEAD,
                     },
                 ]),
                 setState: jest.fn(),
@@ -335,7 +353,10 @@ describe('THE self-review refusal — enforced by the platform, at dispatch', ()
             ]),
             reviews: {
                 countForTask: jest.fn(async () => 1),
-                claim: jest.fn(async (input: any) => ({ id: 'rev-2', ...input })),
+                claim: jest.fn(async (input: any) => ({
+                    outcome: 'claimed',
+                    review: { id: 'rev-2', ...input },
+                })),
                 listRunIdsForTask: jest.fn(async () => ['run-review-1']),
                 listClaimKeysForTask: jest.fn(async () => []),
                 stampRunId: jest.fn(),
@@ -740,7 +761,10 @@ describe('BOUNDED COST — every path that can start a review run', () => {
                     // Two already spent, so exactly one is left even though
                     // two approvers are eligible and the per-entry cap is 2.
                     countForTask: jest.fn(async () => 2),
-                    claim: jest.fn(async (input: any) => ({ id: 'rev-x', ...input })),
+                    claim: jest.fn(async (input: any) => ({
+                        outcome: 'claimed',
+                        review: { id: 'rev-x', ...input },
+                    })),
                     listRunIdsForTask: jest.fn(async () => []),
                     listClaimKeysForTask: jest.fn(async () => []),
                     stampRunId: jest.fn(),
@@ -775,7 +799,8 @@ describe('BOUNDED COST — every path that can start a review run', () => {
         const h = build({
             reviews: {
                 countForTask: jest.fn(async () => 1),
-                claim: jest.fn(async () => null),
+                // `null` before Greptile P1-C; the same outcome, named.
+                claim: jest.fn(async () => ({ outcome: 'already-claimed' })),
                 listRunIdsForTask: jest.fn(async () => []),
                 // The pre-claim check sees nothing (a replica race: the
                 // winner's row lands between the read and the insert), so
@@ -827,7 +852,10 @@ describe('BOUNDED COST — every path that can start a review run', () => {
         const h = build({
             reviews: {
                 countForTask: jest.fn(async () => 1),
-                claim: jest.fn(async (input: any) => ({ id: 'rev-2', ...input })),
+                claim: jest.fn(async (input: any) => ({
+                    outcome: 'claimed',
+                    review: { id: 'rev-2', ...input },
+                })),
                 listRunIdsForTask: jest.fn(async () => []),
                 listClaimKeysForTask: jest.fn(async () => [agentReviewClaimKey('r1', HEAD)]),
                 stampRunId: jest.fn(),
@@ -879,6 +907,248 @@ describe('BOUNDED COST — every path that can start a review run', () => {
             },
         });
         await expect(h.svc.planReviews(makeTask())).resolves.toMatchObject({ reason: 'error' });
+    });
+
+    it('stops when the DATABASE refuses the budget, even though the count said a slot was left (Greptile P1-C)', async () => {
+        // The count is read before the provider calls; another planner can
+        // spend the last slot in between. The claim's unique slot is the
+        // bound, and its `budget-spent` must stop this entry outright —
+        // nothing dispatched, and no later approver even tries.
+        const h = build({
+            reviews: {
+                countForTask: jest.fn(async () => 0),
+                claim: jest.fn(async () => ({ outcome: 'budget-spent' })),
+                listRunIdsForTask: jest.fn(async () => []),
+                listClaimKeysForTask: jest.fn(async () => []),
+                stampRunId: jest.fn(),
+                casSettle: jest.fn(),
+                findOpenForReviewer: jest.fn(),
+            },
+            approvers: {
+                findByTaskId: jest.fn(async () =>
+                    ['r1', 'r2'].map((id, index) => ({
+                        id: `app-${index}`,
+                        approverType: 'agent',
+                        approverId: id,
+                        approvalState: 'pending',
+                    })),
+                ),
+                setState: jest.fn(),
+                resetAgentDecisionToPending: jest.fn(),
+            },
+        });
+        const plan = await h.svc.planReviews(makeTask());
+        expect(plan.dispatches).toHaveLength(0);
+        expect(plan.decisions).toEqual([
+            { reviewerAgentId: 'r1', reason: 'budget-spent' },
+            { reviewerAgentId: 'r2', reason: 'budget-spent' },
+        ]);
+        expect(h.reviews.claim).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails closed on a claim outcome it does not recognise', async () => {
+        const h = build({
+            reviews: {
+                countForTask: jest.fn(async () => 0),
+                claim: jest.fn(async () => ({ outcome: 'something-new' })),
+                listRunIdsForTask: jest.fn(async () => []),
+                listClaimKeysForTask: jest.fn(async () => []),
+                stampRunId: jest.fn(),
+                casSettle: jest.fn(),
+                findOpenForReviewer: jest.fn(),
+            },
+        });
+        const plan = await h.svc.planReviews(makeTask());
+        expect(plan.dispatches).toHaveLength(0);
+        expect(plan.decisions).toEqual([{ reviewerAgentId: 'reviewer-1', reason: 'budget-spent' }]);
+    });
+
+    it('a claim that THROWS mid-loop keeps the reviews already claimed — they are still dispatched (review of P1-C)', async () => {
+        // The finding: the throw escaped to `planReviews`' catch, which
+        // returned `dispatches: []`. The review claimed a moment earlier kept
+        // its `dispatched` row, its budget slot and its claim key — so every
+        // later plan at this head said `already-claimed` for it — and no run
+        // was ever started or settled for it.
+        const claimed: any[] = [];
+        const h = build({
+            reviews: {
+                countForTask: jest.fn(async () => 0),
+                claim: jest
+                    .fn()
+                    .mockImplementationOnce(async (input: any) => {
+                        const row = { id: 'rev-r1', ...input, state: 'dispatched' };
+                        claimed.push(row);
+                        return { outcome: 'claimed', review: row };
+                    })
+                    .mockImplementationOnce(async () => {
+                        throw new Error('pool acquire timeout');
+                    }),
+                listRunIdsForTask: jest.fn(async () => []),
+                listClaimKeysForTask: jest.fn(async () => []),
+                stampRunId: jest.fn(),
+                casSettle: jest.fn(),
+                findOpenForReviewer: jest.fn(),
+            },
+            approvers: {
+                findByTaskId: jest.fn(async () =>
+                    ['r1', 'r2', 'r3'].map((id, index) => ({
+                        id: `app-${index}`,
+                        approverType: 'agent',
+                        approverId: id,
+                        approvalState: 'pending',
+                    })),
+                ),
+                setState: jest.fn(),
+            },
+        });
+        const previous = process.env.TASK_AGENT_REVIEW_MAX_APPROVERS;
+        process.env.TASK_AGENT_REVIEW_MAX_APPROVERS = '3';
+        try {
+            const plan = await h.svc.planReviews(makeTask());
+            expect(plan.reason).toBe('error');
+            expect(plan.dispatches.map((dispatch) => dispatch.reviewId)).toEqual(['rev-r1']);
+            expect(plan.decisions).toEqual([
+                { reviewerAgentId: 'r1', reason: 'dispatched', reviewId: 'rev-r1' },
+                { reviewerAgentId: 'r2', reason: 'error' },
+                // Nothing more is claimed against a store that just failed.
+                { reviewerAgentId: 'r3', reason: 'error' },
+            ]);
+            expect(h.reviews.claim).toHaveBeenCalledTimes(2);
+        } finally {
+            if (previous === undefined) delete process.env.TASK_AGENT_REVIEW_MAX_APPROVERS;
+            else process.env.TASK_AGENT_REVIEW_MAX_APPROVERS = previous;
+        }
+    });
+});
+
+describe('A DECISION ABOUT ANOTHER COMMIT is not a review of this one (Greptile P1-A)', () => {
+    /**
+     * Greptile P1-A on PR #2419: the planner only ever considered PENDING
+     * agent approvers, so an agent that approved head A was never asked
+     * about head B, and its approval stood in for a review of B at the
+     * `→ done` gate. A decided agent row is now re-reviewed unless its
+     * decision is an `agent-review` verdict about the LIVE head, and the
+     * stale decision is reset to `pending` first — against the live head
+     * only, by a compare-and-set on exactly the decision that was read.
+     */
+    function decided(over: Record<string, unknown> = {}) {
+        return {
+            id: 'app-1',
+            taskId: 't1',
+            approverType: 'agent',
+            approverId: 'reviewer-1',
+            approvalState: 'approved',
+            decidedVia: 'agent-review',
+            decidedHeadSha: OTHER_HEAD,
+            ...over,
+        };
+    }
+
+    function withApprovers(rows: Array<Record<string, unknown>>, over: Record<string, any> = {}) {
+        return build({
+            approvers: {
+                findByTaskId: jest.fn(async () => rows),
+                setState: jest.fn(),
+                resetAgentDecisionToPending: jest.fn(async () => true),
+            },
+            ...over,
+        });
+    }
+
+    it('resets an approval for an OLD head to pending and buys a review of the live head', async () => {
+        const h = withApprovers([decided()]);
+        const plan = await h.svc.planReviews(makeTask());
+
+        expect(h.approvers.resetAgentDecisionToPending).toHaveBeenCalledTimes(1);
+        expect(h.approvers.resetAgentDecisionToPending).toHaveBeenCalledWith({
+            id: 'app-1',
+            taskId: 't1',
+            approvalState: 'approved',
+            decidedVia: 'agent-review',
+            decidedHeadSha: OTHER_HEAD,
+        });
+        expect(plan.dispatches).toHaveLength(1);
+        expect(plan.dispatches[0]).toMatchObject({ reviewerAgentId: 'reviewer-1', headSha: HEAD });
+        expect(h.reviews.claim.mock.calls[0][0].claimKey).toBe(
+            agentReviewClaimKey('reviewer-1', HEAD),
+        );
+    });
+
+    it('re-reviews a REQUEST FOR CHANGES about an old head too — the fix push is what needs reading', async () => {
+        const h = withApprovers([decided({ approvalState: 'rejected' })]);
+        const plan = await h.svc.planReviews(makeTask());
+        expect(h.approvers.resetAgentDecisionToPending).toHaveBeenCalledWith(
+            expect.objectContaining({ approvalState: 'rejected', decidedHeadSha: OTHER_HEAD }),
+        );
+        expect(plan.dispatches).toHaveLength(1);
+    });
+
+    it('re-reviews an agent approval that carries no commit at all', async () => {
+        const h = withApprovers([decided({ decidedVia: null, decidedHeadSha: null })]);
+        const plan = await h.svc.planReviews(makeTask());
+        expect(h.approvers.resetAgentDecisionToPending).toHaveBeenCalledWith(
+            expect.objectContaining({ decidedVia: null, decidedHeadSha: null }),
+        );
+        expect(plan.dispatches).toHaveLength(1);
+    });
+
+    it('leaves an approval for the LIVE head alone even when the Task cache still names the old head', async () => {
+        // Cache lags (OTHER_HEAD), provider says HEAD, the decision is about
+        // HEAD. Resetting against the CACHE would erase a current approval.
+        const h = withApprovers([decided({ decidedHeadSha: HEAD })]);
+        const plan = await h.svc.planReviews(makeTask({ prHeadSha: OTHER_HEAD }));
+        expect(h.gitFacade.getPullRequestStatus).toHaveBeenCalledTimes(1);
+        expect(h.approvers.resetAgentDecisionToPending).not.toHaveBeenCalled();
+        expect(h.reviews.claim).not.toHaveBeenCalled();
+        expect(plan.dispatches).toHaveLength(0);
+        expect(plan.decisions).toEqual([
+            { reviewerAgentId: 'reviewer-1', reason: 'already-claimed' },
+        ]);
+    });
+
+    it('never resets on the cached head alone — no live head read, no write', async () => {
+        for (const facade of [
+            {
+                getPullRequestStatus: jest.fn(async () => {
+                    throw new Error('provider down');
+                }),
+                getCompareDiff: jest.fn(),
+            },
+            {
+                getPullRequestStatus: jest.fn(async () => makeStatus({ headSha: null })),
+                getCompareDiff: jest.fn(),
+            },
+        ]) {
+            const h = withApprovers([decided()], { gitFacade: facade });
+            const plan = await h.svc.planReviews(makeTask());
+            expect(plan.dispatches).toHaveLength(0);
+            expect(h.approvers.resetAgentDecisionToPending).not.toHaveBeenCalled();
+        }
+    });
+
+    it('resets a stale decision even when this plan cannot buy the new review (the diff is unreviewable)', async () => {
+        // The stale approval is about code that is no longer the head,
+        // whether or not the new head can be reviewed. `pending` for a human
+        // is the safe direction.
+        const h = withApprovers([decided()], {
+            gitFacade: {
+                getPullRequestStatus: jest.fn(async () => makeStatus()),
+                getCompareDiff: jest.fn(async () => makeDiff({ truncated: true })),
+            },
+        });
+        const plan = await h.svc.planReviews(makeTask());
+        expect(plan.reason).toBe('diff-too-large');
+        expect(h.approvers.resetAgentDecisionToPending).toHaveBeenCalledTimes(1);
+        expect(h.reviews.claim).not.toHaveBeenCalled();
+    });
+
+    it('does not touch a USER approver, decided or not', async () => {
+        const h = withApprovers([
+            decided({ id: 'app-u', approverType: 'user', approverId: 'u9', decidedVia: 'user' }),
+        ]);
+        const plan = await h.svc.planReviews(makeTask());
+        expect(plan.reason).toBe('no-agent-approvers');
+        expect(h.approvers.resetAgentDecisionToPending).not.toHaveBeenCalled();
     });
 });
 

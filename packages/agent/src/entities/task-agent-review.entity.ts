@@ -7,7 +7,9 @@ import { PortableDateColumn } from './_types';
  * - `dispatched` — claimed and handed to the job runtime. The reviewer
  *   may still submit a verdict.
  * - `approved` / `changes-requested` — the run said something explicit,
- *   and the `task_approvers` row was written.
+ *   and the `task_approvers` row was written IN THE SAME TRANSACTION
+ *   (`TaskAgentReviewRepository.recordVerdict`): neither exists without
+ *   the other.
  * - `refused` — the platform declined to accept the verdict (self-review,
  *   a head that moved, an approver that vanished). NOTHING was written.
  * - `failed` — the claim was taken but the dispatch never happened.
@@ -39,7 +41,9 @@ export const TASK_AGENT_REVIEW_CLAIM_KEY_MAX_CHARS = 200;
  *
  * ## Two jobs, one row
  *
- * 1. **The budget.** One row IS one review run. The row is inserted
+ * 1. **The budget.** One row IS one review run, and holds one of the Task's
+ *    `maxRuns` budget slots (`(taskId, slot)` UNIQUE — the budget is a
+ *    database constraint, not a count). The row is inserted
  *    BEFORE the dispatch and its `(taskId, claimKey)` unique index is the
  *    claim, exactly like `task_ci_auto_resume_attempts`: a retried
  *    transition, two API replicas handling one transition, a Task that
@@ -94,6 +98,11 @@ export const TASK_AGENT_REVIEW_CLAIM_KEY_MAX_CHARS = 200;
 // The claim. UNIQUE is load-bearing: it is what turns a Task that
 // re-enters review on the same commit into zero extra model runs.
 @Index('uq_task_agent_review_claim', ['taskId', 'claimKey'], { unique: true })
+// THE budget. UNIQUE is load-bearing: a claim must take one of the Task's
+// `slot ∈ [0, maxRuns)` numbers, so the database itself refuses a run past
+// the lifetime budget, whatever two concurrent planners believed they had
+// counted. See `slot` below.
+@Index('uq_task_agent_review_slot', ['taskId', 'slot'], { unique: true })
 export class TaskAgentReview {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -123,6 +132,26 @@ export class TaskAgentReview {
     /** The commit this review is a statement about. */
     @Column({ type: 'varchar', length: 64 })
     headSha: string;
+
+    /**
+     * Which of the Task's lifetime review-budget slots this row holds:
+     * an integer in `[0, maxRuns)`, UNIQUE per Task
+     * (`uq_task_agent_review_slot`).
+     *
+     * Greptile P1-C on PR #2419, reproduced by execution: the budget used
+     * to be a COUNT of rows read before the insert. Two planners that both
+     * counted `maxRuns - 1` inserted two DISTINCT claims (different
+     * reviewers, or different heads) that the `(taskId, claimKey)` index
+     * could not see as the same, and both dispatched. A slot number turns
+     * the budget into a constraint the database enforces with a plain
+     * INSERT — identical on better-sqlite3 and Postgres, no lock, no
+     * transaction: a unique violation means the slot was taken and the
+     * claimer tries the next one; no free slot left means the budget is
+     * spent. Rows are never deleted, so a slot, once taken, is spent
+     * forever — including by a claim whose dispatch then failed.
+     */
+    @Column({ type: 'int' })
+    slot: number;
 
     /** Pull request the diff came from, for reporting. */
     @Column({ type: 'int', nullable: true })

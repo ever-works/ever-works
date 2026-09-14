@@ -543,7 +543,20 @@ export class TaskPrStatusService {
             return false;
         }
         try {
-            await this.transitions.transition(task, TaskStatus.DONE, { actorType: 'agent' });
+            await this.transitions.transition(task, TaskStatus.DONE, {
+                actorType: 'agent',
+                // Reviewer agent stage (review of Greptile P1-A on PR #2419):
+                // the approver gate binds agent decisions to the MERGED head —
+                // `refreshTask` assigned `prHeadSha` from the provider's answer
+                // moments ago, and a merged pull request's head never moves
+                // again. Passed explicitly because the Task's other head
+                // column (`ciHeadSha`) is written by a compare-and-set that can
+                // lose to a check delivery in the same poll; the gate used to
+                // refuse on that disagreement, and since a merge is completed
+                // only once (the sweep never re-selects a merged pull request)
+                // the refusal was permanent.
+                livePullRequestHeadSha: task.prHeadSha ?? null,
+            });
             this.logger.log(`Task ${task.id} completed — PR #${task.prNumber} merged.`);
             return true;
         } catch (error) {

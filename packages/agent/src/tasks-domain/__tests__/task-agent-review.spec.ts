@@ -28,6 +28,10 @@ import {
     isSameAgentIdentity,
     parseAgentReviewVerdict,
     resolveReviewHead,
+    agentApproverNeedsReview,
+    approverDecisionCountsTowardDone,
+    isCommitBoundApproverDecision,
+    resolveCompletionGateHead,
 } from '../task-agent-review';
 import { config } from '../../config';
 
@@ -681,5 +685,77 @@ describe('isAgentReviewBriefMessage — what counts as a brief in hand', () => {
         ]) {
             expect(isAgentReviewBriefMessage(message)).toBe(false);
         }
+    });
+});
+
+describe('which approver decisions speak for the CURRENT commit (Greptile P1-A)', () => {
+    const A = 'a'.repeat(40);
+    const B = 'b'.repeat(40);
+    const agent = (over: Record<string, unknown> = {}) => ({
+        approverType: 'agent',
+        approvalState: 'approved',
+        decidedVia: 'agent-review',
+        decidedHeadSha: A,
+        ...over,
+    });
+
+    it('the gate head is the pull request head, and nothing when the platform is not sure of it', () => {
+        expect(resolveCompletionGateHead({ prHeadSha: A, ciHeadSha: A })).toBe(A);
+        expect(resolveCompletionGateHead({ prHeadSha: A, ciHeadSha: null })).toBe(A);
+        // Case and whitespace are not disagreements.
+        expect(resolveCompletionGateHead({ prHeadSha: ` ${A.toUpperCase()} `, ciHeadSha: A })).toBe(
+            A,
+        );
+        expect(resolveCompletionGateHead({ prHeadSha: null, ciHeadSha: A })).toBeNull();
+        expect(resolveCompletionGateHead({ prHeadSha: 'not-a-sha', ciHeadSha: A })).toBeNull();
+        expect(resolveCompletionGateHead({ prHeadSha: A, ciHeadSha: B })).toBeNull();
+        expect(resolveCompletionGateHead({})).toBeNull();
+    });
+
+    it('counts an agent approval only for exactly the current head', () => {
+        expect(approverDecisionCountsTowardDone(agent(), A)).toBe(true);
+        expect(approverDecisionCountsTowardDone(agent(), B)).toBe(false);
+        expect(approverDecisionCountsTowardDone(agent(), null)).toBe(false);
+        expect(approverDecisionCountsTowardDone(agent(), undefined)).toBe(false);
+        expect(approverDecisionCountsTowardDone(agent({ decidedHeadSha: null }), A)).toBe(false);
+        expect(approverDecisionCountsTowardDone(agent({ decidedVia: null }), A)).toBe(false);
+        expect(approverDecisionCountsTowardDone(agent({ decidedVia: 'user' }), A)).toBe(false);
+        expect(approverDecisionCountsTowardDone(agent({ approvalState: 'rejected' }), A)).toBe(
+            false,
+        );
+        expect(approverDecisionCountsTowardDone(agent({ approvalState: 'pending' }), A)).toBe(
+            false,
+        );
+    });
+
+    it('leaves a USER approver as it was — approved counts, whatever the head', () => {
+        const user = {
+            approverType: 'user',
+            approvalState: 'approved',
+            decidedVia: null,
+            decidedHeadSha: null,
+        };
+        expect(isCommitBoundApproverDecision(user)).toBe(false);
+        for (const head of [A, B, null]) {
+            expect(approverDecisionCountsTowardDone(user, head)).toBe(true);
+            expect(approverDecisionCountsTowardDone({ ...user, decidedVia: 'user' }, head)).toBe(
+                true,
+            );
+            expect(
+                approverDecisionCountsTowardDone({ ...user, approvalState: 'pending' }, head),
+            ).toBe(false);
+        }
+        // A row stamped agent-review is commit-bound whatever its type says.
+        expect(isCommitBoundApproverDecision({ ...user, decidedVia: 'agent-review' })).toBe(true);
+    });
+
+    it('an agent approver needs a review unless its decision is an agent-review verdict about that head', () => {
+        expect(agentApproverNeedsReview(agent({ approvalState: 'pending' }), A)).toBe(true);
+        expect(agentApproverNeedsReview(agent(), A)).toBe(false);
+        expect(agentApproverNeedsReview(agent(), B)).toBe(true);
+        expect(agentApproverNeedsReview(agent({ approvalState: 'rejected' }), B)).toBe(true);
+        expect(agentApproverNeedsReview(agent({ decidedVia: null }), A)).toBe(true);
+        expect(agentApproverNeedsReview(agent(), null)).toBe(true);
+        expect(agentApproverNeedsReview({ ...agent(), approverType: 'user' }, B)).toBe(false);
     });
 });

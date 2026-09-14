@@ -126,6 +126,45 @@ function build(over: Partial<Record<string, any>> = {}) {
         },
         ...over,
     };
+    // Greptile P1-B on PR #2419: the verdict is ONE write,
+    // `reviews.recordVerdict`, which settles the review and writes the
+    // approver row in a single transaction (atomicity itself, and everything
+    // the repository decides — the `agent-review` stamp, the zero-row
+    // rollback, the superseded refusal — is pinned on a REAL database in
+    // `task-agent-review.verdict-atomicity.spec.ts`; this comment used to name
+    // the wiring spec, which has no verdict test). The service used to call
+    // `casSettle` and then `approvers.setState` itself. This double models the
+    // repository's observable contract in terms of those two doubles — review
+    // CAS first, zero rows = `review-not-open` and nothing written; otherwise
+    // the approver row takes the decision — so every `casSettle` / `setState`
+    // expectation in this file still describes what the verdict write did,
+    // and every "writes nothing" one still means it.
+    //
+    // What this file does NOT prove: the `decidedVia: 'agent-review'` stamp.
+    // The double below supplies that literal itself (production's service
+    // never passes one — the repository stamps it), so a `setState`
+    // expectation naming it pins only that the verdict went through
+    // `recordVerdict`. The service's own hand-off — approver id, Task,
+    // reviewer, state, run and head — is pinned against the
+    // `recordVerdict` call itself.
+    if (parts.reviews && !parts.reviews.recordVerdict) {
+        const reviews = parts.reviews;
+        reviews.recordVerdict = jest.fn(async (write: any) => {
+            if (!(await reviews.casSettle(write.reviewId, write.state, { summary: write.summary })))
+                return 'review-not-open';
+            await parts.approvers.setState(
+                write.approver.id,
+                write.approver.approvalState,
+                write.approver.taskId,
+                {
+                    decidedVia: 'agent-review',
+                    decidedByRunId: write.approver.decidedByRunId,
+                    decidedHeadSha: write.approver.decidedHeadSha,
+                },
+            );
+            return 'recorded';
+        });
+    }
     const svc = new TaskAgentReviewService(
         parts.tasks as any,
         parts.reviews as any,
@@ -172,6 +211,53 @@ describe('submitVerdict — the outcome writes the approver row', () => {
         expect(h.reviews.casSettle).toHaveBeenCalledWith('rev-1', 'approved', {
             summary: 'Read every hunk; the null check is correct.',
         });
+        // …through ONE transactional write naming the review, the approver
+        // row AND the agent that row must still name (Greptile P1-B).
+        expect(h.reviews.recordVerdict).toHaveBeenCalledTimes(1);
+        expect(h.reviews.recordVerdict).toHaveBeenCalledWith({
+            reviewId: 'rev-1',
+            state: 'approved',
+            summary: 'Read every hunk; the null check is correct.',
+            approver: {
+                id: 'app-1',
+                taskId: 't1',
+                reviewerAgentId: 'reviewer-1',
+                approvalState: 'approved',
+                decidedByRunId: REVIEW_RUN,
+                decidedHeadSha: HEAD,
+            },
+        });
+    });
+
+    it('reports NOT recorded — and leaves the review open — when the approver write matches no row (Greptile P1-B)', async () => {
+        // The finding: the approver write's result was ignored, so a row
+        // removed or re-typed between the read and the write still produced
+        // `recorded` while the approver stayed pending. The repository rolls
+        // the review transition back and says so; the service must not
+        // report success.
+        const h = build();
+        h.reviews.recordVerdict = jest.fn(async () => 'approver-not-written');
+        const result = await h.svc.submitVerdict(asReviewRun());
+        expect(result).toEqual({ reason: 'approver-not-written', headSha: HEAD });
+        expect(result.reason).not.toBe('recorded');
+        // Nothing else settles the review on this path: it stays open for a
+        // retry, which will re-read the approver row.
+        expect(h.reviews.casSettle).not.toHaveBeenCalled();
+    });
+
+    it('reports an error — never recorded — when the verdict write throws (Greptile P1-B)', async () => {
+        const h = build();
+        h.reviews.recordVerdict = jest.fn(async () => {
+            throw new Error('approver write failed');
+        });
+        await expect(h.svc.submitVerdict(asReviewRun())).resolves.toEqual({ reason: 'error' });
+        expect(h.reviews.casSettle).not.toHaveBeenCalled();
+    });
+
+    it('fails closed on a verdict-write outcome it does not recognise', async () => {
+        const h = build();
+        h.reviews.recordVerdict = jest.fn(async () => 'something-new');
+        expect((await h.svc.submitVerdict(asReviewRun())).reason).toBe('approver-not-written');
     });
 
     it('writes rejected for request-changes', async () => {

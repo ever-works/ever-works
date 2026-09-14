@@ -175,6 +175,8 @@ describe('AddTaskAgentReviews1790300000000', () => {
                 'refusalCode',
                 'reviewerAgentId',
                 'runId',
+                // Greptile P1-C on PR #2419: the lifetime budget slot.
+                'slot',
                 'state',
                 'summary',
                 'taskId',
@@ -190,6 +192,10 @@ describe('AddTaskAgentReviews1790300000000', () => {
         expect(ledger.approverId.notnull).toBe(1);
         expect(ledger.claimKey.notnull).toBe(1);
         expect(ledger.headSha.notnull).toBe(1);
+        // …and so is the budget slot: a review holding no slot would be a
+        // run the budget constraint cannot see (a NULL never collides in a
+        // unique index, on either engine).
+        expect(ledger.slot.notnull).toBe(1);
         // Everything a dispatch might not know yet is nullable.
         expect(ledger.runId.notnull).toBe(0);
         expect(ledger.summary.notnull).toBe(0);
@@ -227,24 +233,76 @@ describe('AddTaskAgentReviews1790300000000', () => {
 
     it('enforces that uniqueness at the database, and scopes it to ONE Task', async () => {
         await runUp();
-        const insert = (taskId: string, claimKey: string) =>
+        // `slot` is NOT NULL since Greptile P1-C, so every insert names one.
+        // Each insert below takes a slot of its own, so the only constraint
+        // that can refuse the duplicate is the CLAIM index under test.
+        const insert = (taskId: string, claimKey: string, slot: number) =>
             dataSource.query(
-                `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha") VALUES (?, ?, ?, ?, ?, ?)`,
-                [`${taskId}-${claimKey}`, taskId, 'agent-1', 'app-1', claimKey, 'abc123'],
+                `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha", "slot") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    `${taskId}-${claimKey}-${slot}`,
+                    taskId,
+                    'agent-1',
+                    'app-1',
+                    claimKey,
+                    'abc123',
+                    slot,
+                ],
             );
 
-        await insert('task-1', 'agent-review:agent-1:abc123');
-        await expect(insert('task-1', 'agent-review:agent-1:abc123')).rejects.toThrow();
+        await insert('task-1', 'agent-review:agent-1:abc123', 0);
+        await expect(insert('task-1', 'agent-review:agent-1:abc123', 1)).rejects.toThrow(/UNIQUE/);
         // A different Task, and a different head, both go through.
-        await expect(insert('task-2', 'agent-review:agent-1:abc123')).resolves.toBeDefined();
-        await expect(insert('task-1', 'agent-review:agent-1:def456')).resolves.toBeDefined();
+        await expect(insert('task-2', 'agent-review:agent-1:abc123', 0)).resolves.toBeDefined();
+        await expect(insert('task-1', 'agent-review:agent-1:def456', 2)).resolves.toBeDefined();
+    });
+
+    it('makes (taskId, slot) UNIQUE — the lifetime budget is a database constraint (Greptile P1-C)', async () => {
+        await runUp();
+        const indices: Array<{ name: string; unique: number }> = await dataSource.query(
+            `PRAGMA index_list("task_agent_reviews")`,
+        );
+        const slot = indices.find((index) => index.name === 'uq_task_agent_review_slot');
+        expect(slot).toBeDefined();
+        expect(slot?.unique).toBe(1);
+        const slotColumns: Array<{ name: string }> = await dataSource.query(
+            `PRAGMA index_info("uq_task_agent_review_slot")`,
+        );
+        expect(slotColumns.map((column) => column.name)).toEqual(['taskId', 'slot']);
+
+        // Enforced, not decorative: two DISTINCT claims (different reviewer,
+        // different head — nothing the claim index can see as the same)
+        // cannot both take slot 0 of one Task. That is the race Greptile
+        // executed. Another Task's slot 0, and this Task's slot 1, are free.
+        const insert = (id: string, taskId: string, claimKey: string, slot: number) =>
+            dataSource.query(
+                `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha", "slot") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [id, taskId, 'agent-1', 'app-1', claimKey, 'abc123', slot],
+            );
+        await insert('a', 'task-1', 'agent-review:agent-1:abc123', 0);
+        await expect(insert('b', 'task-1', 'agent-review:agent-2:def456', 0)).rejects.toThrow(
+            /UNIQUE/,
+        );
+        await expect(
+            insert('c', 'task-2', 'agent-review:agent-2:def456', 0),
+        ).resolves.toBeDefined();
+        await expect(
+            insert('d', 'task-1', 'agent-review:agent-2:def456', 1),
+        ).resolves.toBeDefined();
+        // …and a slot is not optional.
+        await expect(
+            dataSource.query(
+                `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha") VALUES (?, ?, ?, ?, ?, ?)`,
+                ['e', 'task-1', 'agent-3', 'app-1', 'agent-review:agent-3:abc123', 'abc123'],
+            ),
+        ).rejects.toThrow(/NOT NULL/);
     });
 
     it('defaults a fresh review row to `dispatched`', async () => {
         await runUp();
         await dataSource.query(
-            `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha") VALUES (?, ?, ?, ?, ?, ?)`,
-            ['r1', 'task-1', 'agent-1', 'app-1', 'agent-review:agent-1:abc', 'abc'],
+            `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha", "slot") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            ['r1', 'task-1', 'agent-1', 'app-1', 'agent-review:agent-1:abc', 'abc', 0],
         );
         const rows = await dataSource.query(`SELECT state FROM task_agent_reviews WHERE id = ?`, [
             'r1',
@@ -274,8 +332,103 @@ describe('AddTaskAgentReviews1790300000000', () => {
     it('is idempotent — a partially applied database converges', async () => {
         await runUp();
         await expect(runUp()).resolves.toBeUndefined();
-        expect(Object.keys(await columns('task_agent_reviews'))).toHaveLength(17);
+        // 18, not 17: the `slot` column Greptile P1-C added. Still exact —
+        // a second run adds nothing.
+        expect(Object.keys(await columns('task_agent_reviews'))).toHaveLength(18);
+        const indices: Array<{ name: string }> = await dataSource.query(
+            `PRAGMA index_list("task_agent_reviews")`,
+        );
+        expect(indices.filter((index) => index.name === 'uq_task_agent_review_slot')).toHaveLength(
+            1,
+        );
         expect(Object.keys(await columns('task_approvers'))).toHaveLength(9);
+    });
+
+    it('converges a ledger created WITHOUT the budget slot — backfilled per Task, NOT NULL, uniquely indexed', async () => {
+        // A `task_agent_reviews` table from this migration's earlier revision
+        // (or `synchronize` from the earlier entity): every column but
+        // `slot`, and populated. `createTable` is skipped for an existing
+        // table, so this used to reach `createIndex(['taskId', 'slot'])` on a
+        // column that did not exist and throw.
+        const runner = dataSource.createQueryRunner();
+        await runner.createTable(
+            new Table({
+                name: 'task_agent_reviews',
+                columns: [
+                    { name: 'id', type: 'uuid', isPrimary: true },
+                    { name: 'taskId', type: 'uuid' },
+                    { name: 'reviewerAgentId', type: 'uuid' },
+                    { name: 'approverId', type: 'uuid' },
+                    { name: 'claimKey', type: 'varchar', length: '200' },
+                    { name: 'headSha', type: 'varchar', length: '64' },
+                    { name: 'prNumber', type: 'int', isNullable: true },
+                    { name: 'ciState', type: 'varchar', length: '16', isNullable: true },
+                    { name: 'runId', type: 'uuid', isNullable: true },
+                    { name: 'state', type: 'varchar', length: '24', default: "'dispatched'" },
+                    { name: 'refusalCode', type: 'varchar', length: '64', isNullable: true },
+                    { name: 'summary', type: 'text', isNullable: true },
+                    { name: 'decidedAt', type: 'timestamp', isNullable: true },
+                    { name: 'workId', type: 'uuid', isNullable: true },
+                    { name: 'tenantId', type: 'uuid', isNullable: true },
+                    { name: 'organizationId', type: 'uuid', isNullable: true },
+                    { name: 'createdAt', type: 'timestamp', default: 'CURRENT_TIMESTAMP' },
+                ],
+            }),
+        );
+        const seed = async (id: string, taskId: string, head: string, createdAt: string) =>
+            runner.query(
+                `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha", "createdAt") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [id, taskId, 'agent-1', 'app-1', `agent-review:agent-1:${head}`, head, createdAt],
+            );
+        // Inserted out of claim order on purpose; two rows share a timestamp
+        // so the `id` tie-break is exercised too.
+        await seed('r-3', 'task-1', 'ccc', '2026-09-03 00:00:00');
+        await seed('r-1', 'task-1', 'aaa', '2026-09-01 00:00:00');
+        await seed('r-2b', 'task-1', 'bbb', '2026-09-02 00:00:00');
+        await seed('r-2a', 'task-1', 'bb0', '2026-09-02 00:00:00');
+        await seed('r-x', 'task-2', 'aaa', '2026-09-05 00:00:00');
+        await runner.release();
+
+        await runUp();
+
+        // The physical shape is exactly the entity's, as on the createTable
+        // path — `slot` NOT NULL.
+        const table = await physical('task_agent_reviews');
+        const declared = await entityColumns(TaskAgentReview);
+        expect(Object.keys(table).sort()).toEqual(declared.map((column) => column.name).sort());
+        expect(table.slot.notnull).toBe(1);
+
+        // Every existing row survived and holds a dense, per-Task slot in
+        // claim order.
+        const rows: Array<{ id: string; taskId: string; slot: number }> = await dataSource.query(
+            `SELECT id, "taskId", slot FROM task_agent_reviews ORDER BY "taskId", slot`,
+        );
+        expect(rows.map((row) => [row.taskId, row.id, Number(row.slot)])).toEqual([
+            ['task-1', 'r-1', 0],
+            ['task-1', 'r-2a', 1],
+            ['task-1', 'r-2b', 2],
+            ['task-1', 'r-3', 3],
+            ['task-2', 'r-x', 0],
+        ]);
+
+        // …and the budget index exists, is UNIQUE, and is enforced.
+        const indices: Array<{ name: string; unique: number }> = await dataSource.query(
+            `PRAGMA index_list("task_agent_reviews")`,
+        );
+        expect(indices.find((index) => index.name === 'uq_task_agent_review_slot')?.unique).toBe(1);
+        expect(indices.find((index) => index.name === 'uq_task_agent_review_claim')?.unique).toBe(
+            1,
+        );
+        await expect(
+            dataSource.query(
+                `INSERT INTO task_agent_reviews (id, "taskId", "reviewerAgentId", "approverId", "claimKey", "headSha", "slot") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                ['r-dup', 'task-1', 'agent-2', 'app-2', 'agent-review:agent-2:ddd', 'ddd', 0],
+            ),
+        ).rejects.toThrow(/UNIQUE/);
+
+        // A second run changes nothing.
+        await expect(runUp()).resolves.toBeUndefined();
+        expect(Object.keys(await columns('task_agent_reviews'))).toHaveLength(18);
     });
 
     it('down() removes both halves through the query-runner primitives', async () => {

@@ -93,6 +93,9 @@ export {
 export {
     TaskAgentReviewRepository,
     type ClaimAgentReviewInput,
+    type ClaimAgentReviewResult,
+    type RecordAgentVerdictInput,
+    type RecordAgentVerdictOutcome,
 } from '../database/repositories/task-agent-review.repository';
 // Release promotion lane (self-build slice AI, EW-808) — develop -> stage
 // -> main. Opens a promotion pull request and reports the gate; merging it
