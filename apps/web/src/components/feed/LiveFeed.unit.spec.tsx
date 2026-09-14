@@ -190,6 +190,25 @@ describe('LiveFeed', () => {
         );
     });
 
+    it('reports no kind chip as pressed while "Only failed" overrides the kinds', async () => {
+        searchParams = new URLSearchParams('view=feed&kinds=problem&failed=1');
+        getFeedPage.mockResolvedValue({ success: true, data: page([entry('e1')]) });
+        renderFeed();
+        await screen.findByTestId('feed-list');
+
+        const problemChip = () =>
+            screen
+                .getAllByTestId('feed-kind-chip')
+                .find((chip) => chip.getAttribute('data-kind') === 'problem')!;
+        expect(problemChip()).toBeDisabled();
+        expect(problemChip()).toHaveAttribute('aria-pressed', 'false');
+
+        // Turning it off brings the stored kind selection back into effect.
+        fireEvent.click(screen.getByTestId('feed-only-failed'));
+        await waitFor(() => expect(problemChip()).toHaveAttribute('aria-pressed', 'true'));
+        expect(problemChip()).not.toBeDisabled();
+    });
+
     it('ignores shortcuts typed into a text field', async () => {
         getFeedPage.mockResolvedValue({ success: true, data: page([entry('e1')]) });
         renderFeed();

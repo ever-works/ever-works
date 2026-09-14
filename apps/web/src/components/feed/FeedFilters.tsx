@@ -118,7 +118,10 @@ export function FeedFilters({
                     {t('kindsLabel')}
                 </span>
                 {FEED_KINDS.map((kind) => {
-                    const on = filters.kinds.includes(kind);
+                    // "Only failed" overrides the kind selection (the page shows
+                    // problems only), so no kind chip is in effect while it is on.
+                    // The stored selection is kept and comes back when it is off.
+                    const on = filters.kinds.includes(kind) && !filters.failedOnly;
                     return (
                         <button
                             key={kind}
@@ -128,11 +131,7 @@ export function FeedFilters({
                             aria-pressed={on}
                             disabled={filters.failedOnly}
                             onClick={() => onToggleKind(kind)}
-                            className={cn(
-                                chipBase,
-                                on && !filters.failedOnly ? chipOn : chipOff,
-                                'disabled:opacity-50',
-                            )}
+                            className={cn(chipBase, on ? chipOn : chipOff, 'disabled:opacity-50')}
                         >
                             {tKinds(kind)}
                         </button>

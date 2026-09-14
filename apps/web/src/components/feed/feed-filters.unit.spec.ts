@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
     EMPTY_FEED_FILTERS,
     FEED_FILTER_STORAGE_KEY,
@@ -57,6 +57,16 @@ describe('feed filters', () => {
     it('never keeps more than 20 agents from a URL', () => {
         const ids = Array.from({ length: 25 }, (_, i) => agent(i));
         expect(normalizeFeedFilters({ agentIds: ids }).agentIds).toHaveLength(20);
+    });
+
+    it('counts two spellings of one agent id once toward the limit', () => {
+        const ids = Array.from({ length: 20 }, (_, i) => agent(i));
+        // The upper-case copy of the first id must not cost the last agent its slot.
+        const withDuplicate = [ids[0], ids[0].toUpperCase(), ...ids.slice(1)];
+        expect(normalizeFeedFilters({ agentIds: withDuplicate }).agentIds).toEqual(ids);
+        expect(normalizeFeedFilters({ agentIds: [IVY.toUpperCase(), IVY] }).agentIds).toEqual([
+            IVY,
+        ]);
     });
 
     it('refuses a 21st agent instead of truncating', () => {
@@ -172,6 +182,52 @@ describe('feed relative time', () => {
         expect(describeFeedTime(new Date(2026, 7, 1, 9, 0).toISOString(), now, 'en').kind).toBe(
             'absolute',
         );
+    });
+
+    it('keeps "this week" to the six calendar days before yesterday', () => {
+        // Same weekday a week ago, a little later in the day: under seven
+        // 24-hour days, but naming the weekday would read as today's.
+        expect(describeFeedTime(new Date(2026, 8, 6, 14, 0).toISOString(), now, 'en').kind).toBe(
+            'absolute',
+        );
+        expect(describeFeedTime(new Date(2026, 8, 7, 0, 5).toISOString(), now, 'en').kind).toBe(
+            'withinWeek',
+        );
+    });
+
+    describe('across a daylight-saving change', () => {
+        let previousTz: string | undefined;
+        beforeAll(() => {
+            previousTz = process.env.TZ;
+            process.env.TZ = 'America/New_York';
+        });
+        afterAll(() => {
+            if (previousTz === undefined) delete process.env.TZ;
+            else process.env.TZ = previousTz;
+        });
+
+        it('runs in a zone that really changes its clocks', () => {
+            // Guards the two cases below: without a real 25-hour and 23-hour
+            // day they would pass for the wrong reason.
+            expect(new Date(2026, 10, 2).getTime() - new Date(2026, 10, 1).getTime()).toBe(
+                25 * 3_600_000,
+            );
+            expect(new Date(2026, 2, 9).getTime() - new Date(2026, 2, 8).getTime()).toBe(
+                23 * 3_600_000,
+            );
+        });
+
+        it('calls the whole of a 25-hour day "yesterday"', () => {
+            const afterFallBack = new Date(2026, 10, 2, 12, 0);
+            const earlyYesterday = new Date(2026, 10, 1, 0, 30).toISOString();
+            expect(describeFeedTime(earlyYesterday, afterFallBack, 'en').kind).toBe('yesterdayAt');
+        });
+
+        it('does not call the day before a 23-hour day "yesterday"', () => {
+            const afterSpringForward = new Date(2026, 2, 9, 12, 0);
+            const twoDaysAgo = new Date(2026, 2, 7, 23, 30).toISOString();
+            expect(describeFeedTime(twoDaysAgo, afterSpringForward, 'en').kind).toBe('withinWeek');
+        });
     });
 
     it('treats a future or unreadable timestamp as just now', () => {

@@ -148,6 +148,13 @@ export function useFeedPaging({
         loadingOlderRef.current = false;
         setLoadingOlder(false);
         setOlderFailed(false);
+        // Drop what belongs to the previous filters (or the failed chain) now,
+        // not when the response lands: until then nothing — the list, keyboard
+        // selection or "open" — may act on entries the new request replaces.
+        setEntries((current) => (current.length === 0 ? current : []));
+        setCursor(null);
+        setHasMore(false);
+        setPagesLoaded(0);
         setStatus('loading');
         const result = await fetchRef
             .current(null)

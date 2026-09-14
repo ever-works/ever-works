@@ -131,6 +131,40 @@ describe('useFeedPaging', () => {
         expect(fetchPage).toHaveBeenLastCalledWith(null);
     });
 
+    it('drops the entries of the previous filters as soon as a filter change starts loading', async () => {
+        let resolveFiltered: (result: FeedFetchResult) => void = () => undefined;
+        const fetchPage = vi
+            .fn<(cursor: string | null) => Promise<FeedFetchResult>>()
+            .mockResolvedValueOnce(ok(page([e1, e2], 'c1')))
+            .mockImplementationOnce(
+                () =>
+                    new Promise<FeedFetchResult>((resolve) => {
+                        resolveFiltered = resolve;
+                    }),
+            );
+        const { result, rerender } = renderHook(
+            ({ filterKey }: { filterKey: string }) => useFeedPaging({ filterKey, fetchPage }),
+            { initialProps: { filterKey: '' } },
+        );
+        await waitFor(() => expect(result.current.entries).toHaveLength(2));
+
+        rerender({ filterKey: 'failed=1' });
+        // The filtered request is still pending: nothing from the old list is left.
+        await waitFor(() => expect(result.current.status).toBe('loading'));
+        expect(result.current.entries).toEqual([]);
+        expect(result.current.hasMore).toBe(false);
+        expect(result.current.pagesLoaded).toBe(0);
+        // Nothing to page from while the new first page is loading.
+        act(() => result.current.loadOlder());
+        expect(fetchPage).toHaveBeenCalledTimes(2);
+
+        await act(async () => {
+            resolveFiltered(ok(page([e3], null)));
+        });
+        await waitFor(() => expect(result.current.entries.map((e) => e.id)).toEqual(['e3']));
+        expect(result.current.status).toBe('ready');
+    });
+
     it('stops at the page cap and reports it as the end', async () => {
         let n = 0;
         const fetchPage = vi.fn(async () => {

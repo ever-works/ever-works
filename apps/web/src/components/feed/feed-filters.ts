@@ -41,14 +41,18 @@ function splitList(value: string | null | undefined): string[] {
 export function normalizeFeedFilters(
     state: Partial<FeedFilterState> | null | undefined,
 ): FeedFilterState {
+    // Lower-case before de-duplicating, so two spellings of one id take one
+    // slot and never push a different agent past the limit.
     const agentIds = [
-        ...new Set((state?.agentIds ?? []).filter((id) => typeof id === 'string' && UUID.test(id))),
-    ]
-        .map((id) => id.toLowerCase())
-        .slice(0, FEED_MAX_AGENT_FILTER);
+        ...new Set(
+            (state?.agentIds ?? [])
+                .filter((id) => typeof id === 'string' && UUID.test(id))
+                .map((id) => id.toLowerCase()),
+        ),
+    ].slice(0, FEED_MAX_AGENT_FILTER);
     const requested = new Set(state?.kinds ?? []);
     const kinds = FEED_KINDS.filter((kind) => requested.has(kind));
-    return { agentIds: [...new Set(agentIds)], kinds, failedOnly: state?.failedOnly === true };
+    return { agentIds, kinds, failedOnly: state?.failedOnly === true };
 }
 
 export function hasFeedFilterParams(params: SearchParamsLike): boolean {
