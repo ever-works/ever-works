@@ -78,6 +78,14 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             scopeResolver,
             notifications,
             ...(planner ? { planner } : {}),
+            // Judgment layer G9 — a fleet-bound run is refused when no
+            // delegation-scope guard is wired (fail closed). This matrix is
+            // about the routing preference, not delegation, so it wires the
+            // answer the production guard gives a non-delegated run: admit.
+            // The planner (or its absence) is unchanged.
+            delegationScopeGuard: {
+                refuseUnenforceableDelegationScope: jest.fn(async () => undefined),
+            },
         });
     };
 
