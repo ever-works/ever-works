@@ -785,6 +785,7 @@ export class AgentRunService {
                   editsThisRunByFile,
                   context.delegationScope,
                   context.missionId,
+                  context.taskId,
               )
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
@@ -1826,10 +1827,17 @@ export class AgentRunService {
         editsThisRunByFile: Set<string>,
         delegationScope?: SubAgentScope | null,
         missionId?: string | null,
+        taskId?: string | null,
     ): Promise<AgentToolDescriptor[]> {
         const service = this.toolService;
         if (!service) return [];
-        const runContext = { runId, editsThisRunByFile, missionId: missionId ?? undefined };
+        const runContext = {
+            runId,
+            editsThisRunByFile,
+            missionId: missionId ?? undefined,
+            // AW-17 — the run's Task, so MCP tool calls are attributed to it.
+            taskId: taskId ?? undefined,
+        };
         if (typeof service.resolveGrantedTools !== 'function') {
             return this.applyDelegationScope(
                 await service.resolveAllowedTools(agent, runContext),

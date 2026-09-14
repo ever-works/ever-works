@@ -324,7 +324,7 @@ describe('AgentRunService.execute() — LLM dispatch (FU-1)', () => {
         );
         expect(toolService.resolveAllowedTools).toHaveBeenCalledWith(
             expect.anything(),
-            expect.objectContaining({ runId: 'r1', missionId: 'task-mission' }),
+            expect.objectContaining({ runId: 'r1', missionId: 'task-mission', taskId: 't1' }),
         );
     });
 

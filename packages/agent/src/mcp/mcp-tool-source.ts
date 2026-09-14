@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { Agent } from '../entities/agent.entity';
 import type { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import type { AgentToolDescriptor, AgentToolParameterSchema } from '../agents/agent-tool.service';
-import type { AgentMcpRunHandle, AgentMcpToolSource } from '../agents/agent-mcp-tool-source';
+import {
+    AGENT_MCP_NO_RUN_ID,
+    type AgentMcpRunHandle,
+    type AgentMcpToolSource,
+} from '../agents/agent-mcp-tool-source';
 import { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 import { PluginUsageCapability } from '../entities/plugin-usage-event.entity';
 import { UsagePayer } from '../entities/_types';
@@ -94,8 +98,19 @@ export class McpToolSource implements AgentMcpToolSource {
      *   capabilities write to, which is a larger change than this feature
      *   should make on its own — so unscoped agents are simply not counted,
      *   and that is stated rather than hidden.
+     *
+     * AW-17 — the row carries the same attribution every other call a run
+     * makes carries: the Agent, the run (settlement and the run receipt
+     * select by `runId`), the run's Task and the Task's Mission (Mission
+     * totals group by `missionId`). Without them a tool call would be missing
+     * from the run that made it. The no-run sentinel is never stamped as a
+     * run id.
      */
-    private async recordInvocation(agent: Agent, connection: McpServerConnection): Promise<void> {
+    private async recordInvocation(
+        agent: Agent,
+        connection: McpServerConnection,
+        run: AgentMcpRunHandle,
+    ): Promise<void> {
         if (!this.usage || !agent.workId) return;
         try {
             const pluginId = `mcp:${connection.name}`.slice(0, 128);
@@ -113,6 +128,10 @@ export class McpToolSource implements AgentMcpToolSource {
             await this.usage.record({
                 workId: agent.workId,
                 userId: agent.userId,
+                agentId: agent.id,
+                runId: run.runId && run.runId !== AGENT_MCP_NO_RUN_ID ? run.runId : null,
+                taskId: run.taskId ?? null,
+                missionId: run.missionId ?? null,
                 pluginId,
                 capability: PluginUsageCapability.MCP,
                 units: 1,
@@ -185,7 +204,7 @@ export class McpToolSource implements AgentMcpToolSource {
                 continue;
             }
             for (const tool of tools) {
-                const descriptor = this.toDescriptor(agent, connection, tool, session);
+                const descriptor = this.toDescriptor(agent, connection, tool, run, session);
                 if (!descriptor) continue;
                 if (seen.has(descriptor.name)) {
                     this.logger.warn(
@@ -295,6 +314,7 @@ export class McpToolSource implements AgentMcpToolSource {
         agent: Agent,
         connection: McpServerConnection,
         tool: McpToolInfo,
+        run: AgentMcpRunHandle,
         session: StdioSession | null = null,
     ): AgentToolDescriptor | null {
         const sanitizedTool = this.sanitizeToolName(tool.name);
@@ -355,7 +375,7 @@ export class McpToolSource implements AgentMcpToolSource {
                 // the response path.
                 //
                 // After the call, so a failed tool is not counted as usage.
-                void this.recordInvocation(agent, connection);
+                void this.recordInvocation(agent, connection, run);
                 return result;
             },
         };

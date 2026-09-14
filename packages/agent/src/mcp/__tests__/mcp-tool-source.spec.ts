@@ -298,6 +298,60 @@ describe('usage accounting (T28)', () => {
         );
     });
 
+    it("AW-17 — attributes the invocation to the Agent, the run, the run's Task and its Mission", async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(
+            // The Agent's own Mission must never be the one stamped.
+            makeAgent({ workId: 'work-1', missionId: 'agent-own-mission' }),
+            { runId: 'r1', taskId: 't1', missionId: 'task-mission' },
+        );
+        await tools[0].invoke({ q: 'x' });
+        await flush();
+
+        // Settlement and the run receipt select usage by runId, and Mission
+        // totals group it by missionId — a row without them is missing from
+        // the run that made the call.
+        expect(usage.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                agentId: 'agent-1',
+                runId: 'r1',
+                taskId: 't1',
+                missionId: 'task-mission',
+            }),
+        );
+    });
+
+    it('AW-17 — never stamps the no-run sentinel as a run id, and invents no Task or Mission', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(
+            makeAgent({ workId: 'work-1', missionId: 'agent-own-mission' }),
+            { runId: 'no-run' },
+        );
+        await tools[0].invoke({ q: 'x' });
+        await flush();
+
+        expect(usage.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                agentId: 'agent-1',
+                runId: null,
+                taskId: null,
+                missionId: null,
+            }),
+        );
+    });
+
     it('does NOT record a failed tool call', async () => {
         const usage = { record: jest.fn().mockResolvedValue({}) };
         const { source, client } = makeSource({
