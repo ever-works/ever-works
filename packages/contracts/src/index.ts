@@ -28,6 +28,10 @@ export * from './inbox/index.js';
 // Agent email (AW-05) — approve-before-send statuses and modes, plus the
 // per-inbox / per-workspace send ceilings and their pure resolution.
 export * from './email/index.js';
+// Model accounts (AW-16) — several credentials per AI provider, in order, the
+// workspace / Agent / schedule model ladder, and the record a Run keeps of
+// what actually answered it.
+export * from './model-routing/index.js';
 // Release promotion lane (self-build slice AI, EW-808) — develop -> stage
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.

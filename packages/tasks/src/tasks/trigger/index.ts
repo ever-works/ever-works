@@ -52,3 +52,5 @@ export * from './credits-meter-flush.task';
 // Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
 // dry-run by default, never auto-applied).
 export * from './memory-consolidation-tick.task';
+// Model accounts (AW-16) — six-hourly credential health check per account.
+export * from './model-account-health.task';

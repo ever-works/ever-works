@@ -84,6 +84,15 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Model accounts (AW-16) — provider account + model default changes.
+            ['MODEL_ACCOUNT_ADDED', 'model_account_added'],
+            ['MODEL_ACCOUNT_UPDATED', 'model_account_updated'],
+            ['MODEL_ACCOUNT_REORDERED', 'model_account_reordered'],
+            ['MODEL_ACCOUNT_PAUSED', 'model_account_paused'],
+            ['MODEL_ACCOUNT_RESUMED', 'model_account_resumed'],
+            ['MODEL_ACCOUNT_RECONNECTED', 'model_account_reconnected'],
+            ['MODEL_ACCOUNT_REMOVED', 'model_account_removed'],
+            ['MODEL_POLICY_UPDATED', 'model_policy_updated'],
             // Live Feed — a run starting / finishing / failing for every
             // trigger kind other than heartbeat.
             ['AGENT_RUN_STARTED', 'agent_run_started'],
@@ -157,9 +166,25 @@ describe('activity-log.types', () => {
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
             //
+            // +8 model_account_added / _updated / _reordered / _paused /
+            //    _resumed / _reconnected / _removed and model_policy_updated
+            //    (model accounts, AW-16) -> 165 on this branch's base.
             // +3 agent_run_started / agent_run_completed / agent_run_failed
-            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
-            expect(literals).toHaveLength(160);
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop's base.
+            // 168 after the model-accounts branch merged develop's Live Feed
+            //    work — COUNTED from the merged enum (157 + 8 + 3), not taken
+            //    from either side's total.
+            expect(literals).toHaveLength(168);
+        });
+
+        it('every literal fits the varchar(50) action_type column', () => {
+            const literals = Object.values(ActivityActionType).filter(
+                (v) => typeof v === 'string',
+            ) as string[];
+            for (const v of literals) {
+                expect(v.length).toBeLessThanOrEqual(50);
+            }
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

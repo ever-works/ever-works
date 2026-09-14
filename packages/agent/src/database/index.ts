@@ -79,6 +79,9 @@ export * from './repositories/email-conversation.repository';
 export * from './repositories/email-message.repository';
 // Agent email (AW-05) — per-Agent approval mode + send ceilings
 export * from './repositories/agent-inbox.repository';
+// Model accounts (AW-16) — provider accounts + the model ladder
+export * from './repositories/model-account.repository';
+export * from './repositories/model-policy.repository';
 export * from './repositories/notification-channel.repository';
 export * from './repositories/notification-channel-delivery-log.repository';
 export * from './repositories/notification-event-type.repository';
