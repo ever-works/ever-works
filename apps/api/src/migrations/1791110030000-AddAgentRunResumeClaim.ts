@@ -1,7 +1,8 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
 /**
- * Resume single-flight — `agent_runs.resumeClaimToken` + `resumeClaimedAt`.
+ * Resume single-flight — `agent_runs.resumeClaimToken`, `resumeClaimedAt`
+ * and `resumeSuccessorRunId`.
  *
  * Entity: `packages/agent/src/entities/agent-run.entity.ts`.
  *
@@ -14,13 +15,21 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * caller can win, fenced by the token, and expiring by the timestamp so a
  * process that died mid-resume cannot hold the run forever.
  *
+ * `resumeSuccessorRunId` is the durable link from the source to the
+ * successor an unconsumed claim created, written in the same transaction as
+ * the successor's insert. Expiry alone could not tell "the holder died
+ * before creating anything" from "the holder died (or failed a write) after
+ * its successor was enqueued", and a takeover in the second case would
+ * enqueue a second successor for the same resume. The next claimant reads
+ * the link and reconciles that successor before creating one of its own.
+ *
  * No existing column could carry the claim safely: `awaitingInput` is
  * never set on a parked or completed run (both resumable), and
  * `attentionReason`, `queuedReason` and `terminalState` each already mean
  * something that a claim would overwrite.
  *
- * Additive and nullable, no index: both are read with the row by primary
- * key, never filtered on. Every existing run reads NULL, which is exactly
+ * Additive and nullable, no index: all three are read with the row by
+ * primary key, never filtered on. Every existing run reads NULL, which is exactly
  * "no resume in flight". Forward-only with per-column guards so a partially
  * applied database converges; portable `TableColumn` DDL because CI and the
  * e2e stack run better-sqlite3 while production runs Postgres.
@@ -36,6 +45,12 @@ export class AddAgentRunResumeClaim1791110030000 implements MigrationInterface {
             isNullable: true,
         }),
         new TableColumn({ name: 'resumeClaimedAt', type: 'timestamp', isNullable: true }),
+        new TableColumn({
+            name: 'resumeSuccessorRunId',
+            type: 'varchar',
+            length: '36',
+            isNullable: true,
+        }),
     ];
 
     public async up(queryRunner: QueryRunner): Promise<void> {

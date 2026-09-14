@@ -83,6 +83,8 @@ describe('RunSteeringService — rejection feedback on resume (M9)', () => {
             })),
             releaseResumeClaim: jest.fn().mockResolvedValue(true),
             consumeResumeClaim: jest.fn().mockResolvedValue(true),
+            // No successor left behind by an earlier, unfinished resume.
+            findResumeSuccessor: jest.fn().mockResolvedValue(null),
         };
         rejections = {
             findPendingForTask: jest.fn().mockResolvedValue([]),

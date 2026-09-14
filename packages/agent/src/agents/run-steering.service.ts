@@ -9,6 +9,8 @@ import {
 import { config } from '../config';
 import {
     AgentRunRepository,
+    ResumeClaimLostError,
+    type ResumeSuccessorSnapshot,
     type RunResumeClaim,
 } from '../database/repositories/agent-run.repository';
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
@@ -390,6 +392,10 @@ export class RunSteeringService implements RunSteeringPort {
         // loses even when that resume has already finished (the repository
         // method explains why "unclaimed" alone is not enough).
         //
+        // The in-flight stamp is compared the same way: a request that
+        // loaded the run WHILE another resume held it loses once that
+        // resume has finished, instead of slipping in behind it.
+        //
         // The loser gets exactly the refusal a non-resumable run gets — to
         // that request the run is no longer resumable, it just learned so
         // after its read — so a double submit is a clean 409, not a second
@@ -397,6 +403,7 @@ export class RunSteeringService implements RunSteeringPort {
         // `awaitingInput` to clear, so the claim is its only guard.
         const claim = await this.runs.claimResume(run.id, {
             observedToken: run.resumeClaimToken ?? null,
+            observedClaimedAt: run.resumeClaimedAt ?? null,
             staleBefore: this.resumeClaimStaleBefore(),
         });
         if (!claim) {
@@ -406,10 +413,19 @@ export class RunSteeringService implements RunSteeringPort {
             throw this.notResumable(run);
         }
 
+        // Winning the claim is not yet licence to create: an EARLIER resume
+        // may have left a successor behind without finishing — its process
+        // died after the enqueue, or its consume write failed — and then
+        // its claim expired (which is how this request could win) or was
+        // released. Reconcile that successor first; this throws when it
+        // means this resume must not go ahead.
+        await this.reconcileEarlierSuccessor(run, claim, userId);
+
         // From the claim to a successful enqueue, ANY throw gives the claim
-        // back (see the catch below) so the owner can retry. After the
-        // enqueue nothing may release it: a successor exists by then, and
-        // releasing would invite a second one.
+        // back (see the catch below) so the owner can retry. A successor
+        // created on the way stays LINKED to the source through a release,
+        // so a retry reconciles it (see `reconcileEarlierSuccessor`) rather
+        // than trusting that the rollback beat any worker to it.
         let created: AgentRun | undefined;
         let rolledBack = false;
         let admission: { admitted: boolean; queuedReason?: string };
@@ -439,6 +455,10 @@ export class RunSteeringService implements RunSteeringPort {
                     // interactive terminal, which is what the fan-out's
                     // `requirePersistent` gate reads.
                     persistent: run.persistent === true,
+                    // Inserted together with its link on the source, and
+                    // only while this claim is still held — a request whose
+                    // claim was taken over creates nothing.
+                    resumeClaim: claim,
                 });
             };
             admission = this.dispatchGate
@@ -542,6 +562,17 @@ export class RunSteeringService implements RunSteeringPort {
             //
             // The enqueue catch above has already done (1) for its own
             // failure; neither half may mask the original error.
+            //
+            // A lost claim is the exception: the successor's insert was
+            // rolled back with its link, and the claim belongs to whoever
+            // took it over — there is nothing to roll back or release, and
+            // to this request the run is simply no longer resumable.
+            if (err instanceof ResumeClaimLostError) {
+                this.logger.log(
+                    `Run ${run.id}: resume by user ${userId} refused — its claim was taken over before a successor was created.`,
+                );
+                throw this.notResumable(run);
+            }
             if (created && !rolledBack) {
                 const detail = err instanceof Error ? err.message : String(err);
                 await this.runs
@@ -568,16 +599,24 @@ export class RunSteeringService implements RunSteeringPort {
         // reopened would route 'none' on the next attempt and the owner's
         // answer could never reach a node. The catch above rethrows before
         // this line, so a failed enqueue keeps the source run parked.
-        if (run.awaitingInput) {
-            await this.runs.setAwaitingInput(run.id, false).catch(() => undefined);
-        }
+        //
         // Then the claim is consumed — in THAT order. Consuming first would
         // open a window in which a request loading the run fresh sees it
         // unclaimed AND still awaiting input, and wins a second successor.
         // Clearing `awaitingInput` first means such a request finds the run
         // either still claimed or no longer awaiting; the kept token refuses
         // every request that read the run earlier.
-        await this.consumeResumeClaim(claim);
+        //
+        // If the clear itself failed, consuming would open exactly that
+        // window for good, so the claim is RELEASED instead: the successor
+        // stays linked, and the next resume reconciles it — refusing while
+        // it is live, finishing this bookkeeping once it has run — rather
+        // than creating a second one.
+        if (await this.clearAwaitingInput(run)) {
+            await this.consumeResumeClaim(claim);
+        } else {
+            await this.releaseResumeClaim(claim);
+        }
 
         await this.stamp(next.id, userId, 'resume', {
             resumedFromRunId: run.id,
@@ -650,16 +689,101 @@ export class RunSteeringService implements RunSteeringPort {
      *
      * Reuses the stuck-run sweeper's cutoff rather than inventing a second
      * window, because the two describe the same failure. A process that died
-     * between claim and release left, at worst, a `queued` successor that
-     * never dispatched — and the sweeper reaps exactly that row at this same
-     * cutoff, so the source becomes resumable again as its orphan is cleared
-     * away. The costs are as asymmetric as the sweeper's own: expiring too
-     * EARLY hands a slow-but-alive resume's run to a second caller, which is
-     * the duplicate this claim exists to prevent; expiring too LATE only
-     * delays a retry after a crash that is already rare.
+     * between claim and consume left either nothing, a `queued` successor
+     * that never dispatched (the sweeper reaps exactly that row at this same
+     * cutoff), or a successor that was dispatched and ran. Expiry alone
+     * cannot tell those apart, which is why the successor is linked on the
+     * source and the taker reconciles it before creating anything.
+     *
+     * The same two mechanisms fence a slow-but-alive holder whose claim
+     * expires under it: its insert is refused once the claim is taken (the
+     * link is token-guarded, inside the insert's transaction), and a
+     * successor it had already created is reconciled by the taker. Expiring
+     * too early therefore costs that slow resume a 409, not a duplicate;
+     * expiring too late only delays a retry after a crash that is already
+     * rare.
      */
     private resumeClaimStaleBefore(): Date {
         return new Date(Date.now() - config.agents.getRunStuckSweepMinutes() * 60_000);
+    }
+
+    /**
+     * Resume single-flight — reconcile the successor an earlier, unfinished
+     * resume left linked on the source run, before this resume creates its
+     * own. Returns when this resume may go ahead; otherwise settles the claim
+     * it holds and throws the not-resumable refusal.
+     *
+     * Only a successor whose claim was never CONSUMED is linked, so whatever
+     * is found here is an attempt that did not finish its bookkeeping — a
+     * process that died after the create or the enqueue, or a consume (or
+     * `awaitingInput` clear) that failed after the successor was dispatched:
+     *
+     *  - **never ran** (`failed` without ever starting — the enqueue was
+     *    rolled back, or the sweeper reaped an orphan that was never
+     *    dispatched): nothing answered the source, so this resume goes ahead.
+     *  - **still live** (`queued` / `running`): it may yet run — a gate-parked
+     *    row is drained later, an enqueued one is picked up by a worker — so
+     *    creating another would be the duplicate. Refuse, and release the
+     *    claim so the next attempt reconciles again as soon as that row
+     *    settles. `awaitingInput` is left alone: if the row turns out to be
+     *    an orphan the sweeper reaps, the question must still be answerable.
+     *  - **ran** (anything else): the earlier resume took effect. Finish its
+     *    bookkeeping on its behalf — clear `awaitingInput`, consume the claim
+     *    — and refuse this one, exactly as it would have been refused had
+     *    that resume finished normally while this request was loading.
+     *
+     * A lookup that fails is treated as "cannot tell": the claim is released
+     * and the error propagates, so a retry decides again — never a guess
+     * that could create a second successor.
+     */
+    private async reconcileEarlierSuccessor(
+        run: AgentRun,
+        claim: RunResumeClaim,
+        userId: string,
+    ): Promise<void> {
+        let earlier: ResumeSuccessorSnapshot | null;
+        try {
+            earlier = await this.runs.findResumeSuccessor(run.id);
+        } catch (err) {
+            await this.releaseResumeClaim(claim);
+            throw err;
+        }
+        if (!earlier) return;
+        if (earlier.status === 'failed' && !earlier.startedAt) return;
+
+        if (RunSteeringService.isLive(earlier)) {
+            this.logger.log(
+                `Run ${run.id}: resume by user ${userId} refused — earlier successor ${earlier.id} is still ${earlier.status}.`,
+            );
+            await this.releaseResumeClaim(claim);
+            throw this.notResumable(run);
+        }
+
+        this.logger.warn(
+            `Run ${run.id}: earlier successor ${earlier.id} already ran (${earlier.status}) without its resume finishing — completing that resume and refusing the one by user ${userId}.`,
+        );
+        if (await this.clearAwaitingInput(run)) {
+            await this.consumeResumeClaim(claim);
+        } else {
+            await this.releaseResumeClaim(claim);
+        }
+        throw this.notResumable(run);
+    }
+
+    /**
+     * Mark the source run answered. Best-effort — a failure is logged and
+     * reported, never thrown — and a no-op when the run was not awaiting
+     * input. The caller decides what a failure means for its claim.
+     */
+    private async clearAwaitingInput(run: AgentRun): Promise<boolean> {
+        if (!run.awaitingInput) return true;
+        try {
+            await this.runs.setAwaitingInput(run.id, false);
+            return true;
+        } catch (err) {
+            this.logger.warn(`Run ${run.id}: failed to clear awaitingInput on resume: ${err}`);
+            return false;
+        }
     }
 
     /**
@@ -685,7 +809,9 @@ export class RunSteeringService implements RunSteeringPort {
     /**
      * Mark a resume claim as spent once its successor exists. Best-effort for
      * the same reason the `awaitingInput` clear beside it is: the resume has
-     * already dispatched, and a claim left in flight still expires.
+     * already dispatched. A claim this fails to consume stays in flight with
+     * its successor linked, so whoever takes it over after expiry reconciles
+     * that successor instead of creating a second one.
      */
     private async consumeResumeClaim(claim: RunResumeClaim): Promise<void> {
         try {

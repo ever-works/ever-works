@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ResumeClaimLostError } from '../../database/repositories/agent-run.repository';
 import { RunSteeringService } from '../run-steering.service';
 
 /**
@@ -76,6 +77,8 @@ describe('RunSteeringService', () => {
             })),
             releaseResumeClaim: jest.fn().mockResolvedValue(true),
             consumeResumeClaim: jest.fn().mockResolvedValue(true),
+            // No successor left behind by an earlier, unfinished resume.
+            findResumeSuccessor: jest.fn().mockResolvedValue(null),
         };
         runLogs = { append: jest.fn().mockResolvedValue(undefined) };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trigger-run-2' }) };
@@ -401,6 +404,7 @@ describe('RunSteeringService', () => {
 
             expect(runs.claimResume).toHaveBeenCalledWith(runId, {
                 observedToken: 'read-token',
+                observedClaimedAt: null,
                 staleBefore: expect.any(Date),
             });
             // The expiry window is in the past — never "everything expired".
@@ -529,6 +533,138 @@ describe('RunSteeringService', () => {
 
             expect(outcome.dispatched).toBe('new-run');
             expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        });
+
+        it('passes the in-flight stamp it READ along with the token', async () => {
+            const readAt = new Date('2026-09-14T08:00:00.000Z');
+            runs.findByIdAndUser.mockResolvedValue({
+                ...parkedAwaiting(),
+                resumeClaimedAt: readAt,
+            });
+
+            await makeSvc().resume(runId, userId, 'option B');
+
+            expect(runs.claimResume).toHaveBeenCalledWith(
+                runId,
+                expect.objectContaining({ observedToken: 'read-token', observedClaimedAt: readAt }),
+            );
+        });
+
+        it('⭐ creates the successor under the claim, and reconciles before creating it', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+
+            await makeSvc().resume(runId, userId, 'option B');
+
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    resumeClaim: { runId, token: 'claim-1', previousToken: null },
+                }),
+            );
+            expect(runs.findResumeSuccessor).toHaveBeenCalledWith(runId);
+            expect(runs.findResumeSuccessor.mock.invocationCallOrder[0]).toBeGreaterThan(
+                runs.claimResume.mock.invocationCallOrder[0],
+            );
+            expect(runs.findResumeSuccessor.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.createQueued.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('a claim lost before the insert is a plain 409 — nothing rolled back, nothing released', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.createQueued.mockRejectedValue(new ResumeClaimLostError(runId));
+
+            const error = await makeSvc()
+                .resume(runId, userId, 'option B')
+                .catch((err: unknown) => err);
+
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).message).toContain('is not resumable');
+            expect(runs.markDispatchFailed).not.toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).not.toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+        });
+
+        it('⭐ refuses while a successor an earlier resume left behind is still live', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.findResumeSuccessor.mockResolvedValue({
+                id: 'run-earlier',
+                status: 'running',
+                startedAt: new Date(),
+            });
+
+            await expect(makeSvc().resume(runId, userId, 'option B')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).toHaveBeenCalledWith({
+                runId,
+                token: 'claim-1',
+                previousToken: null,
+            });
+            expect(runs.consumeResumeClaim).not.toHaveBeenCalled();
+            // The question stays answerable in case the live row is an orphan.
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+        });
+
+        it('⭐ completes an earlier resume whose successor already ran, and refuses this one', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.findResumeSuccessor.mockResolvedValue({
+                id: 'run-earlier',
+                status: 'completed',
+                startedAt: new Date(),
+            });
+
+            await expect(makeSvc().resume(runId, userId, 'option B')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).toHaveBeenCalledWith(runId, false);
+            expect(runs.consumeResumeClaim).toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).not.toHaveBeenCalled();
+        });
+
+        it('goes ahead when the earlier successor failed without ever starting', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.findResumeSuccessor.mockResolvedValue({
+                id: 'run-earlier',
+                status: 'failed',
+                startedAt: null,
+            });
+
+            const outcome = await makeSvc().resume(runId, userId, 'option B');
+
+            expect(outcome.runId).toBe('run-2');
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            expect(runs.consumeResumeClaim).toHaveBeenCalled();
+        });
+
+        it('a failed reconcile lookup releases the claim and creates nothing', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.findResumeSuccessor.mockRejectedValue(new Error('db blip'));
+
+            await expect(makeSvc().resume(runId, userId, 'option B')).rejects.toThrow('db blip');
+
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).toHaveBeenCalled();
+        });
+
+        it('⭐ releases (never consumes) the claim when clearing awaitingInput fails after the enqueue', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.setAwaitingInput.mockRejectedValue(new Error('db blip'));
+
+            const outcome = await makeSvc().resume(runId, userId, 'option B');
+
+            expect(outcome.dispatched).toBe('new-run');
+            expect(runs.consumeResumeClaim).not.toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).toHaveBeenCalledWith({
+                runId,
+                token: 'claim-1',
+                previousToken: null,
+            });
         });
     });
 

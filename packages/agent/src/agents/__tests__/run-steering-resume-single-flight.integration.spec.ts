@@ -3,7 +3,10 @@ import { DataSource, Repository } from 'typeorm';
 import { config } from '@src/config';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import { ENTITIES } from '@src/database/_entities-inventory';
-import { AgentRunRepository } from '@src/database/repositories/agent-run.repository';
+import {
+    AgentRunRepository,
+    ResumeClaimLostError,
+} from '@src/database/repositories/agent-run.repository';
 import { RunSteeringService } from '../run-steering.service';
 
 /**
@@ -265,6 +268,58 @@ describe('RunSteeringService — resume single-flight (better-sqlite3)', () => {
             expect(again.dispatched).toBe('new-run');
             expect(await successorsOf(source)).toHaveLength(2);
         });
+
+        it('⭐ a request that read the run WHILE another resume held it still loses after that resume finished', async () => {
+            // The second request loads the run after the first has claimed it
+            // but before the first consumes. The token it read is the
+            // winner's own, which consuming keeps — so only the in-flight
+            // stamp it saw set tells the claim that this read is stale.
+            const source = await seedSource({ terminalEndedReason: 'parked' });
+            const inEnqueue = deferred();
+            const runtime = deferred();
+            dispatcher.enqueue.mockImplementationOnce(async ({ runId }: { runId: string }) => {
+                inEnqueue.resolve();
+                await runtime.promise;
+                return { runId: `trigger-${runId}` };
+            });
+            const winnerConsumed = deferred();
+            const consume = AgentRunRepository.prototype.consumeResumeClaim;
+            jest.spyOn(runs, 'consumeResumeClaim').mockImplementation(async (...args) => {
+                const consumed = await consume.apply(runs, args);
+                winnerConsumed.resolve();
+                return consumed;
+            });
+            const lateReachedClaim = deferred();
+            const claim = AgentRunRepository.prototype.claimResume;
+            let claims = 0;
+            jest.spyOn(runs, 'claimResume').mockImplementation(async (...args) => {
+                claims += 1;
+                if (claims === 2) {
+                    lateReachedClaim.resolve();
+                    await winnerConsumed.promise;
+                }
+                return claim.apply(runs, args);
+            });
+            const svc = makeSvc();
+
+            const first = svc.resume(source.id, USER, 'first answer');
+            first.catch(() => undefined);
+            await inEnqueue.promise;
+            const late = svc.resume(source.id, USER, 'second answer');
+            late.catch(() => undefined);
+            await lateReachedClaim.promise;
+            runtime.resolve();
+
+            const { won, lost } = partition(await Promise.allSettled([first, late]));
+            expect(won).toHaveLength(1);
+            expect(lost).toHaveLength(1);
+            expect(lost[0]).toBeInstanceOf(ConflictException);
+            await expect(first).resolves.toEqual(
+                expect.objectContaining({ dispatched: 'new-run' }),
+            );
+            expect(await successorsOf(source)).toHaveLength(1);
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('release on failure', () => {
@@ -372,6 +427,237 @@ describe('RunSteeringService — resume single-flight (better-sqlite3)', () => {
             expect(after.resumeClaimToken).toBe(DEAD_HOLDER);
             expect(after.awaitingInput).toBe(true);
         });
+
+        it('⭐ a slow holder whose claim was taken over creates nothing', async () => {
+            // Every in-flight claim counts as abandoned, so the second
+            // request takes over the first one's claim while the first is
+            // still on its way to creating its successor.
+            jest.spyOn(config.agents, 'getRunStuckSweepMinutes').mockReturnValue(-1);
+            const source = await seedSource({ terminalEndedReason: 'parked' });
+            const slowAtCreate = deferred();
+            const proceed = deferred();
+            const create = AgentRunRepository.prototype.createQueued;
+            let creates = 0;
+            jest.spyOn(runs, 'createQueued').mockImplementation(async (...args) => {
+                creates += 1;
+                if (creates === 1) {
+                    slowAtCreate.resolve();
+                    await proceed.promise;
+                }
+                return create.apply(runs, args);
+            });
+            const svc = makeSvc();
+
+            const slow = svc.resume(source.id, USER, 'first answer');
+            slow.catch(() => undefined);
+            await slowAtCreate.promise;
+            const taker = await svc.resume(source.id, USER, 'second answer');
+            proceed.resolve();
+
+            const error = await slow.catch((err: unknown) => err);
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).message).toContain('is not resumable');
+            const successors = await successorsOf(source);
+            expect(successors.map((row) => row.id)).toEqual([taker.runId]);
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            const after = await reload(source);
+            expect(after.resumeClaimedAt).toBeNull();
+            expect(after.resumeSuccessorRunId).toBeNull();
+        });
+    });
+
+    describe('reconciling a successor an earlier resume left behind', () => {
+        const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+        const expired = () => minutesAgo(config.agents.getRunStuckSweepMinutes() + 5);
+        const DEAD_HOLDER = '99999999-9999-4999-8999-999999999999';
+
+        function seedSuccessor(overrides: Partial<AgentRun>): Promise<AgentRun> {
+            return rows.save(
+                rows.create({
+                    userId: USER,
+                    agentId: AGENT,
+                    taskId: TASK,
+                    workId: WORK,
+                    triggerKind: 'task',
+                    status: 'queued',
+                    gateAttempts: 0,
+                    persistent: false,
+                    awaitingInput: false,
+                    interruptRequested: false,
+                    ...overrides,
+                } as Partial<AgentRun>),
+            );
+        }
+
+        it('⭐ a resume whose consume failed is not resumed again once its claim expires', async () => {
+            // The first resume dispatched its successor, then the write that
+            // spends its claim failed. Expiry must not reopen the source.
+            const source = await seedSource({ terminalEndedReason: 'parked' });
+            jest.spyOn(runs, 'consumeResumeClaim').mockRejectedValueOnce(new Error('db down'));
+            const svc = makeSvc();
+
+            const first = await svc.resume(source.id, USER, 'Use Postgres');
+            const inFlight = await reload(source);
+            expect(inFlight.resumeClaimedAt).not.toBeNull();
+            expect(inFlight.resumeSuccessorRunId).toBe(first.runId);
+
+            // The claim expires while the successor is still queued.
+            await rows.update(source.id, { resumeClaimedAt: expired() });
+            await expect(svc.resume(source.id, USER, 'Use Postgres')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(await successorsOf(source)).toHaveLength(1);
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            const refused = await reload(source);
+            expect(refused.resumeClaimedAt).toBeNull();
+            expect(refused.resumeSuccessorRunId).toBe(first.runId);
+
+            // The successor runs. The next attempt finishes the first
+            // resume's bookkeeping instead of dispatching the answer again.
+            await rows.update(first.runId, { status: 'completed', startedAt: minutesAgo(1) });
+            await expect(svc.resume(source.id, USER, 'Use Postgres')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(await successorsOf(source)).toHaveLength(1);
+            const finished = await reload(source);
+            expect(finished.resumeClaimedAt).toBeNull();
+            expect(finished.resumeSuccessorRunId).toBeNull();
+
+            // From here the source is judged exactly as after a resume that
+            // finished normally: a parked run is still resumable.
+            const again = await svc.resume(source.id, USER, 'carry on');
+            expect(again.dispatched).toBe('new-run');
+            expect(await successorsOf(source)).toHaveLength(2);
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(2);
+        });
+
+        it('⭐ a takeover after a crash that left a RUNNING successor refuses instead of enqueuing a second one', async () => {
+            const earlier = await seedSuccessor({ status: 'running', startedAt: minutesAgo(30) });
+            const source = await seedSource({
+                resumeClaimToken: DEAD_HOLDER,
+                resumeClaimedAt: expired(),
+                resumeSuccessorRunId: earlier.id,
+            });
+
+            await expect(makeSvc().resume(source.id, USER, 'Use Postgres')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+
+            expect((await successorsOf(source)).map((row) => row.id)).toEqual([earlier.id]);
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            // Released, link kept: the question stays answerable in case the
+            // live row turns out to be an orphan the sweeper reaps.
+            const after = await reload(source);
+            expect(after.resumeClaimToken).toBe(DEAD_HOLDER);
+            expect(after.resumeClaimedAt).toBeNull();
+            expect(after.resumeSuccessorRunId).toBe(earlier.id);
+            expect(after.awaitingInput).toBe(true);
+        });
+
+        it('⭐ a takeover after a crash that left a gate-parked QUEUED successor refuses too', async () => {
+            // The drain would dispatch the parked row later — a second
+            // successor created now would run the same answer twice.
+            const earlier = await seedSuccessor({ queuedReason: 'concurrency-limit' });
+            const source = await seedSource({
+                resumeClaimToken: DEAD_HOLDER,
+                resumeClaimedAt: expired(),
+                resumeSuccessorRunId: earlier.id,
+            });
+
+            await expect(makeSvc().resume(source.id, USER, 'Use Postgres')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(await successorsOf(source)).toHaveLength(1);
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+        });
+
+        it('a successor that already ran completes the earlier resume on its behalf', async () => {
+            const earlier = await seedSuccessor({
+                status: 'completed',
+                startedAt: minutesAgo(90),
+                finishedAt: minutesAgo(60),
+            });
+            const source = await seedSource({
+                resumeClaimToken: DEAD_HOLDER,
+                resumeClaimedAt: expired(),
+                resumeSuccessorRunId: earlier.id,
+            });
+
+            await expect(makeSvc().resume(source.id, USER, 'Use Postgres')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+
+            expect(await successorsOf(source)).toHaveLength(1);
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            const after = await reload(source);
+            expect(after.awaitingInput).toBe(false);
+            expect(after.resumeClaimedAt).toBeNull();
+            expect(after.resumeSuccessorRunId).toBeNull();
+            expect(after.resumeClaimToken).not.toBe(DEAD_HOLDER);
+        });
+
+        it('a successor that never ran does not block the owner — the resume goes ahead', async () => {
+            // Rolled back before a worker ever picked it up, or reaped as an
+            // orphan by the sweeper.
+            const earlier = await seedSuccessor({
+                status: 'failed',
+                errorMessage: 'dispatch-failed: runtime down',
+            });
+            const source = await seedSource({
+                resumeClaimToken: DEAD_HOLDER,
+                resumeClaimedAt: expired(),
+                resumeSuccessorRunId: earlier.id,
+            });
+
+            const outcome = await makeSvc().resume(source.id, USER, 'Use Postgres');
+
+            expect(outcome.dispatched).toBe('new-run');
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            expect((await successorsOf(source)).map((row) => row.status).sort()).toEqual([
+                'failed',
+                'queued',
+            ]);
+            const after = await reload(source);
+            expect(after.awaitingInput).toBe(false);
+            expect(after.resumeSuccessorRunId).toBeNull();
+        });
+
+        it('a failed enqueue keeps its successor linked, so a retry reconciles it', async () => {
+            const source = await seedSource();
+            dispatcher.enqueue.mockRejectedValueOnce(new Error('runtime down'));
+            const svc = makeSvc();
+
+            await expect(svc.resume(source.id, USER, 'Use Postgres')).rejects.toThrow(
+                'Resume could not be dispatched',
+            );
+            const [rolledBack] = await successorsOf(source);
+            expect((await reload(source)).resumeSuccessorRunId).toBe(rolledBack.id);
+
+            // The rollback won (the row never started), so the retry goes ahead.
+            const retry = await svc.resume(source.id, USER, 'Use Postgres');
+            expect(retry.dispatched).toBe('new-run');
+            expect((await reload(source)).resumeSuccessorRunId).toBeNull();
+        });
+
+        it('a failed awaitingInput clear releases instead of consuming, so a retry cannot dispatch twice', async () => {
+            const source = await seedSource();
+            jest.spyOn(runs, 'setAwaitingInput').mockRejectedValueOnce(new Error('db blip'));
+            const svc = makeSvc();
+
+            const first = await svc.resume(source.id, USER, 'Use Postgres');
+            const released = await reload(source);
+            expect(released.awaitingInput).toBe(true);
+            expect(released.resumeClaimedAt).toBeNull();
+            expect(released.resumeSuccessorRunId).toBe(first.runId);
+
+            // Still awaiting input on the row, so the retry passes the cheap
+            // checks — and is refused by the live successor it reconciles.
+            await expect(svc.resume(source.id, USER, 'Use Postgres')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(await successorsOf(source)).toHaveLength(1);
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('AgentRunRepository claim / release / consume', () => {
@@ -383,10 +669,12 @@ describe('RunSteeringService — resume single-flight (better-sqlite3)', () => {
 
             const first = await runs.claimResume(source.id, {
                 observedToken: null,
+                observedClaimedAt: null,
                 staleBefore: past(),
             });
             const second = await runs.claimResume(source.id, {
                 observedToken: null,
+                observedClaimedAt: null,
                 staleBefore: past(),
             });
 
@@ -402,11 +690,13 @@ describe('RunSteeringService — resume single-flight (better-sqlite3)', () => {
             const source = await seedSource();
             const stale = await runs.claimResume(source.id, {
                 observedToken: null,
+                observedClaimedAt: null,
                 staleBefore: past(),
             });
             // Everything before `future()` counts as abandoned.
             const taker = await runs.claimResume(source.id, {
                 observedToken: stale!.token,
+                observedClaimedAt: (await reload(source)).resumeClaimedAt!,
                 staleBefore: future(),
             });
             expect(taker).not.toBeNull();
@@ -428,19 +718,90 @@ describe('RunSteeringService — resume single-flight (better-sqlite3)', () => {
             const source = await seedSource();
             const claim = await runs.claimResume(source.id, {
                 observedToken: null,
+                observedClaimedAt: null,
                 staleBefore: past(),
             });
             expect(await runs.consumeResumeClaim(claim!)).toBe(true);
 
             expect(
-                await runs.claimResume(source.id, { observedToken: null, staleBefore: past() }),
+                await runs.claimResume(source.id, {
+                    observedToken: null,
+                    observedClaimedAt: null,
+                    staleBefore: past(),
+                }),
             ).toBeNull();
             expect(
                 await runs.claimResume(source.id, {
                     observedToken: claim!.token,
+                    observedClaimedAt: null,
                     staleBefore: past(),
                 }),
             ).not.toBeNull();
+        });
+
+        it('refuses a claimant that saw a claim in flight once that claim is consumed', async () => {
+            const source = await seedSource();
+            const claim = await runs.claimResume(source.id, {
+                observedToken: null,
+                observedClaimedAt: null,
+                staleBefore: past(),
+            });
+            const seenInFlight = await reload(source);
+            expect(await runs.consumeResumeClaim(claim!)).toBe(true);
+
+            // Same token, but the stamp it saw set is gone — even with every
+            // claim counted as abandoned.
+            expect(
+                await runs.claimResume(source.id, {
+                    observedToken: seenInFlight.resumeClaimToken!,
+                    observedClaimedAt: seenInFlight.resumeClaimedAt!,
+                    staleBefore: future(),
+                }),
+            ).toBeNull();
+        });
+
+        it('links a successor in the same transaction as its insert — a lost claim creates nothing', async () => {
+            const source = await seedSource();
+            const successorArgs = {
+                agentId: AGENT,
+                userId: USER,
+                triggerKind: 'task' as const,
+                taskId: TASK,
+                workId: WORK,
+            };
+            const stale = await runs.claimResume(source.id, {
+                observedToken: null,
+                observedClaimedAt: null,
+                staleBefore: past(),
+            });
+            const taker = await runs.claimResume(source.id, {
+                observedToken: stale!.token,
+                observedClaimedAt: (await reload(source)).resumeClaimedAt!,
+                staleBefore: future(),
+            });
+
+            await expect(
+                runs.createQueued({ ...successorArgs, resumeClaim: stale! }),
+            ).rejects.toBeInstanceOf(ResumeClaimLostError);
+            expect(await successorsOf(source)).toHaveLength(0);
+            expect(await runs.findResumeSuccessor(source.id)).toBeNull();
+
+            const created = await runs.createQueued({ ...successorArgs, resumeClaim: taker! });
+            expect((await reload(source)).resumeSuccessorRunId).toBe(created.id);
+            expect(await runs.findResumeSuccessor(source.id)).toEqual(
+                expect.objectContaining({ id: created.id, status: 'queued' }),
+            );
+
+            // Releasing keeps the link; consuming clears it.
+            expect(await runs.releaseResumeClaim(taker!)).toBe(true);
+            expect((await runs.findResumeSuccessor(source.id))?.id).toBe(created.id);
+            const next = await runs.claimResume(source.id, {
+                observedToken: stale!.token,
+                observedClaimedAt: null,
+                staleBefore: past(),
+            });
+            expect(await runs.consumeResumeClaim(next!)).toBe(true);
+            expect(await runs.findResumeSuccessor(source.id)).toBeNull();
         });
 
         it('emits quoted identifiers, so the claim runs on Postgres too', async () => {
@@ -449,16 +810,30 @@ describe('RunSteeringService — resume single-flight (better-sqlite3)', () => {
 
             const claim = await runs.claimResume(source.id, {
                 observedToken: null,
+                observedClaimedAt: null,
                 staleBefore: past(),
             });
+            await runs.createQueued({
+                agentId: AGENT,
+                userId: USER,
+                triggerKind: 'task',
+                taskId: TASK,
+                resumeClaim: claim!,
+            });
+            await runs.findResumeSuccessor(source.id);
             await runs.consumeResumeClaim(claim!);
             await runs.releaseResumeClaim(claim!);
+            await runs.claimResume(source.id, {
+                observedToken: claim!.token,
+                observedClaimedAt: new Date(),
+                staleBefore: past(),
+            });
 
             const writes = queries.filter((query) => query.startsWith('UPDATE'));
-            expect(writes).toHaveLength(3);
+            expect(writes).toHaveLength(5);
             for (const query of writes) {
                 expect(query).toContain('"resumeClaimToken"');
-                expect(query).not.toMatch(/[^"]resumeClaim(Token|edAt)[^"]/);
+                expect(query).not.toMatch(/[^"]resume(ClaimToken|ClaimedAt|SuccessorRunId)[^"]/);
             }
         });
     });

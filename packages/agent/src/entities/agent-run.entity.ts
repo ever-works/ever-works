@@ -343,11 +343,11 @@ export class AgentRun {
     @Column({ type: 'boolean', default: false })
     interruptRequested: boolean;
 
-    // ── Resume single-flight. Both additive; NULL on every pre-existing
-    // row. Written only by `RunSteeringService.resume` through the
-    // repository's claim / release / consume trio, and only ever on the
-    // SOURCE run — the successor a resume creates never carries them.
-    // Migration: `1791110030000-AddAgentRunResumeClaim`.
+    // ── Resume single-flight. All three additive; NULL on every
+    // pre-existing row. Written only by `RunSteeringService.resume` through
+    // the repository's claim / link / release / consume writes, and only
+    // ever on the SOURCE run — the successor a resume creates never carries
+    // them. Migration: `1791110030000-AddAgentRunResumeClaim`.
 
     /**
      * Fencing token of the most recent resume claim taken on this run.
@@ -371,9 +371,33 @@ export class AgentRun {
      * flight. A claim older than the stuck-run sweeper cutoff is treated
      * as abandoned (its process died between claim and release) and may
      * be taken over, so a crash can never park a run as "resuming" forever.
+     * Whether it was NULL is part of what a claimant compare-and-sets
+     * against, so a request that read the run while a resume was in flight
+     * loses once that resume has finished.
      */
     @PortableDateColumn({ nullable: true })
     resumeClaimedAt?: Date | null;
+
+    /**
+     * The successor created under a resume claim that has not been
+     * CONSUMED yet — the durable source-to-successor link.
+     *
+     * Written in the same transaction that inserts the successor, and only
+     * while the claim that created it is still held, so a successor can
+     * never exist without this row knowing about it. Consuming the claim
+     * clears it; releasing one keeps it. Every later claim reads it before
+     * creating anything: a successor the earlier attempt left behind — its
+     * process died, or its bookkeeping write failed after the enqueue — is
+     * reconciled (still live ⇒ refuse; already ran ⇒ finish that attempt's
+     * bookkeeping and refuse; never ran ⇒ go ahead) instead of being
+     * silently joined by a second one.
+     *
+     * An `agent_runs.id`, deliberately not a foreign key: a successor row
+     * is never deleted by the resume path, and a dangling id simply reads
+     * as "no successor".
+     */
+    @Column({ type: 'varchar', length: 36, nullable: true })
+    resumeSuccessorRunId?: string | null;
 
     /**
      * The effective scope a DELEGATED run executes under (judgment layer

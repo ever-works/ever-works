@@ -7,9 +7,9 @@ import { AddAgentRunResumeClaim1791110030000 } from '../1791110030000-AddAgentRu
  * Same in-memory better-sqlite3 harness as the sibling migration specs,
  * asserting the PHYSICAL schema. What matters:
  *
- *  - both columns land nullable and every existing run reads NULL, which
- *    is "no resume in flight" — a pre-existing parked run must stay
- *    resumable the moment this migration lands;
+ *  - all three columns land nullable and every existing run reads NULL,
+ *    which is "no resume in flight, no successor linked" — a pre-existing
+ *    parked run must stay resumable the moment this migration lands;
  *  - the claim's compare-and-set actually works against the new columns
  *    (a second claimant from the same observation matches no row);
  *  - up() is idempotent and converges a half-applied database, and
@@ -60,17 +60,25 @@ describe('AddAgentRunResumeClaim1791110030000', () => {
         return Object.fromEntries(rows.map((row) => [row.name, { notnull: row.notnull }]));
     }
 
-    it('adds both claim columns as nullable and leaves every existing run unclaimed', async () => {
+    it('adds all three claim columns as nullable and leaves every existing run unclaimed', async () => {
         await runUp();
 
         const after = await columns();
         expect(after.resumeClaimToken).toEqual({ notnull: 0 });
         expect(after.resumeClaimedAt).toEqual({ notnull: 0 });
+        expect(after.resumeSuccessorRunId).toEqual({ notnull: 0 });
         expect(
             await dataSource.query(
-                `SELECT "resumeClaimToken", "resumeClaimedAt", "awaitingInput" FROM "agent_runs" WHERE id = 'r1'`,
+                `SELECT "resumeClaimToken", "resumeClaimedAt", "resumeSuccessorRunId", "awaitingInput" FROM "agent_runs" WHERE id = 'r1'`,
             ),
-        ).toEqual([{ resumeClaimToken: null, resumeClaimedAt: null, awaitingInput: 1 }]);
+        ).toEqual([
+            {
+                resumeClaimToken: null,
+                resumeClaimedAt: null,
+                resumeSuccessorRunId: null,
+                awaitingInput: 1,
+            },
+        ]);
     });
 
     it('carries a compare-and-set claim: the second claimant from the same read matches no row', async () => {
@@ -99,13 +107,14 @@ describe('AddAgentRunResumeClaim1791110030000', () => {
         const after = await columns();
         expect(after.resumeClaimToken).toBeDefined();
         expect(after.resumeClaimedAt).toBeDefined();
+        expect(after.resumeSuccessorRunId).toBeDefined();
     });
 
     it('is idempotent on re-run and reversible', async () => {
         await runUp();
         await runUp();
         expect(Object.keys(await columns())).toEqual(
-            expect.arrayContaining(['resumeClaimToken', 'resumeClaimedAt']),
+            expect.arrayContaining(['resumeClaimToken', 'resumeClaimedAt', 'resumeSuccessorRunId']),
         );
 
         const runner = dataSource.createQueryRunner();
@@ -113,6 +122,7 @@ describe('AddAgentRunResumeClaim1791110030000', () => {
         const after = await columns();
         expect(after.resumeClaimToken).toBeUndefined();
         expect(after.resumeClaimedAt).toBeUndefined();
+        expect(after.resumeSuccessorRunId).toBeUndefined();
         // Pre-existing data survives the round trip.
         expect(await dataSource.query(`SELECT id, status FROM "agent_runs"`)).toEqual([
             { id: 'r1', status: 'completed' },
