@@ -1,6 +1,15 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, And, IsNull, Not, In, MoreThan, type FindOptionsWhere } from 'typeorm';
+import {
+    Repository,
+    And,
+    IsNull,
+    Not,
+    In,
+    MoreThan,
+    type FindOptionsOrder,
+    type FindOptionsWhere,
+} from 'typeorm';
 import { Task } from '../entities/task.entity';
 import { Agent, AgentStatus } from '../entities/agent.entity';
 import { Mission, MissionType, MissionStatus } from '../entities/mission.entity';
@@ -37,12 +46,38 @@ import type {
 } from './schedule-view.types';
 
 /**
- * Defence-in-depth cap on rows read per source. Per-user schedule counts
- * are small; this only bounds memory if a user has pathologically many
- * Works (data-sync matches nearly every Work). The flat `getSchedules`
- * read is un-paginated (spec §4.1); `getPage` pages the same projection.
+ * Rows read per source query. The flat `getSchedules` read is one query per
+ * source capped at this many rows — a defence-in-depth memory bound for a
+ * user with pathologically many Works (data-sync matches nearly every Work),
+ * unchanged (spec §4.1).
+ *
+ * The workspace reads (`getPage`, `getHealthSummary`, `findOne`) are NOT
+ * capped: their totals, counts and cursors describe every row, and a row a
+ * capped read never returned could not be paged to, counted or controlled.
+ * They walk each source in id order, this many rows per batch.
  */
 const MAX_PER_SOURCE = 500;
+
+/**
+ * How `collect` reads each source: `capped` is the flat read's single
+ * bounded query; `all` reads every row, one keyset batch at a time.
+ */
+type SourceReadMode = 'capped' | 'all';
+
+/** A keyset batch: the rows after `afterId` in id order, at most `take`. */
+interface SourceBatch {
+    afterId: string | null;
+    take: number;
+}
+
+/** Split `values` into arrays of at most `size` — keeps `IN (...)` lists bounded. */
+function chunked<T>(values: T[], size: number): T[][] {
+    const out: T[][] = [];
+    for (let index = 0; index < values.length; index += size) {
+        out.push(values.slice(index, index + size));
+    }
+    return out;
+}
 
 /** Rows per page of the workspace list, and the most one request may ask for. */
 export const SCHEDULE_PAGE_SIZE = 50;
@@ -169,7 +204,7 @@ export class SchedulesService {
         filters: ScheduleQueryFilters = {},
     ): Promise<ScheduleView[]> {
         const now = new Date();
-        const { rows } = await this.collect(scope, now);
+        const { rows } = await this.collect(scope, now, 'capped');
         let views = rows.map((row) => row.view);
 
         if (filters.sourceType) {
@@ -199,7 +234,7 @@ export class SchedulesService {
         limit: number = SCHEDULE_PAGE_SIZE,
     ): Promise<SchedulePage> {
         const now = new Date();
-        const { rows, degraded } = await this.collect(scope, now);
+        const { rows, degraded } = await this.collect(scope, now, 'all');
         const unfilteredTotal = rows.length;
         const matching = this.applyPageFilters(
             rows.map((row) => row.view),
@@ -255,7 +290,7 @@ export class SchedulesService {
      */
     async getHealthSummary(scope: ScheduleScope): Promise<ScheduleHealthSummary> {
         const now = new Date();
-        const { rows, degraded } = await this.collect(scope, now);
+        const { rows, degraded } = await this.collect(scope, now, 'all');
         const byReason: Partial<Record<ScheduleHealthReason, number>> = {};
         const flagged: ScheduleHealthSummary['flagged'] = [];
         let neverRuns = 0;
@@ -301,7 +336,7 @@ export class SchedulesService {
      * by design).
      */
     async findOne(scope: ScheduleScope, id: string): Promise<ScheduleView | null> {
-        const { rows } = await this.collect(scope, new Date());
+        const { rows } = await this.collect(scope, new Date(), 'all');
         return rows.find((row) => row.view.id === id)?.view ?? null;
     }
 
@@ -335,17 +370,21 @@ export class SchedulesService {
      * Query every source, then attach health + controls. A source whose
      * query throws contributes no rows and is named in `degraded`.
      */
-    private async collect(scope: ScheduleScope, now: Date): Promise<Collected> {
+    private async collect(
+        scope: ScheduleScope,
+        now: Date,
+        mode: SourceReadMode,
+    ): Promise<Collected> {
         const degraded: ScheduleSourceType[] = [];
         const [tasks, agents, workSchedules, missions, sourceValidation, dataSync, triggers] =
             await Promise.all([
-                this.recurringTasks(scope, now, degraded),
-                this.agentHeartbeats(scope, degraded),
-                this.workSchedules(scope, degraded),
-                this.missionTicks(scope, now, degraded),
-                this.sourceValidation(scope, degraded),
-                this.dataSync(scope, now, degraded),
-                this.inboundTriggers(scope, degraded),
+                this.recurringTasks(scope, now, degraded, mode),
+                this.agentHeartbeats(scope, degraded, mode),
+                this.workSchedules(scope, degraded, mode),
+                this.missionTicks(scope, now, degraded, mode),
+                this.sourceValidation(scope, degraded, mode),
+                this.dataSync(scope, now, degraded, mode),
+                this.inboundTriggers(scope, degraded, mode),
             ]);
 
         const rows = [
@@ -369,6 +408,55 @@ export class SchedulesService {
             });
         }
         return { rows, degraded };
+    }
+
+    /**
+     * Read one source. `capped` makes the single bounded query the flat read
+     * has always made (`read(null)`). `all` walks the source by primary key,
+     * `MAX_PER_SOURCE` rows per batch, until a short batch — keyset rather
+     * than offset, so a row inserted or deleted mid-walk can never shift a
+     * later batch into skipping or repeating a row. A batch that brings no
+     * row not already seen ends the walk, so a repository that ignores the
+     * keyset can never loop forever.
+     */
+    private async readSource<T extends { id: string }>(
+        mode: SourceReadMode,
+        read: (batch: SourceBatch | null) => Promise<T[]>,
+    ): Promise<T[]> {
+        if (mode === 'capped') return (await read(null)) ?? [];
+        const out: T[] = [];
+        const seen = new Set<string>();
+        let afterId: string | null = null;
+        for (;;) {
+            const batch: T[] = (await read({ afterId, take: MAX_PER_SOURCE })) ?? [];
+            let added = 0;
+            for (const row of batch) {
+                if (seen.has(row.id)) continue;
+                seen.add(row.id);
+                out.push(row);
+                added += 1;
+            }
+            if (batch.length < MAX_PER_SOURCE || added === 0) return out;
+            afterId = batch[batch.length - 1].id;
+        }
+    }
+
+    /**
+     * `find` options for one source read: the flat read's exact options, or
+     * one keyset batch ordered by id.
+     */
+    private findOptions<T extends { id: string }>(
+        where: FindOptionsWhere<T>,
+        batch: SourceBatch | null,
+    ): { where: FindOptionsWhere<T>; take: number; order?: FindOptionsOrder<T> } {
+        if (!batch) return { where, take: MAX_PER_SOURCE };
+        return {
+            where: batch.afterId
+                ? ({ ...where, id: MoreThan(batch.afterId) } as FindOptionsWhere<T>)
+                : where,
+            order: { id: 'ASC' } as FindOptionsOrder<T>,
+            take: batch.take,
+        };
     }
 
     /** Ascending by `nextRunAt`, nulls last; stable tiebreak on ownerName. */
@@ -413,12 +501,14 @@ export class SchedulesService {
         const out = new Map<string, AgentSummary>();
         if (unique.length === 0) return out;
         try {
-            const rows = await this.agentRepo.find({
-                where: { id: In(unique), userId: scope.userId },
-                select: ['id', 'name', 'status'],
-            });
-            for (const agent of rows ?? []) {
-                if (agent?.id) out.set(agent.id, agent);
+            for (const ids of chunked(unique, MAX_PER_SOURCE)) {
+                const rows = await this.agentRepo.find({
+                    where: { id: In(ids), userId: scope.userId },
+                    select: ['id', 'name', 'status'],
+                });
+                for (const agent of rows ?? []) {
+                    if (agent?.id) out.set(agent.id, agent);
+                }
             }
             return out;
         } catch (error) {
@@ -433,27 +523,31 @@ export class SchedulesService {
         scope: ScheduleScope,
         now: Date,
         degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
     ): Promise<ProjectedRow[]> {
         try {
-            const rows = await this.taskRepo.find({
-                where: {
-                    ...this.scopeWhere<Task>(scope),
-                    isRecurring: true,
-                    parentRecurringTaskId: IsNull(),
-                },
-                take: MAX_PER_SOURCE,
-            });
+            const where: FindOptionsWhere<Task> = {
+                ...this.scopeWhere<Task>(scope),
+                isRecurring: true,
+                parentRecurringTaskId: IsNull(),
+            };
+            const rows = await this.readSource(mode, (batch) =>
+                this.taskRepo.find(this.findOptions(where, batch)),
+            );
 
             const assigneesByTask = new Map<string, string[]>();
             if (this.taskAssigneeRepo && rows.length > 0) {
                 try {
-                    const assignees = await this.taskAssigneeRepo.find({
-                        where: { taskId: In(rows.map((task) => task.id)), assigneeType: 'agent' },
-                    });
-                    for (const row of assignees ?? []) {
-                        const list = assigneesByTask.get(row.taskId) ?? [];
-                        list.push(row.assigneeId);
-                        assigneesByTask.set(row.taskId, list);
+                    const taskIds = rows.map((task) => task.id);
+                    for (const ids of chunked(taskIds, MAX_PER_SOURCE)) {
+                        const assignees = await this.taskAssigneeRepo.find({
+                            where: { taskId: In(ids), assigneeType: 'agent' },
+                        });
+                        for (const row of assignees ?? []) {
+                            const list = assigneesByTask.get(row.taskId) ?? [];
+                            list.push(row.assigneeId);
+                            assigneesByTask.set(row.taskId, list);
+                        }
                     }
                 } catch (error) {
                     this.logger.warn(`Schedules assignee attribution failed: ${String(error)}`);
@@ -546,19 +640,20 @@ export class SchedulesService {
     private async agentHeartbeats(
         scope: ScheduleScope,
         degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
     ): Promise<ProjectedRow[]> {
         try {
-            const rows = await this.agentRepo.find({
-                where: {
-                    ...this.scopeWhere<Agent>(scope),
-                    // 'manual' is stored in the cadence column but means "no
-                    // cron" — exclude it in the DB (not in-memory) so `take`
-                    // counts only real scheduled heartbeats and a page full of
-                    // manual-cadence agents can't crowd out scheduled ones.
-                    heartbeatCadence: And(Not(IsNull()), Not('manual')),
-                },
-                take: MAX_PER_SOURCE,
-            });
+            const where: FindOptionsWhere<Agent> = {
+                ...this.scopeWhere<Agent>(scope),
+                // 'manual' is stored in the cadence column but means "no
+                // cron" — exclude it in the DB (not in-memory) so `take`
+                // counts only real scheduled heartbeats and a page full of
+                // manual-cadence agents can't crowd out scheduled ones.
+                heartbeatCadence: And(Not(IsNull()), Not('manual')),
+            };
+            const rows = await this.readSource(mode, (batch) =>
+                this.agentRepo.find(this.findOptions(where, batch)),
+            );
             return rows.map((agent) => {
                 const agentStatus = this.mapAgentStatus(agent.status);
                 // Schedules workspace — a paused heartbeat reads paused
@@ -619,22 +714,31 @@ export class SchedulesService {
     private async workSchedules(
         scope: ScheduleScope,
         degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
     ): Promise<ProjectedRow[]> {
         try {
-            const qb = this.workScheduleRepo
-                .createQueryBuilder('ws')
-                .leftJoinAndSelect('ws.work', 'work')
-                .where('ws.userId = :userId', { userId: scope.userId })
-                .andWhere('ws.status IN (:...statuses)', {
-                    statuses: [WorkScheduleStatus.ACTIVE, WorkScheduleStatus.PAUSED],
-                })
-                .take(MAX_PER_SOURCE);
-            if (scope.organizationId) {
-                qb.andWhere('ws.organizationId = :orgId', { orgId: scope.organizationId });
-            } else {
-                qb.andWhere('ws.organizationId IS NULL');
-            }
-            const rows = await qb.getMany();
+            const rows = await this.readSource(mode, (batch) => {
+                const qb = this.workScheduleRepo
+                    .createQueryBuilder('ws')
+                    .leftJoinAndSelect('ws.work', 'work')
+                    .where('ws.userId = :userId', { userId: scope.userId })
+                    .andWhere('ws.status IN (:...statuses)', {
+                        statuses: [WorkScheduleStatus.ACTIVE, WorkScheduleStatus.PAUSED],
+                    })
+                    .take(batch ? batch.take : MAX_PER_SOURCE);
+                if (scope.organizationId) {
+                    qb.andWhere('ws.organizationId = :orgId', { orgId: scope.organizationId });
+                } else {
+                    qb.andWhere('ws.organizationId IS NULL');
+                }
+                if (batch) {
+                    if (batch.afterId) {
+                        qb.andWhere('ws.id > :afterId', { afterId: batch.afterId });
+                    }
+                    qb.orderBy('ws.id', 'ASC');
+                }
+                return qb.getMany();
+            });
             return rows.map((ws) => {
                 const work = ws.work as { id?: string; name?: string; status?: string } | undefined;
                 const status = this.mapWorkScheduleStatus(ws.status);
@@ -678,15 +782,16 @@ export class SchedulesService {
         scope: ScheduleScope,
         now: Date,
         degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
     ): Promise<ProjectedRow[]> {
         try {
-            const rows = await this.missionRepo.find({
-                where: {
-                    ...this.scopeWhere<Mission>(scope),
-                    type: MissionType.SCHEDULED,
-                },
-                take: MAX_PER_SOURCE,
-            });
+            const where: FindOptionsWhere<Mission> = {
+                ...this.scopeWhere<Mission>(scope),
+                type: MissionType.SCHEDULED,
+            };
+            const rows = await this.readSource(mode, (batch) =>
+                this.missionRepo.find(this.findOptions(where, batch)),
+            );
             return rows.map((mission) => {
                 const status = this.mapMissionStatus(mission.status);
                 const enabled = mission.status === MissionStatus.ACTIVE;
@@ -742,15 +847,16 @@ export class SchedulesService {
     private async sourceValidation(
         scope: ScheduleScope,
         degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
     ): Promise<ProjectedRow[]> {
         try {
-            const rows = await this.workRepo.find({
-                where: {
-                    ...this.scopeWhere<Work>(scope),
-                    sourceValidationEnabled: true,
-                },
-                take: MAX_PER_SOURCE,
-            });
+            const where: FindOptionsWhere<Work> = {
+                ...this.scopeWhere<Work>(scope),
+                sourceValidationEnabled: true,
+            };
+            const rows = await this.readSource(mode, (batch) =>
+                this.workRepo.find(this.findOptions(where, batch)),
+            );
             return rows.map((work) => ({
                 view: {
                     id: `source_validation:${work.id}`,
@@ -789,15 +895,16 @@ export class SchedulesService {
         scope: ScheduleScope,
         now: Date,
         degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
     ): Promise<ProjectedRow[]> {
         try {
-            const rows = await this.workRepo.find({
-                where: {
-                    ...this.scopeWhere<Work>(scope),
-                    syncIntervalMinutes: MoreThan(0),
-                },
-                take: MAX_PER_SOURCE,
-            });
+            const where: FindOptionsWhere<Work> = {
+                ...this.scopeWhere<Work>(scope),
+                syncIntervalMinutes: MoreThan(0),
+            };
+            const rows = await this.readSource(mode, (batch) =>
+                this.workRepo.find(this.findOptions(where, batch)),
+            );
             const nowMs = now.getTime();
             return rows.map((work) => {
                 const lastPolled = work.lastPolledAt ?? null;
@@ -853,12 +960,13 @@ export class SchedulesService {
     private async inboundTriggers(
         scope: ScheduleScope,
         degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
     ): Promise<ProjectedRow[]> {
         try {
-            const rows = await this.inboundTriggerRepo.find({
-                where: this.scopeWhere<InboundTrigger>(scope),
-                take: MAX_PER_SOURCE,
-            });
+            const where = this.scopeWhere<InboundTrigger>(scope);
+            const rows = await this.readSource(mode, (batch) =>
+                this.inboundTriggerRepo.find(this.findOptions(where, batch)),
+            );
             const agents = await this.lookupAgents(
                 scope,
                 rows.map((trigger) => trigger.targetAgentId ?? ''),

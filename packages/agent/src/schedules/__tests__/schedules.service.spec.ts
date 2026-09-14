@@ -15,9 +15,34 @@ function makeWorkScheduleRepo(rows: unknown[]) {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
         getMany: jest.fn().mockResolvedValue(rows),
     };
     return { createQueryBuilder: jest.fn().mockReturnValue(qb), _qb: qb };
+}
+
+/**
+ * A repository that behaves like the database for the options the service
+ * sends: it honours `take`, `order: { id: 'ASC' }` and an `id > afterId`
+ * keyset, and nothing else. `rows` is read live, so a test can change it
+ * between two batches.
+ */
+function makeKeysetRepo(rows: Array<{ id: string }>) {
+    return {
+        find: jest.fn(
+            async (opts: {
+                where?: { id?: { value?: string } };
+                order?: { id?: 'ASC' };
+                take?: number;
+            }) => {
+                let out = [...rows];
+                if (opts?.order?.id === 'ASC') out.sort((a, b) => a.id.localeCompare(b.id));
+                const afterId = opts?.where?.id?.value;
+                if (afterId) out = out.filter((row) => row.id > afterId);
+                return out.slice(0, opts?.take ?? out.length);
+            },
+        ),
+    };
 }
 
 const SCOPE = { userId: 'user-1', organizationId: null };
@@ -632,5 +657,113 @@ describe('SchedulesService — workspace additions', () => {
             'Hook 000',
         );
         expect(await service.findOne(SCOPE, 'inbound_trigger:someone-else')).toBeNull();
+    });
+});
+
+// ── Schedules workspace — every row is reachable past one query's worth ──
+
+describe('SchedulesService — workspace reads are not capped at one source query', () => {
+    const now = new Date('2026-09-14T08:00:00.000Z');
+    beforeEach(() => jest.useFakeTimers().setSystemTime(now));
+    afterEach(() => jest.useRealTimers());
+
+    function serviceOver(
+        triggerRepo: { find: jest.Mock },
+        taskRepo?: unknown,
+        assignees?: unknown,
+    ) {
+        return new SchedulesService(
+            (taskRepo ?? makeRepo([])) as never,
+            makeRepo([]) as never,
+            makeWorkScheduleRepo([]) as never,
+            makeRepo([]) as never,
+            { find: jest.fn().mockResolvedValue([]) } as never,
+            triggerRepo as never,
+            assignees as never,
+        );
+    }
+
+    it('pages, totals and counts all 501 rows of a source, and every cursor page is reachable', async () => {
+        const triggerRepo = makeKeysetRepo(manyTriggers(501));
+        const service = serviceOver(triggerRepo);
+
+        const seen: string[] = [];
+        let cursor: string | null = null;
+        let pages = 0;
+        do {
+            const page = await service.getPage(SCOPE, {}, cursor);
+            expect(page.total).toBe(501);
+            expect(page.unfilteredTotal).toBe(501);
+            expect(page.countsBySourceType.inbound_trigger).toBe(501);
+            expect(page.countsByStatus.paused + page.countsByStatus.active).toBe(501);
+            expect(page.healthCounts.ok).toBe(501);
+            seen.push(...page.items.map((item) => item.id));
+            cursor = page.nextCursor;
+            pages += 1;
+        } while (cursor && pages < 20);
+
+        expect(pages).toBe(11);
+        expect(new Set(seen).size).toBe(501);
+        expect(seen).toContain('inbound_trigger:trigger-500');
+        // Each read walked the source in id order, one bounded batch at a time.
+        for (const [opts] of triggerRepo.find.mock.calls) {
+            expect(opts.take).toBe(500);
+            expect(opts.order).toEqual({ id: 'ASC' });
+        }
+    });
+
+    it('resolves the 501st row for a control, and counts it in the health summary', async () => {
+        const service = serviceOver(makeKeysetRepo(manyTriggers(501)));
+        expect((await service.findOne(SCOPE, 'inbound_trigger:trigger-500'))?.ownerName).toBe(
+            'Hook 500',
+        );
+        const summary = await service.getHealthSummary(SCOPE);
+        expect(summary.counts.ok).toBe(501);
+    });
+
+    it('a row removed between two batches never makes the walk skip a row that is still there', async () => {
+        const rows = manyTriggers(501);
+        const triggerRepo = makeKeysetRepo(rows);
+        const firstBatch = triggerRepo.find.getMockImplementation()!;
+        triggerRepo.find.mockImplementationOnce(async (opts) => {
+            const batch = await firstBatch(opts);
+            rows.splice(0, 1); // trigger-000 is deleted while the walk is mid-way
+            return batch;
+        });
+        const page = await serviceOver(triggerRepo).getPage(SCOPE, { q: 'hook 500' });
+        expect(page.items.map((item) => item.id)).toEqual(['inbound_trigger:trigger-500']);
+    });
+
+    it('stops walking a repository that ignores the keyset instead of looping', async () => {
+        const rows = manyTriggers(500);
+        const triggerRepo = { find: jest.fn().mockResolvedValue(rows) };
+        const page = await serviceOver(triggerRepo).getPage(SCOPE);
+        expect(page.total).toBe(500);
+        expect(triggerRepo.find).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps each IN list bounded when attributing more than one batch of recurring Tasks', async () => {
+        const tasks = Array.from({ length: 501 }, (_, index) =>
+            recurringTask('task-' + String(index).padStart(3, '0')),
+        );
+        const assignees = { find: jest.fn().mockResolvedValue([]) };
+        const service = serviceOver(makeRepo([]), makeKeysetRepo(tasks), assignees);
+        const page = await service.getPage(SCOPE, { sourceType: 'recurring_task' });
+        expect(page.total).toBe(501);
+        expect(assignees.find).toHaveBeenCalledTimes(2);
+        for (const [opts] of assignees.find.mock.calls) {
+            expect(opts.where.taskId.value.length).toBeLessThanOrEqual(500);
+        }
+    });
+
+    it('leaves the flat getSchedules read exactly as it was — one query per source, capped', async () => {
+        const triggerRepo = makeKeysetRepo(manyTriggers(501));
+        const views = await serviceOver(triggerRepo).getSchedules(SCOPE);
+        expect(views).toHaveLength(500);
+        expect(triggerRepo.find).toHaveBeenCalledTimes(1);
+        expect(triggerRepo.find.mock.calls[0][0]).toEqual({
+            where: expect.objectContaining({ userId: 'user-1' }),
+            take: 500,
+        });
     });
 });
