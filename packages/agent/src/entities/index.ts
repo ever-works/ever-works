@@ -189,6 +189,10 @@ export * from './workflow-run.entity';
 export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+// AW-07 — Memory facts (the atomic tier of Memory) + the shared
+// context-file / fact vocabulary re-exported from contracts.
+export * from './memory-fact.entity';
+export * from './context-file-types';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './agent-plugin-package.entity';
 export * from './agent-plugin-package-allowlist.entity';

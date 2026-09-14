@@ -83,6 +83,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
+import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -302,6 +303,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
         MemoryFilesApiModule,
+        // Memory facts (AW-07) — /api/memory/facts: the atomic tier of
+        // Memory (list / search by meaning / edit / forget / restore).
+        // @Global so the embed dispatcher reaches MemoryFactService.
+        MemoryFactsApiModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,

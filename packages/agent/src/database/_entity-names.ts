@@ -123,6 +123,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'McpServerConnection',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
+    // AW-07 — Memory facts (atomic tier of Memory)
+    'MemoryFact',
     // Memory Files — user-defined folders organizing uploads on /memory
     'MemoryFolder',
     'Mission',

@@ -15,6 +15,7 @@ import * as inbox from '../inbox/index.js';
 import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
+import * as memory from '../memory/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as secret from '../secret/index.js';
@@ -54,6 +55,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['ingest', ingest],
 	['item', item],
 	['kb', kb],
+	['memory', memory],
 	['policy', policy],
 	['release', release],
 	['secret', secret],
@@ -68,7 +70,7 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(20);
+		expect(exportLines).toBe(21);
 	});
 
 	it('has no name exported by two different areas', () => {

@@ -52,3 +52,7 @@ export * from './credits-meter-flush.task';
 // Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
 // dry-run by default, never auto-applied).
 export * from './memory-consolidation-tick.task';
+// AW-07 - embed one memory fact, and the nightly sweep that purges expired
+// forgotten facts and backfills / re-embeds their vectors.
+export * from './memory-fact-embed.task';
+export * from './memory-fact-gc.task';

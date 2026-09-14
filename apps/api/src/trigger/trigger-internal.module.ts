@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { TriggerInternalController } from './trigger-internal.controller';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
-import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
+import { KnowledgeBaseModule, MemoryFactsModule, WorkModule } from '@ever-works/agent/services';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { MissionsModule } from '@ever-works/agent/missions';
@@ -103,6 +103,12 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // runs inline on every node lease poll; the cron is what makes a
         // fleet whose nodes ALL died still converge.
         AgentFleetModule,
+        // Memory facts (AW-07) — exposes MemoryFactEmbedService and
+        // MemoryFactSweepService through the remote-proxy controller so the
+        // memory-fact-embed task and the memory-fact-gc cron (in
+        // packages/tasks) run here, where the AI provider and vector-store
+        // plugins are loaded.
+        MemoryFactsModule,
     ],
     controllers: [TriggerInternalController],
 })

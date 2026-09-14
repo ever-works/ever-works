@@ -74,5 +74,12 @@ export * from './memory-folders.service';
 export * from './memory-files.service';
 export * from './memory-folder-sync.service';
 export * from './memory-files.module';
+// AW-07 — Memory facts: the atomic, searchable, forgettable tier of Memory.
+export * from './memory-fact.service';
+export * from './memory-fact-search.service';
+export * from './memory-fact-vector-index.service';
+export * from './memory-fact-embed.service';
+export * from './memory-fact-sweep.service';
+export * from './memory-facts.module';
 // Repository registry (Feature G) — registry CRUD + agent grants + resolver.
 export * from './repo-registry.service';

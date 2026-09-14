@@ -84,6 +84,18 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Memory facts + context files (AW-07).
+            ['MEMORY_FACT_CREATED', 'memory_fact_created'],
+            ['MEMORY_FACT_UPDATED', 'memory_fact_updated'],
+            ['MEMORY_FACT_FORGOTTEN', 'memory_fact_forgotten'],
+            ['MEMORY_FACT_RESTORED', 'memory_fact_restored'],
+            ['MEMORY_FACT_ACCEPTED', 'memory_fact_accepted'],
+            ['MEMORY_FACT_DISCARDED', 'memory_fact_discarded'],
+            ['MEMORY_FACTS_CLEARED', 'memory_facts_cleared'],
+            ['CONTEXT_FILE_UPDATED', 'context_file_updated'],
+            ['CONTEXT_FILE_RESTORED', 'context_file_restored'],
+            ['CONTEXT_FILE_MODE_CHANGED', 'context_file_mode_changed'],
+            ['CONTEXT_BUDGET_EXCEEDED', 'context_budget_exceeded'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -151,7 +163,10 @@ describe('activity-log.types', () => {
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(157);
+            // +11 memory_fact_* x6, memory_facts_cleared, context_file_* x3,
+            //     context_budget_exceeded (AW-07 memory facts + context
+            //     files) -> 168, counted from the merged enum.
+            expect(literals).toHaveLength(168);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

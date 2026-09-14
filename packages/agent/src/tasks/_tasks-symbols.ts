@@ -51,6 +51,9 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'KB_ORG_OVERLAY_FANOUT_DISPATCHER',
     'KB_REEMBED_WORK_DISPATCHER',
     'KB_TRANSCRIBE_DISPATCHER',
+    // AW-07 — embeds one memory fact (create / body edit / accept). `null`
+    // leaves the fact unembedded for the nightly sweep.
+    'MEMORY_FACT_EMBED_DISPATCHER',
     // EW-685 P0 T4 — binding factory that wires every `*_DISPATCHER` symbol
     // onto the active job-runtime provider's `dispatchers` view via the
     // `JOB_RUNTIME_PROVIDER_REGISTRY`. Wired into TriggerModule per the
