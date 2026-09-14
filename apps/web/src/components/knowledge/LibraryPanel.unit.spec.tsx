@@ -133,7 +133,7 @@ describe('LibraryPanel', () => {
         await screen.findByTestId('library-doc-doc-1');
         client.list.mockResolvedValue(page([]));
 
-        fireEvent.click(screen.getByTestId('library-folder-select-support'));
+        fireEvent.click(await screen.findByTestId('library-folder-select-support'));
 
         expect((await screen.findByTestId('library-empty-folder')).textContent).toContain(
             'emptyFolderTitle',
@@ -142,6 +142,75 @@ describe('LibraryPanel', () => {
             { sort: 'recent', folderId: 'support' },
             expect.anything(),
         );
+    });
+
+    it('drops a Load more page that arrives after the shelf changed', async () => {
+        let resolveMore: (value: KbLibraryListDto) => void = () => undefined;
+        client.list.mockImplementation(async (query: { cursor?: string; folderId?: string }) => {
+            if (query.cursor) {
+                return new Promise<KbLibraryListDto>((resolve) => {
+                    resolveMore = resolve;
+                });
+            }
+            if (query.folderId === 'support') {
+                return page([libraryDoc({ id: 'doc-support', title: 'Support doc' })]);
+            }
+            return page([libraryDoc()], { nextCursor: 'cursor-1', total: 2 });
+        });
+        render(<LibraryPanel />);
+        await screen.findByTestId('library-doc-doc-1');
+
+        fireEvent.click(screen.getByTestId('library-load-more'));
+        await waitFor(() =>
+            expect(client.list).toHaveBeenCalledWith(
+                expect.objectContaining({ cursor: 'cursor-1' }),
+                expect.anything(),
+            ),
+        );
+        const moreCall = client.list.mock.calls.find(
+            ([query]) => (query as { cursor?: string }).cursor,
+        );
+        const moreSignal = moreCall?.[1] as AbortSignal;
+
+        fireEvent.click(await screen.findByTestId('library-folder-select-support'));
+        expect(await screen.findByTestId('library-doc-doc-support')).toBeTruthy();
+        expect(moreSignal.aborted).toBe(true);
+
+        resolveMore(
+            page([libraryDoc({ id: 'doc-stale', title: 'Stale' })], {
+                nextCursor: 'cursor-2',
+                total: 99,
+            }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(screen.queryByTestId('library-doc-doc-stale')).toBeNull();
+        expect(screen.getByTestId('library-total').textContent).toBe('documentCount:{"count":1}');
+        expect(screen.queryByTestId('library-load-more')).toBeNull();
+    });
+
+    it('returns to All documents when the deleted folder holds the selected subfolder', async () => {
+        client.deleteFolder.mockResolvedValue({ deletedFolders: 2, unfiledDocuments: 1 });
+        render(<LibraryPanel />);
+        await screen.findByTestId('library-doc-doc-1');
+
+        fireEvent.click(await screen.findByTestId('library-folder-select-support'));
+        await waitFor(() =>
+            expect(client.list).toHaveBeenLastCalledWith(
+                { sort: 'recent', folderId: 'support' },
+                expect.anything(),
+            ),
+        );
+
+        fireEvent.click(await screen.findByTestId('library-folder-menu-playbooks'));
+        fireEvent.click(screen.getByTestId('library-folder-delete-playbooks'));
+        fireEvent.click(await screen.findByTestId('library-folder-delete-confirm'));
+
+        await waitFor(() => expect(client.deleteFolder).toHaveBeenCalledWith('playbooks'));
+        await waitFor(() =>
+            expect(client.list).toHaveBeenLastCalledWith({ sort: 'recent' }, expect.anything()),
+        );
+        expect(screen.getByTestId('library-heading').textContent).toBe('allDocuments');
     });
 
     it('persists the sort choice', async () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { CornerUpLeft, FolderClosed, FolderPlus, Loader2, Search } from 'lucide-react';
 import { KB_LIBRARY_FILE_BATCH_MAX } from '@ever-works/contracts';
@@ -58,6 +58,10 @@ export function FolderPickerDialog({
     const [active, setActive] = useState(0);
     const [chosen, setChosen] = useState<PickerOption | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // Folders this dialog already created, by case-folded name. When filing
+    // fails after the folder was made, File retries into that folder instead
+    // of creating it again.
+    const createdIds = useRef(new Map<string, string>());
 
     useEffect(() => {
         if (!open) return;
@@ -65,6 +69,7 @@ export function FolderPickerDialog({
         setActive(0);
         setChosen(null);
         setIsSubmitting(false);
+        createdIds.current = new Map();
     }, [open]);
 
     const options = useMemo<PickerOption[]>(() => {
@@ -97,8 +102,15 @@ export function FolderPickerDialog({
         setIsSubmitting(true);
         try {
             if (option.kind === 'create') {
-                if (!onCreateFolder) return;
-                const id = await onCreateFolder(option.name);
+                const key = option.name.toLowerCase();
+                let id = createdIds.current.get(key);
+                if (!id) {
+                    if (!onCreateFolder) return;
+                    id = await onCreateFolder(option.name);
+                    createdIds.current.set(key, id);
+                    // The folder exists now: a retry files into it.
+                    setChosen({ kind: 'folder', id, name: option.name, depth: 1 });
+                }
                 await onFile(id);
             } else {
                 await onFile(option.kind === 'folder' ? option.id : null);

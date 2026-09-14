@@ -108,6 +108,33 @@ describe('FolderPickerDialog', () => {
         expect(onCreateFolder).toHaveBeenCalledWith('Refunds');
     });
 
+    it('retries a failed filing into the folder it already created, never creating it twice', async () => {
+        const onFile = vi.fn<(target: string | null) => Promise<void>>();
+        onFile.mockRejectedValueOnce(new Error('refused')).mockResolvedValue(undefined);
+        const { onCreateFolder } = renderPicker({ onFile });
+
+        fireEvent.change(await screen.findByTestId('library-folder-picker-search'), {
+            target: { value: 'Refunds' },
+        });
+        fireEvent.click(screen.getByTestId('library-folder-picker-create'));
+        const confirm = screen.getByTestId('library-folder-picker-confirm') as HTMLButtonElement;
+        fireEvent.click(confirm);
+        await waitFor(() => expect(onFile).toHaveBeenCalledTimes(1));
+        await waitFor(() => expect(confirm.disabled).toBe(false));
+
+        // File again with what the dialog now holds as chosen.
+        fireEvent.click(confirm);
+        await waitFor(() => expect(onFile).toHaveBeenCalledTimes(2));
+        expect(onFile).toHaveBeenLastCalledWith('new-folder-id');
+
+        // Picking the "create" row again still reuses the folder.
+        fireEvent.click(screen.getByTestId('library-folder-picker-create'));
+        fireEvent.click(confirm);
+        await waitFor(() => expect(onFile).toHaveBeenCalledTimes(3));
+        expect(onFile).toHaveBeenLastCalledWith('new-folder-id');
+        expect(onCreateFolder).toHaveBeenCalledTimes(1);
+    });
+
     it('offers no create option on an exact match or without folder management', async () => {
         renderPicker();
         fireEvent.change(await screen.findByTestId('library-folder-picker-search'), {

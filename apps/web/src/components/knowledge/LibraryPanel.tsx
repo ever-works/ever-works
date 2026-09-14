@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { Info, Library, Loader2, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -102,6 +110,10 @@ export function LibraryPanel({ initial, works = [] }: LibraryPanelProps) {
     const [createRequest, setCreateRequest] = useState(0);
 
     const inflight = useRef<AbortController | null>(null);
+    // The Load more request in flight. A first-page load (a new shelf, a new
+    // filter, a refresh) cancels it, so a page of the previous query can never
+    // be appended to the new one.
+    const loadMoreInflight = useRef<AbortController | null>(null);
     // Folders created from the picker, so the confirmation can name one the
     // rail has not re-read yet.
     const createdFolders = useRef(new Map<string, string>());
@@ -144,27 +156,44 @@ export function LibraryPanel({ initial, works = [] }: LibraryPanelProps) {
         }
     }, []);
 
-    const loadFirstPage = useCallback(async (q: KbLibraryListQuery) => {
-        inflight.current?.abort();
-        const controller = new AbortController();
-        inflight.current = controller;
-        setListState('loading');
-        try {
-            const page = await knowledgeLibraryClient.list(q, controller.signal);
-            if (inflight.current !== controller) return;
-            setDocuments(page.documents);
-            setNextCursor(page.nextCursor);
-            setTotal(page.total);
-            setListState('ready');
-        } catch {
-            if (controller.signal.aborted || inflight.current !== controller) return;
-            setListState('error');
-        }
+    const cancelLoadMore = useCallback(() => {
+        if (!loadMoreInflight.current) return;
+        loadMoreInflight.current.abort();
+        loadMoreInflight.current = null;
+        setIsLoadingMore(false);
     }, []);
+
+    const loadFirstPage = useCallback(
+        async (q: KbLibraryListQuery) => {
+            inflight.current?.abort();
+            cancelLoadMore();
+            const controller = new AbortController();
+            inflight.current = controller;
+            setListState('loading');
+            try {
+                const page = await knowledgeLibraryClient.list(q, controller.signal);
+                if (inflight.current !== controller) return;
+                setDocuments(page.documents);
+                setNextCursor(page.nextCursor);
+                setTotal(page.total);
+                setListState('ready');
+            } catch {
+                if (controller.signal.aborted || inflight.current !== controller) return;
+                setListState('error');
+            }
+        },
+        [cancelLoadMore],
+    );
 
     useEffect(() => {
         if (!initial || initial.loadFailed) void loadTree();
     }, [initial, loadTree]);
+
+    // Cancel a Load more the moment the query changes — in the same commit,
+    // before a response still on its way can be applied to the new list.
+    useLayoutEffect(() => {
+        cancelLoadMore();
+    }, [listQuery, cancelLoadMore]);
 
     useEffect(() => {
         if (skipFirstFetch.current) {
@@ -174,7 +203,13 @@ export function LibraryPanel({ initial, works = [] }: LibraryPanelProps) {
         void loadFirstPage(listQuery);
     }, [listQuery, loadFirstPage]);
 
-    useEffect(() => () => inflight.current?.abort(), []);
+    useEffect(
+        () => () => {
+            inflight.current?.abort();
+            loadMoreInflight.current?.abort();
+        },
+        [],
+    );
 
     // A different shelf is a different selection — never carry ids across.
     useEffect(() => {
@@ -183,9 +218,17 @@ export function LibraryPanel({ initial, works = [] }: LibraryPanelProps) {
 
     const loadMore = useCallback(async () => {
         if (!nextCursor || isLoadingMore) return;
+        const controller = new AbortController();
+        loadMoreInflight.current = controller;
         setIsLoadingMore(true);
         try {
-            const page = await knowledgeLibraryClient.list({ ...listQuery, cursor: nextCursor });
+            const page = await knowledgeLibraryClient.list(
+                { ...listQuery, cursor: nextCursor },
+                controller.signal,
+            );
+            // A first-page load for another query (or a refresh) started while
+            // this page was on its way: it no longer belongs to the list.
+            if (loadMoreInflight.current !== controller) return;
             setDocuments((prev) => {
                 const seen = new Set(prev.map((doc) => doc.id));
                 return [...prev, ...page.documents.filter((doc) => !seen.has(doc.id))];
@@ -193,9 +236,13 @@ export function LibraryPanel({ initial, works = [] }: LibraryPanelProps) {
             setNextCursor(page.nextCursor);
             setTotal(page.total);
         } catch {
+            if (controller.signal.aborted || loadMoreInflight.current !== controller) return;
             toast.error(t('loadFailed'));
         } finally {
-            setIsLoadingMore(false);
+            if (loadMoreInflight.current === controller) {
+                loadMoreInflight.current = null;
+                setIsLoadingMore(false);
+            }
         }
     }, [nextCursor, isLoadingMore, listQuery, t]);
 
@@ -363,8 +410,11 @@ export function LibraryPanel({ initial, works = [] }: LibraryPanelProps) {
     };
 
     const deleteFolder = async (folderId: string) => {
+        // The delete removes the folder's whole subtree, so a selected
+        // descendant is gone too. Read the subtree before the tree reloads.
+        const deleted = folderSubtreeIds(tree, folderId);
         await knowledgeLibraryClient.deleteFolder(folderId);
-        if (selection.kind === 'folder' && selection.id === folderId) {
+        if (selection.kind === 'folder' && deleted.has(selection.id)) {
             selectShelf({ kind: 'all' });
             await loadTree();
         } else {
@@ -748,6 +798,26 @@ function findFolderName(tree: KbLibraryTreeDto | null, folderId: string): string
         stack.push(...node.children);
     }
     return null;
+}
+
+/** The folder and every folder below it (just the folder when the tree has not loaded). */
+function folderSubtreeIds(tree: KbLibraryTreeDto | null, folderId: string): Set<string> {
+    const ids = new Set([folderId]);
+    const stack = [...(tree?.folders ?? [])];
+    while (stack.length > 0) {
+        const node = stack.pop()!;
+        if (node.id === folderId) {
+            const below = [...node.children];
+            while (below.length > 0) {
+                const child = below.pop()!;
+                ids.add(child.id);
+                below.push(...child.children);
+            }
+            break;
+        }
+        stack.push(...node.children);
+    }
+    return ids;
 }
 
 function findFolderPath(tree: KbLibraryTreeDto, folderId: string | null): string | null {
