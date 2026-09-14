@@ -8,6 +8,7 @@ import {
     Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, Repository, type FindOptionsWhere } from 'typeorm';
 import {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
@@ -22,6 +23,7 @@ import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port
 import { evaluateGuardrails } from '../agents/guardrails';
 import { RISK_SCORER } from './risk-scorer';
 import { toAgentActionProposalDto, type AgentActionProposalDto } from './types';
+import { AgentActionProposalDecidedEvent } from './agent-action-proposal-decided.event';
 
 /**
  * Create-proposal input — the writable subset an Agent (or the
@@ -44,6 +46,14 @@ export interface CreateAgentActionProposalInput {
      * from anything a model wrote.
      */
     subjectKey?: string | null;
+    /**
+     * AW-05 — the action must be decided by a PERSON: a guardrail may still
+     * block it (saved `rejected`), but never auto-approve it — the proposal
+     * stays `pending` in the queue. PLATFORM-SUPPLIED ONLY (a held email
+     * draft, whose approval sends mail). Absent = the guardrails decide
+     * exactly as before.
+     */
+    humanDecisionRequired?: boolean;
 }
 
 export interface ListAgentActionProposalsFilter {
@@ -79,6 +89,10 @@ export class AgentApprovalsService {
         // so existing positional constructions keep working; bound by the
         // api-side @Global() InboxModule. Absent = pre-inbox behaviour.
         @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
+        // Decision event (AW-05). @Optional() and appended LAST like the
+        // inbox producer above: absent = decisions are records only, which
+        // is the pre-event behaviour.
+        @Optional() private readonly events?: EventEmitter2,
     ) {}
 
     /**
@@ -136,7 +150,7 @@ export class AgentApprovalsService {
             createdAt: now,
             updatedAt: now,
         });
-        if (decision === 'auto_approve') {
+        if (decision === 'auto_approve' && !input.humanDecisionRequired) {
             // Auto-decided rows keep decidedById null — no human made
             // the call; `decidedVia: 'guardrail'` is the audit marker.
             row.status = 'approved';
@@ -163,6 +177,14 @@ export class AgentApprovalsService {
                     riskFlags: saved.riskFlags,
                     agentId: saved.agentId,
                     runId: saved.runId ?? null,
+                    // The Task a merge approval is about — platform-derived
+                    // by the merge gate. Only that action type is trusted:
+                    // any other payload may carry model-authored fields.
+                    taskId:
+                        saved.actionType === 'merge_pull_request' &&
+                        typeof payload.taskId === 'string'
+                            ? payload.taskId
+                            : null,
                     organizationId: saved.organizationId ?? null,
                 });
             } catch (error) {
@@ -220,6 +242,13 @@ export class AgentApprovalsService {
      * Approve or reject a PENDING proposal. Idempotent guard:
      * re-deciding an already-decided proposal throws 409 (the decision
      * is final for this increment; re-opening is not modelled).
+     *
+     * The decision is a compare-and-set (`UPDATE … WHERE status =
+     * 'pending'`), not a read-then-save: two people deciding the same
+     * proposal at once record exactly one decision, and only that one emits
+     * the decision event — the loser gets the same 409 a late re-decide
+     * gets. Without it both saves land, both events fire, and an approval
+     * could send an email whose proposal ends up recorded as rejected.
      */
     async decide(
         userId: string,
@@ -230,20 +259,18 @@ export class AgentApprovalsService {
             throw new BadRequestException(`Invalid decision: ${decision}`);
         }
         const row = await this.requireOwned(userId, id);
-        if (row.status !== 'pending') {
+        if (row.status !== 'pending' || !(await this.claimDecision(row, userId, decision))) {
+            const current =
+                row.status !== 'pending'
+                    ? row
+                    : await this.proposals.findOne({ where: { id, userId } });
             throw new ConflictException(
-                `Proposal ${id} is already ${row.status} and cannot be re-decided.`,
+                `Proposal ${id} is already ${current?.status ?? 'decided'} and cannot be re-decided.`,
             );
         }
-
-        const now = new Date();
-        row.status = decision;
-        row.decidedById = userId;
-        row.decidedAt = now;
-        row.decidedVia = 'user';
-        row.updatedAt = now;
-        const saved = await this.proposals.save(row);
-        return toAgentActionProposalDto(saved);
+        this.emitDecided(row);
+        await this.closeInboxMirror(row.id, decision, userId);
+        return toAgentActionProposalDto(row);
     }
 
     /**
@@ -269,6 +296,10 @@ export class AgentApprovalsService {
      * queue had been handled while it sits there untouched — the precise
      * misreport that makes an unattended merge approval expire, or get
      * clicked later without being read.
+     *
+     * Agent email drafts (AW-05, `payload.kind === 'email-draft'`) are
+     * excluded for the same reason: approving one SENDS it, and a sent
+     * message cannot be recalled. Each is read and released on its own.
      */
     async approveAll(
         userId: string,
@@ -282,29 +313,123 @@ export class AgentApprovalsService {
             : { userId, status: 'pending' };
         const rows = await this.proposals.find({ where });
         const excluded = rows.filter(
-            (row) => row.status === 'pending' && row.actionType === 'merge_pull_request',
+            (row) => row.status === 'pending' && requiresIndividualDecision(row),
         ).length;
         const pending = rows.filter(
-            (row) => row.status === 'pending' && row.actionType !== 'merge_pull_request',
+            (row) => row.status === 'pending' && !requiresIndividualDecision(row),
         );
         const skipped = rows.length - pending.length - excluded;
         if (pending.length === 0) {
             return { approved: 0, skipped, excluded };
         }
 
+        // Each row is claimed with the same compare-and-set `decide` uses: a
+        // row somebody decided between the read above and this write is not
+        // overwritten, emits nothing, and is counted as skipped.
         const now = new Date();
+        const decided: AgentActionProposal[] = [];
         for (const row of pending) {
-            row.status = 'approved';
-            row.decidedById = userId;
-            row.decidedAt = now;
-            row.decidedVia = 'user';
-            row.updatedAt = now;
+            if (await this.claimDecision(row, userId, 'approved', now)) {
+                decided.push(row);
+            }
         }
-        await this.proposals.save(pending);
-        return { approved: pending.length, skipped, excluded };
+        for (const row of decided) {
+            this.emitDecided(row);
+            await this.closeInboxMirror(row.id, 'approved', userId);
+        }
+        return {
+            approved: decided.length,
+            skipped: skipped + (pending.length - decided.length),
+            excluded,
+        };
     }
 
     // ── internals ─────────────────────────────────────────────────
+
+    /**
+     * My Decisions — a proposal decided here (the approvals endpoints,
+     * approve-all) closes its Inbox mirror too, so the owner never finds
+     * an approval still "waiting" in the Inbox after deciding it on Home.
+     * The Inbox reply claims its item before calling `decide`, so on that
+     * door this is a no-op. Best-effort: the decision stands regardless.
+     */
+    private async closeInboxMirror(
+        proposalId: string,
+        decision: 'approved' | 'rejected',
+        decidedByUserId: string,
+    ): Promise<void> {
+        if (!this.inbox?.proposalDecided) return;
+        try {
+            await this.inbox.proposalDecided({ proposalId, decision, decidedByUserId });
+        } catch (error) {
+            this.logger.warn(
+                `Proposal ${proposalId} inbox close failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Record a person's decision on a proposal only if it is still pending.
+     * Returns `false` when another decision got there first; on `true` the
+     * in-memory row carries the recorded decision.
+     */
+    private async claimDecision(
+        row: AgentActionProposal,
+        userId: string,
+        decision: 'approved' | 'rejected',
+        now: Date = new Date(),
+    ): Promise<boolean> {
+        const result = await this.proposals.update(
+            { id: row.id, userId, status: 'pending' },
+            {
+                status: decision,
+                decidedById: userId,
+                decidedAt: now,
+                decidedVia: 'user',
+                updatedAt: now,
+            },
+        );
+        if ((result.affected ?? 0) === 0) return false;
+        row.status = decision;
+        row.decidedById = userId;
+        row.decidedAt = now;
+        row.decidedVia = 'user';
+        row.updatedAt = now;
+        return true;
+    }
+
+    /**
+     * Fire-and-forget: a listener that throws (or an emitter that is not
+     * bound) never turns a recorded decision into a failed request.
+     */
+    private emitDecided(row: AgentActionProposal): void {
+        if (!this.events || (row.status !== 'approved' && row.status !== 'rejected')) {
+            return;
+        }
+        try {
+            this.events.emit(
+                AgentActionProposalDecidedEvent.EVENT_NAME,
+                new AgentActionProposalDecidedEvent(
+                    row.id,
+                    row.userId,
+                    row.agentId,
+                    row.actionType,
+                    row.status,
+                    row.decidedById ?? null,
+                    row.decidedVia ?? null,
+                    row.payload ?? {},
+                ),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Proposal ${row.id} decision event failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
 
     private async requireOwned(userId: string, id: string): Promise<AgentActionProposal> {
         const row = await this.proposals.findOne({ where: { id, userId } });
@@ -321,4 +446,16 @@ function clampLimit(limit?: number): number {
         return 50;
     }
     return Math.min(limit, 200);
+}
+
+/**
+ * Proposals whose approval does something that cannot be undone, so bulk
+ * approval never decides them: a merge onto a real branch, and the release
+ * of a held Agent email draft (AW-05).
+ */
+export function requiresIndividualDecision(
+    row: Pick<AgentActionProposal, 'actionType' | 'payload'>,
+): boolean {
+    if (row.actionType === 'merge_pull_request') return true;
+    return row.actionType === 'send_message' && row.payload?.kind === 'email-draft';
 }

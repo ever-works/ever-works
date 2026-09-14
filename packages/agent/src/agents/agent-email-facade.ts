@@ -50,6 +50,16 @@ export interface AgentSendEmailResult {
     providerMessageId: string;
     accepted: string[];
     rejected: { address: string; reason: string }[];
+    /**
+     * Agent email (AW-05) — `true` when the Agent's inbox holds its mail for
+     * review: nothing was sent, the message waits as a draft for a person to
+     * approve. `providerMessageId` is empty and `accepted` is empty then.
+     */
+    held?: boolean;
+    /** AW-05 — the held draft's `email_messages.id`. */
+    messageId?: string;
+    /** AW-05 — a sentence the model can act on (why it was held). */
+    note?: string;
 }
 
 /**
@@ -71,6 +81,10 @@ export interface AgentMessageAgentInput {
 export interface AgentMessageAgentResult {
     providerMessageId: string;
     targetAddress: string;
+    /** AW-05 — held for review instead of sent (see `AgentSendEmailResult.held`). */
+    held?: boolean;
+    messageId?: string;
+    note?: string;
 }
 
 export interface AgentEmailFacade {

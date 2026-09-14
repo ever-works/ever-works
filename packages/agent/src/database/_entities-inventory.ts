@@ -112,6 +112,7 @@ import { TenantEmailAddress } from '../entities/tenant-email-address.entity';
 import { AgentEmailAssignment } from '../entities/agent-email-assignment.entity';
 import { EmailConversation } from '../entities/email-conversation.entity';
 import { EmailMessage } from '../entities/email-message.entity';
+import { AgentInbox } from '../entities/agent-inbox.entity';
 import { NotificationChannel } from '../entities/notification-channel.entity';
 import { NotificationChannelDeliveryLog } from '../entities/notification-channel-delivery-log.entity';
 import { NotificationEventType } from '../entities/notification-event-type.entity';
@@ -164,6 +165,7 @@ import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-al
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
+import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 
 import {
     PluginEntity,
@@ -303,6 +305,8 @@ export const ENTITIES = [
     AgentEmailAssignment,
     EmailConversation,
     EmailMessage,
+    // Agent email (AW-05) — per-Agent approval mode + send ceilings
+    AgentInbox,
     NotificationChannel,
     NotificationChannelDeliveryLog,
     NotificationEventType,
@@ -416,4 +420,8 @@ export const ENTITIES = [
     // UNIQUE (workId, rung, laneKey) index on it is what stops two merges
     // to develop opening two competing promotion pull requests.
     ReleasePromotion,
+    // AW-14 What's new — one row per (person, product changelog entry) they
+    // have read. Deliberately not workspace-scoped: read state follows the
+    // person, never the active Organization.
+    ProductChangelogRead,
 ];
