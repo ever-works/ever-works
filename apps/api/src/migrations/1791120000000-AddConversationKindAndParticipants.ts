@@ -28,8 +28,12 @@ import {
  *
  * ## `conversation_messages` — eight columns
  *
- * `authorType` defaults to `'user'` and `status` to `'sent'`, which is what
- * every stored message was. `uq_conversation_messages_client_id` is partial
+ * `status` defaults to `'sent'`, which is what every stored message was.
+ * `authorType` defaults to `'user'`; the backfill below then records every
+ * turn the model wrote (any `role` but `'user'`) as `'system'`-authored, so an
+ * old assistant reply is never shown as written by the person. There is no
+ * Agent id to name for those rows, which is what `'system'` means here.
+ * `uq_conversation_messages_client_id` is partial
  * (`clientMessageId IS NOT NULL`), so legacy rows without a client id never
  * collide, while a retried send with the same id is refused by the database.
  *
@@ -46,8 +50,11 @@ import {
  *
  * ## Backfill
  *
+ *  - `authorType = 'system'` for every model-written message (see above);
  *  - one `owner` participant per existing Conversation, from its `userId`,
- *    stamped with the Conversation's scope;
+ *    stamped with the Conversation's scope, whose read position is the
+ *    newest message — history that existed before this migration never
+ *    shows as unread after deploy;
  *  - `lastMessageAt` = the newest message time;
  *  - `titleSource = 'auto'` where the stored metadata records a model title.
  *
@@ -210,6 +217,7 @@ export class AddConversationKindAndParticipants1791120000000 implements Migratio
         await this.ensureForeignKey(queryRunner, 'agent_runs', M.RUN_FK);
         await this.ensureForeignKey(queryRunner, 'conversation_participants', M.PARTICIPANT_FK);
 
+        await this.backfillAuthorTypes(queryRunner);
         await this.backfillOwners(queryRunner);
         await this.backfillLastMessageAt(queryRunner);
         await this.backfillTitleSource(queryRunner);
@@ -235,9 +243,27 @@ export class AddConversationKindAndParticipants1791120000000 implements Migratio
     }
 
     /**
+     * A legacy row has no author. The person wrote the `user` turns; every
+     * other turn came from the model. Only rows still carrying the column
+     * default are touched, so a re-run changes nothing.
+     */
+    private async backfillAuthorTypes(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(
+            `UPDATE conversation_messages SET "authorType" = 'system'
+             WHERE "role" <> 'user' AND "authorType" = 'user' AND "authorId" IS NULL`,
+        );
+    }
+
+    /**
      * One `owner` row per Conversation that has none yet, in batches so a
      * large history never becomes one giant statement. Re-running finds no
      * candidates, which is what makes the backfill idempotent.
+     *
+     * Each inserted owner has already read the Conversation's history: its
+     * read position is set to the newest message. The value is copied inside
+     * the database, not round-tripped through a JS `Date`, which would drop
+     * sub-millisecond precision on Postgres and leave the newest message
+     * unread.
      */
     private async backfillOwners(queryRunner: QueryRunner): Promise<void> {
         const batch = AddConversationKindAndParticipants1791120000000.BACKFILL_BATCH;
@@ -265,6 +291,18 @@ export class AddConversationKindAndParticipants1791120000000 implements Migratio
             if (rows.length === 0) return;
 
             const now = new Date();
+            const owners = rows.map((row) => ({
+                id: randomUUID(),
+                conversationId: row.id,
+                participantType: 'user',
+                participantId: row.userId,
+                role: 'owner',
+                joinedAt: row.createdAt ? new Date(row.createdAt) : now,
+                tenantId: row.tenantId ?? null,
+                organizationId: row.organizationId ?? null,
+                createdAt: now,
+                updatedAt: now,
+            }));
             await queryRunner.manager
                 .createQueryBuilder()
                 .insert()
@@ -280,20 +318,22 @@ export class AddConversationKindAndParticipants1791120000000 implements Migratio
                     'createdAt',
                     'updatedAt',
                 ])
-                .values(
-                    rows.map((row) => ({
-                        id: randomUUID(),
-                        conversationId: row.id,
-                        participantType: 'user',
-                        participantId: row.userId,
-                        role: 'owner',
-                        joinedAt: row.createdAt ? new Date(row.createdAt) : now,
-                        tenantId: row.tenantId ?? null,
-                        organizationId: row.organizationId ?? null,
-                        createdAt: now,
-                        updatedAt: now,
-                    })),
-                )
+                .values(owners)
+                .execute();
+
+            await queryRunner.manager
+                .createQueryBuilder()
+                .update('conversation_participants')
+                .set({
+                    lastReadAt: () =>
+                        `(SELECT MAX(m."createdAt") FROM conversation_messages m
+                          WHERE m."conversationId" = conversation_participants."conversationId")`,
+                    lastReadMessageId: () =>
+                        `(SELECT m.id FROM conversation_messages m
+                          WHERE m."conversationId" = conversation_participants."conversationId"
+                          ORDER BY m."createdAt" DESC, m.id DESC LIMIT 1)`,
+                })
+                .where('"id" IN (:...ownerIds)', { ownerIds: owners.map((owner) => owner.id) })
                 .execute();
 
             if (rows.length < batch) return;

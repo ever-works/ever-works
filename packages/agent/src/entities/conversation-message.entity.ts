@@ -19,6 +19,18 @@ import { ClassToObject } from './types';
 
 export type ConversationMessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
+/**
+ * Who wrote a message stored without an explicit author — the legacy
+ * assistant-thread path. The person wrote the `user` turns; every other turn
+ * came from the model, not from an Agent (there is no Agent id to name), so it
+ * is `system`-authored. The migration backfills existing rows the same way.
+ */
+export function conversationAuthorTypeForRole(
+    role: ConversationMessageRole,
+): ConversationAuthorType {
+    return role === 'user' ? 'user' : 'system';
+}
+
 @Entity({ name: 'conversation_messages' })
 @Index(['conversationId', 'createdAt'])
 // Failed sends in one Conversation — the retry surface reads exactly these.
@@ -63,9 +75,15 @@ export class ConversationMessage {
     usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 
     // ── Named Conversations with Agents. All additive; every pre-existing row
-    // reads as a sent, person-authored message with no mentions.
+    // reads as a sent message with no mentions, authored by the person for a
+    // `user` turn and by `system` for a model turn.
 
-    /** Who wrote it: `user`, `agent` or `system`. Defaults to `user`. */
+    /**
+     * Who wrote it: `user`, `agent` or `system`. The column defaults to
+     * `user`; the legacy append path derives it from `role` instead
+     * ({@link conversationAuthorTypeForRole}), so a model reply is never
+     * recorded as written by the person.
+     */
     @Column({ type: 'varchar', length: 8, default: 'user' })
     authorType: ConversationAuthorType;
 

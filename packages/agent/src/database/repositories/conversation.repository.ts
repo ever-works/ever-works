@@ -15,6 +15,7 @@ import { Conversation } from '../../entities/conversation.entity';
 import {
     ConversationMessage,
     ConversationMessageRole,
+    conversationAuthorTypeForRole,
 } from '../../entities/conversation-message.entity';
 import { ConversationParticipant } from '../../entities/conversation-participant.entity';
 import { ownershipWhere, type OwnershipScope } from '../ownership-scope';
@@ -87,6 +88,21 @@ const SUMMARY_COLUMNS: (keyof Conversation)[] = [
     'updatedAt',
 ];
 
+/**
+ * A legacy append names no author; derive it from the role so a model turn is
+ * `system`-authored instead of taking the column's `user` default. A `user`
+ * turn is left to that default (it is already right), and an explicit author,
+ * where a caller supplies one, always wins.
+ */
+function withLegacyAuthor(
+    input: AppendMessageInput,
+): AppendMessageInput & { authorType?: ConversationAuthorType } {
+    if ((input as Partial<InsertConversationMessageInput>).authorType || input.role === 'user') {
+        return input;
+    }
+    return { ...input, authorType: conversationAuthorTypeForRole(input.role) };
+}
+
 @Injectable()
 export class ConversationRepository {
     constructor(
@@ -125,7 +141,7 @@ export class ConversationRepository {
     }
 
     async appendMessage(input: AppendMessageInput): Promise<ConversationMessage> {
-        const message = this.messageRepo.create(input);
+        const message = this.messageRepo.create(withLegacyAuthor(input));
         const saved = await this.messageRepo.save(message);
 
         // Touch the conversation's updatedAt — and its last activity, which
@@ -135,6 +151,7 @@ export class ConversationRepository {
             updatedAt: now,
             lastMessageAt: now,
         });
+        await this.readThroughLegacyAppend(input.conversationId, saved);
 
         return saved;
     }
@@ -148,7 +165,7 @@ export class ConversationRepository {
         const baseTime = Date.now();
         for (let i = 0; i < messages.length; i++) {
             const entity = this.messageRepo.create({
-                ...messages[i],
+                ...withLegacyAuthor(messages[i]),
                 createdAt: new Date(baseTime + i),
             });
             saved.push(await this.messageRepo.save(entity));
@@ -157,8 +174,48 @@ export class ConversationRepository {
         const conversationId = messages[0].conversationId;
         const now = new Date();
         await this.conversationRepo.update(conversationId, { updatedAt: now, lastMessageAt: now });
+        await this.readThroughLegacyAppend(conversationId, saved[saved.length - 1]);
 
         return saved;
+    }
+
+    /**
+     * The legacy append path is the person's own client persisting turns it
+     * has already shown them — the model's replies included, which are
+     * `system`-authored and would otherwise count as unread. Move the owner's
+     * read position to the newest appended message.
+     *
+     * The position is copied from the stored row inside the database, so the
+     * unread boundary compares a value with itself (a JS `Date` loses
+     * sub-millisecond precision on some drivers). Only an existing owner row
+     * moves: a Conversation that predates participants has none, and counts
+     * nothing as unread until its owner joins.
+     *
+     * Best-effort: read bookkeeping must never fail an append the legacy
+     * contract promised.
+     */
+    private async readThroughLegacyAppend(
+        conversationId: string,
+        newest: ConversationMessage | undefined,
+    ): Promise<void> {
+        if (!newest?.id) return;
+        try {
+            await this.messageRepo.manager
+                .createQueryBuilder()
+                .update(ConversationParticipant)
+                .set({
+                    lastReadMessageId: newest.id,
+                    lastReadAt: () =>
+                        '(SELECT m."createdAt" FROM conversation_messages m WHERE m.id = :readThroughMessageId)',
+                })
+                .where('"conversationId" = :conversationId', { conversationId })
+                .andWhere('"participantType" = :participantType', { participantType: 'user' })
+                .andWhere('"role" = :role', { role: 'owner' })
+                .setParameter('readThroughMessageId', newest.id)
+                .execute();
+        } catch {
+            // Swallowed on purpose — see the method note.
+        }
     }
 
     async updateTitle(
@@ -280,6 +337,12 @@ export class ConversationRepository {
      * Messages an Agent or the system wrote after the person's read position,
      * per Conversation. A Conversation with nothing unread is absent from the
      * map (read it as 0).
+     *
+     * Before a person has read anything, the boundary is when they joined:
+     * history written before they took part is never unread. A person with no
+     * participant row (a Conversation that predates participants and was never
+     * opened through a named-Conversation route) has no read position, so
+     * nothing counts.
      */
     async unreadCountsFor(userId: string, conversationIds: string[]): Promise<Map<string, number>> {
         const counts = new Map<string, number>();
@@ -296,7 +359,9 @@ export class ConversationRepository {
             )
             .where('m.conversationId IN (:...conversationIds)', { conversationIds })
             .andWhere('m.authorType IN (:...authorTypes)', { authorTypes: ['agent', 'system'] })
-            .andWhere('(p.lastReadAt IS NULL OR m.createdAt > p.lastReadAt)')
+            .andWhere(
+                '((p.lastReadAt IS NOT NULL AND m.createdAt > p.lastReadAt) OR (p.lastReadAt IS NULL AND m.createdAt >= p.joinedAt))',
+            )
             .groupBy('m.conversationId')
             .getRawMany<{ conversationId: string; count: string | number }>();
         for (const row of rows) {

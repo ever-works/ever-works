@@ -471,4 +471,30 @@ describe('ConversationRepository — named Conversations', () => {
         const [, patch] = convRepo.update.mock.calls[0];
         expect(patch.lastMessageAt).toBeInstanceOf(Date);
     });
+
+    it('legacy appends record a model turn as system-authored, never as the person', async () => {
+        await service.appendMessage({ conversationId: 'c1', role: 'assistant', content: 'x' });
+        expect(msgRepo.create).toHaveBeenLastCalledWith(
+            expect.objectContaining({ role: 'assistant', authorType: 'system' }),
+        );
+
+        await service.appendMessages([
+            { conversationId: 'c1', role: 'user', content: 'q' },
+            { conversationId: 'c1', role: 'assistant', content: 'a' },
+            { conversationId: 'c1', role: 'tool', content: '{}' },
+        ]);
+        // A `user` turn keeps the column default, which is already `user`.
+        expect(msgRepo.create.mock.calls.slice(-3).map(([row]) => row.authorType)).toEqual([
+            undefined,
+            'system',
+            'system',
+        ]);
+    });
+
+    it('a legacy append whose read bookkeeping fails still succeeds', async () => {
+        // No `manager` on this mock: the read-position update throws inside.
+        await expect(
+            service.appendMessages([{ conversationId: 'c1', role: 'assistant', content: 'x' }]),
+        ).resolves.toEqual([expect.objectContaining({ id: 'm1', authorType: 'system' })]);
+    });
 });

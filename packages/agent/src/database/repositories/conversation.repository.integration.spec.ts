@@ -190,6 +190,58 @@ describe('named Conversations — repository integration (better-sqlite3)', () =
         ).toBe(1);
     });
 
+    it('legacy appends store model turns as system-authored and read them through for the owner', async () => {
+        const legacy = await conversations.create({ userId, title: 'assistant thread' });
+        const unread = async () =>
+            (await conversations.unreadCountsFor(userId, [legacy.id])).get(legacy.id) ?? 0;
+
+        // No participant row yet (the thread predates participants): nothing counts.
+        await conversations.appendMessages([
+            { conversationId: legacy.id, role: 'user', content: 'hi' },
+            { conversationId: legacy.id, role: 'assistant', content: 'hello' },
+        ]);
+        const stored = await dataSource
+            .getRepository(ConversationMessage)
+            .find({ where: { conversationId: legacy.id }, order: { createdAt: 'ASC' } });
+        expect(stored.map((row) => [row.role, row.authorType])).toEqual([
+            ['user', 'user'],
+            ['assistant', 'system'],
+        ]);
+        expect(await unread()).toBe(0);
+
+        // The owner joins later: history from before they joined is not unread.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await participants.addIfAbsent({
+            conversationId: legacy.id,
+            participantType: 'user',
+            participantId: userId,
+            role: 'owner',
+        });
+        expect(await unread()).toBe(0);
+
+        // The person's own client keeps appending: the replies it persisted
+        // were shown to them, so they stay read.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        const appended = await conversations.appendMessages([
+            { conversationId: legacy.id, role: 'user', content: 'more' },
+            { conversationId: legacy.id, role: 'assistant', content: 'sure' },
+        ]);
+        expect(await unread()).toBe(0);
+        const owner = await participants.findOne(legacy.id, 'user', userId);
+        expect(owner?.lastReadMessageId).toBe(appended[1].id);
+
+        // Something the person did not persist themselves is unread.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await conversations.insertMessage({
+            conversationId: legacy.id,
+            role: 'assistant',
+            content: 'from an Agent',
+            authorType: 'agent',
+            authorId: agentId,
+        });
+        expect(await unread()).toBe(1);
+    });
+
     it('adds a participant once even when asked twice', async () => {
         const conversation = await openDirect(ORG);
         const input = {

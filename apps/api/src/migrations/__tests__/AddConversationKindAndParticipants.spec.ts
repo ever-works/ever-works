@@ -8,10 +8,12 @@ import { AddConversationKindAndParticipants1791120000000 } from '../179112000000
  * What matters:
  *
  *  - every existing Conversation reads as the assistant thread it was —
- *    `direct`, no Agent — and every existing message as a sent, person-written
- *    one;
+ *    `direct`, no Agent — and every existing message as a sent one, written
+ *    by the person for a `user` turn and by `system` for a model turn;
  *  - every existing Conversation gets exactly one `owner` participant, scoped
  *    like the Conversation, and a re-run adds no second one;
+ *  - that owner has already read the existing history, so nothing is unread
+ *    after deploy;
  *  - `lastMessageAt` and the model-title marker are backfilled;
  *  - a client message id is stored at most once per Conversation, while legacy
  *    rows with no client id never collide;
@@ -100,21 +102,30 @@ describe('AddConversationKindAndParticipants1791120000000', () => {
         expect(rows[0].title).toBe('Model title');
     });
 
-    it('reads every existing message as a sent, person-written one', async () => {
+    it('reads every existing message as a sent one, written by the person or, for a model turn, by the system', async () => {
         await run('up');
 
         const rows = await dataSource.query(
-            `SELECT "authorType", "status", "clientMessageId", "mentions" FROM "conversation_messages"`,
+            `SELECT "id", "authorType", "authorId", "status", "clientMessageId", "mentions"
+             FROM "conversation_messages" ORDER BY "id"`,
         );
         expect(rows).toHaveLength(3);
         for (const row of rows) {
             expect(row).toMatchObject({
-                authorType: 'user',
+                authorId: null,
                 status: 'sent',
                 clientMessageId: null,
                 mentions: null,
             });
         }
+        // m2 is the assistant's reply: never recorded as written by the person.
+        expect(
+            rows.map((row: { id: string; authorType: string }) => [row.id, row.authorType]),
+        ).toEqual([
+            ['m1', 'user'],
+            ['m2', 'system'],
+            ['m3', 'user'],
+        ]);
         const [runRow] = await dataSource.query(
             `SELECT "conversationMessageId", "triggerKind" FROM "agent_runs"`,
         );
@@ -158,6 +169,77 @@ describe('AddConversationKindAndParticipants1791120000000', () => {
                 leftAt: null,
             },
         ]);
+    });
+
+    it('records every model turn as system-authored and leaves a re-run and later authored rows alone', async () => {
+        await dataSource.query(
+            `INSERT INTO "conversation_messages" ("id", "conversationId", "role", "content", "createdAt")
+             VALUES ('m4', 'c2', 'system', 'be brief', '2026-01-02 10:59:00'),
+                    ('m5', 'c2', 'tool', '{"ok":true}', '2026-01-02 10:59:30')`,
+        );
+        await run('up');
+        // A message written after deploy with its own author keeps it.
+        await dataSource.query(
+            `INSERT INTO "conversation_messages" ("id", "conversationId", "role", "content", "authorType", "authorId")
+             VALUES ('n1', 'c2', 'assistant', 'agent reply', 'agent', 'a1')`,
+        );
+        await run('up');
+
+        const rows = await dataSource.query(
+            `SELECT "id", "authorType" FROM "conversation_messages" ORDER BY "id"`,
+        );
+        expect(
+            rows.map((row: { id: string; authorType: string }) => [row.id, row.authorType]),
+        ).toEqual([
+            ['m1', 'user'],
+            ['m2', 'system'],
+            ['m3', 'user'],
+            ['m4', 'system'],
+            ['m5', 'system'],
+            ['n1', 'agent'],
+        ]);
+    });
+
+    it('marks existing history read for each owner, so nothing is unread after deploy', async () => {
+        await run('up');
+
+        const owners = await dataSource.query(
+            `SELECT "conversationId", "lastReadMessageId", "lastReadAt" FROM "conversation_participants"
+             ORDER BY "conversationId"`,
+        );
+        expect(
+            owners.map((row: { conversationId: string; lastReadMessageId: string | null }) => [
+                row.conversationId,
+                row.lastReadMessageId,
+            ]),
+        ).toEqual([
+            ['c1', 'm2'],
+            ['c2', 'm3'],
+            ['c3', null],
+        ]);
+        expect(String(owners[0].lastReadAt)).toContain('2026-01-01 10:05:00');
+        expect(owners[2].lastReadAt).toBeNull();
+
+        // The unread rule, in SQL: system/Agent messages after the owner's
+        // read position. Legacy history — including the assistant reply m2 —
+        // counts nothing.
+        const unread = `
+            SELECT COUNT(m."id") AS "count" FROM "conversation_messages" m
+            JOIN "conversation_participants" p
+              ON p."conversationId" = m."conversationId" AND p."role" = 'owner'
+            WHERE m."authorType" IN ('agent', 'system')
+              AND ((p."lastReadAt" IS NOT NULL AND m."createdAt" > p."lastReadAt")
+                OR (p."lastReadAt" IS NULL AND m."createdAt" >= p."joinedAt"))`;
+        const [{ count: before }] = await dataSource.query(unread);
+        expect(Number(before)).toBe(0);
+
+        // A reply written after deploy is the first thing that is unread.
+        await dataSource.query(
+            `INSERT INTO "conversation_messages" ("id", "conversationId", "role", "content", "authorType", "authorId", "createdAt")
+             VALUES ('n1', 'c1', 'assistant', 'new', 'agent', 'a1', '2026-02-01 09:00:00')`,
+        );
+        const [{ count: after }] = await dataSource.query(unread);
+        expect(Number(after)).toBe(1);
     });
 
     it('backfills last activity and marks only model titles as automatic', async () => {
