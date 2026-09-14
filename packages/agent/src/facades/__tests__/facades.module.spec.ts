@@ -25,6 +25,8 @@ import { NotificationChannelFacadeService } from '../notification-channel.facade
 import { VectorStoreFacadeService } from '../vector-store.facade';
 // Goals feature PR-7 — metrics-provider capability facade.
 import { MetricsFacadeService } from '../metrics.facade';
+// AW-21 — playbook-provider capability facade.
+import { PlaybookCatalogFacadeService } from '../playbook-catalog.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -64,6 +66,8 @@ describe('FacadesModule + barrel re-exports', () => {
         VectorStoreFacadeService,
         // Goals feature PR-7 — metrics-provider capability (custom-http, Stripe).
         MetricsFacadeService,
+        // AW-21 — playbook-provider capability (capability & playbook catalogue).
+        PlaybookCatalogFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -139,6 +143,7 @@ describe('FacadesModule + barrel re-exports', () => {
                 NotificationChannelFacadeService,
             );
             expect(facadesBarrel.MetricsFacadeService).toBe(MetricsFacadeService);
+            expect(facadesBarrel.PlaybookCatalogFacadeService).toBe(PlaybookCatalogFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -258,6 +263,11 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Goals feature PR-7 — metrics-provider capability facade.
                     'MetricsFacadeError',
                     'MetricsFacadeService',
+                    // AW-21 — playbook-provider capability facade + its paging limits.
+                    'MAX_PLAYBOOK_CATALOG_ENTRIES',
+                    'PLAYBOOK_PROVIDER_PAGE_SIZE',
+                    'PlaybookCatalogFacadeError',
+                    'PlaybookCatalogFacadeService',
                     // Merge-policy matrix (Wave 3, D4). `AgentMergeActor` is
                     // type-only and correctly absent from this runtime list.
                     'MergePolicyRefusedError',
