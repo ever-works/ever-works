@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, EntityManager, IsNull, LessThan, Repository } from 'typeorm';
+import { Brackets, EntityManager, In, IsNull, LessThan, Repository } from 'typeorm';
 import { ModelAccount } from '../../entities/model-account.entity';
 import { advisoryLockObjectId } from './agent-run.repository';
 
@@ -13,6 +13,8 @@ import { advisoryLockObjectId } from './agent-run.repository';
  * during a rolling restart — exactly the window the lock exists for.
  */
 export const MODEL_ACCOUNT_WRITE_LOCK_CLASS_ID = 0x6577_1601 | 0;
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The advisory-lock key for one workspace's accounts of one provider. A write
@@ -114,6 +116,24 @@ export class ModelAccountRepository {
 
     async findById(id: string): Promise<ModelAccount | null> {
         return this.repository.findOne({ where: { id } });
+    }
+
+    /**
+     * The workspace and provider of each id that exists (one `IN` query, no
+     * credentials read). Serves run-cost settlement, which checks that the
+     * account named on a usage row belongs to the run's workspace. An id that
+     * is not a UUID cannot name an account and is dropped before the query
+     * (Postgres would reject the whole `IN` list over it).
+     */
+    async findOwnershipByIds(
+        ids: readonly string[],
+    ): Promise<Array<Pick<ModelAccount, 'id' | 'workspaceKey' | 'providerPluginId'>>> {
+        const candidates = [...new Set(ids)].filter((id) => UUID_PATTERN.test(id));
+        if (candidates.length === 0) return [];
+        return this.repository.find({
+            where: { id: In(candidates) },
+            select: { id: true, workspaceKey: true, providerPluginId: true },
+        });
     }
 
     /** True when any account exists anywhere — the call path's cheapest "is this feature in use" probe. */

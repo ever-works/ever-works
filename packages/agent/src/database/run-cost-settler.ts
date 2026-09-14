@@ -45,6 +45,12 @@ export interface RunSettlementResult {
     writtenOffCredits?: number;
     /** Plugins excluded because their calls ran on user-supplied keys. */
     exemptPluginIds: string[];
+    /**
+     * Model accounts (AW-16) — the workspace's own Model Accounts whose served
+     * spend was excluded from the debit. Set only when there was any; a plugin
+     * a Model Account served in full is also listed in `exemptPluginIds`.
+     */
+    exemptModelAccountIds?: string[];
 }
 
 export interface RunCostSettler {
