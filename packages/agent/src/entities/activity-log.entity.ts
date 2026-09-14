@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Work } from './work.entity';
-import type { ActivityActionType, ActivityStatus } from './activity-log.types';
+import type { ActivityActionType, ActivityActorKind, ActivityStatus } from './activity-log.types';
 
 @Entity({ name: 'activity_log' })
 @Index(['userId', 'createdAt'])
@@ -21,6 +21,11 @@ import type { ActivityActionType, ActivityStatus } from './activity-log.types';
     unique: true,
     where: '"ingestEventId" IS NOT NULL',
 })
+// Live Feed — the keyset page (`ORDER BY createdAt DESC, id DESC`) and the
+// per-agent filter / actor roster. Shipped by
+// 1791040000000-AddActivityLogFeedActor.
+@Index('idx_activity_log_user_created_id', ['userId', 'createdAt', 'id'])
+@Index('idx_activity_log_user_actor_created', ['userId', 'actorAgentId', 'createdAt'])
 export class ActivityLog {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -80,6 +85,26 @@ export class ActivityLog {
 
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
+
+    /**
+     * Live Feed — who did it. NULL on rows written before this column
+     * existed; the feed resolves those at read time from `details` and the
+     * action type, so there is deliberately no backfill.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    actorKind?: ActivityActorKind | null;
+
+    /**
+     * The acting agent. No @ManyToOne, by the same convention as the scope
+     * columns above: deleting an Agent must not rewrite history, so
+     * `actorLabel` stays the display source of truth for a deleted agent.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    actorAgentId?: string | null;
+
+    /** The actor's display name captured when the record was written. */
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    actorLabel?: string | null;
 
     @CreateDateColumn()
     createdAt: Date;

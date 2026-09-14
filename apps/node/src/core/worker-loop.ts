@@ -215,7 +215,13 @@ export function nextBackoffMs(consecutiveFailures: number): number {
  */
 export interface JobLeaseCapableClient {
 	lease(
-		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] },
+		request: {
+			max?: number;
+			leaseTtlSec?: number;
+			capabilities?: string[];
+			kinds?: FleetJobKind[];
+			excludeKinds?: FleetJobKind[];
+		},
 		signal?: AbortSignal
 	): Promise<FleetJobView[]>;
 	heartbeat(jobId: string, leaseTtlSec?: number, leaseGeneration?: number): Promise<FleetJobView | null>;
@@ -401,6 +407,20 @@ export interface WorkerLoopState {
 	paused: boolean;
 }
 
+/**
+ * How long an idle loop waits before its next poll, decided per poll.
+ *
+ * Absent, the loop keeps its fixed `idlePollMs` exactly as before. The
+ * attended live-view lane supplies one that polls fast while a view is
+ * likely and backs off when none has been asked for in a while.
+ */
+export interface WorkerPollCadence {
+	/** Called after every settled lease call with how many jobs it claimed. */
+	recordPoll(leased: number): void;
+	/** The idle gap to arm next, in milliseconds. */
+	nextIdleDelayMs(): number;
+}
+
 /** Durable fail-closed marker stored beside the node enrollment config. */
 export interface WorkerUnsafeState {
 	since: string;
@@ -459,6 +479,15 @@ export interface WorkerLoopOptions {
 	safetyGate?: WorkerSafetyGate;
 	/** Bound shutdown if a lease transport does not settle after abort. */
 	leasePollDrainTimeoutMs?: number;
+	/**
+	 * Claim only these job kinds (sent on every lease). Absent = every kind.
+	 * The attended live-view lane leases `computer-session` alone.
+	 */
+	kinds?: FleetJobKind[];
+	/** Never claim these job kinds. Absent = none excluded. */
+	excludeKinds?: FleetJobKind[];
+	/** Per-poll idle cadence; absent keeps the fixed `idlePollMs`. */
+	pollCadence?: WorkerPollCadence;
 }
 
 export class WorkerLoop {
@@ -713,6 +742,29 @@ export class WorkerLoop {
 		return true;
 	}
 
+	/**
+	 * Poll now instead of waiting out the idle gap — e.g. the heartbeat said
+	 * a live view is already waiting for this machine. A no-op while stopped,
+	 * paused, quarantined or mid-poll, so it can never double-lease.
+	 */
+	pollSoon(): void {
+		if (!this.running || this.stopping || this.paused || this.unsafe || this.activePolls.size > 0) return;
+		this.cancelTimer();
+		void this.tick();
+	}
+
+	/** The idle gap after an empty poll: the cadence's answer, else the fixed interval. */
+	private idleDelayMs(): number {
+		const cadence = this.options.pollCadence;
+		if (!cadence) return this.idlePollMs;
+		try {
+			const delay = cadence.nextIdleDelayMs();
+			return Number.isFinite(delay) && delay >= 0 ? Math.floor(delay) : this.idlePollMs;
+		} catch {
+			return this.idlePollMs;
+		}
+	}
+
 	/** Run one poll now. Exposed so a UI can offer "check for work" and tests can step. */
 	tick(): Promise<void> {
 		const poll = this.pollOnce();
@@ -789,11 +841,21 @@ export class WorkerLoop {
 		const pollController = new AbortController();
 		this.pollControllers.add(pollController);
 		try {
-			const request: { max: number; leaseTtlSec: number; capabilities?: string[] } = {
+			const request: {
+				max: number;
+				leaseTtlSec: number;
+				capabilities?: string[];
+				kinds?: FleetJobKind[];
+				excludeKinds?: FleetJobKind[];
+			} = {
 				max: capacity,
 				leaseTtlSec: this.leaseTtlSec
 			};
 			if (this.options.capabilities) request.capabilities = this.options.capabilities;
+			if (this.options.kinds && this.options.kinds.length > 0) request.kinds = [...this.options.kinds];
+			if (this.options.excludeKinds && this.options.excludeKinds.length > 0) {
+				request.excludeKinds = [...this.options.excludeKinds];
+			}
 			jobs = await this.options.client.lease(request, pollController.signal);
 		} catch (error) {
 			if (pollController.signal.aborted || this.stopping || !this.running) return;
@@ -844,10 +906,11 @@ export class WorkerLoop {
 		}
 
 		this.patch({ consecutiveFailures: 0, lastError: null });
+		this.options.pollCadence?.recordPoll(jobs.length);
 
 		if (jobs.length === 0) {
 			this.patch({ state: this.inFlight.size > 0 ? 'working' : 'idle' });
-			this.scheduleNext(this.idlePollMs);
+			this.scheduleNext(this.idleDelayMs());
 			return;
 		}
 

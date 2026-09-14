@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import {
     Dialog,
     DialogPanel,
@@ -36,7 +36,14 @@ interface HelpDrawerProps {
         totalSteps: number;
         onOpen: () => void;
     };
+    /**
+     * Tab to show each time the drawer opens. Omitted keeps the drawer on the
+     * tab the operator last chose (Tips on first open).
+     */
+    initialTab?: HelpDrawerTab;
 }
+
+export type HelpDrawerTab = 'tips' | 'shortcuts' | 'faq' | 'resources';
 
 const DOCS_URL = 'https://docs.ever.works/docs';
 const GITHUB_URL = 'https://github.com/ever-works/ever-works';
@@ -75,11 +82,15 @@ function SectionHeading({
     );
 }
 
-export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
+export function HelpDrawer({ open, onClose, onboarding, initialTab }: HelpDrawerProps) {
     const t = useTranslations('dashboard.header.help');
     const tCommon = useTranslations('common.ui');
 
-    const [activeTab, setActiveTab] = useState<'tips' | 'shortcuts' | 'faq' | 'resources'>('tips');
+    const [activeTab, setActiveTab] = useState<HelpDrawerTab>(initialTab ?? 'tips');
+
+    useEffect(() => {
+        if (open && initialTab) setActiveTab(initialTab);
+    }, [open, initialTab]);
 
     const quickTips = [
         { icon: '1', text: t('quickTips.tip1') },
@@ -89,7 +100,10 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     ];
 
     const keyboardShortcuts = [
-        { keys: ['Ctrl', 'K'], label: t('shortcuts.search') },
+        { keys: ['Ctrl', 'K'], label: t('shortcuts.palette') },
+        { keys: ['/'], label: t('shortcuts.paletteSlash') },
+        { keys: ['↑', '↓'], label: t('shortcuts.paletteNavigate') },
+        { keys: ['Tab'], label: t('shortcuts.paletteFilter') },
         { keys: ['C'], label: t('shortcuts.newWork') },
         { keys: ['?'], label: t('shortcuts.help') },
     ];

@@ -5,6 +5,8 @@ import { workAPI } from '@/lib/api';
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { AgentsPageTabs } from '@/components/agents/AgentsPageTabs';
 import { AgentSessionsClient } from '@/components/agents/AgentSessionsClient';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.agentsPage.sessions');
@@ -45,13 +47,23 @@ export default async function AgentSessionsPage() {
     return (
         <div className="w-full space-y-4">
             <AgentsPageTabs active="sessions" />
-            <div>
-                <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
-                    {t('title')}
-                </h1>
-                <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                    {t('subtitle')}
-                </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark">
+                        {t('title')}
+                    </h1>
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                        {t('subtitle')}
+                    </p>
+                </div>
+                {/* Runs ledger (AW-09) — the same runs on a calendar, with totals. */}
+                <Link
+                    href={ROUTES.DASHBOARD_RUNS}
+                    className="text-xs text-primary hover:underline"
+                    data-testid="agent-sessions-open-in-runs"
+                >
+                    {t('openInRuns')}
+                </Link>
             </div>
             <AgentSessionsClient
                 initialSessions={sessions}

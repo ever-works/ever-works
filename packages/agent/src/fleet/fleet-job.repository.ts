@@ -124,11 +124,36 @@ export class FleetJobRepository {
      * another PC's targeted backlog could fill the over-fetch window and hide
      * later unbound work from an otherwise idle node.
      */
-    async findQueuedForNode(userId: string, nodeId: string, limit: number): Promise<FleetJob[]> {
+    async findQueuedForNode(
+        userId: string,
+        nodeId: string,
+        limit: number,
+        filter: { kinds?: FleetJobKind[]; excludeKinds?: FleetJobKind[] } = {},
+    ): Promise<FleetJob[]> {
+        // Optional kind narrowing for a lane that polls for one kind (or
+        // never wants one). Absent = the exact query this always ran.
+        //
+        // Both filters are applied IN the predicate, before `take`. When a
+        // poll names both, the excluded kinds are removed from the included
+        // set here rather than after the fetch: otherwise excluded rows at
+        // the head of the queue could fill the window and hide eligible
+        // work further down it.
+        const excluded = filter.excludeKinds ?? [];
+        const included =
+            filter.kinds && filter.kinds.length > 0
+                ? filter.kinds.filter((candidate) => !excluded.includes(candidate))
+                : null;
+        // Every kind the poll asked for is also excluded: nothing can match.
+        if (included !== null && included.length === 0) return [];
+        const kind = included
+            ? { kind: In(included) }
+            : excluded.length > 0
+              ? { kind: Not(In(excluded)) }
+              : {};
         return this.repository.find({
             where: [
-                { userId, status: 'queued', targetNodeId: IsNull() },
-                { userId, status: 'queued', targetNodeId: nodeId },
+                { userId, status: 'queued', targetNodeId: IsNull(), ...kind },
+                { userId, status: 'queued', targetNodeId: nodeId, ...kind },
             ],
             order: { createdAt: 'ASC' },
             take: limit,

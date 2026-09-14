@@ -91,6 +91,20 @@ describe('TaskRunControls — parked on a fleet question (slice Q)', () => {
         expect(screen.getByTestId('task-run-awaiting-badge')).toBeTruthy();
     });
 
+    it("links to My Decisions filtered to the run's Task, and only when the run has one", () => {
+        render(<TaskRunControls run={run()} openQuestion={QUESTION} />);
+        const link = screen.getByTestId('task-run-all-decisions-link');
+        expect(link.getAttribute('href')).toBe('/inbox?view=decisions&taskId=t1');
+        expect(link.textContent).toBe('dashboard.tasksPage.detail.runControls.allDecisions');
+
+        const taskless = render(
+            <TaskRunControls run={run({ taskId: null })} openQuestion={QUESTION} />,
+        );
+        expect(
+            taskless.container.querySelector('[data-testid="task-run-all-decisions-link"]'),
+        ).toBeNull();
+    });
+
     it('URL-encodes the Inbox item id in the deep link', () => {
         render(<TaskRunControls run={run()} openQuestion={{ id: 'a b&c', title: 'q' }} />);
         expect(screen.getByTestId('task-run-open-question-link').getAttribute('href')).toBe(

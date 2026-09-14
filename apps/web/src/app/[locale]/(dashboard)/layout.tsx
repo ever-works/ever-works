@@ -6,6 +6,7 @@ import { healthAPI } from '@/lib/api/health';
 import { getWorkStats } from '@/app/actions/dashboard/works';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { onboardingAPI } from '@/lib/api/onboarding';
+import { changelogAPI } from '@/lib/api/changelog';
 import { ONBOARDING_DEFAULT_STATE } from '@ever-works/contracts/api';
 import type { OnboardingCatalogResponse, OnboardingStateResponse } from '@ever-works/contracts/api';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
@@ -53,6 +54,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         onboardingCatalog,
         apiVersion,
         jobRuntimeConfigured,
+        changelogUnreadCount,
     ] = await Promise.all([
         authAPI.getFreshProfile().catch(() => null),
         getWorkStats().catch(() => ({
@@ -70,6 +72,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         // configured (agent runs can execute). null on failure — the
         // banner only renders on a KNOWN misconfiguration.
         healthAPI.getJobRuntimeConfigured(),
+        // What's new (AW-14) — unread product changelog entries for the
+        // top-bar badge. Fetched once per shell render; null on any failure
+        // so the control renders with no badge and the shell never degrades.
+        changelogAPI.unreadCount().catch(() => null),
     ]);
 
     const hasGithubConnected =
@@ -115,6 +121,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             initialOnboardingCatalog={onboardingCatalog}
             apiVersion={apiVersion}
             jobRuntimeConfigured={jobRuntimeConfigured}
+            changelogUnreadCount={changelogUnreadCount}
         >
             {children}
         </DashboardLayoutClient>

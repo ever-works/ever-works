@@ -193,6 +193,10 @@
             "types": "./dist/schedules/index.d.ts",
             "default": "./dist/schedules/index.js"
         },
+        "./workspace-search": {
+            "types": "./dist/workspace-search/index.d.ts",
+            "default": "./dist/workspace-search/index.js"
+        },
         "./triggers": {
             "types": "./dist/triggers/index.d.ts",
             "default": "./dist/triggers/index.js"
@@ -200,6 +204,10 @@
         "./inbox": {
             "types": "./dist/inbox/index.d.ts",
             "default": "./dist/inbox/index.js"
+        },
+        "./email": {
+            "types": "./dist/email/index.d.ts",
+            "default": "./dist/email/index.js"
         },
         "./ingest": {
             "types": "./dist/ingest/index.d.ts",
@@ -216,6 +224,10 @@
         "./fleet": {
             "types": "./dist/fleet/index.d.ts",
             "default": "./dist/fleet/index.js"
+        },
+        "./computer": {
+            "types": "./dist/computer/index.d.ts",
+            "default": "./dist/computer/index.js"
         },
         "./pr-review": {
             "types": "./dist/pr-review/index.d.ts",

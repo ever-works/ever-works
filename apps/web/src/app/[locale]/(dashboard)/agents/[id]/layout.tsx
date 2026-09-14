@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { agentsAPI } from '@/lib/api/agents';
 import { AgentDetailTabs } from '@/components/agents';
+import { isFleetEnabled } from '@/lib/fleet-flags';
 
 type LayoutParams = {
     params: Promise<{ id: string }>;
@@ -47,7 +48,7 @@ export default async function AgentLayout({ params, children }: LayoutParams) {
                     </p>
                 )}
             </header>
-            <AgentDetailTabs agentId={agent.id} />
+            <AgentDetailTabs agentId={agent.id} showComputer={isFleetEnabled()} />
             <div className="flex-1 min-h-0 overflow-auto">{children}</div>
         </div>
     );

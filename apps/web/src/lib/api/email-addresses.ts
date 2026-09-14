@@ -1,4 +1,6 @@
 import 'server-only';
+import type { AgentInboxDto, AgentInboxMode, EmailMessageStatus } from '@ever-works/contracts';
+import type { AgentEmailSendPolicyView } from '../agent-email-policy';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -41,6 +43,41 @@ export interface EmailMessageListItem {
     receivedAt: string | null;
     deliveryStatus: string | null;
     createdAt: string;
+    /** AW-05 — where the message is in its life (`draft` waits for approval). */
+    status?: EmailMessageStatus | null;
+    approvedById?: string | null;
+    failureReason?: string | null;
+}
+
+/** AW-05 — which of the owner's addresses an Agent sends from / receives at. */
+export interface AgentEmailAssignment {
+    id: string;
+    agentId: string;
+    emailAddressId: string;
+    address: string | null;
+    direction: 'outbound' | 'inbound';
+    priority: number;
+    dispatchMode: 'task-spawn' | 'conversation';
+    createdAt: string;
+}
+
+/** AW-05 — a per-Agent inbox settings patch. Ceilings: null = inherit, 0 = no limit. */
+export interface AgentInboxSettingsInput {
+    mode?: AgentInboxMode;
+    emailAddressId?: string | null;
+    dailySendCap?: number | null;
+    burstSendCap?: number | null;
+    recipientBurstCap?: number | null;
+    recipientsPerMessageCap?: number | null;
+}
+
+export interface EmailDraftDecision {
+    id: string;
+    status: EmailMessageStatus | null;
+    approvedById: string | null;
+    approvedAt: string | null;
+    sentAt: string | null;
+    failureReason: string | null;
 }
 
 export interface EmailMessageDetail extends EmailMessageListItem {
@@ -123,5 +160,58 @@ export const emailAddressesAPI = {
             wrapInData: false,
         });
         return data.result;
+    },
+
+    // ── Agent email (AW-05) ─────────────────────────────────────────
+    getAgentSendPolicy: async (agentId: string) =>
+        serverFetch<AgentEmailSendPolicyView>(
+            `/email/agents/${encodeURIComponent(agentId)}/send-policy`,
+        ),
+    updateAgentInbox: async (agentId: string, input: AgentInboxSettingsInput) =>
+        serverMutation<AgentEmailSendPolicyView & { inbox: AgentInboxDto; created: boolean }>({
+            method: 'PUT',
+            endpoint: `/email/agents/${encodeURIComponent(agentId)}/inbox`,
+            data: input,
+            wrapInData: false,
+        }),
+    approveDraft: async (messageId: string) =>
+        serverMutation<{ message: EmailDraftDecision }>({
+            method: 'POST',
+            endpoint: `/email/messages/${encodeURIComponent(messageId)}/approve`,
+            data: {},
+            wrapInData: false,
+        }),
+    discardDraft: async (messageId: string) =>
+        serverMutation<{ message: EmailDraftDecision }>({
+            method: 'POST',
+            endpoint: `/email/messages/${encodeURIComponent(messageId)}/discard`,
+            data: {},
+            wrapInData: false,
+        }),
+    listAgentAssignments: async (agentId: string) => {
+        const data = await serverFetch<{ assignments: AgentEmailAssignment[] }>(
+            `/email/agents/${encodeURIComponent(agentId)}/assignments`,
+        );
+        return data.assignments;
+    },
+    createAgentAssignment: async (
+        agentId: string,
+        input: { emailAddressId: string; direction: 'outbound' | 'inbound' },
+    ) => {
+        const data = await serverMutation<{ assignment: AgentEmailAssignment }>({
+            method: 'POST',
+            endpoint: `/email/agents/${encodeURIComponent(agentId)}/assignments`,
+            data: input,
+            wrapInData: false,
+        });
+        return data.assignment;
+    },
+    removeAgentAssignment: async (assignmentId: string) => {
+        await serverMutation<void>({
+            method: 'DELETE',
+            endpoint: `/email/assignments/${encodeURIComponent(assignmentId)}`,
+            data: {},
+            wrapInData: false,
+        });
     },
 };

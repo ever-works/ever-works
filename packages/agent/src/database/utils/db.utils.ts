@@ -23,15 +23,35 @@ export function buildCaseInsensitiveLikeClause(
     columnExpression: string,
     paramName = 'search',
 ): string {
+    assertTrustedColumnExpression('buildCaseInsensitiveLikeClause', columnExpression);
+    return `LOWER(${columnExpression}) LIKE :${paramName} ESCAPE '\\'`;
+}
+
+/**
+ * Builds a portable case-insensitive equality clause for PostgreSQL, MySQL, and SQLite.
+ * Bind the parameter to an already lower-cased value.
+ *
+ * @param columnExpression - Must be a trusted, hardcoded column identifier (e.g. 'work.name'
+ *   or a TypeORM-generated alias). Never pass user-controlled input here.
+ * @param paramName - The named parameter token compared against.
+ */
+export function buildCaseInsensitiveEqualsClause(
+    columnExpression: string,
+    paramName = 'search',
+): string {
+    assertTrustedColumnExpression('buildCaseInsensitiveEqualsClause', columnExpression);
+    return `LOWER(${columnExpression}) = :${paramName}`;
+}
+
+function assertTrustedColumnExpression(caller: string, columnExpression: string): void {
     // Security: allowlist check — column expressions must be dotted SQL identifiers or
     // TypeORM-generated aliases (alphanumeric, underscores, dots). Reject anything else
     // to prevent SQL injection if a future caller inadvertently passes user-controlled input.
     if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(columnExpression)) {
         throw new Error(
-            `buildCaseInsensitiveLikeClause: columnExpression must be a trusted SQL identifier, got: ${JSON.stringify(columnExpression)}`,
+            `${caller}: columnExpression must be a trusted SQL identifier, got: ${JSON.stringify(columnExpression)}`,
         );
     }
-    return `LOWER(${columnExpression}) LIKE :${paramName} ESCAPE '\\'`;
 }
 
 /**

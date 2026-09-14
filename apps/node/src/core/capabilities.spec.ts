@@ -475,3 +475,72 @@ describe('git-push capability (scoped push credentials)', () => {
 		expect(await probeGit(gitRunner(null))).toEqual({ present: false, scopedPush: false });
 	});
 });
+
+describe('detectCapabilities — live view tags (Agent computers)', () => {
+	it('advertises neither `attended` nor `screen` on a machine started without --attend', async () => {
+		const tags = await detectCapabilities(runnerWith([]), environment({ browserPath: '/usr/bin/chromium' }));
+		expect(tags).not.toContain('attended');
+		expect(tags).not.toContain('screen');
+	});
+
+	it('advertises `screen` only when --attend is on AND a capture backend can take a picture', async () => {
+		const attendedWithBrowser = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, browserPath: '/usr/bin/chromium' })
+		);
+		expect(attendedWithBrowser).toEqual(expect.arrayContaining(['attended', 'screen', 'terminal']));
+
+		const attendedHeadlessServer = await detectCapabilities(runnerWith([]), environment({ attended: true }));
+		expect(attendedHeadlessServer).toContain('attended');
+		expect(attendedHeadlessServer).toContain('terminal');
+		expect(attendedHeadlessServer).not.toContain('screen');
+	});
+
+	it('advertises `screen` from the backends the live-view lane was built with, not from a resolved browser', async () => {
+		const unavailable = { id: 'none', isAvailable: () => false };
+		const custom = { id: 'custom', isAvailable: () => true };
+
+		const browserButNoBackend = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, browserPath: '/usr/bin/chromium', captureBackends: [] })
+		);
+		expect(browserButNoBackend).toContain('attended');
+		expect(browserButNoBackend).not.toContain('screen');
+
+		const browserButUnavailableBackend = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, browserPath: '/usr/bin/chromium', captureBackends: [unavailable] })
+		);
+		expect(browserButUnavailableBackend).not.toContain('screen');
+
+		const customWithoutBrowser = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, captureBackends: [custom] })
+		);
+		expect(customWithoutBrowser).toEqual(expect.arrayContaining(['attended', 'screen']));
+
+		const customWithoutAttend = await detectCapabilities(
+			runnerWith([]),
+			environment({ captureBackends: [custom] })
+		);
+		expect(customWithoutAttend).not.toContain('screen');
+	});
+
+	it('never advertises `input`: nothing on this node injects input yet', async () => {
+		const tags = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, hasDisplay: true, browserPath: '/usr/bin/chromium' })
+		);
+		expect(tags).not.toContain('input');
+	});
+
+	it('keeps `attended` and `screen` through an operator selection that predates them', async () => {
+		const description = await describeSelf(
+			runnerWith([]),
+			environment({ attended: true, browserPath: '/usr/bin/chromium' }),
+			'0.2.0',
+			['terminal']
+		);
+		expect(description.capabilities).toEqual(expect.arrayContaining(['attended', 'screen', 'terminal']));
+	});
+});

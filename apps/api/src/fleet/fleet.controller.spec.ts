@@ -586,6 +586,116 @@ describe('FleetController', () => {
             ).resolves.toEqual({ ok: true, node: nodeView });
         });
 
+        /**
+         * Agent computers — an attended machine learns from its heartbeat
+         * that a live view is already waiting for it. The field is additive:
+         * absent whenever nothing is pending, so every other response keeps
+         * its exact shape and an older daemon never sees it.
+         */
+        describe('pending live-view hint', () => {
+            const beat = { nodeId: nodeView.id, secret: 'x'.repeat(43) } as FleetHeartbeatDto;
+            const attended = { ...nodeView, capabilities: ['terminal', 'attended'] };
+            const SESSION = '22222222-2222-4222-8222-222222222222';
+
+            function withLookup(pendingForNode: jest.Mock) {
+                return new FleetController(
+                    service as never,
+                    jobs as never,
+                    { status: jest.fn() } as never,
+                    {} as never,
+                    {} as never,
+                    { drainNodeForUser: jest.fn(async () => null) } as never,
+                    undefined,
+                    undefined,
+                    { pendingForNode } as never,
+                );
+            }
+
+            it('carries the waiting views for an online, attended machine', async () => {
+                const pendingForNode = jest.fn(async () => [SESSION]);
+                service.heartbeat.mockResolvedValue({ node: attended });
+
+                const result = await withLookup(pendingForNode).heartbeat(beat);
+
+                expect(pendingForNode).toHaveBeenCalledWith(nodeView.id);
+                expect(result).toEqual({
+                    ok: true,
+                    node: attended,
+                    pendingComputerSessions: [SESSION],
+                });
+            });
+
+            it('runs the waiting-job promotion and the live-view lookup concurrently, not one after the other', async () => {
+                let releasePromotion: () => void = () => undefined;
+                jobs.promoteWaitingForNode.mockImplementationOnce(
+                    () =>
+                        new Promise<number>((resolve) => {
+                            releasePromotion = () => resolve(0);
+                        }),
+                );
+                const pendingForNode = jest.fn(async () => [SESSION]);
+                service.heartbeat.mockResolvedValue({ node: attended });
+
+                const beating = withLookup(pendingForNode).heartbeat(beat);
+                await new Promise((resolve) => setImmediate(resolve));
+
+                // The lookup started while the promotion is still in flight.
+                expect(jobs.promoteWaitingForNode).toHaveBeenCalledWith(nodeView.id);
+                expect(pendingForNode).toHaveBeenCalledWith(nodeView.id);
+                releasePromotion();
+                await expect(beating).resolves.toEqual({
+                    ok: true,
+                    node: attended,
+                    pendingComputerSessions: [SESSION],
+                });
+            });
+
+            it('still carries the waiting views when the promotion fails', async () => {
+                jobs.promoteWaitingForNode.mockRejectedValueOnce(new Error('db down'));
+                service.heartbeat.mockResolvedValue({ node: attended });
+                await expect(
+                    withLookup(jest.fn(async () => [SESSION])).heartbeat(beat),
+                ).resolves.toEqual({
+                    ok: true,
+                    node: attended,
+                    pendingComputerSessions: [SESSION],
+                });
+            });
+
+            it('is absent — not an empty list — when nothing is waiting', async () => {
+                service.heartbeat.mockResolvedValue({ node: attended });
+                const result = await withLookup(jest.fn(async () => [])).heartbeat(beat);
+                expect('pendingComputerSessions' in result).toBe(false);
+            });
+
+            it('never asks for a machine that is not online or never switched live viewing on', async () => {
+                const pendingForNode = jest.fn(async () => [SESSION]);
+                const controllerWithLookup = withLookup(pendingForNode);
+
+                service.heartbeat.mockResolvedValue({ node: nodeView });
+                expect(
+                    'pendingComputerSessions' in (await controllerWithLookup.heartbeat(beat)),
+                ).toBe(false);
+
+                service.heartbeat.mockResolvedValue({ node: { ...attended, status: 'paused' } });
+                expect(
+                    'pendingComputerSessions' in (await controllerWithLookup.heartbeat(beat)),
+                ).toBe(false);
+
+                expect(pendingForNode).not.toHaveBeenCalled();
+            });
+
+            it('never fails the beat when the lookup fails, and is absent when nothing is wired', async () => {
+                service.heartbeat.mockResolvedValue({ node: attended });
+                await expect(
+                    withLookup(jest.fn(async () => Promise.reject(new Error('db down')))).heartbeat(
+                        beat,
+                    ),
+                ).resolves.toEqual({ ok: true, node: attended });
+                expect('pendingComputerSessions' in (await controller.heartbeat(beat))).toBe(false);
+            });
+        });
+
         it('rotate-credential maps every refusal to ONE undifferentiated 401', async () => {
             // A distinct message per refusal would turn this route into a
             // probe for which node ids exist and which are mid-rotation.

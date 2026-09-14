@@ -1,6 +1,14 @@
 name: Deploy to Trigger.dev Dev
 
+# The `workflow_run` trigger below CAN NO LONGER FIRE (2026-09-14). CI stopped
+# running on `develop` when the heavy suites were narrowed to stage/main, so no CI
+# run will ever again have head_branch=develop. That is harmless today - the job
+# is gated off by TRIGGER_SELFHOSTED=true anyway - but the rollback the job comment
+# documents ("flip the flag back to re-enable this cloud path") would otherwise
+# have been a dead instruction: flipping the flag would re-enable a job nothing can
+# start. `workflow_dispatch` is added so that rollback remains real.
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["CI"]
     branches: [develop]

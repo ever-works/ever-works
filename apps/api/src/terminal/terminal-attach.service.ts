@@ -23,7 +23,20 @@ export interface TerminalAttachClaims {
     role: TerminalClientRole;
     /** Unix ms expiry. */
     exp: number;
+    /**
+     * Which socket family the token opens. Absent (every token minted
+     * before this field existed, and every terminal token) means the
+     * run's terminal. `computer` means an Agent computer live view, in
+     * which case `runId` carries the live-view session id — the relay key
+     * of that channel. The terminal gateway refuses a `computer` token and
+     * the computer gateway refuses one without it, so a token minted for
+     * one channel can never open the other.
+     */
+    channel?: TerminalAttachChannel;
 }
+
+/** Socket families that share this signer. Only the non-default one is ever stamped. */
+export type TerminalAttachChannel = 'computer';
 
 export const TERMINAL_ATTACH_TOKEN_TTL_SECONDS = 60;
 
@@ -72,6 +85,11 @@ export class TerminalAttachService {
             ...claims,
             exp: Date.now() + TERMINAL_ATTACH_TOKEN_TTL_SECONDS * 1000,
         };
+        // A terminal token stays byte-for-byte what it always was: the
+        // channel claim is written only when a caller names one.
+        if (payload.channel === undefined) {
+            delete payload.channel;
+        }
         const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
         const mac = createHmac('sha256', key).update(body).digest('base64url');
         return { token: `${body}.${mac}`, expiresInSec: TERMINAL_ATTACH_TOKEN_TTL_SECONDS };
@@ -106,7 +124,8 @@ export class TerminalAttachService {
                 (claims.role !== 'driver' &&
                     claims.role !== 'viewer' &&
                     claims.role !== 'worker') ||
-                typeof claims.exp !== 'number'
+                typeof claims.exp !== 'number' ||
+                (claims.channel !== undefined && claims.channel !== 'computer')
             ) {
                 return null;
             }
