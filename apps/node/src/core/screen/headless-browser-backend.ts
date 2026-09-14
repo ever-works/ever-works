@@ -225,6 +225,19 @@ function mouseButton(button: 'left' | 'middle' | 'right' | null): 'left' | 'midd
 }
 
 /**
+ * The button a move is dragging with, from the pressed-buttons bitmask
+ * (1 left, 2 right, 4 middle): a move carries no `button` of its own, and a
+ * move reported with none pressed is a hover, not a drag.
+ */
+function draggingButton(buttons: number | undefined): 'left' | 'middle' | 'right' | null {
+	if (buttons === undefined) return null;
+	if (buttons & 1) return 'left';
+	if (buttons & 2) return 'right';
+	if (buttons & 4) return 'middle';
+	return null;
+}
+
+/**
  * One input frame as the browser debugging protocol call that performs it,
  * with picture pixels mapped back to the page's CSS pixels by the scale the
  * last picture was taken at. Pure, so the mapping is testable without a
@@ -238,22 +251,23 @@ export function inputToProtocolCall(
 	const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
 	const toPage = (value: number) => Math.round((value / safeScale) * 100) / 100;
 	switch (input.kind) {
-		case 'pointer':
-			return {
-				method: 'Input.dispatchMouseEvent',
-				params: {
-					type:
-						input.action === 'move'
-							? 'mouseMoved'
-							: input.action === 'down'
-								? 'mousePressed'
-								: 'mouseReleased',
-					x: toPage(input.x),
-					y: toPage(input.y),
-					button: mouseButton(input.button),
-					clickCount: input.action === 'move' ? 0 : 1
-				}
+		case 'pointer': {
+			const params: Record<string, unknown> = {
+				type:
+					input.action === 'move' ? 'mouseMoved' : input.action === 'down' ? 'mousePressed' : 'mouseReleased',
+				x: toPage(input.x),
+				y: toPage(input.y),
+				button: mouseButton(
+					input.action === 'move' && input.button === null ? draggingButton(input.buttons) : input.button
+				),
+				clickCount: input.action === 'move' ? 0 : 1
 			};
+			// Which buttons are held once this event has happened: what keeps a
+			// move a drag (the protocol reads a move with none as a hover), and
+			// 0 after the last release.
+			if (input.buttons !== undefined) params.buttons = input.buttons;
+			return { method: 'Input.dispatchMouseEvent', params };
+		}
 		case 'scroll':
 			return {
 				method: 'Input.dispatchMouseEvent',

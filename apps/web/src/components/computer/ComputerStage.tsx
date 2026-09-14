@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils/cn';
 import {
     COMPUTER_ESCAPE_TWICE_WINDOW_MS,
     keyEventToFrame,
+    pointerButtonsMask,
     pointerToPicture,
     type ComputerStallState,
 } from './computer-session.shared';
@@ -118,6 +119,10 @@ export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function Com
     const sectionRef = useRef<HTMLElement | null>(null);
     const lastEscapeRef = useRef(0);
     const lastMoveRef = useRef(0);
+    /** The last point forwarded on the picture: where a release with no point of its own lands. */
+    const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+    /** The button pressed on the picture and not yet released. */
+    const pressedButtonRef = useRef<'left' | 'middle' | 'right' | null>(null);
     const inputRef = useRef(onInput);
     const escapeTwiceRef = useRef(onEscapeTwice);
     useEffect(() => {
@@ -213,27 +218,57 @@ export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function Com
         return () => section.removeEventListener('wheel', onWheel);
     }, [driving]);
 
+    /**
+     * A pointer event on the picture, forwarded. A release is NEVER dropped:
+     * one off the picture is pinned to its nearest edge (the pointer is
+     * captured on press, so a release outside the stage still arrives), and
+     * a cancelled pointer releases the button it pressed — otherwise the
+     * computer would keep that button held and carry on a drag or selection.
+     * Every event carries the buttons still held, which is what makes a move
+     * a drag on the computer.
+     */
     const forwardPointer = (
         event: ReactPointerEvent<HTMLCanvasElement>,
         action: 'move' | 'down' | 'up',
+        cancelled = false,
     ) => {
         if (!driving) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
+        if (cancelled && !pressedButtonRef.current) return;
         if (action === 'move') {
             const at = Date.now();
             if (at - lastMoveRef.current < POINTER_MOVE_INTERVAL_MS) return;
             lastMoveRef.current = at;
         }
-        const point = pointerToPicture(event, canvas.getBoundingClientRect(), canvas);
+        const releasing = action === 'up';
+        // A cancelled pointer has no meaningful position: release where it last was.
+        const point = cancelled
+            ? lastPointRef.current
+            : (pointerToPicture(event, canvas.getBoundingClientRect(), canvas, {
+                  clamp: releasing,
+              }) ?? (releasing ? lastPointRef.current : null));
         if (!point) return;
         event.preventDefault();
-        inputRef.current?.({
-            kind: 'pointer',
-            action,
-            ...point,
-            button: action === 'move' ? null : pointerButton(event.button),
-        });
+        lastPointRef.current = point;
+        const button =
+            action === 'move'
+                ? null
+                : cancelled
+                  ? pressedButtonRef.current
+                  : pointerButton(event.button);
+        const buttons = cancelled ? 0 : pointerButtonsMask(event.buttons);
+        if (action === 'down') {
+            pressedButtonRef.current = button;
+            try {
+                canvas.setPointerCapture?.(event.pointerId);
+            } catch {
+                // a pointer that is already gone cannot be captured
+            }
+        } else if (releasing && buttons === 0) {
+            pressedButtonRef.current = null;
+        }
+        inputRef.current?.({ kind: 'pointer', action, ...point, button, buttons });
     };
 
     const forwardKey = (event: ReactKeyboardEvent<HTMLElement>, action: 'down' | 'up') => {
@@ -296,6 +331,7 @@ export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function Com
                     onPointerMove={(event) => forwardPointer(event, 'move')}
                     onPointerDown={(event) => forwardPointer(event, 'down')}
                     onPointerUp={(event) => forwardPointer(event, 'up')}
+                    onPointerCancel={(event) => forwardPointer(event, 'up', true)}
                     className={cn(
                         'max-h-full max-w-full object-contain transition-opacity',
                         (stalled || stall === 'dead') && 'opacity-40',

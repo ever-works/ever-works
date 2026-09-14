@@ -6,6 +6,7 @@ import {
     COMPUTER_KEY_MODIFIER_META,
     COMPUTER_KEY_MODIFIER_SHIFT,
     COMPUTER_MAX_DIMENSION,
+    COMPUTER_MAX_POINTER_BUTTONS,
     COMPUTER_QUALITIES,
     computerStallStateForAge,
     isComputerChannel,
@@ -547,12 +548,15 @@ export function describeControlRefusal(status: number, body: unknown): ComputerC
  * Where a pointer on the stage lands in the picture, in picture pixels. The
  * canvas is scaled to fit and centred (letterboxed), so the picture occupies
  * a centred box inside the element; a point in the margins is outside it
- * and maps to null.
+ * and maps to null — unless `clamp` is set, which pins it to the nearest
+ * picture edge instead (a button released off the picture must still be
+ * released on the computer). An empty stage or picture is always null.
  */
 export function pointerToPicture(
     point: { clientX: number; clientY: number },
     box: { left: number; top: number; width: number; height: number },
     picture: { width: number; height: number },
+    options: { clamp?: boolean } = {},
 ): { x: number; y: number } | null {
     if (box.width <= 0 || box.height <= 0 || picture.width <= 0 || picture.height <= 0) return null;
     const scale = Math.min(box.width / picture.width, box.height / picture.height);
@@ -560,13 +564,27 @@ export function pointerToPicture(
     const shownHeight = picture.height * scale;
     const offsetX = box.left + (box.width - shownWidth) / 2;
     const offsetY = box.top + (box.height - shownHeight) / 2;
-    const x = (point.clientX - offsetX) / scale;
-    const y = (point.clientY - offsetY) / scale;
-    if (x < 0 || y < 0 || x >= picture.width || y >= picture.height) return null;
+    let x = (point.clientX - offsetX) / scale;
+    let y = (point.clientY - offsetY) / scale;
+    const outside = x < 0 || y < 0 || x >= picture.width || y >= picture.height;
+    if (outside && !options.clamp) return null;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    x = Math.max(0, Math.min(picture.width - 1, x));
+    y = Math.max(0, Math.min(picture.height - 1, y));
     return {
         x: Math.min(COMPUTER_MAX_DIMENSION, Math.floor(x)),
         y: Math.min(COMPUTER_MAX_DIMENSION, Math.floor(y)),
     };
+}
+
+/**
+ * The pressed-buttons bitmask of a pointer event, as the computer takes it
+ * (1 left, 2 right, 4 middle, 8 back, 16 forward): what makes a move a drag,
+ * and 0 once the last button is released. Anything unreadable is 0.
+ */
+export function pointerButtonsMask(buttons: unknown): number {
+    if (typeof buttons !== 'number' || !Number.isInteger(buttons) || buttons < 0) return 0;
+    return buttons & COMPUTER_MAX_POINTER_BUTTONS;
 }
 
 /** The `key` frame for a keyboard event, or null for one this page never forwards. */

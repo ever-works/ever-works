@@ -358,6 +358,25 @@ describe('HeadlessBrowserCaptureBackend — a person driving the Agent’s brows
 		});
 	});
 
+	it('keeps a drag a drag: a move carries the held buttons, and the release leaves none', () => {
+		expect(
+			inputToProtocolCall({ kind: 'pointer', action: 'down', x: 10, y: 10, button: 'left', buttons: 1 }, 1).params
+		).toEqual({ type: 'mousePressed', x: 10, y: 10, button: 'left', buttons: 1, clickCount: 1 });
+		expect(
+			inputToProtocolCall({ kind: 'pointer', action: 'move', x: 60, y: 30, button: null, buttons: 1 }, 1).params
+		).toEqual({ type: 'mouseMoved', x: 60, y: 30, button: 'left', buttons: 1, clickCount: 0 });
+		expect(
+			inputToProtocolCall({ kind: 'pointer', action: 'move', x: 60, y: 30, button: null, buttons: 2 }, 1).params
+		).toMatchObject({ button: 'right', buttons: 2 });
+		expect(
+			inputToProtocolCall({ kind: 'pointer', action: 'up', x: 80, y: 30, button: 'left', buttons: 0 }, 1).params
+		).toEqual({ type: 'mouseReleased', x: 80, y: 30, button: 'left', buttons: 0, clickCount: 1 });
+		// A hover (no button held) stays a hover.
+		expect(
+			inputToProtocolCall({ kind: 'pointer', action: 'move', x: 1, y: 2, button: null, buttons: 0 }, 1).params
+		).toEqual({ type: 'mouseMoved', x: 1, y: 2, button: 'none', buttons: 0, clickCount: 0 });
+	});
+
 	it('types characters, sends raw keys for everything else, and inserts text as one edit', () => {
 		expect(inputToProtocolCall({ kind: 'key', action: 'down', key: 'a', code: 'KeyA', modifiers: 8 }, 1)).toEqual({
 			method: 'Input.dispatchKeyEvent',

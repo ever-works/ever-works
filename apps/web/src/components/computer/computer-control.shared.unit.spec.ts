@@ -9,6 +9,7 @@ import {
     isControlStateView,
     keyEventToFrame,
     msUntil,
+    pointerButtonsMask,
     pointerToPicture,
     serverClockOffsetMs,
     takeOverAvailability,
@@ -215,6 +216,28 @@ describe('pointerToPicture', () => {
         });
     });
 
+    it('pins a point off the picture to its nearest edge when asked to clamp', () => {
+        const box = { left: 0, top: 0, width: 1000, height: 600 };
+        expect(
+            pointerToPicture({ clientX: 50, clientY: 300 }, box, picture, { clamp: true }),
+        ).toEqual({ x: 0, y: 300 });
+        expect(
+            pointerToPicture({ clientX: 2000, clientY: -40 }, box, picture, { clamp: true }),
+        ).toEqual({ x: 799, y: 0 });
+        // A point on the picture is the same either way.
+        expect(
+            pointerToPicture({ clientX: 500, clientY: 300 }, box, picture, { clamp: true }),
+        ).toEqual({ x: 400, y: 300 });
+        expect(
+            pointerToPicture(
+                { clientX: 1, clientY: 1 },
+                { left: 0, top: 0, width: 0, height: 0 },
+                picture,
+                { clamp: true },
+            ),
+        ).toBeNull();
+    });
+
     it('refuses an empty stage or picture', () => {
         expect(
             pointerToPicture(
@@ -230,6 +253,18 @@ describe('pointerToPicture', () => {
                 { width: 0, height: 0 },
             ),
         ).toBeNull();
+    });
+});
+
+describe('pointerButtonsMask', () => {
+    it('keeps the held buttons a pointer event reports, and reads anything else as none', () => {
+        expect(pointerButtonsMask(1)).toBe(1);
+        expect(pointerButtonsMask(5)).toBe(5);
+        expect(pointerButtonsMask(0)).toBe(0);
+        expect(pointerButtonsMask(64 | 1)).toBe(1);
+        for (const junk of [-1, 1.5, Number.NaN, '1', undefined, null]) {
+            expect(pointerButtonsMask(junk)).toBe(0);
+        }
     });
 });
 
