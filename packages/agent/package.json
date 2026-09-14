@@ -209,6 +209,10 @@
             "types": "./dist/email/index.d.ts",
             "default": "./dist/email/index.js"
         },
+        "./model-routing": {
+            "types": "./dist/model-routing/index.d.ts",
+            "default": "./dist/model-routing/index.js"
+        },
         "./ingest": {
             "types": "./dist/ingest/index.d.ts",
             "default": "./dist/ingest/index.js"
