@@ -89,6 +89,10 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.SCHEDULE_UPDATED]: 'system',
     [ActivityActionType.SCHEDULE_DELETED]: 'system',
     [ActivityActionType.SCHEDULE_EXECUTED]: 'work',
+    // Schedules workspace pause / resume — an owner changing a cadence's
+    // control state, the same configuration shape as create/update/delete.
+    [ActivityActionType.SCHEDULE_PAUSED]: 'system',
+    [ActivityActionType.SCHEDULE_RESUMED]: 'system',
 
     // Import / export
     [ActivityActionType.IMPORT]: 'work',

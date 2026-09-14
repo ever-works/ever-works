@@ -112,6 +112,10 @@ export const ROUTES = {
     // each with a receipt. `?g=` granularity, `?d=` anchor date, `?run=` opens
     // a receipt; the filters ride along as `agent` / `kind` / `status` / `q`.
     DASHBOARD_RUNS: '/runs',
+    // Schedules workspace — every recurring definition from every source,
+    // with run-now / pause / resume. The Activity page's Schedules tab keeps
+    // working and links here.
+    DASHBOARD_SCHEDULES: '/schedules',
     // Inbox (operator message center) — messages addressed to the human:
     // blocking agent questions, approval requests, escalations, notices.
     // `?view=archived` switches tabs; `?id=` deep-links one message (the

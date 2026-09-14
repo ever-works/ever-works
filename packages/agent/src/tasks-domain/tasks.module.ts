@@ -65,6 +65,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DatabaseModule } from '../database/database.module';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 
 /**
  * Tasks feature — Phases 11 + 12 + 13.
@@ -209,6 +210,11 @@ import { DatabaseModule } from '../database/database.module';
         // (FacadesModule, imported above) and treats it as @Optional(), so
         // a deployment with no AI provider degrades to "no judge".
         TaskGateJudgeService,
+        // Schedules — the per-template run-now claim `TasksService` holds
+        // across the in-flight check, the instance insert and the dispatch.
+        // Backed by `cache_entries` through DatabaseModule (imported above);
+        // local, not exported, like CommunityPrModule's copy.
+        DistributedTaskLockService,
     ],
     exports: [
         TaskRepository,

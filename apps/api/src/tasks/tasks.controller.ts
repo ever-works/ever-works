@@ -498,6 +498,20 @@ export class TasksController {
         );
     }
 
+    @Post(':id/recurring/run-now')
+    @ApiOperation({
+        summary:
+            'Fire this recurring template now, out of band. Spawns one instance and dispatches it through the same gated path a scheduled fire uses; the next scheduled fire is NOT moved. Allowed on a paused template (does not resume it). 409 SCHEDULE_ALREADY_RUNNING / SCHEDULE_NO_AGENT / SCHEDULE_OWNER_ARCHIVED; 400 SCHEDULE_NOT_RECURRING.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async runRecurringNow(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.runRecurringNow(auth.userId, id, this.scopeContext.getScope());
+    }
+
     // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
 
     @Post(':id/schedule')

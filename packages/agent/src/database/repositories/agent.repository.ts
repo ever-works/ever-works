@@ -314,16 +314,22 @@ export class AgentRepository {
      * triggered explicitly via `POST /agents/:id/run-now`.
      */
     async findDueForHeartbeat(limit: number, now: Date = new Date()): Promise<Agent[]> {
-        return this.repository
-            .createQueryBuilder('agent')
-            .where('agent.status = :active', { active: AgentStatus.ACTIVE })
-            .andWhere('agent.heartbeatCadence IS NOT NULL')
-            .andWhere("agent.heartbeatCadence != 'manual'")
-            .andWhere('agent.nextHeartbeatAt IS NOT NULL')
-            .andWhere('agent.nextHeartbeatAt <= :now', { now })
-            .orderBy('agent.nextHeartbeatAt', 'ASC')
-            .take(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('agent')
+                .where('agent.status = :active', { active: AgentStatus.ACTIVE })
+                // Schedules — a paused heartbeat keeps its cadence and its
+                // `nextHeartbeatAt` but is not due. The Agent itself stays
+                // ACTIVE for assigned Tasks, chat and manual run-now.
+                .andWhere('agent.heartbeatPausedAt IS NULL')
+                .andWhere('agent.heartbeatCadence IS NOT NULL')
+                .andWhere("agent.heartbeatCadence != 'manual'")
+                .andWhere('agent.nextHeartbeatAt IS NOT NULL')
+                .andWhere('agent.nextHeartbeatAt <= :now', { now })
+                .orderBy('agent.nextHeartbeatAt', 'ASC')
+                .take(limit)
+                .getMany()
+        );
     }
 
     /**
@@ -340,9 +346,13 @@ export class AgentRepository {
     async tryClaimForRun(agentId: string): Promise<Date | null> {
         const agent = await this.repository.findOne({
             where: { id: agentId },
-            select: ['id', 'nextHeartbeatAt', 'status'],
+            select: ['id', 'nextHeartbeatAt', 'status', 'heartbeatPausedAt'],
         });
         if (!agent?.nextHeartbeatAt || agent.status !== AgentStatus.ACTIVE) {
+            return null;
+        }
+        // Schedules — paused between the due-scan read and this claim.
+        if (agent.heartbeatPausedAt) {
             return null;
         }
 
@@ -361,6 +371,7 @@ export class AgentRepository {
             .where('id = :id', { id: agentId })
             .andWhere('status = :active', { active: AgentStatus.ACTIVE })
             .andWhere('nextHeartbeatAt = :originalNext', { originalNext })
+            .andWhere('heartbeatPausedAt IS NULL')
             .execute();
 
         return (result.affected ?? 0) > 0 ? originalNext : null;
