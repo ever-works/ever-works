@@ -188,13 +188,13 @@ describe('isFleetJobTerminal / isFleetJobActive', () => {
 });
 
 describe('FLEET_JOB_KINDS', () => {
-	it('lists the three executors', () => {
-		expect(FLEET_JOB_KINDS).toEqual(['acceptance-checks', 'agent-task', 'browser-check']);
+	it('lists the three executors plus the live-view session', () => {
+		expect(FLEET_JOB_KINDS).toEqual(['acceptance-checks', 'agent-task', 'browser-check', 'computer-session']);
 	});
 
-	it('has exactly three unique members', () => {
-		expect(FLEET_JOB_KINDS).toHaveLength(3);
-		expect(new Set(FLEET_JOB_KINDS).size).toBe(3);
+	it('has exactly four unique members', () => {
+		expect(FLEET_JOB_KINDS).toHaveLength(4);
+		expect(new Set(FLEET_JOB_KINDS).size).toBe(4);
 	});
 });
 
@@ -916,7 +916,8 @@ describe('clampQueuedMaxAgeSec (queue SLA, self-build slice S)', () => {
 		expect(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC).toEqual({
 			'agent-task': 86_400,
 			'acceptance-checks': 7_200,
-			'browser-check': 7_200
+			'browser-check': 7_200,
+			'computer-session': 7_200
 		});
 		for (const kind of FLEET_JOB_KINDS) {
 			expect(clampQueuedMaxAgeSec(kind)).toBe(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind]);

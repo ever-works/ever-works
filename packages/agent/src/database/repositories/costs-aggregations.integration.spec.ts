@@ -216,6 +216,37 @@ describe('Costs aggregations over seeded rows (integration)', () => {
         });
     });
 
+    describe('getRunSpendLines', () => {
+        const RUN_1 = '44444444-4444-4444-8444-444444444441';
+        const RUN_2 = '44444444-4444-4444-8444-444444444442';
+
+        it("groups one run's events by capability and model, most expensive first", async () => {
+            await seedEvent({ runId: RUN_1, modelId: 'model-a', units: 400, costCents: 10 });
+            await seedEvent({ runId: RUN_1, modelId: 'model-a', units: 500, costCents: 19 });
+            await seedEvent({
+                runId: RUN_1,
+                modelId: null,
+                capability: PluginUsageCapability.SEARCH,
+                pluginId: 'search-plugin',
+                units: 1,
+                costCents: 2,
+            });
+            // Another run's spend never leaks into this receipt.
+            await seedEvent({ runId: RUN_2, modelId: 'model-a', units: 1, costCents: 500 });
+
+            const lines = await usage.getRunSpendLines(RUN_1);
+
+            expect(lines).toEqual([
+                { capability: 'ai', modelId: 'model-a', calls: 2, units: 900, costCents: 29 },
+                { capability: 'search', modelId: null, calls: 1, units: 1, costCents: 2 },
+            ]);
+        });
+
+        it('returns no lines for a run with no retained usage', async () => {
+            await expect(usage.getRunSpendLines(RUN_1)).resolves.toEqual([]);
+        });
+    });
+
     describe('countRunsByAgentForUser', () => {
         it('counts every run in the window regardless of status', async () => {
             await seedRun({ agentId: AGENT_A, status: 'completed' });

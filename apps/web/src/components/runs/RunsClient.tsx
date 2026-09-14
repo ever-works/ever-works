@@ -1,0 +1,495 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Loader2 } from 'lucide-react';
+import type {
+    RunLedgerFilters,
+    RunLedgerGranularity,
+    RunLedgerPage,
+    RunLedgerStatus,
+    RunLedgerWindow,
+    RunWindowStats,
+} from '@ever-works/contracts';
+import { usePathname, useRouter } from '@/i18n/navigation';
+import { Button } from '@/components/ui/button';
+import { getRunStatsAction, getRunsAction } from '@/app/actions/runs';
+import { RunReceiptPanel } from './RunReceiptPanel';
+import { RunsCalendarBar, formatWindowLabel } from './RunsCalendarBar';
+import { RunsEmptyState, type RunsEmptyVariant } from './RunsEmptyState';
+import { RunsFilters, type RunsAgentOption } from './RunsFilters';
+import { RunsRail } from './RunsRail';
+import { RunsShortcutSheet } from './RunsShortcutSheet';
+import { RunsTable } from './RunsTable';
+import {
+    RUNS_GRANULARITY_STORAGE_KEY,
+    RUNS_POLL_INTERVAL_MS,
+    buildRunsSearch,
+    countActiveFilters,
+    hasOpenRuns,
+    isTypingTarget,
+    mergeRefreshedRows,
+    stepAnchorDate,
+    windowIncludesNow,
+    type RunsViewState,
+} from './runs.shared';
+
+/**
+ * Runs ledger (AW-09) — the page's client shell.
+ *
+ * Owns the view (granularity, anchor date, filters, open receipt) and
+ * mirrors all of it into the URL, so a view is shareable and survives a
+ * reload; only the granularity is remembered between visits. The list and
+ * the rail load independently — either can fail without blanking the other.
+ * While the window includes now and a listed run is still in flight, both
+ * refresh every 5 seconds; a refresh merges rows by id, so it never moves the
+ * scroll position, the focused row or the open receipt.
+ */
+export function RunsClient({
+    initialView,
+    granularityFromUrl,
+    timeZone,
+    initialPage,
+    initialStats,
+    agents,
+}: {
+    initialView: RunsViewState;
+    /** False when the URL named no granularity, so the remembered one may apply. */
+    granularityFromUrl: boolean;
+    timeZone: string;
+    initialPage: RunLedgerPage | null;
+    initialStats: RunWindowStats | null;
+    agents: RunsAgentOption[];
+}) {
+    const t = useTranslations('dashboard.runsPage');
+    const locale = useLocale();
+    const router = useRouter();
+    const pathname = usePathname();
+
+    const [view, setView] = useState<RunsViewState>(initialView);
+    const [page, setPage] = useState<RunLedgerPage | null>(initialPage);
+    const [listError, setListError] = useState(initialPage === null);
+    const [listLoading, setListLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [stats, setStats] = useState<RunWindowStats | null>(initialStats);
+    const [statsError, setStatsError] = useState(initialStats === null);
+    const [statsLoading, setStatsLoading] = useState(false);
+    const [focusedIndex, setFocusedIndex] = useState(-1);
+    const [shortcutsOpen, setShortcutsOpen] = useState(false);
+    const searchRef = useRef<HTMLInputElement>(null);
+    // Separate sequences so a stale list response never overwrites a newer
+    // one, and a list retry never orphans an in-flight rail request.
+    const listSeq = useRef(0);
+    const statsSeq = useRef(0);
+
+    const rows = useMemo(() => page?.rows ?? [], [page]);
+    const ledgerWindow: RunLedgerWindow = page?.window ??
+        stats?.window ?? {
+            granularity: view.granularity,
+            anchorDate: view.date ?? new Date().toISOString().slice(0, 10),
+            from: '',
+            to: '',
+            timezone: timeZone,
+            clamped: false,
+        };
+
+    const query = useMemo(
+        () => ({
+            granularity: view.granularity,
+            date: view.date ?? undefined,
+            timezone: timeZone,
+            filters: view.filters,
+        }),
+        [view.granularity, view.date, view.filters, timeZone],
+    );
+
+    // ── URL mirror ────────────────────────────────────────────────────
+    const firstUrlSync = useRef(true);
+    useEffect(() => {
+        if (firstUrlSync.current) {
+            firstUrlSync.current = false;
+            return;
+        }
+        router.replace(`${pathname}?${buildRunsSearch(view)}`, { scroll: false });
+    }, [view, pathname, router]);
+
+    // ── Remembered granularity (never the window) ─────────────────────
+    useEffect(() => {
+        if (granularityFromUrl) return;
+        try {
+            const saved = localStorage.getItem(RUNS_GRANULARITY_STORAGE_KEY);
+            if ((saved === 'week' || saved === 'month') && saved !== initialView.granularity) {
+                setView((current) => ({ ...current, granularity: saved }));
+            }
+        } catch {
+            // Storage unavailable (private mode) — the default stands.
+        }
+    }, [granularityFromUrl, initialView.granularity]);
+
+    // ── Load list + rail whenever the window or filters change ────────
+    const load = useCallback(
+        async (target: 'both' | 'list' | 'stats' = 'both') => {
+            const tasks: Promise<void>[] = [];
+            if (target !== 'stats') {
+                const seq = ++listSeq.current;
+                setListLoading(true);
+                tasks.push(
+                    getRunsAction(query)
+                        .then((next) => {
+                            if (seq !== listSeq.current) return;
+                            setPage(next);
+                            setListError(false);
+                            setFocusedIndex(-1);
+                        })
+                        .catch(() => {
+                            // Keep the previous window on screen; say so.
+                            if (seq === listSeq.current) setListError(true);
+                        })
+                        .finally(() => {
+                            if (seq === listSeq.current) setListLoading(false);
+                        }),
+                );
+            }
+            if (target !== 'list') {
+                const seq = ++statsSeq.current;
+                setStatsLoading(true);
+                tasks.push(
+                    getRunStatsAction(query)
+                        .then((next) => {
+                            if (seq !== statsSeq.current) return;
+                            setStats(next);
+                            setStatsError(false);
+                        })
+                        .catch(() => {
+                            if (seq === statsSeq.current) setStatsError(true);
+                        })
+                        .finally(() => {
+                            if (seq === statsSeq.current) setStatsLoading(false);
+                        }),
+                );
+            }
+            await Promise.all(tasks);
+        },
+        [query],
+    );
+
+    const firstLoad = useRef(true);
+    useEffect(() => {
+        if (firstLoad.current) {
+            firstLoad.current = false;
+            return;
+        }
+        void load();
+    }, [load]);
+
+    // ── Live refresh while something in this window is still running ──
+    const live =
+        !listError &&
+        ledgerWindow.from !== '' &&
+        windowIncludesNow(ledgerWindow) &&
+        hasOpenRuns(rows);
+    useEffect(() => {
+        if (!live) return;
+        let inFlight = false;
+        const timer = setInterval(() => {
+            if (inFlight || (typeof document !== 'undefined' && document.hidden)) return;
+            inFlight = true;
+            const seq = listSeq.current;
+            Promise.all([getRunsAction(query), getRunStatsAction(query)])
+                .then(([nextPage, nextStats]) => {
+                    if (seq !== listSeq.current) return;
+                    setPage((current) =>
+                        current
+                            ? {
+                                  ...nextPage,
+                                  rows: mergeRefreshedRows(current.rows, nextPage.rows),
+                                  // Keep the cursor of the pages already loaded.
+                                  nextCursor: current.nextCursor,
+                              }
+                            : nextPage,
+                    );
+                    setStats(nextStats);
+                })
+                .catch(() => undefined)
+                .finally(() => {
+                    inFlight = false;
+                });
+        }, RUNS_POLL_INTERVAL_MS);
+        return () => clearInterval(timer);
+    }, [live, query]);
+
+    // ── View mutations ────────────────────────────────────────────────
+    const setGranularity = useCallback((granularity: RunLedgerGranularity) => {
+        setView((current) => ({ ...current, granularity }));
+        try {
+            localStorage.setItem(RUNS_GRANULARITY_STORAGE_KEY, granularity);
+        } catch {
+            // Storage unavailable — the choice still applies to this visit.
+        }
+    }, []);
+
+    const step = useCallback(
+        (direction: -1 | 1) => {
+            setView((current) => ({
+                ...current,
+                date: stepAnchorDate(ledgerWindow.anchorDate, current.granularity, direction),
+            }));
+        },
+        [ledgerWindow.anchorDate],
+    );
+
+    const goToday = useCallback(() => setView((current) => ({ ...current, date: null })), []);
+
+    const setFilters = useCallback(
+        (filters: RunLedgerFilters) => setView((current) => ({ ...current, filters })),
+        [],
+    );
+
+    const filterStatus = useCallback(
+        (status: RunLedgerStatus | null) =>
+            setView((current) => ({
+                ...current,
+                filters: { ...current.filters, statuses: status ? [status] : undefined },
+            })),
+        [],
+    );
+
+    const openReceipt = useCallback((runId: string, index?: number) => {
+        if (index !== undefined) setFocusedIndex(index);
+        setView((current) => ({ ...current, runId }));
+    }, []);
+
+    const closeReceipt = useCallback(() => setView((current) => ({ ...current, runId: null })), []);
+
+    const loadMore = useCallback(async () => {
+        if (!page?.nextCursor) return;
+        setLoadingMore(true);
+        const seq = listSeq.current;
+        try {
+            const next = await getRunsAction({ ...query, cursor: page.nextCursor });
+            if (seq !== listSeq.current) return;
+            setPage((current) =>
+                current
+                    ? {
+                          ...current,
+                          rows: [
+                              ...current.rows,
+                              ...next.rows.filter(
+                                  (row) => !current.rows.some((known) => known.id === row.id),
+                              ),
+                          ],
+                          nextCursor: next.nextCursor,
+                          total: next.total,
+                      }
+                    : next,
+            );
+        } catch {
+            // The button stays; a second click retries.
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [page, query]);
+
+    // ── Keyboard layer ────────────────────────────────────────────────
+    const focusRow = useCallback((index: number) => {
+        setFocusedIndex(index);
+        const element = document.querySelector<HTMLElement>(
+            `[data-testid="runs-row"][data-row-index="${index}"]`,
+        );
+        element?.focus();
+    }, []);
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+            if (isTypingTarget(event.target)) return;
+            // While a dialog is open its own keys (Esc, Tab) belong to it.
+            if (view.runId || shortcutsOpen) return;
+            const handled = handleShortcut(event.key);
+            if (handled) event.preventDefault();
+        };
+        const handleShortcut = (key: string): boolean => {
+            switch (key) {
+                case 'ArrowLeft':
+                    step(-1);
+                    return true;
+                case 'ArrowRight':
+                    step(1);
+                    return true;
+                case 't':
+                    goToday();
+                    return true;
+                case 'd':
+                    setGranularity('day');
+                    return true;
+                case 'w':
+                    setGranularity('week');
+                    return true;
+                case 'm':
+                    setGranularity('month');
+                    return true;
+                case 'j':
+                    if (rows.length === 0) return false;
+                    focusRow(Math.min(focusedIndex + 1, rows.length - 1));
+                    return true;
+                case 'k':
+                    if (rows.length === 0) return false;
+                    focusRow(Math.max(focusedIndex - 1, 0));
+                    return true;
+                case 'o':
+                case 'Enter':
+                    if (focusedIndex < 0 || !rows[focusedIndex]) return false;
+                    openReceipt(rows[focusedIndex].id, focusedIndex);
+                    return true;
+                case 'Escape':
+                    if (focusedIndex < 0) return false;
+                    setFocusedIndex(-1);
+                    return true;
+                case '/':
+                    searchRef.current?.focus();
+                    return true;
+                case '?':
+                    setShortcutsOpen(true);
+                    return true;
+                default:
+                    return false;
+            }
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [
+        view.runId,
+        shortcutsOpen,
+        step,
+        goToday,
+        setGranularity,
+        rows,
+        focusedIndex,
+        focusRow,
+        openReceipt,
+    ]);
+
+    // ── Render ────────────────────────────────────────────────────────
+    const activeFilters = countActiveFilters(view.filters);
+    const windowLabel = formatWindowLabel(ledgerWindow, locale);
+    const emptyVariant: RunsEmptyVariant =
+        activeFilters > 0 ? 'filters' : page?.everRan === false ? 'never' : 'window';
+
+    return (
+        <div className="w-full space-y-4" data-testid="runs-page">
+            <RunsCalendarBar
+                window={ledgerWindow}
+                granularity={view.granularity}
+                onGranularityChange={setGranularity}
+                onStep={step}
+                onToday={goToday}
+                onShowShortcuts={() => setShortcutsOpen(true)}
+            />
+            <RunsFilters
+                ref={searchRef}
+                filters={view.filters}
+                agents={agents}
+                onChange={setFilters}
+            />
+
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                <section aria-busy={listLoading} className="space-y-3 min-w-0">
+                    {listError && (
+                        <div
+                            className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2"
+                            role="alert"
+                            data-testid="runs-list-error"
+                        >
+                            <p className="text-sm text-text dark:text-text-dark">
+                                {t('errors.loadWindow')}
+                            </p>
+                            <p className="text-xs text-text-muted">{t('errors.stateKept')}</p>
+                            <Button variant="secondary" size="sm" onClick={() => void load('list')}>
+                                {t('errors.retry')}
+                            </Button>
+                        </div>
+                    )}
+
+                    {listLoading && rows.length === 0 && (
+                        <p
+                            className="flex items-center gap-2 text-xs text-text-muted"
+                            role="status"
+                        >
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                            {t(`loading.${view.granularity}`)}
+                        </p>
+                    )}
+
+                    {page && rows.length === 0 && !listLoading && (
+                        <RunsEmptyState
+                            variant={emptyVariant}
+                            granularity={view.granularity}
+                            onClearFilters={() => setFilters({})}
+                        />
+                    )}
+
+                    {rows.length > 0 && (
+                        <>
+                            <RunsTable
+                                rows={rows}
+                                caption={
+                                    activeFilters > 0
+                                        ? t('table.captionFiltered', {
+                                              window: windowLabel,
+                                              count: activeFilters,
+                                          })
+                                        : t('table.caption', { window: windowLabel })
+                                }
+                                timeZone={ledgerWindow.timezone}
+                                focusedIndex={focusedIndex}
+                                onFocusRow={setFocusedIndex}
+                                onOpen={openReceipt}
+                            />
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
+                                <span data-testid="runs-showing">
+                                    {t('showingCount', {
+                                        shown: rows.length,
+                                        total: page?.total ?? rows.length,
+                                    })}
+                                </span>
+                                {page?.nextCursor && (
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => void loadMore()}
+                                        disabled={loadingMore}
+                                        data-testid="runs-load-more"
+                                    >
+                                        {loadingMore && (
+                                            <Loader2
+                                                className="w-3.5 h-3.5 mr-1 animate-spin"
+                                                aria-hidden
+                                            />
+                                        )}
+                                        {t('loadMore')}
+                                    </Button>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </section>
+
+                <RunsRail
+                    stats={stats}
+                    granularity={view.granularity}
+                    error={statsError}
+                    loading={statsLoading}
+                    onRetry={() => void load('stats')}
+                    onFilterStatus={filterStatus}
+                />
+            </div>
+
+            <RunReceiptPanel
+                runId={view.runId}
+                timeZone={ledgerWindow.timezone}
+                onClose={closeReceipt}
+            />
+            <RunsShortcutSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        </div>
+    );
+}

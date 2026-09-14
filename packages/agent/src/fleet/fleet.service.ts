@@ -1579,8 +1579,27 @@ export class FleetService {
             workspaceBytes: toOptionalNumber(node.workspaceBytes),
             lastReclaimAt: node.lastReclaimAt ? toIso(node.lastReclaimAt) : null,
             lastReclaimFreedBytes: toOptionalNumber(node.lastReclaimFreedBytes),
+            // Agent computers. The lock columns surface as ONE holder object,
+            // present only while the lock is held and unexpired — an expired
+            // lock is free, and showing it would claim control nobody has.
+            controlPolicy: node.controlPolicy ?? 'owner',
+            recordWatchSessions: Boolean(node.recordWatchSessions),
+            recordingRetentionDays: toOptionalNumber(node.recordingRetentionDays) ?? 14,
+            controlHolder: toControlHolder(node),
         };
     }
+}
+
+/** The live control lock as a view, or null when it is free or has expired. */
+function toControlHolder(node: FleetNode): FleetNodeView['controlHolder'] {
+    if (!node.controlHolderUserId) return null;
+    const expiresMs = toEpochMsOrNaN(node.controlExpiresAt);
+    if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) return null;
+    return {
+        userId: node.controlHolderUserId,
+        since: node.controlHeldSince ? toIso(node.controlHeldSince) : null,
+        expiresAt: toIso(node.controlExpiresAt as Date),
+    };
 }
 
 /** `Date | string` → epoch ms, `NaN` when it is not a usable date. */
