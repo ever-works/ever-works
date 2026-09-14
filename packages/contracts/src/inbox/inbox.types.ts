@@ -168,7 +168,10 @@ export interface InboxDecisionContext {
 	actionType: string | null;
 	riskFlags: string[];
 	agentName: string | null;
-	/** The Task this decision belongs to — the item's own link, or the linked run's. */
+	/**
+	 * The Task this decision belongs to — the item's own link, or the linked run's.
+	 * NULL when that Task is gone or belongs to another owner.
+	 */
 	taskId: string | null;
 	taskTitle: string | null;
 	taskStatus: string | null;

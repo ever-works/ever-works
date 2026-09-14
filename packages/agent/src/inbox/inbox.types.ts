@@ -81,7 +81,11 @@ export function toInboxDecisionDto(
                 ? row.riskFlags.filter((flag): flag is string => typeof flag === 'string')
                 : [],
             agentName: row.agentName,
-            taskId: row.taskId ?? item.taskId,
+            // Only the owner-scoped join: it already resolves the item's own
+            // link or the linked run's, and reads a deleted or another
+            // owner's Task as absent. The raw `item.taskId` would bring
+            // that stale id back as a Task link.
+            taskId: row.taskId,
             taskTitle: row.taskTitle,
             taskStatus: row.taskStatus,
             missionId: row.missionId,

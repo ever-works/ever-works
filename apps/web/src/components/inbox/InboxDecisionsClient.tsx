@@ -285,6 +285,17 @@ export function InboxDecisionsClient({
         sendingRef.current = sending;
     }, []);
 
+    // After an answer: re-read the header counts in the background. An
+    // unknown result (or a failed call) keeps the counts already on screen.
+    const refreshHeaderCounts = useCallback(async () => {
+        try {
+            const next = await getInboxDecisionCountsAction();
+            if (next) setHeaderCounts(next);
+        } catch {
+            // Best-effort: the page refresh re-reads them anyway.
+        }
+    }, []);
+
     const handleReplied = useCallback(
         (outcome: InboxReplyOutcome) => {
             const key = decisionRestartKey(outcome);
@@ -305,12 +316,10 @@ export function InboxDecisionsClient({
             setAnnouncement(sentence);
             if (key === 'failed') toast.error(sentence);
             else toast.success(sentence);
-            void getInboxDecisionCountsAction().then((next) => {
-                if (next) setHeaderCounts(next);
-            });
+            void refreshHeaderCounts();
             router.refresh();
         },
-        [router, rows, t],
+        [refreshHeaderCounts, router, rows, t],
     );
 
     const handleLoadMore = useCallback(async () => {

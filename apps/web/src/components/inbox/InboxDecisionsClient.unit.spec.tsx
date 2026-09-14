@@ -482,6 +482,67 @@ describe('InboxDecisionsClient — walking and answering', () => {
         expect(nav.refresh).toHaveBeenCalled();
     });
 
+    it('re-reads the header counts after an answer, and keeps the ones on screen when that read fails', async () => {
+        const open = decision('a');
+        actions.reply.mockResolvedValue({
+            item: { ...open, status: 'answered', answerText: 'Go ahead' },
+            routed: 'escalation-resolved',
+            restart: 'none',
+        });
+        actions.counts.mockResolvedValueOnce({
+            open: 1,
+            blocking: 0,
+            lastRaisedAt: '2026-09-03T10:00:00.000Z',
+        });
+        renderClient({
+            decisions: [open, decision('b')],
+            counts: { open: 2, blocking: 1, lastRaisedAt: '2026-09-03T10:00:00.000Z' },
+        });
+
+        fireEvent.change(screen.getByTestId('inbox-reply-textarea'), {
+            target: { value: 'Go ahead' },
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('inbox-send-reply'));
+        });
+
+        await waitFor(() =>
+            expect(screen.getByTestId('decisions-open-count').textContent).toContain('{"count":1}'),
+        );
+        expect(screen.queryByTestId('decisions-blocking-count')).toBeNull();
+    });
+
+    it('keeps the header counts on screen when re-reading them after an answer fails', async () => {
+        const open = decision('a');
+        actions.reply.mockResolvedValue({
+            item: { ...open, status: 'answered', answerText: 'Go ahead' },
+            routed: 'escalation-resolved',
+            restart: 'none',
+        });
+        actions.counts.mockRejectedValueOnce(new Error('network down'));
+        renderClient({
+            decisions: [open, decision('b')],
+            counts: { open: 2, blocking: 1, lastRaisedAt: '2026-09-03T10:00:00.000Z' },
+        });
+
+        fireEvent.change(screen.getByTestId('inbox-reply-textarea'), {
+            target: { value: 'Go ahead' },
+        });
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('inbox-send-reply'));
+        });
+
+        await waitFor(() => expect(actions.counts).toHaveBeenCalledTimes(1));
+        await waitFor(() =>
+            expect(screen.getByTestId('decision-outcome').getAttribute('data-outcome')).toBe(
+                'none',
+            ),
+        );
+        expect(screen.getByTestId('decisions-open-count').textContent).toContain('{"count":2}');
+        expect(screen.getByTestId('decisions-blocking-count').textContent).toContain('{"count":1}');
+        expect(screen.queryByTestId('decisions-error')).toBeNull();
+    });
+
     it('offers the Task as the manual restart when the automatic one failed', async () => {
         const open = decision('a', {}, { taskId: 'task-1', taskTitle: 'Refresh pricing' });
         actions.reply.mockResolvedValue({

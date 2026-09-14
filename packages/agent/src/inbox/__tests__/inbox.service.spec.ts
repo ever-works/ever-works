@@ -1307,6 +1307,42 @@ describe('InboxService — My Decisions', () => {
             });
         });
 
+        it('links only a Task the owner-scoped read resolved, never the raw id on the item', async () => {
+            const store = {
+                ...makeStore(),
+                listDecisionsForUser: jest.fn(async () => ({
+                    rows: [
+                        {
+                            // The item still names a Task that was deleted or
+                            // belongs to someone else: the join found nothing.
+                            ...emptyContext,
+                            item: makeRow({ id: 'stale', taskId: 'task-gone' }),
+                        },
+                        {
+                            ...emptyContext,
+                            taskId: 't-run',
+                            taskTitle: 'From the run',
+                            item: makeRow({ id: 'via-run', taskId: null }),
+                        },
+                    ],
+                    total: 2,
+                    hasMore: false,
+                })),
+                countDecisionsForUser: jest.fn(async () => ({
+                    open: 2,
+                    blocking: 0,
+                    lastRaisedAt: null,
+                })),
+            };
+            const { service } = build({ store: store as never });
+
+            const { items } = await service.listDecisions('u1');
+
+            expect(items[0].decision.taskId).toBeNull();
+            expect(items[0].decision.taskTitle).toBeNull();
+            expect(items[1].decision.taskId).toBe('t-run');
+        });
+
         it('flags an old open decision with nothing live behind it as dormant, never a blocking or live one', async () => {
             const old = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
             const store = {
