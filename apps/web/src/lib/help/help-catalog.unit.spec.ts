@@ -14,6 +14,7 @@ import {
     LIMITS as GENERATOR_LIMITS,
     readCommittedCatalog,
 } from '../../../scripts/build-help-catalog.mjs';
+import { isHelpArticleBody } from './help-body';
 import { HELP_ARTICLES } from './help-catalog.generated';
 import type { HelpArticleMeta } from './help-types';
 
@@ -184,6 +185,14 @@ describe('help catalog — invariants (spec FR-3, FR-5, FR-9)', () => {
                     expect(url.username + url.password, `${id} ${target.href}`).toBe('');
                 }
             });
+        }
+    });
+
+    it('every generated body passes the grammar check the in-product loader applies', () => {
+        expect(manual.bodies.length).toBeGreaterThan(0);
+        for (const { id, body } of manual.bodies as { id: string; body: unknown }[]) {
+            // Round-trip through JSON, as the static file the browser fetches does.
+            expect(isHelpArticleBody(JSON.parse(JSON.stringify(body)), id), id).toBe(true);
         }
     });
 });

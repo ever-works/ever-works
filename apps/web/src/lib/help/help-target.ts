@@ -60,6 +60,22 @@ export function parseHelpTarget(value: string): ParsedHelpTarget | null {
     return { articleId, headingId };
 }
 
+/**
+ * The heading a URL fragment names (`#creating-a-task` → `creating-a-task`),
+ * or null for an empty fragment. A fragment that is not valid percent-encoding
+ * is returned as written rather than thrown: it matches no heading, so the
+ * article opens at its top with the "section has moved" line (spec S-15).
+ */
+export function decodeHelpFragment(hash: string): string | null {
+    const raw = hash.replace(/^#/, '');
+    if (!raw) return null;
+    try {
+        return decodeURIComponent(raw) || null;
+    } catch {
+        return raw;
+    }
+}
+
 export function formatHelpTarget(articleId: string, headingId?: string | null): string {
     return headingId ? `${articleId}#${headingId}` : articleId;
 }

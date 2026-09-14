@@ -25,7 +25,12 @@ export interface HelpArticleBlocksProps {
     headingOffset?: 0 | 1;
 }
 
-/** Same-origin address of an article on the full page. */
+/**
+ * Same-origin address of an article on the full page, unscoped. Render it
+ * through the workspace-aware `Link` (or push it through the workspace-aware
+ * router) so an Organization user stays under `/org/<slug>` — never put it on
+ * a bare anchor.
+ */
 export function helpArticleHref(target: string): string {
     const hash = target.indexOf('#');
     return hash === -1
@@ -37,6 +42,20 @@ export function helpArticleHref(target: string): string {
 function screenHref(routeKey: string): string | null {
     const value = (ROUTES as Record<string, unknown>)[routeKey];
     return typeof value === 'string' && routeKey.startsWith('DASHBOARD') ? value : null;
+}
+
+/**
+ * Whether a click on an in-app help link should be left to the browser (a new
+ * tab or window, a download) instead of opening the article in place.
+ */
+export function isModifiedHelpClick(event: {
+    metaKey: boolean;
+    ctrlKey: boolean;
+    shiftKey: boolean;
+    altKey: boolean;
+    button: number;
+}): boolean {
+    return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
 }
 
 /** An external address the renderer is willing to link: absolute `https:` with no credentials. */
@@ -81,26 +100,22 @@ export function HelpArticleBlocks({
             case 'article': {
                 const value = formatHelpTarget(target.articleId, target.headingId);
                 if (!resolveHelpTarget(value)) return <Fragment key={key}>{children}</Fragment>;
+                // The workspace-aware Link keeps `/org/<slug>` on the address a
+                // modified click (new tab or window) follows.
                 return (
-                    <a
+                    <Link
                         key={key}
                         href={helpArticleHref(value)}
                         data-help-article-link={value}
                         onClick={(event) => {
-                            if (
-                                event.metaKey ||
-                                event.ctrlKey ||
-                                event.shiftKey ||
-                                event.button !== 0
-                            )
-                                return;
+                            if (isModifiedHelpClick(event)) return;
                             event.preventDefault();
                             onOpenArticle(value);
                         }}
                         className={LINK_CLASS}
                     >
                         {children}
-                    </a>
+                    </Link>
                 );
             }
             case 'screen': {

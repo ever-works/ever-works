@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    decodeHelpFragment,
     formatHelpTarget,
     getHelpArticle,
     getHelpArticles,
@@ -94,5 +95,24 @@ describe('catalog helpers', () => {
         expect(suggestions.map((article) => article.id)).toContain('agents');
         expect(suggestHelpArticles('zzzqqq')).toEqual([]);
         expect(suggestHelpArticles('')).toEqual([]);
+    });
+});
+
+describe('decodeHelpFragment', () => {
+    it('reads the heading a URL fragment names, decoding percent-encoding', () => {
+        expect(decodeHelpFragment('#creating-a-task')).toBe('creating-a-task');
+        expect(decodeHelpFragment('creating-a-task')).toBe('creating-a-task');
+        expect(decodeHelpFragment('#caf%C3%A9')).toBe('café');
+    });
+
+    it('is null for an empty fragment', () => {
+        expect(decodeHelpFragment('')).toBeNull();
+        expect(decodeHelpFragment('#')).toBeNull();
+    });
+
+    it('returns a malformed percent-encoding as written instead of throwing (spec S-15)', () => {
+        expect(() => decodeHelpFragment('#%E0%A4%A')).not.toThrow();
+        expect(decodeHelpFragment('#%E0%A4%A')).toBe('%E0%A4%A');
+        expect(decodeHelpFragment('#100%')).toBe('100%');
     });
 });

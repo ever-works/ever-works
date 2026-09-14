@@ -1,17 +1,24 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { HelpBlock, HelpInline, HelpLinkTarget } from '@ever-works/contracts/api';
 
+// Stands in for the workspace-aware Link: inside an Organization it puts the
+// `/org/<slug>` prefix on the address, which a bare anchor would not get.
+const workspace = vi.hoisted(() => ({ prefix: '' }));
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
 }));
 vi.mock('@/i18n/navigation', () => ({
     Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
-        <a href={href} {...rest}>
+        <a href={`${workspace.prefix}${href}`} {...rest}>
             {children}
         </a>
     ),
 }));
+
+afterEach(() => {
+    workspace.prefix = '';
+});
 
 import { HelpArticleBlocks } from './HelpArticleBlocks';
 
@@ -91,6 +98,25 @@ describe('HelpArticleBlocks — links (spec FR-27a)', () => {
         ]);
         fireEvent.click(screen.getByRole('link', { name: 'Tasks' }), { ctrlKey: true });
         expect(onOpenArticle).not.toHaveBeenCalled();
+    });
+
+    it('keeps the Organization namespace on the address a modified click follows', () => {
+        workspace.prefix = '/org/acme';
+        const { onOpenArticle } = renderBlocks([
+            linkParagraph('Tasks', {
+                type: 'article',
+                articleId: 'tasks',
+                headingId: 'creating-a-task',
+            }),
+        ]);
+        const link = screen.getByRole('link', { name: 'Tasks' });
+        expect(link).toHaveAttribute('href', '/org/acme/help/tasks#creating-a-task');
+        for (const modifier of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey'] as const) {
+            expect(fireEvent.click(link, { [modifier]: true }), modifier).toBe(true);
+        }
+        expect(onOpenArticle).not.toHaveBeenCalled();
+        expect(fireEvent.click(link)).toBe(false);
+        expect(onOpenArticle).toHaveBeenCalledWith('tasks#creating-a-task');
     });
 
     it('links a screen through the route map', () => {

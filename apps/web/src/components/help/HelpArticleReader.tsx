@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils/cn';
 import { loadHelpArticleBody } from '@/lib/help/help-body';
 import { getHelpArticle } from '@/lib/help/help-target';
 import type { HelpArticleMeta } from '@/lib/help/help-types';
-import { HelpArticleBlocks } from './HelpArticleBlocks';
+import { HelpArticleBlocks, isModifiedHelpClick } from './HelpArticleBlocks';
 import { helpSectionMessageKey } from './help-section-label';
 
 type BodyState =
@@ -337,19 +337,18 @@ export function HelpArticleReader({
                     <ul className="space-y-1">
                         {related.map((entry) => (
                             <li key={entry.id}>
-                                <a
-                                    href={`${ROUTES.DASHBOARD_HELP}/${entry.id}`}
+                                <Link
+                                    href={ROUTES.DASHBOARD_HELP_ARTICLE(entry.id)}
                                     data-help-related={entry.id}
                                     onClick={(event) => {
-                                        if (event.metaKey || event.ctrlKey || event.shiftKey)
-                                            return;
+                                        if (isModifiedHelpClick(event)) return;
                                         event.preventDefault();
                                         onOpenArticle(entry.id);
                                     }}
                                     className="inline-flex min-h-11 items-center text-sm text-primary underline-offset-2 hover:underline md:min-h-0 dark:text-primary-dark"
                                 >
                                     {entry.title}
-                                </a>
+                                </Link>
                             </li>
                         ))}
                     </ul>

@@ -3,15 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { captureHelpEvent } from '@/lib/help/help-telemetry';
-import { getHelpArticle, parseHelpTarget } from '@/lib/help/help-target';
+import { decodeHelpFragment, getHelpArticle, parseHelpTarget } from '@/lib/help/help-target';
 import { helpArticleHref } from './HelpArticleBlocks';
 import { HelpArticleReader } from './HelpArticleReader';
 import { HelpBuildStamp } from './HelpBuildStamp';
 
 function readHash(): string | null {
     if (typeof window === 'undefined') return null;
-    const hash = decodeURIComponent(window.location.hash.replace(/^#/, ''));
-    return hash || null;
+    return decodeHelpFragment(window.location.hash);
 }
 
 /**

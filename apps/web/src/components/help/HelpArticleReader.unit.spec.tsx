@@ -3,6 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { HelpArticleBody } from '@ever-works/contracts/api';
 
 const intl = vi.hoisted(() => ({ locale: 'en' }));
+// Stands in for the workspace-aware Link: inside an Organization it puts the
+// `/org/<slug>` prefix on the address, which a bare anchor would not get.
+const workspace = vi.hoisted(() => ({ prefix: '' }));
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string, values?: Record<string, unknown>) =>
         values ? `${key}:${JSON.stringify(values)}` : key,
@@ -11,7 +14,7 @@ vi.mock('next-intl', () => ({
 }));
 vi.mock('@/i18n/navigation', () => ({
     Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
-        <a href={href} {...rest}>
+        <a href={`${workspace.prefix}${href}`} {...rest}>
             {children}
         </a>
     ),
@@ -44,6 +47,7 @@ function bodyFor(id: string, headingIds: string[]): HelpArticleBody {
 
 beforeEach(() => {
     intl.locale = 'en';
+    workspace.prefix = '';
     Element.prototype.scrollIntoView = vi.fn();
 });
 
@@ -172,6 +176,28 @@ describe('HelpArticleReader', () => {
         expect(onOpenArticle).toHaveBeenCalledWith(missions.related[0]);
         fireEvent.click(screen.getByTestId('help-article-back'));
         expect(onBack).toHaveBeenCalled();
+    });
+
+    it('keeps the Organization namespace on a related article a modified click follows', () => {
+        workspace.prefix = '/org/acme';
+        const onOpenArticle = vi.fn();
+        render(
+            <HelpArticleReader
+                article={missions}
+                headingId={null}
+                mode="panel"
+                onOpenArticle={onOpenArticle}
+                loadBody={vi.fn(async () => null)}
+            />,
+        );
+        const related = document.querySelector<HTMLAnchorElement>(
+            `[data-help-related="${missions.related[0]}"]`,
+        )!;
+        expect(related).toHaveAttribute('href', `/org/acme/help/${missions.related[0]}`);
+        for (const modifier of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey'] as const) {
+            expect(fireEvent.click(related, { [modifier]: true }), modifier).toBe(true);
+        }
+        expect(onOpenArticle).not.toHaveBeenCalled();
     });
 
     it('uses a page-level title and no Back control on the full page', () => {
