@@ -330,6 +330,103 @@ describe('Live Feed over seeded activity (integration)', () => {
         expect(actors[0].lastActivityAt).toBe(new Date(NOW.getTime() - 5 * 60_000).toISOString());
     });
 
+    it('counts the older rows the per-agent filter shows in the roster, and nothing else', async () => {
+        await seedAgent(AGENT_IVY, 'Ivy');
+        await seedAgent(AGENT_WREN, 'Wren');
+        await seed({ actorKind: 'agent', actorAgentId: AGENT_IVY, minutesAgo: 30 });
+        // Written before the actor columns existed: attributed from `details`.
+        await seed({
+            actionType: ActivityActionType.AGENT_PAUSED,
+            details: { resourceType: 'agent', resourceId: AGENT_WREN },
+            minutesAgo: 4,
+        });
+        await seed({
+            actionType: ActivityActionType.TASK_MERGED,
+            details: { agentId: AGENT_WREN, prNumber: 9 },
+            minutesAgo: 8,
+        });
+        await seed({
+            actionType: ActivityActionType.AGENT_PAUSED,
+            details: { resourceType: 'agent', resourceId: AGENT_IVY },
+            minutesAgo: 9,
+        });
+        // A person's action about an agent, old and new: the agent is its subject.
+        await seed({
+            actionType: ActivityActionType.AGENT_EXPORTED,
+            details: { resourceType: 'agent', resourceId: AGENT_WREN },
+        });
+        await seed({
+            actionType: ActivityActionType.AGENT_EXPORTED,
+            actorKind: 'user',
+            details: { resourceType: 'agent', resourceId: AGENT_WREN },
+        });
+        // A task row whose `resourceId` is not an agent.
+        await seed({
+            actionType: ActivityActionType.AGENT_RUN_COMPLETED,
+            details: { resourceType: 'task', resourceId: AGENT_WREN },
+        });
+        // Outside the window, another user's, another scope's.
+        await seed({
+            details: { agentId: AGENT_WREN },
+            actionType: ActivityActionType.TASK_MERGED,
+            minutesAgo: 120,
+        });
+        await seed({
+            actionType: ActivityActionType.TASK_MERGED,
+            details: { agentId: AGENT_WREN },
+            userId: OTHER_USER,
+        });
+        await seed({
+            actionType: ActivityActionType.TASK_MERGED,
+            details: { agentId: AGENT_WREN },
+            organizationId: ORG,
+        });
+
+        const { actors } = await feed.getActors(USER, PERSONAL, 1, NOW);
+        // Two each; the tie goes to the more recent activity.
+        expect(actors.map((actor) => [actor.label, actor.count])).toEqual([
+            ['Wren', 2],
+            ['Ivy', 2],
+        ]);
+        expect(actors.find((actor) => actor.agentId === AGENT_WREN)?.lastActivityAt).toBe(
+            new Date(NOW.getTime() - 4 * 60_000).toISOString(),
+        );
+        expect(actors.find((actor) => actor.agentId === AGENT_IVY)?.lastActivityAt).toBe(
+            new Date(NOW.getTime() - 9 * 60_000).toISOString(),
+        );
+
+        // Every row the repository hands over names an agent candidate; the
+        // person's actions and the task row never leave the database.
+        const read = await activityLogs.findFeedLegacyActorRows(USER, PERSONAL, {
+            since: new Date(NOW.getTime() - 60 * 60_000),
+            personActionTypes: [ActivityActionType.AGENT_EXPORTED],
+            afterId: null,
+            limit: 50,
+        });
+        expect(read.map((row) => row.actionType).sort()).toEqual(
+            [
+                ActivityActionType.AGENT_PAUSED,
+                ActivityActionType.AGENT_PAUSED,
+                ActivityActionType.TASK_MERGED,
+            ].sort(),
+        );
+        const firstTwo = await activityLogs.findFeedLegacyActorRows(USER, PERSONAL, {
+            since: new Date(NOW.getTime() - 60 * 60_000),
+            personActionTypes: [ActivityActionType.AGENT_EXPORTED],
+            afterId: null,
+            limit: 2,
+        });
+        const rest = await activityLogs.findFeedLegacyActorRows(USER, PERSONAL, {
+            since: new Date(NOW.getTime() - 60 * 60_000),
+            personActionTypes: [ActivityActionType.AGENT_EXPORTED],
+            afterId: firstTwo[1].id,
+            limit: 2,
+        });
+        expect([...firstTwo, ...rest].map((row) => row.id).sort()).toEqual(
+            read.map((row) => row.id).sort(),
+        );
+    });
+
     it('lists every scoped agent in the roster, well past one query page', async () => {
         const agentId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
         for (let n = 0; n < 205; n++) {

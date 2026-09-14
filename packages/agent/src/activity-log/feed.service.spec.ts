@@ -29,6 +29,7 @@ function build(
                 new Map(rows.map((row) => [row.id, new Date(row.createdAt).toISOString()])),
         }),
         aggregateFeedActors: jest.fn().mockResolvedValue([]),
+        findFeedLegacyActorRows: jest.fn().mockResolvedValue([]),
     };
     const agents = {
         findManyByIdsForUser: jest.fn().mockResolvedValue([]),
@@ -384,6 +385,104 @@ describe('FeedService', () => {
 
             expect(agents.findRosterPage).toHaveBeenCalledTimes(2);
             expect(result.actors.map((actor) => actor.agentId)).toEqual([IVY]);
+        });
+
+        it('counts older rows with no stamped actor the way the feed attributes them', async () => {
+            const { service, activityLogs, agents } = build();
+            agents.findRosterPage.mockResolvedValue([
+                { id: IVY, name: 'Ivy', status: 'active', avatarMode: null },
+                { id: WREN, name: 'Wren', status: 'active', avatarMode: null },
+            ]);
+            activityLogs.aggregateFeedActors.mockResolvedValue([
+                { agentId: WREN, count: 2, lastActivityAt: '2026-09-13T09:00:00.000Z' },
+            ]);
+            activityLogs.findFeedLegacyActorRows.mockResolvedValue([
+                // The agent paused itself: the agent's own activity.
+                activity({
+                    id: ROW_1,
+                    actionType: ActivityActionType.AGENT_PAUSED,
+                    details: { resourceType: 'agent', resourceId: IVY },
+                    createdAt: new Date('2026-09-13T10:00:00.000Z'),
+                }),
+                // A merge the agent carried out, named by `agentId`.
+                activity({
+                    id: ROW_2,
+                    actionType: ActivityActionType.TASK_MERGED,
+                    details: { agentId: IVY },
+                    createdAt: new Date('2026-09-13T11:30:00.000Z'),
+                }),
+                activity({
+                    id: RUN,
+                    actionType: ActivityActionType.AGENT_RUN_COMPLETED,
+                    details: { agentId: WREN },
+                    createdAt: new Date('2026-09-13T11:45:00.000Z'),
+                }),
+                // A person exported the agent: its subject, not its actor.
+                activity({
+                    id: '99999999-9999-4999-8999-999999999999',
+                    actionType: ActivityActionType.AGENT_EXPORTED,
+                    details: { resourceType: 'agent', resourceId: WREN },
+                }),
+            ]);
+
+            const result = await service.getActors(USER, SCOPE, undefined, NOW);
+
+            const query = activityLogs.findFeedLegacyActorRows.mock.calls[0][2];
+            expect(activityLogs.findFeedLegacyActorRows).toHaveBeenCalledWith(USER, SCOPE, {
+                since: new Date('2026-09-06T12:00:00.000Z'),
+                personActionTypes: expect.arrayContaining([ActivityActionType.AGENT_EXPORTED]),
+                afterId: null,
+                limit: 500,
+            });
+            expect(query.personActionTypes).not.toContain(ActivityActionType.AGENT_PAUSED);
+            expect(
+                result.actors.map((actor) => [actor.agentId, actor.count, actor.lastActivityAt]),
+            ).toEqual([
+                [WREN, 3, '2026-09-13T11:45:00.000Z'],
+                [IVY, 2, '2026-09-13T11:30:00.000Z'],
+            ]);
+        });
+
+        it('walks older unattributed rows page by page and stops on a short page', async () => {
+            const { service, activityLogs, agents } = build();
+            agents.findRosterPage.mockResolvedValue([
+                { id: IVY, name: 'Ivy', status: 'active', avatarMode: null },
+            ]);
+            const rowId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+            const rows = Array.from({ length: 501 }, (_, n) =>
+                activity({
+                    id: rowId(n),
+                    actionType: ActivityActionType.AGENT_RUN_COMPLETED,
+                    details: { agentId: IVY },
+                }),
+            );
+            activityLogs.findFeedLegacyActorRows.mockImplementation(
+                async (_user: string, _scope: unknown, query: { afterId: string | null }) => {
+                    const start = query.afterId
+                        ? rows.findIndex((row) => row.id === query.afterId) + 1
+                        : 0;
+                    return rows.slice(start, start + 500);
+                },
+            );
+
+            const result = await service.getActors(USER, SCOPE, undefined, NOW);
+
+            expect(
+                activityLogs.findFeedLegacyActorRows.mock.calls.map((call) => call[2].afterId),
+            ).toEqual([null, rowId(499)]);
+            expect(result.actors).toEqual([expect.objectContaining({ agentId: IVY, count: 501 })]);
+        });
+
+        it('stops walking older rows when a page does not advance', async () => {
+            const { service, activityLogs } = build();
+            const stuck = Array.from({ length: 500 }, () =>
+                activity({ actionType: ActivityActionType.AGENT_RUN_COMPLETED }),
+            );
+            activityLogs.findFeedLegacyActorRows.mockResolvedValue(stuck);
+
+            await service.getActors(USER, SCOPE, undefined, NOW);
+
+            expect(activityLogs.findFeedLegacyActorRows).toHaveBeenCalledTimes(2);
         });
 
         it('clamps the window to 1..720 hours', async () => {

@@ -34,6 +34,26 @@ export interface ActivityFeedActorCount {
     lastActivityAt: string | null;
 }
 
+/** The fields actor attribution reads from a row with no stamped actor agent. */
+export type ActivityFeedLegacyActorRow = Pick<
+    ActivityLog,
+    'id' | 'actionType' | 'actorKind' | 'actorAgentId' | 'details' | 'createdAt'
+>;
+
+/** One bounded read of {@link ActivityLogRepository.findFeedLegacyActorRows}. */
+export interface ActivityFeedLegacyActorQuery {
+    since: Date;
+    /**
+     * Action types a person performs. A row of one of these with no actor
+     * stamped names its agent as the subject, never the actor, so it is not
+     * read at all.
+     */
+    personActionTypes: readonly string[];
+    /** Keyset position: only rows whose id sorts after this one. */
+    afterId: string | null;
+    limit: number;
+}
+
 type ActivityQueryBuilder = SelectQueryBuilder<ActivityLog>;
 
 /** Placeholder for an empty `IN (...)` list, which is not valid SQL. */
@@ -397,8 +417,9 @@ export class ActivityLogRepository {
 
     /**
      * Live Feed — entries per acting agent inside a window, busiest first.
-     * Reads the indexed `actorAgentId` column; rows that predate it are not
-     * counted (the roster still lists every agent, with a zero).
+     * Reads the indexed `actorAgentId` column only; rows that predate it are
+     * read through {@link findFeedLegacyActorRows} and attributed by the
+     * feed service with the same rule the feed itself uses.
      */
     async aggregateFeedActors(
         userId: string,
@@ -441,6 +462,72 @@ export class ActivityLogRepository {
             });
         }
         return counts;
+    }
+
+    /**
+     * Live Feed — one keyset page (by id) of the rows in a window that carry
+     * no stamped actor agent yet may name one in `details`: rows written
+     * before the actor columns existed. The actor roster attributes them in
+     * memory so its counts agree with what the per-agent filter shows.
+     *
+     * Deliberately narrow, so the walk stays small and ends: a row the write
+     * path stamped as a person's, an external source's or the platform's is
+     * skipped, as is an unstamped row of an action a person performs, and so
+     * is any row whose `details` holds no agent reference (the same
+     * serialized fragments {@link applyFeedAgentFilter} matches). A row
+     * the activity log service writes with an agent reference gets
+     * `actorAgentId` stamped, so once the older rows leave the window there
+     * is normally nothing left to read. Paged by
+     * id rather than timestamp, so no row is counted twice or skipped.
+     */
+    async findFeedLegacyActorRows(
+        userId: string,
+        ownershipScope: OwnershipScope,
+        query: ActivityFeedLegacyActorQuery,
+    ): Promise<ActivityFeedLegacyActorRow[]> {
+        const qb = this.repository
+            .createQueryBuilder('activity')
+            .select([
+                'activity.id',
+                'activity.actionType',
+                'activity.actorKind',
+                'activity.actorAgentId',
+                'activity.details',
+                'activity.createdAt',
+            ])
+            .where('activity.userId = :feedUserId', { feedUserId: userId })
+            .andWhere('activity.actorAgentId IS NULL')
+            .andWhere('activity.createdAt >= :feedSince', { feedSince: query.since })
+            .andWhere(
+                '((activity.actorKind IS NULL AND activity.actionType NOT IN (:...feedPersonActionTypes)) OR activity.actorKind = :feedAgentActorKind)',
+                {
+                    feedPersonActionTypes:
+                        query.personActionTypes.length > 0
+                            ? [...query.personActionTypes]
+                            : NO_MATCH,
+                    feedAgentActorKind: 'agent',
+                },
+            )
+            .andWhere(
+                '(activity.details LIKE :feedAgentResourceType OR activity.details LIKE :feedAgentIdKey)',
+                {
+                    feedAgentResourceType: '%"resourceType":"agent"%',
+                    feedAgentIdKey: '%"agentId":"%',
+                },
+            );
+
+        const ownership = ownershipSqlPredicate('activity', ownershipScope, 'feedOwnership');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        if (query.afterId) {
+            qb.andWhere('activity.id > :feedAfterId', { feedAfterId: query.afterId });
+        }
+
+        return qb
+            .orderBy('activity.id', 'ASC')
+            .limit(Math.max(1, Math.trunc(query.limit)))
+            .getMany();
     }
 
     /**

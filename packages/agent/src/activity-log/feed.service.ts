@@ -11,12 +11,16 @@ import {
     type FeedEntryDto,
     type FeedPageDto,
 } from '@ever-works/contracts';
-import { ActivityLogRepository } from '../database/repositories/activity-log.repository';
+import {
+    ActivityLogRepository,
+    type ActivityFeedActorCount,
+} from '../database/repositories/activity-log.repository';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import type { OwnershipScope } from '../database/ownership-scope';
 import type { ActivityLog } from '../entities/activity-log.entity';
 import type { Agent } from '../entities/agent.entity';
 import {
+    FEED_USER_ACTION_TYPES,
     actorAgentIdOf,
     isUuid,
     resolveFeedActor,
@@ -67,6 +71,35 @@ const HOUR_MS = 60 * 60 * 1000;
  * the catalog is walked page by page, so each individual read stays bounded.
  */
 const ROSTER_PAGE_SIZE = 200;
+/**
+ * Rows read per query while attributing activity that carries no stamped
+ * actor agent. Only counts are kept between reads, so memory stays bounded.
+ */
+const LEGACY_ACTOR_PAGE_SIZE = 500;
+const PERSON_ACTION_TYPES = [...FEED_USER_ACTION_TYPES];
+
+/**
+ * Sum two sets of per-agent counts, keeping the newest activity time. The
+ * first set's order is kept; agents only the second one knows follow it.
+ */
+export function mergeFeedActorCounts(
+    first: readonly ActivityFeedActorCount[],
+    second: readonly ActivityFeedActorCount[],
+): ActivityFeedActorCount[] {
+    const merged = new Map<string, ActivityFeedActorCount>();
+    for (const entry of [...first, ...second]) {
+        const current = merged.get(entry.agentId);
+        if (!current) {
+            merged.set(entry.agentId, { ...entry });
+            continue;
+        }
+        current.count += entry.count;
+        if ((entry.lastActivityAt ?? '') > (current.lastActivityAt ?? '')) {
+            current.lastActivityAt = entry.lastActivityAt;
+        }
+    }
+    return [...merged.values()];
+}
 
 /** The kind sets never change at runtime; build them once. */
 const KIND_SETS = buildFeedKindSets();
@@ -195,12 +228,16 @@ export class FeedService {
         );
         const since = new Date(now.getTime() - hours * HOUR_MS);
 
-        const [scoped, counts] = await Promise.all([
+        const [scoped, stamped, legacy] = await Promise.all([
             this.loadScopedRoster(userId, ownershipScope),
             // Every acting agent in the window — a cap here would report a
             // busy agent past it as having done nothing.
             this.activityLogs.aggregateFeedActors(userId, ownershipScope, since),
+            // Rows from before the actor column: the per-agent filter shows
+            // them, so the counts include them too.
+            this.countLegacyActors(userId, ownershipScope, since),
         ]);
+        const counts = mergeFeedActorCounts(stamped, legacy);
 
         const countById = new Map(counts.map((entry) => [entry.agentId, entry]));
         const known = new Map(scoped.map((agent) => [agent.id, agent]));
@@ -269,6 +306,47 @@ export class FeedService {
             afterId = last.id;
         }
         return roster;
+    }
+
+    /**
+     * Per-agent counts for rows in the window with no stamped actor agent,
+     * attributed by the same rule a feed entry's actor is resolved with.
+     * Walked by keyset page until a short page; only the counts are kept.
+     */
+    private async countLegacyActors(
+        userId: string,
+        ownershipScope: OwnershipScope,
+        since: Date,
+    ): Promise<ActivityFeedActorCount[]> {
+        const counts = new Map<string, ActivityFeedActorCount>();
+        let afterId: string | null = null;
+        for (;;) {
+            const rows = await this.activityLogs.findFeedLegacyActorRows(userId, ownershipScope, {
+                since,
+                personActionTypes: PERSON_ACTION_TYPES,
+                afterId,
+                limit: LEGACY_ACTOR_PAGE_SIZE,
+            });
+            for (const row of rows) {
+                const agentId = actorAgentIdOf(row);
+                if (!agentId) continue;
+                const at = new Date(row.createdAt);
+                const iso = Number.isNaN(at.getTime()) ? null : at.toISOString();
+                const current = counts.get(agentId);
+                if (!current) {
+                    counts.set(agentId, { agentId, count: 1, lastActivityAt: iso });
+                } else {
+                    current.count += 1;
+                    if ((iso ?? '') > (current.lastActivityAt ?? '')) current.lastActivityAt = iso;
+                }
+            }
+            const last = rows[rows.length - 1];
+            // A short page is the end; a page whose last id did not advance
+            // would never end, so it is treated as the end too.
+            if (rows.length < LEGACY_ACTOR_PAGE_SIZE || !last || last.id === afterId) break;
+            afterId = last.id;
+        }
+        return [...counts.values()];
     }
 
     /** One batched lookup for every agent the page refers to. */
