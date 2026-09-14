@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
+import { Hand } from 'lucide-react';
 import type { ComputerChannel, ComputerQuality } from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
 
@@ -17,6 +18,8 @@ interface Props {
     live: 'live' | 'connecting' | 'ended';
     /** The node picker trigger, rendered in place of the plain node name. */
     nodeSlot?: ReactNode;
+    /** True while this view holds control: the strip carries a YOU badge beside LIVE. */
+    controlling?: boolean;
 }
 
 /**
@@ -34,6 +37,7 @@ export function ComputerIdentityStrip({
     lowered,
     live,
     nodeSlot,
+    controlling = false,
 }: Props) {
     const t = useTranslations('dashboard.computer');
     const clockText = clock ?? '—:—:—';
@@ -90,6 +94,15 @@ export function ComputerIdentityStrip({
                       ? t('connectingBadge')
                       : t('endedBadge')}
             </span>
+            {controlling ? (
+                <span
+                    data-testid="computer-you-badge"
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"
+                >
+                    <Hand className="h-3 w-3" aria-hidden />
+                    {t('control.youBadge')}
+                </span>
+            ) : null}
         </div>
     );
 }

@@ -1,11 +1,23 @@
 import {
+    COMPUTER_BLOCKED_SHORTCUTS,
+    COMPUTER_CONTROL_IDLE_WARNING_MS,
+    COMPUTER_KEY_MODIFIER_ALT,
+    COMPUTER_KEY_MODIFIER_CTRL,
+    COMPUTER_KEY_MODIFIER_META,
+    COMPUTER_KEY_MODIFIER_SHIFT,
+    COMPUTER_MAX_DIMENSION,
     COMPUTER_QUALITIES,
     computerStallStateForAge,
     isComputerChannel,
+    isComputerControlRefusal,
     isComputerQuality,
+    isComputerShortcutBlocked,
     isComputerUnwatchableReason,
     type ComputerChannel,
     type ComputerCloseReason,
+    type ComputerControlRefusal,
+    type ComputerControlStateView,
+    type ComputerKeyFrame,
     type ComputerNodeOption,
     type ComputerQuality,
     type ComputerSessionHolderView,
@@ -426,4 +438,227 @@ export function buildComputerViewHref(
     if (channel) params.set('channel', channel);
     const qs = params.toString();
     return `${ROUTES.DASHBOARD_AGENT_COMPUTER(agentId)}${qs ? `?${qs}` : ''}`;
+}
+
+// ── Taking control ───────────────────────────────────────────────────────
+
+/** Two Escape presses closer together than this give control back. */
+export const COMPUTER_ESCAPE_TWICE_WINDOW_MS = 600;
+
+/** How often the page re-reads control while a view is live. */
+export const COMPUTER_CONTROL_POLL_MS = 3000;
+
+/** Whether the Take over button is offered, and if not, why. */
+export type ComputerTakeOverAvailability =
+    | 'available'
+    /** This view already holds control (the button reads Give back control). */
+    | 'controlling'
+    /** The machine's control policy leaves this person out. */
+    | 'denied'
+    /** Another view holds control. */
+    | 'held-elsewhere'
+    /** Control drives the screen; the terminal channel stays read-only. */
+    | 'terminal'
+    /** Nothing to drive yet (no picture), or control is not available here. */
+    | 'unavailable';
+
+export function takeOverAvailability(input: {
+    state: ComputerControlStateView | null;
+    channel: ComputerChannel | null;
+    live: boolean;
+}): ComputerTakeOverAvailability {
+    const { state } = input;
+    if (state?.mode === 'controlling') return 'controlling';
+    if (!state || !input.live) return 'unavailable';
+    if (!state.canControl) return 'denied';
+    if (input.channel !== 'screen') return 'terminal';
+    if (state.holder && !state.holder.thisView) return 'held-elsewhere';
+    return 'available';
+}
+
+/** `m:ss` for a countdown; never negative. */
+export function formatCountdown(ms: number): string {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const minutes = Math.floor(total / 60);
+    return `${minutes}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** Milliseconds until an ISO instant on the platform's clock, read through the view's clock offset. */
+export function msUntil(
+    iso: string | null | undefined,
+    nowMs: number,
+    serverOffsetMs: number,
+): number | null {
+    if (!iso) return null;
+    const at = new Date(iso).getTime();
+    return Number.isFinite(at) ? at - (nowMs + serverOffsetMs) : null;
+}
+
+/** The platform clock minus this browser's, from a control state read at `receivedAtMs`. */
+export function serverClockOffsetMs(
+    state: Pick<ComputerControlStateView, 'serverTime'> | null,
+    receivedAtMs: number,
+): number {
+    const server = state ? new Date(state.serverTime).getTime() : NaN;
+    return Number.isFinite(server) ? server - receivedAtMs : 0;
+}
+
+/** While controlling: ms left before the idle give-back, when inside the warning window; else null. */
+export function idleWarningMs(
+    state: ComputerControlStateView | null,
+    nowMs: number,
+    serverOffsetMs: number,
+): number | null {
+    if (state?.mode !== 'controlling' || !state.holder) return null;
+    const left = msUntil(state.holder.idleAt, nowMs, serverOffsetMs);
+    return left !== null && left <= COMPUTER_CONTROL_IDLE_WARNING_MS ? Math.max(0, left) : null;
+}
+
+/** True when the view lost control on its own (idle, ceiling, a lost connection or the view ending). */
+export function wasReleasedAutomatically(state: ComputerControlStateView | null): boolean {
+    const reason = state?.lastRelease?.reason;
+    return (
+        reason === 'idle' ||
+        reason === 'ceiling' ||
+        reason === 'disconnected' ||
+        reason === 'revoked' ||
+        reason === 'session-ended'
+    );
+}
+
+/** A refusal from a control route: its named reason and the control state it carried. */
+export interface ComputerControlRefusalView {
+    reason: ComputerControlRefusal | 'unavailable' | 'failed';
+    state: ComputerControlStateView | null;
+}
+
+export function describeControlRefusal(status: number, body: unknown): ComputerControlRefusalView {
+    const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+    const state =
+        record.state && typeof record.state === 'object'
+            ? (record.state as ComputerControlStateView)
+            : null;
+    if (isComputerControlRefusal(record.reason)) return { reason: record.reason, state };
+    if (status === 503) return { reason: 'unavailable', state };
+    return { reason: 'failed', state };
+}
+
+/**
+ * Where a pointer on the stage lands in the picture, in picture pixels. The
+ * canvas is scaled to fit and centred (letterboxed), so the picture occupies
+ * a centred box inside the element; a point in the margins is outside it
+ * and maps to null.
+ */
+export function pointerToPicture(
+    point: { clientX: number; clientY: number },
+    box: { left: number; top: number; width: number; height: number },
+    picture: { width: number; height: number },
+): { x: number; y: number } | null {
+    if (box.width <= 0 || box.height <= 0 || picture.width <= 0 || picture.height <= 0) return null;
+    const scale = Math.min(box.width / picture.width, box.height / picture.height);
+    const shownWidth = picture.width * scale;
+    const shownHeight = picture.height * scale;
+    const offsetX = box.left + (box.width - shownWidth) / 2;
+    const offsetY = box.top + (box.height - shownHeight) / 2;
+    const x = (point.clientX - offsetX) / scale;
+    const y = (point.clientY - offsetY) / scale;
+    if (x < 0 || y < 0 || x >= picture.width || y >= picture.height) return null;
+    return {
+        x: Math.min(COMPUTER_MAX_DIMENSION, Math.floor(x)),
+        y: Math.min(COMPUTER_MAX_DIMENSION, Math.floor(y)),
+    };
+}
+
+/** The `key` frame for a keyboard event, or null for one this page never forwards. */
+export function keyEventToFrame(
+    event: Pick<KeyboardEvent, 'key' | 'code' | 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>,
+    action: 'down' | 'up',
+): ComputerKeyFrame | null {
+    const key = typeof event.key === 'string' ? event.key : '';
+    const code = typeof event.code === 'string' && event.code.length > 0 ? event.code : key;
+    if (
+        !key ||
+        key.length > 32 ||
+        code.length > 32 ||
+        key === 'Unidentified' ||
+        key === 'Process'
+    ) {
+        return null;
+    }
+    const modifiers =
+        (event.altKey ? COMPUTER_KEY_MODIFIER_ALT : 0) |
+        (event.ctrlKey ? COMPUTER_KEY_MODIFIER_CTRL : 0) |
+        (event.metaKey ? COMPUTER_KEY_MODIFIER_META : 0) |
+        (event.shiftKey ? COMPUTER_KEY_MODIFIER_SHIFT : 0);
+    const frame: ComputerKeyFrame = { kind: 'key', action, key, code, modifiers };
+    return isComputerShortcutBlocked(frame) ? null : frame;
+}
+
+/** The shortcuts a controlling browser never sends, as the sheet lists them (each once). */
+export function blockedShortcutLabels(): string[] {
+    return [...new Set(COMPUTER_BLOCKED_SHORTCUTS.map((shortcut) => shortcut.label))];
+}
+
+/** True for a body that is a control state (anything else — an error, an empty answer — is not adopted). */
+export function isControlStateView(value: unknown): value is ComputerControlStateView {
+    if (!value || typeof value !== 'object') return false;
+    const record = value as Record<string, unknown>;
+    return (
+        typeof record.sessionId === 'string' &&
+        typeof record.serverTime === 'string' &&
+        typeof record.canControl === 'boolean' &&
+        (record.mode === 'watching' || record.mode === 'controlling')
+    );
+}
+
+export type ComputerControlRefusalKey =
+    | 'policy'
+    | 'held'
+    | 'notLive'
+    | 'sessionEnded'
+    | 'notHolder'
+    | 'notHeld'
+    | 'alreadyRequested'
+    | 'noRequest'
+    | 'alreadyExtended'
+    | 'unavailable'
+    | 'failed';
+
+/** The `dashboard.computer.control.refusals` leaf for a refusal reason. */
+export function controlRefusalKey(
+    reason: ComputerControlRefusalView['reason'],
+): ComputerControlRefusalKey {
+    switch (reason) {
+        case 'policy':
+        case 'held':
+        case 'unavailable':
+        case 'failed':
+            return reason;
+        case 'not-live':
+            return 'notLive';
+        case 'session-ended':
+            return 'sessionEnded';
+        case 'not-holder':
+            return 'notHolder';
+        case 'not-held':
+            return 'notHeld';
+        case 'already-requested':
+            return 'alreadyRequested';
+        case 'no-request':
+            return 'noRequest';
+        case 'already-extended':
+            return 'alreadyExtended';
+    }
+}
+
+/** `09:12` in the viewer's locale, for "since …" sentences; empty for an unknown instant. */
+export function formatClockTime(iso: string | null | undefined): string {
+    if (!iso) return '';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    try {
+        return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return date.toISOString().slice(11, 16);
+    }
 }

@@ -1,13 +1,31 @@
 'use client';
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, type ReactNode } from 'react';
+import {
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useRef,
+    type KeyboardEvent as ReactKeyboardEvent,
+    type PointerEvent as ReactPointerEvent,
+    type ReactNode,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { RefreshCw } from 'lucide-react';
-import type { ComputerChannel, ComputerScreenFrame, TerminalFrame } from '@ever-works/contracts';
+import type {
+    ComputerChannel,
+    ComputerInputFrame,
+    ComputerScreenFrame,
+    TerminalFrame,
+} from '@ever-works/contracts';
 import { createTerminalRenderer } from '@/components/terminal/create-terminal-renderer';
 import type { TerminalRenderer } from '@/components/terminal/terminal-renderer';
 import { cn } from '@/lib/utils/cn';
-import type { ComputerStallState } from './computer-session.shared';
+import {
+    COMPUTER_ESCAPE_TWICE_WINDOW_MS,
+    keyEventToFrame,
+    pointerToPicture,
+    type ComputerStallState,
+} from './computer-session.shared';
 
 /** What the page pushes into the stage as frames arrive (outside React state — pictures are hot). */
 export interface ComputerStageHandle {
@@ -30,6 +48,22 @@ interface Props {
         frame: ComputerScreenFrame,
     ) => Promise<CanvasImageSource & { width: number; height: number }>;
     createRenderer?: () => Promise<TerminalRenderer>;
+    /** True while this view holds control: the stage takes pointer and keyboard and forwards them. */
+    controlling?: boolean;
+    /** Where forwarded input goes (the live-view socket). */
+    onInput?: (frame: ComputerInputFrame) => void;
+    /** Escape pressed twice: give control back. The only key the stage keeps while in control. */
+    onEscapeTwice?: () => void;
+}
+
+/** Pointer moves closer together than this are coalesced (the machine gets the latest position). */
+const POINTER_MOVE_INTERVAL_MS = 30;
+
+function pointerButton(button: number): 'left' | 'middle' | 'right' | null {
+    if (button === 0) return 'left';
+    if (button === 1) return 'middle';
+    if (button === 2) return 'right';
+    return null;
 }
 
 /** Consecutive undecodable pictures after which the stage asks for a fresh one. */
@@ -51,6 +85,12 @@ async function defaultDecode(frame: ComputerScreenFrame): Promise<ImageBitmap> {
  * dimmed, with its age and a Refresh; at the dead line it says the stream
  * stopped and offers Reconnect. A picture that cannot be decoded is dropped;
  * three in a row ask the computer for a fresh one.
+ *
+ * In control (screen channel only) the stage wears an amber border, takes
+ * focus, and forwards the pointer, wheel, keys and composed text to the
+ * computer in picture pixels. Escape pressed twice gives control back — the
+ * only key it keeps. Pasting and dropping files are swallowed, never sent,
+ * and so are the shortcuts the computer refuses.
  */
 export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function ComputerStage(
     {
@@ -63,6 +103,9 @@ export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function Com
         children,
         decodePicture,
         createRenderer,
+        controlling = false,
+        onInput,
+        onEscapeTwice,
     },
     ref,
 ) {
@@ -72,6 +115,16 @@ export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function Com
     const rendererRef = useRef<TerminalRenderer | null>(null);
     const pendingTerminalRef = useRef<Uint8Array[]>([]);
     const decodeFailuresRef = useRef(0);
+    const sectionRef = useRef<HTMLElement | null>(null);
+    const lastEscapeRef = useRef(0);
+    const lastMoveRef = useRef(0);
+    const inputRef = useRef(onInput);
+    const escapeTwiceRef = useRef(onEscapeTwice);
+    useEffect(() => {
+        inputRef.current = onInput;
+        escapeTwiceRef.current = onEscapeTwice;
+    }, [onInput, onEscapeTwice]);
+    const driving = controlling && channel === 'screen';
     const onRefreshRef = useRef(onRefresh);
     // Synced after render (never during it), so a decode failure always calls the latest handler.
     useEffect(() => {
@@ -134,22 +187,119 @@ export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function Com
         };
     }, [channel, createRenderer]);
 
+    // Taking control moves focus onto the stage, so the keyboard drives the computer at once.
+    useEffect(() => {
+        if (driving) sectionRef.current?.focus();
+    }, [driving]);
+
+    // Wheel input needs a non-passive listener to keep the page itself from scrolling.
+    useEffect(() => {
+        const section = sectionRef.current;
+        if (!driving || !section) return;
+        const onWheel = (event: WheelEvent) => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const point = pointerToPicture(event, canvas.getBoundingClientRect(), canvas);
+            if (!point) return;
+            event.preventDefault();
+            inputRef.current?.({
+                kind: 'scroll',
+                ...point,
+                dx: Math.max(-10_000, Math.min(10_000, Math.round(event.deltaX))),
+                dy: Math.max(-10_000, Math.min(10_000, Math.round(event.deltaY))),
+            });
+        };
+        section.addEventListener('wheel', onWheel, { passive: false });
+        return () => section.removeEventListener('wheel', onWheel);
+    }, [driving]);
+
+    const forwardPointer = (
+        event: ReactPointerEvent<HTMLCanvasElement>,
+        action: 'move' | 'down' | 'up',
+    ) => {
+        if (!driving) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        if (action === 'move') {
+            const at = Date.now();
+            if (at - lastMoveRef.current < POINTER_MOVE_INTERVAL_MS) return;
+            lastMoveRef.current = at;
+        }
+        const point = pointerToPicture(event, canvas.getBoundingClientRect(), canvas);
+        if (!point) return;
+        event.preventDefault();
+        inputRef.current?.({
+            kind: 'pointer',
+            action,
+            ...point,
+            button: action === 'move' ? null : pointerButton(event.button),
+        });
+    };
+
+    const forwardKey = (event: ReactKeyboardEvent<HTMLElement>, action: 'down' | 'up') => {
+        if (!driving) return;
+        if (action === 'down' && event.key === 'Escape') {
+            const at = Date.now();
+            if (at - lastEscapeRef.current <= COMPUTER_ESCAPE_TWICE_WINDOW_MS) {
+                lastEscapeRef.current = 0;
+                event.preventDefault();
+                escapeTwiceRef.current?.();
+                return;
+            }
+            lastEscapeRef.current = at;
+        }
+        if (event.nativeEvent.isComposing) return;
+        const frame = keyEventToFrame(event, action);
+        event.preventDefault();
+        event.stopPropagation();
+        if (frame) inputRef.current?.(frame);
+    };
+
     const stalled = stall === 'stalled' || stall === 'auto-refresh';
     return (
         <section
+            ref={sectionRef}
             role="region"
             aria-label={label}
             tabIndex={0}
             data-testid="computer-stage"
-            className="relative flex min-h-[320px] flex-1 items-center justify-center overflow-hidden rounded-lg bg-[#0b0f19] outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            data-controlling={driving ? 'true' : undefined}
+            onKeyDown={(event) => forwardKey(event, 'down')}
+            onKeyUp={(event) => forwardKey(event, 'up')}
+            onCompositionEnd={(event) => {
+                if (driving && event.data)
+                    inputRef.current?.({ kind: 'text', text: event.data.slice(0, 4096) });
+            }}
+            onPaste={(event) => {
+                // Clipboard contents never leave this computer.
+                if (driving) event.preventDefault();
+            }}
+            onDrop={(event) => {
+                if (driving) event.preventDefault();
+            }}
+            onDragOver={(event) => {
+                if (driving) event.preventDefault();
+            }}
+            onContextMenu={(event) => {
+                if (driving) event.preventDefault();
+            }}
+            className={cn(
+                'relative flex min-h-[320px] flex-1 items-center justify-center overflow-hidden rounded-lg bg-[#0b0f19] outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                driving &&
+                    'ring-4 ring-amber-500 focus-visible:ring-4 focus-visible:ring-amber-500',
+            )}
         >
             {channel === 'screen' ? (
                 <canvas
                     ref={canvasRef}
                     data-testid="computer-canvas"
+                    onPointerMove={(event) => forwardPointer(event, 'move')}
+                    onPointerDown={(event) => forwardPointer(event, 'down')}
+                    onPointerUp={(event) => forwardPointer(event, 'up')}
                     className={cn(
                         'max-h-full max-w-full object-contain transition-opacity',
                         (stalled || stall === 'dead') && 'opacity-40',
+                        driving && 'cursor-default touch-none',
                     )}
                 />
             ) : (
