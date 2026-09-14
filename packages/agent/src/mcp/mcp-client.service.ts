@@ -178,7 +178,13 @@ export class McpClientService {
         try {
             client = await this.connect(connection, resolved);
             const result = await client.listTools(undefined, { timeout: MCP_LIST_TIMEOUT_MS });
-            const tools = (result.tools ?? []).map((tool) => this.normalizeTool(tool));
+            // Tool metadata is server-controlled: a server that reflects the
+            // credential it received (in a name, description or schema) must
+            // not put a resolved value into model-visible tool definitions or
+            // the tools cache. Scrubbed before normalization and caching.
+            const tools = this.redactResolvedSecrets(result.tools ?? [], resolved.secrets).map(
+                (tool) => this.normalizeTool(tool),
+            );
             this.toolsCache.set(connection.id, { at: Date.now(), tools });
             await this.stamp(connection, this.successOutcome(resolved));
             return tools;
@@ -215,11 +221,7 @@ export class McpClientService {
             await this.stamp(connection, this.successOutcome(resolved));
             // A server that reflects its own auth header in a RESULT must
             // not hand a resolved credential to the model.
-            return this.capResultSize(
-                resolved.secrets && resolved.secrets.size > 0
-                    ? redactCredentialValues(result, resolved.secrets)
-                    : result,
-            );
+            return this.capResultSize(this.redactResolvedSecrets(result, resolved.secrets));
         } catch (err) {
             const message = this.classifyError(err, connection, resolved.secrets);
             await this.stamp(connection, { ok: false, error: message });
@@ -382,6 +384,15 @@ export class McpClientService {
         warning?: 'insecure_transport';
     } {
         return sink.insecureTransport ? { ok: true, warning: 'insecure_transport' } : { ok: true };
+    }
+
+    /**
+     * Scrub the values resolved for THIS attempt out of anything the server
+     * sent back (a tool result, a tool list). No resolved values ⇒ the input
+     * is returned as is.
+     */
+    private redactResolvedSecrets<T>(value: T, secrets?: ReadonlyMap<string, string>): T {
+        return secrets && secrets.size > 0 ? redactCredentialValues(value, secrets) : value;
     }
 
     private normalizeTool(tool: McpSdkTool): McpToolInfo {

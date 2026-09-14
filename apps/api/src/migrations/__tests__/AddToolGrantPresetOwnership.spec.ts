@@ -126,6 +126,11 @@ describe('AW-15 access-level ownership + credential transport migrations', () =>
             );
             await withRunner((runner) => migration.up(runner));
 
+            const [preserved] = await dataSource.query(
+                `SELECT "health" FROM "mcp_server_connections" WHERE "id" = 'c1'`,
+            );
+            expect(preserved.health).toBe('expired');
+
             await dataSource.query(
                 `UPDATE "mcp_server_connections" SET "health" = 'insecure_transport' WHERE "id" = 'c1'`,
             );

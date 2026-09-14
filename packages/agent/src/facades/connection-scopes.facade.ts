@@ -37,9 +37,13 @@ export class ConnectionScopesFacadeService {
 
     /** Every loaded provider that declares at least one level. */
     async listProviders(): Promise<ConnectionScopePresetProviderDto[]> {
+        // Each declaration is independent and `readPresets` absorbs its own
+        // failure, so one slow plugin never delays the others.
+        const entries = this.declaringPlugins();
+        const declared = await Promise.all(entries.map((entry) => this.readPresets(entry)));
         const out: ConnectionScopePresetProviderDto[] = [];
-        for (const entry of this.declaringPlugins()) {
-            const presets = await this.readPresets(entry);
+        for (const [index, entry] of entries.entries()) {
+            const presets = declared[index];
             if (presets.length === 0) continue;
             out.push({
                 providerId: entry.plugin.id,

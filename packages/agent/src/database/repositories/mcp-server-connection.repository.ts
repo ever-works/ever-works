@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import type { ConnectionHealthErrorCode } from '@ever-works/contracts';
 import { McpServerConnection } from '../../entities/mcp-server-connection.entity';
 import { classifyProbeResult } from '../../connections/connection-health';
 import { mcpHealthErrorCode } from '../../mcp/mcp-connection-health';
+
+/**
+ * How many times a failed attempt re-reads the failure counter after a
+ * concurrent stamp changed it. Each miss means another attempt's write DID
+ * land, so contention converges long before this bound.
+ */
+export const MCP_HEALTH_STAMP_MAX_ATTEMPTS = 10;
 
 /**
  * Agent Plugins MCP slice — data surface for the manual/global MCP
@@ -55,12 +62,14 @@ export class McpServerConnectionRepository {
      * Stamp the outcome of a connect/list/call attempt. `lastError` is a
      * CLASSIFIED message (never raw header material); success clears it.
      *
-     * AW-15: the same write also records connection health. The failure
-     * counter is read first so `classifyProbeResult` can tell `degraded`
-     * from `unreachable`; under two concurrent failed attempts one increment
-     * can be lost, which only delays `unreachable` by one attempt and never
-     * flips a working connection. `errorCode` is optional — when absent it is
-     * derived from the classified message the MCP client already produced.
+     * AW-15: the same write also records connection health. A failure is a
+     * compare-and-set on the failure counter: the count is read, classified
+     * (`classifyProbeResult` tells `degraded` from `unreachable`), and written
+     * only if the row still holds the count that was read. When a concurrent
+     * attempt stamped the row in between, nothing is written and the attempt
+     * re-reads and classifies against the fresh count, so no increment is
+     * ever lost. `errorCode` is optional — when absent it is derived from the
+     * classified message the MCP client already produced.
      *
      * A success may carry `warning: 'insecure_transport'` (literal
      * credentials sent over plain http). It is still a success —
@@ -91,20 +100,35 @@ export class McpServerConnectionRepository {
         }
 
         const error = result.error ?? 'Unknown error';
-        const current = await this.repository.findOne({
-            where: { id },
-            select: { id: true, healthFailureCount: true },
-        });
-        const classified = classifyProbeResult(
-            { ok: false, errorCode: result.errorCode ?? mcpHealthErrorCode(error) },
-            current?.healthFailureCount ?? 0,
+        const outcome = { ok: false, errorCode: result.errorCode ?? mcpHealthErrorCode(error) };
+        for (let attempt = 0; attempt < MCP_HEALTH_STAMP_MAX_ATTEMPTS; attempt += 1) {
+            const current = await this.repository.findOne({
+                where: { id },
+                select: { id: true, healthFailureCount: true },
+            });
+            // The row is gone (deleted mid-attempt): there is nothing to stamp.
+            if (!current) return;
+            const stored = current.healthFailureCount;
+            const classified = classifyProbeResult(outcome, stored ?? 0);
+            const written = await this.repository.update(
+                {
+                    id,
+                    healthFailureCount: stored === null || stored === undefined ? IsNull() : stored,
+                },
+                {
+                    lastError: error,
+                    health: classified.health,
+                    healthCheckedAt: now,
+                    healthFailureCount: classified.failureCount,
+                    lastErrorCode: classified.errorCode,
+                },
+            );
+            // Every supported driver reports affected rows; one that does not
+            // cannot confirm the compare, so its write is accepted as is.
+            if (written?.affected === undefined || written.affected > 0) return;
+        }
+        throw new Error(
+            `Could not record health for MCP connection ${id}: the row changed under ${MCP_HEALTH_STAMP_MAX_ATTEMPTS} consecutive attempts.`,
         );
-        await this.repository.update(id, {
-            lastError: error,
-            health: classified.health,
-            healthCheckedAt: now,
-            healthFailureCount: classified.failureCount,
-            lastErrorCode: classified.errorCode,
-        });
     }
 }

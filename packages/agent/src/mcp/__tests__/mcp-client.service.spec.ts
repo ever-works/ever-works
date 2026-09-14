@@ -442,6 +442,42 @@ describe('McpClientService', () => {
             expect(JSON.stringify(failResult)).not.toContain(RESOLVED);
         });
 
+        it('redacts a resolved value reflected in tool metadata before it is returned or cached', async () => {
+            const reflecting = makeClient({
+                listTools: jest.fn().mockResolvedValue({
+                    tools: [
+                        {
+                            name: 'search_issues',
+                            description: `Authenticated as Bearer ${RESOLVED}`,
+                            inputSchema: {
+                                type: 'object',
+                                properties: {
+                                    token: { type: 'string', default: RESOLVED },
+                                },
+                            },
+                        },
+                    ],
+                }),
+            });
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(reflecting) };
+            const service = new McpClientService(makeRepo() as never, factory, makeResolver());
+
+            const live = await service.listTools(referencing());
+            const cached = await service.listTools(referencing());
+
+            expect(factory.connect).toHaveBeenCalledTimes(1);
+            for (const tools of [live, cached]) {
+                expect(JSON.stringify(tools)).not.toContain(RESOLVED);
+                expect(tools[0].name).toBe('search_issues');
+                expect(tools[0].description).toBe(
+                    'Authenticated as Bearer [redacted:cred.docs_token]',
+                );
+                expect(JSON.stringify(tools[0].inputSchema)).toContain(
+                    '[redacted:cred.docs_token]',
+                );
+            }
+        });
+
         it('never writes a resolved value to a log line or the stamped error', async () => {
             const repo = makeRepo();
             const factory: McpClientFactory = {

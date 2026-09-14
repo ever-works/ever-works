@@ -112,6 +112,28 @@ describe('ConnectionScopesFacadeService', () => {
         ]);
     });
 
+    it('reads every declaration at once, so a slow plugin never holds up the others', async () => {
+        const started: string[] = [];
+        const release: Array<() => void> = [];
+        const deferred = (id: string) => () => {
+            started.push(id);
+            return new Promise((resolve) => release.push(() => resolve(DECLARED)));
+        };
+        const facade = new ConnectionScopesFacadeService(
+            makeRegistry([
+                provider('zeta', { getConnectionScopePresets: deferred('zeta') }),
+                provider('alpha', { getConnectionScopePresets: deferred('alpha') }),
+            ]),
+        );
+
+        const pending = facade.listProviders();
+        await Promise.resolve();
+
+        expect(started).toEqual(['zeta', 'alpha']);
+        release.forEach((resolve) => resolve());
+        expect((await pending).map((p) => p.providerId)).toEqual(['alpha', 'zeta']);
+    });
+
     it('coversTool uses exactly the tool-grant matcher', async () => {
         const facade = new ConnectionScopesFacadeService(makeRegistry([provider('vcs')]));
 
