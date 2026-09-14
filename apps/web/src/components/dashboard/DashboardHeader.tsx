@@ -5,6 +5,7 @@ import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationDropdown } from './NotificationDropdown';
+import { WhatsNewButton } from './WhatsNewButton';
 import { WorkSwitcher } from './WorkSwitcher';
 import { CommandPaletteTrigger } from '@/components/command-palette/CommandPaletteTrigger';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -17,12 +18,22 @@ interface DashboardHeaderOnboardingBadge {
     onDismiss: () => void;
 }
 
+/** What's new (AW-14) — the product changelog control. Omit to render no control. */
+interface DashboardHeaderWhatsNew {
+    /** Unread entries; `null` when unknown (no badge). */
+    unreadCount: number | null;
+    onOpen: () => void;
+    /** Whether the panel is open, for `aria-expanded`. */
+    isOpen?: boolean;
+}
+
 interface DashboardHeaderProps {
     user: AuthUser;
     onMenuClick: () => void;
     isSidebarOpen?: boolean;
     onHelpClick?: () => void;
     onboardingBadge?: DashboardHeaderOnboardingBadge;
+    whatsNew?: DashboardHeaderWhatsNew;
 }
 
 export function DashboardHeader({
@@ -30,6 +41,7 @@ export function DashboardHeader({
     isSidebarOpen = true,
     onHelpClick,
     onboardingBadge,
+    whatsNew,
 }: DashboardHeaderProps) {
     const t = useTranslations('dashboard.header');
     const tTheme = useTranslations('common.theme');
@@ -94,6 +106,18 @@ export function DashboardHeader({
                     <CommandPaletteTrigger className="mx-3" />
 
                     <div className="flex shrink-0 items-center gap-4">
+                        {whatsNew && (
+                            // Before the bell: "about the product" reads left of
+                            // "about your workspace".
+                            <div className="mt-2">
+                                <WhatsNewButton
+                                    unreadCount={whatsNew.unreadCount}
+                                    onOpen={whatsNew.onOpen}
+                                    isOpen={whatsNew.isOpen ?? false}
+                                />
+                            </div>
+                        )}
+
                         <div className="mt-2">
                             <NotificationDropdown />
                         </div>

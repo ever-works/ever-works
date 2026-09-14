@@ -25,6 +25,9 @@ export * from './delegation/index.js';
 // Inbox (operator message center) — one surface for questions /
 // approvals / escalations / notices addressed to the human.
 export * from './inbox/index.js';
+// Agent email (AW-05) — approve-before-send statuses and modes, plus the
+// per-inbox / per-workspace send ceilings and their pure resolution.
+export * from './email/index.js';
 // Release promotion lane (self-build slice AI, EW-808) — develop -> stage
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
@@ -32,6 +35,9 @@ export * from './release/index.js';
 // Conversations — kinds, participants, send status and delivery outcomes for
 // named conversations with Agents.
 export * from './conversations/index.js';
+// Live Feed — the narrated, filterable view of the activity log. Structure
+// only (narration keys + typed destinations); renderers own the words.
+export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';

@@ -138,6 +138,8 @@ export class FleetJobsController {
             ...(body.max !== undefined ? { max: body.max } : {}),
             ...(body.leaseTtlSec !== undefined ? { leaseTtlSec: body.leaseTtlSec } : {}),
             ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
+            ...(body.kinds !== undefined ? { kinds: body.kinds } : {}),
+            ...(body.excludeKinds !== undefined ? { excludeKinds: body.excludeKinds } : {}),
         });
         if (jobs === null) {
             // One undifferentiated message — never say WHICH check failed.

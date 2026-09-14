@@ -9,13 +9,19 @@ import {
 import {
     INBOX_MAX_BODY_CHARS,
     INBOX_MAX_REPLY_CHARS,
+    inboxDecisionNeedsReason,
     normalizeInboxOptions,
+    type InboxDecisionCounts,
+    type InboxDecisionDto,
     type InboxItemDto,
     type InboxItemOption,
     type InboxItemSourceMeta,
     type InboxItemStatus,
 } from '@ever-works/contracts';
-import { InboxItemRepository } from '../database/repositories/inbox-item.repository';
+import {
+    InboxItemRepository,
+    type ListInboxDecisionsOptions,
+} from '../database/repositories/inbox-item.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { RunSteeringService } from '../agents/run-steering.service';
 import { AgentApprovalsService } from '../agent-approvals/agent-approvals.service';
@@ -26,12 +32,27 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import type { InboxItem } from '../entities/inbox-item.entity';
 import type {
     InboxEscalationRaisedInput,
+    InboxEscalationResolvedInput,
     InboxNoticeInput,
     InboxProducer,
+    InboxProposalDecidedInput,
     InboxProposalPendingInput,
     InboxQuestionRaisedInput,
 } from './inbox-producer.port';
-import { toInboxItemDto, type InboxReplyOutcome, type InboxReplyRouted } from './inbox.types';
+import { decodeInboxDecisionCursor, encodeInboxDecisionCursor } from './inbox-decision-cursor';
+import {
+    toInboxDecisionDto,
+    toInboxItemDto,
+    type InboxReplyOutcome,
+    type InboxReplyRestart,
+    type InboxReplyRouted,
+} from './inbox.types';
+
+/** What handing an answer to the work behind a decision produced. */
+interface AnswerHandOff {
+    restart: InboxReplyRestart;
+    runId?: string;
+}
 
 /** Input of the `askHuman` agent tool (already schema-validated shape-wise). */
 export interface AskHumanInput {
@@ -44,6 +65,12 @@ export interface AskHumanInput {
 export interface AskHumanSource {
     agentId: string;
     agentRunId?: string | null;
+}
+
+/** My Decisions list input: the repository filters, paged by an opaque cursor. */
+export interface ListInboxDecisionsQuery extends Omit<ListInboxDecisionsOptions, 'after'> {
+    /** The previous page's `nextCursor`; the page starts right after that row. */
+    cursor?: string;
 }
 
 export interface ListInboxOptions {
@@ -139,11 +166,60 @@ export class InboxService implements InboxProducer {
         return row ? toInboxItemDto(row) : null;
     }
 
+    /**
+     * My Decisions — the Inbox read as a decision queue: only the items
+     * that ask the human to decide (questions, approvals, escalations),
+     * ranked blocking-first, with the context each one links to, plus the
+     * header counts. Owner-scoped inside the repository like every read.
+     *
+     * `nextCursor` continues right after the last row of this page (null
+     * when nothing ranks after it). Paging with it instead of `offset`
+     * cannot skip or repeat a decision when the live queue changes between
+     * two reads — see `inbox-decision-cursor.ts`.
+     */
+    async listDecisions(
+        userId: string,
+        options: ListInboxDecisionsQuery = {},
+    ): Promise<{
+        items: InboxDecisionDto[];
+        total: number;
+        counts: InboxDecisionCounts;
+        nextCursor: string | null;
+    }> {
+        const { cursor, ...filters } = options;
+        const status = filters.status ?? 'open';
+        // Decoded BEFORE any read: a malformed cursor is the caller's 400.
+        const after = cursor ? decodeInboxDecisionCursor(cursor, status) : undefined;
+        const [{ rows, total, hasMore }, counts] = await Promise.all([
+            this.items.listDecisionsForUser(userId, after ? { ...filters, after } : filters),
+            this.decisionCounts(userId),
+        ]);
+        const now = new Date();
+        const last = rows.length > 0 ? rows[rows.length - 1] : null;
+        return {
+            items: rows.map((row) => toInboxDecisionDto(row, now)),
+            total,
+            counts,
+            nextCursor: hasMore && last ? encodeInboxDecisionCursor(last, status) : null,
+        };
+    }
+
+    /** My Decisions header / sidebar badge: open, blocking, and the latest raise. */
+    async decisionCounts(userId: string): Promise<InboxDecisionCounts> {
+        const counts = await this.items.countDecisionsForUser(userId);
+        return {
+            open: counts.open,
+            blocking: counts.blocking,
+            lastRaisedAt: toIso(counts.lastRaisedAt),
+        };
+    }
+
     // ── read-state / archive ──────────────────────────────────────
 
     async setUnread(id: string, userId: string, unread: boolean): Promise<InboxItemDto> {
         const changed = await this.items.setUnread(id, userId, unread);
         if (!changed) throw new NotFoundException(`Inbox item ${id} not found.`);
+        if (!unread) await this.stampFirstViewed(id, userId);
         const row = await this.items.findOwned(id, userId);
         if (!row) throw new NotFoundException(`Inbox item ${id} not found.`);
         return toInboxItemDto(row);
@@ -284,6 +360,15 @@ export class InboxService implements InboxProducer {
     async proposalPending(input: InboxProposalPendingInput): Promise<void> {
         const existing = await this.items.findByProposalId(input.proposalId);
         if (existing) return;
+        // My Decisions — the Task this approval belongs to, so the queue
+        // can filter by it and say what is waiting: the producer's own
+        // link first, else the proposing run's Task (only when that run is
+        // the owner's — a foreign run id links nothing).
+        let taskId = input.taskId ?? null;
+        if (!taskId && input.runId) {
+            const run = await this.runs.findById(input.runId).catch(() => null);
+            if (run && run.userId === input.userId) taskId = run.taskId ?? null;
+        }
         const risks =
             input.riskFlags && input.riskFlags.length > 0
                 ? `\n\nRisk flags: ${input.riskFlags.join(', ')}`
@@ -304,6 +389,7 @@ export class InboxService implements InboxProducer {
             sourceType: 'proposal',
             agentId: input.agentId ?? null,
             agentRunId: input.runId ?? null,
+            taskId,
             proposalId: input.proposalId,
             organizationId: input.organizationId ?? null,
         });
@@ -335,10 +421,16 @@ export class InboxService implements InboxProducer {
 
     // ── reply routing ─────────────────────────────────────────────
 
+    /**
+     * `answer.requireReason` (My Decisions) opts the caller into the
+     * decision answer rule: a rejection, or an option other than the
+     * recommended one, must carry text explaining why. Omitted, the reply
+     * accepts exactly what it always has.
+     */
     async reply(
         userId: string,
         id: string,
-        answer: { text?: string | null; optionId?: string | null },
+        answer: { text?: string | null; optionId?: string | null; requireReason?: boolean },
     ): Promise<InboxReplyOutcome> {
         const row = await this.items.findOwned(id, userId);
         if (!row) throw new NotFoundException(`Inbox item ${id} not found.`);
@@ -377,6 +469,11 @@ export class InboxService implements InboxProducer {
                 );
             }
         }
+        if (answer.requireReason === true && !text && inboxDecisionNeedsReason(row, option?.id)) {
+            throw new BadRequestException(
+                'Add one sentence explaining why: a rejection, or a choice other than the recommended one, needs a reason.',
+            );
+        }
 
         // The message the downstream run/record receives: option label
         // first (the structured half), free text after it.
@@ -403,25 +500,41 @@ export class InboxService implements InboxProducer {
             return { item: toInboxItemDto(winner), routed: 'already-decided' };
         }
 
+        // Answering is looking: record the first view if the read flip
+        // never did (best-effort — a telemetry stamp never fails a reply).
+        await this.stampFirstViewed(id, userId);
+
         let routed: InboxReplyRouted = 'none';
         let runId: string | undefined;
+        let restart: InboxReplyRestart = 'none';
         try {
             switch (row.kind) {
                 case 'question': {
                     const outcome = await this.routeQuestionReply(row, userId, composed);
                     routed = outcome.routed;
                     runId = outcome.runId;
+                    restart = outcome.restart;
                     break;
                 }
                 case 'approval': {
                     routed = await this.routeApprovalReply(row, userId, option);
+                    if (routed === 'approved' || routed === 'rejected') {
+                        // A run that parked to wait for this approval picks
+                        // the decision up; nothing else is restarted.
+                        const handOff = await this.tryResumeLinkedRun(row, userId, composed, {
+                            parkedOnly: true,
+                        });
+                        restart = handOff.restart;
+                        if (handOff.runId) runId = handOff.runId;
+                    }
                     break;
                 }
                 case 'escalation': {
                     routed = await this.routeEscalationReply(row, userId, composed);
                     if (routed === 'escalation-resolved') {
-                        const resumed = await this.tryResumeLinkedRun(row, userId, composed);
-                        if (resumed) runId = resumed;
+                        const handOff = await this.tryResumeLinkedRun(row, userId, composed);
+                        restart = handOff.restart;
+                        if (handOff.runId) runId = handOff.runId;
                     }
                     break;
                 }
@@ -442,8 +555,85 @@ export class InboxService implements InboxProducer {
         const fresh = await this.items.findOwned(id, userId);
         if (!fresh) throw new NotFoundException(`Inbox item ${id} not found.`);
 
-        this.logAnswered(fresh, routed);
-        return { item: toInboxItemDto(fresh), routed, runId };
+        this.logAnswered(fresh, routed, { restart });
+        return { item: toInboxItemDto(fresh), routed, runId, restart };
+    }
+
+    // ── other doors (My Decisions) ────────────────────────────────
+
+    /**
+     * {@link InboxProducer.escalationResolved} — an escalation was resolved
+     * through the escalation endpoint, the Task page or the chat tool.
+     *
+     * The mirror item closes with the resolution note as its recorded
+     * answer and the note goes to the work behind it exactly as an Inbox
+     * reply would send it, so the queue never shows a decision somebody
+     * already made and the agent is never left parked on it.
+     *
+     * CAS-claimed like `reply`: when the Inbox reply itself resolved the
+     * escalation, its claim already closed the item and this is a no-op —
+     * one answer, one restart, whichever door it came through. Best-effort
+     * by the port contract: the escalation IS resolved either way.
+     */
+    async escalationResolved(input: InboxEscalationResolvedInput): Promise<void> {
+        const row = await this.items.findByEscalationId(input.escalationId);
+        if (!row || row.status !== 'open') return;
+        const note = (input.note ?? '').trim().slice(0, INBOX_MAX_REPLY_CHARS);
+        const claimed = await this.items.markAnswered(row.id, row.userId, {
+            text: note || null,
+            optionId: null,
+        });
+        if (!claimed) return;
+        // Deciding through another door is still a human looking at it:
+        // same first-view rule as `reply`, so an answered mirror never
+        // reads as "never seen" in the raised → seen → answered timings.
+        await this.stampFirstViewed(row.id, row.userId);
+
+        const handOff = await this.tryResumeLinkedRun(row, row.userId, note);
+        const fresh = await this.items.findOwned(row.id, row.userId);
+        if (fresh) {
+            this.logAnswered(fresh, 'escalation-resolved', {
+                via: 'escalation',
+                restart: handOff.restart,
+                decidedByUserId: input.resolvedByUserId,
+            });
+        }
+    }
+
+    /**
+     * {@link InboxProducer.proposalDecided} — a proposal was approved or
+     * rejected through the approvals endpoints or approve-all. Closes the
+     * mirror with the matching option recorded, and hands the decision to
+     * a run that parked waiting for it. Same CAS no-op rule as
+     * {@link escalationResolved}.
+     */
+    async proposalDecided(input: InboxProposalDecidedInput): Promise<void> {
+        const row = await this.items.findByProposalId(input.proposalId);
+        if (!row || row.status !== 'open') return;
+        const optionId = input.decision === 'approved' ? 'approve' : 'reject';
+        const claimed = await this.items.markAnswered(row.id, row.userId, {
+            text: null,
+            optionId,
+        });
+        if (!claimed) return;
+        // Same first-view rule as `reply` and `escalationResolved`.
+        await this.stampFirstViewed(row.id, row.userId);
+
+        const label =
+            (Array.isArray(row.options)
+                ? row.options.find((candidate) => candidate.id === optionId)?.label
+                : undefined) ?? (input.decision === 'approved' ? 'Approve' : 'Reject');
+        const handOff = await this.tryResumeLinkedRun(row, row.userId, label, {
+            parkedOnly: true,
+        });
+        const fresh = await this.items.findOwned(row.id, row.userId);
+        if (fresh) {
+            this.logAnswered(fresh, input.decision, {
+                via: 'approvals',
+                restart: handOff.restart,
+                decidedByUserId: input.decidedByUserId,
+            });
+        }
     }
 
     // ── internals ─────────────────────────────────────────────────
@@ -574,14 +764,14 @@ export class InboxService implements InboxProducer {
         row: InboxItem,
         userId: string,
         message: string,
-    ): Promise<{ routed: InboxReplyRouted; runId?: string }> {
+    ): Promise<{ routed: InboxReplyRouted; runId?: string; restart: InboxReplyRestart }> {
         if (!row.agentRunId || !this.steering) {
             await this.clearAwaitingInput(row);
-            return { routed: 'none' };
+            return { routed: 'none', restart: 'none' };
         }
         const run = await this.runs.findByIdAndUser(row.agentRunId, userId);
         if (!run) {
-            return { routed: 'none' };
+            return { routed: 'none', restart: 'none' };
         }
         const outbound =
             row.sourceType === 'fleet-run'
@@ -590,19 +780,23 @@ export class InboxService implements InboxProducer {
         if (RunSteeringService.isLive(run)) {
             const outcome = await this.steering.steer({ runId: run.id, userId, message: outbound });
             if (outcome.dispatched === 'injected') {
-                return { routed: 'steered', runId: run.id };
+                return { routed: 'steered', runId: run.id, restart: 'injected' };
             }
             // Terminal race — fall through to the resume branch below.
         }
         if (RunSteeringService.isResumable(run) && run.taskId) {
             const outcome = await this.steering.resume(run.id, userId, outbound);
-            return { routed: 'resumed', runId: outcome.runId };
+            return {
+                routed: 'resumed',
+                runId: outcome.runId,
+                restart: outcome.queued === true ? 'queued' : 'resumed',
+            };
         }
         // Not resumable (no Task, or ended for good). Clear the parked
         // flag so the Sessions attention filter stops pointing at a
         // question that has been answered.
         await this.clearAwaitingInput(row);
-        return { routed: 'none' };
+        return { routed: 'none', restart: 'none' };
     }
 
     private async routeApprovalReply(
@@ -641,29 +835,71 @@ export class InboxService implements InboxProducer {
     }
 
     /**
-     * An escalation reply also resumes the linked run when it is parked
-     * — the decision the run was waiting on has been made, and the note
-     * is exactly the context the resumed run should start from.
+     * A decided escalation or approval hands the answer to the work behind
+     * it — the decision the run was waiting on has been made, and the
+     * answer is exactly the context the run should continue from.
+     *
+     *   live run      → the answer is injected between its iterations
+     *                   (escalations; an approval only when the run parked
+     *                   to wait for it);
+     *   parked run    → a new run continues its conversation, seeded with
+     *                   the answer (an approval: only a run that parked);
+     *   anything else → nothing is restarted, and the outcome says so.
+     *
+     * Best-effort by contract: the record IS decided; a restart hiccup
+     * must not undo that answer, so a throw reports `failed` instead of
+     * propagating.
      */
     private async tryResumeLinkedRun(
         row: InboxItem,
         userId: string,
         note: string,
-    ): Promise<string | undefined> {
-        if (!row.agentRunId || !this.steering) return undefined;
+        options: { parkedOnly?: boolean } = {},
+    ): Promise<AnswerHandOff> {
+        if (!row.agentRunId) return { restart: 'none' };
         try {
             const run = await this.runs.findByIdAndUser(row.agentRunId, userId);
-            if (!run || RunSteeringService.isLive(run)) return undefined;
-            if (!RunSteeringService.isResumable(run) || !run.taskId) return undefined;
-            const outcome = await this.steering.resume(run.id, userId, note);
-            return outcome.runId;
+            if (!run) return { restart: 'none' };
+            const waitingOnThis = options.parkedOnly ? run.awaitingInput === true : true;
+            if (!waitingOnThis) return { restart: 'none' };
+            if (!this.steering) {
+                // Work is waiting but no steering runtime is bound: say the
+                // restart failed rather than pretend nothing was waiting.
+                const couldRestart =
+                    RunSteeringService.isLive(run) ||
+                    (RunSteeringService.isResumable(run) && Boolean(run.taskId));
+                return { restart: couldRestart ? 'failed' : 'none' };
+            }
+            const message = note.trim() ? note : undefined;
+            if (RunSteeringService.isLive(run) && message) {
+                const outcome = await this.steering.steer({ runId: run.id, userId, message });
+                if (outcome.dispatched === 'injected') {
+                    return { restart: 'injected', runId: run.id };
+                }
+                // Terminal race — nothing to inject into any more.
+                return { restart: 'none' };
+            }
+            if (RunSteeringService.isLive(run)) return { restart: 'none' };
+            if (!RunSteeringService.isResumable(run) || !run.taskId) return { restart: 'none' };
+            const outcome = await this.steering.resume(run.id, userId, message);
+            return {
+                restart: outcome.queued === true ? 'queued' : 'resumed',
+                runId: outcome.runId,
+            };
         } catch (err) {
-            // Best-effort: the escalation IS resolved; a resume hiccup
-            // must not undo that answer.
             this.logger.warn(
-                `Inbox reply: resume of run ${row.agentRunId} after escalation resolve failed: ${err}`,
+                `Inbox: handing the answer of item ${row.id} to run ${row.agentRunId} failed (the record stays decided): ${err}`,
             );
-            return undefined;
+            return { restart: 'failed' };
+        }
+    }
+
+    /** First human view of an item. Best-effort — never fails the caller. */
+    private async stampFirstViewed(id: string, userId: string): Promise<void> {
+        try {
+            await this.items.stampFirstViewed(id, userId);
+        } catch (err) {
+            this.logger.warn(`Inbox item ${id}: first-view stamp failed: ${err}`);
         }
     }
 
@@ -692,8 +928,17 @@ export class InboxService implements InboxProducer {
         void this.tryLogActivity(row.userId, ActivityActionType.INBOX_ITEM_CREATED, row, {});
     }
 
-    private logAnswered(row: InboxItem, routed: InboxReplyRouted): void {
+    /**
+     * `extra` carries shapes only (which door, what restarted, who
+     * decided) — never the answer text.
+     */
+    private logAnswered(
+        row: InboxItem,
+        routed: InboxReplyRouted,
+        extra: Record<string, unknown> = {},
+    ): void {
         void this.tryLogActivity(row.userId, ActivityActionType.INBOX_ITEM_ANSWERED, row, {
+            ...extra,
             routed,
         });
     }
@@ -724,6 +969,13 @@ export class InboxService implements InboxProducer {
             this.logger.warn(`Inbox item ${row.id}: activity log failed: ${err}`);
         }
     }
+}
+
+/** A driver date (a Date, or a string on some SQLite paths) as ISO, or null. */
+function toIso(value: Date | string | null | undefined): string | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 /** First non-empty line, capped to the title column. */
