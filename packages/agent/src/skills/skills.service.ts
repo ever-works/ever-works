@@ -18,6 +18,7 @@ import {
 } from '@ever-works/contracts';
 import type { Skill, SkillFrontmatter, SkillOwnerType } from '../entities/skill.entity';
 import { SkillRepository, type ListSkillsFilter } from '../database/repositories/skill.repository';
+import type { OwnershipScope } from '../database/ownership-scope';
 import {
     SkillBindingRepository,
     type ResolvedSkill,
@@ -142,8 +143,13 @@ export class SkillsService {
         return this.skills.findByUserIdFiltered(userId, filter);
     }
 
-    async getOne(userId: string, id: string): Promise<Skill> {
-        const skill = await this.skills.findByIdAndUser(id, userId);
+    /**
+     * One of the caller's Skills, or 404. `ownershipScope` (the request's
+     * active workspace) also 404s a Skill stamped for another workspace;
+     * omitted, the lookup is the user-scoped one every existing caller uses.
+     */
+    async getOne(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<Skill> {
+        const skill = await this.skills.findByIdAndUser(id, userId, ownershipScope);
         if (!skill) throw new NotFoundException(`Skill ${id} not found.`);
         return skill;
     }
@@ -317,8 +323,12 @@ export class SkillsService {
      * changes nothing. Bindings are never read or written: the switch lives
      * on the Skill, and `resolveActive` honours it.
      */
-    async enable(userId: string, id: string): Promise<SkillSwitchResult> {
-        return this.setSwitch(userId, id, true);
+    async enable(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<SkillSwitchResult> {
+        return this.setSwitch(userId, id, true, ownershipScope);
     }
 
     /**
@@ -327,12 +337,24 @@ export class SkillsService {
      * with. Bindings are never touched, so switching it back on restores
      * exactly the previous behaviour.
      */
-    async disable(userId: string, id: string): Promise<SkillSwitchResult> {
-        return this.setSwitch(userId, id, false);
+    async disable(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<SkillSwitchResult> {
+        return this.setSwitch(userId, id, false, ownershipScope);
     }
 
-    private async setSwitch(userId: string, id: string, on: boolean): Promise<SkillSwitchResult> {
-        const skill = await this.getOne(userId, id);
+    private async setSwitch(
+        userId: string,
+        id: string,
+        on: boolean,
+        ownershipScope?: OwnershipScope,
+    ): Promise<SkillSwitchResult> {
+        // The workspace check happens here, before any write: a Skill from
+        // another workspace is not found. Its scope stamp never changes, so
+        // the id + user WHERE below cannot then reach a different workspace.
+        const skill = await this.getOne(userId, id, ownershipScope);
         const alreadyInState = on ? !skill.disabledAt : !!skill.disabledAt;
         if (alreadyInState) {
             return {

@@ -17,6 +17,7 @@ import {
 import { Skill, type SkillOwnerType } from '../../entities/skill.entity';
 import { SkillTag } from '../../entities/skill-tag.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
+import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 
 export interface ListSkillsFilter {
     ownerType?: SkillOwnerType;
@@ -75,6 +76,54 @@ const PROBLEM_READINESS_SQL = SKILL_CARD_STATES_NEEDING_ATTENTION.filter((state)
     .join(', ');
 const NEEDS_ATTENTION = `(skill.disabledAt IS NULL AND (skill.reviewState = '${SKILL_REVIEW_STATE_PROPOSED}' OR skill.readiness IN (${PROBLEM_READINESS_SQL})))`;
 
+/** One of the readiness sweep's two passes (never checked, then stale). */
+interface ReadinessSweepPass {
+    where: string;
+    parameters: Record<string, unknown>;
+    orderColumn: 'createdAt' | 'readinessCheckedAt';
+}
+
+/**
+ * Narrow a `skill`-aliased query to the request's active workspace, through
+ * the shared ownership predicate every scoped repository uses. No scope → the
+ * query is left exactly as it was (background jobs, legacy callers).
+ */
+function applyOwnership(qb: SelectQueryBuilder<Skill>, ownershipScope?: OwnershipScope): void {
+    const ownership = ownershipSqlPredicate('skill', ownershipScope);
+    if (ownership) qb.andWhere(ownership.clause, ownership.parameters);
+}
+
+/**
+ * Split `room` slots across owners as evenly as their capacities allow:
+ * level by level, everyone with capacity left gets one more before anyone
+ * gets another; when a level cannot be completed, the earlier owners (the
+ * ones waiting longest) get the leftover slots. Pure.
+ */
+function fairShares(capacities: readonly number[], room: number): number[] {
+    const shares = capacities.map(() => 0);
+    let left = Math.max(0, Math.floor(room));
+    let active = capacities
+        .map((capacity, index) => ({ capacity, index }))
+        .filter((owner) => owner.capacity > 0)
+        .map((owner) => owner.index);
+    while (left > 0 && active.length > 0) {
+        const smallestGap = Math.min(...active.map((index) => capacities[index] - shares[index]));
+        const perOwner = Math.min(smallestGap, Math.floor(left / active.length));
+        if (perOwner === 0) {
+            for (const index of active) {
+                if (left === 0) break;
+                shares[index] += 1;
+                left -= 1;
+            }
+            break;
+        }
+        for (const index of active) shares[index] += perOwner;
+        left -= perOwner * active.length;
+        active = active.filter((index) => shares[index] < capacities[index]);
+    }
+    return shares;
+}
+
 /**
  * Skills feature — Phase 8.4 (`features/skills/plan.md §2`).
  *
@@ -94,7 +143,22 @@ export class SkillRepository {
         return this.repository.findOne({ where: { id } });
     }
 
-    async findByIdAndUser(id: string, userId: string): Promise<Skill | null> {
+    /**
+     * One of the user's Skills. With an `ownershipScope` (the request's active
+     * workspace), a Skill stamped for another workspace is not found either —
+     * the shelf's 404-on-every-verb rule. Omitted, the lookup is exactly the
+     * user-scoped one every existing caller relies on.
+     */
+    async findByIdAndUser(
+        id: string,
+        userId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Skill | null> {
+        if (ownershipScope) {
+            return this.repository.findOne({
+                where: ownershipWhereWith<Skill>(userId, ownershipScope, { id }),
+            });
+        }
         return this.repository.findOne({ where: { id, userId } });
     }
 
@@ -109,10 +173,12 @@ export class SkillRepository {
     async findByUserIdFiltered(
         userId: string,
         filter: ListSkillsFilter = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<{ rows: Skill[]; total: number }> {
         const qb = this.repository
             .createQueryBuilder('skill')
             .where('skill.userId = :userId', { userId });
+        applyOwnership(qb, ownershipScope);
 
         if (filter.ownerType)
             qb.andWhere('skill.ownerType = :ownerType', { ownerType: filter.ownerType });
@@ -166,11 +232,13 @@ export class SkillRepository {
      * `attention` filter selects. Honours the owner filters but
      * deliberately NOT search / tags / readiness / enabled: the summary
      * describes the whole shelf, so it does not jump while a person narrows
-     * the grid.
+     * the grid. Takes the same `ownershipScope` as the list, so the summary
+     * never counts another workspace's Skills.
      */
     async countsByCardState(
         userId: string,
         filter: Pick<ListSkillsFilter, 'ownerType' | 'ownerId'> = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<SkillCardStateCounts> {
         const disabledExpr = 'CASE WHEN skill.disabledAt IS NULL THEN 0 ELSE 1 END';
         const qb = this.repository
@@ -180,6 +248,7 @@ export class SkillRepository {
             .addSelect('skill.reviewState', 'reviewState')
             .addSelect('COUNT(*)', 'n')
             .where('skill.userId = :userId', { userId });
+        applyOwnership(qb, ownershipScope);
         if (filter.ownerType)
             qb.andWhere('skill.ownerType = :ownerType', { ownerType: filter.ownerType });
         if (filter.ownerId) qb.andWhere('skill.ownerId = :ownerId', { ownerId: filter.ownerId });
@@ -240,45 +309,124 @@ export class SkillRepository {
 
     /**
      * Skills shelf: the sweep's work list. Skills whose verdict was never
-     * computed or is older than `staleBefore`, oldest first, at most `limit`
-     * rows and at most `perUser` rows per user so one large workspace cannot
-     * starve the rest of a tick.
+     * computed (first) or is older than `staleBefore` (then), at most `limit`
+     * rows and at most `perUser` rows per user.
+     *
+     * Fair by construction: the owners with work are chosen FIRST, from a
+     * grouped count (oldest waiting Skill first), and each is given a share of
+     * the batch before any Skill is read — so one owner's backlog, however
+     * large and however old, can never fill the batch and push every other
+     * owner out of the tick. Shares are handed out level by level (everyone
+     * gets one before anyone gets a second), capped by what each owner has
+     * waiting and by `perUser`; each owner's share is its oldest Skills.
+     *
+     * Portable across Postgres, MySQL and SQLite: no window function and no
+     * NULLS FIRST. Never reads more than `limit` Skill rows per pass: owners
+     * whose whole backlog fits their share come back in one batched query,
+     * and only an owner with more waiting than its share gets its own capped
+     * query.
      */
     async findStaleForReadiness(
         staleBefore: Date,
         limit: number,
         perUser: number,
     ): Promise<Skill[]> {
-        // Two ordered passes (never-checked first, then oldest checked) so the
-        // ordering is portable without NULLS FIRST; the per-user cap is applied
-        // in code, portable across Postgres and SQLite without a window
-        // function. Over-fetch so a capped user does not shrink the batch.
-        const fetch = limit * 4;
-        const neverChecked = await this.repository
-            .createQueryBuilder('skill')
-            .where('skill.readinessCheckedAt IS NULL')
-            .orderBy('skill.createdAt', 'ASC')
-            .take(fetch)
-            .getMany();
-        const stale =
-            neverChecked.length >= fetch
-                ? []
-                : await this.repository
-                      .createQueryBuilder('skill')
-                      .where('skill.readinessCheckedAt < :staleBefore', { staleBefore })
-                      .orderBy('skill.readinessCheckedAt', 'ASC')
-                      .take(fetch - neverChecked.length)
-                      .getMany();
-        const perUserCount = new Map<string, number>();
+        if (limit <= 0 || perUser <= 0) return [];
+        const passes: ReadinessSweepPass[] = [
+            { where: 'skill.readinessCheckedAt IS NULL', parameters: {}, orderColumn: 'createdAt' },
+            {
+                where: 'skill.readinessCheckedAt < :staleBefore',
+                parameters: { staleBefore },
+                orderColumn: 'readinessCheckedAt',
+            },
+        ];
+        // Skills already picked per owner across passes (the per-user cap is per tick).
+        const taken = new Map<string, number>();
         const out: Skill[] = [];
-        for (const skill of [...neverChecked, ...stale]) {
-            const seen = perUserCount.get(skill.userId) ?? 0;
-            if (seen >= perUser) continue;
-            perUserCount.set(skill.userId, seen + 1);
-            out.push(skill);
-            if (out.length >= limit) break;
+
+        for (const pass of passes) {
+            const room = limit - out.length;
+            if (room <= 0) break;
+
+            // Owners already at the cap cannot take anything; over-read by
+            // exactly that many so `room` owners with allowance still come back.
+            const cappedOwners = [...taken.values()].filter((n) => n >= perUser).length;
+            const grouped = await this.repository
+                .createQueryBuilder('skill')
+                .select('skill.userId', 'userId')
+                .addSelect('COUNT(*)', 'waiting')
+                .where(pass.where, pass.parameters)
+                .groupBy('skill.userId')
+                .orderBy(`MIN(skill.${pass.orderColumn})`, 'ASC')
+                .addOrderBy('skill.userId', 'ASC')
+                .limit(room + cappedOwners)
+                .getRawMany<{ userId: string; waiting: string | number }>();
+            const owners = grouped
+                .map((row) => {
+                    const waiting = Number(row.waiting);
+                    const allowance = perUser - (taken.get(row.userId) ?? 0);
+                    return { userId: row.userId, waiting, capacity: Math.min(waiting, allowance) };
+                })
+                .filter((owner) => owner.capacity > 0)
+                .slice(0, room);
+            if (owners.length === 0) continue;
+
+            const quotas = fairShares(
+                owners.map((owner) => owner.capacity),
+                room,
+            );
+            const byOwner = new Map<string, Skill[]>();
+            const whole = owners.filter((owner, index) => quotas[index] === owner.waiting);
+            if (whole.length > 0) {
+                const rows = await this.readinessPassQuery(pass)
+                    .andWhere('skill.userId IN (:...sweepOwners)', {
+                        sweepOwners: whole.map((owner) => owner.userId),
+                    })
+                    .getMany();
+                for (const row of rows) {
+                    const list = byOwner.get(row.userId) ?? [];
+                    list.push(row);
+                    byOwner.set(row.userId, list);
+                }
+            }
+            for (const [index, owner] of owners.entries()) {
+                if (quotas[index] === owner.waiting || quotas[index] === 0) continue;
+                const rows = await this.readinessPassQuery(pass)
+                    .andWhere('skill.userId = :sweepOwner', { sweepOwner: owner.userId })
+                    .take(quotas[index])
+                    .getMany();
+                byOwner.set(owner.userId, rows);
+            }
+
+            // Emit level by level too, so the batch order is fair as well.
+            const queues = owners.map((owner, index) => ({
+                userId: owner.userId,
+                // A row inserted between the count and the read never overshoots the share.
+                rows: (byOwner.get(owner.userId) ?? []).slice(0, quotas[index]),
+            }));
+            for (let level = 0; out.length < limit; level += 1) {
+                let emitted = false;
+                for (const queue of queues) {
+                    if (out.length >= limit) break;
+                    const row = queue.rows[level];
+                    if (!row) continue;
+                    out.push(row);
+                    taken.set(queue.userId, (taken.get(queue.userId) ?? 0) + 1);
+                    emitted = true;
+                }
+                if (!emitted) break;
+            }
         }
         return out;
+    }
+
+    /** One sweep pass's eligible Skills, oldest first (id breaks ties so paging is stable). */
+    private readinessPassQuery(pass: ReadinessSweepPass): SelectQueryBuilder<Skill> {
+        return this.repository
+            .createQueryBuilder('skill')
+            .where(pass.where, pass.parameters)
+            .orderBy(`skill.${pass.orderColumn}`, 'ASC')
+            .addOrderBy('skill.id', 'ASC');
     }
 
     private applyShelfFilters(

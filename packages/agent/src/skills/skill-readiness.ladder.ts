@@ -38,6 +38,14 @@ import {
 export interface SkillReadinessFindings {
     /** The binding lookup itself threw — nothing else can be trusted. */
     bindingsFailed: boolean;
+    /**
+     * Resolving the agents the Skill reaches threw part-way, so the checks
+     * covered only some of them. What those agents proved still counts (a
+     * missing connection, a run-time suppression), but the Skill can be
+     * neither `ready` nor blocked for every agent on that evidence.
+     * Omitted = false.
+     */
+    agentLookupFailed?: boolean;
     boundTargetCount: number;
     mutedBindingCount: number;
     /** Every requirement row found, in any order. */
@@ -77,7 +85,10 @@ export function decideSkillReadiness(findings: SkillReadinessFindings): {
     if (findings.blockedForEveryAgent || (findings.runSuppressions?.length ?? 0) > 0) {
         return { readiness: 'blocked_by_access', detail };
     }
-    if (findings.requirements.some((row) => row.status === 'unknown')) {
+    if (
+        findings.agentLookupFailed ||
+        findings.requirements.some((row) => row.status === 'unknown')
+    ) {
         return { readiness: 'check_failed', detail };
     }
     return { readiness: 'ready', detail };

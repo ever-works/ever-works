@@ -24,6 +24,11 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
  */
 const AUTH = { userId: 'u1' } as AuthenticatedUser;
 const ID = '11111111-1111-4111-8111-111111111111';
+/** The active workspace every shelf call is narrowed to (FR-57). */
+const SCOPE = {
+    tenantId: '22222222-2222-4222-8222-222222222222',
+    organizationId: '33333333-3333-4333-8333-333333333333',
+};
 
 function skillRow(over: Record<string, unknown> = {}) {
     return {
@@ -68,8 +73,10 @@ const COUNTS = {
     needs_review: 0,
 };
 
-function build(opts: { wired?: boolean } = {}) {
+function build(opts: { wired?: boolean; scope?: typeof SCOPE | null } = {}) {
     const wired = opts.wired ?? true;
+    const scope = opts.scope === undefined ? SCOPE : opts.scope;
+    const scopeContext = { getScope: jest.fn(() => scope) };
     const skills = {
         findByUserIdFiltered: jest.fn().mockResolvedValue({ rows: [skillRow()], total: 1 }),
         findByIdAndUser: jest.fn().mockResolvedValue(skillRow()),
@@ -127,8 +134,9 @@ function build(opts: { wired?: boolean } = {}) {
         wired ? (tags as never) : undefined,
         wired ? (bindings as never) : undefined,
         wired ? (registry as never) : undefined,
+        wired && scope ? (scopeContext as never) : undefined,
     );
-    return { controller, skills, service, readiness, tags, bindings };
+    return { controller, skills, service, readiness, tags, bindings, scopeContext };
 }
 
 const pipe = new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true });
@@ -199,13 +207,35 @@ describe('SkillsController — GET /api/skills (shelf)', () => {
     it('with no shelf params passes exactly the pre-shelf filter', async () => {
         const { controller, skills } = build();
         await controller.list(AUTH, { search: 'inv' } as ListSkillsQueryDto);
-        expect(skills.findByUserIdFiltered).toHaveBeenCalledWith('u1', {
-            ownerType: undefined,
-            ownerId: undefined,
-            search: 'inv',
-            limit: 50,
-            offset: 0,
-        });
+        expect(skills.findByUserIdFiltered).toHaveBeenCalledWith(
+            'u1',
+            {
+                ownerType: undefined,
+                ownerId: undefined,
+                search: 'inv',
+                limit: 50,
+                offset: 0,
+            },
+            SCOPE,
+        );
+    });
+
+    it('narrows the rows AND the summary counts to the active workspace', async () => {
+        const { controller, skills } = build();
+        await controller.list(AUTH, { ownerType: 'tenant' } as ListSkillsQueryDto);
+        expect(skills.findByUserIdFiltered.mock.calls[0][2]).toEqual(SCOPE);
+        expect(skills.countsByCardState).toHaveBeenCalledWith(
+            'u1',
+            { ownerType: 'tenant', ownerId: undefined },
+            SCOPE,
+        );
+    });
+
+    it('with no scope service bound, queries exactly as user-scoped as before', async () => {
+        const { controller, skills } = build({ scope: null });
+        await controller.list(AUTH, { search: 'inv' } as ListSkillsQueryDto);
+        expect(skills.findByUserIdFiltered.mock.calls[0][2]).toBeUndefined();
+        expect(skills.countsByCardState.mock.calls[0][2]).toBeUndefined();
     });
 
     it('passes every shelf filter through, with provenance ids resolved from the registry', async () => {
@@ -263,9 +293,9 @@ describe('SkillsController — GET /api/skills/tags', () => {
             tags: [{ tag: 'billing', count: 2 }],
             total: 1,
         });
-        expect(tags.facets).toHaveBeenCalledWith('u1', 12);
+        expect(tags.facets).toHaveBeenCalledWith('u1', 12, SCOPE);
         await controller.tags(AUTH, {});
-        expect(tags.facets).toHaveBeenLastCalledWith('u1', 200);
+        expect(tags.facets).toHaveBeenLastCalledWith('u1', 200, SCOPE);
     });
 
     it('is declared before every :id route so an id of "tags" cannot shadow it', () => {
@@ -287,7 +317,7 @@ describe('SkillsController — on/off switch', () => {
     it('disable and enable answer with the card state and the stored verdict', async () => {
         const { controller, service } = build();
         const off = await controller.disable(AUTH, ID);
-        expect(service.disable).toHaveBeenCalledWith('u1', ID);
+        expect(service.disable).toHaveBeenCalledWith('u1', ID, SCOPE);
         expect(off).toMatchObject({
             id: ID,
             cardState: 'disabled',
@@ -460,6 +490,68 @@ describe('SkillsController — cross-workspace ids answer 404 on every shelf ver
         const { controller, service } = build();
         service[verb].mockRejectedValue(new NotFoundException(`Skill ${ID} not found.`));
         await expect(controller[verb](OTHER, ID)).rejects.toBeInstanceOf(NotFoundException);
+    });
+});
+
+describe('SkillsController — another workspace’s Skill (same user) answers 404 on every shelf verb', () => {
+    /** The service's real rule: found only in the workspace it is stamped for. */
+    const OTHER_WORKSPACE = { ...SCOPE, organizationId: '44444444-4444-4444-8444-444444444444' };
+
+    function buildInOtherWorkspace() {
+        const built = build({ scope: OTHER_WORKSPACE });
+        const notFound = () => new NotFoundException(`Skill ${ID} not found.`);
+        const inScope = (scope: unknown) =>
+            (scope as { organizationId?: string } | undefined)?.organizationId ===
+            SCOPE.organizationId;
+        built.service.getOne.mockImplementation(
+            async (_u: string, _id?: string, scope?: unknown) => {
+                if (!inScope(scope)) throw notFound();
+                return skillRow();
+            },
+        );
+        for (const verb of ['enable', 'disable'] as const) {
+            built.service[verb].mockImplementation(
+                async (_u: string, _id: string, scope?: unknown) => {
+                    if (!inScope(scope)) throw notFound();
+                    return { id: ID, cardState: 'ready', disabledAt: null, changed: true };
+                },
+            );
+        }
+        return built;
+    }
+
+    it.each([
+        ['GET :id/readiness', (c: SkillsController) => c.getReadiness(AUTH, ID)],
+        ['POST :id/readiness/refresh', (c: SkillsController) => c.refreshReadiness(AUTH, ID)],
+        ['POST :id/enable', (c: SkillsController) => c.enable(AUTH, ID)],
+        ['POST :id/disable', (c: SkillsController) => c.disable(AUTH, ID)],
+    ])('%s', async (_label, call) => {
+        const { controller, readiness, service } = buildInOtherWorkspace();
+        await expect(call(controller)).rejects.toBeInstanceOf(NotFoundException);
+        expect(readiness.refreshSkill).not.toHaveBeenCalled();
+        // Every lookup carried the request's workspace, not just the user.
+        const scopes = [
+            ...service.getOne.mock.calls,
+            ...service.enable.mock.calls,
+            ...service.disable.mock.calls,
+        ].map((call) => call[2]);
+        expect(scopes).toEqual(scopes.map(() => OTHER_WORKSPACE));
+        expect(scopes.length).toBeGreaterThan(0);
+    });
+
+    it('the list and the tag facet ask only for the active workspace', async () => {
+        const { controller, skills, tags } = buildInOtherWorkspace();
+        await controller.list(AUTH, {} as ListSkillsQueryDto);
+        await controller.tags(AUTH, {});
+        expect(skills.findByUserIdFiltered.mock.calls[0][2]).toEqual(OTHER_WORKSPACE);
+        expect(skills.countsByCardState.mock.calls[0][2]).toEqual(OTHER_WORKSPACE);
+        expect(tags.facets.mock.calls[0][2]).toEqual(OTHER_WORKSPACE);
+    });
+
+    it('the switch reads the stored verdict back in the same workspace', async () => {
+        const { controller, skills } = build();
+        await controller.enable(AUTH, ID);
+        expect(skills.findByIdAndUser).toHaveBeenCalledWith(ID, 'u1', SCOPE);
     });
 });
 

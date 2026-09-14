@@ -403,6 +403,149 @@ describe('Skills shelf repositories (better-sqlite3)', () => {
             expect(perUser.filter((s) => s.userId === OTHER)).toHaveLength(1);
             expect(await skills.findStaleForReadiness(cutoff, 3, 200)).toHaveLength(3);
         });
+
+        it('one owner’s large, older backlog never pushes another owner out of the tick', async () => {
+            const now = Date.now();
+            // Owner A: 20 never-checked Skills, all older than owner B's one —
+            // enough to fill any "oldest N rows" window on its own.
+            for (let i = 0; i < 20; i += 1) {
+                await makeSkill({
+                    slug: `a-${i}`,
+                    createdAt: new Date(now - 100_000 + i),
+                });
+            }
+            await makeSkill({ slug: 'b-0', userId: OTHER, createdAt: new Date(now - 1_000) });
+
+            const batch = await skills.findStaleForReadiness(new Date(now - 3_600_000), 4, 2);
+            expect(batch.filter((s) => s.userId === OTHER).map((s) => s.slug)).toEqual(['b-0']);
+            // Owner A still gets its per-user share, and its OLDEST Skills.
+            expect(batch.filter((s) => s.userId === USER).map((s) => s.slug)).toEqual([
+                'a-0',
+                'a-1',
+            ]);
+            expect(batch).toHaveLength(3);
+        });
+
+        it('stale owners are not starved either, and never-checked Skills still go first', async () => {
+            const now = Date.now();
+            const cutoff = new Date(now - 3_600_000);
+            for (let i = 0; i < 10; i += 1) {
+                await makeSkill({
+                    slug: `a-stale-${i}`,
+                    readinessCheckedAt: new Date(now - 90_000_000 + i),
+                });
+            }
+            await makeSkill({
+                slug: 'b-stale',
+                userId: OTHER,
+                readinessCheckedAt: new Date(now - 7_200_000),
+            });
+            await makeSkill({ slug: 'b-fresh-never', userId: OTHER });
+
+            const batch = await skills.findStaleForReadiness(cutoff, 3, 10);
+            expect(batch.map((s) => s.slug)).toEqual(['b-fresh-never', 'a-stale-0', 'b-stale']);
+        });
+
+        it('fills the batch across owners as evenly as their backlogs allow, never past a cap', async () => {
+            const now = Date.now();
+            const THIRD = randomUUID();
+            for (let i = 0; i < 6; i += 1) {
+                await makeSkill({ slug: `a-${i}`, createdAt: new Date(now - 60_000 + i) });
+            }
+            await makeSkill({ slug: 'b-0', userId: OTHER, createdAt: new Date(now - 50_000) });
+            for (let i = 0; i < 6; i += 1) {
+                await makeSkill({
+                    slug: `c-${i}`,
+                    userId: THIRD,
+                    createdAt: new Date(now - 40_000 + i),
+                });
+            }
+            const cutoff = new Date(now - 3_600_000);
+
+            const batch = await skills.findStaleForReadiness(cutoff, 7, 5);
+            const per = (userId: string) => batch.filter((s) => s.userId === userId).length;
+            expect(batch).toHaveLength(7);
+            expect([per(USER), per(OTHER), per(THIRD)]).toEqual([3, 1, 3]);
+            // Everyone gets one before anyone gets a second.
+            expect(batch.slice(0, 3).map((s) => s.slug)).toEqual(['a-0', 'b-0', 'c-0']);
+
+            const capped = await skills.findStaleForReadiness(cutoff, 500, 2);
+            expect([
+                capped.filter((s) => s.userId === USER).length,
+                capped.filter((s) => s.userId === OTHER).length,
+                capped.filter((s) => s.userId === THIRD).length,
+            ]).toEqual([2, 1, 2]);
+            expect(await skills.findStaleForReadiness(cutoff, 0, 5)).toEqual([]);
+        });
+    });
+
+    describe('workspace scope — another workspace’s Skill is not on this shelf', () => {
+        const TENANT = randomUUID();
+        const ORG_A = randomUUID();
+        const ORG_B = randomUUID();
+        const inA = { tenantId: TENANT, organizationId: ORG_A };
+        const inB = { tenantId: TENANT, organizationId: ORG_B };
+        const personal = { tenantId: TENANT, organizationId: null };
+
+        async function seed() {
+            const a = await makeSkill({
+                slug: 'in-a',
+                tags: ['billing'],
+                readiness: 'needs_setup',
+                ...inA,
+            });
+            const b = await makeSkill({
+                slug: 'in-b',
+                tags: ['billing', 'secret-b'],
+                readiness: 'missing_requirements',
+                ...inB,
+            });
+            const mine = await makeSkill({ slug: 'personal', tags: ['notes'], ...personal });
+            // Tag rows carry no stamp here on purpose: the scope comes from the Skill row.
+            return { a, b, mine };
+        }
+
+        it('lists, counts and facets only the active workspace', async () => {
+            await seed();
+            const listed = await skills.findByUserIdFiltered(USER, {}, inA);
+            expect(listed.rows.map((s) => s.slug)).toEqual(['in-a']);
+            expect(listed.total).toBe(1);
+            expect(
+                (await skills.findByUserIdFiltered(USER, { tags: ['billing'] }, inA)).rows.map(
+                    (s) => s.slug,
+                ),
+            ).toEqual(['in-a']);
+
+            const counts = await skills.countsByCardState(USER, {}, inA);
+            expect(counts.needs_setup).toBe(1);
+            expect(counts.missing_requirements).toBe(0);
+
+            expect(await tags.facets(USER, 200, inA)).toEqual({
+                tags: [{ tag: 'billing', count: 1 }],
+                total: 1,
+            });
+            expect((await tags.facets(USER, 200, personal)).tags).toEqual([
+                { tag: 'notes', count: 1 },
+            ]);
+            expect(
+                (await skills.findByUserIdFiltered(USER, {}, personal)).rows.map((s) => s.slug),
+            ).toEqual(['personal']);
+        });
+
+        it('an id lookup in the wrong workspace finds nothing', async () => {
+            const { b } = await seed();
+            expect(await skills.findByIdAndUser(b.id, USER, inA)).toBeNull();
+            expect(await skills.findByIdAndUser(b.id, USER, personal)).toBeNull();
+            expect((await skills.findByIdAndUser(b.id, USER, inB))?.slug).toBe('in-b');
+        });
+
+        it('without a scope, every lookup answers exactly as before', async () => {
+            const { b } = await seed();
+            expect((await skills.findByUserIdFiltered(USER, {})).total).toBe(3);
+            expect((await skills.findByIdAndUser(b.id, USER))?.slug).toBe('in-b');
+            expect((await tags.facets(USER)).total).toBe(3);
+            expect(countSkillsNeedingAttention(await skills.countsByCardState(USER))).toBe(2);
+        });
     });
 
     describe('resolveActive — the off switch and the review gate', () => {

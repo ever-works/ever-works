@@ -332,6 +332,107 @@ describe('SkillReadinessService.evaluate', () => {
         expect(readiness).toBe('check_failed');
     });
 
+    describe('an agent lookup that fails part-way never yields a definitive verdict', () => {
+        const restricted = resolveToolGrantChain([
+            { scope: 'tenant', id: 't1', grant: { allow: [] } },
+        ]);
+        const permitted = resolveToolGrantChain([]);
+        const deploySkill = () =>
+            skill({ frontmatter: { name: 'd', description: 'd', allowedTools: ['deploy_work'] } });
+
+        function twoAgents() {
+            const built = build({
+                bindings: [binding(), binding({ id: 'b2', targetId: 'a2' })],
+            });
+            (built.toolGrants.resolve as jest.Mock).mockImplementation(
+                async (scope: { agentId: string | null }) =>
+                    scope.agentId === 'a1' ? restricted : permitted,
+            );
+            return built;
+        }
+
+        it('control: both agents resolve → ready (the permitted agent can use it)', async () => {
+            const { service, skills } = twoAgents();
+            await service.refreshSkill(deploySkill());
+            expect(skills.recordReadiness.mock.calls[0][2].readiness).toBe('ready');
+        });
+
+        it('the permitted agent’s lookup throws → persisted as check_failed, not blocked_by_access', async () => {
+            const { service, skills, agents } = twoAgents();
+            agents.findByIdAndUser.mockImplementation(async (id: string) => {
+                if (id === 'a2') throw new Error('db blip');
+                return { id, userId: USER, workId: 'w1' };
+            });
+            await service.refreshSkill(deploySkill());
+            const [, , verdict] = skills.recordReadiness.mock.calls[0];
+            expect(verdict.readiness).toBe('check_failed');
+            expect(verdict.readiness).not.toBe('blocked_by_access');
+            // The restricted agent WAS evaluated, and is named as blocked;
+            // the tool is not called refused, because a2 was never checked.
+            expect(verdict.readinessDetail.evaluatedForAgentIds).toEqual(['a1']);
+            expect(verdict.readinessDetail.blockedForAgentIds).toEqual(['a1']);
+            expect(verdict.readinessDetail.requirements).toEqual([
+                { kind: 'tool', id: 'deploy_work', status: 'unknown', reason: 'checkFailed' },
+            ]);
+        });
+
+        it('a partial lookup whose resolved agent allows everything is still not ready', async () => {
+            const { service, agents, toolGrants } = twoAgents();
+            toolGrants.resolve.mockResolvedValue(permitted);
+            agents.findByIdAndUser.mockImplementation(async (id: string) => {
+                if (id === 'a2') throw new Error('db blip');
+                return { id, userId: USER, workId: 'w1' };
+            });
+            const { readiness, detail } = await service.evaluate(deploySkill());
+            expect(readiness).toBe('check_failed');
+            expect(detail.requirements).toEqual([
+                { kind: 'tool', id: 'deploy_work', status: 'met' },
+            ]);
+        });
+
+        it('what the resolved agents prove still wins: a missing connection stays missing', async () => {
+            const { service, agents } = twoAgents();
+            agents.findByIdAndUser.mockImplementation(async (id: string) => {
+                if (id === 'a2') throw new Error('db blip');
+                return { id, userId: USER, workId: 'w1' };
+            });
+            const { readiness } = await service.evaluate(
+                skill({
+                    frontmatter: { name: 'd', description: 'd', allowedTools: ['mcp__crm__find'] },
+                }),
+            );
+            expect(readiness).toBe('missing_requirements');
+        });
+
+        it('no agent resolved at all → no fallback matrix, no false missing credential', async () => {
+            const { service, agents, toolGrants } = build({
+                grants: [{ scope: 'tenant', id: 't1', grant: { allow: [] } }],
+                credentials: {},
+            });
+            agents.findByIdAndUser.mockRejectedValue(new Error('db down'));
+            const { readiness, detail } = await service.evaluate(
+                skill({
+                    instructionsMd: 'use {{cred.stripe_key}}',
+                    frontmatter: { name: 'd', description: 'd', allowedTools: ['deploy_work'] },
+                }),
+            );
+            expect(readiness).toBe('check_failed');
+            expect(toolGrants.resolve).not.toHaveBeenCalled();
+            expect(detail.evaluatedForAgentIds).toEqual([]);
+            expect(detail.requirements).toEqual(
+                expect.arrayContaining([
+                    { kind: 'tool', id: 'deploy_work', status: 'unknown', reason: 'checkFailed' },
+                    expect.objectContaining({
+                        kind: 'credential',
+                        id: 'stripe_key',
+                        status: 'unknown',
+                        reason: 'checkFailed',
+                    }),
+                ]),
+            );
+        });
+    });
+
     it('binding lookup throws → check_failed for the whole Skill', async () => {
         const { service } = build({ bindings: new Error('db down') });
         expect((await service.evaluate(skill())).readiness).toBe('check_failed');

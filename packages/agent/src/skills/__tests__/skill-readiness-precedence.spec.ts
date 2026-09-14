@@ -77,6 +77,21 @@ describe('decideSkillReadiness — precedence ladder', () => {
         ['a requirement that could not be checked', { requirements: [unknownRow] }, 'check_failed'],
         ['binding lookup failed', { bindingsFailed: true, boundTargetCount: 0 }, 'check_failed'],
         [
+            'agent lookup failed part-way, everything checked was met',
+            { agentLookupFailed: true, requirements: [met] },
+            'check_failed',
+        ],
+        [
+            'missing still beats an agent lookup that failed part-way',
+            { agentLookupFailed: true, requirements: [missing] },
+            'missing_requirements',
+        ],
+        [
+            'no binding still beats an agent lookup that failed part-way',
+            { agentLookupFailed: true, boundTargetCount: 0 },
+            'needs_setup',
+        ],
+        [
             'a run-time suppression still in force',
             {
                 requirements: [met],

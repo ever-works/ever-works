@@ -105,7 +105,10 @@ export class SkillReadinessService {
         }
         const active = bindings.filter((binding) => binding.injectIntoAgent);
 
-        const agents = bindingsFailed ? [] : await this.agentsInReach(skill.userId, active);
+        const reach = bindingsFailed
+            ? { agents: [] as Agent[], failed: false }
+            : await this.agentsInReach(skill.userId, active);
+        const agents = reach.agents;
         const tools = declaredToolsOf(skill.frontmatter?.allowedTools);
         const requirements: SkillRequirement[] = [];
 
@@ -114,10 +117,10 @@ export class SkillReadinessService {
             blockedForEveryAgent,
             blockedAgentIds,
             grantsReadForAgentIds,
-        } = await this.checkTools(skill, tools, agents);
+        } = await this.checkTools(skill, tools, agents, reach.failed);
         requirements.push(...toolRows);
         requirements.push(...(await this.checkConnections(skill.userId, tools)));
-        requirements.push(...(await this.checkCredentials(skill, tools, agents)));
+        requirements.push(...(await this.checkCredentials(skill, tools, agents, reach.failed)));
 
         // A suppression a run recorded for an agent this check did not
         // actually evaluate is kept, not silently cleared (see the ladder).
@@ -130,6 +133,7 @@ export class SkillReadinessService {
 
         return decideSkillReadiness({
             bindingsFailed,
+            agentLookupFailed: reach.failed,
             boundTargetCount: bindings.length,
             mutedBindingCount: bindings.length - active.length,
             requirements,
@@ -285,9 +289,17 @@ export class SkillReadinessService {
      * The agents a Skill actually reaches through its unmuted bindings, at
      * most 10: agent bindings directly, Work/Mission/Idea bindings through the
      * agents pinned there, a workspace binding through the owner's agents.
+     *
+     * `failed` is true when a lookup threw part-way: `agents` then holds only
+     * the agents resolved before the failure, which is NOT the set the Skill
+     * reaches, so the checks treat anything that depends on the missing agents
+     * as not checked, never as a verdict.
      */
-    private async agentsInReach(userId: string, active: SkillBinding[]): Promise<Agent[]> {
-        if (!this.agents || active.length === 0) return [];
+    private async agentsInReach(
+        userId: string,
+        active: SkillBinding[],
+    ): Promise<{ agents: Agent[]; failed: boolean }> {
+        if (!this.agents || active.length === 0) return { agents: [], failed: false };
         const found = new Map<string, Agent>();
         const add = (rows: Agent[]) => {
             for (const agent of rows) {
@@ -338,11 +350,14 @@ export class SkillReadinessService {
                 }
             }
         } catch (err) {
-            // Fewer agents is still a verdict: the grant check falls back to
-            // the owner's workspace-level matrix below.
+            // A partial set is not the set the Skill reaches: an agent that
+            // was never resolved might allow (or need) exactly what the
+            // resolved ones do not. Report the failure so the checks cannot
+            // turn it into a definitive verdict.
             this.logger.warn(`Readiness: agent lookup failed for user ${userId}: ${err}`);
+            return { agents: [...found.values()], failed: true };
         }
-        return [...found.values()];
+        return { agents: [...found.values()], failed: false };
     }
 
     /**
@@ -354,11 +369,19 @@ export class SkillReadinessService {
      * Also reports, per agent, which ones the Skill is blocked for and whose
      * grants were actually read (`null` when none were), so a run-time
      * suppression is only ever cleared by a check that covered its agent.
+     *
+     * When the agent lookup failed part-way (`agentLookupFailed`), only what
+     * the resolved agents PROVE survives: a tool allowed for one of them is
+     * met. A tool refused for all of them is `unknown` (an unresolved agent
+     * may allow it), and the Skill is never reported blocked for every agent.
+     * With no agent resolved at all, the workspace-level fallback matrix is
+     * not consulted, because it is not what those agents run with.
      */
     private async checkTools(
         skill: Skill,
         tools: string[],
         agents: Agent[],
+        agentLookupFailed = false,
     ): Promise<{
         rows: SkillRequirement[];
         blockedForEveryAgent: boolean;
@@ -377,6 +400,20 @@ export class SkillReadinessService {
             // No matrix wired — the run path treats every tool as allowed.
             return {
                 rows: tools.map((tool) => ({ kind: 'tool', id: tool, status: 'met' })),
+                blockedForEveryAgent: false,
+                blockedAgentIds: [],
+                grantsReadForAgentIds: null,
+            };
+        }
+        const notChecked = (tool: string): SkillRequirement => ({
+            kind: 'tool',
+            id: tool,
+            status: 'unknown',
+            reason: 'checkFailed',
+        });
+        if (agentLookupFailed && agents.length === 0) {
+            return {
+                rows: tools.map(notChecked),
                 blockedForEveryAgent: false,
                 blockedAgentIds: [],
                 grantsReadForAgentIds: null,
@@ -403,12 +440,7 @@ export class SkillReadinessService {
                 `Readiness: tool-grant resolution failed for skill ${skill.id}: ${err}`,
             );
             return {
-                rows: tools.map((tool) => ({
-                    kind: 'tool',
-                    id: tool,
-                    status: 'unknown',
-                    reason: 'checkFailed',
-                })),
+                rows: tools.map(notChecked),
                 blockedForEveryAgent: false,
                 blockedAgentIds: [],
                 grantsReadForAgentIds: null,
@@ -420,7 +452,7 @@ export class SkillReadinessService {
                 filterSkillsByToolGrants([{ slug: skill.slug, allowedTools: tools }], grants)
                     .suppressed.length === 1,
         );
-        const blockedForEveryAgent = blockedFor.every(Boolean);
+        const blockedForEveryAgent = !agentLookupFailed && blockedFor.every(Boolean);
         const blockedAgentIds: string[] = [];
         matrices.forEach(({ agentId }, index) => {
             if (agentId && blockedFor[index]) blockedAgentIds.push(agentId);
@@ -433,6 +465,7 @@ export class SkillReadinessService {
             );
             if (refusedFor.length < matrices.length)
                 return { kind: 'tool', id: tool, status: 'met' };
+            if (agentLookupFailed) return notChecked(tool);
             const row: SkillRequirement = {
                 kind: 'tool',
                 id: tool,
@@ -513,11 +546,18 @@ export class SkillReadinessService {
      * referenced as `{{cred.key}}` in its instructions — asked of the
      * credential port. Only the returned key SET is looked at; the map (and
      * with it every value) is discarded before this method returns.
+     *
+     * The keys are resolved for the first agent the Skill reaches. If the
+     * agent lookup failed before ANY agent was resolved, that is not the
+     * agent a complete lookup would have used, so a key that did not come
+     * back is `unknown`, never a false "missing" (a key that did come back is
+     * still met).
      */
     private async checkCredentials(
         skill: Skill,
         tools: string[],
         agents: Agent[],
+        agentLookupFailed = false,
     ): Promise<SkillRequirement[]> {
         const keys: string[] = [];
         for (const tool of tools) {
@@ -559,17 +599,26 @@ export class SkillReadinessService {
             return unknownRows();
         }
 
+        const firstAgentUnknown = agentLookupFailed && agents.length === 0;
         return keys.map(
             (key): SkillRequirement =>
                 available.has(key)
                     ? { kind: 'credential', id: key, status: 'met' }
-                    : {
-                          kind: 'credential',
-                          id: key,
-                          status: 'missing',
-                          reason: 'notSet',
-                          fixTarget: { surface: 'credentials', ref: key },
-                      },
+                    : firstAgentUnknown
+                      ? {
+                            kind: 'credential',
+                            id: key,
+                            status: 'unknown',
+                            reason: 'checkFailed',
+                            fixTarget: { surface: 'credentials', ref: key },
+                        }
+                      : {
+                            kind: 'credential',
+                            id: key,
+                            status: 'missing',
+                            reason: 'notSet',
+                            fixTarget: { surface: 'credentials', ref: key },
+                        },
         );
     }
 }

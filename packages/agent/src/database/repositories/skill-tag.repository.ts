@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, type SelectQueryBuilder } from 'typeorm';
 import { SKILL_TAG_FACET_LIMIT } from '@ever-works/contracts';
+import { Skill } from '../../entities/skill.entity';
 import { SkillTag } from '../../entities/skill-tag.entity';
+import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
 
 export interface SkillTagFacet {
     tag: string;
@@ -80,28 +82,44 @@ export class SkillTagRepository {
      * The tag chip row: distinct tags across the user's Skills with how many
      * Skills carry each, most-used first then alphabetical, capped at
      * `limit` (≤ 200). `total` is the number of distinct tags before the cap.
+     *
+     * With an `ownershipScope` (the request's active workspace), only tags on
+     * Skills in that workspace count. The scope is read from the Skill row
+     * itself, never from the tag row's own stamp, so a tag row that predates
+     * or missed a stamp can neither leak nor vanish.
      */
     async facets(
         userId: string,
         limit: number = SKILL_TAG_FACET_LIMIT,
+        ownershipScope?: OwnershipScope,
     ): Promise<{ tags: SkillTagFacet[]; total: number }> {
         const capped = Math.max(1, Math.min(limit, SKILL_TAG_FACET_LIMIT));
-        const rows = await this.repository
-            .createQueryBuilder('st')
-            .select('st.tag', 'tag')
-            .addSelect('COUNT(DISTINCT st.skillId)', 'count')
-            .where('st.userId = :userId', { userId })
+        const scoped = (qb: SelectQueryBuilder<SkillTag>): SelectQueryBuilder<SkillTag> => {
+            const ownership = ownershipSqlPredicate('skill', ownershipScope);
+            if (!ownership) return qb;
+            return qb
+                .innerJoin(Skill, 'skill', 'skill.id = st.skillId AND skill.userId = st.userId')
+                .andWhere(ownership.clause, ownership.parameters);
+        };
+        const rows = await scoped(
+            this.repository
+                .createQueryBuilder('st')
+                .select('st.tag', 'tag')
+                .addSelect('COUNT(DISTINCT st.skillId)', 'count')
+                .where('st.userId = :userId', { userId }),
+        )
             .groupBy('st.tag')
             .orderBy('count', 'DESC')
             .addOrderBy('st.tag', 'ASC')
             .limit(capped)
             .getRawMany<{ tag: string; count: string | number }>();
 
-        const totalRow = await this.repository
-            .createQueryBuilder('st')
-            .select('COUNT(DISTINCT st.tag)', 'total')
-            .where('st.userId = :userId', { userId })
-            .getRawOne<{ total: string | number }>();
+        const totalRow = await scoped(
+            this.repository
+                .createQueryBuilder('st')
+                .select('COUNT(DISTINCT st.tag)', 'total')
+                .where('st.userId = :userId', { userId }),
+        ).getRawOne<{ total: string | number }>();
 
         return {
             tags: rows.map((row) => ({ tag: row.tag, count: Number(row.count) })),

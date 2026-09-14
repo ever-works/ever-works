@@ -32,6 +32,7 @@ import {
     type Skill,
 } from '@ever-works/agent/skills';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
+import type { OwnershipScope } from '@ever-works/agent/database';
 import {
     SKILL_TAG_FACET_LIMIT,
     deriveSkillCardState,
@@ -44,6 +45,7 @@ import type { SkillCatalogEntry, SkillCatalogListResult } from '@ever-works/plug
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { UploadsService } from '../uploads/uploads.service';
+import { ScopeContextService } from '../scope/scope-context.service';
 import { SkillFileContentReaderService } from './skill-file-content-reader.service';
 import {
     CreateSkillBindingDto,
@@ -98,6 +100,10 @@ export class SkillsController {
         @Optional() private readonly skillTags?: SkillTagRepository,
         @Optional() private readonly skillBindings?: SkillBindingRepository,
         @Optional() private readonly pluginRegistry?: PluginRegistryService,
+        // Skills shelf — the request's active workspace (spec FR-57). Appended
+        // last + `@Optional()` for the same reason as above; unbound, every
+        // shelf query is the user-scoped one it was before.
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     @Get('catalog')
@@ -163,15 +169,26 @@ export class SkillsController {
         if (query.enabled !== undefined) filter.enabled = query.enabled;
         if (query.sort) filter.sort = query.sort;
 
-        const { rows, total } = await this.skills.findByUserIdFiltered(auth.userId, filter);
+        // Skills shelf (FR-1, FR-57): the shelf, its counts and its tag chips
+        // all answer for the active workspace only.
+        const ownershipScope = this.ownershipScope();
+        const { rows, total } = await this.skills.findByUserIdFiltered(
+            auth.userId,
+            filter,
+            ownershipScope,
+        );
         const ids = rows.map((row) => row.id);
         const [tagsBySkill, bindingCounts, counts] = await Promise.all([
             this.skillTags?.findBySkillIds(ids, auth.userId) ?? new Map<string, string[]>(),
             this.skillBindings?.countBySkillIds(ids, auth.userId) ?? new Map<string, number>(),
-            this.skills.countsByCardState(auth.userId, {
-                ownerType: query.ownerType,
-                ownerId: query.ownerId,
-            }),
+            this.skills.countsByCardState(
+                auth.userId,
+                {
+                    ownerType: query.ownerType,
+                    ownerId: query.ownerId,
+                },
+                ownershipScope,
+            ),
         ]);
         const data: SkillShelfRowDto[] = rows.map((row) =>
             Object.assign(row, {
@@ -204,7 +221,11 @@ export class SkillsController {
         @Query() query: ListSkillTagsQueryDto,
     ): Promise<SkillTagFacetsDto> {
         if (!this.skillTags) return { tags: [], total: 0 };
-        return this.skillTags.facets(auth.userId, query.limit ?? SKILL_TAG_FACET_LIMIT);
+        return this.skillTags.facets(
+            auth.userId,
+            query.limit ?? SKILL_TAG_FACET_LIMIT,
+            this.ownershipScope(),
+        );
     }
 
     // NOTE: declared BEFORE `:id` so the literal segment wins route
@@ -456,7 +477,12 @@ export class SkillsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<SkillSwitchDto> {
-        return this.switchResult(auth.userId, await this.service.enable(auth.userId, id));
+        const ownershipScope = this.ownershipScope();
+        return this.switchResult(
+            auth.userId,
+            await this.service.enable(auth.userId, id, ownershipScope),
+            ownershipScope,
+        );
     }
 
     @Post(':id/disable')
@@ -470,7 +496,12 @@ export class SkillsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<SkillSwitchDto> {
-        return this.switchResult(auth.userId, await this.service.disable(auth.userId, id));
+        const ownershipScope = this.ownershipScope();
+        return this.switchResult(
+            auth.userId,
+            await this.service.disable(auth.userId, id, ownershipScope),
+            ownershipScope,
+        );
     }
 
     @Get(':id/readiness')
@@ -483,7 +514,7 @@ export class SkillsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<SkillReadinessDto> {
-        return readinessDto(await this.service.getOne(auth.userId, id));
+        return readinessDto(await this.service.getOne(auth.userId, id, this.ownershipScope()));
     }
 
     @Post(':id/readiness/refresh')
@@ -497,7 +528,7 @@ export class SkillsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<SkillReadinessDto> {
-        const skill = await this.service.getOne(auth.userId, id);
+        const skill = await this.service.getOne(auth.userId, id, this.ownershipScope());
         if (!this.readiness) return readinessDto(skill);
 
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -568,6 +599,16 @@ export class SkillsController {
             .catch(() => undefined);
     }
 
+    /**
+     * Skills shelf — the request's active workspace, as the ownership scope
+     * every shelf read and write is narrowed to (FR-57: another workspace's
+     * Skill answers not found). `undefined` when the scope service is not
+     * bound, which leaves each query exactly as user-scoped as before.
+     */
+    private ownershipScope(): OwnershipScope | undefined {
+        return this.scopeContext?.getScope();
+    }
+
     private async switchResult(
         userId: string,
         result: {
@@ -576,8 +617,9 @@ export class SkillsController {
             disabledAt: Date | null;
             changed: boolean;
         },
+        ownershipScope?: OwnershipScope,
     ): Promise<SkillSwitchDto> {
-        const skill = await this.skills.findByIdAndUser(result.id, userId);
+        const skill = await this.skills.findByIdAndUser(result.id, userId, ownershipScope);
         return {
             id: result.id,
             cardState: result.cardState,
