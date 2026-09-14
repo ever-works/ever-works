@@ -43,13 +43,11 @@ describe('KbController — unarchive', () => {
     beforeEach(() => {
         kb = {
             archiveDocument: jest.fn().mockResolvedValue({ id: DOC_ID, status: 'archived' }),
-            unarchiveDocument: jest
-                .fn()
-                .mockResolvedValue({
-                    document: { id: DOC_ID },
-                    restoredToUnfiled: false,
-                    changed: true,
-                }),
+            unarchiveDocument: jest.fn().mockResolvedValue({
+                document: { id: DOC_ID },
+                restoredToUnfiled: false,
+                changed: true,
+            }),
             restoreDocumentFromHistory: jest.fn().mockResolvedValue({ id: DOC_ID }),
         };
         controller = new KbController(kb as unknown as KnowledgeBaseService);
