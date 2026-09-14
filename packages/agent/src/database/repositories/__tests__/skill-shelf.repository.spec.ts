@@ -174,13 +174,9 @@ describe('Skills shelf repositories (better-sqlite3)', () => {
             expect(await slugs({ readiness: 'disabled' })).toEqual(['off']);
             expect(await slugs({ readiness: 'needs_review' })).toEqual(['draft']);
             expect(await slugs({ readiness: 'unknown' })).toEqual(['fresh']);
-            // "Not checked yet" is selectable on its own, but is not a problem.
-            expect(await slugs({ readiness: 'attention' })).toEqual([
-                'draft',
-                'missing',
-                'off',
-                'setup',
-            ]);
+            // "Not checked yet" and switched off are selectable on their own, but
+            // neither is a problem.
+            expect(await slugs({ readiness: 'attention' })).toEqual(['draft', 'missing', 'setup']);
         });
 
         it('a shelf of Skills nothing has checked yet has nothing needing attention', async () => {
@@ -202,11 +198,44 @@ describe('Skills shelf repositories (better-sqlite3)', () => {
 
             const counts = await skills.countsByCardState(USER);
             const attention = await slugs({ readiness: 'attention' });
-            expect(attention).toEqual(['blocked', 'draft', 'failed', 'missing', 'off', 'setup']);
+            expect(attention).toEqual(['blocked', 'draft', 'failed', 'missing', 'setup']);
             // The summary number and the filter agree, row for row.
             expect(countSkillsNeedingAttention(counts)).toBe(attention.length);
             // An unrecognised stored verdict reads as not-checked-yet, not as a problem.
             expect(counts.unknown).toBe(2);
+        });
+
+        it('does not count a Skill switched off on purpose, but the disabled filter still returns it', async () => {
+            // Switched off while carrying a real problem, and while in review:
+            // the owner's choice wins, so neither needs them.
+            await makeSkill({
+                slug: 'off-missing',
+                readiness: 'missing_requirements',
+                disabledAt: new Date(),
+            });
+            await makeSkill({
+                slug: 'off-draft',
+                readiness: 'ready',
+                reviewState: 'proposed',
+                disabledAt: new Date(),
+            });
+            await makeSkill({ slug: 'setup', readiness: 'needs_setup' });
+            await makeSkill({ slug: 'draft', readiness: 'ready', reviewState: 'proposed' });
+
+            const counts = await skills.countsByCardState(USER);
+            expect(counts.disabled).toBe(2);
+            expect(countSkillsNeedingAttention(counts)).toBe(2);
+            expect(await slugs({ readiness: 'attention' })).toEqual(['draft', 'setup']);
+            expect(await slugs({ readiness: 'disabled' })).toEqual(['off-draft', 'off-missing']);
+            expect(await slugs({ enabled: false })).toEqual(['off-draft', 'off-missing']);
+
+            const byAttention = await skills.findByUserIdFiltered(USER, { sort: 'attention' });
+            expect(
+                byAttention.rows
+                    .slice(-2)
+                    .map((s) => s.slug)
+                    .sort(),
+            ).toEqual(['off-draft', 'off-missing']);
         });
 
         it('filters by the on/off switch', async () => {

@@ -51,9 +51,10 @@ const SORT_KEYS = {
  *
  * Above the grid: the summary line ("{n} of {total} Skills need you"), which
  * is itself the needs-attention filter. It counts real problems only — a Skill
- * nothing has checked yet ("Not checked yet") is not one, so a shelf of
- * unchecked Skills says nothing needs you rather than that everything does.
- * Then the sort and state controls (where `unknown` stays selectable), and the
+ * nothing has checked yet ("Not checked yet") is not one, and neither is one
+ * the owner switched off on purpose — so a shelf of unchecked or switched-off
+ * Skills says nothing needs you, without claiming they are all ready. Then the
+ * sort and state controls (where `unknown` and `disabled` stay selectable), and the
  * tag chips. The grid renders from server-fetched rows, badges included, so
  * nothing reflows after first paint. Three empty states are kept distinct:
  * no Skills at all, nothing matching the filters, and a page past the end.
@@ -77,6 +78,7 @@ export function SkillShelf({
         : null;
     const needAttention = counts && total !== null ? countSkillsNeedingAttention(counts) : null;
     const notChecked = counts?.unknown ?? 0;
+    const switchedOff = counts?.disabled ?? 0;
     const attentionOn = filters.readiness === 'attention';
     const hasFilters = Boolean(filters.search.trim() || tags.length || filters.readiness);
 
@@ -112,6 +114,13 @@ export function SkillShelf({
                             className="text-text-secondary dark:text-text-secondary-dark"
                         >
                             {t('attentionNoneNotChecked', { count: notChecked, total })}
+                        </span>
+                    ) : switchedOff > 0 ? (
+                        <span
+                            data-testid="skill-shelf-summary"
+                            className="text-text-secondary dark:text-text-secondary-dark"
+                        >
+                            {t('attentionNoneSwitchedOff', { count: switchedOff, total })}
                         </span>
                     ) : (
                         <span

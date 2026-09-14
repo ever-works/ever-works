@@ -63,6 +63,12 @@ describe('skill readiness copy', () => {
         expect(shelf.attentionNoneNotChecked).not.toMatch(/need you\./);
     });
 
+    it('has summary copy for a shelf where nothing needs you but some Skills are switched off', () => {
+        expect(shelf.attentionNoneSwitchedOff).toContain('{count, plural,');
+        expect(shelf.attentionNoneSwitchedOff).toContain('{total}');
+        expect(shelf.attentionNoneSwitchedOff).not.toMatch(/ready|need you\./);
+    });
+
     it('never uses a dotted leaf key in the shelf sub-trees', () => {
         for (const key of [...Object.keys(readiness), ...Object.keys(shelf)]) {
             expect(key).toMatch(/^[a-z][A-Za-z0-9]*$/);

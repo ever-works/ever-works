@@ -2241,6 +2241,7 @@
                 "attentionSummary": "{count} of {total} Skills need you.",
                 "attentionAllReady": "All {total} Skills are ready.",
                 "attentionNoneNotChecked": "Nothing needs you. {count, plural, =1 {1 of {total} Skills hasn’t} other {# of {total} Skills haven’t}} been checked yet.",
+                "attentionNoneSwitchedOff": "Nothing needs you. {count, plural, =1 {1 of {total} Skills is} other {# of {total} Skills are}} switched off.",
                 "attentionFilterOn": "Show only these",
                 "attentionFilterOff": "Show all",
                 "reach": "Attached to {count, plural, =0 {nothing} =1 {1 place} other {# places}}",

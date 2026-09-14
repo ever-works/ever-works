@@ -124,18 +124,23 @@ describe('deriveSkillCardState', () => {
 		expect(deriveSkillCardState({ readiness: 'ready', disabledAt: '2026-09-01T00:00:00.000Z' })).toBe('disabled');
 	});
 
-	it('only ready and not-checked-yet ask nothing of a person', () => {
+	it('only ready, not-checked-yet and switched-off ask nothing of a person', () => {
 		for (const state of SKILL_CARD_STATES) {
-			expect(skillCardStateNeedsAttention(state)).toBe(state !== 'ready' && state !== 'unknown');
+			expect(skillCardStateNeedsAttention(state)).toBe(
+				state !== 'ready' && state !== 'unknown' && state !== 'disabled'
+			);
 		}
 		expect([...SKILL_CARD_STATES_NEEDING_ATTENTION]).toEqual([
 			'needs_setup',
 			'missing_requirements',
 			'blocked_by_access',
 			'check_failed',
-			'disabled',
 			'needs_review'
 		]);
+		// A deliberate off switch is not a problem, but review and setup still are.
+		expect(skillCardStateNeedsAttention('disabled')).toBe(false);
+		expect(skillCardStateNeedsAttention('needs_review')).toBe(true);
+		expect(skillCardStateNeedsAttention('needs_setup')).toBe(true);
 	});
 });
 
@@ -149,7 +154,7 @@ describe('countSkillsNeedingAttention', () => {
 		expect(countSkillsNeedingAttention({ ...zero, unknown: 34 })).toBe(0);
 	});
 
-	it('counts real problems, never ready or not-checked-yet', () => {
+	it('counts real problems, never ready, not-checked-yet or switched-off', () => {
 		expect(
 			countSkillsNeedingAttention({
 				...zero,
@@ -162,7 +167,11 @@ describe('countSkillsNeedingAttention', () => {
 				disabled: 5,
 				needs_review: 6
 			})
-		).toBe(21);
+		).toBe(16);
+	});
+
+	it('a shelf of Skills switched off on purpose needs nobody', () => {
+		expect(countSkillsNeedingAttention({ ...zero, disabled: 12, ready: 3 })).toBe(0);
 	});
 
 	it('treats a missing bucket or missing counts as zero', () => {

@@ -46,13 +46,15 @@ export type SkillCardState = (typeof SKILL_CARD_STATES)[number];
  * The card states that ask something of a person. `ready` asks nothing, and
  * neither does `unknown`: a Skill nothing has checked yet is not a problem, so
  * a freshly deployed shelf does not claim that every Skill needs its owner.
+ * `disabled` is left out too: the owner switched it off on purpose, and that
+ * choice is not something to nag them about. Both stay selectable through the
+ * explicit state filter.
  */
 export const SKILL_CARD_STATES_NEEDING_ATTENTION = [
 	'needs_setup',
 	'missing_requirements',
 	'blocked_by_access',
 	'check_failed',
-	'disabled',
 	'needs_review'
 ] as const satisfies readonly SkillCardState[];
 
@@ -198,7 +200,8 @@ export function deriveSkillCardState(input: {
 
 /**
  * True for every card state that asks something of a person — never `ready`,
- * and never `unknown` ("Not checked yet").
+ * never `unknown` ("Not checked yet"), and never `disabled` (switched off on
+ * purpose).
  */
 export function skillCardStateNeedsAttention(state: SkillCardState): boolean {
 	return (SKILL_CARD_STATES_NEEDING_ATTENTION as readonly string[]).includes(state);

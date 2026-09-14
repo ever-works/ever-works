@@ -59,10 +59,12 @@ export type SkillCardStateCounts = Record<SkillCardState, number>;
 const NOT_IN_REVIEW = `(skill.reviewState IS NULL OR skill.reviewState <> '${SKILL_REVIEW_STATE_PROPOSED}')`;
 
 /**
- * The SQL twin of `skillCardStateNeedsAttention`: switched off, in review, or a
- * stored verdict that is a real problem. `ready` and `unknown` ("Not checked
- * yet") are not in the list, and neither is an unrecognised stored value —
- * which `deriveSkillCardState` also reads as `unknown`. Built from the shared
+ * The SQL twin of `skillCardStateNeedsAttention`: switched on, and either in
+ * review or carrying a stored verdict that is a real problem. A switched-off
+ * Skill never matches — its card state is `disabled` whatever its verdict, and
+ * the owner chose that. `ready` and `unknown` ("Not checked yet") are not in
+ * the list, and neither is an unrecognised stored value — which
+ * `deriveSkillCardState` also reads as `unknown`. Built from the shared
  * contracts list (constants, never input), so the filter, the sort and the
  * web summary cannot disagree about what needs a person.
  */
@@ -71,7 +73,7 @@ const PROBLEM_READINESS_SQL = SKILL_CARD_STATES_NEEDING_ATTENTION.filter((state)
 )
     .map((state) => `'${state}'`)
     .join(', ');
-const NEEDS_ATTENTION = `(skill.disabledAt IS NOT NULL OR skill.reviewState = '${SKILL_REVIEW_STATE_PROPOSED}' OR skill.readiness IN (${PROBLEM_READINESS_SQL}))`;
+const NEEDS_ATTENTION = `(skill.disabledAt IS NULL AND (skill.reviewState = '${SKILL_REVIEW_STATE_PROPOSED}' OR skill.readiness IN (${PROBLEM_READINESS_SQL})))`;
 
 /**
  * Skills feature — Phase 8.4 (`features/skills/plan.md §2`).

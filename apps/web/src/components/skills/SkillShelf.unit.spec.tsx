@@ -124,7 +124,7 @@ describe('SkillShelf', () => {
         expect(screen.queryByTestId('skill-shelf-attention-toggle')).toBeNull();
     });
 
-    it('counts real problems only, leaving not-checked-yet Skills out of the number', () => {
+    it('counts real problems only, leaving not-checked-yet and switched-off Skills out of the number', () => {
         renderShelf({
             counts: {
                 ...COUNTS,
@@ -139,8 +139,28 @@ describe('SkillShelf', () => {
             },
         });
         expect(screen.getByTestId('skill-shelf-summary').textContent).toBe(
-            'attentionSummary(7,34)',
+            'attentionSummary(6,34)',
         );
+    });
+
+    it('does not count Skills the owner switched off, never calls the shelf all ready, and keeps them selectable', () => {
+        const { onFiltersChange } = renderShelf({
+            counts: {
+                ...COUNTS,
+                ready: 30,
+                needs_setup: 0,
+                missing_requirements: 0,
+                disabled: 4,
+            },
+        });
+        expect(screen.getByTestId('skill-shelf-summary').textContent).toBe(
+            'attentionNoneSwitchedOff(4,34)',
+        );
+        expect(screen.queryByTestId('skill-shelf-attention-toggle')).toBeNull();
+        const select = screen.getByTestId('skill-shelf-readiness') as HTMLSelectElement;
+        expect([...select.options].map((option) => option.value)).toContain('disabled');
+        fireEvent.change(select, { target: { value: 'disabled' } });
+        expect(onFiltersChange).toHaveBeenCalledWith({ readiness: 'disabled' });
     });
 
     it('keeps not-checked-yet selectable in the state filter', () => {
