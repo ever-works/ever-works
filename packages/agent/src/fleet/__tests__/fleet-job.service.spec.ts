@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
-import { FleetJobService } from '../fleet-job.service';
+import { FleetJobService, isLeasableKind } from '../fleet-job.service';
 import { FleetJobRepository } from '../fleet-job.repository';
 import { FleetNodeRepository } from '../fleet-node.repository';
 import { FleetJob } from '../../entities/fleet-job.entity';
@@ -775,6 +775,45 @@ describe('FleetJobService', () => {
 
             expect(await service.lease({ nodeId: NODE_B, secret: secretB })).toEqual([]);
             expect(await service.lease({ nodeId: NODE_A, secret: secretA })).toHaveLength(1);
+        });
+
+        it('gives a live-view lane only live views, and keeps them out of a work lane that excludes them', async () => {
+            const everything = ['terminal', 'workspace', 'attended', 'screen'];
+            stores.nodes.push(enrolledNode(NODE_A, secretA, { capabilities: everything }));
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks', payload: {} });
+            await service.enqueue(sessionRequest(NODE_A, ['screen']));
+
+            const work = await service.lease({
+                nodeId: NODE_A,
+                secret: secretA,
+                max: 5,
+                excludeKinds: ['computer-session'],
+            });
+            expect(work?.map((job) => job.kind)).toEqual(['acceptance-checks']);
+
+            const views = await service.lease({
+                nodeId: NODE_A,
+                secret: secretA,
+                max: 5,
+                kinds: ['computer-session'],
+            });
+            expect(views?.map((job) => job.kind)).toEqual(['computer-session']);
+        });
+    });
+
+    describe('isLeasableKind', () => {
+        it('filters nothing when the poll names no kinds', () => {
+            expect(isLeasableKind('agent-task', {})).toBe(true);
+            expect(isLeasableKind('agent-task', { kinds: [], excludeKinds: [] })).toBe(true);
+        });
+
+        it('keeps only the named kinds, and drops the excluded ones', () => {
+            expect(isLeasableKind('computer-session', { kinds: ['computer-session'] })).toBe(true);
+            expect(isLeasableKind('agent-task', { kinds: ['computer-session'] })).toBe(false);
+            expect(isLeasableKind('computer-session', { excludeKinds: ['computer-session'] })).toBe(
+                false,
+            );
+            expect(isLeasableKind('agent-task', { excludeKinds: ['computer-session'] })).toBe(true);
         });
     });
 

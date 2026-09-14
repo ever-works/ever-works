@@ -7,6 +7,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import type {
+    EmailSendPolicyOverride,
     KbMemoryConsolidationSettings,
     MergePolicyOverride,
     OrganizationDigestSettings,
@@ -215,6 +216,21 @@ export class Organization {
      */
     @Column('simple-json', { nullable: true, name: 'digest_settings' })
     digestSettings?: OrganizationDigestSettings | null;
+
+    /**
+     * Agent email (AW-05) — the organization's email sending policy: the
+     * send ceilings for its Agents and the mode Agents without inbox
+     * settings of their own start in.
+     *
+     * NULL ⇒ inherit the platform defaults, which is the value for every
+     * existing row. Partial objects are normal — resolution is field by
+     * field, and a ceiling of `0` means explicitly unrestricted.
+     *
+     * Read through `EmailSendPolicyService` — never inspect this column
+     * directly to decide whether a send may go out.
+     */
+    @Column('simple-json', { nullable: true, name: 'email_send_policy' })
+    emailSendPolicy?: EmailSendPolicyOverride | null;
 
     @CreateDateColumn()
     createdAt: Date;

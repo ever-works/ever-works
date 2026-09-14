@@ -96,6 +96,11 @@ describe('activity-log.types', () => {
             ['CONTEXT_FILE_RESTORED', 'context_file_restored'],
             ['CONTEXT_FILE_MODE_CHANGED', 'context_file_mode_changed'],
             ['CONTEXT_BUDGET_EXCEEDED', 'context_budget_exceeded'],
+            // Live Feed — a run starting / finishing / failing for every
+            // trigger kind other than heartbeat.
+            ['AGENT_RUN_STARTED', 'agent_run_started'],
+            ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
+            ['AGENT_RUN_FAILED', 'agent_run_failed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -166,7 +171,15 @@ describe('activity-log.types', () => {
             // +11 memory_fact_* x6, memory_facts_cleared, context_file_* x3,
             //     context_budget_exceeded (AW-07 memory facts + context
             //     files) -> 168, counted from the merged enum.
-            expect(literals).toHaveLength(168);
+            //
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            //
+            // 171 after the AW-07 memory facts + context files branch merged
+            // develop's Live Feed run-lifecycle members — COUNTED from the
+            // merged enum (the AW-07 branch said 168, develop said 160; the
+            // two sets are disjoint).
+            expect(literals).toHaveLength(171);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

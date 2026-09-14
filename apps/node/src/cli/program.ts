@@ -359,6 +359,12 @@ export interface StartCommandOptions {
 	 * Default: `EVER_WORKS_NODE_WORKSPACE_ROOT`, then `~/.ever-works/fleet-workspaces`.
 	 */
 	workspaceRoot?: string;
+	/**
+	 * Agent computers — allow live viewing of this machine from the
+	 * dashboard. Independent of `--work`: a machine can be watchable without
+	 * taking platform work, and vice versa.
+	 */
+	attend?: boolean;
 }
 
 /**
@@ -443,6 +449,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	};
 
 	const workerEnabled = options.work === true;
+	const attendEnabled = options.attend === true;
 	// A node paused by `ever-works-node pause` comes back paused: the
 	// operator drained the machine on purpose, and a service restart
 	// (or a reboot) must not quietly hand it work again.
@@ -508,9 +515,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 				}
 			),
 		workerSafetyGate: createConfigWorkerSafetyGate(deps.fs, deps.configPath, { platform: deps.platform }),
-		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {})
+		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {}),
+		attendEnabled
 	});
 	const { loop, worker } = runtime;
+	const attendedWorker = runtime.attended?.worker ?? null;
 	loop.onChange((state) => {
 		if (state.state === 'connected') {
 			deps.io.logger.info(`Heartbeat accepted — node ${config.nodeId} is online`);
@@ -538,6 +547,14 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	await loop.start();
 	if (worker) {
 		await worker.start();
+	}
+	if (attendedWorker) {
+		await attendedWorker.start();
+		deps.out(
+			runtime.attended?.captureBackend
+				? 'Live view enabled — the owner can watch this machine from the dashboard (screen and terminal)'
+				: 'Live view enabled — terminal only: no browser was found here to show a screen'
+		);
 	}
 	// The workspace reaper rides with the worker: it is the process that
 	// creates worktrees, so it is the one that reclaims them. A
@@ -593,6 +610,15 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	reaper?.stop();
 	loop.stop();
 	await loop.settled();
+	if (attendedWorker) {
+		// A live view is open-ended, so draining would wait for ever: end each
+		// one now (the executor tells its viewers this machine went away), then
+		// stop the lane.
+		for (const jobId of attendedWorker.getState().activeJobIds) {
+			attendedWorker.cancelJob(jobId, 'This machine is shutting down');
+		}
+		await attendedWorker.stop();
+	}
 	if (worker) {
 		// Drains: stops leasing at once, then WAITS for the jobs already
 		// running so their verdicts reach the platform instead of being
@@ -1216,6 +1242,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.description('Run the heartbeat loop (and, with --work, the job worker host) until SIGINT/SIGTERM')
 		.option('-i, --heartbeat-interval <seconds>', 'Override the stored heartbeat cadence, in seconds')
 		.option('-w, --work', 'Lease and execute platform work on this machine (off by default)')
+		.option(
+			'--attend',
+			'Allow live viewing of this machine from the dashboard (off by default; independent of --work)'
+		)
 		.option(
 			'-c, --concurrency <count>',
 			'Max jobs to execute at once when --work is set (overrides the stored limit)'

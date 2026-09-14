@@ -60,6 +60,11 @@ import { InboxController } from './inbox.controller';
                     notice: (userId, input) => inbox().notice(userId, input),
                     // Self-build slice Q — the fleet reconciler's question path.
                     questionRaised: (input) => inbox().questionRaised(input),
+                    // My Decisions — a decision taken through another door
+                    // (escalation endpoint, Task page, chat tool, approvals
+                    // endpoints) closes its Inbox mirror too.
+                    escalationResolved: (input) => inbox().escalationResolved(input),
+                    proposalDecided: (input) => inbox().proposalDecided(input),
                 };
             },
         },

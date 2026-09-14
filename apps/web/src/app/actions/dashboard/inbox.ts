@@ -2,8 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { inboxAPI, type ReplyInboxInput } from '@/lib/api/inbox';
-import type { InboxItem, InboxReplyOutcome } from '@/lib/api/inbox.shared';
+import {
+    inboxAPI,
+    type InboxDecisionListResult,
+    type ListInboxDecisionsInput,
+    type ReplyInboxInput,
+} from '@/lib/api/inbox';
+import type { InboxDecisionCounts, InboxItem, InboxReplyOutcome } from '@/lib/api/inbox.shared';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 
@@ -25,6 +30,8 @@ async function requireInboxAuth() {
 }
 
 const INBOX_PATH = '/[locale]/(dashboard)/inbox';
+/** Home carries the approval block — an approval answered here must leave it too. */
+const HOME_PATH = '/[locale]/(dashboard)/(home)';
 
 function revalidateInbox() {
     revalidatePath(INBOX_PATH, 'page');
@@ -37,6 +44,7 @@ export async function replyToInboxItemAction(
     await requireInboxAuth();
     const outcome = await inboxAPI.reply(id, input);
     revalidateInbox();
+    revalidatePath(HOME_PATH, 'page');
     return outcome;
 }
 
@@ -74,6 +82,33 @@ export async function getInboxUnreadCountAction(): Promise<number | null> {
     if (!user) return null;
     try {
         return await inboxAPI.unreadCount();
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * My Decisions — the next page of the decision view ("Load more"). Throws
+ * on an API failure so the caller can say so; an empty page is a real
+ * answer, never a stand-in for an error.
+ */
+export async function listInboxDecisionsAction(
+    input: ListInboxDecisionsInput,
+): Promise<InboxDecisionListResult> {
+    await requireInboxAuth();
+    return inboxAPI.listDecisions(input);
+}
+
+/**
+ * My Decisions header refresh. `null` rather than a throw when the API is
+ * unhappy — the header then keeps the counts it has instead of showing a
+ * "0 open" that would read as "nothing needs you".
+ */
+export async function getInboxDecisionCountsAction(): Promise<InboxDecisionCounts | null> {
+    const user = await getAuthFromCookie();
+    if (!user) return null;
+    try {
+        return await inboxAPI.decisionCounts();
     } catch {
         return null;
     }
