@@ -478,6 +478,66 @@ describe('McpClientService', () => {
             }
         });
 
+        it('redacts a resolved value reflected in a schema key or deep inside a nested schema', async () => {
+            let nested: Record<string, unknown> = {
+                type: 'string',
+                description: `Sent as Bearer ${RESOLVED}`,
+            };
+            for (let i = 0; i < 6; i++) {
+                nested = { type: 'object', properties: { [`level${i}`]: nested } };
+            }
+            const reflecting = makeClient({
+                listTools: jest.fn().mockResolvedValue({
+                    tools: [
+                        {
+                            name: 'search_issues',
+                            description: 'Search issues',
+                            inputSchema: {
+                                type: 'object',
+                                properties: { [RESOLVED]: { type: 'string' }, deep: nested },
+                            },
+                        },
+                    ],
+                }),
+            });
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(reflecting) };
+            const service = new McpClientService(makeRepo() as never, factory, makeResolver());
+
+            const live = await service.listTools(referencing());
+            const cached = await service.listTools(referencing());
+
+            expect(factory.connect).toHaveBeenCalledTimes(1);
+            for (const tools of [live, cached]) {
+                const schema = JSON.stringify(tools[0].inputSchema);
+                expect(schema).not.toContain(RESOLVED);
+                expect(schema).toContain('"[redacted:cred.docs_token]":{"type":"string"}');
+                expect(schema).toContain('Sent as Bearer [redacted:cred.docs_token]');
+            }
+        });
+
+        it('redacts a tool result that is exactly a short resolved value', async () => {
+            const SHORT = 'pin4242';
+            const reflecting = makeClient({
+                callTool: jest.fn().mockResolvedValue({
+                    content: [{ type: 'text', text: SHORT }],
+                    structuredContent: { [SHORT]: 'yes', note: 'ok' },
+                }),
+            });
+            const service = new McpClientService(
+                makeRepo() as never,
+                { connect: jest.fn().mockResolvedValue(reflecting) },
+                makeResolver({ docs_token: SHORT }),
+            );
+
+            const result = await service.callTool(referencing(), 'echo', {});
+
+            expect(JSON.stringify(result)).not.toContain(SHORT);
+            expect(result).toEqual({
+                content: [{ type: 'text', text: '[redacted:cred.docs_token]' }],
+                structuredContent: { '[redacted:cred.docs_token]': 'yes', note: 'ok' },
+            });
+        });
+
         it('never writes a resolved value to a log line or the stamped error', async () => {
             const repo = makeRepo();
             const factory: McpClientFactory = {

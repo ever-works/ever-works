@@ -390,9 +390,16 @@ export class McpClientService {
      * Scrub the values resolved for THIS attempt out of anything the server
      * sent back (a tool result, a tool list). No resolved values ⇒ the input
      * is returned as is.
+     *
+     * `'credential'` mode, because a server chooses where it reflects a
+     * value: object keys are scrubbed too, a string that is exactly a short
+     * value is redacted, and content nested past the rebuild depth is still
+     * checked rather than passed through.
      */
     private redactResolvedSecrets<T>(value: T, secrets?: ReadonlyMap<string, string>): T {
-        return secrets && secrets.size > 0 ? redactCredentialValues(value, secrets) : value;
+        return secrets && secrets.size > 0
+            ? redactCredentialValues(value, secrets, { mode: 'credential' })
+            : value;
     }
 
     private normalizeTool(tool: McpSdkTool): McpToolInfo {
