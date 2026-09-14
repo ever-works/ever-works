@@ -54,11 +54,22 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // AW-07 — embeds one memory fact (create / body edit / accept). `null`
     // leaves the fact unembedded for the nightly sweep.
     'MEMORY_FACT_EMBED_DISPATCHER',
+    // AW-07 — runtime-neutral ids for the two memory-fact jobs (see
+    // `memory-fact-jobs.ts`): every provider registers under these.
+    'MEMORY_FACT_EMBED_JOB_ID',
+    'MEMORY_FACT_GC_CRON',
+    'MEMORY_FACT_GC_JOB_ID',
     // EW-685 P0 T4 — binding factory that wires every `*_DISPATCHER` symbol
     // onto the active job-runtime provider's `dispatchers` view via the
     // `JOB_RUNTIME_PROVIDER_REGISTRY`. Wired into TriggerModule per the
     // EW-685 T4 full cutover.
     'buildJobRuntimeProviders',
+    // AW-07 — runtime-neutral memory-fact job handlers. A provider's
+    // registration (Trigger.dev task, BullMQ / pg-boss worker host, …) is a
+    // one-line adapter over these, so behaviour is identical on every runtime.
+    'parseMemoryFactEmbedPayload',
+    'runMemoryFactEmbedJob',
+    'runMemoryFactGcJob',
     // EW-742 P3.1 / T22 — enqueue-site `credentialVersion` capture helper.
     // Dispatchers `await stamper.stamp(tenantId)` and write the result into
     // the run record so the worker host can later resolve THAT snapshot

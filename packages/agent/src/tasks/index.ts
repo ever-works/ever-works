@@ -30,6 +30,9 @@ export * from './workflow-run-dispatcher';
 // AW-07 — embeds one memory fact through the AI facade + vector-store port.
 export * from './memory-fact-embed.types';
 export * from './memory-fact-embed-dispatcher';
+// AW-07 — runtime-neutral handlers + ids for the two memory-fact jobs, so
+// every job-runtime provider registers the same behaviour.
+export * from './memory-fact-jobs';
 export * from './kb-org-overlay-fanout.types';
 export * from './kb-org-overlay-fanout-dispatcher';
 export * from './kb-normalize-media.types';

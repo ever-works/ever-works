@@ -52,6 +52,11 @@ vi.mock('../trigger/worker/trigger-logger', () => ({
 // The real service classes are the DI tokens the tasks resolve — the worker
 // context is stubbed, so they are only ever used as lookup keys here.
 import { MemoryFactEmbedService, MemoryFactSweepService } from '@ever-works/agent/services';
+import {
+    MEMORY_FACT_EMBED_JOB_ID,
+    MEMORY_FACT_GC_CRON,
+    MEMORY_FACT_GC_JOB_ID,
+} from '@ever-works/agent/tasks';
 
 type TaskConfig = {
     id: string;
@@ -122,6 +127,11 @@ describe('memory-fact jobs', () => {
             expect(config.queue).toEqual({ name: 'memory-fact-embed', concurrencyLimit: 4 });
         });
 
+        it('registers under the runtime-neutral job id every other runtime uses', async () => {
+            const config = await importEmbedTask();
+            expect(config.id).toBe(MEMORY_FACT_EMBED_JOB_ID);
+        });
+
         it('forwards embedFact(factId) through TriggerInternalModule', async () => {
             const config = await importEmbedTask();
             const outcome = await config.run({ factId: FACT_ID, userId: FACT_ID });
@@ -152,6 +162,9 @@ describe('memory-fact jobs', () => {
             const config = await importGcTask();
             expect(config.id).toBe('memory-fact-gc');
             expect(config.cron).toBe('13 4 * * *');
+            // Same id and cron the API's in-process fallback schedules with.
+            expect(config.id).toBe(MEMORY_FACT_GC_JOB_ID);
+            expect(config.cron).toBe(MEMORY_FACT_GC_CRON);
             for (const taken of [
                 '42 3 * * *',
                 '23 */2 * * *',

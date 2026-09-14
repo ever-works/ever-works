@@ -1,5 +1,5 @@
 import { logger, task } from '@trigger.dev/sdk';
-import type { MemoryFactEmbedPayload } from '@ever-works/agent/tasks';
+import { runMemoryFactEmbedJob, type MemoryFactEmbedPayload } from '@ever-works/agent/tasks';
 import { MemoryFactEmbedService } from '@ever-works/agent/services';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
@@ -28,6 +28,13 @@ import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
  * `unavailable` outcome, the task acks, and the nightly `memory-fact-gc`
  * sweep embeds the fact once both exist. Retrying here would only burn
  * attempts against a configuration that has not changed.
+ *
+ * The job body is the runtime-neutral `runMemoryFactEmbedJob` from
+ * `@ever-works/agent/tasks`; this file is only the Trigger.dev registration
+ * of it. Other job-runtime providers register the same handler under
+ * `MEMORY_FACT_EMBED_JOB_ID` with their own worker host. The id stays a
+ * literal here (read at module load, where Trigger.dev indexes it);
+ * `memory-fact-tasks.spec.ts` pins it equal to the shared constant.
  */
 export const memoryFactEmbedTask = task<'memory-fact-embed', MemoryFactEmbedPayload>({
     id: 'memory-fact-embed',
@@ -46,7 +53,10 @@ export const memoryFactEmbedTask = task<'memory-fact-embed', MemoryFactEmbedPayl
             'MemoryFactEmbed',
             async (appContext) => {
                 const svc = appContext.get(MemoryFactEmbedService);
-                const outcome = await svc.embedFact(factId);
+                const outcome = await runMemoryFactEmbedJob(
+                    { factId, userId: payload?.userId },
+                    svc,
+                );
                 if (outcome.status === 'unavailable') {
                     logger.info('memory-fact-embed deferred to the sweep', { factId });
                 }

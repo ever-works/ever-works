@@ -413,4 +413,60 @@ describe('MemoryFactService', () => {
             expect(decodeCursor(encodeCursor(40))).toBe(40);
         });
     });
+
+    describe('no job runtime — said once at startup, never per write', () => {
+        function registry(active: { runtimeId: string; isEnabled: () => boolean } | null) {
+            return { register: jest.fn(), getActive: jest.fn(() => active) };
+        }
+
+        function build(
+            dispatcherValue: MemoryFactEmbedDispatcher | null | undefined,
+            registryValue?: ReturnType<typeof registry>,
+        ): MemoryFactService {
+            return new MemoryFactService(
+                repo as unknown as MemoryFactRepository,
+                search as unknown as MemoryFactSearchService,
+                agents as unknown as AgentRepository,
+                vectors as unknown as MemoryFactVectorIndexService,
+                activity as unknown as ActivityLogService,
+                dispatcherValue,
+                registryValue as never,
+            );
+        }
+
+        it('logs one line at bootstrap when the dispatcher resolved to null, and nothing on writes', async () => {
+            const svc = build(null, registry(null));
+            const log = jest.spyOn((svc as any).logger, 'log').mockImplementation(() => undefined);
+            const warn = jest
+                .spyOn((svc as any).logger, 'warn')
+                .mockImplementation(() => undefined);
+
+            svc.onApplicationBootstrap();
+            await svc.create(ACTOR, { body: 'a' });
+            await svc.create(ACTOR, { body: 'b' });
+
+            expect(log).toHaveBeenCalledTimes(1);
+            expect(log.mock.calls[0][0]).toContain('no job runtime is configured');
+            expect(warn).not.toHaveBeenCalled();
+        });
+
+        it('names a registered runtime that is not enabled', () => {
+            const svc = build(
+                dispatcher as unknown as MemoryFactEmbedDispatcher,
+                registry({ runtimeId: 'pgboss', isEnabled: () => false }),
+            );
+            expect(svc.embedRuntimeGap()).toBe("the 'pgboss' job runtime is not enabled");
+        });
+
+        it('stays silent when an enabled runtime can run the embed', () => {
+            const svc = build(
+                dispatcher as unknown as MemoryFactEmbedDispatcher,
+                registry({ runtimeId: 'bullmq', isEnabled: () => true }),
+            );
+            const log = jest.spyOn((svc as any).logger, 'log').mockImplementation(() => undefined);
+            svc.onApplicationBootstrap();
+            expect(svc.embedRuntimeGap()).toBeNull();
+            expect(log).not.toHaveBeenCalled();
+        });
+    });
 });

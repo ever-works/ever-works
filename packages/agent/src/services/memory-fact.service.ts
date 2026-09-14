@@ -6,6 +6,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    type OnApplicationBootstrap,
     Optional,
 } from '@nestjs/common';
 import {
@@ -34,6 +35,10 @@ import {
     MEMORY_FACT_EMBED_DISPATCHER,
     type MemoryFactEmbedDispatcher,
 } from '../tasks/memory-fact-embed-dispatcher';
+import {
+    JOB_RUNTIME_PROVIDER_REGISTRY,
+    type JobRuntimeProviderRegistry,
+} from '../tasks/job-runtime.providers';
 import { MemoryFactSearchService } from './memory-fact-search.service';
 import { MemoryFactVectorIndexService } from './memory-fact-vector-index.service';
 
@@ -101,9 +106,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * the job runtime through {@link MEMORY_FACT_EMBED_DISPATCHER}. A `null`
  * dispatch, a missing dispatcher or a failing one never fails the write —
  * the fact is saved, literal search finds it, and the nightly sweep embeds it.
+ *
+ * The dispatcher resolves through the job-runtime provider registry, so
+ * whichever runtime is active runs the embed. When none can (nothing
+ * registered, or the registered runtime is not enabled) that is said ONCE,
+ * at startup — never as a warning per saved fact.
  */
 @Injectable()
-export class MemoryFactService {
+export class MemoryFactService implements OnApplicationBootstrap {
     private readonly logger = new Logger(MemoryFactService.name);
 
     constructor(
@@ -115,7 +125,47 @@ export class MemoryFactService {
         @Optional()
         @Inject(MEMORY_FACT_EMBED_DISPATCHER)
         private readonly embedDispatcher?: MemoryFactEmbedDispatcher | null,
+        @Optional()
+        @Inject(JOB_RUNTIME_PROVIDER_REGISTRY)
+        private readonly jobRuntimeRegistry?: JobRuntimeProviderRegistry | null,
     ) {}
+
+    /**
+     * One startup line when facts will be saved without being embedded, so
+     * the no-runtime install is observable without a warning per write.
+     */
+    onApplicationBootstrap(): void {
+        const gap = this.embedRuntimeGap();
+        if (gap) {
+            this.logger.log(
+                `Memory facts: ${gap} — facts are saved and matched by exact words; ` +
+                    'the nightly sweep embeds them once an AI provider and a vector store are available.',
+            );
+        }
+    }
+
+    /** Why `memory-fact-embed` cannot be enqueued right now, or `null` when it can. */
+    embedRuntimeGap(): string | null {
+        if (!this.embedDispatcher) {
+            return 'no job runtime is configured to run memory-fact-embed';
+        }
+        if (!this.jobRuntimeRegistry) {
+            // A dispatcher bound outside the registry (tests, custom wiring):
+            // nothing further to inspect.
+            return null;
+        }
+        const active = this.jobRuntimeRegistry.getActive();
+        if (!active) {
+            return 'no job runtime is registered to run memory-fact-embed';
+        }
+        let enabled = true;
+        try {
+            enabled = active.isEnabled();
+        } catch {
+            enabled = false;
+        }
+        return enabled ? null : `the '${active.runtimeId}' job runtime is not enabled`;
+    }
 
     // ─── Reads ──────────────────────────────────────────────────────────────
 

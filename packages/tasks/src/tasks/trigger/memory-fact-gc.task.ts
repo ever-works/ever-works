@@ -1,5 +1,6 @@
 import { logger, schedules } from '@trigger.dev/sdk';
 import { MemoryFactSweepService } from '@ever-works/agent/services';
+import { runMemoryFactGcJob } from '@ever-works/agent/tasks';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 
@@ -24,8 +25,21 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
  *
  * The real service lives in the API; the worker calls `sweep()` over the
  * internal RPC channel.
+ *
+ * ## On runtimes other than Trigger.dev
+ *
+ * This is the Trigger.dev registration of the sweep, matching every other
+ * cron in this folder. When Trigger.dev is not the configured runtime, the
+ * API runs the same pass itself — `MemoryFactGcCronService` in
+ * `apps/api/src/memory-facts/`, gated on `!config.trigger.shouldUseTrigger()`
+ * and distributed-locked, the established fallback
+ * `WorkScheduleDispatcherCronService` uses — so forgotten facts are still
+ * purged at the end of their restore window on every install.
  */
 export const memoryFactGcTask = schedules.task({
+    // Literals, read at module load where Trigger.dev indexes them;
+    // `memory-fact-tasks.spec.ts` pins both equal to the shared
+    // MEMORY_FACT_GC_JOB_ID / MEMORY_FACT_GC_CRON the API fallback uses.
     id: 'memory-fact-gc',
     cron: '13 4 * * *',
     run: async () => {
@@ -33,7 +47,7 @@ export const memoryFactGcTask = schedules.task({
             'MemoryFactGc',
             async (appContext) => {
                 const svc = appContext.get(MemoryFactSweepService);
-                const summary = await svc.sweep();
+                const summary = await runMemoryFactGcJob(svc);
                 // Quiet when there is nothing to say.
                 if (
                     summary.purged > 0 ||

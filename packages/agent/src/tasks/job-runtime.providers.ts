@@ -7,6 +7,7 @@ import { KB_NORMALIZE_MEDIA_DISPATCHER } from './kb-normalize-media-dispatcher';
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from './kb-org-overlay-fanout-dispatcher';
 import { KB_REEMBED_WORK_DISPATCHER } from './kb-reembed-work-dispatcher';
 import { KB_TRANSCRIBE_DISPATCHER } from './kb-transcribe-dispatcher';
+import { MEMORY_FACT_EMBED_DISPATCHER } from './memory-fact-embed-dispatcher';
 import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from './template-customization-dispatcher';
 import { WEBHOOK_DELIVERY_DISPATCHER } from './webhook-delivery-dispatcher';
 import { WORK_GENERATION_DISPATCHER } from './work-generation-dispatcher';
@@ -139,6 +140,11 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
     KB_ORG_OVERLAY_FANOUT_DISPATCHER,
     KB_REEMBED_WORK_DISPATCHER,
     KB_TRANSCRIBE_DISPATCHER,
+    // AW-07 — embeds one memory fact. Routed through the registry like every
+    // other dispatcher so whichever job-runtime provider is active (and the
+    // tenant overlay in front of it) runs `memory-fact-embed`; `null` when no
+    // provider is registered leaves the fact for the nightly sweep.
+    MEMORY_FACT_EMBED_DISPATCHER,
     TEMPLATE_CUSTOMIZATION_DISPATCHER,
     WEBHOOK_DELIVERY_DISPATCHER,
     WORK_GENERATION_DISPATCHER,
@@ -160,8 +166,9 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  *     letting the API's existing in-process dev fallback continue to
  *     kick in unchanged.
  *
- * Provider arity is pinned at 11 — one per entry in {@link DISPATCHER_SYMBOLS}
- * — and verified by `__tests__/job-runtime.providers.spec.ts`.
+ * Provider arity is pinned at 12 — one per entry in {@link DISPATCHER_SYMBOLS}
+ * (the original 11 plus AW-07's `MEMORY_FACT_EMBED_DISPATCHER`) — and
+ * verified by `__tests__/job-runtime.providers.spec.ts`.
  *
  * @param opts Optional `symbols` filter — when supplied, only those
  *   tokens are bound (the rest stay wherever the operator's module
