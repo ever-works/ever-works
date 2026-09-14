@@ -583,6 +583,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 kind: 'task',
                 // No `signal` — see the note on the `run` params above.
                 taskId: payload.taskId,
+                // AW-17 — the Task's own Mission, from the row already loaded
+                // (never the Agent's): usage rows roll up to it.
+                missionId: taskRow?.missionId ?? undefined,
                 immediateInput,
                 workspaceCwd,
                 scopeContext,
@@ -819,6 +822,8 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                                 kind: 'task',
                                 // No `signal` — see the note on the `run` params above.
                                 taskId: payload.taskId,
+                                // AW-17 — same Mission attribution on the retry.
+                                missionId: taskRow?.missionId ?? undefined,
                                 immediateInput: iterateMessage,
                                 workspaceCwd,
                                 scopeContext,

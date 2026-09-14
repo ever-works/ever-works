@@ -275,6 +275,29 @@ describe('usage accounting (T28)', () => {
         );
     });
 
+    it('AW-17 — classifies the invocation as Workspace-paid model usage that draws no credits', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }), RUN);
+        await tools[0].invoke({ q: 'x' });
+        await flush();
+
+        expect(usage.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                meter: 'model',
+                payer: 'workspace',
+                outcome: 'ok',
+                priceKey: 'mcp.toolCall',
+                creditsCharged: 0,
+            }),
+        );
+    });
+
     it('does NOT record a failed tool call', async () => {
         const usage = { record: jest.fn().mockResolvedValue({}) };
         const { source, client } = makeSource({

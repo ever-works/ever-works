@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import { PluginUsageCapability, PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
+import { UsageMeter, UsageOutcome, UsagePayer } from '@src/entities/_types';
 import { ENTITIES } from '../_entities-inventory';
 import { AgentRunRepository } from './agent-run.repository';
 import { PluginUsageRepository } from './plugin-usage.repository';
@@ -334,6 +335,173 @@ describe('Costs aggregations over seeded rows (integration)', () => {
 
             await expect(runs.findTopByCostForUser(USER, FROM, TO, 0)).resolves.toHaveLength(1);
             await expect(runs.findTopByCostForUser(USER, FROM, TO, 1000)).resolves.toHaveLength(3);
+        });
+    });
+
+    /**
+     * AW-17 — the meter-aware aggregations, over seeded rows. The load-bearing
+     * properties: rows recorded before meters (`meter IS NULL`) never land in
+     * a named meter or a breakdown; the NULL Mission bucket survives GROUP BY;
+     * the per-run groups agree with `getRunCostByPlugin`.
+     */
+    describe('meter aggregations (AW-17)', () => {
+        const MISSION_A = '44444444-4444-4444-8444-444444444444';
+        const RUN = '55555555-5555-4555-8555-555555555555';
+
+        async function seedMetered(): Promise<void> {
+            await seedEvent({
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                meter: UsageMeter.CREDITS,
+                payer: UsagePayer.PLATFORM,
+                outcome: UsageOutcome.OK,
+                priceKey: 'search.query',
+                priceVersion: 1,
+                creditsCharged: 2,
+                costCents: 1,
+                missionId: MISSION_A,
+                runId: RUN,
+            });
+            await seedEvent({
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                meter: UsageMeter.CREDITS,
+                payer: UsagePayer.PLATFORM,
+                outcome: UsageOutcome.CACHED,
+                priceKey: 'search.query',
+                priceVersion: 1,
+                creditsCharged: 0,
+                missionId: MISSION_A,
+                runId: RUN,
+            });
+            await seedEvent({
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+                meter: UsageMeter.MODEL,
+                payer: UsagePayer.WORKSPACE,
+                outcome: UsageOutcome.OK,
+                priceKey: 'ai.managed',
+                creditsCharged: 0,
+                costCents: 40,
+                runId: RUN,
+            });
+            await seedEvent({
+                pluginId: 'extract-a',
+                capability: PluginUsageCapability.EXTRACTOR,
+                meter: UsageMeter.CREDITS,
+                payer: UsagePayer.UNCONFIRMED,
+                outcome: UsageOutcome.FAILED,
+                priceKey: 'extractor.page',
+                priceVersion: 1,
+                creditsCharged: 0,
+            });
+            // Recorded before meters were separated.
+            await seedEvent({ pluginId: 'anthropic', costCents: 84, runId: RUN });
+            // Another user, and outside the window.
+            await seedEvent({
+                userId: OTHER_USER,
+                meter: UsageMeter.CREDITS,
+                priceKey: 'search.query',
+                creditsCharged: 99,
+            });
+            await seedEvent({
+                meter: UsageMeter.CREDITS,
+                priceKey: 'search.query',
+                creditsCharged: 77,
+                occurredAt: TO,
+            });
+        }
+
+        it('getSpendByMeterForUser groups by meter × outcome × payer and returns the pre-meter bucket apart', async () => {
+            await seedMetered();
+
+            const rows = await usage.getSpendByMeterForUser(USER, FROM, TO);
+
+            const find = (meter: string | null, outcome: string | null) =>
+                rows.find((row) => row.meter === meter && row.outcome === outcome);
+            expect(find('credits', 'ok')).toMatchObject({ calls: 1, credits: 2, costCents: 1 });
+            expect(find('credits', 'cached')).toMatchObject({ calls: 1, credits: 0 });
+            expect(find('credits', 'failed')).toMatchObject({ calls: 1, payer: 'unconfirmed' });
+            expect(find('model', 'ok')).toMatchObject({ calls: 1, costCents: 40, credits: 0 });
+            expect(find(null, null)).toMatchObject({ calls: 1, costCents: 84 });
+            // Neither the other user's 99 credits nor the out-of-window 77.
+            expect(rows.reduce((sum, row) => sum + row.credits, 0)).toBe(2);
+        });
+
+        it('getSpendByPriceKeyForUser ranks classified kinds and excludes pre-meter rows', async () => {
+            await seedMetered();
+
+            const rows = await usage.getSpendByPriceKeyForUser(USER, FROM, TO);
+
+            expect(rows.map((row) => row.key)).toEqual([
+                'search.query',
+                'ai.managed',
+                'extractor.page',
+            ]);
+            expect(rows[0]).toMatchObject({ capability: 'search', calls: 2, credits: 2 });
+            expect(rows.some((row) => row.key === null)).toBe(false);
+        });
+
+        it('getSpendByMissionForUser keeps the NULL Mission bucket', async () => {
+            await seedMetered();
+
+            const rows = await usage.getSpendByMissionForUser(USER, FROM, TO);
+
+            expect(rows).toEqual([
+                expect.objectContaining({ key: MISSION_A, calls: 2, credits: 2 }),
+                expect.objectContaining({ key: null, calls: 2, costCents: 40 }),
+            ]);
+        });
+
+        it('getRunMeterGroups covers the same rows as getRunCostByPlugin', async () => {
+            await seedMetered();
+
+            const [groups, byPlugin] = await Promise.all([
+                usage.getRunMeterGroups(RUN),
+                usage.getRunCostByPlugin(RUN),
+            ]);
+
+            const groupCost = groups.reduce((sum, group) => sum + group.costCents, 0);
+            const pluginCost = byPlugin.reduce((sum, row) => sum + row.costCents, 0);
+            expect(groupCost).toBe(pluginCost);
+            expect(groups.find((g) => g.meter === 'credits')).toMatchObject({
+                pluginId: 'search-a',
+                priceKey: 'search.query',
+                priceVersion: 1,
+                calls: 2,
+                creditsCharged: 2,
+            });
+            expect(groups.find((g) => g.meter === null)).toMatchObject({
+                pluginId: 'anthropic',
+                priceVersion: null,
+                costCents: 84,
+            });
+        });
+
+        it('getRunMeterLines splits a run by meter, kind and outcome', async () => {
+            await seedMetered();
+
+            const lines = await usage.getRunMeterLines(RUN);
+
+            expect(lines).toHaveLength(4);
+            expect(lines.filter((line) => line.priceKey === 'search.query')).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ outcome: 'ok', calls: 1, creditsCharged: 2 }),
+                    expect.objectContaining({ outcome: 'cached', calls: 1, creditsCharged: 0 }),
+                ]),
+            );
+        });
+
+        it('countForUserExport counts the export scope, organization included', async () => {
+            await seedMetered();
+            await seedEvent({ organizationId: '66666666-6666-4666-8666-666666666666' });
+
+            await expect(usage.countForUserExport(USER, FROM, TO)).resolves.toBe(6);
+            await expect(
+                usage.countForUserExport(USER, FROM, TO, {
+                    organizationId: '66666666-6666-4666-8666-666666666666',
+                }),
+            ).resolves.toBe(1);
         });
     });
 });

@@ -20,7 +20,16 @@ describe('costs window vocabulary', () => {
     });
 
     it('pins the proxy route section allow-list to the API paths', () => {
-        expect(COSTS_SECTIONS).toEqual(['summary', 'daily', 'by-agent', 'by-model', 'top-runs']);
+        expect(COSTS_SECTIONS).toEqual([
+            'summary',
+            'daily',
+            'by-agent',
+            'by-model',
+            'top-runs',
+            'by-tool',
+            'by-mission',
+            'by-meter',
+        ]);
     });
 
     it('isCostsWindowDays accepts only the numeric members', () => {

@@ -272,7 +272,7 @@ export class AgentToolService {
      */
     resolveAllowedTools(
         agent: Agent,
-        runContext: { runId: string; editsThisRunByFile: Set<string> } = {
+        runContext: { runId: string; editsThisRunByFile: Set<string>; missionId?: string } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
         },
@@ -660,7 +660,7 @@ export class AgentToolService {
      */
     async resolveGrantedTools(
         agent: Agent,
-        runContext: { runId: string; editsThisRunByFile: Set<string> } = {
+        runContext: { runId: string; editsThisRunByFile: Set<string>; missionId?: string } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
         },
@@ -1342,7 +1342,7 @@ export class AgentToolService {
 
     private buildSearchWebTool(
         agent: Agent,
-        runContext: { runId: string },
+        runContext: { runId: string; missionId?: string },
     ): AgentToolDescriptor<
         {
             query: string;
@@ -1391,6 +1391,8 @@ export class AgentToolService {
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
                         runId: this.runIdFor(runContext),
+                        // AW-17 — the Task's Mission, when the run has one.
+                        missionId: runContext.missionId,
                         query: args.query,
                         maxResults: args.maxResults,
                         includeDomains: args.includeDomains,
@@ -1612,7 +1614,7 @@ export class AgentToolService {
 
     private buildScreenshotTool(
         agent: Agent,
-        runContext: { runId: string },
+        runContext: { runId: string; missionId?: string },
     ): AgentToolDescriptor<
         { url: string; viewportWidth?: number; viewportHeight?: number; fullPage?: boolean },
         AgentScreenshotResult
@@ -1661,6 +1663,8 @@ export class AgentToolService {
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
                         runId: this.runIdFor(runContext),
+                        // AW-17 — the Task's Mission, when the run has one.
+                        missionId: runContext.missionId,
                         url: args.url,
                         viewportWidth: args.viewportWidth,
                         viewportHeight: args.viewportHeight,
@@ -1675,7 +1679,7 @@ export class AgentToolService {
 
     private buildExtractContentTool(
         agent: Agent,
-        runContext: { runId: string },
+        runContext: { runId: string; missionId?: string },
     ): AgentToolDescriptor<{ url: string; maxChars?: number }, AgentExtractContentResult> {
         return {
             name: 'extractContent',
@@ -1716,6 +1720,8 @@ export class AgentToolService {
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
                         runId: this.runIdFor(runContext),
+                        // AW-17 — the Task's Mission, when the run has one.
+                        missionId: runContext.missionId,
                         url: args.url,
                         maxChars: args.maxChars,
                     });

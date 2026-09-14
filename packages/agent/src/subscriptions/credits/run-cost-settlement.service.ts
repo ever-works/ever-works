@@ -5,8 +5,10 @@ import { isFleetModelPluginId } from '@ever-works/contracts';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import {
     PluginUsageRepository,
+    type RunMeterGroup,
     type RunPluginSpend,
 } from '@src/database/repositories/plugin-usage.repository';
+import { UsageMeter, UsagePayer } from '@src/entities/_types';
 import type { RunCostSettler, RunSettlementResult } from '@src/database/run-cost-settler';
 import { NotificationService } from '@src/notifications/notification.service';
 import { PluginSettingsService } from '@src/plugins/services/plugin-settings.service';
@@ -50,6 +52,23 @@ import { PaygService } from '../billing/payg.service';
  * When that service is not wired (`@Optional()` — e.g. a deployment
  * without the plugins module), the exemption is skipped and the full
  * metered cost is billed; see `BYOK_EXEMPTION_UNRESOLVED_BILLS_FULL`.
+ *
+ * METERS (AW-17): usage rows now carry their meter, payer and — for a fixed
+ * `per-unit` price-list entry — the credits and price-list version that
+ * priced them, stamped when each row was written. Settlement reads that
+ * classification beside the per-plugin totals:
+ *
+ *  - a fixed-priced credits row debits exactly its stamped credits (0 for a
+ *    cached or failed call);
+ *  - a row stamped as paid by the Workspace (`model` meter) or covered by an
+ *    add-on (`addon` meter) debits nothing, with no provenance lookup;
+ *  - EVERYTHING ELSE — rows with no fixed price (managed model access is
+ *    priced from the model's own cost), rows recorded before meters existed,
+ *    rows whose payer is unconfirmed — settles exactly as before: its
+ *    provider cost goes through the provenance exemption above and converts
+ *    at the configured rate. No price known ⇒ no change in what is debited.
+ *
+ * If the classified read fails, the whole run settles the pre-meter way.
  */
 @Injectable()
 export class RunCostSettlementService implements RunCostSettler, RunCreditsPrecheck {
@@ -119,29 +138,70 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 this.logger.warn(`Run ${runId}: costCents stamp failed (ignored): ${err}`);
             }
 
-            result.exemptPluginIds = await this.resolveExemptPlugins(
-                spend,
+            const metered = splitMeteredSpend(spend, await this.readMeterGroups(runId));
+
+            const exempt = await this.resolveExemptPlugins(
+                metered.legacySpend,
                 run.userId,
                 run.workId ?? undefined,
             );
-            result.billableCostCents = spend
-                .filter((row) => !result.exemptPluginIds.includes(row.pluginId))
-                .reduce((sum, row) => sum + row.costCents, 0);
+            // Fixed-priced rows whose payer was not confirmed at capture get
+            // the same settlement-time provenance check the legacy rows get:
+            // a Workspace-owned key is never charged on doubt resolved.
+            const unconfirmedFixedPlugins = metered.fixedRows
+                .filter((row) => row.unconfirmed && !exempt.includes(row.pluginId))
+                .map((row) => ({ pluginId: row.pluginId, costCents: 1 }));
+            const exemptFixed =
+                unconfirmedFixedPlugins.length > 0
+                    ? await this.resolveExemptPlugins(
+                          dedupeByPlugin(unconfirmedFixedPlugins),
+                          run.userId,
+                          run.workId ?? undefined,
+                      )
+                    : [];
+            result.exemptPluginIds = unique([
+                ...exempt,
+                ...metered.workspacePluginIds,
+                ...exemptFixed,
+            ]);
 
-            if (result.billableCostCents <= 0) {
+            const legacyBillableCents = metered.legacySpend
+                .filter((row) => !exempt.includes(row.pluginId))
+                .reduce((sum, row) => sum + row.costCents, 0);
+            const billedFixed = metered.fixedRows.filter(
+                (row) =>
+                    !(
+                        row.unconfirmed &&
+                        (exempt.includes(row.pluginId) || exemptFixed.includes(row.pluginId))
+                    ),
+            );
+            const fixedCredits = billedFixed.reduce((sum, row) => sum + row.creditsCharged, 0);
+            result.billableCostCents =
+                legacyBillableCents + billedFixed.reduce((sum, row) => sum + row.costCents, 0);
+
+            if (result.billableCostCents <= 0 && fixedCredits <= 0) {
                 result.status = 'settled';
                 return result;
             }
 
             try {
-                const entry = await this.creditLedgerService.consumeForRun({
+                const consume: Parameters<CreditLedgerService['consumeForRun']>[0] = {
                     userId: run.userId,
                     runId,
                     costCents: result.billableCostCents,
                     organizationId: run.organizationId ?? null,
                     tenantId: run.tenantId ?? null,
                     description: `Run ${runId} (${run.triggerKind})`,
-                });
+                };
+                if (metered.fixedRows.length > 0) {
+                    // Published fixed prices + the legacy conversion of the
+                    // rest. Without a fixed-priced row the ledger converts
+                    // the cost itself, byte-for-byte as before.
+                    consume.credits =
+                        fixedCredits +
+                        this.creditLedgerService.creditsForCostCents(legacyBillableCents);
+                }
+                const entry = await this.creditLedgerService.consumeForRun(consume);
                 result.debitedCredits = entry ? Math.abs(entry.amountCredits) : 0;
                 result.status = 'settled';
                 // Debit-time auto-recharge check (PRD §3.4). Best-effort:
@@ -320,6 +380,22 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
     }
 
     /**
+     * AW-17 — the run's rows grouped by meter / payer / fixed price. A failed
+     * read is not an error: the run settles the pre-meter way.
+     */
+    private async readMeterGroups(runId: string): Promise<RunMeterGroup[]> {
+        try {
+            const groups = await this.pluginUsageRepository.getRunMeterGroups(runId);
+            return Array.isArray(groups) ? groups : [];
+        } catch (err) {
+            this.logger.debug(
+                `Run ${runId}: classified usage read failed, settling from provider cost: ${err}`,
+            );
+            return [];
+        }
+    }
+
+    /**
      * Dispatch-gate precheck (Wave 9 M2; billing spec FR-3 / FR-19 / FR-30).
      * Parks a run only when EVERY lever agrees: enforcement is on (unset ⇒
      * on iff the billing provider is configured), the user's plan carries
@@ -368,4 +444,82 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
             return false;
         }
     }
+}
+
+/** A fixed-priced credits group, ready to debit. */
+interface FixedPricedRow {
+    pluginId: string;
+    costCents: number;
+    creditsCharged: number;
+    unconfirmed: boolean;
+}
+
+/**
+ * AW-17 — split a run's spend into (a) fixed-priced credits rows, (b) rows
+ * stamped as not debitable (Workspace-paid or add-on), and (c) the legacy
+ * remainder that settles from provider cost exactly as before. Pure.
+ *
+ * The legacy remainder is the per-plugin total MINUS the classified groups
+ * that are settled another way, so a plugin whose rows straddle both keeps
+ * its unclassified cost on the legacy path and nothing is counted twice.
+ */
+export function splitMeteredSpend(
+    spend: RunPluginSpend[],
+    groups: RunMeterGroup[],
+): {
+    fixedRows: FixedPricedRow[];
+    workspacePluginIds: string[];
+    legacySpend: RunPluginSpend[];
+} {
+    const settledElsewhere = new Map<string, number>();
+    const fixedRows: FixedPricedRow[] = [];
+    const workspacePluginIds: string[] = [];
+
+    for (const group of groups) {
+        const isFixed =
+            group.meter === UsageMeter.CREDITS &&
+            group.priceVersion !== null &&
+            group.payer !== UsagePayer.WORKSPACE;
+        const notDebited =
+            group.meter === UsageMeter.MODEL ||
+            group.meter === UsageMeter.ADDON ||
+            (group.meter === UsageMeter.CREDITS && group.payer === UsagePayer.WORKSPACE);
+        if (!isFixed && !notDebited) {
+            continue;
+        }
+        settledElsewhere.set(
+            group.pluginId,
+            (settledElsewhere.get(group.pluginId) ?? 0) + group.costCents,
+        );
+        if (isFixed) {
+            fixedRows.push({
+                pluginId: group.pluginId,
+                costCents: group.costCents,
+                creditsCharged: Math.max(0, Math.trunc(group.creditsCharged)),
+                unconfirmed: group.payer !== UsagePayer.PLATFORM,
+            });
+        } else if (group.meter !== UsageMeter.ADDON && group.costCents > 0) {
+            workspacePluginIds.push(group.pluginId);
+        }
+    }
+
+    const legacySpend = spend.map((row) => ({
+        pluginId: row.pluginId,
+        costCents: Math.max(0, row.costCents - (settledElsewhere.get(row.pluginId) ?? 0)),
+    }));
+
+    return { fixedRows, workspacePluginIds: unique(workspacePluginIds), legacySpend };
+}
+
+function unique(values: string[]): string[] {
+    return Array.from(new Set(values));
+}
+
+function dedupeByPlugin(rows: RunPluginSpend[]): RunPluginSpend[] {
+    const seen = new Set<string>();
+    return rows.filter((row) => {
+        if (seen.has(row.pluginId)) return false;
+        seen.add(row.pluginId);
+        return true;
+    });
 }

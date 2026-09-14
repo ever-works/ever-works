@@ -344,6 +344,7 @@ const HELD_FOR_APPROVAL_NOTE =
                     agentId,
                     taskId,
                     runId,
+                    missionId,
                     query,
                     maxResults,
                     includeDomains,
@@ -352,8 +353,9 @@ const HELD_FOR_APPROVAL_NOTE =
                     const results = await search.search(
                         query,
                         { maxResults, includeDomains, excludeDomains },
-                        // Wave 9 M2 — runId feeds per-run cost attribution.
-                        { userId, workId, agentId, taskId, runId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution;
+                        // AW-17 — missionId rolls the usage up to the Task's Mission.
+                        { userId, workId, agentId, taskId, runId, missionId },
                     );
                     return {
                         results: results.map((r) => ({
@@ -371,6 +373,7 @@ const HELD_FOR_APPROVAL_NOTE =
                     agentId,
                     taskId,
                     runId,
+                    missionId,
                     url,
                     viewportWidth,
                     viewportHeight,
@@ -378,8 +381,9 @@ const HELD_FOR_APPROVAL_NOTE =
                 }) {
                     const result = await screenshot.capture(
                         { url, viewportWidth, viewportHeight, fullPage } as any,
-                        // Wave 9 M2 — runId feeds per-run cost attribution.
-                        { userId, workId, agentId, taskId, runId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution;
+                        // AW-17 — missionId rolls the usage up to the Task's Mission.
+                        { userId, workId, agentId, taskId, runId, missionId },
                     );
                     return {
                         success: result.success,
@@ -387,7 +391,16 @@ const HELD_FOR_APPROVAL_NOTE =
                         cacheUrl: result.cacheUrl ?? null,
                     };
                 },
-                async extractContent({ userId, workId, agentId, taskId, runId, url, maxChars }) {
+                async extractContent({
+                    userId,
+                    workId,
+                    agentId,
+                    taskId,
+                    runId,
+                    missionId,
+                    url,
+                    maxChars,
+                }) {
                     const result = await extractor.extractContent(url, undefined, {
                         userId,
                         workId,
@@ -395,6 +408,8 @@ const HELD_FOR_APPROVAL_NOTE =
                         taskId,
                         // Wave 9 M2 — runId feeds per-run cost attribution.
                         runId,
+                        // AW-17 — the Task's Mission.
+                        missionId,
                     });
                     const raw = result?.rawContent ?? '';
                     const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
@@ -466,6 +481,8 @@ const HELD_FOR_APPROVAL_NOTE =
                             taskId: input.facadeOptions.taskId,
                             // Wave 9 M2 — per-run cost attribution.
                             runId: input.facadeOptions.runId,
+                            // AW-17 — the Mission of the run's Task.
+                            missionId: input.facadeOptions.missionId,
                             providerOverride: input.facadeOptions.providerOverride,
                         },
                     );

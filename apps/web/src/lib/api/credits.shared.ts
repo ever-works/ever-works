@@ -1,3 +1,4 @@
+import type { CreditPriceListView } from '@ever-works/contracts';
 import {
     serializeWorkspaceScope,
     WORKSPACE_SCOPE_QUERY_PARAM,
@@ -70,6 +71,12 @@ export interface CreditsPricing {
         defaultMonthlyCapCredits: number;
         maxMonthlyCapCredits: number;
     };
+    /** AW-17 — the credit price-list version new calls are priced at (optional: older APIs omit it). */
+    pricebookVersion?: number;
+    /** AW-17 — `YYYY-MM-DD` that version took effect. */
+    pricebookEffectiveFrom?: string;
+    /** AW-17 — the published credit price list. */
+    priceList?: CreditPriceListView;
 }
 
 /**

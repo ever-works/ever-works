@@ -298,4 +298,43 @@ describe('AgentRunService.execute() — LLM dispatch (FU-1)', () => {
         expect(result.status).toBe('assembled');
         expect(ai.dispatch).not.toHaveBeenCalled();
     });
+
+    it("AW-17 — dispatches with the Mission of the run's Task, never the Agent's own Mission", async () => {
+        agents.findById.mockResolvedValueOnce(makeAgent({ missionId: 'agent-own-mission' }));
+        ai.dispatch.mockResolvedValueOnce(aiResponse({ text: 'Sure thing.' }));
+
+        await makeSvc().execute({
+            runId: 'r1',
+            agentId: 'a1',
+            userId: 'u1',
+            kind: 'chat',
+            taskId: 't1',
+            missionId: 'task-mission',
+            chatMessageId: 'm1',
+        });
+
+        expect(ai.dispatch).toHaveBeenCalledWith(
+            expect.objectContaining({
+                facadeOptions: expect.objectContaining({
+                    runId: 'r1',
+                    taskId: 't1',
+                    missionId: 'task-mission',
+                }),
+            }),
+        );
+        expect(toolService.resolveAllowedTools).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ runId: 'r1', missionId: 'task-mission' }),
+        );
+    });
+
+    it('AW-17 — a run with no Task dispatches with no Mission', async () => {
+        agents.findById.mockResolvedValueOnce(makeAgent({ missionId: 'agent-own-mission' }));
+        ai.dispatch.mockResolvedValueOnce(aiResponse());
+
+        await makeSvc().execute({ runId: 'r2', agentId: 'a1', userId: 'u1', kind: 'heartbeat' });
+
+        const options = ai.dispatch.mock.calls[0][0].facadeOptions;
+        expect(options.missionId).toBeUndefined();
+    });
 });

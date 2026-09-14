@@ -35,4 +35,14 @@ export interface FacadeOptions {
 	 * agentId/taskId attribution is unaffected).
 	 */
 	readonly runId?: string;
+
+	/**
+	 * AW-17 — the Mission of the run's Task (`tasks.missionId`), resolved
+	 * once when the run is dispatched and carried beside `taskId` / `runId`
+	 * so every usage row the call records rolls up to the Mission that
+	 * raised the work. NEVER the Agent's own `missionId` — an Agent scoped to
+	 * one Mission can work a Task filed against another. Undefined for runs
+	 * with no Task (heartbeat, chat without a Task) and outside a run.
+	 */
+	readonly missionId?: string;
 }

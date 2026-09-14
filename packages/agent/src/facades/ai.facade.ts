@@ -211,6 +211,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             taskId: facadeOptions.taskId,
             // Wave 9 M2 — per-run cost attribution.
             runId: facadeOptions.runId,
+            // AW-17 — the Mission of the run's Task.
+            missionId: facadeOptions.missionId,
             pluginId: plugin.id,
             capability: PluginUsageCapability.AI,
             units: response.usage?.totalTokens ?? 1,
@@ -396,6 +398,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             taskId: facadeOptions.taskId,
             // Wave 9 M2 — per-run cost attribution.
             runId: facadeOptions.runId,
+            // AW-17 — the Mission of the run's Task.
+            missionId: facadeOptions.missionId,
             pluginId: plugin.id,
             capability: PluginUsageCapability.AI,
             units: response.usage?.totalTokens ?? 1,
@@ -472,6 +476,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                         taskId: facadeOptions.taskId,
                         // Wave 9 M2 — per-run cost attribution.
                         runId: facadeOptions.runId,
+                        // AW-17 — the Mission of the run's Task.
+                        missionId: facadeOptions.missionId,
                         pluginId: plugin.id,
                         capability: PluginUsageCapability.AI,
                         units: chunkCount,
@@ -552,6 +558,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 taskId: facadeOptions.taskId,
                 // Wave 9 M2 — per-run cost attribution.
                 runId: facadeOptions.runId,
+                // AW-17 — the Mission of the run's Task.
+                missionId: facadeOptions.missionId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.AI,
                 units,
@@ -628,6 +636,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 taskId: facadeOptions.taskId,
                 // Wave 9 M2 — per-run cost attribution.
                 runId: facadeOptions.runId,
+                // AW-17 — the Mission of the run's Task.
+                missionId: facadeOptions.missionId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.AI,
                 units: minutes,

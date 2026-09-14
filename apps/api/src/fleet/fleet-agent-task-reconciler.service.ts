@@ -775,6 +775,9 @@ export class FleetAgentTaskReconcilerService {
                         agentId,
                         taskId: ctx.taskId,
                         runId: ctx.runId,
+                        // AW-17 — the Task's own Mission; the node's own model
+                        // seat paid, so the row is Workspace-paid by construction.
+                        missionId: task?.missionId ?? undefined,
                     }),
                 );
             } else {

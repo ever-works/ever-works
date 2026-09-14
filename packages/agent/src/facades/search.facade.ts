@@ -13,6 +13,7 @@ import { WorkPluginRepository } from '../plugins/repositories/work-plugin.reposi
 import { PluginUsageService } from '../usage/plugin-usage.service';
 import { BudgetGuardService } from '../budgets/budget-guard.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
+import { UsageOutcome } from '@src/entities/_types';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class SearchFacadeError extends FacadeError {
@@ -59,13 +60,36 @@ export class SearchFacadeService extends BaseFacadeService implements ISearchFac
 
         const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
 
-        const response = await plugin.search({
-            query,
-            limit: options?.maxResults,
-            includeDomains: options?.includeDomains as string[],
-            excludeDomains: options?.excludeDomains as string[],
-            settings,
-        });
+        let response: Awaited<ReturnType<ISearchPlugin['search']>>;
+        try {
+            response = await plugin.search({
+                query,
+                limit: options?.maxResults,
+                includeDomains: options?.includeDomains as string[],
+                excludeDomains: options?.excludeDomains as string[],
+                settings,
+            });
+        } catch (error) {
+            // AW-17 — a search that reached (or tried to reach) the provider
+            // and failed is still a call on the receipt: recorded with outcome
+            // `failed` and zero-rated. The error itself is never copied onto
+            // the row — a provider message can echo a credential.
+            await this.pluginUsageService?.record({
+                workId: facadeOptions.workId,
+                userId: facadeOptions.userId,
+                agentId: facadeOptions.agentId,
+                taskId: facadeOptions.taskId,
+                runId: facadeOptions.runId,
+                missionId: facadeOptions.missionId,
+                pluginId: plugin.id,
+                capability: PluginUsageCapability.SEARCH,
+                units: 1,
+                costCents: 0,
+                outcome: UsageOutcome.FAILED,
+                metadata: { operation: 'search', failed: true },
+            });
+            throw error;
+        }
 
         const pricing = (await plugin.getPricing?.()) ?? null;
         await this.pluginUsageService?.record({
@@ -76,6 +100,8 @@ export class SearchFacadeService extends BaseFacadeService implements ISearchFac
             taskId: facadeOptions.taskId,
             // Wave 9 M2 — per-run cost attribution.
             runId: facadeOptions.runId,
+            // AW-17 — the Mission of the run's Task.
+            missionId: facadeOptions.missionId,
             pluginId: plugin.id,
             capability: PluginUsageCapability.SEARCH,
             units: 1,

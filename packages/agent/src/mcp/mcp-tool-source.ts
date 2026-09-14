@@ -5,6 +5,8 @@ import type { AgentToolDescriptor, AgentToolParameterSchema } from '../agents/ag
 import type { AgentMcpRunHandle, AgentMcpToolSource } from '../agents/agent-mcp-tool-source';
 import { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 import { PluginUsageCapability } from '../entities/plugin-usage-event.entity';
+import { UsagePayer } from '../entities/_types';
+import { classifyUsage } from '../usage/usage-meter-classifier';
 import { McpClientService, type McpToolInfo } from './mcp-client.service';
 import { McpConnectionsService } from './mcp-connections.service';
 import {
@@ -96,14 +98,32 @@ export class McpToolSource implements AgentMcpToolSource {
     private async recordInvocation(agent: Agent, connection: McpServerConnection): Promise<void> {
         if (!this.usage || !agent.workId) return;
         try {
+            const pluginId = `mcp:${connection.name}`.slice(0, 128);
+            // AW-17 — this row is written straight to the repository, so it is
+            // classified here with the same total rule the usage service
+            // applies. The connection is one the Workspace configured with its
+            // own endpoint and auth, so the Workspace paid for the call.
+            const meter = classifyUsage({
+                capability: PluginUsageCapability.MCP,
+                pluginId,
+                units: 1,
+                costCents: 0,
+                payer: UsagePayer.WORKSPACE,
+            });
             await this.usage.record({
                 workId: agent.workId,
                 userId: agent.userId,
-                pluginId: `mcp:${connection.name}`.slice(0, 128),
+                pluginId,
                 capability: PluginUsageCapability.MCP,
                 units: 1,
                 costCents: 0,
                 metadata: { connectionId: connection.id, source: connection.source },
+                meter: meter.meter,
+                payer: meter.payer,
+                outcome: meter.outcome,
+                priceKey: meter.priceKey,
+                priceVersion: meter.priceVersion,
+                creditsCharged: meter.creditsCharged,
             });
         } catch (err) {
             this.logger.debug(
