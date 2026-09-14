@@ -1,5 +1,6 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
+jest.mock('@ever-works/agent/conversations', () => ({}));
 
 import { NotFoundException } from '@nestjs/common';
 import { ConversationController } from './conversation.controller';
@@ -303,6 +304,30 @@ describe('ConversationController', () => {
 
             expect(repo.deleteAllByUser).toHaveBeenCalledWith('user-1');
             expect(result).toEqual({ deleted: 7 });
+        });
+    });
+
+    describe('named Conversations — the routes stay inert without their services', () => {
+        it('a list with a new filter still answers the legacy way when the service is unbound', async () => {
+            repo.findByUser.mockResolvedValue({ conversations: [], total: 0 } as any);
+            await controller.list(auth, undefined, undefined, 'direct');
+            expect(repo.findByUser).toHaveBeenCalledWith('user-1', {
+                limit: undefined,
+                offset: undefined,
+            });
+        });
+
+        it('the new routes 404 when their services are unbound', async () => {
+            const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+            await expect(controller.setName(auth, id, { name: 'x' })).rejects.toThrow(
+                NotFoundException,
+            );
+            await expect(controller.send(auth, id, { body: 'hi' })).rejects.toThrow(
+                NotFoundException,
+            );
+            await expect(controller.mentionCandidates(auth, 'no')).resolves.toEqual({
+                candidates: [],
+            });
         });
     });
 });

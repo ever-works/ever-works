@@ -1,5 +1,6 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
+jest.mock('@ever-works/agent/conversations', () => ({}));
 
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -83,6 +84,12 @@ describe('UpdateConversationDto', () => {
 
         it('rejects a model over 100 characters', () => {
             expect(failedProps({ model: 'z'.repeat(101) })).toContain('model');
+        });
+
+        it('does not take a name — naming has its own route with an explicit null', () => {
+            // `PUT /api/conversations/:id/name` owns set-and-clear; PATCH keeps
+            // refusing null titles, so a blanked form field can never clear one.
+            expect(failedProps({ name: null })).toContain('name');
         });
 
         it('still rejects providerId — the thread identity is immutable', () => {

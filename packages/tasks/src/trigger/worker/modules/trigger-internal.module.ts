@@ -30,6 +30,7 @@ import {
     TaskWorkspaceService,
 } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
+import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
@@ -269,6 +270,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TaskChatService'),
             inject: [TriggerInternalApiClient],
         },
+        // Named Conversations — the agent-conversation-reply task loads the
+        // Conversation it answers and records the reply over the internal
+        // RPC channel. The real service (repositories, mention lookups) lives
+        // API-side, same shape as TaskChatService above.
+        {
+            provide: ConversationMessageService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'ConversationMessageService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Kanban run cockpit (plan 04 M5/M7) — the task-pr-status-sync
         // cron calls syncDuePrStatuses() over the internal RPC channel.
         // The real service needs the git facade (provider plugins are
@@ -418,6 +429,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskRecurrenceDispatcherService,
         TasksService,
         TaskChatService,
+        ConversationMessageService,
         TaskRunDenormService,
         TaskWorkspaceService,
         FleetJobService,

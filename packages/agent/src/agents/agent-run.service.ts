@@ -99,6 +99,14 @@ export interface AgentRunContext {
      */
     chatMessageId?: string | null;
     /**
+     * Named Conversations — the Conversation message a `chat`-kind run is
+     * replying to when it was started from a Conversation rather than a Task.
+     * Its reply is recorded in the Conversation by the job that started the
+     * run, so finalize neither posts it to a Task nor warns that no Task was
+     * given. Absent for every other run.
+     */
+    conversationMessageId?: string | null;
+    /**
      * Trigger.dev's run AbortSignal, aborted when the run is cancelled. Optional:
      * absent in unit tests and for runs executed outside a Trigger.dev task, in
      * which case cooperative abort falls back to the throttled DB status read.
@@ -1580,6 +1588,11 @@ export class AgentRunService {
         body: string,
     ): Promise<string | undefined> {
         const taskId = context.taskId ?? undefined;
+        if (!taskId && context.conversationMessageId) {
+            // A Conversation reply: the conversation reply job records it
+            // against the message it answers. Nothing to post to a Task.
+            return undefined;
+        }
         if (!this.chatBackPoster) {
             await this.runLogs
                 .append({

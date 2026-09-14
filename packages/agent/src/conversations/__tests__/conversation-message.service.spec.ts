@@ -1,0 +1,304 @@
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
+import { ConversationMessageService } from '../conversation-message.service';
+import { ConversationMentionService } from '../conversation-mention.service';
+import { MAX_CONVERSATION_BODY_BYTES } from '../conversation.types';
+
+const CONVERSATION = {
+    id: 'c1',
+    userId: 'u1',
+    kind: 'direct',
+    agentId: 'a1',
+    tenantId: 't1',
+    organizationId: 'o1',
+};
+
+describe('ConversationMessageService', () => {
+    let conversations: Record<string, jest.Mock>;
+    let conversationService: { assertParticipant: jest.Mock; ensureOwner: jest.Mock };
+    let mentions: ConversationMentionService;
+    let dispatch: { dispatch: jest.Mock };
+    let service: ConversationMessageService;
+
+    beforeEach(() => {
+        conversations = {
+            findByClientMessageId: jest.fn().mockResolvedValue(null),
+            insertMessage: jest.fn(async (input) => ({
+                id: 'm1',
+                createdAt: new Date(),
+                ...input,
+            })),
+            findMessageById: jest.fn(),
+            updateMessageStatus: jest.fn().mockResolvedValue(undefined),
+            deleteMessages: jest.fn().mockResolvedValue(1),
+            findMessagesPaged: jest.fn().mockResolvedValue([]),
+            findById: jest.fn().mockResolvedValue(CONVERSATION),
+            findByIdForUser: jest.fn().mockResolvedValue(CONVERSATION),
+        };
+        conversationService = {
+            assertParticipant: jest.fn().mockResolvedValue(CONVERSATION),
+            ensureOwner: jest.fn().mockResolvedValue(undefined),
+        };
+        mentions = new ConversationMentionService(
+            {
+                findByUserIdScoped: jest.fn().mockResolvedValue({
+                    rows: [{ id: 'a2', slug: 'orion', name: 'Orion', status: 'active' }],
+                    total: 1,
+                }),
+            } as any,
+            { findSummariesByUser: jest.fn() } as any,
+        );
+        dispatch = {
+            dispatch: jest
+                .fn()
+                .mockResolvedValue([{ agentId: 'a1', outcome: 'delivered', runId: 'r1' }]),
+        };
+        service = new ConversationMessageService(
+            conversations as any,
+            conversationService as any,
+            mentions,
+            dispatch as any,
+        );
+    });
+
+    describe('send', () => {
+        it('stores the message as sent, then dispatches it with the resolved mentions', async () => {
+            const scope = { tenantId: 't1', organizationId: 'o1' };
+            const result = await service.send(
+                'u1',
+                'c1',
+                { body: '@ghost ask @Orion please', clientMessageId: 'client-1' },
+                scope,
+            );
+
+            expect(conversationService.assertParticipant).toHaveBeenCalledWith('c1', 'u1', scope);
+            expect(conversations.insertMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    conversationId: 'c1',
+                    role: 'user',
+                    content: '@ghost ask @Orion please',
+                    authorType: 'user',
+                    authorId: 'u1',
+                    status: 'sent',
+                    clientMessageId: 'client-1',
+                    mentions: [{ type: 'agent', id: 'a2', slug: 'orion' }],
+                    tenantId: 't1',
+                    organizationId: 'o1',
+                }),
+            );
+            expect(dispatch.dispatch).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    agentVisibleBody: 'ask @Orion please',
+                    mentionedAgentIds: ['a2'],
+                }),
+            );
+            expect(result.duplicate).toBe(false);
+            expect(result.reach).toEqual([{ agentId: 'a1', outcome: 'delivered', runId: 'r1' }]);
+        });
+
+        it('sending the same client id twice returns the first message and creates no row', async () => {
+            const first = { id: 'm-first', clientMessageId: 'client-1' };
+            conversations.findByClientMessageId.mockResolvedValue(first);
+
+            const result = await service.send('u1', 'c1', {
+                body: 'hi',
+                clientMessageId: 'client-1',
+            });
+
+            expect(result).toEqual({ message: first, reach: [], duplicate: true });
+            expect(conversations.insertMessage).not.toHaveBeenCalled();
+            expect(dispatch.dispatch).not.toHaveBeenCalled();
+        });
+
+        it('a lost race on the client id answers with the message that won', async () => {
+            const winner = { id: 'm-winner', clientMessageId: 'client-1' };
+            conversations.findByClientMessageId
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce(winner);
+            const violation = new QueryFailedError('INSERT', [], {
+                code: 'SQLITE_CONSTRAINT_UNIQUE',
+            } as any);
+            conversations.insertMessage.mockRejectedValue(violation);
+
+            const result = await service.send('u1', 'c1', {
+                body: 'hi',
+                clientMessageId: 'client-1',
+            });
+
+            expect(result).toEqual({ message: winner, reach: [], duplicate: true });
+            expect(dispatch.dispatch).not.toHaveBeenCalled();
+        });
+
+        it('rejects a body over 16 KB before anything is stored, with its size', async () => {
+            const body = 'é'.repeat(MAX_CONVERSATION_BODY_BYTES / 2 + 1);
+            const error = await service.send('u1', 'c1', { body }).catch((e) => e);
+
+            expect(error).toBeInstanceOf(BadRequestException);
+            expect(error.getResponse()).toMatchObject({
+                failureCode: 'too_large',
+                size: MAX_CONVERSATION_BODY_BYTES + 2,
+                max: MAX_CONVERSATION_BODY_BYTES,
+            });
+            expect(conversations.insertMessage).not.toHaveBeenCalled();
+        });
+
+        it('rejects a body carrying a credential before anything is stored, without echoing it', async () => {
+            const secret = 'ghp_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8';
+            const error = await service.send('u1', 'c1', { body: `use ${secret}` }).catch((e) => e);
+
+            expect(error).toBeInstanceOf(BadRequestException);
+            expect(error.getResponse()).toMatchObject({ failureCode: 'secret_detected' });
+            expect(JSON.stringify(error.getResponse())).not.toContain(secret);
+            expect(conversations.insertMessage).not.toHaveBeenCalled();
+        });
+
+        it('rejects an empty body and more than ten attachments', async () => {
+            await expect(service.send('u1', 'c1', { body: '   ' })).rejects.toThrow(
+                BadRequestException,
+            );
+            const attachments = Array.from({ length: 11 }, (_, i) => ({ uploadId: `up-${i}` }));
+            await expect(service.send('u1', 'c1', { body: 'hi', attachments })).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(conversations.insertMessage).not.toHaveBeenCalled();
+        });
+
+        it('404s for a Conversation the sender may not read', async () => {
+            conversationService.assertParticipant.mockRejectedValue(new NotFoundException());
+            await expect(service.send('u1', 'c-other', { body: 'hi' })).rejects.toThrow(
+                NotFoundException,
+            );
+            expect(conversations.insertMessage).not.toHaveBeenCalled();
+        });
+
+        it('marks the message failed when every dispatch failed unexpectedly, so it can be retried', async () => {
+            dispatch.dispatch.mockResolvedValue([
+                { agentId: 'a1', outcome: 'refused', reason: 'dispatch-failed', runId: 'r1' },
+            ]);
+
+            const result = await service.send('u1', 'c1', { body: 'hi' });
+
+            expect(conversations.updateMessageStatus).toHaveBeenCalledWith(
+                'm1',
+                'failed',
+                'provider_unavailable',
+            );
+            expect(result.message).toMatchObject({
+                status: 'failed',
+                failureCode: 'provider_unavailable',
+            });
+        });
+
+        it('keeps the message sent when a reply was only queued or skipped', async () => {
+            dispatch.dispatch.mockResolvedValue([
+                { agentId: 'a1', outcome: 'queued', reason: 'concurrency-limit' },
+            ]);
+            const result = await service.send('u1', 'c1', { body: 'hi' });
+            expect(conversations.updateMessageStatus).not.toHaveBeenCalled();
+            expect(result.message.status).toBe('sent');
+        });
+    });
+
+    describe('retry and discard', () => {
+        const failed = {
+            id: 'm1',
+            conversationId: 'c1',
+            authorType: 'user',
+            authorId: 'u1',
+            content: 'hi',
+            status: 'failed',
+            failureCode: 'provider_unavailable',
+        };
+
+        it('retries only a failed message, moving it back to sent and dispatching again', async () => {
+            conversations.findMessageById.mockResolvedValue(failed);
+
+            const result = await service.retry('u1', 'c1', 'm1');
+
+            expect(conversations.updateMessageStatus).toHaveBeenCalledWith('m1', 'sent', null);
+            expect(dispatch.dispatch).toHaveBeenCalledTimes(1);
+            expect(result.message.status).toBe('sent');
+        });
+
+        it('a second Retry of a message already sent is a 409 and dispatches nothing', async () => {
+            conversations.findMessageById.mockResolvedValue({ ...failed, status: 'sent' });
+            await expect(service.retry('u1', 'c1', 'm1')).rejects.toThrow(ConflictException);
+            expect(dispatch.dispatch).not.toHaveBeenCalled();
+        });
+
+        it('discards only a failed message', async () => {
+            conversations.findMessageById.mockResolvedValueOnce(failed);
+            await service.discard('u1', 'c1', 'm1');
+            expect(conversations.deleteMessages).toHaveBeenCalledWith('c1', ['m1']);
+
+            conversations.findMessageById.mockResolvedValueOnce({ ...failed, status: 'sent' });
+            await expect(service.discard('u1', 'c1', 'm1')).rejects.toThrow(ConflictException);
+            expect(conversations.deleteMessages).toHaveBeenCalledTimes(1);
+        });
+
+        it('another person’s message, or an Agent’s, is not found', async () => {
+            conversations.findMessageById.mockResolvedValueOnce({ ...failed, authorId: 'u2' });
+            await expect(service.retry('u1', 'c1', 'm1')).rejects.toThrow(NotFoundException);
+            conversations.findMessageById.mockResolvedValueOnce({ ...failed, authorType: 'agent' });
+            await expect(service.discard('u1', 'c1', 'm1')).rejects.toThrow(NotFoundException);
+        });
+    });
+
+    describe('appendAgentMessage', () => {
+        it('records the reply as Agent-authored, answering the triggering message', async () => {
+            await service.appendAgentMessage({
+                conversationId: 'c1',
+                agentId: 'a1',
+                body: 'Done.',
+                replyToMessageId: 'm1',
+            });
+            expect(conversations.insertMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    conversationId: 'c1',
+                    role: 'assistant',
+                    content: 'Done.',
+                    authorType: 'agent',
+                    authorId: 'a1',
+                    status: 'sent',
+                    replyToMessageId: 'm1',
+                    tenantId: 't1',
+                    organizationId: 'o1',
+                }),
+            );
+        });
+
+        it('redacts a credential an Agent echoed instead of storing it', async () => {
+            const secret = 'ghp_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8';
+            await service.appendAgentMessage({ conversationId: 'c1', agentId: 'a1', body: secret });
+            const stored = conversations.insertMessage.mock.calls[0][0].content as string;
+            expect(stored).not.toContain(secret);
+        });
+
+        it('404s when the Conversation is gone', async () => {
+            conversations.findById.mockResolvedValue(null);
+            await expect(
+                service.appendAgentMessage({ conversationId: 'gone', agentId: 'a1', body: 'x' }),
+            ).rejects.toThrow(NotFoundException);
+        });
+    });
+
+    describe('loadReplyContext', () => {
+        it('loads the Conversation for the dispatching user, the triggering message and recent history', async () => {
+            conversations.findMessageById.mockResolvedValue({ id: 'm1', content: 'hi' });
+            conversations.findMessagesPaged.mockResolvedValue([{ id: 'm0' }, { id: 'm1' }]);
+
+            const context = await service.loadReplyContext('u1', 'c1', 'm1');
+
+            expect(conversations.findByIdForUser).toHaveBeenCalledWith('c1', 'u1');
+            expect(conversations.findMessagesPaged).toHaveBeenCalledWith('c1', 20);
+            expect(context?.triggering).toEqual({ id: 'm1', content: 'hi' });
+            expect(context?.recent).toHaveLength(2);
+        });
+
+        it('returns null when the Conversation is no longer the user’s', async () => {
+            conversations.findByIdForUser.mockResolvedValue(null);
+            await expect(service.loadReplyContext('u2', 'c1', 'm1')).resolves.toBeNull();
+        });
+    });
+});

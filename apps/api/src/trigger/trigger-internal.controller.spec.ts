@@ -32,6 +32,11 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskChatService: class TaskChatService {},
     TaskRunDenormService: class TaskRunDenormService {},
 }));
+// Named Conversations — the controller imports ConversationMessageService
+// from the conversations barrel; stub it so the entity chain is never loaded.
+jest.mock('@ever-works/agent/conversations', () => ({
+    ConversationMessageService: class ConversationMessageService {},
+}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
     CACHE_MANAGER: 'CACHE_MANAGER',

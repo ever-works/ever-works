@@ -103,6 +103,23 @@ describe('AgentRunService.finalize()', () => {
         );
     });
 
+    it('chat kind started from a Conversation → completes without a Task post or a missing-Task warning', async () => {
+        // The conversation reply job records the reply in the Conversation
+        // itself; finalize must neither post it to a Task nor log that no
+        // Task was given.
+        const result = await svc.finalize(
+            baseContext({ kind: 'chat', taskId: null, conversationMessageId: 'cm-1' }),
+            { summary: 'answered', replyBody: 'Here you go.' },
+        );
+        expect(result.status).toBe('completed');
+        expect(result.postedMessageId).toBeUndefined();
+        expect(runs.markCompleted).toHaveBeenCalledWith('r1', 'answered');
+        expect(chatBackPoster.postReply).not.toHaveBeenCalled();
+        expect(runLogs.append).not.toHaveBeenCalledWith(
+            expect.objectContaining({ message: expect.stringContaining('no taskId') }),
+        );
+    });
+
     it('chat kind + empty/blank replyBody → completes without posting', async () => {
         await svc.finalize(baseContext({ kind: 'chat' }), { replyBody: '   ' });
         expect(runs.markCompleted).toHaveBeenCalled();
