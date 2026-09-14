@@ -36,3 +36,6 @@ export * from './changelog/index.js';
 
 // AW-01 workspace-wide search behind the dashboard command palette.
 export * from './workspace-search/index.js';
+
+// AW-25 Help centre — manual sections and the structured article grammar.
+export * from './help/index.js';

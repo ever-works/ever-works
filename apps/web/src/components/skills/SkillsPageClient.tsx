@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import { Download, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -246,6 +247,11 @@ function InstalledList({ installed }: { installed: Skill[] }) {
             <div className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
                 <p className="font-medium text-text dark:text-text-dark">{t('empty.title')}</p>
                 <p className="mt-1">{t('empty.subtitle')}</p>
+                <HelpLink
+                    target="skills-catalog#attaching-skills-to-agents"
+                    variant="emptyState"
+                    className="mt-3"
+                />
             </div>
         );
     }

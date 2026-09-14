@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import {
     Brain,
@@ -432,6 +433,7 @@ export function MemoryShell({ initial, meetings }: MemoryShellProps) {
                                   : t('empty.noResults')
                         }
                         subtitle={hasActiveFilters ? undefined : t('empty.subtitle')}
+                        showHelpLink={!hasActiveFilters}
                     />
                 ) : (
                     <ul className="flex flex-col gap-2">
@@ -746,7 +748,16 @@ function MemoryRow({
     );
 }
 
-function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
+function EmptyState({
+    title,
+    subtitle,
+    showHelpLink = false,
+}: {
+    title: string;
+    subtitle?: string;
+    /** AW-25 — "How this works" into the Memory article (not on a filtered no-results list). */
+    showHelpLink?: boolean;
+}) {
     return (
         <div className="flex flex-col items-center justify-center text-center py-16 px-6">
             <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-surface-secondary dark:bg-card-primary-dark mb-4">
@@ -760,6 +771,9 @@ function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
                 <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark max-w-md">
                     {subtitle}
                 </p>
+            )}
+            {showHelpLink && (
+                <HelpLink target="memory#adding-to-memory" variant="emptyState" className="mt-3" />
             )}
         </div>
     );
