@@ -36,6 +36,7 @@ import { AgentRepoAttachmentRepository } from './repositories/agent-repo-attachm
 import { ApiKeyRepository } from './repositories/api-key.repository';
 import { AuthAccountRepository } from './repositories/auth-account.repository';
 import { BillingProfileRepository } from './repositories/billing-profile.repository';
+import { ConversationParticipantRepository } from './repositories/conversation-participant.repository';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { CreditLedgerRepository } from './repositories/credit-ledger.repository';
 import { EmailConversationRepository } from './repositories/email-conversation.repository';
@@ -94,6 +95,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ApiKeyRepository,
     AuthAccountRepository,
     BillingProfileRepository,
+    ConversationParticipantRepository,
     ConversationRepository,
     CreditLedgerRepository,
     EmailConversationRepository,

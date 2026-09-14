@@ -42,6 +42,7 @@ import { Notification } from '../entities/notification.entity';
 import { ActivityLog } from '../entities/activity-log.entity';
 import { Conversation } from '../entities/conversation.entity';
 import { ConversationMessage } from '../entities/conversation-message.entity';
+import { ConversationParticipant } from '../entities/conversation-participant.entity';
 import { AuthAccount } from '../entities/auth-account.entity';
 import { AuthSession } from '../entities/auth-session.entity';
 import { AuthVerification } from '../entities/auth-verification.entity';
@@ -198,6 +199,7 @@ export const ENTITIES = [
     ActivityLog,
     Conversation,
     ConversationMessage,
+    ConversationParticipant,
     AuthAccount,
     AuthSession,
     AuthVerification,

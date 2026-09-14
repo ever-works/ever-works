@@ -1,17 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository, type FindOptionsWhere } from 'typeorm';
+import type {
+    ConversationAttachmentRef,
+    ConversationAuthorType,
+    ConversationContextType,
+    ConversationFailureCode,
+    ConversationKind,
+    ConversationMention,
+    ConversationMessageStatus,
+    ConversationTitleSource,
+} from '@ever-works/contracts';
 import { Conversation } from '../../entities/conversation.entity';
 import {
     ConversationMessage,
     ConversationMessageRole,
 } from '../../entities/conversation-message.entity';
+import { ConversationParticipant } from '../../entities/conversation-participant.entity';
+import { ownershipWhere, type OwnershipScope } from '../ownership-scope';
 
 export interface CreateConversationInput {
     userId: string;
     title?: string;
     providerId?: string;
     model?: string;
+    // Named Conversations with Agents — every field optional, so an input
+    // carrying none of them creates exactly the row it always did.
+    kind?: ConversationKind;
+    agentId?: string | null;
+    titleSource?: ConversationTitleSource | null;
+    contextType?: ConversationContextType | null;
+    contextId?: string | null;
+    tenantId?: string | null;
+    organizationId?: string | null;
 }
 
 export interface AppendMessageInput {
@@ -22,6 +43,49 @@ export interface AppendMessageInput {
     model?: string;
     usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
+
+/** A message written by the named-Conversation send path or an Agent reply. */
+export interface InsertConversationMessageInput extends AppendMessageInput {
+    authorType: ConversationAuthorType;
+    authorId?: string | null;
+    mentions?: ConversationMention[] | null;
+    attachments?: ConversationAttachmentRef[] | null;
+    status?: ConversationMessageStatus;
+    failureCode?: ConversationFailureCode | null;
+    clientMessageId?: string | null;
+    replyToMessageId?: string | null;
+    tenantId?: string | null;
+    organizationId?: string | null;
+}
+
+export interface ListConversationSummariesFilter {
+    limit?: number;
+    offset?: number;
+    kind?: ConversationKind;
+    agentId?: string;
+    contextType?: ConversationContextType;
+    contextId?: string;
+}
+
+/**
+ * Columns a named-Conversation list row carries. The legacy `findByUser`
+ * projection is deliberately left exactly as it was — clients that read it
+ * pin its key set.
+ */
+const SUMMARY_COLUMNS: (keyof Conversation)[] = [
+    'id',
+    'kind',
+    'agentId',
+    'title',
+    'titleSource',
+    'providerId',
+    'model',
+    'contextType',
+    'contextId',
+    'lastMessageAt',
+    'createdAt',
+    'updatedAt',
+];
 
 @Injectable()
 export class ConversationRepository {
@@ -64,8 +128,13 @@ export class ConversationRepository {
         const message = this.messageRepo.create(input);
         const saved = await this.messageRepo.save(message);
 
-        // Touch the conversation's updatedAt
-        await this.conversationRepo.update(input.conversationId, { updatedAt: new Date() });
+        // Touch the conversation's updatedAt — and its last activity, which
+        // named-Conversation lists order by.
+        const now = new Date();
+        await this.conversationRepo.update(input.conversationId, {
+            updatedAt: now,
+            lastMessageAt: now,
+        });
 
         return saved;
     }
@@ -86,7 +155,8 @@ export class ConversationRepository {
         }
 
         const conversationId = messages[0].conversationId;
-        await this.conversationRepo.update(conversationId, { updatedAt: new Date() });
+        const now = new Date();
+        await this.conversationRepo.update(conversationId, { updatedAt: now, lastMessageAt: now });
 
         return saved;
     }
@@ -137,6 +207,191 @@ export class ConversationRepository {
 
     async deleteAllByUser(userId: string): Promise<number> {
         const result = await this.conversationRepo.delete({ userId });
+        return result.affected ?? 0;
+    }
+
+    // ── Named Conversations with Agents ─────────────────────────────────
+
+    /**
+     * One person's Conversations in the active scope, newest activity first,
+     * with the columns a named list needs. Every filter is optional; with
+     * none, the rows are the same set `findByUser` returns.
+     */
+    async findSummariesByUser(
+        userId: string,
+        filter: ListConversationSummariesFilter = {},
+        scope?: OwnershipScope,
+    ): Promise<{ conversations: Conversation[]; total: number }> {
+        const extra: FindOptionsWhere<Conversation> = {};
+        if (filter.kind) extra.kind = filter.kind;
+        if (filter.agentId) extra.agentId = filter.agentId;
+        if (filter.contextType) extra.contextType = filter.contextType;
+        if (filter.contextId) extra.contextId = filter.contextId;
+
+        const [conversations, total] = await this.conversationRepo.findAndCount({
+            where: ownershipWhere<Conversation>(userId, scope).map((branch) => ({
+                ...branch,
+                ...extra,
+            })),
+            order: { lastMessageAt: { direction: 'DESC', nulls: 'LAST' }, updatedAt: 'DESC' },
+            take: filter.limit ?? 50,
+            skip: filter.offset ?? 0,
+            select: SUMMARY_COLUMNS,
+        });
+        return { conversations, total };
+    }
+
+    /**
+     * The Conversation row without its messages, scoped to the caller. `null`
+     * for a Conversation that does not exist and for one the caller may not
+     * read — callers must not tell the two apart.
+     */
+    async findByIdForUser(
+        id: string,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<Conversation | null> {
+        return this.conversationRepo.findOne({
+            where: ownershipWhere<Conversation>(userId, scope).map((branch) => ({
+                ...branch,
+                id,
+            })),
+        });
+    }
+
+    /**
+     * Set or clear the name a person gave a Conversation. A name marks the
+     * title as `user`-owned, which stops automatic titling for good; clearing
+     * it resets the source so automatic titling may run again.
+     */
+    async setName(id: string, userId: string, name: string | null): Promise<boolean> {
+        const result = await this.conversationRepo.update({ id, userId }, {
+            title: name,
+            titleSource: name === null ? null : 'user',
+        } as Partial<Conversation>);
+        return (result.affected ?? 0) > 0;
+    }
+
+    async touchLastMessageAt(id: string, at: Date = new Date()): Promise<void> {
+        await this.conversationRepo.update(id, { updatedAt: at, lastMessageAt: at });
+    }
+
+    /**
+     * Messages an Agent or the system wrote after the person's read position,
+     * per Conversation. A Conversation with nothing unread is absent from the
+     * map (read it as 0).
+     */
+    async unreadCountsFor(userId: string, conversationIds: string[]): Promise<Map<string, number>> {
+        const counts = new Map<string, number>();
+        if (conversationIds.length === 0) return counts;
+        const rows = await this.messageRepo
+            .createQueryBuilder('m')
+            .select('m.conversationId', 'conversationId')
+            .addSelect('COUNT(m.id)', 'count')
+            .leftJoin(
+                ConversationParticipant,
+                'p',
+                'p.conversationId = m.conversationId AND p.participantType = :participantType AND p.participantId = :userId',
+                { participantType: 'user', userId },
+            )
+            .where('m.conversationId IN (:...conversationIds)', { conversationIds })
+            .andWhere('m.authorType IN (:...authorTypes)', { authorTypes: ['agent', 'system'] })
+            .andWhere('(p.lastReadAt IS NULL OR m.createdAt > p.lastReadAt)')
+            .groupBy('m.conversationId')
+            .getRawMany<{ conversationId: string; count: string | number }>();
+        for (const row of rows) {
+            const count = Number(row.count);
+            if (count > 0) counts.set(row.conversationId, count);
+        }
+        return counts;
+    }
+
+    /**
+     * A page of messages, returned oldest-first. `before` is a message id: the
+     * page holds the `limit` messages written just before it.
+     */
+    async findMessagesPaged(
+        conversationId: string,
+        limit: number,
+        before?: string,
+    ): Promise<ConversationMessage[]> {
+        if (before) {
+            const anchor = await this.messageRepo.findOne({
+                where: { id: before, conversationId },
+                select: ['id'],
+            });
+            if (!anchor) return [];
+        }
+        const query = this.messageRepo
+            .createQueryBuilder('m')
+            .where('m.conversationId = :conversationId', { conversationId });
+        if (before) {
+            // Compared inside the database, column to column: a JS Date bound
+            // as a parameter is formatted differently from the stored value
+            // on some drivers, which silently disables the bound.
+            query.andWhere(
+                'm.createdAt < (SELECT anchor."createdAt" FROM conversation_messages anchor WHERE anchor.id = :before)',
+                { before },
+            );
+        }
+        const rows = await query.orderBy('m.createdAt', 'DESC').take(limit).getMany();
+        return rows.reverse();
+    }
+
+    async findMessageById(
+        conversationId: string,
+        messageId: string,
+    ): Promise<ConversationMessage | null> {
+        return this.messageRepo.findOne({ where: { id: messageId, conversationId } });
+    }
+
+    async findByClientMessageId(
+        conversationId: string,
+        clientMessageId: string,
+    ): Promise<ConversationMessage | null> {
+        return this.messageRepo.findOne({ where: { conversationId, clientMessageId } });
+    }
+
+    /** Messages newer than `since`, oldest-first — the live stream diffs these. */
+    async findMessagesSince(
+        conversationId: string,
+        since: Date,
+        limit = 50,
+    ): Promise<ConversationMessage[]> {
+        return this.messageRepo
+            .createQueryBuilder('m')
+            .where('m.conversationId = :conversationId', { conversationId })
+            .andWhere('m.createdAt >= :since', { since })
+            .orderBy('m.createdAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /** Store one message and move the Conversation's activity forward. */
+    async insertMessage(input: InsertConversationMessageInput): Promise<ConversationMessage> {
+        // Explicit millisecond `createdAt`, as `appendMessages` does: a column
+        // default can round to the second on some drivers, which would order
+        // a reply before the message it answers and blur the unread boundary.
+        const now = new Date();
+        const saved = await this.messageRepo.save(
+            this.messageRepo.create({ ...input, status: input.status ?? 'sent', createdAt: now }),
+        );
+        await this.touchLastMessageAt(input.conversationId, now);
+        return saved;
+    }
+
+    async updateMessageStatus(
+        messageId: string,
+        status: ConversationMessageStatus,
+        failureCode: ConversationFailureCode | null = null,
+    ): Promise<void> {
+        await this.messageRepo.update(messageId, { status, failureCode });
+    }
+
+    /** Remove messages by id inside one Conversation. Returns how many went. */
+    async deleteMessages(conversationId: string, messageIds: string[]): Promise<number> {
+        if (messageIds.length === 0) return 0;
+        const result = await this.messageRepo.delete({ conversationId, id: In(messageIds) });
         return result.affected ?? 0;
     }
 }
