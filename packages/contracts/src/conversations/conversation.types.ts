@@ -165,6 +165,12 @@ export interface ConversationSummaryView {
 	contextId: string | null;
 	lastMessageAt: string | null;
 	unreadCount: number;
+	/**
+	 * The first message a person wrote, shortened. A row with no `title`
+	 * renders this instead — never "Untitled" (FR-4). Optional: older API
+	 * builds do not send it.
+	 */
+	preview?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { ConversationRepository } from '../database/repositories/conversation.repository';
 import type { OwnershipScope } from '../database/ownership-scope';
+import { parseConversationMentions } from '@ever-works/contracts';
 import {
     MAX_MENTION_CANDIDATES,
-    MAX_MENTIONS_PER_MESSAGE,
     type ConversationMention,
     type ConversationMentionCandidate,
 } from './conversation.types';
@@ -27,7 +27,7 @@ export interface ResolvedMentionSpan {
 }
 
 export interface ParsedConversationMentions {
-    /** Resolved mentions, de-duplicated, at most {@link MAX_MENTIONS_PER_MESSAGE}. */
+    /** Resolved mentions, de-duplicated, at most `MAX_MENTIONS_PER_MESSAGE`. */
     mentions: ConversationMention[];
     /** Agent ids among {@link mentions}, in first-mention order. */
     agentIds: string[];
@@ -43,14 +43,6 @@ export interface ParsedConversationMentions {
     overLimit: number;
 }
 
-/** Characters that continue a name or slug — a match must not be followed by one. */
-const NAME_CONTINUATION_RE = /[\p{L}\p{N}_-]/u;
-/** Characters that make an `@` part of a word (an email address, a handle) rather than a mention. */
-const WORD_BEFORE_AT_RE = /[\p{L}\p{N}_.+-]/u;
-/** The token an unresolved `@` mention covers. */
-const UNRESOLVED_TOKEN_RE = /^[\p{L}\p{N}_-]{1,80}/u;
-/** The existing document-reference syntax (`@kb:slug`) is not a mention and is left alone. */
-const DOCUMENT_REFERENCE_PREFIX = 'kb:';
 const MAX_QUERY_CHARS = 80;
 
 /**
@@ -82,72 +74,9 @@ export class ConversationMentionService {
      * send path, which loads candidates once per message.
      */
     parse(body: string, candidates: readonly MentionCandidateSource[]): ParsedConversationMentions {
-        const keys = candidates
-            .flatMap((candidate) =>
-                [candidate.name, candidate.slug]
-                    .filter((key): key is string => typeof key === 'string' && key.trim() !== '')
-                    .map((key) => ({ key: key.trim().toLowerCase(), candidate })),
-            )
-            .sort((a, b) => b.key.length - a.key.length);
-
-        const mentions: ConversationMention[] = [];
-        const agentIds: string[] = [];
-        const spans: ResolvedMentionSpan[] = [];
-        const strip: Array<{ start: number; end: number }> = [];
-        const seen = new Set<string>();
-        let overLimit = 0;
-        const lower = body.toLowerCase();
-
-        for (let at = body.indexOf('@'); at !== -1; at = body.indexOf('@', at + 1)) {
-            if (at > 0 && WORD_BEFORE_AT_RE.test(body[at - 1])) continue;
-            const restLower = lower.slice(at + 1);
-            if (restLower.startsWith(DOCUMENT_REFERENCE_PREFIX)) continue;
-
-            const hit = keys.find(
-                ({ key }) =>
-                    restLower.startsWith(key) &&
-                    (restLower.length === key.length ||
-                        !NAME_CONTINUATION_RE.test(restLower[key.length])),
-            );
-
-            if (!hit) {
-                const token = UNRESOLVED_TOKEN_RE.exec(body.slice(at + 1));
-                if (token) strip.push({ start: at, end: at + 1 + token[0].length });
-                continue;
-            }
-
-            const { candidate, key } = hit;
-            const span: ResolvedMentionSpan = {
-                start: at,
-                length: key.length + 1,
-                type: candidate.type,
-                id: candidate.id,
-            };
-            const identity = `${candidate.type}:${candidate.id}`;
-            if (seen.has(identity)) {
-                // A repeat of a mention that landed: it lands too (once).
-                spans.push(span);
-                continue;
-            }
-            if (mentions.length >= MAX_MENTIONS_PER_MESSAGE) {
-                // Past the cap: plain text, and never highlighted — a
-                // highlight must always mean the mention lands.
-                overLimit += 1;
-                continue;
-            }
-            seen.add(identity);
-            spans.push(span);
-            mentions.push({ type: candidate.type, id: candidate.id, slug: candidate.slug });
-            if (candidate.type === 'agent') agentIds.push(candidate.id);
-        }
-
-        return {
-            mentions,
-            agentIds,
-            agentVisibleBody: removeSpans(body, strip),
-            spans,
-            overLimit,
-        };
+        // The rule itself lives in `@ever-works/contracts`, so the composer
+        // that highlights a mention and this send path can never disagree.
+        return parseConversationMentions(body, candidates);
     }
 
     /**
@@ -240,21 +169,6 @@ export class ConversationMentionService {
         }
         return order;
     }
-}
-
-function removeSpans(body: string, spans: Array<{ start: number; end: number }>): string {
-    if (spans.length === 0) return body;
-    let out = '';
-    let cursor = 0;
-    for (const span of spans) {
-        out += body.slice(cursor, span.start);
-        cursor = span.end;
-    }
-    out += body.slice(cursor);
-    return out
-        .replace(/[ \t]{2,}/g, ' ')
-        .replace(/ +([,.;:!?])/g, '$1')
-        .trim();
 }
 
 function describe(err: unknown): string {

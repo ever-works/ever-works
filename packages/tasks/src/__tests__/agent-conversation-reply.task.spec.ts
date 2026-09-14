@@ -297,4 +297,43 @@ describe('agentConversationReplyTask', () => {
         await config.onFailure({ payload, error: new Error('worker crashed') });
         expect(runs.markFailed).toHaveBeenCalledWith(RUN_ID, 'worker crashed');
     });
+
+    it('on failure, surfaces the crash on the person’s message so it can be retried', async () => {
+        await config.onFailure({ payload, error: new Error('worker crashed') });
+        expect(messages.markReplyRefused).toHaveBeenCalledWith({
+            conversationId: CONVERSATION_ID,
+            messageId: MESSAGE_ID,
+            failureCode: 'provider_unavailable',
+        });
+    });
+
+    it('on failure, still surfaces the message when the run already finished', async () => {
+        runs.findById.mockResolvedValue({ id: RUN_ID, status: 'completed' });
+        await config.onFailure({ payload, error: new Error('worker crashed') });
+        expect(runs.markFailed).not.toHaveBeenCalled();
+        expect(messages.markReplyRefused).toHaveBeenCalledTimes(1);
+    });
+
+    it('on failure without a run id, still surfaces the message', async () => {
+        const { runId: _runId, ...withoutRun } = payload;
+        await config.onFailure({ payload: withoutRun, error: new Error('worker crashed') });
+        expect(runs.findById).not.toHaveBeenCalled();
+        expect(messages.markReplyRefused).toHaveBeenCalledTimes(1);
+    });
+
+    it('on failure, never touches the database for ids that are not uuids', async () => {
+        await config.onFailure({
+            payload: { ...payload, runId: 'nope', conversationId: 'nope' },
+            error: new Error('worker crashed'),
+        });
+        expect(createApplicationContextMock).not.toHaveBeenCalled();
+    });
+
+    it('on failure, a message that cannot be marked does not throw', async () => {
+        messages.markReplyRefused.mockRejectedValue(new Error('db down'));
+        await expect(
+            config.onFailure({ payload, error: new Error('worker crashed') }),
+        ).resolves.toBeUndefined();
+        expect(runs.markFailed).toHaveBeenCalledWith(RUN_ID, 'worker crashed');
+    });
 });

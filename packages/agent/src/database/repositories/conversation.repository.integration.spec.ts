@@ -190,6 +190,43 @@ describe('named Conversations — repository integration (better-sqlite3)', () =
         ).toBe(1);
     });
 
+    it('previews each Conversation by the first message a person wrote, shortened', async () => {
+        const first = await openDirect(ORG);
+        const empty = await openDirect(ORG);
+        await conversations.insertMessage({
+            conversationId: first.id,
+            role: 'assistant',
+            content: 'An Agent spoke first',
+            authorType: 'agent',
+            authorId: agentId,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await conversations.insertMessage({
+            conversationId: first.id,
+            role: 'user',
+            content: `Can you check   the pricing page?
+${'x'.repeat(400)}`,
+            authorType: 'user',
+            authorId: userId,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await conversations.insertMessage({
+            conversationId: first.id,
+            role: 'user',
+            content: 'A later question',
+            authorType: 'user',
+            authorId: userId,
+        });
+
+        const previews = await conversations.firstMessagePreviews([first.id, empty.id]);
+
+        expect(previews.has(empty.id)).toBe(false);
+        const preview = previews.get(first.id) ?? '';
+        expect(preview.startsWith('Can you check the pricing page? x')).toBe(true);
+        expect(preview.length).toBeLessThanOrEqual(160);
+        expect(await conversations.firstMessagePreviews([])).toEqual(new Map());
+    });
+
     it('legacy appends store model turns as system-authored and read them through for the owner', async () => {
         const legacy = await conversations.create({ userId, title: 'assistant thread' });
         const unread = async () =>

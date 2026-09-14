@@ -68,6 +68,9 @@ export interface ListConversationSummariesFilter {
     contextId?: string;
 }
 
+/** Characters of a Conversation's first message a list row shows when it has no name. */
+export const CONVERSATION_PREVIEW_CHARS = 160;
+
 /**
  * Columns a named-Conversation list row carries. The legacy `findByUser`
  * projection is deliberately left exactly as it was — clients that read it
@@ -369,6 +372,37 @@ export class ConversationRepository {
             if (count > 0) counts.set(row.conversationId, count);
         }
         return counts;
+    }
+
+    /**
+     * The opening line of each Conversation — the first message a person
+     * wrote, cut to {@link CONVERSATION_PREVIEW_CHARS} characters. A list row
+     * with no name renders this instead, so no row ever reads "Untitled"
+     * (FR-4). A Conversation no person has written in yet is absent.
+     */
+    async firstMessagePreviews(conversationIds: string[]): Promise<Map<string, string>> {
+        const previews = new Map<string, string>();
+        if (conversationIds.length === 0) return previews;
+        const rows = await this.messageRepo
+            .createQueryBuilder('m')
+            .select('m.conversationId', 'conversationId')
+            .addSelect(`SUBSTR(m.content, 1, ${CONVERSATION_PREVIEW_CHARS})`, 'preview')
+            .where('m.conversationId IN (:...conversationIds)', { conversationIds })
+            .andWhere('m.authorType = :authorType', { authorType: 'user' })
+            // Compared inside the database, column to column — the same
+            // precision note as `findMessagesPaged`.
+            .andWhere(
+                'm.createdAt = (SELECT MIN(earliest."createdAt") FROM conversation_messages earliest WHERE earliest."conversationId" = m."conversationId" AND earliest."authorType" = :authorType)',
+            )
+            .orderBy('m.id', 'ASC')
+            .getRawMany<{ conversationId: string; preview: string | null }>();
+        for (const row of rows) {
+            const preview = (row.preview ?? '').replace(/\s+/g, ' ').trim();
+            if (preview && !previews.has(row.conversationId)) {
+                previews.set(row.conversationId, preview);
+            }
+        }
+        return previews;
     }
 
     /**
