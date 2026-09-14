@@ -110,17 +110,24 @@ export function AgentComputerClient({
     const stageRef = useRef<ComputerStageHandle | null>(null);
     const pickerRef = useRef<ComputerNodePickerHandle | null>(null);
 
+    // The owner's pick when it is still in the list; otherwise derived from the
+    // CURRENT list the same way the first render chose. A refreshed list that
+    // no longer holds the picked computer falls back to one that exists,
+    // instead of reading as "no computer" while others are listed.
     const node = useMemo(
-        () => (nodes ?? []).find((option) => option.id === selectedNodeId) ?? null,
-        [nodes, selectedNodeId],
+        () =>
+            (nodes ?? []).find((option) => option.id === selectedNodeId) ??
+            selectInitialNode(nodes ?? [], initialNodeId),
+        [nodes, selectedNodeId, initialNodeId],
     );
+    const nodeId = node?.id ?? null;
     const preOpen = resolvePreOpenState({ nodes, node, requestedChannel, stop });
     const channel: ComputerChannel | null = preOpen.kind === 'ready' ? preOpen.channel : null;
 
     // The owner's quality for this computer (localStorage; `sharp` when unreadable).
     useEffect(() => {
-        if (selectedNodeId) setQualityState(readStoredQuality(safeStorage(), selectedNodeId));
-    }, [selectedNodeId]);
+        if (nodeId) setQualityState(readStoredQuality(safeStorage(), nodeId));
+    }, [nodeId]);
 
     const attach = useComputerAttach(
         {
@@ -186,10 +193,10 @@ export function AgentComputerClient({
         }
     }, [node, channel]);
 
-    const selectNode = useCallback((nodeId: string) => {
+    const selectNode = useCallback((picked: string) => {
         setCancelled(false);
         setRequestedChannel(null);
-        setSelectedNodeId(nodeId);
+        setSelectedNodeId(picked);
     }, []);
     const pickAnother = useCallback(() => pickerRef.current?.open(), []);
     const tryAgain = useCallback(() => {
@@ -204,10 +211,10 @@ export function AgentComputerClient({
     const changeQuality = useCallback(
         (next: ComputerQuality) => {
             setQualityState(next);
-            if (selectedNodeId) writeStoredQuality(safeStorage(), selectedNodeId, next);
+            if (nodeId) writeStoredQuality(safeStorage(), nodeId, next);
             sendQuality(next);
         },
-        [sendQuality, selectedNodeId],
+        [sendQuality, nodeId],
     );
     const copyLink = useCallback(() => {
         // The current page (locale prefix included) with this computer and channel in the query.
@@ -268,7 +275,7 @@ export function AgentComputerClient({
                 agentId={agentId}
                 agentName={agentName}
                 nodes={nodes}
-                selectedNodeId={selectedNodeId}
+                selectedNodeId={nodeId}
                 onSelect={selectNode}
             />
         ) : null;
@@ -301,7 +308,11 @@ export function AgentComputerClient({
                     agentName={agentName}
                     nodeId={node.id}
                     nodeName={node.name}
-                    profile={node.id === initialNodeIdFor(nodes, initialNodeId) ? profile : null}
+                    // The server-rendered profile belongs to the first computer only;
+                    // for any other one the panel reads it rather than guessing.
+                    profile={
+                        node.id === initialNodeIdFor(nodes, initialNodeId) ? profile : undefined
+                    }
                 />
             ) : null}
             <ComputerShortcutSheet open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

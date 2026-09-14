@@ -176,6 +176,52 @@ describe('AgentComputerClient — states shown instead of a picture (no view is 
         expect(screen.getByText('computer.cannotShow.watchTerminalInstead')).toBeInTheDocument();
     });
 
+    it('follows a refreshed computer list that no longer holds the chosen computer, instead of claiming there is none', () => {
+        const offline = {
+            status: 'offline' as const,
+            watchable: false,
+            unwatchableReason: 'offline' as const,
+        };
+        const gone = node({
+            id: '66666666-2222-4333-8444-555555555555',
+            name: 'old-laptop',
+            ...offline,
+        });
+        const kept = node({
+            name: 'studio-imac',
+            boundToAgent: false,
+            ...offline,
+            servableChannels: [],
+        });
+        const props = (nodes: ComputerNodeOption[]) =>
+            ({
+                agentId: AGENT,
+                agentName: 'Ops',
+                nodes,
+                initialNodeId: gone.id,
+                initialChannel: null,
+                stop: null,
+                brief: null,
+                profile: null,
+                attachDeps: {
+                    fetchImpl: vi.fn() as unknown as typeof fetch,
+                    webSocketImpl: FakeSocket as unknown as typeof WebSocket,
+                },
+            }) satisfies AgentComputerClientProps;
+
+        const { rerender } = render(<AgentComputerClient {...props([gone, kept])} />);
+        expect(screen.getByTestId('computer-offline')).toHaveTextContent(
+            'computer.offline.title:old-laptop',
+        );
+
+        // `router.refresh()` answered with a list the old computer is no longer in.
+        rerender(<AgentComputerClient {...props([kept])} />);
+        expect(screen.queryByTestId('computer-empty')).not.toBeInTheDocument();
+        expect(screen.getByTestId('computer-offline')).toHaveTextContent(
+            'computer.offline.title:studio-imac',
+        );
+    });
+
     it('shows the fleet stop instead of opening anything', () => {
         renderClient({
             stop: {
@@ -346,6 +392,50 @@ describe('AgentComputerClient — a live view', () => {
             expect(await screen.findByTestId('computer-canvas')).toBeInTheDocument();
             act(() => vi.advanceTimersByTime(50_000));
             expect(screen.getByText('computer.stall.stopped')).toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('announces a stale picture once and politely, and interrupts only when the stream has stopped', async () => {
+        const fetchImpl = vi.fn(async (url: string) =>
+            url.endsWith('/computer/sessions')
+                ? jsonResponse(202, { sessionId: SESSION })
+                : jsonResponse(200, { token: 'tok', wsUrl: 'ws://api/ws/computer/x' }),
+        );
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            renderClient({ initialChannel: 'screen' }, fetchImpl as unknown as typeof fetch);
+            await waitFor(() => expect(FakeSocket.last).not.toBeNull());
+            const socket = FakeSocket.last as FakeSocket;
+            act(() => {
+                socket.onopen?.();
+                socket.emit({
+                    kind: 'frame',
+                    seq: 1,
+                    keyframe: true,
+                    width: 800,
+                    height: 600,
+                    mime: 'image/jpeg',
+                    data: 'QUJD',
+                });
+            });
+            expect(await screen.findByTestId('computer-canvas')).toBeInTheDocument();
+
+            // Stalled, then auto-refreshed: the banner shows, the status line says it, nothing interrupts.
+            act(() => vi.advanceTimersByTime(10_000));
+            expect(screen.getByTestId('computer-stall-banner')).toBeInTheDocument();
+            expect(screen.getByTestId('computer-status-line')).toHaveTextContent(
+                'computer.stall.staleNote',
+            );
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+            act(() => vi.advanceTimersByTime(15_000));
+            expect(screen.getByTestId('computer-stall-banner')).toBeInTheDocument();
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+            // Dead: the one assertive announcement, with Reconnect.
+            act(() => vi.advanceTimersByTime(25_000));
+            expect(screen.getByRole('alert')).toHaveTextContent('computer.stall.stopped');
         } finally {
             vi.useRealTimers();
         }

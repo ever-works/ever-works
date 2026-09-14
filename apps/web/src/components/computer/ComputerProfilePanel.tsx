@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { NodeAgentProfileView } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
@@ -23,12 +23,22 @@ interface Props {
     agentName: string;
     nodeId: string;
     nodeName: string;
-    profile: NodeAgentProfileView | null;
+    /**
+     * The Agent's profile on this computer, as the page server-rendered it:
+     * a view, or `null` when the Agent has never used this computer. Left
+     * `undefined` when the page does not know (a computer other than the one
+     * it rendered) — the panel then reads it itself when opened, and never
+     * claims "not used yet" before that read says so.
+     */
+    profile?: NodeAgentProfileView | null;
     /** Seam for tests. */
     fetchImpl?: typeof fetch;
 }
 
 type ResetOutcome = 'idle' | 'working' | 'done' | 'blocked' | 'mismatch' | 'failed';
+
+/** Where the panel's knowledge of the profile stands (`pending` = not answered yet). */
+type ProfileLoad = 'pending' | 'known' | 'unknown';
 
 /**
  * Own logins and files — the Agent's own browser profile on this computer:
@@ -47,10 +57,58 @@ export function ComputerProfilePanel({
     fetchImpl,
 }: Props) {
     const t = useTranslations('dashboard.computer.profile');
-    const [view, setView] = useState<NodeAgentProfileView | null>(profile);
+    const [view, setView] = useState<NodeAgentProfileView | null>(profile ?? null);
+    const [load, setLoad] = useState<ProfileLoad>(profile === undefined ? 'pending' : 'known');
+    const [loadAttempt, setLoadAttempt] = useState(0);
     const [confirming, setConfirming] = useState(false);
     const [typed, setTyped] = useState('');
     const [outcome, setOutcome] = useState<ResetOutcome>('idle');
+    const requested = useRef(false);
+
+    // Read the profile the first time the panel opens without one.
+    useEffect(() => {
+        if (!open || profile !== undefined || requested.current) return;
+        requested.current = true;
+        let active = true;
+        let settled = false;
+        void (async () => {
+            let next: { load: ProfileLoad; view?: NodeAgentProfileView | null } = {
+                load: 'unknown',
+            };
+            try {
+                const res = await (fetchImpl ?? browserApiFetch)(
+                    `/api/agents/${agentId}/computer/profile?nodeId=${encodeURIComponent(nodeId)}`,
+                    { method: 'GET' },
+                );
+                const body = (await res.json().catch(() => null)) as
+                    | (NodeAgentProfileView & { reason?: string })
+                    | null;
+                if (res.ok && body) {
+                    next = { load: 'known', view: body };
+                } else if (res.status === 404 && body?.reason === 'profile-not-found') {
+                    // The platform says so: this Agent has never used this computer.
+                    next = { load: 'known', view: null };
+                }
+            } catch {
+                // stays unknown: the panel says it could not tell, never "not used yet"
+            }
+            settled = true;
+            if (!active) return;
+            if (next.view !== undefined) setView(next.view);
+            setLoad(next.load);
+        })();
+        return () => {
+            active = false;
+            // Interrupted before it answered (closed, or remounted): read again next time.
+            if (!settled) requested.current = false;
+        };
+    }, [open, profile, agentId, nodeId, fetchImpl, loadAttempt]);
+
+    const retryLoad = () => {
+        requested.current = false;
+        setLoad('pending');
+        setLoadAttempt((attempt) => attempt + 1);
+    };
 
     const reset = async () => {
         setOutcome('working');
@@ -85,11 +143,25 @@ export function ComputerProfilePanel({
                         {t('title')}
                     </DialogTitle>
                     <DialogDescription>
-                        {view
-                            ? t('body', { agent: agentName, node: nodeName })
-                            : t('notYet', { agent: agentName, node: nodeName })}
+                        <span data-testid="computer-profile-description">
+                            {load === 'pending'
+                                ? t('loading', { agent: agentName, node: nodeName })
+                                : load === 'unknown'
+                                  ? t('unknown', { agent: agentName, node: nodeName })
+                                  : view
+                                    ? t('body', { agent: agentName, node: nodeName })
+                                    : t('notYet', { agent: agentName, node: nodeName })}
+                        </span>
                     </DialogDescription>
                 </DialogHeader>
+
+                {load === 'unknown' ? (
+                    <div>
+                        <Button variant="ghost" size="sm" onClick={retryLoad}>
+                            {t('tryAgain')}
+                        </Button>
+                    </div>
+                ) : null}
 
                 {view ? (
                     <dl

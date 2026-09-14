@@ -160,8 +160,12 @@ export const ComputerStage = forwardRef<ComputerStageHandle, Props>(function Com
                 />
             )}
             {stalled ? (
+                // Deliberately NOT a live region. A stale picture is routine and is
+                // announced once, politely, by the status line below the stage; this
+                // banner's seconds counter changes every second and would otherwise
+                // be read out again and again. Only the dead stream (below) interrupts.
                 <div
-                    role="alert"
+                    data-testid="computer-stall-banner"
                     className="absolute inset-x-0 top-6 mx-auto flex w-fit flex-col items-center gap-2 rounded-md bg-black/70 px-4 py-3 text-sm text-white"
                 >
                     <span>{t('stall.banner', { seconds: staleSeconds })}</span>
