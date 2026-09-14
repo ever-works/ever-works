@@ -9,8 +9,8 @@ import {
 } from '../kb-memory-facets.js';
 
 /**
- * The kb barrel is ten `export *` lines and nothing of its own. Eight of
- * the ten sources are 100% type-only, so this list IS the entire runtime
+ * The kb barrel is eleven `export *` lines and nothing of its own. Eight of
+ * the eleven sources are 100% type-only, so this list IS the entire runtime
  * surface of `@ever-works/contracts` kb — a dropped, renamed or reordered
  * `export *` line silently breaks every downstream `import { KB_… }` and
  * nothing else in the package would notice.
@@ -21,6 +21,24 @@ const EXPECTED_RUNTIME_EXPORTS = [
 	'KB_DOCUMENT_CLASSES',
 	'KB_DOCUMENT_SOURCES',
 	'KB_DOCUMENT_STATUSES',
+	'KB_EXPORT_FORMATS',
+	'KB_EXPORT_LINK_TTL_HOURS',
+	'KB_EXPORT_MAX_BYTES',
+	'KB_EXPORT_MAX_DOCS',
+	'KB_EXPORT_SYNC_MAX_DOCS',
+	'KB_LIBRARY_ARCHIVED_FILTERS',
+	'KB_LIBRARY_FILE_BATCH_MAX',
+	'KB_LIBRARY_FOLDERS_MAX_PER_ORG',
+	'KB_LIBRARY_FOLDER_MAX_DEPTH',
+	'KB_LIBRARY_FOLDER_NAME_MAX',
+	'KB_LIBRARY_PAGE_SIZE_DEFAULT',
+	'KB_LIBRARY_PAGE_SIZE_MAX',
+	'KB_LIBRARY_PINS_MAX_PER_USER',
+	'KB_LIBRARY_QUERY_MAX',
+	'KB_LIBRARY_READ_DWELL_MS',
+	'KB_LIBRARY_ROLLUP_CACHE_MS',
+	'KB_LIBRARY_SORTS',
+	'KB_LIBRARY_UNFILED',
 	'KB_LOCK_MODES',
 	'KB_MEMORY_CONSOLIDATION_CADENCES',
 	'KB_MEMORY_CONSOLIDATION_DEFAULT_CADENCE',
@@ -29,6 +47,11 @@ const EXPECTED_RUNTIME_EXPORTS = [
 	'KB_MEMORY_CONSOLIDATION_MODES',
 	'KB_MEMORY_SOURCE_BADGES',
 	'KB_ORG_INHERITABLE_CLASSES',
+	'KB_READ_STATES',
+	'KB_REFERENCE_MAX_PER_MESSAGE',
+	'KB_REFERENCE_PICKER_DEBOUNCE_MS',
+	'KB_REFERENCE_PICKER_LIMIT',
+	'KB_REFERENCE_TOKEN_BUDGET',
 	'KB_REVIEW_STATES',
 	'KB_SYNTHESIS_PATH_PREFIX',
 	'KB_SYNTHESIS_TAG',
@@ -38,15 +61,15 @@ const EXPECTED_RUNTIME_EXPORTS = [
 ];
 
 describe('kb barrel', () => {
-	it('re-exports exactly the nineteen runtime names', () => {
+	it('re-exports exactly the forty-two runtime names', () => {
 		expect(Object.keys(kb).sort()).toEqual([...EXPECTED_RUNTIME_EXPORTS].sort());
 	});
 
-	it('exposes nineteen runtime keys — tripwire for a silent addition', () => {
+	it('exposes forty-two runtime keys — tripwire for a silent addition', () => {
 		// Asserted separately from the name list so an accidental new
 		// export shows up as a count change even if someone updates the
 		// list above without thinking about it.
-		expect(Object.keys(kb)).toHaveLength(19);
+		expect(Object.keys(kb)).toHaveLength(42);
 	});
 
 	it('contributes no runtime keys from the eight type-only modules', () => {
@@ -57,7 +80,10 @@ describe('kb barrel', () => {
 		// forced to add a spec for it.
 		const fromDocumentClass = 9;
 		const fromMemoryFacets = 10;
-		expect(Object.keys(kb)).toHaveLength(fromDocumentClass + fromMemoryFacets);
+		// kb-library.types is the one mixed module: 18 numeric limits, four
+		// vocabularies and the Unfiled folder literal, plus type-only DTOs.
+		const fromLibrary = 23;
+		expect(Object.keys(kb)).toHaveLength(fromDocumentClass + fromMemoryFacets + fromLibrary);
 	});
 
 	it('has no default export', () => {
@@ -96,8 +122,9 @@ describe('kb barrel', () => {
 	it('exposes every KB_*_ES / KB_*_S vocabulary as a non-empty array', () => {
 		const arrays = Object.entries(kb).filter(([, value]) => Array.isArray(value));
 		// 9 from kb-document-class + KB_MEMORY_SOURCE_BADGES +
-		// KB_MEMORY_CONSOLIDATION_CADENCES + KB_MEMORY_CONSOLIDATION_MODES.
-		expect(arrays).toHaveLength(12);
+		// KB_MEMORY_CONSOLIDATION_CADENCES + KB_MEMORY_CONSOLIDATION_MODES +
+		// the four knowledge-library vocabularies.
+		expect(arrays).toHaveLength(16);
 		for (const [name, value] of arrays) {
 			expect(name.startsWith('KB_')).toBe(true);
 			expect((value as unknown as unknown[]).length).toBeGreaterThan(0);

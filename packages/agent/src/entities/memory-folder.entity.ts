@@ -25,6 +25,21 @@ export interface MemoryFolderSyncRepo {
 }
 
 /**
+ * Who a folder belongs to.
+ *
+ *  - `user` — the original per-person folder of the /memory Files area. It
+ *    organizes one person's uploaded files and is visible to that person
+ *    only. Every row that predates the knowledge library has this scope.
+ *  - `organization` — a shared Knowledge library folder. It organizes
+ *    Knowledge Base documents for a whole Organization and is visible to
+ *    every member. `userId` records who created it.
+ */
+export enum MemoryFolderScope {
+    USER = 'user',
+    ORGANIZATION = 'organization',
+}
+
+/**
  * Memory Files — a user-defined folder in the /memory Files area.
  *
  * Folders organize the user's files across BOTH upload spines
@@ -49,11 +64,34 @@ export interface MemoryFolderSyncRepo {
  *
  * Tier C scope columns (`tenantId` / `organizationId`) are stamped by
  * `ScopeStampingSubscriber` on insert — tenancy denormalization, not the
- * ownership discriminator (that is `userId`).
+ * ownership discriminator for per-person folders (that is `userId`).
+ *
+ * Scopes (`scope`, see {@link MemoryFolderScope}):
+ *   - `user` rows keep exactly their original semantics. Path uniqueness is
+ *     the PARTIAL unique index `uq_memory_folders_user_path` on
+ *     `(userId, path) WHERE scope = 'user'`, which enforces over those rows
+ *     precisely what the original full index did.
+ *   - `organization` rows are shared Knowledge library folders holding
+ *     documents. Their paths are unique per Organization through the
+ *     partial index `uq_memory_folders_org_path` on
+ *     `(organizationId, path) WHERE scope = 'organization'`. Every
+ *     per-person query filters on `scope = 'user'`, so a shared folder never
+ *     appears in anyone's Files tree and a personal folder never appears on
+ *     the shared shelf.
  */
 @Entity({ name: 'memory_folders' })
-@Index('uq_memory_folders_user_path', ['userId', 'path'], { unique: true })
+@Index('uq_memory_folders_user_path', ['userId', 'path'], {
+    unique: true,
+    where: `"scope" = 'user'`,
+})
 @Index('idx_memory_folders_user_parent', ['userId', 'parentId'])
+@Index('uq_memory_folders_org_path', ['organizationId', 'path'], {
+    unique: true,
+    where: `"scope" = 'organization'`,
+})
+@Index('idx_memory_folders_org_parent', ['organizationId', 'parentId'], {
+    where: `"scope" = 'organization'`,
+})
 export class MemoryFolder {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -88,6 +126,13 @@ export class MemoryFolder {
     /** Manual git-sync target (repo coordinates only — no credentials). */
     @Column({ type: 'simple-json', nullable: true })
     syncRepo?: MemoryFolderSyncRepo | null;
+
+    /**
+     * `user` (default — a personal Files folder) or `organization` (a shared
+     * Knowledge library folder). See {@link MemoryFolderScope}.
+     */
+    @Column({ type: 'varchar', length: 16, default: MemoryFolderScope.USER })
+    scope: MemoryFolderScope;
 
     @CreateDateColumn()
     createdAt: Date;

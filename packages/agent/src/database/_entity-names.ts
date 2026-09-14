@@ -114,6 +114,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'IngestedEvent',
     // Memory eval loop (memory upgrades M10) — append-only retrieval log
     'KbRetrievalLog',
+    // Knowledge library — per-person read state + pins on KB documents
+    'KnowledgeDocumentReaderState',
     // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
     // written only by the signature-verified webhook
     'Invoice',
