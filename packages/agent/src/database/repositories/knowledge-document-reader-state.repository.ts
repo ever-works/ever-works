@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, IsNull, Not, Repository } from 'typeorm';
+import { Brackets, In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { KnowledgeDocumentReaderState } from '../../entities/knowledge-document-reader-state.entity';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
 import { KbDocumentStatus } from '../../entities/kb-types';
@@ -29,7 +29,9 @@ export interface ReaderStateFolderRollup {
  * Writes are find-then-save with one retry on the `(userId, documentId)`
  * unique index, which works identically on Postgres and better-sqlite3
  * (a driver-specific `ON CONFLICT` upsert would not preserve
- * `lastOpenedAt` on both).
+ * `lastOpenedAt` on both). A read on an existing row is applied with
+ * conditional UPDATEs instead (see {@link upsertRead}), so the monotonic
+ * read revision holds under concurrent reads.
  */
 @Injectable()
 export class KnowledgeDocumentReaderStateRepository {
@@ -52,6 +54,12 @@ export class KnowledgeDocumentReaderStateRepository {
      * is set once, the first time; `lastReadRevision` never moves backwards,
      * so a stale read (made against an older revision) cannot un-read a
      * newer one.
+     *
+     * On an existing row both columns move through conditional UPDATEs the
+     * database evaluates against the row as it is at write time
+     * (`lastReadRevision < :revision`, `lastOpenedAt IS NULL`), never through
+     * a value read earlier in this call — so two reads racing on the same
+     * row always leave the higher revision, whichever commits last.
      */
     async upsertRead(
         userId: string,
@@ -59,35 +67,76 @@ export class KnowledgeDocumentReaderStateRepository {
         revision: number,
         now: Date = new Date(),
     ): Promise<KnowledgeDocumentReaderState> {
-        return this.write(userId, documentId, (row) => {
-            if (!row.lastOpenedAt) row.lastOpenedAt = now;
-            row.lastReadRevision = Math.max(row.lastReadRevision ?? 0, revision);
-        });
+        return this.writeAtomically(
+            userId,
+            documentId,
+            (row) => {
+                row.lastOpenedAt = now;
+                row.lastReadRevision = Math.max(revision, 0);
+            },
+            async () => {
+                await this.repo.update(
+                    { userId, documentId, lastOpenedAt: IsNull() },
+                    { lastOpenedAt: now },
+                );
+                await this.repo.update(
+                    { userId, documentId, lastReadRevision: LessThan(revision) },
+                    { lastReadRevision: revision },
+                );
+            },
+        );
     }
 
     /**
      * Mark a document unread for the person: `lastReadRevision = 0` while
      * `lastOpenedAt` is kept (or set), so it reads as UPDATED, never NEW.
+     *
+     * Deliberately unconditional on the read revision. On an existing row
+     * it writes only the columns it owns, so it can never put back a pin (or
+     * an un-pin) that a concurrent write changed meanwhile.
      */
     async markUnread(
         userId: string,
         documentId: string,
         now: Date = new Date(),
     ): Promise<KnowledgeDocumentReaderState> {
-        return this.write(userId, documentId, (row) => {
-            if (!row.lastOpenedAt) row.lastOpenedAt = now;
-            row.lastReadRevision = 0;
-        });
+        return this.writeAtomically(
+            userId,
+            documentId,
+            (row) => {
+                row.lastOpenedAt = now;
+                row.lastReadRevision = 0;
+            },
+            async () => {
+                await this.repo.update(
+                    { userId, documentId, lastOpenedAt: IsNull() },
+                    { lastOpenedAt: now },
+                );
+                await this.repo.update({ userId, documentId }, { lastReadRevision: 0 });
+            },
+        );
     }
 
+    /**
+     * Pin a document for the person; an already-pinned document keeps its
+     * original `pinnedAt`. Writes only `pinnedAt` on an existing row, so a
+     * pin can never move the read revision.
+     */
     async upsertPin(
         userId: string,
         documentId: string,
         pinnedAt: Date = new Date(),
     ): Promise<KnowledgeDocumentReaderState> {
-        return this.write(userId, documentId, (row) => {
-            if (!row.pinnedAt) row.pinnedAt = pinnedAt;
-        });
+        return this.writeAtomically(
+            userId,
+            documentId,
+            (row) => {
+                row.pinnedAt = pinnedAt;
+            },
+            async () => {
+                await this.repo.update({ userId, documentId, pinnedAt: IsNull() }, { pinnedAt });
+            },
+        );
     }
 
     async deletePin(userId: string, documentId: string): Promise<void> {
@@ -159,22 +208,34 @@ export class KnowledgeDocumentReaderStateRepository {
         });
     }
 
-    private async write(
+    /**
+     * Insert the person's first row, or — when a row already exists (or a
+     * concurrent first write just created one) — apply `update`, a set of
+     * conditional UPDATEs that never write back a value read before them.
+     * Returns the row as the database holds it afterwards.
+     */
+    private async writeAtomically(
         userId: string,
         documentId: string,
-        mutate: (row: KnowledgeDocumentReaderState) => void,
+        initialize: (row: KnowledgeDocumentReaderState) => void,
+        update: () => Promise<void>,
     ): Promise<KnowledgeDocumentReaderState> {
         for (let attempt = 0; attempt < 2; attempt++) {
             const existing = await this.repo.findOne({ where: { userId, documentId } });
-            const row = existing ?? this.repo.create({ userId, documentId, lastReadRevision: 0 });
-            mutate(row);
-            try {
-                return await this.repo.save(row);
-            } catch (error) {
-                // A concurrent first write won the unique index; re-read and
-                // apply the mutation to the row that now exists.
-                if (existing || attempt > 0) throw error;
+            if (!existing) {
+                const row = this.repo.create({ userId, documentId, lastReadRevision: 0 });
+                initialize(row);
+                try {
+                    return await this.repo.save(row);
+                } catch (error) {
+                    // A concurrent first write won the unique index; re-read
+                    // and apply the update to the row that now exists.
+                    if (attempt > 0) throw error;
+                    continue;
+                }
             }
+            await update();
+            return (await this.repo.findOne({ where: { userId, documentId } })) ?? existing;
         }
         throw new Error('unreachable');
     }

@@ -1,6 +1,15 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, IsNull, Like, Not, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+    Brackets,
+    EntityManager,
+    In,
+    IsNull,
+    Like,
+    Not,
+    Repository,
+    SelectQueryBuilder,
+} from 'typeorm';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
 import {
     KB_ORG_INHERITABLE_CLASSES,
@@ -114,7 +123,23 @@ export interface KbLibraryListOptions extends KbLibraryScope {
     q?: string;
     sort: 'recent' | 'title' | 'unread';
     limit: number;
+    /** Rows to skip. Ignored when {@link after} is given. */
     offset: number;
+    /**
+     * Keyset boundary: return only rows that sort strictly after this one.
+     * Unlike an offset it still points at the same place when documents are
+     * added, removed or re-sorted between two page requests.
+     */
+    after?: KbLibraryKeysetBoundary;
+}
+
+/**
+ * Knowledge library — where a page ended: the active sort's key of its last
+ * row, exactly as the database renders it, plus that row's id.
+ */
+export interface KbLibraryKeysetBoundary {
+    sortKey: string;
+    id: string;
 }
 
 /** Knowledge library — per-folder document counts for the folder rail. */
@@ -623,11 +648,30 @@ export class WorkKnowledgeDocumentRepository {
         return this.repository.save(entity);
     }
 
+    /**
+     * Apply `patch` and return the row as it now reads (`null` when it does
+     * not exist).
+     *
+     * Knowledge library — with `expectedRevision`, the UPDATE is a
+     * compare-and-set: it lands only while the row still carries that
+     * revision, so an edit's content, fingerprint and next revision are
+     * written together or not at all. `null` then also means "another edit
+     * moved the revision first; nothing was written".
+     */
     async update(
         docId: string,
         patch: Partial<WorkKnowledgeDocument>,
+        opts: { expectedRevision?: number } = {},
     ): Promise<WorkKnowledgeDocument | null> {
-        await this.repository.update({ id: docId }, patch);
+        if (opts.expectedRevision !== undefined) {
+            const result = await this.repository.update(
+                { id: docId, revision: opts.expectedRevision },
+                patch,
+            );
+            if ((result.affected ?? 0) === 0) return null;
+        } else {
+            await this.repository.update({ id: docId }, patch);
+        }
         return this.repository.findOne({ where: { id: docId } });
     }
 
@@ -668,14 +712,23 @@ export class WorkKnowledgeDocumentRepository {
      * library promises — archived → folder → class / query — then the sort.
      *
      * `recent` orders by `revisionAt` (the last SUBSTANTIVE change), never
-     * `updatedAt`, which background mirror / embed writes move. `title` is
-     * case-insensitive A→Z. `unread` has no read state to order by until
-     * per-person read state is wired in, so it orders like `recent`. Every
-     * sort ends on `id` so offset pages never repeat or skip a row.
+     * `updatedAt`, which background mirror / embed writes move; a row with
+     * no revision timestamp falls back to `createdAt`, so the order is the
+     * same on every driver. `title` is case-insensitive A→Z. `unread` has no
+     * read state to order by until per-person read state is wired in, so it
+     * orders like `recent`. Every sort ends on `id`, a total order.
+     *
+     * Pagination is keyset: `nextAfter` is the boundary of the last row
+     * returned (`null` on the last page), and passing it back as `after`
+     * resumes strictly after that row — the sort key is compared as the
+     * database renders it, so no precision is lost in the round trip.
+     * `offset` is still honoured when no `after` is given.
      */
-    async listForLibrary(
-        opts: KbLibraryListOptions,
-    ): Promise<{ items: WorkKnowledgeDocument[]; total: number }> {
+    async listForLibrary(opts: KbLibraryListOptions): Promise<{
+        items: WorkKnowledgeDocument[];
+        total: number;
+        nextAfter: KbLibraryKeysetBoundary | null;
+    }> {
         const qb = this.repository.createQueryBuilder('doc');
         this.applyOrgAggregateScope(qb, {
             workIds: opts.workIds,
@@ -708,16 +761,40 @@ export class WorkKnowledgeDocumentRepository {
 
         const total = await qb.getCount();
 
-        if (opts.sort === 'title') {
-            qb.orderBy('LOWER(doc.title)', 'ASC');
-        } else {
-            qb.orderBy('doc.revisionAt', 'DESC');
+        const ascending = opts.sort === 'title';
+        const sortExpression = ascending
+            ? 'LOWER(doc.title)'
+            : 'COALESCE(doc.revisionAt, doc.createdAt)';
+        if (opts.after) {
+            qb.andWhere(
+                new Brackets((w) => {
+                    w.where(`${sortExpression} ${ascending ? '>' : '<'} :libAfterKey`, {
+                        libAfterKey: opts.after?.sortKey,
+                    }).orWhere(`(${sortExpression} = :libAfterKey AND doc.id > :libAfterId)`, {
+                        libAfterKey: opts.after?.sortKey,
+                        libAfterId: opts.after?.id,
+                    });
+                }),
+            );
         }
+        qb.addSelect(`CAST(${sortExpression} AS TEXT)`, 'lib_sort_key');
+        qb.orderBy(sortExpression, ascending ? 'ASC' : 'DESC');
         qb.addOrderBy('doc.id', 'ASC');
-        qb.limit(opts.limit).offset(opts.offset);
+        // One extra row says whether another page exists.
+        qb.limit(opts.limit + 1).offset(opts.after ? 0 : opts.offset);
 
-        const items = await qb.getMany();
-        return { items, total };
+        const { entities, raw } = await qb.getRawAndEntities<{
+            doc_id: string;
+            lib_sort_key: string | null;
+        }>();
+        const items = entities.slice(0, opts.limit);
+        const last = items[items.length - 1];
+        let nextAfter: KbLibraryKeysetBoundary | null = null;
+        if (entities.length > opts.limit && last) {
+            const row = raw.find((candidate) => candidate.doc_id === last.id);
+            nextAfter = { sortKey: String(row?.lib_sort_key ?? ''), id: last.id };
+        }
+        return { items, total, nextAfter };
     }
 
     /**
@@ -786,7 +863,10 @@ export class WorkKnowledgeDocumentRepository {
      * that a later edit may already have moved.
      *
      * Touches only `revision` and `revisionAt` (and the `updatedAt` stamp
-     * every update carries). `null` when the document no longer exists; a
+     * every update carries), so it is for a revision-only move. An edit that
+     * also writes content must not pair a content write with this call — it
+     * writes both in one statement through {@link update} with
+     * `expectedRevision`. `null` when the document no longer exists; a
      * {@link ConflictException} only if the row keeps changing for
      * {@link REVISION_BUMP_MAX_ATTEMPTS} reads in a row.
      */
@@ -817,12 +897,17 @@ export class WorkKnowledgeDocumentRepository {
         );
     }
 
-    /** Unfile every document filed in any of `folderIds`; returns how many moved. */
-    async clearFolders(folderIds: string[]): Promise<number> {
+    /**
+     * Unfile every document filed in any of `folderIds`; returns how many
+     * moved. Pass `manager` to enlist both statements in an open transaction
+     * (a shared-folder delete unfiles and deletes as one unit).
+     */
+    async clearFolders(folderIds: string[], manager?: EntityManager): Promise<number> {
         if (folderIds.length === 0) return 0;
-        const count = await this.repository.count({ where: { folderId: In(folderIds) } });
+        const repository = manager?.getRepository(WorkKnowledgeDocument) ?? this.repository;
+        const count = await repository.count({ where: { folderId: In(folderIds) } });
         if (count === 0) return 0;
-        await this.repository
+        await repository
             .createQueryBuilder()
             .update(WorkKnowledgeDocument)
             .set({ folderId: null })

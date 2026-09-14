@@ -1,28 +1,53 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
     MemoryFolder,
     MemoryFolderScope,
     MemoryFolderSyncRepo,
 } from '../../entities/memory-folder.entity';
+import { advisoryLockObjectId } from './agent-run.repository';
 
-export interface CreateMemoryFolderInput {
+/**
+ * Advisory-lock namespace (`classid`) for writes to one Organization's shared
+ * folder tree — distinct from every other feature's namespace (run admission
+ * is `0x6577_0001`, live-view admission `0x6577_000b` / `0x6577_000c`).
+ * Arbitrary but STABLE: changing it would make an old and a new replica lock
+ * on different keys during a rolling restart.
+ */
+export const KB_LIBRARY_FOLDER_TREE_LOCK_CLASS_ID = 0x6577_0006 | 0;
+
+interface CreateMemoryFolderBase {
     userId: string;
     name: string;
     parentId?: string | null;
     path: string;
     ownerAgentId?: string | null;
     syncRepo?: MemoryFolderSyncRepo | null;
+}
+
+/** A per-person Files folder — exactly the shape that predates scopes. */
+export interface CreateUserMemoryFolderInput extends CreateMemoryFolderBase {
     /** Omitted = a per-person folder (`user`), exactly as before scopes existed. */
-    scope?: MemoryFolderScope;
+    scope?: MemoryFolderScope.USER;
     /**
-     * Required for an `organization` folder. Omitted for a per-person folder
-     * so `ScopeStampingSubscriber` stamps it from the request scope as it
-     * always has.
+     * Normally omitted, so `ScopeStampingSubscriber` stamps the Tier C
+     * tenancy column from the request scope as it always has. It is not the
+     * ownership discriminator of a per-person folder (that is `userId`).
      */
     organizationId?: string | null;
 }
+
+/** A shared Knowledge library folder: it always belongs to one Organization. */
+export interface CreateOrganizationMemoryFolderInput extends CreateMemoryFolderBase {
+    scope: MemoryFolderScope.ORGANIZATION;
+    /** The Organization the shared folder belongs to — never empty. */
+    organizationId: string;
+}
+
+export type CreateMemoryFolderInput =
+    | CreateUserMemoryFolderInput
+    | CreateOrganizationMemoryFolderInput;
 
 /**
  * Character (code-point) length of a path — NOT `String.length`.
@@ -81,7 +106,19 @@ export class MemoryFolderRepository {
         private readonly repo: Repository<MemoryFolder>,
     ) {}
 
+    /**
+     * Insert a folder. An `organization` folder without an `organizationId`
+     * is refused before anything is written: no query could ever find it
+     * again, and the per-Organization path index would not keep its path
+     * unique.
+     */
     async create(input: CreateMemoryFolderInput): Promise<MemoryFolder> {
+        if (
+            input.scope === MemoryFolderScope.ORGANIZATION &&
+            (typeof input.organizationId !== 'string' || input.organizationId.length === 0)
+        ) {
+            throw new Error('An organization-scope memory folder requires an organizationId');
+        }
         const entity = this.repo.create({
             userId: input.userId,
             name: input.name,
@@ -165,6 +202,41 @@ export class MemoryFolderRepository {
     }
 
     // ─── Shared (organization-scope) folders ─────────────────────────────
+
+    /**
+     * Run one mutation of an Organization's shared folder tree as a single
+     * unit: every read and write `fn` makes through the `folders` repository
+     * (and through `manager`, for writes to other tables such as unfiling
+     * documents) commits or rolls back together, so a failure part-way never
+     * leaves paths that disagree with folder rows, or documents unfiled from
+     * folders that still exist.
+     *
+     * POSTGRES: the transaction first takes
+     * `pg_advisory_xact_lock(KB_LIBRARY_FOLDER_TREE_LOCK_CLASS_ID, <org>)`,
+     * so every mutation of the same Organization's tree queues behind the one
+     * in flight. A check made inside `fn` (the folder cap, a free sibling
+     * name, a descendant that is not the new parent) therefore still holds
+     * when `fn` writes. The case-insensitive path index is the durable floor
+     * under the name check either way.
+     *
+     * EVERY OTHER DRIVER (better-sqlite3 — the e2e/CI stack): advisory locks
+     * do not exist; `fn` still runs in one transaction, and SQLite admits a
+     * single writer at a time.
+     */
+    async withOrganizationTree<T>(
+        organizationId: string,
+        fn: (folders: MemoryFolderRepository, manager: EntityManager) => Promise<T>,
+    ): Promise<T> {
+        return this.repo.manager.transaction(async (manager) => {
+            if (manager.connection.options.type === 'postgres') {
+                await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+                    KB_LIBRARY_FOLDER_TREE_LOCK_CLASS_ID,
+                    advisoryLockObjectId(organizationId),
+                ]);
+            }
+            return fn(new MemoryFolderRepository(manager.getRepository(MemoryFolder)), manager);
+        });
+    }
 
     async findOrganizationFolder(organizationId: string, id: string): Promise<MemoryFolder | null> {
         return this.repo.findOne({
