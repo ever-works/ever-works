@@ -93,6 +93,7 @@ export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './repositories/memory-folder.repository';
+export * from './repositories/knowledge-document-reader-state.repository';
 // Repository registry (Feature G) — repo connections + agent grants.
 export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';

@@ -5,7 +5,7 @@ import {
     UnprocessableEntityException,
 } from '@nestjs/common';
 import { MemoryFoldersService } from '../memory-folders.service';
-import { MemoryFolder } from '../../entities/memory-folder.entity';
+import { MemoryFolder, MemoryFolderScope } from '../../entities/memory-folder.entity';
 
 const USER = 'user-1';
 
@@ -263,6 +263,273 @@ describe('MemoryFoldersService', () => {
             await expect(service.createFolder(USER, { name: 'Docs' })).resolves.toMatchObject({
                 path: '/Docs',
             });
+        });
+    });
+});
+
+describe('MemoryFoldersService — shared (organization) folders', () => {
+    const ORG = 'org-1';
+    const ADMIN = 'user-admin';
+
+    function shared(partial: Partial<MemoryFolder>): MemoryFolder {
+        return folder({
+            userId: ADMIN,
+            organizationId: ORG,
+            scope: MemoryFolderScope.ORGANIZATION,
+            ...partial,
+        });
+    }
+
+    let folders: Record<string, jest.Mock>;
+    let activityLog: { log: jest.Mock };
+    let service: MemoryFoldersService;
+
+    beforeEach(() => {
+        folders = {
+            create: jest.fn(async (input) => shared({ ...input, id: 'created' })),
+            findById: jest.fn(async () => null),
+            findByPath: jest.fn(async () => null),
+            listByUser: jest.fn(async () => []),
+            update: jest.fn(async () => undefined),
+            updateSubtreePaths: jest.fn(async () => undefined),
+            deleteByIds: jest.fn(async () => undefined),
+            findOrganizationFolder: jest.fn(async () => null),
+            listByOrganization: jest.fn(async () => []),
+            countByOrganization: jest.fn(async () => 0),
+            listOrganizationChildren: jest.fn(async () => []),
+            listOrganizationSubtree: jest.fn(async () => []),
+            updateOrganizationSubtreePaths: jest.fn(async () => undefined),
+            deleteOrganizationFoldersByIds: jest.fn(async () => undefined),
+        };
+        activityLog = { log: jest.fn(async () => undefined) };
+        service = new MemoryFoldersService(
+            folders as never,
+            { countByFolderIds: jest.fn(), clearFolders: jest.fn() } as never,
+            { countByFolderIds: jest.fn(), clearFolders: jest.fn() } as never,
+            activityLog as never,
+        );
+    });
+
+    const byId = (...rows: MemoryFolder[]) =>
+        folders.findOrganizationFolder.mockImplementation(
+            async (_org: string, id: string) => rows.find((row) => row.id === id) ?? null,
+        );
+
+    describe('createOrganizationFolder', () => {
+        it('creates an organization-scope folder stamped with the Organization', async () => {
+            await service.createOrganizationFolder(ORG, ADMIN, { name: 'Playbooks' });
+            expect(folders.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: ADMIN,
+                    organizationId: ORG,
+                    scope: MemoryFolderScope.ORGANIZATION,
+                    path: '/Playbooks',
+                    parentId: null,
+                }),
+            );
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'memory_folder_created',
+                    details: expect.objectContaining({
+                        scope: 'organization',
+                        organizationId: ORG,
+                    }),
+                }),
+            );
+        });
+
+        it('never touches the per-person lookups', async () => {
+            await service.createOrganizationFolder(ORG, ADMIN, { name: 'Playbooks' });
+            expect(folders.findById).not.toHaveBeenCalled();
+            expect(folders.findByPath).not.toHaveBeenCalled();
+        });
+
+        it('allows a folder at depth 5', async () => {
+            byId(shared({ id: 'd4', path: '/a/b/c/d' }));
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'e', parentId: 'd4' }),
+            ).resolves.toBeDefined();
+        });
+
+        it('refuses a folder at depth 6 with the depth message', async () => {
+            byId(shared({ id: 'd5', path: '/a/b/c/d/e' }));
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'f', parentId: 'd5' }),
+            ).rejects.toMatchObject({
+                response: { message: 'Folders can be nested up to 5 levels deep.' },
+            });
+            expect(folders.create).not.toHaveBeenCalled();
+        });
+
+        it('refuses the 501st folder in an Organization', async () => {
+            folders.countByOrganization.mockResolvedValue(500);
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'One more' }),
+            ).rejects.toBeInstanceOf(UnprocessableEntityException);
+            expect(folders.create).not.toHaveBeenCalled();
+        });
+
+        it('allows the 500th folder', async () => {
+            folders.countByOrganization.mockResolvedValue(499);
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'Last one' }),
+            ).resolves.toBeDefined();
+        });
+
+        it('refuses a sibling name that differs only by case, quoting the existing name', async () => {
+            folders.listOrganizationChildren.mockResolvedValue([
+                shared({ id: 's', name: 'Support' }),
+            ]);
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'support' }),
+            ).rejects.toMatchObject({
+                response: { message: 'A folder called "Support" already exists here.' },
+            });
+        });
+
+        it.each([
+            ['empty', '   '],
+            ['longer than 120 characters', 'x'.repeat(121)],
+        ])('refuses a name that is %s', async (_label, name) => {
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('404s a parent that belongs to another Organization', async () => {
+            await expect(
+                service.createOrganizationFolder(ORG, ADMIN, { name: 'X', parentId: 'foreign' }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+    });
+
+    describe('renameOrganizationFolder', () => {
+        it('rewrites the subtree paths and logs a rename', async () => {
+            byId(shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }));
+            await service.renameOrganizationFolder(ORG, ADMIN, 'p', 'Guides');
+            expect(folders.updateOrganizationSubtreePaths).toHaveBeenCalledWith(
+                ORG,
+                '/Playbooks',
+                '/Guides',
+            );
+            expect(folders.update).toHaveBeenCalledWith('p', { name: 'Guides' });
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'memory_folder_renamed',
+                    details: expect.objectContaining({ oldPath: '/Playbooks', newPath: '/Guides' }),
+                }),
+            );
+        });
+
+        it('allows a case-only rename of the same folder', async () => {
+            byId(shared({ id: 'p', name: 'playbooks', path: '/playbooks' }));
+            folders.listOrganizationChildren.mockResolvedValue([
+                shared({ id: 'p', name: 'playbooks', path: '/playbooks' }),
+            ]);
+            await expect(
+                service.renameOrganizationFolder(ORG, ADMIN, 'p', 'Playbooks'),
+            ).resolves.toBeDefined();
+        });
+
+        it('refuses a rename onto a sibling name', async () => {
+            byId(shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }));
+            folders.listOrganizationChildren.mockResolvedValue([
+                shared({ id: 'p', name: 'Playbooks' }),
+                shared({ id: 'r', name: 'Reports', path: '/Reports' }),
+            ]);
+            await expect(
+                service.renameOrganizationFolder(ORG, ADMIN, 'p', 'reports'),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(folders.updateOrganizationSubtreePaths).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('moveOrganizationFolder', () => {
+        it('refuses a move into the folder subtree with the exact message', async () => {
+            byId(
+                shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }),
+                shared({ id: 's', name: 'Support', path: '/Playbooks/Support', parentId: 'p' }),
+            );
+            await expect(
+                service.moveOrganizationFolder(ORG, ADMIN, 'p', 's'),
+            ).rejects.toMatchObject({
+                response: { message: 'A folder cannot be moved inside itself.' },
+            });
+            expect(folders.updateOrganizationSubtreePaths).not.toHaveBeenCalled();
+        });
+
+        it('refuses a move into itself', async () => {
+            byId(shared({ id: 'p', name: 'Playbooks', path: '/Playbooks' }));
+            await expect(
+                service.moveOrganizationFolder(ORG, ADMIN, 'p', 'p'),
+            ).rejects.toBeInstanceOf(UnprocessableEntityException);
+        });
+
+        it('refuses a move that would push a descendant past depth 5', async () => {
+            byId(
+                shared({ id: 'p', name: 'p', path: '/p' }),
+                shared({ id: 'deep', name: 'd', path: '/x/y/z/d' }),
+            );
+            // `/p` reaches two levels down (/p/q/r); under /x/y/z/d that is depth 7.
+            folders.listOrganizationSubtree.mockResolvedValue([
+                shared({ id: 'p', path: '/p' }),
+                shared({ id: 'q', path: '/p/q' }),
+                shared({ id: 'r', path: '/p/q/r' }),
+            ]);
+            await expect(
+                service.moveOrganizationFolder(ORG, ADMIN, 'p', 'deep'),
+            ).rejects.toMatchObject({
+                response: { code: 'FolderDepthLimit' },
+            });
+        });
+
+        it('moves a folder under a new parent, rewriting subtree paths', async () => {
+            byId(
+                shared({ id: 'p', name: 'Support', path: '/Support' }),
+                shared({ id: 'pb', name: 'Playbooks', path: '/Playbooks' }),
+            );
+            folders.listOrganizationSubtree.mockResolvedValue([
+                shared({ id: 'p', path: '/Support' }),
+            ]);
+            await service.moveOrganizationFolder(ORG, ADMIN, 'p', 'pb');
+            expect(folders.updateOrganizationSubtreePaths).toHaveBeenCalledWith(
+                ORG,
+                '/Support',
+                '/Playbooks/Support',
+            );
+            expect(folders.update).toHaveBeenCalledWith('p', { parentId: 'pb' });
+        });
+    });
+
+    describe('deleteOrganizationFolder', () => {
+        it('unfiles the whole subtree BEFORE deleting the folders, and deletes no document', async () => {
+            byId(shared({ id: 'p', path: '/Playbooks' }));
+            folders.listOrganizationSubtree.mockResolvedValue([
+                shared({ id: 'p', path: '/Playbooks' }),
+                shared({ id: 's', path: '/Playbooks/Support' }),
+            ]);
+            const order: string[] = [];
+            const unfile = jest.fn(async (ids: string[]) => {
+                order.push(`unfile:${ids.join(',')}`);
+                return 12;
+            });
+            folders.deleteOrganizationFoldersByIds.mockImplementation(async () => {
+                order.push('delete');
+            });
+
+            const result = await service.deleteOrganizationFolder(ORG, ADMIN, 'p', unfile);
+
+            expect(order).toEqual(['unfile:p,s', 'delete']);
+            expect(result).toEqual({ deletedFolders: 2, unfiledDocuments: 12 });
+            expect(folders.deleteOrganizationFoldersByIds).toHaveBeenCalledWith(ORG, ['p', 's']);
+        });
+
+        it('404s a folder of another Organization and unfiles nothing', async () => {
+            const unfile = jest.fn();
+            await expect(
+                service.deleteOrganizationFolder(ORG, ADMIN, 'foreign', unfile),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(unfile).not.toHaveBeenCalled();
         });
     });
 });

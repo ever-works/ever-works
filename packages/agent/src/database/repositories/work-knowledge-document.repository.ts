@@ -85,6 +85,37 @@ export interface OrgMemoryAggregateOptions {
     offset?: number;
 }
 
+/**
+ * Knowledge library — the scope of the organization shelf: the documents of
+ * the Organization's Works plus (optionally) its own organization-scoped
+ * documents. Same mandatory-scope guard as {@link OrgMemoryAggregateOptions}:
+ * a call with neither throws.
+ */
+export interface KbLibraryScope {
+    workIds: string[];
+    organizationId?: string;
+}
+
+/** Knowledge library — one page of the shelf. */
+export interface KbLibraryListOptions extends KbLibraryScope {
+    /** A folder id, `null` for Unfiled, `undefined` for every folder. */
+    folderId?: string | null;
+    archived: 'exclude' | 'only' | 'include';
+    classes?: KbDocumentClass[];
+    /** Title, description or slug contains. */
+    q?: string;
+    sort: 'recent' | 'title' | 'unread';
+    limit: number;
+    offset: number;
+}
+
+/** Knowledge library — per-folder document counts for the folder rail. */
+export interface KbLibraryCounts {
+    /** Non-archived documents per direct folder; key `null` = Unfiled. */
+    byFolder: Map<string | null, number>;
+    archived: number;
+}
+
 /** A single `{ value, count }` facet bucket for the Memory chips. */
 export interface OrgMemoryFacetCount {
     value: string;
@@ -575,6 +606,12 @@ export class WorkKnowledgeDocumentRepository {
 
     async create(data: Partial<WorkKnowledgeDocument>): Promise<WorkKnowledgeDocument> {
         const entity = this.repository.create(data);
+        // Knowledge library — every document carries a revision timestamp
+        // from birth, whichever service created it, so the "recently
+        // changed" sort never has to reason about NULLs.
+        if (!entity.revisionAt) {
+            entity.revisionAt = new Date();
+        }
         return this.repository.save(entity);
     }
 
@@ -614,6 +651,144 @@ export class WorkKnowledgeDocumentRepository {
     ): Promise<WorkKnowledgeDocument | null> {
         await this.repository.update({ id: docId }, { locked, lockMode });
         return this.repository.findOne({ where: { id: docId } });
+    }
+
+    // ─── Knowledge library ───────────────────────────────────────────────
+
+    /**
+     * One page of the organization shelf. Filters apply in the order the
+     * library promises — archived → folder → class / query — then the sort.
+     *
+     * `recent` orders by `revisionAt` (the last SUBSTANTIVE change), never
+     * `updatedAt`, which background mirror / embed writes move. `title` is
+     * case-insensitive A→Z. `unread` has no read state to order by until
+     * per-person read state is wired in, so it orders like `recent`. Every
+     * sort ends on `id` so offset pages never repeat or skip a row.
+     */
+    async listForLibrary(
+        opts: KbLibraryListOptions,
+    ): Promise<{ items: WorkKnowledgeDocument[]; total: number }> {
+        const qb = this.repository.createQueryBuilder('doc');
+        this.applyOrgAggregateScope(qb, {
+            workIds: opts.workIds,
+            organizationId: opts.organizationId,
+        });
+        this.applyArchivedFilter(qb, opts.archived);
+
+        if (opts.folderId === null) {
+            qb.andWhere('doc.folderId IS NULL');
+        } else if (opts.folderId !== undefined) {
+            qb.andWhere('doc.folderId = :libFolderId', { libFolderId: opts.folderId });
+        }
+        if (opts.classes && opts.classes.length > 0) {
+            qb.andWhere('doc.kbDocumentClass IN (:...libClasses)', { libClasses: opts.classes });
+        }
+        const pattern = prepareCaseInsensitiveContainsPattern(opts.q);
+        if (pattern) {
+            qb.andWhere(
+                new Brackets((w) => {
+                    w.where(buildCaseInsensitiveLikeClause('doc.title', 'libQ'), { libQ: pattern })
+                        .orWhere(buildCaseInsensitiveLikeClause('doc.description', 'libQ'), {
+                            libQ: pattern,
+                        })
+                        .orWhere(buildCaseInsensitiveLikeClause('doc.slug', 'libQ'), {
+                            libQ: pattern,
+                        });
+                }),
+            );
+        }
+
+        const total = await qb.getCount();
+
+        if (opts.sort === 'title') {
+            qb.orderBy('LOWER(doc.title)', 'ASC');
+        } else {
+            qb.orderBy('doc.revisionAt', 'DESC');
+        }
+        qb.addOrderBy('doc.id', 'ASC');
+        qb.limit(opts.limit).offset(opts.offset);
+
+        const items = await qb.getMany();
+        return { items, total };
+    }
+
+    /**
+     * Non-archived documents per direct folder (`null` key = Unfiled) plus
+     * the archived total — two grouped queries, no per-folder round-trips.
+     */
+    async countsForLibrary(scope: KbLibraryScope): Promise<KbLibraryCounts> {
+        const live = this.repository.createQueryBuilder('doc');
+        this.applyOrgAggregateScope(live, scope);
+        this.applyArchivedFilter(live, 'exclude');
+        const rows = await live
+            .select('doc.folderId', 'folderId')
+            .addSelect('COUNT(*)', 'count')
+            .groupBy('doc.folderId')
+            .getRawMany<{ folderId: string | null; count: string | number }>();
+
+        const archivedQb = this.repository.createQueryBuilder('doc');
+        this.applyOrgAggregateScope(archivedQb, scope);
+        this.applyArchivedFilter(archivedQb, 'only');
+        const archived = await archivedQb.getCount();
+
+        const byFolder = new Map<string | null, number>();
+        for (const row of rows) {
+            byFolder.set(row.folderId ?? null, Number(row.count));
+        }
+        return { byFolder, archived };
+    }
+
+    /** The subset of `ids` that lies inside the library scope. */
+    async findInLibraryScope(
+        scope: KbLibraryScope,
+        ids: string[],
+    ): Promise<WorkKnowledgeDocument[]> {
+        if (ids.length === 0) return [];
+        const qb = this.repository.createQueryBuilder('doc');
+        this.applyOrgAggregateScope(qb, scope);
+        qb.andWhere('doc.id IN (:...libIds)', { libIds: ids });
+        return qb.getMany();
+    }
+
+    /**
+     * File documents into a folder (`null` = Unfiled). Touches ONLY the
+     * folder column — `revision` and the fingerprint are untouched, because
+     * moving a document is not a change to what it says.
+     */
+    async setFolder(docIds: string[], folderId: string | null): Promise<number> {
+        if (docIds.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkKnowledgeDocument)
+            .set({ folderId })
+            .where('id IN (:...docIds)', { docIds })
+            .execute();
+        return result.affected ?? docIds.length;
+    }
+
+    /** Unfile every document filed in any of `folderIds`; returns how many moved. */
+    async clearFolders(folderIds: string[]): Promise<number> {
+        if (folderIds.length === 0) return 0;
+        const count = await this.repository.count({ where: { folderId: In(folderIds) } });
+        if (count === 0) return 0;
+        await this.repository
+            .createQueryBuilder()
+            .update(WorkKnowledgeDocument)
+            .set({ folderId: null })
+            .where('folder_id IN (:...folderIds)', { folderIds })
+            .execute();
+        return count;
+    }
+
+    private applyArchivedFilter(
+        qb: SelectQueryBuilder<WorkKnowledgeDocument>,
+        archived: 'exclude' | 'only' | 'include',
+    ): void {
+        if (archived === 'exclude') {
+            qb.andWhere('doc.status != :libArchived', { libArchived: KbDocumentStatus.ARCHIVED });
+        } else if (archived === 'only') {
+            qb.andWhere('doc.status = :libArchived', { libArchived: KbDocumentStatus.ARCHIVED });
+        }
     }
 
     /** Lookup using either Work id+slug-path or org id+path. */
