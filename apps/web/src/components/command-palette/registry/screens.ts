@@ -3,9 +3,11 @@ import {
     Bot,
     Brain,
     Calendar,
+    Compass,
     CreditCard,
     FileText,
     Gauge,
+    GitFork,
     Home,
     Inbox,
     LayoutTemplate,
@@ -112,6 +114,21 @@ export const DASHBOARD_SCREENS: readonly PaletteScreen[] = [
         href: ROUTES.DASHBOARD_TEMPLATES,
         icon: LayoutTemplate,
         title: (t) => t('dashboard.sidebar.navigation.templates'),
+    },
+    // Capability & playbook catalogue (AW-21). Reached from the palette
+    // rather than a new sidebar entry; its title reuses the navigation label.
+    {
+        id: 'catalog',
+        href: ROUTES.DASHBOARD_CATALOG,
+        icon: Compass,
+        title: (t) => t('dashboard.sidebar.navigation.catalog'),
+    },
+    {
+        id: 'catalog.workflows',
+        href: ROUTES.DASHBOARD_CATALOG_WORKFLOWS,
+        icon: GitFork,
+        title: (t) => t('dashboard.catalogPage.sections.workflows'),
+        breadcrumb: (t) => [t('dashboard.sidebar.navigation.catalog')],
     },
     {
         id: 'plugins',

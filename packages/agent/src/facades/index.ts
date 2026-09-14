@@ -156,6 +156,15 @@ export type {
     MetricWindow,
 } from '@ever-works/plugin';
 
+// Playbook Catalog Facade — capability & playbook catalogue (AW-21).
+// Version-wins merge across enabled playbook-provider plugins.
+export {
+    PlaybookCatalogFacadeService,
+    PlaybookCatalogFacadeError,
+    PLAYBOOK_PROVIDER_PAGE_SIZE,
+    MAX_PLAYBOOK_CATALOG_ENTRIES,
+} from './playbook-catalog.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

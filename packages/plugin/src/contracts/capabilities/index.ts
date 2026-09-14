@@ -68,3 +68,6 @@ export * from './secret-store.interface.js';
 // PostHog + Google Analytics in PR-9). Consumed by MetricsFacadeService
 // and, from PR-8 on, by Goal evaluation.
 export * from './metrics-provider.interface.js';
+// Capability & playbook catalogue (AW-21) — providers of Playbook catalogue
+// entries. Consumed by PlaybookCatalogFacadeService.
+export * from './playbook-provider.interface.js';

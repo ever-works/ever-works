@@ -95,7 +95,13 @@ export const PLUGIN_CAPABILITIES = {
 	// Event-ingest spine (Wave 6) — plugins that pull/push normalized
 	// external events into the platform ingest pipeline. See
 	// capabilities/event-source.interface.ts.
-	EVENT_SOURCE: 'event-source'
+	EVENT_SOURCE: 'event-source',
+	// Capability & playbook catalogue (AW-21) — plugins that supply Playbook
+	// catalogue entries (packaged outcomes: trigger, steps, required
+	// capabilities, artefacts, escalation points). Consumed only through
+	// PlaybookCatalogFacadeService. See
+	// capabilities/playbook-provider.interface.ts.
+	PLAYBOOK_PROVIDER: 'playbook-provider'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

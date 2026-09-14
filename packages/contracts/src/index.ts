@@ -38,3 +38,7 @@ export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';
+// Capability & playbook catalogue (AW-21) — the playbook-provider entry
+// shape, its pure validator + version comparator, and the per-caller
+// readiness / preflight wire types.
+export * from './playbook/index.js';

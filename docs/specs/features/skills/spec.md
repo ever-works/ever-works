@@ -15,6 +15,11 @@
 - KB editor: `apps/web/src/components/works/detail/kb/KbEditor.tsx`
 - Works config schema: `packages/agent/src/works-config/services/works-config.service.ts`
 
+**Indexed by**: the capability catalogue
+([AW-21](../agent-workspace/AW-21-capability-catalog/spec.md)) shows catalogue
+Skills, marks the installed ones, and links back to the Skills surface for
+installing and binding them.
+
 > **Scope**: Skills are markdown-defined, reusable, scoped capability files that Agents (see [agents/spec.md](../agents/spec.md)) attach to themselves, and that Generators inject into AI calls. They follow Anthropic's progressive-disclosure Skill shape (frontmatter `name`/`description`/`allowed-tools` + markdown body).
 >
 > **Hard rule (additive)**: Nothing existing changes. The `WorkAdvancedPrompts` mechanism stays. The Plugins page stays. We add a new Skills sidebar entry, a Skills tab on Work / Mission / Agent detail pages, and an injection hook in `AiFacadeService.assembleSystemMessage`.
