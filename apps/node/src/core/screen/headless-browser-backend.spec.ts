@@ -200,3 +200,127 @@ describe('HeadlessBrowserCaptureBackend.start', () => {
 		await expect(backend.start({ profileDir: '/p' })).rejects.toThrow(/exited before it was ready/);
 	});
 });
+
+/**
+ * A browser with several tabs. `visibility` maps a tab to what its page
+ * reports (`visible:true` = on screen and focused, `hidden:false` = a
+ * background tab); a test flips it to switch tabs. Every call is recorded
+ * with the session it was sent to.
+ */
+function fakeTabbedBrowser(visibility: Record<string, string>) {
+	const calls: Array<{ method: string; sessionId?: string; params?: Record<string, unknown> }> = [];
+	const sessionOf = new Map<string, string>();
+	const tabOf = new Map<string, string>();
+	let nextSession = 1;
+	const socket: WebSocketLike = {
+		readyState: 1,
+		onopen: null,
+		onmessage: null,
+		onerror: null,
+		onclose: null,
+		send: (raw: string) => {
+			const { id, method, params, sessionId } = JSON.parse(raw) as {
+				id: number;
+				method: string;
+				params?: Record<string, unknown>;
+				sessionId?: string;
+			};
+			calls.push({ method, ...(sessionId ? { sessionId } : {}), ...(params ? { params } : {}) });
+			let result: Record<string, unknown> = {};
+			if (method === 'Target.getTargets') {
+				result = { targetInfos: Object.keys(visibility).map((targetId) => ({ type: 'page', targetId })) };
+			} else if (method === 'Target.attachToTarget') {
+				const targetId = String(params?.targetId);
+				const session = `session-${nextSession++}`;
+				sessionOf.set(targetId, session);
+				tabOf.set(session, targetId);
+				result = { sessionId: session };
+			} else if (method === 'Runtime.evaluate') {
+				const tab = sessionId ? tabOf.get(sessionId) : undefined;
+				result = { result: { value: tab ? visibility[tab] : undefined } };
+			} else if (method === 'Page.getLayoutMetrics') {
+				result = { cssVisualViewport: { clientWidth: 1280, clientHeight: 800 } };
+			} else if (method === 'Page.captureScreenshot') {
+				const tab = sessionId ? tabOf.get(sessionId) : undefined;
+				result = { data: Buffer.from(`picture-of-${tab}`).toString('base64') };
+			}
+			queueMicrotask(() => socket.onmessage?.({ data: JSON.stringify({ id, result }) }));
+		},
+		close: () => socket.onclose?.({})
+	};
+	const open = (): WebSocketLike => {
+		queueMicrotask(() => socket.onopen?.({}));
+		return socket;
+	};
+	const pictured = () =>
+		calls
+			.filter((call) => call.method === 'Page.captureScreenshot')
+			.map((call) => (call.sessionId ? tabOf.get(call.sessionId) : undefined));
+	return { open, calls, sessionOf, pictured };
+}
+
+describe('HeadlessBrowserCaptureBackend — which tab is pictured', () => {
+	const attachTo = (browser: ReturnType<typeof fakeTabbedBrowser>) =>
+		new HeadlessBrowserCaptureBackend({
+			browserPath: '/usr/bin/chromium',
+			readTextFile: async () => '9222\n/devtools/browser/abc\n',
+			webSocketFactory: () => browser.open()
+		});
+
+	it('pictures the foreground tab, never the first background tab in the target list', async () => {
+		const browser = fakeTabbedBrowser({ 'tab-mail': 'hidden:false', 'tab-work': 'visible:true' });
+		const source = await attachTo(browser).start({ profileDir: '/profiles/abc/browser' });
+		await source.capture({ width: 1280, quality: 70 });
+		expect(browser.pictured()).toEqual(['tab-work']);
+		// The background tab was only asked whether it is on screen, then let go.
+		expect(browser.calls).toContainEqual(
+			expect.objectContaining({
+				method: 'Target.detachFromTarget',
+				params: { sessionId: browser.sessionOf.get('tab-mail') }
+			})
+		);
+		await source.stop();
+	});
+
+	it('follows the Agent to the tab it switches to', async () => {
+		const tabs = { 'tab-mail': 'hidden:false', 'tab-work': 'visible:true' };
+		const browser = fakeTabbedBrowser(tabs);
+		const source = await attachTo(browser).start({ profileDir: '/profiles/abc/browser' });
+		await source.capture({ width: 1280, quality: 70 });
+
+		tabs['tab-work'] = 'hidden:false';
+		tabs['tab-mail'] = 'visible:true';
+		await source.capture({ width: 1280, quality: 70 });
+
+		expect(browser.pictured()).toEqual(['tab-work', 'tab-mail']);
+		await source.stop();
+	});
+
+	it('prefers the focused tab when several windows each show one', async () => {
+		const browser = fakeTabbedBrowser({ 'tab-a': 'visible:false', 'tab-b': 'visible:true' });
+		const source = await attachTo(browser).start({ profileDir: '/profiles/abc/browser' });
+		await source.capture({ width: 1280, quality: 70 });
+		expect(browser.pictured()).toEqual(['tab-b']);
+		await source.stop();
+	});
+
+	it('refuses to picture anything when none of several tabs is in the foreground', async () => {
+		const tabs = { 'tab-a': 'visible:true', 'tab-b': 'hidden:false' };
+		const browser = fakeTabbedBrowser(tabs);
+		const source = await attachTo(browser).start({ profileDir: '/profiles/abc/browser' });
+		tabs['tab-a'] = 'hidden:false';
+		await expect(source.capture({ width: 1280, quality: 70 })).rejects.toThrow(/foreground/);
+		expect(browser.pictured()).toEqual([]);
+		await source.stop();
+	});
+
+	it('keeps picturing a single tab even when it reports hidden (it is the only page the Agent has)', async () => {
+		const browser = fakeTabbedBrowser({ 'tab-only': 'hidden:false' });
+		const source = await attachTo(browser).start({ profileDir: '/profiles/abc/browser' });
+		await source.capture({ width: 1280, quality: 70 });
+		await source.capture({ width: 1280, quality: 70 });
+		expect(browser.pictured()).toEqual(['tab-only', 'tab-only']);
+		expect(browser.calls.filter((call) => call.method === 'Target.attachToTarget')).toHaveLength(1);
+		await source.stop();
+	});
+});

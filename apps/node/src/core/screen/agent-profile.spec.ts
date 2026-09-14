@@ -3,9 +3,11 @@ import { join } from 'path';
 import {
 	AGENT_PROFILE_KEY_FILE,
 	AGENT_PROFILE_ROOT_ENV,
+	AgentProfileAccessError,
 	AgentProfileKeyError,
 	AgentProfileManager,
 	agentProfileDirName,
+	createAgentProfileManager,
 	defaultAgentProfileRoot,
 	type AgentProfileFs
 } from './agent-profile';
@@ -114,6 +116,117 @@ describe('agent profile directories', () => {
 				throw new Error('icacls missing');
 			}
 		});
+		await expect(manager.ensure(NODE, AGENT_A, KEY_1)).resolves.toMatchObject({ created: true });
+	});
+
+	it('fails closed where owner-only access is required: no hook, or a failing hook, leaves nothing behind', async () => {
+		const noHookFs = memoryFs();
+		const noHook = new AgentProfileManager({ root: ROOT, fs: noHookFs, requireOwnerOnly: true });
+		await expect(noHook.ensure(NODE, AGENT_A, KEY_1)).rejects.toBeInstanceOf(AgentProfileAccessError);
+		expect(noHookFs.dirs.size).toBe(0);
+		expect(noHookFs.files.size).toBe(0);
+
+		const failingFs = memoryFs();
+		const failing = new AgentProfileManager({
+			root: ROOT,
+			fs: failingFs,
+			requireOwnerOnly: true,
+			restrictToOwner: async () => {
+				throw new Error('icacls failed');
+			}
+		});
+		await expect(failing.ensure(NODE, AGENT_A, KEY_1)).rejects.toThrow(/icacls failed/);
+		expect(failingFs.dirs.size).toBe(0);
+		expect(failingFs.files.size).toBe(0);
+	});
+
+	it('requires owner-only access on Windows and keeps it best-effort elsewhere', async () => {
+		const windows = createAgentProfileManager({ root: ROOT, fs: memoryFs(), platform: 'win32' });
+		await expect(windows.ensure(NODE, AGENT_A, KEY_1)).rejects.toBeInstanceOf(AgentProfileAccessError);
+
+		const restricted: string[] = [];
+		const windowsWithAcl = createAgentProfileManager({
+			root: ROOT,
+			fs: memoryFs(),
+			platform: 'win32',
+			restrictToOwner: (path) => void restricted.push(path)
+		});
+		const profile = await windowsWithAcl.ensure(NODE, AGENT_A, KEY_1);
+		expect(restricted).toEqual([profile.dir]);
+
+		const linux = createAgentProfileManager({ root: ROOT, fs: memoryFs(), platform: 'linux' });
+		await expect(linux.ensure(NODE, AGENT_A, KEY_1)).resolves.toMatchObject({ created: true });
+	});
+
+	it('serializes opens of one profile: a stale-key open cannot resume after a reset and write its key back', async () => {
+		const fs = memoryFs();
+		const manager = new AgentProfileManager({ root: ROOT, fs });
+		const first = await manager.ensure(NODE, AGENT_A, KEY_1);
+
+		// Hold the old-key open inside its critical section (between reading the
+		// stored key and publishing its own) while the rotated-key open arrives.
+		let releaseOld: () => void = () => undefined;
+		const oldHeld = new Promise<void>((resolve) => {
+			releaseOld = resolve;
+		});
+		const realRead = fs.readTextFile;
+		let reads = 0;
+		fs.readTextFile = async (path) => {
+			reads += 1;
+			const value = await realRead(path);
+			if (reads === 1) await oldHeld;
+			return value;
+		};
+
+		const stale = manager.ensure(NODE, AGENT_A, KEY_1);
+		const rotated = manager.ensure(NODE, AGENT_A, KEY_2);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		// The rotated open is queued behind the held one, not interleaved with it.
+		expect(reads).toBe(1);
+		releaseOld();
+
+		await expect(stale).resolves.toMatchObject({ created: false, reset: false });
+		await expect(rotated).resolves.toMatchObject({ created: true, reset: true });
+		expect(fs.files.get(join(first.dir, AGENT_PROFILE_KEY_FILE))).toBe(KEY_2);
+
+		// The next open with the current key keeps the fresh profile.
+		fs.files.set(join(first.browserDir, 'Cookies'), 'signed-in');
+		await expect(manager.ensure(NODE, AGENT_A, KEY_2)).resolves.toMatchObject({ created: false, reset: false });
+		expect(fs.files.get(join(first.browserDir, 'Cookies'))).toBe('signed-in');
+	});
+
+	it('does not hold one Agent’s open behind a different Agent’s', async () => {
+		const fs = memoryFs();
+		const manager = new AgentProfileManager({ root: ROOT, fs });
+		let releaseA: () => void = () => undefined;
+		const aHeld = new Promise<void>((resolve) => {
+			releaseA = resolve;
+		});
+		const realExists = fs.exists;
+		const aDir = join(ROOT, agentProfileDirName(NODE, AGENT_A));
+		fs.exists = async (path) => {
+			if (path === aDir) await aHeld;
+			return realExists(path);
+		};
+		const a = manager.ensure(NODE, AGENT_A, KEY_1);
+		await expect(manager.ensure(NODE, AGENT_B, KEY_1)).resolves.toMatchObject({ created: true });
+		releaseA();
+		await expect(a).resolves.toMatchObject({ created: true });
+	});
+
+	it('keeps serving a profile after an open of it failed', async () => {
+		const fs = memoryFs();
+		let fail = true;
+		const manager = new AgentProfileManager({
+			root: ROOT,
+			fs,
+			requireOwnerOnly: true,
+			restrictToOwner: () => {
+				if (fail) throw new Error('icacls failed');
+			}
+		});
+		await expect(manager.ensure(NODE, AGENT_A, KEY_1)).rejects.toBeInstanceOf(AgentProfileAccessError);
+		fail = false;
 		await expect(manager.ensure(NODE, AGENT_A, KEY_1)).resolves.toMatchObject({ created: true });
 	});
 

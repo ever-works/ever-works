@@ -31,7 +31,8 @@ import type { Logger } from './logger';
 import { PtyLocalPlugin } from '@ever-works/pty-local-plugin';
 import type { ITerminalStreamPlugin } from '@ever-works/plugin';
 import { AttendedPollCadence, clampAttendedPollMs } from './screen/attended-cadence';
-import { AgentProfileManager, createAgentProfileFs, defaultAgentProfileRoot } from './screen/agent-profile';
+import { createAgentProfileFs, createAgentProfileManager, defaultAgentProfileRoot } from './screen/agent-profile';
+import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
 import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
@@ -392,7 +393,11 @@ export interface CreateNodeRuntimeOptions {
 	terminalHost?: ITerminalStreamPlugin | null;
 	/** Where each Agent's profile directory lives; defaults to `~/.ever-works/agent-profiles`. */
 	agentProfileRoot?: string;
-	/** Owner-only access for a new profile directory (the CLI supplies icacls on Windows). */
+	/**
+	 * Owner-only access for a new profile directory. Defaults to an `icacls`
+	 * ACL on Windows, where it is required: a profile whose ACL cannot be
+	 * applied is never opened.
+	 */
 	restrictProfileDir?: (path: string) => Promise<void> | void;
 	/** Test seam for the live-view socket leg and the capture backend's debugging connection. */
 	webSocketFactory?: WebSocketFactory | null;
@@ -790,10 +795,15 @@ function createAttendedLane(
 			: []);
 	const captureBackend = selectCaptureBackend(backends, environment);
 	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;
-	const profiles = new AgentProfileManager({
+	// Windows directories have no mode bits, so an Agent's profile there is
+	// owner-only through an ACL or it is not opened at all (fail closed).
+	const restrictToOwner =
+		options.restrictProfileDir ?? (environment.platform === 'win32' ? restrictDirectoryToOwnerWindows : undefined);
+	const profiles = createAgentProfileManager({
 		root: options.agentProfileRoot ?? defaultAgentProfileRoot(options.env ?? process.env),
 		fs: createAgentProfileFs(),
-		...(options.restrictProfileDir ? { restrictToOwner: options.restrictProfileDir } : {})
+		platform: environment.platform,
+		...(restrictToOwner ? { restrictToOwner } : {})
 	});
 	const fastPollMs = clampAttendedPollMs(options.attendedPollMs);
 	const cadence = new AttendedPollCadence({ fastPollMs, ...(io.now ? { now: io.now } : {}) });

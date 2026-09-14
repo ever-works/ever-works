@@ -173,41 +173,136 @@ export function countSessionCookieSites(cookies: unknown): number {
 	return sites.size;
 }
 
+/** A page target this connection is attached to. */
+interface AttachedPage {
+	targetId: string;
+	sessionId: string;
+}
+
+/** How a page reports whether it is on screen: `visibilityState:hasFocus`. */
+const FOREGROUND_PROBE_EXPRESSION = "document.visibilityState + ':' + document.hasFocus()";
+
+/**
+ * How much a page is the one on screen: 2 visible and focused, 1 visible,
+ * 0 hidden (a background tab) or unreadable (a tab that closed mid-probe).
+ */
+async function foregroundScore(cdp: CdpConnection, sessionId: string): Promise<number> {
+	try {
+		const probe = await cdp.send(
+			'Runtime.evaluate',
+			{ expression: FOREGROUND_PROBE_EXPRESSION, returnByValue: true },
+			sessionId
+		);
+		const value = (probe.result as { value?: unknown } | undefined)?.value;
+		if (typeof value !== 'string' || !value.startsWith('visible:')) return 0;
+		return value === 'visible:true' ? 2 : 1;
+	} catch {
+		return 0;
+	}
+}
+
+async function attachToPage(cdp: CdpConnection, targetId: string): Promise<AttachedPage> {
+	const attached = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+	if (typeof attached.sessionId !== 'string') throw new Error('Could not attach to the browser page');
+	return { targetId, sessionId: attached.sessionId };
+}
+
+async function detachQuietly(cdp: CdpConnection, sessionId: string): Promise<void> {
+	try {
+		await cdp.send('Target.detachFromTarget', { sessionId });
+	} catch {
+		// the tab is already gone
+	}
+}
+
+/**
+ * The page the Agent has on screen, attached. A browser with ONE tab shows
+ * that tab. With several, every tab is asked whether it is visible (and
+ * focused), and only the foreground one is ever pictured: the first tab in
+ * the target list is often a background page the Agent is not looking at.
+ * When no tab is in the foreground this refuses rather than guess.
+ *
+ * `current` is reused (never re-attached) when it is still the answer, and
+ * every session this opened or held that is not the answer is detached.
+ */
+async function attachForegroundPage(cdp: CdpConnection, current: AttachedPage | null): Promise<AttachedPage> {
+	const targets = await cdp.send('Target.getTargets');
+	const infos = Array.isArray(targets.targetInfos) ? (targets.targetInfos as Array<Record<string, unknown>>) : [];
+	const pageIds = infos
+		.filter((info) => info.type === 'page' && typeof info.targetId === 'string')
+		.map((info) => info.targetId as string);
+	const release = async (keep: AttachedPage | null, sessions: AttachedPage[]): Promise<void> => {
+		for (const page of sessions) {
+			if (page.sessionId !== keep?.sessionId) await detachQuietly(cdp, page.sessionId);
+		}
+	};
+
+	if (pageIds.length === 0) {
+		const created = await cdp.send('Target.createTarget', { url: 'about:blank' });
+		if (typeof created.targetId !== 'string') throw new Error('The browser has no page to show');
+		const page = await attachToPage(cdp, created.targetId);
+		await release(page, current ? [current] : []);
+		return page;
+	}
+	if (pageIds.length === 1) {
+		const page = current?.targetId === pageIds[0] ? current : await attachToPage(cdp, pageIds[0]);
+		await release(page, current ? [current] : []);
+		return page;
+	}
+
+	const probed: AttachedPage[] = [];
+	let best: { page: AttachedPage; score: number } | null = null;
+	try {
+		for (const targetId of pageIds) {
+			const page = current?.targetId === targetId ? current : await attachToPage(cdp, targetId);
+			probed.push(page);
+			const score = await foregroundScore(cdp, page.sessionId);
+			if (score > (best?.score ?? 0)) best = { page, score };
+			if (score === 2) break;
+		}
+	} catch (error) {
+		await release(null, current && !probed.includes(current) ? [...probed, current] : probed);
+		throw error;
+	}
+	const chosen = best?.page ?? null;
+	await release(chosen, current && !probed.includes(current) ? [...probed, current] : probed);
+	if (!chosen) throw new Error('No tab of the browser is in the foreground to show');
+	return chosen;
+}
+
 class BrowserPageSource implements CaptureSource {
 	private stopped = false;
 
 	private constructor(
 		private readonly cdp: CdpConnection,
 		private readonly launched: ChildProcess | null,
-		private readonly sessionId: string
+		private page: AttachedPage
 	) {}
 
 	static async create(cdp: CdpConnection, launched: ChildProcess | null): Promise<BrowserPageSource> {
 		try {
-			const targets = await cdp.send('Target.getTargets');
-			const infos = Array.isArray(targets.targetInfos)
-				? (targets.targetInfos as Array<Record<string, unknown>>)
-				: [];
-			let targetId = infos.find((info) => info.type === 'page' && typeof info.targetId === 'string')?.targetId as
-				| string
-				| undefined;
-			if (!targetId) {
-				const created = await cdp.send('Target.createTarget', { url: 'about:blank' });
-				targetId = typeof created.targetId === 'string' ? created.targetId : undefined;
-			}
-			if (!targetId) throw new Error('The browser has no page to show');
-			const attached = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-			if (typeof attached.sessionId !== 'string') throw new Error('Could not attach to the browser page');
-			return new BrowserPageSource(cdp, launched, attached.sessionId);
+			return new BrowserPageSource(cdp, launched, await attachForegroundPage(cdp, null));
 		} catch (error) {
 			cdp.close();
 			throw error;
 		}
 	}
 
+	/**
+	 * The session of the page on screen NOW. The Agent may have switched tabs
+	 * (or closed this one) since the last picture, so a page that is no longer
+	 * visible is re-resolved before anything of it is captured.
+	 */
+	private async foregroundSession(): Promise<string> {
+		if ((await foregroundScore(this.cdp, this.page.sessionId)) > 0) return this.page.sessionId;
+		this.page = await attachForegroundPage(this.cdp, this.page);
+		return this.page.sessionId;
+	}
+
 	async capture(request: CaptureRequest): Promise<CapturedPicture> {
 		if (this.stopped) throw new Error('Capture source is stopped');
-		const metrics = await this.cdp.send('Page.getLayoutMetrics', {}, this.sessionId);
+		const sessionId = await this.foregroundSession();
+		const metrics = await this.cdp.send('Page.getLayoutMetrics', {}, sessionId);
 		const viewport = (metrics.cssVisualViewport ?? metrics.cssLayoutViewport ?? metrics.layoutViewport) as
 			| { clientWidth?: number; clientHeight?: number }
 			| undefined;
@@ -226,7 +321,7 @@ class BrowserPageSource implements CaptureSource {
 					scale: size.scale
 				}
 			},
-			this.sessionId
+			sessionId
 		);
 		if (typeof shot.data !== 'string' || shot.data.length === 0) {
 			throw new Error('The browser returned an empty picture');
