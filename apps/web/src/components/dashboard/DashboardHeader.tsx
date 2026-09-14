@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationDropdown } from './NotificationDropdown';
 import { WhatsNewButton } from './WhatsNewButton';
 import { WorkSwitcher } from './WorkSwitcher';
+import { CommandPaletteTrigger } from '@/components/command-palette/CommandPaletteTrigger';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Menu, HelpCircle, Sparkles, X } from 'lucide-react';
 
@@ -100,6 +101,9 @@ export function DashboardHeader({
                             </div>
                         )}
                     </div>
+
+                    {/* Command palette trigger — between the Work switcher and the right-hand cluster. */}
+                    <CommandPaletteTrigger className="mx-3" />
 
                     <div className="flex shrink-0 items-center gap-4">
                         {whatsNew && (

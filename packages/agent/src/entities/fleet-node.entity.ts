@@ -1,5 +1,10 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-import type { FleetNodeKind, FleetNodeStatus, FleetNodeWorkerState } from '@ever-works/contracts';
+import type {
+    ComputerControlPolicy,
+    FleetNodeKind,
+    FleetNodeStatus,
+    FleetNodeWorkerState,
+} from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -78,6 +83,14 @@ export { FLEET_NODE_NON_LEASABLE_STATUSES } from '@ever-works/contracts';
  * must never silently un-pause it.
  */
 export const FLEET_NODE_STICKY_STATUSES: readonly FleetNodeStatus[] = ['paused', 'disabled'];
+
+/**
+ * Agent computers — who may take control of a node from a live view. The
+ * union and its list are the shared contract's, re-exported beside the
+ * other node unions so the entity and the wire cannot drift.
+ */
+export type FleetNodeControlPolicy = ComputerControlPolicy;
+export { COMPUTER_CONTROL_POLICIES as FLEET_NODE_CONTROL_POLICIES } from '@ever-works/contracts';
 
 @Entity({ name: 'fleet_nodes' })
 @Index('idx_fleet_nodes_user', ['userId'])
@@ -399,6 +412,47 @@ export class FleetNode {
     /** Bytes that sweep freed. 0 is a real answer — it ran and found nothing to take. */
     @Column({ type: 'bigint', nullable: true })
     lastReclaimFreedBytes?: string | number | null;
+
+    /**
+     * Agent computers — who may take control of this machine from a live
+     * view: `owner` (the default), `org-admins` or `org-members`. Watching
+     * is never widened by it on its own; control is refused server-side to
+     * anyone outside it. Migration: `1791110000000-CreateComputerSessions`.
+     */
+    @Column({ type: 'varchar', length: 24, default: 'owner' })
+    controlPolicy: FleetNodeControlPolicy;
+
+    /** Whether a watch-only live view of this machine is recorded. Off unless the owner opts in. */
+    @Column({ type: 'boolean', default: false })
+    recordWatchSessions: boolean;
+
+    /** Days a recording of this machine is kept. Clamped 1–90 by the service that reads it. */
+    @Column({ type: 'int', default: 14 })
+    recordingRetentionDays: number;
+
+    /**
+     * The four `controlHolder*` columns are a COMPARE-AND-SET LOCK, not a
+     * cache of who is looking. Exactly one person may drive a machine at a
+     * time across every live view of it: taking control is one conditional
+     * UPDATE that succeeds only while the lock is free or expired, and
+     * releasing is scoped by the holding SESSION id, so a stale releaser can
+     * never evict a newer holder. `controlExpiresAt` is what makes an
+     * abandoned lock free itself without anyone's cooperation.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    controlHolderUserId?: string | null;
+
+    /** The live view that holds the lock. See {@link controlHolderUserId}. */
+    @Column({ type: 'uuid', nullable: true })
+    controlHolderSessionId?: string | null;
+
+    /** When the current holder took control. See {@link controlHolderUserId}. */
+    @PortableDateColumn({ nullable: true })
+    controlHeldSince?: Date | null;
+
+    /** When the lock frees itself. See {@link controlHolderUserId}. */
+    @PortableDateColumn({ nullable: true })
+    controlExpiresAt?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;

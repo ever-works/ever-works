@@ -33,3 +33,6 @@ export * from './plugins/index.js';
 // AW-14 What's new — in-product changelog categories, kinds and the
 // `/api/changelog` wire-types.
 export * from './changelog/index.js';
+
+// AW-01 workspace-wide search behind the dashboard command palette.
+export * from './workspace-search/index.js';

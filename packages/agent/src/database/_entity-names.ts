@@ -71,6 +71,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'BillingProfile',
     'CacheEntry',
     'ComposioTriggerSubscription',
+    // Agent computers — live views of an Agent's Node
+    'ComputerSession',
     'Conversation',
     'ConversationMessage',
     // Credits ledger (pricing Wave 9 M1)
@@ -132,6 +134,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'MissionAttachment',
     'MissionWork',
     'IdeaWork',
+    // Agent computers — each Agent's own profile on each Node
+    'NodeAgentProfile',
     'Notification',
     'NotificationChannel',
     'NotificationChannelDeliveryLog',

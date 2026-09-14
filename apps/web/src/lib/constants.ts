@@ -168,6 +168,10 @@ export const ROUTES = {
     // the same rows (`/api/meetings`).
     DASHBOARD_MEETINGS: '/meetings',
     DASHBOARD_MEETINGS_NEW: '/meetings/new',
+    // Goals — the sidebar links to the same paths; named here so the
+    // command palette's registries build every href from ROUTES.
+    DASHBOARD_GOALS: '/goals',
+    DASHBOARD_GOALS_NEW: '/goals/new',
     DASHBOARD_MEETING: (id: string) => `/meetings/${id}`,
     // Navigation consolidation (docs/specs/features/navigation-consolidation):
     // the Meetings catalog now renders as a block on the Memory page, so

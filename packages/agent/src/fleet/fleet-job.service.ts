@@ -269,10 +269,34 @@ export class FleetJobService {
         userId: string,
         payload: Record<string, unknown> | null,
     ): Promise<string | null> {
+        if (kind === 'computer-session') {
+            return this.resolveComputerSessionTarget(userId, payload?.nodeId);
+        }
         if (kind !== 'agent-task') {
             return null;
         }
         return this.resolveAgentTaskTarget(userId, payload?.agentId);
+    }
+
+    /**
+     * Agent computers — a live view is of ONE machine, the one its owner
+     * chose, so a `computer-session` job is always pinned to `payload.nodeId`.
+     * Unlike an Agent binding, there is no "any of my PCs" fallback: a job
+     * that named no machine, or a machine the owner does not own, is refused
+     * here rather than written unpinned — an unpinned view could be claimed,
+     * and shown, by a different computer.
+     */
+    private async resolveComputerSessionTarget(userId: string, nodeId: unknown): Promise<string> {
+        if (typeof nodeId !== 'string' || !isUUID(nodeId)) {
+            throw new BadRequestException('A computer-session job must name the node it is for');
+        }
+        const node = await this.nodes.findById(nodeId);
+        if (!node || node.userId !== userId) {
+            throw new BadRequestException(
+                'A computer-session job must name a node its owner holds',
+            );
+        }
+        return node.id;
     }
 
     /**

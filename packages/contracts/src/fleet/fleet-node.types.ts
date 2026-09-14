@@ -33,6 +33,8 @@ import type { FleetJobView } from './fleet-jobs.types';
 
 import type { FleetNodeLoadView } from './fleet-jobs.types.js';
 
+import type { ComputerControlPolicy } from '../computer/computer-session.types.js';
+
 /**
  * App shape of a fleet node.
  *
@@ -374,6 +376,29 @@ export interface FleetNodeView {
 	workspaceBytes?: number | null;
 	lastReclaimAt?: string | null;
 	lastReclaimFreedBytes?: number | null;
+
+	/**
+	 * Agent computers — who may take control of this machine from a live
+	 * view (`owner` unless the owner widened it). Optional on the wire so an
+	 * older API build still satisfies this type.
+	 */
+	controlPolicy?: ComputerControlPolicy;
+	/** Whether a watch-only live view of this machine is recorded (default off). */
+	recordWatchSessions?: boolean;
+	/** How many days a recording of this machine is kept (default 14). */
+	recordingRetentionDays?: number;
+	/**
+	 * Who holds control of this machine right now, or null / absent when
+	 * nobody does. At most one person at a time, across every live view.
+	 */
+	controlHolder?: FleetNodeControlHolderView | null;
+}
+
+/** The current holder of a node's control lock. */
+export interface FleetNodeControlHolderView {
+	userId: string;
+	since: string | null;
+	expiresAt: string | null;
 }
 
 /**
@@ -439,6 +464,16 @@ export interface FleetHeartbeatResponse {
 	 * to ship a protocol field to machines nobody can redeploy at once.
 	 */
 	rotationRequested?: boolean;
+	/**
+	 * Agent computers — ids of the live views waiting for THIS node to claim
+	 * them. An attended node that sees a non-empty list polls for its
+	 * interactive work immediately instead of on its next tick.
+	 *
+	 * Optional and additive for the same reason as `rotationRequested`: a
+	 * daemon built before this field existed ignores it, and a response
+	 * with nothing pending omits it.
+	 */
+	pendingComputerSessions?: string[];
 }
 
 // ─── Protocol bounds (fixed) ────────────────────────────────────────────────
