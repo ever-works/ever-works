@@ -13,6 +13,7 @@ import {
 	countSessionCookieSites,
 	HeadlessBrowserCaptureBackend,
 	parseDevToolsActivePort,
+	parseDevToolsListeningLine,
 	scaleForWidth
 } from './headless-browser-backend';
 
@@ -116,6 +117,22 @@ describe('headless browser backend — pure helpers', () => {
 		expect(parseDevToolsActivePort(null)).toBeNull();
 		expect(parseDevToolsActivePort('99999\n/devtools/browser/x')).toBeNull();
 		expect(parseDevToolsActivePort('9222\n/evil?host=elsewhere')).toBeNull();
+	});
+
+	it('accepts only a loopback debugging endpoint announced by a launched browser', () => {
+		expect(parseDevToolsListeningLine('DevTools listening on ws://127.0.0.1:41234/devtools/browser/xyz-1\n')).toBe(
+			'ws://127.0.0.1:41234/devtools/browser/xyz-1'
+		);
+		expect(parseDevToolsListeningLine('noise\nDevTools listening on ws://[::1]:9222/devtools/browser/abc\n')).toBe(
+			'ws://[::1]:9222/devtools/browser/abc'
+		);
+		expect(parseDevToolsListeningLine('starting up')).toBeNull();
+		expect(parseDevToolsListeningLine('DevTools listening on ws://10.0.0.5:9222/devtools/browser/abc')).toBeNull();
+		expect(
+			parseDevToolsListeningLine('DevTools listening on ws://evil.example:9222/devtools/browser/abc')
+		).toBeNull();
+		expect(parseDevToolsListeningLine('DevTools listening on ws://127.0.0.1:9222/evil')).toBeNull();
+		expect(parseDevToolsListeningLine('DevTools listening on ws://127.0.0.1/devtools/browser/abc')).toBeNull();
 	});
 
 	it('scales a viewport down to the preset width and never up', () => {

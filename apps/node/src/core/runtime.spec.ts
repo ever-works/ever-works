@@ -962,6 +962,45 @@ describe('createNodeRuntime — the attended live-view lane (Agent computers)', 
 		expect(runtime.attended?.captureBackend).toBeNull();
 	});
 
+	it('advertises `screen` exactly when the lane has a capture backend to serve it', async () => {
+		const withBrowser = { ...environment, browserPath: '/usr/bin/chromium' };
+
+		// A browser was resolved, but the lane was configured with no backend.
+		const noBackend = recording();
+		const bare = createNodeRuntime(
+			config(),
+			{ ...io(noBackend.fetchFn).io, environment: withBrowser },
+			{ attendEnabled: true, terminalHost: null, captureBackends: [], webSocketFactory: null }
+		);
+		await bare.loop.start();
+		bare.loop.stop();
+		expect(bare.attended?.captureBackend).toBeNull();
+		const bareBeat = noBackend.calls.find((call) => call.url.endsWith('/api/fleet/heartbeat'));
+		expect(bareBeat?.body.capabilities).toContain('attended');
+		expect(bareBeat?.body.capabilities).not.toContain('screen');
+
+		// No browser at all, but a custom backend that can take a picture here.
+		const custom = {
+			id: 'custom',
+			isAvailable: () => true,
+			start: vi.fn(async () => {
+				throw new Error('not started in this test');
+			})
+		};
+		const customBackend = recording();
+		const served = createNodeRuntime(config(), io(customBackend.fetchFn).io, {
+			attendEnabled: true,
+			terminalHost: null,
+			captureBackends: [custom],
+			webSocketFactory: null
+		});
+		await served.loop.start();
+		served.loop.stop();
+		expect(served.attended?.captureBackend).toBe(custom);
+		const servedBeat = customBackend.calls.find((call) => call.url.endsWith('/api/fleet/heartbeat'));
+		expect(servedBeat?.body.capabilities).toEqual(expect.arrayContaining(['attended', 'screen']));
+	});
+
 	it('wakes the attended lane when a heartbeat says a live view is waiting', async () => {
 		const { calls, fetchFn } = recording(['55555555-5555-4555-8555-555555555555']);
 		const { io: deps } = io(fetchFn);

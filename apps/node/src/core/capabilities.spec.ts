@@ -496,6 +496,36 @@ describe('detectCapabilities — live view tags (Agent computers)', () => {
 		expect(attendedHeadlessServer).not.toContain('screen');
 	});
 
+	it('advertises `screen` from the backends the live-view lane was built with, not from a resolved browser', async () => {
+		const unavailable = { id: 'none', isAvailable: () => false };
+		const custom = { id: 'custom', isAvailable: () => true };
+
+		const browserButNoBackend = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, browserPath: '/usr/bin/chromium', captureBackends: [] })
+		);
+		expect(browserButNoBackend).toContain('attended');
+		expect(browserButNoBackend).not.toContain('screen');
+
+		const browserButUnavailableBackend = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, browserPath: '/usr/bin/chromium', captureBackends: [unavailable] })
+		);
+		expect(browserButUnavailableBackend).not.toContain('screen');
+
+		const customWithoutBrowser = await detectCapabilities(
+			runnerWith([]),
+			environment({ attended: true, captureBackends: [custom] })
+		);
+		expect(customWithoutBrowser).toEqual(expect.arrayContaining(['attended', 'screen']));
+
+		const customWithoutAttend = await detectCapabilities(
+			runnerWith([]),
+			environment({ captureBackends: [custom] })
+		);
+		expect(customWithoutAttend).not.toContain('screen');
+	});
+
 	it('never advertises `input`: nothing on this node injects input yet', async () => {
 		const tags = await detectCapabilities(
 			runnerWith([]),

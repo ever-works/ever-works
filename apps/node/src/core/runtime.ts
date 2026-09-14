@@ -443,7 +443,17 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// Agent computers: `--attend` is process-scoped consent, so it rides the
 	// environment the capability probe reads rather than the stored config —
 	// `attended` (and `screen`) are advertised only by a process started with it.
-	const environment = options.attendEnabled ? { ...io.environment, attended: true } : io.environment;
+	// The capture backend is selected HERE, once, and handed to both the
+	// probe and the live-view lane: `screen` is advertised exactly when the
+	// lane has a backend that can serve it, never from a separate guess.
+	const attendedCapture = options.attendEnabled ? selectAttendedCapture(io.environment, options) : null;
+	const environment: CapabilityEnvironment = attendedCapture
+		? {
+				...io.environment,
+				attended: true,
+				captureBackends: attendedCapture.captureBackend ? [attendedCapture.captureBackend] : []
+			}
+		: io.environment;
 	// Set once the attended lane exists (below); the heartbeat hint wakes it.
 	let attendedWake: ((pending: readonly string[] | undefined) => void) | null = null;
 	const loopOptions = {
@@ -751,8 +761,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		runtime.workspaceProvisioner = workspaceProvisioner;
 	}
 
-	if (options.attendEnabled) {
-		const lane = createAttendedLane(config, io, options, environment, jobClientFor());
+	if (attendedCapture) {
+		const lane = createAttendedLane(config, io, options, environment, jobClientFor(), attendedCapture);
 		runtime.attended = lane;
 		runtime.jobClient ??= jobClientFor();
 		attendedWake = (pending) => {
@@ -767,6 +777,29 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 export const ATTENDED_MAX_CONCURRENT_VIEWS = 2;
 /** Lease requested for a live view; kept alive at a third of it while the view runs. */
 export const ATTENDED_LEASE_TTL_SEC = 120;
+
+/** The capture half of an attended lane, selected once per process. */
+interface AttendedCapture {
+	webSocketFactory: WebSocketFactory | null;
+	/** The first configured backend available here, or null (terminal-only views). */
+	captureBackend: CaptureBackend | null;
+}
+
+/**
+ * Select the live-view capture backend from the configured list (the
+ * headless-browser backend by default, when a browser was resolved). The
+ * result feeds BOTH the `screen` capability tag and the lane's executor.
+ */
+function selectAttendedCapture(environment: CapabilityEnvironment, options: CreateNodeRuntimeOptions): AttendedCapture {
+	const webSocketFactory =
+		options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
+	const backends =
+		options.captureBackends ??
+		(environment.browserPath
+			? [new HeadlessBrowserCaptureBackend({ browserPath: environment.browserPath, webSocketFactory })]
+			: []);
+	return { webSocketFactory, captureBackend: selectCaptureBackend(backends, environment) };
+}
 
 /**
  * Agent computers — the attended live-view lane: its own worker loop, its
@@ -784,16 +817,10 @@ function createAttendedLane(
 	io: NodeIo,
 	options: CreateNodeRuntimeOptions,
 	environment: CapabilityEnvironment,
-	jobClient: FleetJobClient
+	jobClient: FleetJobClient,
+	capture: AttendedCapture
 ): NonNullable<NodeRuntime['attended']> {
-	const webSocketFactory =
-		options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
-	const backends =
-		options.captureBackends ??
-		(environment.browserPath
-			? [new HeadlessBrowserCaptureBackend({ browserPath: environment.browserPath, webSocketFactory })]
-			: []);
-	const captureBackend = selectCaptureBackend(backends, environment);
+	const { webSocketFactory, captureBackend } = capture;
 	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;
 	// Windows directories have no mode bits, so an Agent's profile there is
 	// owner-only through an ACL or it is not opened at all (fail closed).

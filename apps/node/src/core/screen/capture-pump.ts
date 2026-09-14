@@ -80,6 +80,14 @@ export class CapturePump {
 	private captureTimer: unknown = null;
 	private statsTimer: unknown = null;
 	private running = false;
+	/** Set by `stop()` and never cleared: a stopped pump opens nothing again. */
+	private stopped = false;
+	/**
+	 * Source starts still in flight, each settling only once its source is
+	 * either installed or — when `stop()` began first — stopped again.
+	 * `stop()` waits for all of them, so no capture process outlives it.
+	 */
+	private readonly opening = new Set<Promise<void>>();
 	private capturing = false;
 	private forceNext = false;
 	private seq = 0;
@@ -101,7 +109,9 @@ export class CapturePump {
 
 	/** Open the capture source and begin. Rejects when the source cannot start. */
 	async start(): Promise<void> {
-		this.source = await this.options.backend.start({ profileDir: this.options.profileDir });
+		// Stopped while (or before) starting: the source was released inside
+		// `openSource`, and nothing is armed.
+		if (!(await this.openSource())) return;
 		this.running = true;
 		this.forceNext = true;
 		this.armCapture(0);
@@ -138,12 +148,16 @@ export class CapturePump {
 	}
 
 	async stop(): Promise<void> {
+		this.stopped = true;
 		this.running = false;
 		this.clearTimer('captureTimer');
 		this.clearTimer('statsTimer');
 		const source = this.source;
 		this.source = null;
-		await source?.stop();
+		// A start still in flight stops its own source when it lands (it sees
+		// `stopped`); waiting for it here means this resolves only once every
+		// capture process this pump opened is gone.
+		await Promise.allSettled([source?.stop(), ...this.opening]);
 	}
 
 	/** The stats frame for this instant. */
@@ -169,8 +183,10 @@ export class CapturePump {
 		try {
 			// A restart that failed left no source: try again here, one tick
 			// later, rather than ending a view over a browser that hiccupped.
-			this.source ??= await this.options.backend.start({ profileDir: this.options.profileDir });
-			const picture = await this.source.capture({ width: preset.width, quality: preset.q });
+			if (!this.source && !(await this.openSource())) return;
+			const source = this.source;
+			if (!source) return;
+			const picture = await source.capture({ width: preset.width, quality: preset.q });
 			if (!this.running) return;
 			this.failures = 0;
 			const at = this.now();
@@ -199,12 +215,6 @@ export class CapturePump {
 			await this.onFailure(error instanceof Error ? error.message : String(error));
 		} finally {
 			this.capturing = false;
-			if (!this.running && this.source) {
-				// Stopped while this tick was starting a source: release it.
-				const orphan = this.source;
-				this.source = null;
-				void orphan.stop();
-			}
 		}
 		if (!this.running) return;
 		this.adaptQuality();
@@ -227,14 +237,46 @@ export class CapturePump {
 		this.source = null;
 		await previous?.stop();
 		try {
-			this.source = await this.options.backend.start({ profileDir: this.options.profileDir });
-			this.forceNext = true;
+			// `openSource` rechecks for a stop that began while the previous
+			// source was closing, and releases a source that lands after one.
+			if (await this.openSource()) this.forceNext = true;
 		} catch (error) {
 			this.options.logger?.warn(
 				`Live view capture could not restart: ${error instanceof Error ? error.message : String(error)}`
 			);
 			// Try again on the next tick rather than ending the view.
 		}
+	}
+
+	/**
+	 * Start a capture source and install it as the active one — unless
+	 * `stop()` began first, in which case the new source is stopped (and
+	 * awaited) here and nothing is installed. The check and the install run
+	 * in the same synchronous step after the start resolves, so a stop can
+	 * land only before it (this releases the source) or after it (`stop()`
+	 * finds and releases it); there is no window in between.
+	 *
+	 * Resolves true when a source was installed, false when the pump was
+	 * stopped; rejects when the backend cannot start.
+	 */
+	private openSource(): Promise<boolean> {
+		if (this.stopped) return Promise.resolve(false);
+		const attempt = (async (): Promise<boolean> => {
+			const source = await this.options.backend.start({ profileDir: this.options.profileDir });
+			if (this.stopped) {
+				await source.stop();
+				return false;
+			}
+			this.source = source;
+			return true;
+		})();
+		const settled = attempt.then(
+			() => undefined,
+			() => undefined
+		);
+		this.opening.add(settled);
+		void settled.then(() => this.opening.delete(settled));
+		return attempt;
 	}
 
 	private adaptQuality(): void {

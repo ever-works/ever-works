@@ -83,6 +83,9 @@ export async function startNodeTerminalChannel(options: NodeTerminalChannelOptio
 		stop: async () => {
 			if (stopped) return;
 			stopped = true;
+			// Outbound closes FIRST: a shell that ignores the kill must not keep
+			// publishing into a view this channel has already reported stopped.
+			closed = true;
 			stopInbound();
 			try {
 				handle.kill();

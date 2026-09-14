@@ -210,6 +210,96 @@ describe('CapturePump', () => {
 		await pump.stop();
 	});
 
+	it('does not start capturing when stopped while its source is still starting, and releases that source', async () => {
+		const scheduler = manualScheduler();
+		let release: () => void = () => undefined;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const { backend, sources } = backendWith(async () => shot());
+		const startSource = backend.start;
+		backend.start = vi.fn(async (input) => {
+			await gate;
+			return startSource(input);
+		});
+		const pump = new CapturePump({ backend, profileDir: '/p', quality: 'sharp', outbox: fakeOutbox(), scheduler });
+
+		const starting = pump.start();
+		await vi.waitFor(() => expect(backend.start).toHaveBeenCalledTimes(1));
+		let stopResolved = false;
+		const stopping = pump.stop().then(() => {
+			stopResolved = true;
+		});
+		await Promise.resolve();
+		expect(stopResolved).toBe(false);
+
+		release();
+		await starting;
+		await stopping;
+		expect(sources).toHaveLength(1);
+		expect(sources[0].stopped).toBe(true);
+		expect(pump.captureSource).toBeNull();
+		expect(scheduler.pending()).toBe(0);
+	});
+
+	it('waits for a restart that is still starting when stopped, and stops the source it produces', async () => {
+		const scheduler = manualScheduler();
+		const { backend, sources } = backendWith(async () => {
+			throw new Error('page crashed');
+		});
+		const startSource = backend.start;
+		let release: () => void = () => undefined;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		let starts = 0;
+		backend.start = vi.fn(async (input) => {
+			starts += 1;
+			// The first source opens at once; the restart waits for the test.
+			if (starts > 1) await gate;
+			return startSource(input);
+		});
+		const outbox = fakeOutbox();
+		const pump = new CapturePump({ backend, profileDir: '/p', quality: 'sharp', outbox, scheduler });
+		await pump.start();
+		await pump.tick();
+		await pump.tick();
+
+		// The third failure restarts the capture; its new source is still starting.
+		const restarting = pump.tick();
+		await vi.waitFor(() => expect(backend.start).toHaveBeenCalledTimes(2));
+		expect(sources[0].stopped).toBe(true);
+
+		let stopResolved = false;
+		const stopping = pump.stop().then(() => {
+			stopResolved = true;
+		});
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(stopResolved).toBe(false);
+
+		release();
+		await stopping;
+		// stop() resolved only after the late source was released.
+		expect(sources).toHaveLength(2);
+		expect(sources[1].stopped).toBe(true);
+		await restarting;
+		expect(pump.captureSource).toBeNull();
+		expect(scheduler.pending()).toBe(0);
+		expect(backend.start).toHaveBeenCalledTimes(2);
+	});
+
+	it('opens nothing once stopped', async () => {
+		const { backend } = backendWith(async () => shot());
+		const pump = new CapturePump({
+			backend,
+			profileDir: '/p',
+			quality: 'sharp',
+			outbox: fakeOutbox(),
+			scheduler: manualScheduler()
+		});
+		await pump.stop();
+		await pump.start();
+		await pump.tick();
+		expect(backend.start).not.toHaveBeenCalled();
+	});
+
 	it('stops its source and its timers', async () => {
 		const scheduler = manualScheduler();
 		const { backend, sources } = backendWith(async () => shot());

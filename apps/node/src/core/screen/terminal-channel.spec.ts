@@ -177,6 +177,34 @@ describe('startNodeTerminalChannel', () => {
 		}
 	});
 
+	it('publishes nothing more once stopped, even from a shell that ignores the kill', async () => {
+		vi.useFakeTimers();
+		try {
+			const { host, transports } = fakeHost({ neverExits: true });
+			const published: TerminalFrame[] = [];
+			const channel = await startNodeTerminalChannel({
+				host,
+				sessionId: SESSION,
+				cwd: '/files',
+				publish: (frame) => published.push(frame),
+				platform: 'linux',
+				parentEnv: {}
+			});
+			transports[0].publish(stdout('before\n'));
+			expect(published).toHaveLength(1);
+
+			const stopped = channel.stop();
+			transports[0].publish(stdout('while stopping\n'));
+			await vi.advanceTimersByTimeAsync(3000);
+			await stopped;
+			transports[0].publish(stdout('after stop\n'));
+
+			expect(published).toHaveLength(1);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('surfaces a provider that cannot host a shell as a rejection the executor turns into a banner', async () => {
 		const { host } = fakeHost({
 			spawnError: Object.assign(new Error('no pty here'), { name: 'TerminalNotProvisionedError' })

@@ -10,7 +10,7 @@ import type { BrowserProbeIo } from './browser-probe';
 import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
 import type { NodeHousekeepingReport } from './housekeeping-report';
-import { isScreenCaptureAvailable } from './screen/capture-backend';
+import { isScreenCaptureAvailable, type CaptureBackendAvailability } from './screen/capture-backend';
 import type { WorkerHealth } from './worker-health';
 import {
 	MAX_CAPABILITY_TAG_LENGTH,
@@ -71,6 +71,15 @@ export interface CapabilityEnvironment {
 	 * `screen`, and no live view can ever be leased here.
 	 */
 	attended?: boolean;
+	/**
+	 * Agent computers — the capture backends this process's live-view lane
+	 * was actually built with. When present, `screen` is advertised from
+	 * THESE and nothing else: an empty list advertises no `screen` whatever
+	 * browser was resolved, and a working custom backend advertises it with
+	 * no browser at all. Absent, the default backends' availability rules
+	 * apply.
+	 */
+	captureBackends?: readonly CaptureBackendAvailability[];
 }
 
 /**
@@ -294,11 +303,14 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		// switch for live viewing. `screen` only under `--attend` AND when a
 		// capture backend can actually take a picture here (the headless
 		// browser backend needs the SAME resolved browser the `browser` tag
-		// stands on): the live-view executor is registered by exactly that
-		// fact, so the tag and the executor cannot disagree. `input` is NOT
-		// advertised: nothing on this node injects input yet.
+		// stands on). A runtime with a live-view lane passes the backends
+		// that lane selects from, so the tag reads the SAME list with the
+		// SAME rule the lane used, and the two cannot disagree. `input` is
+		// NOT advertised: nothing on this node injects input yet.
 		environment.attended === true ? FLEET_ATTENDED_CAPABILITY : null,
-		environment.attended === true && isScreenCaptureAvailable(environment) ? FLEET_SCREEN_CAPABILITY : null
+		environment.attended === true && isScreenCaptureAvailable(environment, environment.captureBackends)
+			? FLEET_SCREEN_CAPABILITY
+			: null
 	]);
 }
 

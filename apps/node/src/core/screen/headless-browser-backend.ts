@@ -137,6 +137,29 @@ export function parseDevToolsActivePort(content: string | null): string | null {
 	return `ws://127.0.0.1:${port}${path}`;
 }
 
+/**
+ * The endpoint a browser we launched announced on stderr, held to the same
+ * shape {@link parseDevToolsActivePort} accepts: plain `ws:` to loopback,
+ * a real port, and a `/devtools/browser/<id>` path. Anything else is null,
+ * so a debugging connection is never opened to another host.
+ */
+export function parseDevToolsListeningLine(output: string): string | null {
+	const match = DEVTOOLS_LISTENING_PATTERN.exec(output);
+	if (!match) return null;
+	let url: URL;
+	try {
+		url = new URL(match[1]);
+	} catch {
+		return null;
+	}
+	if (url.protocol !== 'ws:' || (url.hostname !== '127.0.0.1' && url.hostname !== '[::1]')) return null;
+	if (url.search || url.hash || url.username || url.password) return null;
+	const port = Number.parseInt(url.port, 10);
+	if (!Number.isInteger(port) || port <= 0 || port > 65_535) return null;
+	if (!/^\/devtools\/browser\/[A-Za-z0-9-]+$/.test(url.pathname)) return null;
+	return `ws://${url.hostname}:${port}${url.pathname}`;
+}
+
 /** Scale a viewport down to a preset width, never up. */
 export function scaleForWidth(
 	viewportWidth: number,
@@ -373,8 +396,8 @@ function waitForDevToolsEndpoint(child: ChildProcess, timeoutMs: number, signal?
 		signal?.addEventListener('abort', onAbort, { once: true });
 		child.stderr?.on('data', (chunk: Buffer | string) => {
 			stderr = (stderr + chunk.toString()).slice(-4096);
-			const match = DEVTOOLS_LISTENING_PATTERN.exec(stderr);
-			if (match) finish(null, match[1]);
+			const endpoint = parseDevToolsListeningLine(stderr);
+			if (endpoint) finish(null, endpoint);
 		});
 		child.once('error', (error: Error) => finish(new Error(`The browser could not start: ${error.message}`)));
 		child.once('exit', (code: number | null) =>
