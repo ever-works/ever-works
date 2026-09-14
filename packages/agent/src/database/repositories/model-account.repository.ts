@@ -2,6 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, EntityManager, IsNull, LessThan, Repository } from 'typeorm';
 import { ModelAccount } from '../../entities/model-account.entity';
+import { advisoryLockObjectId } from './agent-run.repository';
+
+/**
+ * Model accounts (AW-16) — advisory-lock namespace (`classid`) for writes to a
+ * workspace's accounts for one provider. Apart from run admission
+ * (`0x6577_0001`), live-view admission (`0x6577_000b` / `0x6577_000c`) and
+ * send admission (`0x6577_0e01` / `0x6577_0e02`). Arbitrary but STABLE:
+ * changing it would make an old and a new replica lock on different keys
+ * during a rolling restart — exactly the window the lock exists for.
+ */
+export const MODEL_ACCOUNT_WRITE_LOCK_CLASS_ID = 0x6577_1601 | 0;
+
+/**
+ * The advisory-lock key for one workspace's accounts of one provider. A write
+ * that is not about one provider (`null`) locks the workspace as a whole.
+ */
+export function modelAccountWriteLockKey(
+    workspaceKey: string,
+    providerPluginId: string | null,
+): string {
+    return providerPluginId
+        ? `model-accounts:${workspaceKey}:${providerPluginId}`
+        : `model-accounts:${workspaceKey}`;
+}
 
 /**
  * Model accounts (AW-16) — repository for `model_accounts`.
@@ -28,9 +52,23 @@ export class ModelAccountRepository {
     }
 
     /**
-     * Run `work` in one transaction with a repository bound to it. On Postgres
-     * the workspace's rows for the provider are locked first so two concurrent
-     * writes serialize on the count and the positions they read.
+     * Run `work` in one transaction with a repository bound to it, serialized
+     * against every other write to the same workspace's accounts of the same
+     * provider.
+     *
+     * POSTGRES: first takes `pg_advisory_xact_lock` keyed by workspace and
+     * provider ({@link modelAccountWriteLockKey}), then row-locks the
+     * provider's existing rows. The row lock alone cannot serialize the FIRST
+     * adds for a provider — with no rows there is nothing to lock, and two
+     * concurrent adds would both pass the limit count. The advisory lock
+     * exists whether or not rows do, and is held until this transaction
+     * commits, so the next writer's count sees the row just written. A failure
+     * to take the lock fails the write with nothing written: unlike the run
+     * admission valve, the account limit is a hard rule, not a safety valve.
+     *
+     * EVERY OTHER DRIVER (better-sqlite3 — the e2e/CI stack): advisory and row
+     * locks do not exist, so both are a documented no-op and `work` runs in a
+     * plain transaction, as before.
      */
     async inTransaction<T>(
         workspaceKey: string,
@@ -40,6 +78,10 @@ export class ModelAccountRepository {
         return this.repository.manager.transaction(async (manager: EntityManager) => {
             const tx = manager.getRepository(ModelAccount);
             if (manager.connection.options.type === 'postgres') {
+                await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+                    MODEL_ACCOUNT_WRITE_LOCK_CLASS_ID,
+                    advisoryLockObjectId(modelAccountWriteLockKey(workspaceKey, providerPluginId)),
+                ]);
                 const query = tx
                     .createQueryBuilder('account')
                     .select('account.id')
