@@ -162,7 +162,7 @@
           `decisionNeeded` is empty or unparseable;
         - proposal → one `kind: 'approval'` ask with `question.kind = 'approval'`,
           `prompt` / `action` = `title`, `risks` = `riskFlags`.
-          Each derived ask gets `dedupKey = \`${decisionType}:${decisionId}:derived\``.
+          Each derived ask gets `` dedupKey = `${decisionType}:${decisionId}:derived` ``.
     - **Test**: `packages/agent/src/decisions/__tests__/decision-ask-materialiser.spec.ts`
       — one case per reason code and per action type, plus the empty/garbage
       `decisionNeeded` fallback.
@@ -301,7 +301,7 @@ AgentRun, Task])`, providing and exporting `DecisionAskRepository`,
 - [ ] **T16. Add the route constants and the sidebar entry.**
     - Modify `apps/web/src/lib/constants.ts`: add to `ROUTES` (near
       `DASHBOARD_INBOX` at line 115) `DASHBOARD_DECISIONS: '/decisions'` and
-      `DASHBOARD_DECISION: (id: string) => \`/decisions?id=${id}\``, with a comment
+      `` DASHBOARD_DECISION: (id: string) => `/decisions?id=${id}` ``, with a comment
       explaining the composite id form.
     - Modify `apps/web/src/components/dashboard/DashboardSidebar.tsx`: one nav entry
       between `Dashboard` and `Inbox`, label key

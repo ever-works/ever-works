@@ -300,6 +300,7 @@ needed, where it comes from instead, and what each substitution costs.
 | Sub-task roll-up                                 | `COUNT(*) GROUP BY parentTaskId, status`                  | One grouped query on `idx_tasks_parent`                                                                                                               |
 | Top-level only                                   | `parentTaskId IS NULL`                                    | Needs a "no parent" form on the list filter (§3.2)                                                                                                    |
 | Decision count                                   | Grouped counts over escalations and pending approvals     | Two grouped queries, both index-backed                                                                                                                |
+| Done today                                       | `status = 'done'` + `completedAt >= :since` (§4.1.1)      | One count under the board predicate. `completedAt` is already stamped by the transition service on every move to `done`                               |
 | Comment count                                    | `COUNT(*) GROUP BY taskId` on the chat table              | One grouped query on `idx_task_chat_task_created`. A denormalised counter would need a writer on post, edit and delete plus a repair job — for a chip |
 | Stalled                                          | `status`, `latestRunStatus`, `updatedAt`                  | Under-reports after an unrelated edit (§2.4)                                                                                                          |
 | Hidden                                           | `hiddenFromBoard`                                         | —                                                                                                                                                     |
@@ -365,17 +366,18 @@ unchanged.
 
 **`GET /api/tasks/board`** — the board read model.
 
-| Query                                                          | Type              | Default          | Notes                                           |
-| -------------------------------------------------------------- | ----------------- | ---------------- | ----------------------------------------------- |
-| `layout`                                                       | `status \| focus` | `status`         | Which column table to group by                  |
-| `columnLimit`                                                  | int 1–100         | 50               | Cards per column                                |
-| `terminalWindowDays`                                           | int 1–90          | 7                | Bounds `done` and `cancelled` (spec FR-10, S25) |
-| `priority`, `label`, `search`                                  | as the list route | —                | Same parsing helpers                            |
-| `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` | uuid              | —                | Same `ParseUUIDPipe({ optional: true })`        |
-| `includeSubtasks`                                              | `'true'`          | off              | Off → `parentTaskId: 'none'`                    |
-| `includeTemplates`                                             | `'true'`          | off              | Off → `isRecurring: false`                      |
-| `includeHidden`                                                | `'true'`          | off              | Same meaning as the list route                  |
-| `includeCancelled`                                             | `'true'`          | layout-dependent | `focus` only; `status` always includes it       |
+| Query                                                          | Type              | Default          | Notes                                              |
+| -------------------------------------------------------------- | ----------------- | ---------------- | -------------------------------------------------- |
+| `layout`                                                       | `status \| focus` | `status`         | Which column table to group by                     |
+| `columnLimit`                                                  | int 1–100         | 50               | Cards per column                                   |
+| `terminalWindowDays`                                           | int 1–90          | 7                | Bounds `done` and `cancelled` (spec FR-10, S25)    |
+| `priority`, `label`, `search`                                  | as the list route | —                | Same parsing helpers                               |
+| `missionId`, `ideaId`, `workId`, `teamId`, `agentId`, `goalId` | uuid              | —                | Same `ParseUUIDPipe({ optional: true })`           |
+| `includeSubtasks`                                              | `'true'`          | off              | Off → `parentTaskId: 'none'`                       |
+| `includeTemplates`                                             | `'true'`          | off              | Off → `isRecurring: false`                         |
+| `includeHidden`                                                | `'true'`          | off              | Same meaning as the list route                     |
+| `includeCancelled`                                             | `'true'`          | layout-dependent | `focus` only; `status` always includes it          |
+| `timeZone`                                                     | IANA zone name    | —                | The viewer's day boundary for `doneToday` (§4.1.1) |
 
 Response:
 
@@ -401,7 +403,13 @@ Response:
 			"ended": false
 		}
 	],
-	"counters": { "waitingOnYou": 3, "doneToday": 7 },
+	"counters": {
+		"waitingOnYou": 3,
+		"doneToday": 7, // null when no valid timeZone was supplied (§4.1.1)
+		"timeZone": "Europe/Berlin", // the canonical zone actually used, or null
+		"doneTodaySince": "2026-03-09T23:00:00.000Z", // local midnight in timeZone, or null
+		"doneTodayResetsAt": "2026-03-10T23:00:00.000Z" // next local midnight, or null
+	},
 	"terminalWindowDays": 7,
 	"degraded": [] // names of enrichments that failed this read
 }
@@ -426,6 +434,36 @@ shape:
 `provenance` is returned **fully ordered by the FR-28 precedence and already
 scope-filtered**, so the client renders the first two and menus the rest without
 knowing the rules. Throttle: matches the existing list route.
+
+#### 4.1.1 The "done today" boundary
+
+Spec FR-54 needs a day boundary the server cannot guess, so the contract carries it
+explicitly, as the viewer's **IANA zone name**, and the server derives the instants:
+
+1. **Validate.** A pure `resolveBoardTimeZone(raw)` in
+   `packages/agent/src/tasks-domain/task-board-day.ts` accepts a string of at most 64
+   characters for which `new Intl.DateTimeFormat('en-US', { timeZone: raw })` does not
+   throw, and returns the canonical `resolvedOptions().timeZone`. Anything else —
+   absent, empty, too long, unknown — returns `null`. The route never 400s on it, in
+   line with every other malformed board parameter. This is the same `Intl`-based zone
+   handling the notification quiet-hours check already does on the server.
+2. **Derive.** A pure `localDayWindow(now, timeZone)` in the same file returns
+   `{ since, resetsAt }`: `since` is the **first instant whose wall-clock date in
+   `timeZone` equals today's**, and `resetsAt` is the first instant of the next local
+   date. Defining it as "first instant of the date" rather than "00:00" keeps it
+   correct on 23- and 25-hour days and in zones whose daylight-saving change skips
+   midnight, where the day starts at 01:00 local.
+3. **Count.** `doneToday` is `COUNT(*)` under the shared board predicate plus
+   `status = 'done' AND completedAt >= :since`. `completedAt` is stamped by the
+   existing transition service on every move to `done`; no column is added.
+4. **Echo.** The response returns `timeZone`, `doneTodaySince` and `doneTodayResetsAt`
+   beside the count, so a test or a support session can see exactly which boundary a
+   number was taken against. With no valid zone all four are `null` and the header
+   renders the §6.7 placeholder — never a count against UTC or the server's zone.
+
+Why a zone name and not a client-computed instant: the server owns one derivation that
+is unit-tested across zones, and the same value also yields `resetsAt`, which the
+client needs for the reset half of FR-54 (§5.3).
 
 **`GET /api/tasks/board/column`** — one column, for **Show 50 more**.
 Same query parameters plus `status` (a single column key) and `offset`; returns
@@ -460,6 +498,9 @@ For `view=cards|table` it keeps calling `tasksAPI.list(...)` exactly as today.
 View resolution order, implemented once in a small `resolveTasksView()`:
 `?view=` → a `tasks.view` cookie → `'board'`.
 
+For `view=board` the page also forwards the `tasks.timeZone` cookie, when present, as
+the board read's `timeZone` (§4.1.1).
+
 ### 5.2 New and changed components
 
 Under `apps/web/src/components/tasks/`:
@@ -483,6 +524,7 @@ In `packages/agent/src/tasks-domain/`:
 | `task-board-columns.ts`    | Both layout tables, `resolveDrop()`, `columnForStatus()`. Pure, no imports from TypeORM or NestJS. **Imported by both the API and the web client**, so the two cannot disagree |
 | `task-board-stall.ts`      | `isStalled()`, `clampStallAfterDays()`, `stallCutoff()`. Pure                                                                                                                  |
 | `task-board-provenance.ts` | `orderProvenance()` implementing FR-28's precedence. Pure                                                                                                                      |
+| `task-board-day.ts`        | `resolveBoardTimeZone()` and `localDayWindow()` — the "done today" boundary of §4.1.1. Pure                                                                                    |
 | `task-board.service.ts`    | The read model of §2.1. The only new service                                                                                                                                   |
 
 ### 5.3 State and data fetching
@@ -495,6 +537,20 @@ In `packages/agent/src/tasks-domain/`:
   that column's array only.
 - `useTaskRunPolling` is reused unchanged — its merge already touches only run and PR
   fields, which is exactly what a board refresh must not widen.
+- **The viewer's zone.** On mount `TaskBoard` reads
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` — the detection
+  `TaskRecurringSection` already uses, and passes it to
+  `setTasksTimeZoneAction(zone)`. The action returns `{ changed: true }` only when the
+  stored cookie value actually changed (the first visit, or a viewer who has
+  travelled); only then does `TaskBoard` call `router.refresh()`, so the counter
+  arrives computed against the viewer's own midnight. Comparing against the stored
+  cookie rather than the echoed canonical zone means an alias the server canonicalises
+  differently can never cause a refresh loop. Until the refresh lands the header shows
+  the §6.7 placeholder, because the API returned `doneToday: null`.
+- **The reset.** `TaskBoard` schedules one `router.refresh()` at
+  `counters.doneTodayResetsAt`, and on `visibilitychange` back to visible re-checks
+  whether that instant has passed while the tab was hidden. The count therefore
+  returns to its new-day value at local midnight without a poll.
 
 ### 5.4 New server actions — `apps/web/src/app/actions/tasks.ts`
 
@@ -503,6 +559,9 @@ Appended beside the existing ones, none of which change:
 - `getTaskBoardAction(filters)` → the P1 read.
 - `getTaskBoardColumnAction(filters, status, offset)` → the column read.
 - `setTasksViewAction(view)` → writes the `tasks.view` cookie.
+- `setTasksTimeZoneAction(timeZone)` → writes the `tasks.timeZone` cookie, only for a
+  value that passes the same `Intl` validation as §4.1.1 (anything else is ignored),
+  and returns `{ changed }` — `true` only when the stored value differs from before.
 
 ---
 
@@ -687,7 +746,23 @@ undefined` emits none; each `orderBy` value emits the expected clause; **omittin
 - `task-board.service.spec.ts` — totals come from the grouped count and not from
   `cards.length`; each enrichment failure degrades only itself and names itself in
   `degraded[]`; the enrichment reads are batched (assert one call per source with an
-  `IN` list, not N calls).
+  `IN` list, not N calls); a Task with `completedAt` one millisecond before
+  `doneTodaySince` is not counted and one at exactly `doneTodaySince` is; with no
+  `timeZone` the count is `null` and the count query is not issued.
+- `task-board-day.spec.ts` — the boundary across UTC/local-midnight transitions, each
+  asserted on `since` and `resetsAt`:
+    - `UTC`, `now = 2026-03-10T12:00:00Z` → `since 2026-03-10T00:00:00Z`.
+    - `Asia/Tokyo`, `now = 2026-03-10T16:30:00Z` (already 11 March locally, still
+      10 March in UTC) → `since 2026-03-10T15:00:00Z`.
+    - `America/Los_Angeles`, `now = 2026-03-11T06:30:00Z` (already 11 March in UTC,
+      still 10 March locally) → `since 2026-03-10T07:00:00Z`.
+    - `America/New_York` on its 23-hour day, `now = 2026-03-08T12:00:00Z` →
+      `since 2026-03-08T05:00:00Z`, `resetsAt 2026-03-09T04:00:00Z`.
+    - `America/Santiago`, whose change on 2026-09-06 skips local midnight,
+      `now = 2026-09-06T12:00:00Z` → `since 2026-09-06T04:00:00Z` (01:00 local).
+    - One millisecond either side of a local midnight flips the date.
+    - `resolveBoardTimeZone`: a valid name returns its canonical form; `undefined`,
+      `''`, a 65-character string and `Not/AZone` return `null`.
 
 ### 10.2 Controller specs — API (Jest, colocated in `apps/api/src/tasks/`)
 
@@ -697,7 +772,9 @@ Following the existing `tasks.controller.*.spec.ts` files:
   defaults; `layout=focus` returns four columns plus the toggle behaviour;
   `columnLimit` clamps at 1 and 100; `terminalWindowDays` clamps at 1 and 90;
   `includeSubtasks` / `includeTemplates` / `includeHidden` each flip exactly one
-  predicate; the `board` block is present on every card.
+  predicate; the `board` block is present on every card; `timeZone` reaches the
+  service as given, and an unknown zone yields `counters.doneToday: null` with a 200
+  rather than a 400.
 - `tasks.controller.board-scope.spec.ts` — another user's Task is absent from every
   column and every count; a provenance name the caller cannot see is omitted;
   cross-user column paging 404s in the same shape as the existing scope specs.
@@ -725,6 +802,12 @@ Following the existing `tasks.controller.*.spec.ts` files:
   back, chipped and not draggable.
 - A Task with an open escalation shows the Decision chip while staying in
   `In progress`.
+- "done today" follows the viewer's zone: with the browser context's `timezoneId` set
+  to a non-UTC zone, fixtures are seeded through the same `localDayWindow` helper — a
+  Task completed exactly at that zone's current local midnight is counted and one
+  completed a millisecond earlier is not. A first visit with no `tasks.timeZone`
+  cookie shows the placeholder, then the count after exactly one refresh; a second
+  visit shows the count on first paint with no refresh.
 - Focus layout: dragging `in_progress` onto `Needs you` opens the picker; choosing
   `Blocked` moves the card; cancelling changes nothing.
 - The board's existing behaviours still pass: drag to transition, the `r` shortcut,
@@ -734,6 +817,11 @@ Following the existing `tasks.controller.*.spec.ts` files:
 
 - `TaskBoardCard` renders an Agent-supplied title containing markup as literal text.
 - `TaskProvenanceChips` renders two chips and menus the third.
+- `TaskBoard` zone and reset handling, with fake timers: `setTasksTimeZoneAction`
+  returning `changed: true` triggers exactly one `router.refresh()` and `changed: false`
+  triggers none; one refresh fires at `doneTodayResetsAt`; a tab hidden across that
+  instant refreshes once on becoming visible; `doneToday: null` renders the
+  placeholder, never `0`.
 - `TasksList` view resolution: URL beats cookie beats the board default.
 - A hydration spec over the new keys — a missing parent key must fail the suite here
   rather than reddening every e2e shard.

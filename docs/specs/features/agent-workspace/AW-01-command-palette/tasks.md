@@ -307,7 +307,17 @@ class `SearchIndexEntry`) and `packages/agent/src/entities/workspace-search-rece
 (`@Entity('workspace_search_recents')`, class `WorkspaceSearchRecent`) with exactly the columns
 and indexes in [plan.md §3.2](plan.md#32-p2--two-new-tables). Both declare **`tenantId` and
 `organizationId`** so the existing scope-stamping subscriber fills them on insert.
-**Done:** both compile and are exported from `packages/agent/src/entities/index.ts`.
+`WorkspaceSearchRecent` also declares the non-null `scopeKey` (`varchar(64)`,
+`organizationId ?? 'personal'`), recomputed in a `@BeforeInsert`/`@BeforeUpdate` hook, and its
+unique index is `uq_workspace_search_recents_user_scope_target` on
+`(userId, scopeKey, kind, sourceId)` — **never** on `organizationId`, which is `NULL` in personal
+scope and would let duplicates through. The doc comment must say so and point at
+`Agent.scopeTargetId` as the precedent.
+Create `packages/agent/src/entities/__tests__/workspace-search-recent.entity.spec.ts`: the unique
+index columns are exactly `['userId', 'scopeKey', 'kind', 'sourceId']`, and the hook maps
+`organizationId: null` → `'personal'` and a uuid → that uuid.
+**Done:** both compile, are exported from `packages/agent/src/entities/index.ts`, and the entity
+spec is green.
 
 **T-35 — The three inventory files (or CI reds).**
 Modify `packages/agent/src/database/_entities-inventory.ts` (concrete per-file import + an
@@ -322,7 +332,9 @@ Create `apps/api/src/migrations/1791010000000-AddWorkspaceSearchIndex.ts`, class
 `AddWorkspaceSearchIndex1791010000000`. Two existence-guarded `CREATE TABLE`s plus their
 indexes, expressed with TypeORM `Table`/`TableIndex` objects (portable — CI and e2e run
 `better-sqlite3`, production runs Postgres). No `ALTER`, no `DROP`, no data movement on any
-existing table. `down()` drops exactly the two tables it created.
+existing table. `down()` drops exactly the two tables it created. `workspace_search_recents`
+is created with `scopeKey` `NOT NULL` and its unique index on `(userId, scopeKey, kind, sourceId)`
+exactly as T-34 declares it, so the entity and the schema cannot drift.
 Follow the doc-comment style of `apps/api/src/migrations/1789100000000-AddTaskGraphFanout.ts`.
 The timestamp is AW-01's reserved slot 00 ([README §5 rule 10](../README.md#5-rules-every-epic-spec-in-this-program-must-follow)); before merge, rebase on `develop` and
 re-stamp filename and class name if a newer migration has landed.
@@ -401,14 +413,29 @@ enforces it).
 passes.
 
 **T-45 — Recents endpoints.**
+Create `packages/agent/src/workspace-search/workspace-search-recents.service.ts` with
+`record(userId, kind, sourceId)`, `list(userId, limit)`, `trim(userId)` and
+`remove(userId, kind, sourceId)`. `record()` resolves the active scope once from
+`ScopeContextService`, sets `tenantId`, `organizationId` and `scopeKey` explicitly on the row (it
+must not rely on the subscriber, which runs after entity listeners), and writes one conditional
+insert that updates `openedAt` on a conflict against
+`uq_workspace_search_recents_user_scope_target` — atomic, no read-then-write. Every read, trim and
+delete filters on `(userId, scopeKey)`, never on `organizationId IS NULL`.
+Create `packages/agent/src/workspace-search/__tests__/workspace-search-recents.service.integration.spec.ts`
+on an in-memory `better-sqlite3` DataSource with the real entity and index: two `record()` calls
+for one target in **personal scope** leave one row carrying the later `openedAt`; the same target
+in personal scope and in an Organization gives two rows; two Organizations give two rows; ten
+concurrent `record()` calls for one target resolve to one row and none rejects; `trim()` keeps 12
+per `(userId, scopeKey)` and leaves the other scope's rows alone.
 Create `apps/api/src/workspace-search/workspace-search-recents.controller.ts`
-(`GET` capped at 12, `POST` upserting on `(userId, organizationId, kind, sourceId)` and trimming
-to 12, `DELETE /:kind/:sourceId`), register it in the existing
+(`GET` capped at 12, `POST` delegating to `record()` and trimming to 12,
+`DELETE /:kind/:sourceId`), register it in the existing
 `apps/api/src/workspace-search/workspace-search.module.ts`, and create
 `apps/api/src/workspace-search/workspace-search-recents.controller.spec.ts`.
 Create `apps/web/src/app/api/workspace-search/recents/route.ts` (`GET` + `POST`, `bffProxy`,
 `scope: 'workspace'`).
-**Done:** a repeat open updates rather than duplicates; every route filters by `userId`.
+**Done:** a repeat open updates rather than duplicates in personal scope **and** in an
+Organization; the integration spec is green; every route filters by `userId` and `scopeKey`.
 
 **T-46 — Client prefers the server list.**
 Modify `apps/web/src/components/command-palette/hooks/use-palette-recents.ts` to read/write the

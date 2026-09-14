@@ -541,7 +541,7 @@ shapes do not move.
   [`activity/activity-client.tsx`](<../../../../../apps/web/src/app/[locale]/(dashboard)/activity/activity-client.tsx>)).
 - `apps/web/src/lib/constants.ts` — add
   `DASHBOARD_DECISIONS: '/decisions'` and
-  `DASHBOARD_DECISION: (id: string) => \`/decisions?id=${id}\``to`ROUTES`.
+  `` DASHBOARD_DECISION: (id: string) => `/decisions?id=${id}` `` to `ROUTES`.
 - `apps/web/src/components/dashboard/DashboardSidebar.tsx` — one nav entry between
   `Dashboard` and `Inbox`, label key `dashboard.sidebar.navigation.decisions`, with
   the open-count badge fed the same way the Inbox unread badge is.

@@ -243,13 +243,13 @@ The API returns **structure, not English**:
 narration: { key: 'agentRunCompleted', params: { actor: 'Ivy', subject: 'Weekly source validation' } }
 ```
 
-The web renders `t(\`dashboard.feed.narration.${key}\`, params)`. This keeps translation on the web
+The web renders ``t(`dashboard.feed.narration.${key}`, params)``. This keeps translation on the web
 side where the 21 message files live, keeps the API locale-free, and lets the same payload serve the
-CLI and MCP surfaces later. Every param is passed through a sanitiser that strips `<`and`>`and
-truncates to 120 characters with`…` (spec FR-16) — the same defence
+CLI and MCP surfaces later. Every param is passed through a sanitiser that strips `<` and `>` and
+truncates to 120 characters with `…` (spec FR-16) — the same defence
 [`NotificationService`](../../../../../packages/agent/src/notifications/notification.service.ts)
 applies with `sanitizeLabel`. An action type with no entry in the narrator table returns
-`{ key: 'fallback', params: { actor, action } }`where`action` is the humanised action type.
+`{ key: 'fallback', params: { actor, action } }` where `action` is the humanised action type.
 
 **Allow-listed params only.** Each narrator entry declares which `details` keys it may read. A key
 not on that entry's list is unreachable, which is what makes spec FR-20/S20 enforceable rather than

@@ -589,7 +589,9 @@ attempts to count or render an unbounded terminal column.
 - **FR-53** A decision is attributable to a Task when it is an open escalation raised
   on that Task, or a pending approval raised by a run dispatched for that Task.
 - **FR-54** "done today" MUST count Tasks that reached `done` since local midnight in
-  the viewer's timezone, and MUST reset at local midnight.
+  the viewer's timezone, and MUST reset at local midnight. The viewer's timezone is
+  the one their browser reports. Until it is known, the counter MUST show the
+  placeholder of §6.7 rather than a count taken against any other day boundary.
 - **FR-55** Clicking "waiting on you" MUST filter the board to exactly those Tasks.
 - **FR-56** The board MUST NOT render, rank or resolve a decision. It counts them,
   flags them and links out to them; the queue itself is [AW-03](../AW-03-decision-queue/).

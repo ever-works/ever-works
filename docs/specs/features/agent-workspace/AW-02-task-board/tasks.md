@@ -370,10 +370,44 @@ Task's branch`, `n/m started`, `Transition failed`. - Every leaf name camelCase,
       whatever column the Task's status puts it in.
     - Header: `N waiting on you` (clicking filters the board to exactly those) and
       `N done today`, counted since the viewer's local midnight.
+    - **The day boundary is an explicit input**, exactly as [`plan.md`](./plan.md)
+      §4.1.1:
+        - Create `packages/agent/src/tasks-domain/task-board-day.ts` (pure, no
+          framework import) with `resolveBoardTimeZone(raw)` and
+          `localDayWindow(now, timeZone): { since; resetsAt }`, and re-export both from
+          `packages/agent/src/tasks-domain/index.ts`.
+        - `GET /api/tasks/board` accepts an optional `timeZone` (IANA name, declared
+          with `@ApiQuery({ required: false })`). `TaskBoardService` counts
+          `status = 'done' AND completedAt >= since` under the shared board predicate
+          and returns `doneToday`, `timeZone`, `doneTodaySince` and
+          `doneTodayResetsAt` in `counters` — all `null` when the zone is absent or
+          invalid, and the count query is then not issued.
+        - `apps/web/src/app/[locale]/(dashboard)/tasks/page.tsx` forwards the
+          `tasks.timeZone` cookie; `apps/web/src/app/actions/tasks.ts` appends
+          `setTasksTimeZoneAction(timeZone)` returning `{ changed }`; `TaskBoard`
+          detects the browser zone on mount, calls the action, refreshes once only on
+          `changed: true`, and schedules one refresh at `doneTodayResetsAt` (plus a
+          re-check when the tab becomes visible again).
     - The board **counts and links**; it renders no decision content
       ([AW-03](../AW-03-decision-queue/) owns that).
+    - **Test**: `packages/agent/src/tasks-domain/__tests__/task-board-day.spec.ts` —
+      every case in [`plan.md`](./plan.md) §10.1: UTC; `Asia/Tokyo` and
+      `America/Los_Angeles` where the local and UTC dates differ; the 23-hour
+      `America/New_York` day; `America/Santiago` where the change skips local
+      midnight; one millisecond either side of a local midnight; invalid and absent
+      zones.
+    - **Test**: extend `task-board.service.spec.ts` — `completedAt` one millisecond
+      before `since` is excluded and exactly at `since` is included; no zone → `null`
+      counters and no count query. Extend `tasks.controller.board.spec.ts` — `timeZone`
+      passes through; an unknown zone is a 200 with `doneToday: null`, not a 400.
+    - **Test (Vitest)**: `TaskBoard` refreshes once on `changed: true`, never on
+      `changed: false`, once at `doneTodayResetsAt`, and once on becoming visible after
+      it; `doneToday: null` renders the placeholder, never `0`.
     - **Test (e2e)**: a Task with an open escalation shows the chip while staying in
-      `In progress`; the counter matches; clicking it filters.
+      `In progress`; the counter matches; clicking it filters. With a non-UTC
+      `timezoneId`, a Task completed at that zone's local midnight is counted and one
+      completed a millisecond earlier is not; a first visit shows the placeholder, then
+      the count after one refresh.
     - **Done when**: green.
 
 - [ ] **T27. Comment count and reply.** _(parallel with T24)_

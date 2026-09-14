@@ -167,18 +167,41 @@ Indexes:
 **`workspace_search_recents`** — new entity `WorkspaceSearchRecent`, file
 `packages/agent/src/entities/workspace-search-recent.entity.ts`.
 
-| Column                        | Type        | Null | Notes                      |
-| ----------------------------- | ----------- | ---- | -------------------------- |
-| `id`                          | uuid PK     | no   |                            |
-| `userId`                      | uuid        | no   |                            |
-| `tenantId` / `organizationId` | uuid        | yes  | scope (subscriber-stamped) |
-| `kind`                        | varchar(32) | no   | same vocabulary as above   |
-| `sourceId`                    | varchar(64) | no   |                            |
-| `openedAt`                    | timestamptz | no   | ordering key               |
-| `createdAt` / `updatedAt`     | timestamptz | no   |                            |
+| Column                        | Type        | Null | Notes                                                                    |
+| ----------------------------- | ----------- | ---- | ------------------------------------------------------------------------ |
+| `id`                          | uuid PK     | no   |                                                                          |
+| `userId`                      | uuid        | no   |                                                                          |
+| `tenantId` / `organizationId` | uuid        | yes  | scope; `organizationId` is `NULL` in personal scope                      |
+| `scopeKey`                    | varchar(64) | no   | `organizationId ?? 'personal'` — the non-null scope member of the upsert |
+| `kind`                        | varchar(32) | no   | same vocabulary as above                                                 |
+| `sourceId`                    | varchar(64) | no   |                                                                          |
+| `openedAt`                    | timestamptz | no   | ordering key                                                             |
+| `createdAt` / `updatedAt`     | timestamptz | no   |                                                                          |
 
-Indexes: `UNIQUE (userId, organizationId, kind, sourceId)` (so a repeat open is an update, not
-a duplicate — FR-27) and `(userId, organizationId, openedAt DESC)`.
+Indexes: `uq_workspace_search_recents_user_scope_target` — `UNIQUE (userId, scopeKey, kind,
+sourceId)` (so a repeat open is an update, not a duplicate — FR-27) — and
+`idx_workspace_search_recents_user_scope_opened` on `(userId, scopeKey, openedAt DESC)`.
+
+**Why `scopeKey` and not `organizationId` in the unique index.** `organizationId` is `NULL` in
+personal scope, and both Postgres and SQLite treat `NULL`s as distinct inside a unique index. A
+`UNIQUE (userId, organizationId, kind, sourceId)` would therefore accept any number of identical
+personal-scope rows, and every repeat open there would insert a duplicate instead of updating
+the existing entry. `scopeKey` is the same normalisation `Agent.scopeTargetId` already uses for
+`uq_agents_user_scope_slug`: a non-null column derived from the nullable scope, so the index has
+no nullable member and deduplicates on both databases. An Organization id is a uuid, so it can
+never collide with the literal `'personal'`.
+
+**Who writes `scopeKey`.** Not the scope-stamping subscriber, and not an entity listener alone:
+TypeORM runs `@BeforeInsert` listeners _before_ subscribers, so a listener would read an
+`organizationId` the subscriber has not stamped yet, and the write must not depend on hook
+ordering. `WorkspaceSearchRecentsService.record()` therefore resolves the active scope once from
+`ScopeContextService`, sets `tenantId`, `organizationId` **and** `scopeKey` explicitly on the
+row, and writes it with one conditional insert that updates `openedAt` on a conflict against
+`uq_workspace_search_recents_user_scope_target` — a single atomic statement, so two concurrent
+opens of the same target converge on one row with no read-then-write window. A
+`@BeforeInsert`/`@BeforeUpdate` hook on the entity recomputes `scopeKey` from `organizationId`
+as a safety net for any later `save()` path. Every read, trim and delete filters on
+`(userId, scopeKey)`, never on `organizationId IS NULL`.
 
 No content is stored here: display name and destination are re-resolved from the index at read
 time, so a renamed record shows its new name in Recent and a deleted one simply drops out.
@@ -311,7 +334,7 @@ threw", which is exactly the failure the Ideas-search regression taught us to ma
 | Method   | Path                                            | Body / params              | Returns                                                                                                                    |
 | -------- | ----------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `GET`    | `/api/workspace-search/recents`                 | `limit` (1–12, default 12) | `{ items: WorkspaceSearchHit[] }` — resolved through the index, so renamed rows show new names and deleted rows are absent |
-| `POST`   | `/api/workspace-search/recents`                 | `{ kind, sourceId }`       | `204`; upsert on `(userId, organizationId, kind, sourceId)`, trims to 12                                                   |
+| `POST`   | `/api/workspace-search/recents`                 | `{ kind, sourceId }`       | `204`; atomic upsert on `(userId, scopeKey, kind, sourceId)` (§3.2), trims to 12                                           |
 | `DELETE` | `/api/workspace-search/recents/:kind/:sourceId` | —                          | `204`; used by FR-29's self-heal                                                                                           |
 
 Throttle: `{ long: { limit: 240, ttl: 60_000 } }` on `POST` (one write per opened row).
@@ -347,6 +370,7 @@ packages/agent/src/workspace-search/
     idea.source.ts  skill.source.ts  team.source.ts  knowledge.source.ts
   index-maintainer.service.ts        # P2 — projects a source row into the index
   index-reconcile.service.ts         # P2 — sweep + tombstone GC
+  workspace-search-recents.service.ts   # P2 — record / list / trim / delete Recent on (userId, scopeKey)
   workspace-search-index.dispatcher.ts  # P2 — DI symbol + producer interface
   __tests__/
 ```
@@ -618,24 +642,26 @@ page someone, not one occurrence.
 
 ### 10.1 Unit — agent package (Jest)
 
-| File                                                                                                    | Covers                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/agent/src/workspace-search/__tests__/ranking.spec.ts`                                         | Every FR-14 score band; both boosts and the 100 cap; every FR-15 tie-break, including the promote-a-100-group rule                                                                                                                      |
-| `packages/agent/src/workspace-search/__tests__/fold.spec.ts`                                            | Case folding, diacritic folding, non-Latin pass-through, empty/whitespace input                                                                                                                                                         |
-| `packages/agent/src/workspace-search/__tests__/workspace-search.service.spec.ts`                        | Fan-out over all P1 sources; per-source cap; a throwing source lands in `degradedKinds` and does not fail the call; group ordering; total cap; a query matching a Mission and a Task yields two distinct groups, never one merged group |
-| `packages/agent/src/workspace-search/__tests__/workspace-search.scope.spec.ts`                          | `userId` always filtered; Organization filter when active; `organizationId IS NULL` in personal scope; Knowledge restricted to member Works                                                                                             |
-| `packages/agent/src/workspace-search/__tests__/workspace-search.sqlite-portability.integration.spec.ts` | The whole fan-out runs on an in-memory `better-sqlite3` DataSource with `PRAGMA case_sensitive_like = ON` — the harness from the Ideas portability spec. Asserts no emitted SQL contains a Postgres-only operator                       |
-| `packages/agent/src/workspace-search/__tests__/no-hardcoded-plugin-ids.spec.ts`                         | Constitution II: the epic's source tree contains no known plugin identifier                                                                                                                                                             |
-| `packages/agent/src/workspace-search/__tests__/index-maintainer.service.spec.ts` (P2)                   | Insert → `current`; update → `stale` then refreshed; delete → `tombstoned`; a `tombstoned` row is never returned                                                                                                                        |
-| `packages/agent/src/workspace-search/__tests__/index-reconcile.service.spec.ts` (P2)                    | Stale refresh; 24 h tombstone GC; 90-day Recent GC; back-fill of missing projections; counter summary                                                                                                                                   |
-| `packages/agent/src/entities/__tests__/tier-c.tenants-orgs.spec.ts` (extend)                            | Both new tables are recognised as scope-stamped                                                                                                                                                                                         |
+| File                                                                                                      | Covers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/agent/src/workspace-search/__tests__/ranking.spec.ts`                                           | Every FR-14 score band; both boosts and the 100 cap; every FR-15 tie-break, including the promote-a-100-group rule                                                                                                                                                                                                                                                                                                                                                                             |
+| `packages/agent/src/workspace-search/__tests__/fold.spec.ts`                                              | Case folding, diacritic folding, non-Latin pass-through, empty/whitespace input                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `packages/agent/src/workspace-search/__tests__/workspace-search.service.spec.ts`                          | Fan-out over all P1 sources; per-source cap; a throwing source lands in `degradedKinds` and does not fail the call; group ordering; total cap; a query matching a Mission and a Task yields two distinct groups, never one merged group                                                                                                                                                                                                                                                        |
+| `packages/agent/src/workspace-search/__tests__/workspace-search.scope.spec.ts`                            | `userId` always filtered; Organization filter when active; `organizationId IS NULL` in personal scope; Knowledge restricted to member Works                                                                                                                                                                                                                                                                                                                                                    |
+| `packages/agent/src/workspace-search/__tests__/workspace-search.sqlite-portability.integration.spec.ts`   | The whole fan-out runs on an in-memory `better-sqlite3` DataSource with `PRAGMA case_sensitive_like = ON` — the harness from the Ideas portability spec. Asserts no emitted SQL contains a Postgres-only operator                                                                                                                                                                                                                                                                              |
+| `packages/agent/src/workspace-search/__tests__/no-hardcoded-plugin-ids.spec.ts`                           | Constitution II: the epic's source tree contains no known plugin identifier                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `packages/agent/src/workspace-search/__tests__/index-maintainer.service.spec.ts` (P2)                     | Insert → `current`; update → `stale` then refreshed; delete → `tombstoned`; a `tombstoned` row is never returned                                                                                                                                                                                                                                                                                                                                                                               |
+| `packages/agent/src/workspace-search/__tests__/index-reconcile.service.spec.ts` (P2)                      | Stale refresh; 24 h tombstone GC; 90-day Recent GC; back-fill of missing projections; counter summary                                                                                                                                                                                                                                                                                                                                                                                          |
+| `packages/agent/src/workspace-search/__tests__/workspace-search-recents.service.integration.spec.ts` (P2) | On an in-memory `better-sqlite3` DataSource with the real entity and its unique index: two `record()` calls for the same target in **personal scope** leave exactly one row with the later `openedAt`; the same target in personal scope and in an Organization gives two rows; two Organizations give two rows; ten concurrent `record()` calls for one target resolve to one row with no unique-violation surfacing; trim keeps 12 per `(userId, scopeKey)` without touching the other scope |
+| `packages/agent/src/entities/__tests__/workspace-search-recent.entity.spec.ts` (P2)                       | `uq_workspace_search_recents_user_scope_target` is unique on exactly `['userId', 'scopeKey', 'kind', 'sourceId']` (no nullable member); the `@BeforeInsert`/`@BeforeUpdate` hook maps `organizationId: null` → `'personal'` and a uuid → that uuid                                                                                                                                                                                                                                             |
+| `packages/agent/src/entities/__tests__/tier-c.tenants-orgs.spec.ts` (extend)                              | Both new tables are recognised as scope-stamped                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 ### 10.2 Controller spec — API (Jest)
 
 | File                                                                             | Covers                                                                                                                                                                                                                              |
 | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api/src/workspace-search/workspace-search.controller.spec.ts`              | Auth guard; `q` under 2 chars → empty, no service call; `limit`/`perKindLimit` clamping; unknown `kinds` ignored not 400; scope threaded from `ScopeContextService`; throttle metadata present; response shape matches the contract |
-| `apps/api/src/workspace-search/workspace-search-recents.controller.spec.ts` (P2) | `GET` cap of 12; `POST` upsert-not-duplicate; `DELETE` removes; every route scoped by `userId`                                                                                                                                      |
+| `apps/api/src/workspace-search/workspace-search-recents.controller.spec.ts` (P2) | `GET` cap of 12; `POST` upsert-not-duplicate in both personal and Organization scope; `DELETE` removes; every route scoped by `userId` and `scopeKey`                                                                               |
 
 ### 10.3 Unit — web (Vitest)
 
