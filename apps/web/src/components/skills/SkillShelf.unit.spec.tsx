@@ -231,6 +231,58 @@ describe('SkillShelf', () => {
         });
     });
 
+    it.each([
+        ['provenance', { provenance: 'package' as const }],
+        ['enabled', { enabled: false }],
+    ])(
+        'a shelf narrowed only by the URL-only %s filter is "no results", not "no Skills", and Clear drops it',
+        (_label, hidden) => {
+            const { onFiltersChange } = renderShelf({
+                skills: [],
+                meta: { total: 0, limit: 50, offset: 0 },
+                filters: { search: '', ...hidden },
+            });
+            expect(screen.queryByTestId('skill-shelf-empty')).toBeNull();
+            expect(screen.getByTestId('skill-shelf-no-results').textContent).toContain(
+                'noResultsFilters',
+            );
+            fireEvent.click(screen.getByRole('button', { name: 'clearFilters' }));
+            const cleared = onFiltersChange.mock.calls.at(-1)?.[0];
+            expect(cleared).toEqual({
+                search: '',
+                tags: [],
+                readiness: undefined,
+                provenance: undefined,
+                enabled: undefined,
+            });
+            expect(Object.keys(cleared)).toEqual(expect.arrayContaining(['provenance', 'enabled']));
+        },
+    );
+
+    it('shows URL-only filters in force as chips, each removable on its own', () => {
+        const { onFiltersChange } = renderShelf({
+            filters: { search: '', provenance: 'package', enabled: true },
+        });
+        const chips = screen.getAllByTestId('skill-shelf-active-filter');
+        expect(chips.map((chip) => chip.textContent)).toEqual([
+            'filterProvenance(provenancePackage)',
+            'filterEnabledOn',
+        ]);
+        fireEvent.click(
+            screen.getByRole('button', {
+                name: 'removeFilter(filterProvenance(provenancePackage))',
+            }),
+        );
+        expect(onFiltersChange).toHaveBeenLastCalledWith({ provenance: undefined });
+        fireEvent.click(screen.getByRole('button', { name: 'removeFilter(filterEnabledOn)' }));
+        expect(onFiltersChange).toHaveBeenLastCalledWith({ enabled: undefined });
+    });
+
+    it('shows no filter chips when no URL-only filter is set', () => {
+        renderShelf();
+        expect(screen.queryByTestId('skill-shelf-active-filters')).toBeNull();
+    });
+
     it('empty state 3 — a page past the end, with a way back', () => {
         const { onFirstPage } = renderShelf({
             skills: [],

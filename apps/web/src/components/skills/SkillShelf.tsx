@@ -1,10 +1,11 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import {
     SKILL_CARD_STATES,
     countSkillsNeedingAttention,
+    type SkillProvenance,
     type SkillReadinessFilter,
     type SkillShelfSort,
 } from '@ever-works/contracts';
@@ -20,6 +21,13 @@ export interface SkillShelfFilters {
     tags?: string[];
     readiness?: SkillReadinessFilter;
     sort?: SkillShelfSort;
+    /**
+     * URL-only filters (a linked or bookmarked shelf can carry them; no
+     * control sets them). Shown as removable chips so a shelf narrowed by one
+     * never looks empty for no visible reason, and cleared with the rest.
+     */
+    provenance?: SkillProvenance;
+    enabled?: boolean;
 }
 
 export interface SkillShelfProps {
@@ -45,6 +53,13 @@ const SORT_KEYS = {
     name: 'sortName',
     attention: 'sortAttention',
 } as const satisfies Record<SkillShelfSort, string>;
+
+const PROVENANCE_KEYS = {
+    firstParty: 'provenanceFirstParty',
+    plugin: 'provenancePlugin',
+    package: 'provenancePackage',
+    authored: 'provenanceAuthored',
+} as const satisfies Record<SkillProvenance, string>;
 
 /**
  * Skills shelf — the installed Skills as a filterable grid.
@@ -80,7 +95,13 @@ export function SkillShelf({
     const notChecked = counts?.unknown ?? 0;
     const switchedOff = counts?.disabled ?? 0;
     const attentionOn = filters.readiness === 'attention';
-    const hasFilters = Boolean(filters.search.trim() || tags.length || filters.readiness);
+    const hasFilters = Boolean(
+        filters.search.trim() ||
+        tags.length ||
+        filters.readiness ||
+        filters.provenance ||
+        filters.enabled !== undefined,
+    );
 
     return (
         <div className="space-y-3" data-testid="skill-shelf">
@@ -193,13 +214,48 @@ export function SkillShelf({
                 onChange={(next) => onFiltersChange({ tags: next })}
             />
 
+            {filters.provenance || filters.enabled !== undefined ? (
+                <div
+                    className="flex flex-wrap items-center gap-2 text-xs"
+                    data-testid="skill-shelf-active-filters"
+                >
+                    <span className="text-text-muted dark:text-text-muted-dark">
+                        {t('activeFiltersLabel')}
+                    </span>
+                    {filters.provenance ? (
+                        <ActiveFilterChip
+                            label={t('filterProvenance', {
+                                source: tr(PROVENANCE_KEYS[filters.provenance]),
+                            })}
+                            removeLabel={(label) => t('removeFilter', { filter: label })}
+                            onRemove={() => onFiltersChange({ provenance: undefined })}
+                        />
+                    ) : null}
+                    {filters.enabled !== undefined ? (
+                        <ActiveFilterChip
+                            label={filters.enabled ? t('filterEnabledOn') : t('filterEnabledOff')}
+                            removeLabel={(label) => t('removeFilter', { filter: label })}
+                            onRemove={() => onFiltersChange({ enabled: undefined })}
+                        />
+                    ) : null}
+                </div>
+            ) : null}
+
             <ShelfBody
                 skills={skills}
                 meta={meta}
                 hasFilters={hasFilters}
                 shelfIsEmpty={total === 0}
                 filters={filters}
-                onClear={() => onFiltersChange({ search: '', tags: [], readiness: undefined })}
+                onClear={() =>
+                    onFiltersChange({
+                        search: '',
+                        tags: [],
+                        readiness: undefined,
+                        provenance: undefined,
+                        enabled: undefined,
+                    })
+                }
                 onFirstPage={onFirstPage}
                 onBrowseCatalog={onBrowseCatalog}
             />
@@ -299,6 +355,34 @@ function ShelfBody({
                 </span>
             </div>
         </div>
+    );
+}
+
+/** One URL-only filter in force, with a way to drop just that filter. */
+function ActiveFilterChip({
+    label,
+    removeLabel,
+    onRemove,
+}: {
+    label: string;
+    removeLabel: (label: string) => string;
+    onRemove: () => void;
+}) {
+    return (
+        <span
+            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-surface-secondary px-2 py-0.5 text-text dark:border-border-dark/60 dark:bg-surface-secondary-dark dark:text-text-dark"
+            data-testid="skill-shelf-active-filter"
+        >
+            {label}
+            <button
+                type="button"
+                aria-label={removeLabel(label)}
+                onClick={onRemove}
+                className="rounded-full p-0.5 text-text-muted hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark"
+            >
+                <X className="h-3 w-3" aria-hidden="true" />
+            </button>
+        </span>
     );
 }
 

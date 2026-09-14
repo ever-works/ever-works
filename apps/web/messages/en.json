@@ -2259,6 +2259,11 @@
                 "noResultsPlain": "No Skills match “{query}”.",
                 "noResultsFilters": "No Skills match these filters.",
                 "clearFilters": "Clear filters",
+                "activeFiltersLabel": "Also filtered by:",
+                "filterProvenance": "Source: {source}",
+                "filterEnabledOn": "Switched on",
+                "filterEnabledOff": "Switched off",
+                "removeFilter": "Remove filter: {filter}",
                 "pastEnd": "No results on this page.",
                 "backToFirstPage": "Back to the first page"
             },

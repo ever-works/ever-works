@@ -220,6 +220,8 @@ export function SkillsPageClient({
                             tags: filters.tags,
                             readiness: filters.readiness,
                             sort: filters.sort,
+                            provenance: filters.provenance,
+                            enabled: filters.enabled,
                         }}
                         onFiltersChange={(updates) => {
                             if (updates.search !== undefined) setSearch(updates.search);
