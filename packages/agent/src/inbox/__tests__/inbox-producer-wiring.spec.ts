@@ -317,6 +317,18 @@ describe('resolution through other doors → inbox', () => {
         function makeProposalsRepo(rows: AgentActionProposal[]) {
             return {
                 save: jest.fn(async (value: AgentActionProposal | AgentActionProposal[]) => value),
+                // Decisions are recorded with a compare-and-set on `status: 'pending'`.
+                update: jest.fn(
+                    async (
+                        where: { id: string; status: string },
+                        patch: Partial<AgentActionProposal>,
+                    ) => {
+                        const row = rows.find((candidate) => candidate.id === where.id);
+                        if (!row || row.status !== where.status) return { affected: 0 };
+                        Object.assign(row, patch);
+                        return { affected: 1 };
+                    },
+                ),
                 find: jest.fn(async () => rows),
                 findOne: jest.fn(async () => rows[0] ?? null),
             };

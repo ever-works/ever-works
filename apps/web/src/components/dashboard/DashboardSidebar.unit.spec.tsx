@@ -141,6 +141,14 @@ describe('DashboardSidebar — navigation consolidation', () => {
         expect(labels.indexOf('navigation.teams')).toBe(labels.indexOf('navigation.tasks') + 1);
         expect(labels.indexOf('navigation.memory')).toBe(labels.indexOf('navigation.teams') + 1);
     });
+
+    it('lists Runs (AW-09) directly above Activity, linking to /runs', () => {
+        const { container } = renderSidebar();
+        const labels = navLinks(container).map((a) => a.textContent?.trim());
+
+        expect(labels.indexOf('navigation.runs')).toBe(labels.indexOf('navigation.activity') - 1);
+        expect(linkFor(container, 'navigation.runs')?.getAttribute('href')).toBe('/runs');
+    });
 });
 
 describe('DashboardSidebar — untouched entries', () => {

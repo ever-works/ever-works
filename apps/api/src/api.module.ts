@@ -49,6 +49,7 @@ import { WorkAgentModule } from './work-agent/work-agent.module';
 import { MissionsModule } from './missions/missions.module';
 import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
+import { RunsModule } from './runs/runs.module';
 import { EnvironmentsApiModule } from './environments/environments.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
@@ -60,8 +61,10 @@ import { ReleaseModule } from './release/release.module';
 import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
+import { ComputerApiModule } from './computer/computer.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
+import { WorkspaceSearchModule } from './workspace-search/workspace-search.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
@@ -188,6 +191,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // + AgentsController. Heartbeat dispatcher + run service land in
         // Phase 6/7.
         AgentsModule,
+        // Runs ledger + run receipt (AW-09) — GET /api/runs*: the
+        // calendar-navigated ledger of every Agent run and the itemised
+        // receipt of one, over the same run rows the Sessions endpoints read.
+        RunsModule,
         // Environments (Settings → Environments) — named, reusable
         // runtime recipes (packages + networking) assigned per-Agent.
         EnvironmentsApiModule,
@@ -223,6 +230,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Streaming-terminal M3 — relay registry + WS gateway on this
         // process's HTTP server + attach-token/internal-publish endpoints.
         TerminalModule,
+        // Agent computers (watch) — live views of the machine an Agent works
+        // on: owner session routes, node publish routes, a relay and a WS
+        // gateway sharing this process's HTTP server with the terminal's.
+        // Rides the terminal's attach-token signer and the fleet's node
+        // auth and job runtime; dark with FLEET_ENABLED=false.
+        ComputerApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,
@@ -230,6 +243,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // user-owned scheduled source into GET /api/schedules. Additive;
         // reuses existing entity tables (no new schema).
         SchedulesModule,
+        // Workspace search (AW-01) — read-only GET /api/workspace-search
+        // behind the dashboard command palette. Additive; reads existing
+        // entity tables (no new schema).
+        WorkspaceSearchModule,
         // Inbound Triggers ("Trigger Schedules") — signed webhook/API
         // triggers that spawn Tasks on verified HMAC deliveries.
         // Management CRUD + the public /:id/fire endpoint.

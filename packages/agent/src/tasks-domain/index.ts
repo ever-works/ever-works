@@ -4,6 +4,8 @@
 // — this module owns the per-Task DB entities + repositories.
 export * from './tasks.module';
 export * from './tasks.service';
+// Task board read model (AW-02) — per-column true totals + column paging.
+export * from './task-board.service';
 export * from './task-gates';
 export * from './task-gate-runner.service';
 export * from './task-gate-judge.service';

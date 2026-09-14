@@ -42,6 +42,7 @@ import {
 } from '../database/repositories/task-side.repositories';
 import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
+import { TaskBoardService } from './task-board.service';
 import { TaskTemplatesService } from './task-templates.service';
 import { TaskChatService } from './task-chat.service';
 import { TaskGateRunnerService } from './task-gate-runner.service';
@@ -155,6 +156,9 @@ import { DatabaseModule } from '../database/database.module';
         TaskTemplateRepository,
         TaskTransitionService,
         TasksService,
+        // Task board read model — true per-column totals and independent
+        // column paging over TasksService.list (AW-02).
+        TaskBoardService,
         TaskTemplatesService,
         TaskChatService,
         TaskRecurrenceDispatcherService,
@@ -225,6 +229,7 @@ import { DatabaseModule } from '../database/database.module';
         TaskTemplateRepository,
         TaskTransitionService,
         TasksService,
+        TaskBoardService,
         TaskTemplatesService,
         TaskChatService,
         TaskRecurrenceDispatcherService,

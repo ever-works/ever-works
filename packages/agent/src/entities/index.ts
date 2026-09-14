@@ -94,6 +94,8 @@ export * from './tenant-email-address.entity';
 export * from './agent-email-assignment.entity';
 export * from './email-conversation.entity';
 export * from './email-message.entity';
+// Agent email (AW-05) — per-Agent mail policy (approval mode + send ceilings)
+export * from './agent-inbox.entity';
 export * from './notification-channel.entity';
 export * from './notification-channel-delivery-log.entity';
 export * from './notification-event-type.entity';
@@ -167,6 +169,10 @@ export * from './fleet-audit.entity';
 // Fleet local-runner routing — per Work / Goal / account execution
 // preference (local runner vs cloud) read by the fleet run router.
 export * from './fleet-execution-preference.entity';
+// Agent computers — live views of an Agent's Node, and each Agent's own
+// profile (logins and files) on each Node.
+export * from './computer-session.entity';
+export * from './node-agent-profile.entity';
 // Fleet cost accounting (EW-777) — the owner's fleet-wide daily
 // model-spend ceiling and its one-notice trip marker.
 export * from './fleet-cost-policy.entity';

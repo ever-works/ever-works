@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as root from '../index.js';
 
 import * as agents from '../agents/index.js';
+import * as computer from '../computer/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
@@ -16,6 +17,8 @@ import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
+import * as runs from '../runs/index.js';
+import * as secret from '../secret/index.js';
 import * as skills from '../skills/index.js';
 import * as tasks from '../tasks/index.js';
 import * as terminal from '../terminal/index.js';
@@ -40,6 +43,7 @@ import * as workflow from '../workflow/index.js';
 /** [area name, namespace] for every barrel `src/index.ts` re-exports. */
 const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
+	['computer', computer],
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
@@ -53,6 +57,8 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['kb', kb],
 	['policy', policy],
 	['release', release],
+	['runs', runs],
+	['secret', secret],
 	['skills', skills],
 	['tasks', tasks],
 	['terminal', terminal],
@@ -64,7 +70,7 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(18);
+		expect(exportLines).toBe(21);
 	});
 
 	it('has no name exported by two different areas', () => {
