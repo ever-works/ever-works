@@ -132,12 +132,24 @@ export class FleetJobRepository {
     ): Promise<FleetJob[]> {
         // Optional kind narrowing for a lane that polls for one kind (or
         // never wants one). Absent = the exact query this always ran.
-        const kind =
+        //
+        // Both filters are applied IN the predicate, before `take`. When a
+        // poll names both, the excluded kinds are removed from the included
+        // set here rather than after the fetch: otherwise excluded rows at
+        // the head of the queue could fill the window and hide eligible
+        // work further down it.
+        const excluded = filter.excludeKinds ?? [];
+        const included =
             filter.kinds && filter.kinds.length > 0
-                ? { kind: In(filter.kinds) }
-                : filter.excludeKinds && filter.excludeKinds.length > 0
-                  ? { kind: Not(In(filter.excludeKinds)) }
-                  : {};
+                ? filter.kinds.filter((candidate) => !excluded.includes(candidate))
+                : null;
+        // Every kind the poll asked for is also excluded: nothing can match.
+        if (included !== null && included.length === 0) return [];
+        const kind = included
+            ? { kind: In(included) }
+            : excluded.length > 0
+              ? { kind: Not(In(excluded)) }
+              : {};
         return this.repository.find({
             where: [
                 { userId, status: 'queued', targetNodeId: IsNull(), ...kind },
