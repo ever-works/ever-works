@@ -496,12 +496,221 @@ describe('Costs aggregations over seeded rows (integration)', () => {
             await seedMetered();
             await seedEvent({ organizationId: '66666666-6666-4666-8666-666666666666' });
 
-            await expect(usage.countForUserExport(USER, FROM, TO)).resolves.toBe(6);
+            // Six rows in scope, less the failed extraction: the count gates
+            // the export, and the export streams no failed calls.
+            await expect(usage.countForUserExport(USER, FROM, TO)).resolves.toBe(5);
+            await expect(
+                usage.findPageForUserExport(USER, FROM, TO, { limit: 100, offset: 0 }),
+            ).resolves.toHaveLength(5);
             await expect(
                 usage.countForUserExport(USER, FROM, TO, {
                     organizationId: '66666666-6666-4666-8666-666666666666',
                 }),
             ).resolves.toBe(1);
+        });
+    });
+
+    /**
+     * AW-17 — failed search, screenshot and extraction calls are now recorded
+     * (outcome `failed`, 0 credits, 0 cost, 1 unit) where a failure used to
+     * write nothing. Every reader that existed before must return EXACTLY what
+     * it returned before, so each is read over the same seeded rows twice —
+     * once as they were, once after failed rows land in every scope a reader
+     * keys on (same Work / user / Agent / Task / run / owner / tenant, plus a
+     * new day, Agent, model, Work and plugin that only a failure touches) —
+     * and the two reads must be identical.
+     */
+    describe('readers that predate meters ignore failed calls (AW-17)', () => {
+        const TENANT = '77777777-7777-4777-8777-777777777777';
+        const TASK = '88888888-8888-4888-8888-888888888888';
+        const RUN = '99999999-9999-4999-8999-999999999999';
+        const NEW_WORK = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+        const NEW_AGENT = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+        async function seedBaseline(): Promise<void> {
+            const scope = {
+                agentId: AGENT_A,
+                taskId: TASK,
+                runId: RUN,
+                ownerId: WORK,
+                tenantId: TENANT,
+            };
+            // A row recorded before meters, and two classified successes.
+            await seedEvent({ ...scope, modelId: 'model-a', units: 900, costCents: 29 });
+            await seedEvent({
+                ...scope,
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                units: 1,
+                costCents: 2,
+                meter: UsageMeter.CREDITS,
+                payer: UsagePayer.PLATFORM,
+                outcome: UsageOutcome.OK,
+                priceKey: 'search.query',
+                priceVersion: 1,
+                creditsCharged: 2,
+            });
+            await seedEvent({
+                ...scope,
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                units: 1,
+                costCents: 0,
+                meter: UsageMeter.CREDITS,
+                payer: UsagePayer.PLATFORM,
+                outcome: UsageOutcome.CACHED,
+                priceKey: 'search.query',
+                priceVersion: 1,
+                creditsCharged: 0,
+            });
+        }
+
+        /** Exactly what the facades write for a failed call. */
+        function seedFailed(overrides: Partial<PluginUsageEvent>): Promise<PluginUsageEvent> {
+            return seedEvent({
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                units: 1,
+                costCents: 0,
+                meter: UsageMeter.CREDITS,
+                payer: UsagePayer.PLATFORM,
+                outcome: UsageOutcome.FAILED,
+                priceKey: 'search.query',
+                priceVersion: 1,
+                creditsCharged: 0,
+                metadata: { operation: 'search', failed: true },
+                ...overrides,
+            });
+        }
+
+        async function seedFailures(): Promise<void> {
+            const scope = {
+                agentId: AGENT_A,
+                taskId: TASK,
+                runId: RUN,
+                ownerId: WORK,
+                tenantId: TENANT,
+            };
+            await seedFailed(scope);
+            await seedFailed({
+                ...scope,
+                pluginId: 'screenshot-a',
+                capability: PluginUsageCapability.SCREENSHOT,
+                priceKey: 'screenshot.capture',
+                metadata: { operation: 'capture', failed: true },
+            });
+            await seedFailed({
+                ...scope,
+                pluginId: 'extract-a',
+                capability: PluginUsageCapability.EXTRACTOR,
+                priceKey: 'extractor.page',
+                payer: UsagePayer.UNCONFIRMED,
+                metadata: { operation: 'extract', failed: true },
+            });
+            // Scopes only a failure touches: a day, an Agent, a model, a Work
+            // and a plugin with no successful call behind them.
+            await seedFailed({
+                ...scope,
+                occurredAt: new Date('2026-08-13T12:00:00.000Z'),
+            });
+            await seedFailed({ ...scope, agentId: NEW_AGENT, modelId: 'model-only-failed' });
+            await seedFailed({ ...scope, workId: NEW_WORK, ownerId: NEW_WORK });
+            await seedFailed({ ...scope, pluginId: 'plugin-only-failed' });
+        }
+
+        async function readEverything() {
+            const exportPage = await usage.findPageForUserExport(USER, FROM, TO, {
+                limit: 100,
+                offset: 0,
+            });
+            const workExport = await usage.findForExport(WORK, FROM, TO);
+            const newWorkExport = await usage.findForExport(NEW_WORK, FROM, TO);
+            return {
+                // Budgets, limits and the Costs / Usage headline totals.
+                totalForWork: await usage.getTotalSpendCents(WORK, FROM, TO),
+                totalForWorkPlugin: await usage.getTotalSpendCents(WORK, FROM, TO, 'search-a'),
+                totalForUser: await usage.getTotalSpendCentsForUser(USER, FROM, TO),
+                totalForOwner: await usage.getTotalSpendCentsForOwner('work', WORK, FROM, TO),
+                totalForAgent: await usage.getTotalSpendCentsForAgent(USER, AGENT_A, FROM, TO),
+                totalForNewAgent: await usage.getTotalSpendCentsForAgent(USER, NEW_AGENT, FROM, TO),
+                totalForTask: await usage.getTotalSpendCentsForTask(TASK),
+                // Run settlement input, the receipt lines, the top-runs model.
+                runCostByPlugin: await usage.getRunCostByPlugin(RUN),
+                runSpendLines: await usage.getRunSpendLines(RUN),
+                dominantModel: Array.from((await usage.getDominantModelByRun([RUN])).entries()),
+                // Per-Work usage page: per-plugin units and calls, daily trend.
+                spendByPlugin: await usage.getSpendByPlugin(WORK, FROM, TO),
+                spendByPluginNewWork: await usage.getSpendByPlugin(NEW_WORK, FROM, TO),
+                dailyForWork: await usage.getDailySpend(WORK, FROM, TO),
+                // Account-wide usage summary and Costs dashboard groups.
+                dailyForUser: await usage.getDailySpendForUser(USER, FROM, TO),
+                dailyByAgent: await usage.getDailySpendByAgentForUser(USER, FROM, TO),
+                byModel: await usage.getSpendByModelForUser(USER, FROM, TO),
+                byAgent: await usage.getSpendByAgentForUser(USER, FROM, TO),
+                byWork: await usage.getSpendByWorkForUser(USER, FROM, TO),
+                // Admin cross-user report, tenant-scoped and platform-wide.
+                crossUser: await usage.getCrossUserSpend(FROM, TO),
+                crossUserTenant: await usage.getCrossUserSpend(FROM, TO, TENANT),
+                // Both CSV exports (row identity, not just count).
+                exportCount: await usage.countForUserExport(USER, FROM, TO),
+                exportIds: exportPage.map((row) => row.id).sort(),
+                workExportIds: workExport.map((row) => row.id).sort(),
+                newWorkExportIds: newWorkExport.map((row) => row.id).sort(),
+            };
+        }
+
+        it('returns identical results before and after failed rows are recorded', async () => {
+            await seedBaseline();
+            const before = await readEverything();
+            // Guard the fixture: the baseline is not empty, so "identical"
+            // cannot pass vacuously.
+            expect(before.totalForWork).toBe(31);
+            expect(before.runSpendLines.length).toBeGreaterThan(0);
+            expect(before.exportIds).toHaveLength(3);
+
+            await seedFailures();
+            const after = await readEverything();
+
+            expect(after).toEqual(before);
+        });
+
+        it('a run whose only rows are failures has nothing to settle and no receipt lines', async () => {
+            await seedFailed({ runId: RUN });
+
+            await expect(usage.getRunCostByPlugin(RUN)).resolves.toEqual([]);
+            await expect(usage.getRunSpendLines(RUN)).resolves.toEqual([]);
+        });
+
+        it('rows recorded before meters (outcome NULL) are still read', async () => {
+            await seedEvent({ runId: RUN, costCents: 12, units: 3 });
+
+            await expect(usage.getRunCostByPlugin(RUN)).resolves.toEqual([
+                { pluginId: 'anthropic', costCents: 12 },
+            ]);
+            await expect(usage.getTotalSpendCentsForUser(USER, FROM, TO)).resolves.toBe(12);
+        });
+
+        it('the meter reads still show the failures, apart from charged calls', async () => {
+            await seedBaseline();
+            await seedFailures();
+
+            const meters = await usage.getSpendByMeterForUser(USER, FROM, TO);
+            const failed = meters
+                .filter((row) => row.outcome === 'failed')
+                .reduce((sum, row) => sum + row.calls, 0);
+            expect(failed).toBe(7);
+            expect(
+                meters
+                    .filter((row) => row.outcome === 'failed')
+                    .reduce((sum, row) => sum + row.credits + row.costCents, 0),
+            ).toBe(0);
+
+            const lines = await usage.getRunMeterLines(RUN);
+            expect(
+                lines
+                    .filter((line) => line.outcome === 'failed')
+                    .reduce((sum, line) => sum + line.calls, 0),
+            ).toBe(7);
         });
     });
 });

@@ -176,7 +176,13 @@ export class PluginUsageEvent {
     @Column({ type: 'varchar', length: 16, nullable: true })
     payer?: UsagePayer | null;
 
-    /** AW-17 — `ok` / `cached` / `failed`. Cached and failed are zero-rated. */
+    /**
+     * AW-17 — `ok` / `cached` / `failed`. Cached and failed are zero-rated.
+     * A failed call wrote no row before meters existed, so every
+     * `PluginUsageRepository` reader that predates them skips `failed` rows
+     * (spend, units, day buckets, groups, exports) and only the meter and
+     * breakdown reads count them.
+     */
     @Column({ type: 'varchar', length: 12, nullable: true })
     outcome?: UsageOutcome | null;
 

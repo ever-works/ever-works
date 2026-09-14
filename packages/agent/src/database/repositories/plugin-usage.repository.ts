@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, LessThan, Repository } from 'typeorm';
+import {
+    Between,
+    In,
+    LessThan,
+    Repository,
+    type ObjectLiteral,
+    type SelectQueryBuilder,
+} from 'typeorm';
 import { PluginUsageCapability, PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
+import { UsageOutcome } from '@src/entities/_types';
 import { Agent } from '@src/entities/agent.entity';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import { Task, TaskStatus } from '@src/entities/task.entity';
@@ -152,6 +160,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (pluginId) {
             qb.andWhere('e.pluginId = :pluginId', { pluginId });
@@ -192,6 +201,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (currency) {
             qb.andWhere('e.currency = :currency', { currency });
@@ -227,6 +237,7 @@ export class PluginUsageRepository {
             .andWhere('e.ownerId = :ownerId', { ownerId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (pluginId) {
             qb.andWhere('e.pluginId = :pluginId', { pluginId });
@@ -261,6 +272,7 @@ export class PluginUsageRepository {
             .andWhere('e.agentId = :agentId', { agentId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
         if (currency) {
             qb.andWhere('e.currency = :currency', { currency });
         }
@@ -283,6 +295,7 @@ export class PluginUsageRepository {
             .createQueryBuilder('e')
             .select('COALESCE(SUM(e.costCents), 0)', 'total')
             .where('e.taskId = :taskId', { taskId });
+        excludeFailedCalls(qb);
         if (opts.since) {
             qb.andWhere('e.occurredAt >= :since', { since: opts.since });
         }
@@ -311,6 +324,7 @@ export class PluginUsageRepository {
             .select('e.pluginId', 'pluginId')
             .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
             .where('e.runId = :runId', { runId })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.pluginId')
             .getRawMany<{ pluginId: string; costCents: string }>();
 
@@ -334,6 +348,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.pluginId')
             .addGroupBy('e.capability')
             .orderBy('"costCents"', 'DESC')
@@ -369,6 +384,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .getMany();
 
         const byDay = new Map<string, number>();
@@ -399,6 +415,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .getMany();
 
         const byDay = new Map<string, number>();
@@ -430,6 +447,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy(`e.${column}`)
             .orderBy('"costCents"', 'DESC')
             .getRawMany<{ key: string | null; units: string; costCents: string }>();
@@ -533,6 +551,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .getRawMany<{ occurredAt: Date | string; agentId: string | null; costCents: number }>();
 
         // Composite map key: the day and the agent id can never collide
@@ -577,6 +596,7 @@ export class PluginUsageRepository {
             .addSelect('COALESCE(SUM(e.units), 0)', 'units')
             .where('e.runId IN (:...runIds)', { runIds })
             .andWhere('e.modelId IS NOT NULL')
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.runId')
             .addGroupBy('e.modelId')
             .getRawMany<{
@@ -618,6 +638,7 @@ export class PluginUsageRepository {
             .addSelect('COALESCE(SUM(e.units), 0)', 'units')
             .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
             .where('e.runId = :runId', { runId })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .groupBy('e.capability')
             .addGroupBy('e.modelId')
             .getRawMany<{
@@ -648,7 +669,8 @@ export class PluginUsageRepository {
      * AW-17 — the run settlement's classified view of one run: rows grouped by
      * (plugin, meter, payer, price key, price version). Same `(runId,
      * occurredAt)` index as `getRunCostByPlugin`; the two reads cover the
-     * same rows, so their cost sums always agree.
+     * same rows (this one also counts failed calls, which carry no cost), so
+     * their cost sums always agree.
      */
     async getRunMeterGroups(runId: string): Promise<RunMeterGroup[]> {
         const rows = await this.repository
@@ -856,6 +878,8 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        // The same rows the export streams: failed calls are not exported.
+        excludeFailedCalls(qb);
         if (options.organizationId) {
             qb.andWhere('e.organizationId = :organizationId', {
                 organizationId: options.organizationId,
@@ -936,6 +960,7 @@ export class PluginUsageRepository {
             .addSelect('SUM(e.costCents)', 'costCents')
             .where('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (tenantId) {
             qb.andWhere('e.tenantId = :tenantId', { tenantId });
@@ -992,6 +1017,7 @@ export class PluginUsageRepository {
             .where('e.userId = :userId', { userId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd });
+        excludeFailedCalls(qb);
 
         if (options.organizationId) {
             qb.andWhere('e.organizationId = :organizationId', {
@@ -1025,6 +1051,7 @@ export class PluginUsageRepository {
             .where('e.workId = :workId', { workId })
             .andWhere('e.occurredAt >= :start', { start: periodStart })
             .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED })
             .orderBy('e.occurredAt', 'ASC')
             .getMany();
     }
@@ -1038,6 +1065,26 @@ export class PluginUsageRepository {
             .execute();
         return result.affected ?? 0;
     }
+}
+
+/**
+ * AW-17 — the predicate every reader that predates meters applies.
+ *
+ * Failed calls are now recorded (outcome `failed`, zero-rated) so a receipt
+ * and the meter cards can show them. Before meters a failure wrote NO row, so
+ * each earlier reader — budget and limit spend, per-plugin units, daily
+ * buckets, per-model / Agent / Work groups, the run's settlement input and
+ * receipt lines, the admin report, both CSV exports — excludes them and
+ * returns exactly what it returned before. Rows recorded before meters
+ * (`outcome IS NULL`) are kept. The meter and breakdown reads count failures
+ * on purpose and do not apply this.
+ */
+const FAILED_CALLS_EXCLUDED = '(e.outcome IS NULL OR e.outcome <> :failedOutcome)';
+
+function excludeFailedCalls<Entity extends ObjectLiteral>(
+    qb: SelectQueryBuilder<Entity>,
+): SelectQueryBuilder<Entity> {
+    return qb.andWhere(FAILED_CALLS_EXCLUDED, { failedOutcome: UsageOutcome.FAILED });
 }
 
 function nullableString(value: unknown): string | null {
