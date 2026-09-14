@@ -98,6 +98,29 @@ describe('feed actor', () => {
             ).toMatchObject({ actorKind: 'agent', actorAgentId: WREN });
         });
 
+        it('records a file save or a refused save as the person, with the agent as its subject', () => {
+            for (const actionType of [
+                ActivityActionType.AGENT_FILE_EDITED,
+                ActivityActionType.AGENT_FILE_REVERTED,
+            ]) {
+                // The payload the Instructions tab save writes (no actor passed).
+                const derived = withDerivedActor(
+                    entry({ agentId: IVY, name: 'SOUL.md' }, { actionType }),
+                );
+                expect(derived.actorKind).toBe('user');
+                expect(derived.actorAgentId).toBeUndefined();
+                // The agent's own edit tool names itself, and that still wins.
+                expect(
+                    withDerivedActor(
+                        entry(
+                            { agentId: IVY, name: 'SOUL.md' },
+                            { actionType, actorKind: 'agent', actorAgentId: IVY },
+                        ),
+                    ),
+                ).toMatchObject({ actorKind: 'agent', actorAgentId: IVY });
+            }
+        });
+
         it('fills in the kind when only the acting agent was passed', () => {
             expect(withDerivedActor(entry(undefined, { actorAgentId: WREN }))).toMatchObject({
                 actorKind: 'agent',
@@ -212,6 +235,32 @@ describe('feed actor', () => {
             // The agent that acted is not also its own subject.
             expect(subjectAgentIdOf(paused)).toBeNull();
             expect(subjectAgentIdOf({ actionType: 'x' })).toBeNull();
+        });
+
+        it('resolves an older file save to the person, and an agent-authored one to the agent', () => {
+            for (const actionType of [
+                ActivityActionType.AGENT_FILE_EDITED,
+                ActivityActionType.AGENT_FILE_REVERTED,
+            ]) {
+                const saved = { actionType, details: { agentId: IVY, name: 'SOUL.md' } };
+                expect(actorAgentIdOf(saved)).toBeNull();
+                expect(subjectAgentIdOf(saved)).toBe(IVY);
+                expect(resolveFeedActor(saved, agents)).toEqual({ kind: 'user', label: null });
+
+                const byAgent = {
+                    ...saved,
+                    actorKind: 'agent' as const,
+                    actorAgentId: IVY,
+                    actorLabel: 'Ivy',
+                };
+                expect(resolveFeedActor(byAgent, agents)).toEqual({
+                    kind: 'agent',
+                    agentId: IVY,
+                    label: 'Ivy',
+                    avatarMode: 'initials',
+                });
+                expect(subjectAgentIdOf(byAgent)).toBeNull();
+            }
         });
 
         it('keeps the name captured at write time after a rename and after a deletion', () => {

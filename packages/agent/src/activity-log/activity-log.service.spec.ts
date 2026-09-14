@@ -390,5 +390,27 @@ describe('ActivityLogService', () => {
                 expect(written.details).toEqual({ resourceType: 'agent', resourceId: AGENT_ID });
             }
         });
+
+        it('records a saved or refused agent file as the signed-in user acting on the agent', async () => {
+            const { svc, repo, agents } = buildWithAgents(jest.fn());
+            for (const actionType of [
+                ActivityActionType.AGENT_FILE_EDITED,
+                ActivityActionType.AGENT_FILE_REVERTED,
+            ]) {
+                await svc.log({
+                    userId: 'user-1',
+                    actionType,
+                    action: actionType,
+                    status: ActivityStatus.COMPLETED,
+                    summary: `Edited SOUL.md — ${actionType}`,
+                    details: { agentId: AGENT_ID, name: 'SOUL.md' },
+                });
+            }
+            expect(agents.findManyByIdsForUser).not.toHaveBeenCalled();
+            for (const [written] of repo.create.mock.calls) {
+                expect(written.actorKind).toBe('user');
+                expect(written.actorAgentId).toBeUndefined();
+            }
+        });
     });
 });

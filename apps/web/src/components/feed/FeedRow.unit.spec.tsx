@@ -86,6 +86,21 @@ describe('FeedRow', () => {
         expect(screen.getByRole('article')).toHaveTextContent('You finished a run');
     });
 
+    it('reads naturally when the signed-in user saved an agent file', () => {
+        const { errors } = renderRow({
+            actionType: 'agent_file_edited',
+            actor: { kind: 'user', label: null },
+            narration: {
+                key: 'agentFileEdited',
+                params: { actor: '', subject: 'SOUL.md', hasSubject: 'yes' },
+            },
+        });
+        expect(screen.getByRole('article')).toHaveTextContent(
+            'You edited the agent file “SOUL.md”',
+        );
+        expect(errors).toEqual([]);
+    });
+
     it('uses the generic line for an action with no bespoke narration, never a raw token', () => {
         renderRow({
             actionType: 'some_new_thing',
@@ -113,7 +128,12 @@ describe('FeedRow', () => {
         [
             'agentFileEdited',
             { hasSubject: 'yes', subject: 'AGENTS.md' },
-            'Ivy had its file “AGENTS.md” edited',
+            'Ivy edited the agent file “AGENTS.md”',
+        ],
+        [
+            'agentFileEditRejected',
+            { hasSubject: 'yes', subject: 'SOUL.md' },
+            'Ivy could not save the agent file “SOUL.md” because it changed elsewhere',
         ],
         [
             'missionTick',

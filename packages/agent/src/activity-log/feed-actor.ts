@@ -22,8 +22,9 @@ import { sanitizeNarrationParam } from './feed-narration';
  *
  * An agent reference in `details` names the ACTING agent only for action
  * types a person does not perform. For the ones a person does (exporting or
- * importing an agent, giving it a skill, answering its decision, dispatching
- * it onto a task, ...) the referenced agent is what the action was ABOUT —
+ * importing an agent, editing its instruction files, giving it a skill,
+ * answering its decision, dispatching it onto a task, ...) the referenced
+ * agent is what the action was ABOUT —
  * its subject — and the actor is the signed-in user.
  */
 
@@ -155,6 +156,11 @@ export const FEED_USER_ACTION_TYPES: ReadonlySet<string> = new Set<string>([
     ActivityActionType.IDEA_REBUILD_STARTED,
     ActivityActionType.AGENT_EXPORTED,
     ActivityActionType.AGENT_IMPORTED,
+    // Saving an agent's instruction files (and a save refused because the
+    // file changed elsewhere) is a person's action by default. The agent's
+    // own edit tool stamps the agent as the actor explicitly when it writes.
+    ActivityActionType.AGENT_FILE_EDITED,
+    ActivityActionType.AGENT_FILE_REVERTED,
     ActivityActionType.ENVIRONMENT_CREATED,
     ActivityActionType.ENVIRONMENT_UPDATED,
     ActivityActionType.ENVIRONMENT_PUBLISHED,

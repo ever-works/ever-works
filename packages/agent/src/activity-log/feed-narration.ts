@@ -88,6 +88,10 @@ export const FEED_NARRATORS: Readonly<Record<string, NarratorEntry>> = {
         key: 'agentFileEdited',
         params: { subject: detailsText('name') },
     },
+    [ActivityActionType.AGENT_FILE_REVERTED]: {
+        key: 'agentFileEditRejected',
+        params: { subject: detailsText('name') },
+    },
     [ActivityActionType.AGENT_TASK_ASSIGNED]: { key: 'agentTaskAssigned' },
 
     // Missions
