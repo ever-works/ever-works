@@ -5,6 +5,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { QUEUED_REASON_INSUFFICIENT_CREDITS } from '../agents/run-admission-chain';
 import {
@@ -17,6 +18,7 @@ import type { ConversationMessage } from '../entities/conversation-message.entit
 import { JOB_RUNTIME_NOT_CONFIGURED_REASON } from '../tasks-domain/task-dispatcher';
 import { isUniqueConstraintError } from '../utils/db-error.utils';
 import { redactSecrets, scanForSecrets } from '../utils/secret-scan';
+import { ConversationAttachmentResolver } from './conversation-attachment.resolver';
 import { ConversationDispatchService } from './conversation-dispatch.service';
 import { ConversationMentionService } from './conversation-mention.service';
 import { ConversationService } from './conversation.service';
@@ -134,6 +136,11 @@ export class ConversationMessageService {
         private readonly conversationService: ConversationService,
         private readonly mentions: ConversationMentionService,
         private readonly dispatch: ConversationDispatchService,
+        // Describes attachments (name, type, reopen URL) on the messages this
+        // service hands back. Optional: without it they read back as the
+        // bare references they are stored as.
+        @Optional()
+        private readonly attachments?: ConversationAttachmentResolver,
     ) {}
 
     async send(
@@ -154,7 +161,12 @@ export class ConversationMessageService {
                 conversation.id,
                 clientMessageId,
             );
-            if (existing) return { message: existing, reach: [], duplicate: true };
+            if (existing) {
+                return this.withAttachments(
+                    { message: existing, reach: [], duplicate: true },
+                    scope,
+                );
+            }
         }
 
         const body = typeof input.body === 'string' ? input.body : '';
@@ -190,7 +202,12 @@ export class ConversationMessageService {
                     conversation.id,
                     clientMessageId,
                 );
-                if (winner) return { message: winner, reach: [], duplicate: true };
+                if (winner) {
+                    return this.withAttachments(
+                        { message: winner, reach: [], duplicate: true },
+                        scope,
+                    );
+                }
             }
             throw err;
         }
@@ -204,7 +221,7 @@ export class ConversationMessageService {
             );
 
         const reach = await this.dispatchMessage(conversation, message, userId, parsed);
-        return { message, reach, duplicate: false };
+        return this.withAttachments({ message, reach, duplicate: false }, scope);
     }
 
     /**
@@ -242,7 +259,7 @@ export class ConversationMessageService {
             : [];
         const parsed = this.mentions.parse(sent.content, candidates);
         const reach = await this.dispatchMessage(conversation, sent, userId, parsed);
-        return { message: sent, reach, duplicate: false };
+        return this.withAttachments({ message: sent, reach, duplicate: false }, scope);
     }
 
     /** Remove a `failed` message for good. Anything else is a 409. */
@@ -273,7 +290,12 @@ export class ConversationMessageService {
             userId,
             scope,
         );
-        return this.conversations.findMessagesPaged(conversation.id, options.limit, options.before);
+        const messages = await this.conversations.findMessagesPaged(
+            conversation.id,
+            options.limit,
+            options.before,
+        );
+        return this.describeAttachments(messages, scope);
     }
 
     /**
@@ -292,11 +314,12 @@ export class ConversationMessageService {
             userId,
             scope,
         );
-        return this.conversations.findMessagesAfter(
+        const messages = await this.conversations.findMessagesAfter(
             conversation.id,
             options.after ?? null,
             options.limit,
         );
+        return this.describeAttachments(messages, scope);
     }
 
     /**
@@ -477,6 +500,22 @@ export class ConversationMessageService {
             message.failureCode = failureCode;
         }
         return reach;
+    }
+
+    /** `messages` as a person reads them: attachments with their name and reopen URL. */
+    private async describeAttachments(
+        messages: ConversationMessage[],
+        scope?: OwnershipScope,
+    ): Promise<ConversationMessage[]> {
+        return this.attachments ? this.attachments.describe(messages, scope) : messages;
+    }
+
+    private async withAttachments(
+        outcome: ConversationSendOutcome,
+        scope?: OwnershipScope,
+    ): Promise<ConversationSendOutcome> {
+        const [message] = await this.describeAttachments([outcome.message], scope);
+        return { ...outcome, message };
     }
 
     private async markFailed(

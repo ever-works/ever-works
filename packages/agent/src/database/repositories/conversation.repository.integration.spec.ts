@@ -195,6 +195,97 @@ describe('named Conversations — repository integration (better-sqlite3)', () =
         ).toBe(1);
     });
 
+    it('previews each Conversation by the first message a person wrote, shortened', async () => {
+        const first = await openDirect(ORG);
+        const empty = await openDirect(ORG);
+        await conversations.insertMessage({
+            conversationId: first.id,
+            role: 'assistant',
+            content: 'An Agent spoke first',
+            authorType: 'agent',
+            authorId: agentId,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await conversations.insertMessage({
+            conversationId: first.id,
+            role: 'user',
+            content: `Can you check   the pricing page?
+${'x'.repeat(400)}`,
+            authorType: 'user',
+            authorId: userId,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await conversations.insertMessage({
+            conversationId: first.id,
+            role: 'user',
+            content: 'A later question',
+            authorType: 'user',
+            authorId: userId,
+        });
+
+        const previews = await conversations.firstMessagePreviews([first.id, empty.id]);
+
+        expect(previews.has(empty.id)).toBe(false);
+        const preview = previews.get(first.id) ?? '';
+        expect(preview.startsWith('Can you check the pricing page? x')).toBe(true);
+        expect(preview.length).toBeLessThanOrEqual(160);
+        expect(await conversations.firstMessagePreviews([])).toEqual(new Map());
+    });
+
+    it('previews a timestamp tie by the message the thread shows first, and pages through ties', async () => {
+        const conversation = await openDirect(ORG);
+        const messages = dataSource.getRepository(ConversationMessage);
+        const at = new Date('2026-09-12T08:00:00.000Z');
+        // Stored in this order, in one millisecond; the first one stored has
+        // the HIGHER id, so id order and storage order disagree.
+        const tied = [
+            { id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', content: 'Stored first' },
+            { id: '00000000-0000-4000-8000-000000000001', content: 'Stored second' },
+            { id: '77777777-7777-4777-8777-777777777777', content: 'Stored third' },
+        ];
+        for (const row of tied) {
+            await messages.save(
+                messages.create({
+                    ...row,
+                    conversationId: conversation.id,
+                    role: 'user',
+                    authorType: 'user',
+                    authorId: userId,
+                    createdAt: at,
+                }),
+            );
+        }
+        await messages.save(
+            messages.create({
+                conversationId: conversation.id,
+                role: 'user',
+                content: 'Later',
+                authorType: 'user',
+                authorId: userId,
+                createdAt: new Date(at.getTime() + 1),
+            }),
+        );
+
+        const thread = await conversations.findMessagesPaged(conversation.id, 10);
+        const stream = await conversations.findMessagesAfter(conversation.id, null, 10);
+        // One message order everywhere: the thread, the live stream, the preview.
+        expect(thread.map((row) => row.id)).toEqual(stream.map((row) => row.id));
+        const previews = await conversations.firstMessagePreviews([conversation.id]);
+        expect(previews.get(conversation.id)).toBe(thread[0].content);
+
+        // Paging backwards two at a time visits every message once, even
+        // when a page boundary falls inside the tie.
+        const walked: string[] = [];
+        let before: string | undefined;
+        for (let page = 0; page < 10; page += 1) {
+            const rows = await conversations.findMessagesPaged(conversation.id, 2, before);
+            if (rows.length === 0) break;
+            walked.unshift(...rows.map((row) => row.id));
+            before = rows[0].id;
+        }
+        expect(walked).toEqual(thread.map((row) => row.id));
+    });
+
     it('legacy appends store model turns as system-authored and read them through for the owner', async () => {
         const legacy = await conversations.create({ userId, title: 'assistant thread' });
         const unread = async () =>

@@ -357,6 +357,7 @@ describe('ConversationRepository — named Conversations', () => {
             'andWhere',
             'groupBy',
             'orderBy',
+            'addOrderBy',
             'take',
         ]) {
             queryBuilder[method] = jest.fn(() => queryBuilder);
@@ -428,6 +429,8 @@ describe('ConversationRepository — named Conversations', () => {
             { id: 'm3' },
         ]);
         expect(queryBuilder.orderBy).toHaveBeenCalledWith('m.createdAt', 'DESC');
+        // Timestamp ties read in one fixed order, the stream's (`createdAt`, `id`).
+        expect(queryBuilder.addOrderBy).toHaveBeenCalledWith('m.id', 'DESC');
         expect(queryBuilder.take).toHaveBeenCalledWith(2);
 
         msgRepo.findOne.mockResolvedValue(null);
