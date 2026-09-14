@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 102 plugins under `packages/plugins/`, spanning **19 of the 24 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, and utility. (`form`, `integration`, `theme`, `memory`, and `rag` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
+The platform ships with 103 plugins under `packages/plugins/`, spanning **19 of the 24 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, and utility. (`form`, `integration`, `theme`, `memory`, and `rag` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
 
 ## Plugin count by category
 
@@ -18,7 +18,7 @@ Counted from each package's `everworks.plugin.category` field.
 | `pipeline`              | 14    | `activepieces`, `agent-pipeline`, `claude-code`, `claude-managed-agent`, `codex`, `composio`, `gemini`, `gtm-pipeline`, `hermes-agent`, `make`, `opencode`, `sim-ai`, `standard-pipeline`, `zapier`                                     |
 | `ai-provider`           | 11    | `anthropic`, `google`, `grok`, `groq`, `lm-studio`, `mistral`, `ollama`, `openai`, `openrouter`, `vercel-ai-gateway`, `vllm`                                                                                                            |
 | `connector`             | 11    | `bluesky-connector`, `discord-connector`, `google-workspace-connector`, `hubspot-connector`, `jira-connector`, `linear-connector`, `mastodon-connector`, `notion-connector`, `pipedrive-connector`, `slack-connector`, `zoom-connector` |
-| `utility`               | 10    | `agentmemory`, `browser-automation`, `comparison-generator`, `everworks-skills`, `everworks-task-tracker`, `langfuse`, `local-workspace`, `memory-pipeline-modifier`, `pty-local`, `sandbox-workspace`                                  |
+| `utility`               | 11    | `agentmemory`, `browser-automation`, `comparison-generator`, `everworks-playbooks`, `everworks-skills`, `everworks-task-tracker`, `langfuse`, `local-workspace`, `memory-pipeline-modifier`, `pty-local`, `sandbox-workspace`           |
 | `search`                | 9     | `brave`, `brightdata`, `exa`, `firecrawl`, `linkup`, `perplexity`, `serpapi`, `tavily`, `valyu`                                                                                                                                         |
 | `secret-store-resolver` | 7     | `secret-store-aws-sm`, `secret-store-azure-kv`, `secret-store-doppler`, `secret-store-gcp-sm`, `secret-store-infisical`, `secret-store-k8s`, `secret-store-vault`                                                                       |
 | `job-runtime`           | 6     | `job-runtime-bullmq`, `job-runtime-inngest`, `job-runtime-node`, `job-runtime-pgboss`, `job-runtime-temporal`, `job-runtime-trigger`                                                                                                    |
@@ -59,7 +59,7 @@ are bundled in every image. `local-fs` is the default boot-storage so
 the API can serve without any distributable storage plugin enabled
 (FR-4).
 
-**Distributable (75):** every other plugin under `packages/plugins/*`.
+**Distributable (76):** every other plugin under `packages/plugins/*`.
 In `bundled` mode these still ship in the image (so a fresh deploy
 behaves byte-for-byte the same as pre-EW-693); in `dynamic` mode they
 are stripped from the image and pulled from `@ever-works/<id>-plugin`
@@ -68,7 +68,7 @@ generated from each plugin's `package.json` `everworks.plugin`
 manifest — see `scripts/strip-non-core-plugins.js` for the runtime
 classification rule.
 
-27 core plus 75 distributable accounts for all 102 plugins. Sixteen
+27 core plus 76 distributable accounts for all 103 plugins. Sixteen
 plugins state `distribution: 'core'` explicitly (the six job runtimes,
 the seven secret stores, `local-fs`, `pgvector`, `postgres-db`); the
 other eleven inherit `core` from `systemPlugin: true`. Everything added
@@ -1710,6 +1710,30 @@ self-recovers when it appears.
 
 See [Skills feature](/features/skills-catalog) for the platform-side
 data model + resolver + injection pipeline.
+
+### Ever Works Playbooks
+
+First-party `playbook-provider` capability plugin. Supplies the
+built-in Playbook catalogue shown in the Playbooks section of the
+capability catalogue (`/catalog`): eight packaged outcomes, each naming
+its trigger, its steps, the capabilities it needs (never a provider
+id), what it produces and when it stops to ask. Every entry is
+sanitised and validated before it is served, and five of the eight
+need no connection at all. `PlaybookCatalogFacadeService` merges the
+entries of every enabled `playbook-provider`; a later provider replaces
+an entry only with a strictly higher `version`.
+
+| Field              | Value                                    |
+| ------------------ | ---------------------------------------- |
+| Plugin ID          | `everworks-playbooks`                    |
+| Package            | `@ever-works/everworks-playbooks-plugin` |
+| License            | MIT                                      |
+| Configuration Mode | `admin-only`                             |
+| Auto Enable        | Yes (default `playbook-provider`)        |
+| Distribution       | `registry`                               |
+| Capabilities       | `playbook-provider`                      |
+
+No settings.
 
 ### Ever Works Task Tracker
 
