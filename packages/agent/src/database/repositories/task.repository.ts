@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, LessThanOrEqual, Repository } from 'typeorm';
+import { Brackets, LessThanOrEqual, Repository, type SelectQueryBuilder } from 'typeorm';
 import { Task, TaskStatus } from '../../entities/task.entity';
 import {
     buildCaseInsensitiveLikeClause,
@@ -18,7 +18,13 @@ export interface ListTasksFilter {
     teamId?: string;
     agentId?: string;
     goalId?: string;
-    parentTaskId?: string;
+    /**
+     * A parent Task id returns that parent's sub-tasks. The literal `'none'`
+     * (never a valid uuid, so it cannot collide with one) returns only
+     * top-level Tasks — the Task board's default read. Omitted = no
+     * predicate, today's behaviour.
+     */
+    parentTaskId?: string | 'none';
     label?: string;
     search?: string;
     /**
@@ -28,9 +34,44 @@ export interface ListTasksFilter {
      * default list want.
      */
     includeHidden?: boolean;
+    /**
+     * `true` = recurring templates only; `false` = everything except
+     * templates. Omitted = no predicate, today's behaviour.
+     */
+    isRecurring?: boolean;
+    /**
+     * Task board — bound the terminal statuses (`done`, `cancelled`) to rows
+     * updated at or after this instant, leaving every other status
+     * unbounded. The same predicate reaches the count and the page, so a
+     * windowed column's total and its cards always agree. Omitted = no
+     * predicate.
+     */
+    terminalUpdatedSince?: Date;
+    /**
+     * Row order. Omitted and `'updatedAt'` both emit today's
+     * `updatedAt DESC`, so every existing caller is unchanged. Every order
+     * then breaks remaining ties on `id ASC`, so offset pages never overlap.
+     *   - `'priorityThenUpdated'` — `p0` first, then oldest update first.
+     *   - `'stalledThenPriority'` — stalled `in_progress` Tasks first (see
+     *     `stallCutoff`), then priority, then oldest update first. The
+     *     Task board's order.
+     */
+    orderBy?: 'updatedAt' | 'priorityThenUpdated' | 'stalledThenPriority';
+    /**
+     * Only read with `orderBy: 'stalledThenPriority'`: an `in_progress` Task
+     * with nothing running whose `updatedAt` is before this instant sorts
+     * first. Omitted = nothing sorts as stalled.
+     */
+    stallCutoff?: Date;
     limit?: number;
     offset?: number;
 }
+
+/** Task statuses the board bounds to a recent window. */
+const TERMINAL_TASK_STATUSES: TaskStatus[] = [TaskStatus.DONE, TaskStatus.CANCELLED];
+
+/** Run statuses after which nothing is running for a Task (stall ordering). */
+const FINISHED_RUN_STATUSES = ['completed', 'failed', 'cancelled'];
 
 /**
  * Tasks feature — Phase 11.5.
@@ -165,8 +206,27 @@ export class TaskRepository {
         if (filter.teamId) qb.andWhere('task.teamId = :teamId', { teamId: filter.teamId });
         if (filter.agentId) qb.andWhere('task.agentId = :agentId', { agentId: filter.agentId });
         if (filter.goalId) qb.andWhere('task.goalId = :goalId', { goalId: filter.goalId });
-        if (filter.parentTaskId)
+        if (filter.parentTaskId === 'none') {
+            qb.andWhere('task.parentTaskId IS NULL');
+        } else if (filter.parentTaskId) {
             qb.andWhere('task.parentTaskId = :parentTaskId', { parentTaskId: filter.parentTaskId });
+        }
+        if (filter.isRecurring !== undefined) {
+            qb.andWhere('task.isRecurring = :isRecurring', { isRecurring: filter.isRecurring });
+        }
+        if (filter.terminalUpdatedSince) {
+            qb.andWhere(
+                new Brackets((windowQb) => {
+                    windowQb
+                        .where('task.status NOT IN (:...terminalStatuses)', {
+                            terminalStatuses: TERMINAL_TASK_STATUSES,
+                        })
+                        .orWhere('task.updatedAt >= :terminalUpdatedSince', {
+                            terminalUpdatedSince: filter.terminalUpdatedSince,
+                        });
+                }),
+            );
+        }
 
         // Board visibility: trigger-spawned Tasks whose trigger opted out
         // of the board are excluded unless the caller explicitly asks for
@@ -229,11 +289,62 @@ export class TaskRepository {
         }
 
         const total = await qb.getCount();
-        qb.orderBy('task.updatedAt', 'DESC')
-            .take(filter.limit ?? 50)
-            .skip(filter.offset ?? 0);
+        this.applyListOrder(qb, filter);
+        qb.take(filter.limit ?? 50).skip(filter.offset ?? 0);
         const rows = await qb.getMany();
         return { rows, total };
+    }
+
+    /**
+     * Row order for {@link findByUserIdFiltered}. Applied AFTER the count, so
+     * no ordering option can change a total.
+     *
+     * `task.priority ASC` is deliberate and correct: the column is a
+     * `varchar(4)` holding `p0`..`p4`, so lexicographic order IS priority
+     * order (`'p0' < 'p1' < … < 'p4'`). No CASE mapping or numeric column is
+     * needed. It looks accidental; it is not.
+     *
+     * Every order ends on `task.id ASC`. `updatedAt` is not unique, and rows
+     * tied on every other key have no defined relative order: two OFFSET
+     * reads may then be served by different plans and repeat one row while
+     * never returning another. The unique final key makes each page a fixed
+     * slice of one total order. It only breaks ties, so it never moves a row
+     * that the earlier keys already placed.
+     */
+    private applyListOrder(qb: SelectQueryBuilder<Task>, filter: ListTasksFilter): void {
+        this.applyListOrderKeys(qb, filter);
+        qb.addOrderBy('task.id', 'ASC');
+    }
+
+    private applyListOrderKeys(qb: SelectQueryBuilder<Task>, filter: ListTasksFilter): void {
+        switch (filter.orderBy) {
+            case 'priorityThenUpdated':
+                qb.orderBy('task.priority', 'ASC').addOrderBy('task.updatedAt', 'ASC');
+                return;
+            case 'stalledThenPriority': {
+                if (filter.stallCutoff) {
+                    // Stalled = in progress, nothing running, untouched since
+                    // the cutoff. Same rule as `isTaskStalled` in contracts,
+                    // so the order and the card flag cannot disagree.
+                    qb.orderBy(
+                        `CASE WHEN task.status = :stallStatus AND (task.latestRunStatus IS NULL OR task.latestRunStatus IN (:...stallFinishedRuns)) AND task.updatedAt < :stallCutoff THEN 0 ELSE 1 END`,
+                        'ASC',
+                    )
+                        .setParameter('stallStatus', TaskStatus.IN_PROGRESS)
+                        .setParameter('stallFinishedRuns', FINISHED_RUN_STATUSES)
+                        .setParameter('stallCutoff', filter.stallCutoff)
+                        .addOrderBy('task.priority', 'ASC');
+                } else {
+                    qb.orderBy('task.priority', 'ASC');
+                }
+                qb.addOrderBy('task.updatedAt', 'ASC');
+                return;
+            }
+            case 'updatedAt':
+            case undefined:
+            default:
+                qb.orderBy('task.updatedAt', 'DESC');
+        }
     }
 
     async create(data: Partial<Task>): Promise<Task> {

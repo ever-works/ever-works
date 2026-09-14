@@ -89,3 +89,57 @@ describe('TasksController — includeHidden query mapping', () => {
         expect(list.mock.calls[1][1]).toMatchObject({ includeHidden: false });
     });
 });
+
+/**
+ * Task board read (AW-02) — the same flag on the board route. The board
+ * hand-builds its input from the query string too, so the copy is pinned
+ * here beside the list route's. That hidden rows are then absent from the
+ * board's columns AND its counts, and present with `includeHidden=true`, is
+ * proven against a real database in the agent package's
+ * `task-board.integration.spec.ts`.
+ */
+describe('TasksController — includeHidden on the board read', () => {
+    const auth = { userId: 'user-1' } as never;
+    const scope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+
+    function make() {
+        const getBoard = jest.fn().mockResolvedValue({ columns: [] });
+        const getColumn = jest.fn().mockResolvedValue({ cards: [] });
+        const controller = new TasksController(
+            { list: jest.fn() } as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            { getScope: () => scope } as never,
+            undefined,
+            { getBoard, getColumn } as never,
+        );
+        return { controller, getBoard, getColumn };
+    }
+
+    it('keeps hidden Tasks off the board and out of its counts by default', async () => {
+        const { controller, getBoard, getColumn } = make();
+        await controller.board(auth, {});
+        await controller.boardColumn(auth, { column: 'todo' });
+        expect(getBoard.mock.calls[0][1]).toMatchObject({ includeHidden: false });
+        expect(getColumn.mock.calls[0][1]).toMatchObject({ includeHidden: false });
+    });
+
+    it("reveals them only for the exact string 'true', on both board routes", async () => {
+        const { controller, getBoard, getColumn } = make();
+        await controller.board(auth, { includeHidden: 'true' });
+        await controller.board(auth, { includeHidden: '1' });
+        await controller.boardColumn(auth, { column: 'todo', includeHidden: 'true' });
+        expect(getBoard.mock.calls[0][1]).toMatchObject({ includeHidden: true });
+        expect(getBoard.mock.calls[1][1]).toMatchObject({ includeHidden: false });
+        expect(getColumn.mock.calls[0][1]).toMatchObject({ includeHidden: true });
+    });
+});

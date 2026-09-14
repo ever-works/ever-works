@@ -12,6 +12,8 @@ import {
     type RunTaskResult,
     type Task,
     type TaskAssignCandidate,
+    type TaskBoardColumn,
+    type TaskBoardQuery,
     type TaskChatMessage,
     type TaskDiff,
     type TaskPriority,
@@ -111,6 +113,60 @@ export async function transitionTaskAction(
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
     return task;
+}
+
+/**
+ * Task board — a card move that REPORTS a refusal instead of throwing it.
+ *
+ * The server's reason for refusing a move ("has 2 open blocker(s)") is the
+ * one thing the user needs to see, and production redacts the message of
+ * an error thrown out of a Server Action. So the board gets a value it can
+ * render. `transitionTaskAction` above is unchanged for its other callers.
+ */
+export type TransitionTaskBoardResult =
+    | { ok: true; task: Task }
+    | { ok: false; code: string; message: string };
+
+export async function transitionTaskBoardAction(
+    id: string,
+    to: TaskStatus,
+): Promise<TransitionTaskBoardResult> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const task = await tasksAPI.transition(id, to, false);
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${id}`);
+        return { ok: true, task };
+    } catch (err) {
+        if (err instanceof ApiResponseError) {
+            return { ok: false, code: err.code ?? 'TRANSITION_FAILED', message: err.message };
+        }
+        return { ok: false, code: 'TRANSITION_FAILED', message: '' };
+    }
+}
+
+/**
+ * Task board — "show more" for ONE column. Read-only (no revalidatePath) and
+ * never throws: a failed page read comes back `ok: false` so the column can
+ * say so without the rest of the board noticing.
+ */
+export async function getTaskBoardColumnAction(
+    query: TaskBoardQuery,
+    column: string,
+    offset: number,
+): Promise<{ ok: true; column: TaskBoardColumn } | { ok: false }> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        return { ok: true, column: await tasksAPI.boardColumn(query, column, offset) };
+    } catch {
+        return { ok: false };
+    }
 }
 
 /**

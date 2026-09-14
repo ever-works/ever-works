@@ -16,8 +16,9 @@ import { createTaskViaAPI, transitionTaskViaAPI, type Task } from './helpers/age
  * NEW angles proven here (all against the real components):
  *   - The view segmented control (Cards / Table / Kanban) toggles view,
  *     with `aria-pressed` reflecting the active tab and Cards as default.
- *   - The Kanban board renders all SEVEN status columns
- *     (Backlog, Todo, In Progress, In Review, Blocked, Done, Cancelled).
+ *   - The Kanban board renders all SEVEN status columns, named from the
+ *     translated status catalogue
+ *     (Backlog, To do, In progress, In review, Blocked, Done, Cancelled).
  *   - The Table view renders its 5 column headers + task rows.
  *   - Status-filter pills (cards view) client-filter the card grid, and are
  *     hidden in kanban (the columns already group by status).
@@ -32,8 +33,13 @@ import { createTaskViaAPI, transitionTaskViaAPI, type Task } from './helpers/age
  *   - GET /api/tasks → { data:Task[], meta:{ total, limit(=50 default), offset } }
  *   - list is ordered by `task.updatedAt DESC` (repository), so freshly
  *     created / just-transitioned tasks bubble to the top of the 50-window
- *     — that is why newly created seeded-user tasks are reliably visible on
- *     the board (which fetches the newest 50).
+ *     in the Cards and Table views.
+ *   - the BOARD reads each column on its own (GET /api/tasks/board): a true
+ *     total per column, 50 cards per column, ordered by priority then oldest
+ *     update. A fresh p3 card can therefore sit past the first page of a busy
+ *     seeded-user column, so the board journeys below narrow the board to
+ *     their own fixtures with `?search=<unique tag>` — the same filter a user
+ *     would type — instead of depending on how much other specs have seeded.
  *   - status filter (?status=todo) narrows to that status only.
  *   - Kanban NEXT_STATUS lattice (mirror of TaskTransitionService):
  *       backlog → todo, cancelled
@@ -47,12 +53,12 @@ import { createTaskViaAPI, transitionTaskViaAPI, type Task } from './helpers/age
  * The API-contract tests register isolated users for determinism.
  */
 
-// ── View-tab labels (COLUMNS in TasksKanbanView / VIEW_TABS in TasksList) ──
+// ── Column names (dashboard.tasksPage.status.* in messages/en.json) ──
 const KANBAN_COLUMNS = [
     'Backlog',
-    'Todo',
-    'In Progress',
-    'In Review',
+    'To do',
+    'In progress',
+    'In review',
     'Blocked',
     'Done',
     'Cancelled',
@@ -96,9 +102,9 @@ async function gotoBoard(page: Page, query = ''): Promise<void> {
 
 /**
  * Switch to the kanban view (idempotent + retry-guarded for the prod-build
- * hydration race). "In Review" is a kanban-only column header — the cards
- * view uses "In review" for its pill and hides pills in kanban — so its
- * visibility is a reliable "we are on the board" signal.
+ * hydration race). A board column region only exists on the board — the
+ * cards view has pills, not columns — so its visibility is a reliable
+ * "we are on the board" signal.
  */
 async function openKanban(page: Page): Promise<void> {
     const tab = page.locator('button[title="Kanban"]');
@@ -107,10 +113,17 @@ async function openKanban(page: Page): Promise<void> {
         if ((await tab.getAttribute('aria-pressed')) !== 'true') {
             await tab.click({ timeout: 5_000 }).catch(() => undefined);
         }
-        await expect(page.getByText('In Review', { exact: true }).first()).toBeVisible({
+        await expect(
+            page.locator('[data-testid="task-board-column"][data-status="in_review"]'),
+        ).toBeVisible({
             timeout: 4_000,
         });
     }).toPass({ timeout: 30_000 });
+}
+
+/** Narrow the page to one spec's own fixtures (see the data-contract note above). */
+function searchFor(tag: string): string {
+    return `?search=${encodeURIComponent(tag)}`;
 }
 
 /** The kanban card element (a draggable div) carrying `title`. */
@@ -218,7 +231,7 @@ test.describe('Tasks board — reflects API data (seeded UI)', () => {
         const created = await createTaskViaAPI(request, token, { title });
         expect(created.status).toBe('backlog');
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
@@ -244,7 +257,7 @@ test.describe('Tasks board — reflects API data (seeded UI)', () => {
         const created = (await createRes.json()) as Task;
         expect(created.priority).toBe('p0');
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
@@ -257,9 +270,10 @@ test.describe('Tasks board — reflects API data (seeded UI)', () => {
         request,
     }) => {
         const token = await seededToken(request);
-        const backlogTitle = uniq('Multi backlog');
-        const todoTitle = uniq('Multi todo');
-        const progressTitle = uniq('Multi progress');
+        const tag = uniq('Multi');
+        const backlogTitle = `${tag} backlog`;
+        const todoTitle = `${tag} todo`;
+        const progressTitle = `${tag} progress`;
 
         await createTaskViaAPI(request, token, { title: backlogTitle });
         const todoTask = await createTaskViaAPI(request, token, { title: todoTitle });
@@ -268,7 +282,7 @@ test.describe('Tasks board — reflects API data (seeded UI)', () => {
         await transitionTaskViaAPI(request, token, progressTask.id, 'todo');
         await transitionTaskViaAPI(request, token, progressTask.id, 'in_progress');
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(tag));
         await openKanban(page);
         for (const title of [backlogTitle, todoTitle, progressTitle]) {
             await expect(kanbanCard(page, title)).toBeVisible({ timeout: 30_000 });
@@ -310,13 +324,13 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
         const title = uniq('Move menu');
         await createTaskViaAPI(request, token, { title });
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
 
         await expect(async () => {
-            const todoItem = card.getByRole('button', { name: 'todo', exact: true });
+            const todoItem = card.getByRole('button', { name: 'To do', exact: true });
             if (!(await todoItem.isVisible().catch(() => false))) {
                 await card
                     .getByRole('button', { name: /move/i })
@@ -326,13 +340,13 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
             await expect(todoItem).toBeVisible({ timeout: 2_000 });
         }).toPass({ timeout: 30_000 });
 
-        // Legal targets present…
-        await expect(card.getByRole('button', { name: 'todo', exact: true })).toBeVisible();
-        await expect(card.getByRole('button', { name: 'cancelled', exact: true })).toBeVisible();
+        // Legal targets present (named from the status catalogue)…
+        await expect(card.getByRole('button', { name: 'To do', exact: true })).toBeVisible();
+        await expect(card.getByRole('button', { name: 'Cancelled', exact: true })).toBeVisible();
         // …illegal ones never offered from backlog.
-        await expect(card.getByRole('button', { name: 'done', exact: true })).toHaveCount(0);
-        await expect(card.getByRole('button', { name: 'in review', exact: true })).toHaveCount(0);
-        await expect(card.getByRole('button', { name: 'in progress', exact: true })).toHaveCount(0);
+        await expect(card.getByRole('button', { name: 'Done', exact: true })).toHaveCount(0);
+        await expect(card.getByRole('button', { name: 'In review', exact: true })).toHaveCount(0);
+        await expect(card.getByRole('button', { name: 'In progress', exact: true })).toHaveCount(0);
     });
 
     test('moving a card backlog → todo via the kanban menu persists (API + reload agree)', async ({
@@ -344,15 +358,15 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
         const created = await createTaskViaAPI(request, token, { title });
         expect(created.status).toBe('backlog');
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
 
-        // Open the Move menu and click "todo"; retry until the API confirms
+        // Open the Move menu and click "To do"; retry until the API confirms
         // the server-action transition landed (absorbs the hydration race).
         await expect(async () => {
-            const todoItem = card.getByRole('button', { name: 'todo', exact: true });
+            const todoItem = card.getByRole('button', { name: 'To do', exact: true });
             if (!(await todoItem.isVisible().catch(() => false))) {
                 await card
                     .getByRole('button', { name: /move/i })
@@ -364,14 +378,14 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
         }).toPass({ timeout: 30_000 });
 
         // After a fresh reload the card re-renders in its `todo` move-state:
-        // its menu now offers a todo-only target ("in progress") and can no
-        // longer move to "todo" itself.
-        await gotoBoard(page);
+        // its menu now offers a todo-only target ("In progress") and can no
+        // longer move to "To do" itself.
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const reloaded = kanbanCard(page, title);
         await expect(reloaded).toBeVisible({ timeout: 30_000 });
         await expect(async () => {
-            const inProgress = reloaded.getByRole('button', { name: 'in progress', exact: true });
+            const inProgress = reloaded.getByRole('button', { name: 'In progress', exact: true });
             if (!(await inProgress.isVisible().catch(() => false))) {
                 await reloaded
                     .getByRole('button', { name: /move/i })
@@ -380,7 +394,7 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
             }
             await expect(inProgress).toBeVisible({ timeout: 2_000 });
         }).toPass({ timeout: 30_000 });
-        await expect(reloaded.getByRole('button', { name: 'todo', exact: true })).toHaveCount(0);
+        await expect(reloaded.getByRole('button', { name: 'To do', exact: true })).toHaveCount(0);
     });
 
     test('moving a todo card → in progress via the kanban menu reflects on the API', async ({
@@ -394,13 +408,13 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
         // todo → in_progress specifically.
         await transitionTaskViaAPI(request, token, created.id, 'todo');
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
 
         await expect(async () => {
-            const item = card.getByRole('button', { name: 'in progress', exact: true });
+            const item = card.getByRole('button', { name: 'In progress', exact: true });
             if (!(await item.isVisible().catch(() => false))) {
                 await card
                     .getByRole('button', { name: /move/i })
@@ -423,7 +437,7 @@ test.describe('Tasks board — kanban Move → transition (seeded UI)', () => {
         await transitionTaskViaAPI(request, token, created.id, 'cancelled');
         expect(await apiStatus(request, token, created.id)).toBe('cancelled');
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
@@ -502,7 +516,7 @@ test.describe('Tasks board — cards/table filter (seeded UI)', () => {
         const title = uniq('Kanban link');
         const created = await createTaskViaAPI(request, token, { title });
 
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(title));
         await openKanban(page);
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
@@ -535,17 +549,18 @@ test.describe('Tasks board — cards/table filter (seeded UI)', () => {
 test.describe('Tasks board — new tasks + data contract', () => {
     test('newly created tasks appear on the board after reload (UI)', async ({ page, request }) => {
         const token = await seededToken(request);
-        const first = uniq('New first');
-        const second = uniq('New second');
+        const tag = uniq('New');
+        const first = `${tag} first`;
+        const second = `${tag} second`;
 
         await createTaskViaAPI(request, token, { title: first });
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(tag));
         await openKanban(page);
         await expect(kanbanCard(page, first)).toBeVisible({ timeout: 30_000 });
 
         // A brand-new task shows up on the next board load.
         await createTaskViaAPI(request, token, { title: second });
-        await gotoBoard(page);
+        await gotoBoard(page, searchFor(tag));
         await openKanban(page);
         await expect(kanbanCard(page, second)).toBeVisible({ timeout: 30_000 });
         await expect(kanbanCard(page, first)).toBeVisible({ timeout: 30_000 });
