@@ -1,3 +1,4 @@
+import type { Logger } from '@nestjs/common';
 import {
     ComputerControlChangedEvent,
     ComputerSessionEndedEvent,
@@ -92,6 +93,9 @@ describe('ComputerControlListener', () => {
 
     it('never throws into the event bus when the Activity Log is down', async () => {
         const { listener, activityLog } = build();
+        const warn = jest
+            .spyOn((listener as unknown as { logger: Logger }).logger, 'warn')
+            .mockImplementation(() => undefined);
         activityLog.log.mockRejectedValue(new Error('db down'));
         expect(() =>
             listener.onControlChanged(
@@ -101,6 +105,10 @@ describe('ComputerControlListener', () => {
             ),
         ).not.toThrow();
         await new Promise((resolve) => setImmediate(resolve));
+        // The rejection is handled — logged, not left unhandled.
+        expect(activityLog.log).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('control activity not logged'));
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('db down'));
     });
 
     it('releases whatever an ended view held, and swallows a failure', async () => {

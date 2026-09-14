@@ -233,6 +233,13 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
                         ws.send(wire);
                     },
                 });
+                if (claims.role === 'worker' && this.registry.getControl(state.sessionId)?.held) {
+                    // The machine's leg rejoined a view this replica believes is
+                    // held: its replay told it what this replica last heard, so
+                    // confirm the hold with the arbiter (renewed elsewhere →
+                    // `controlling` again; ran out → released and `watching`).
+                    this.refreshHold(state.sessionId, true, false);
+                }
                 return;
             }
 
@@ -308,21 +315,28 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
         const now = Date.now();
         if (now - writes.inputAt < INPUT_WRITE_INTERVAL_MS) return;
         writes.inputAt = now;
-        this.runControl(sessionId, 'input', async (control) =>
-            this.registry.applyControl(sessionId, await control.recordInput(sessionId)),
-        );
+        this.runControl(sessionId, 'input', async (control) => {
+            this.registry.applyControl(sessionId, await control.recordInput(sessionId));
+            this.scheduleDisconnect(sessionId);
+        });
     }
 
-    /** Re-read this view's hold from the arbiter into the relay (throttled unless `force`). */
-    private refreshHold(sessionId: string, force = false): void {
+    /**
+     * Re-read this view's hold from the arbiter into the relay (throttled
+     * unless `force`). `fromDriver`: a driving socket on this replica asked
+     * for it — if that socket left while the read was in flight, its close
+     * found no hold here to give back, so the disconnect grace starts now.
+     */
+    private refreshHold(sessionId: string, force = false, fromDriver = true): void {
         if (!this.control) return;
         const writes = this.writesFor(sessionId);
         const now = Date.now();
         if (!force && now - writes.refreshAt < HOLD_REFRESH_INTERVAL_MS) return;
         writes.refreshAt = now;
-        this.runControl(sessionId, 'hold refresh', async (control) =>
-            this.registry.applyControl(sessionId, await control.holdOf(sessionId)),
-        );
+        this.runControl(sessionId, 'hold refresh', async (control) => {
+            this.registry.applyControl(sessionId, await control.holdOf(sessionId));
+            if (fromDriver) this.scheduleDisconnect(sessionId);
+        });
     }
 
     private writesFor(sessionId: string): { inputAt: number; refreshAt: number } {

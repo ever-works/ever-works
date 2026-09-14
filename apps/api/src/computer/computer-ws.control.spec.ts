@@ -169,6 +169,63 @@ describe('ComputerWsService — taking control (integration)', () => {
         control.holdOf.mockResolvedValue({ held: false, untilMs: null });
     });
 
+    it('still gives control back when the driving socket leaves before its hold was read', async () => {
+        const view = 'c5000000-0000-4000-8000-000000000005';
+        let answer: (hold: { held: boolean; untilMs: number | null }) => void = () => undefined;
+        control.holdOf.mockImplementationOnce(
+            () =>
+                new Promise((resolve) => {
+                    answer = resolve;
+                }),
+        );
+
+        const driver = await connect(`/ws/computer/${view}`);
+        auth(driver, view, 'driver');
+        await tick(60);
+        expect(control.holdOf).toHaveBeenCalledWith(view);
+        // Gone while the arbiter's answer is still on its way: its close found no hold here.
+        driver.close();
+        await tick(60);
+        answer({ held: true, untilMs: Date.now() + 60_000 });
+        await tick(60);
+        expect(control.releaseForSession).not.toHaveBeenCalledWith(view, expect.anything());
+        await tick(250);
+        expect(control.releaseForSession).toHaveBeenCalledWith(view, 'disconnected');
+    });
+
+    it('confirms a hold that ran out here when the machine’s leg rejoins, and tells the leg', async () => {
+        const view = 'c6000000-0000-4000-8000-000000000006';
+        // This replica's last word: held, but past its deadline.
+        relay.applyControl(view, { held: true, untilMs: Date.now() - 1 });
+        control.holdOf.mockResolvedValueOnce({ held: true, untilMs: Date.now() + 60_000 });
+
+        const node = await connect(`/ws/computer/${view}`);
+        const nodeGot: Array<Record<string, unknown>> = [];
+        node.on('message', (data) => nodeGot.push(JSON.parse(data.toString())));
+        auth(node, view, 'worker');
+        await tick(150);
+        expect(control.holdOf).toHaveBeenCalledWith(view);
+        expect(nodeGot).toEqual([
+            { kind: 'mode', mode: 'watching' },
+            { kind: 'mode', mode: 'controlling' },
+        ]);
+        node.close();
+        await tick(50);
+    });
+
+    it('never asks the arbiter anything when a machine leg joins a watch-only view', async () => {
+        const view = 'c7000000-0000-4000-8000-000000000007';
+        const node = await connect(`/ws/computer/${view}`);
+        const nodeGot: Array<Record<string, unknown>> = [];
+        node.on('message', (data) => nodeGot.push(JSON.parse(data.toString())));
+        auth(node, view, 'worker');
+        await tick(150);
+        expect(control.holdOf).not.toHaveBeenCalled();
+        expect(nodeGot).toEqual([]);
+        node.close();
+        await tick(50);
+    });
+
     it('never starts a disconnect release for a watching socket', async () => {
         const view = 'c4000000-0000-4000-8000-000000000004';
         relay.applyControl(view, { held: true, untilMs: Date.now() + 60_000 });

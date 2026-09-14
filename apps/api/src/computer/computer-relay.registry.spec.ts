@@ -421,6 +421,106 @@ describe('ComputerRelayRegistry — cross-replica seam', () => {
         expect(throwing.deliverToNode(SESSION, { kind: 'refresh' })).toBe(false);
     });
 
+    /** Two replicas on one bus: what one publishes, the other hears. */
+    function linkedReplicas() {
+        const handlers: Array<((sessionId: string, wire: string) => void) | undefined> = [];
+        const bus = (index: number) => ({
+            publishRemote: jest.fn((sessionId: string, wire: string) => {
+                handlers.forEach((handler, i) => {
+                    if (i !== index) handler?.(sessionId, wire);
+                });
+                return true;
+            }),
+            onRemote: (handler: (sessionId: string, wire: string) => void) => {
+                handlers[index] = handler;
+            },
+        });
+        const busA = bus(0);
+        const busB = bus(1);
+        const a = new ComputerRelayRegistry(busA, true);
+        const b = new ComputerRelayRegistry(busB, true);
+        return { a, b, busA, busB };
+    }
+
+    const input: ComputerFrame = {
+        kind: 'key',
+        action: 'down',
+        key: 'a',
+        code: 'KeyA',
+        modifiers: 0,
+    };
+
+    it('gates input on a peer replica by the hold the arbiter decided elsewhere, and revokes it there too', () => {
+        const { a, b, busA, busB } = linkedReplicas();
+        // The person's driving socket and the machine's leg are on B; control moves on A.
+        const driver = client('driver', 'driver');
+        const watcher = client('watcher', 'viewer');
+        const node = client('node', 'worker');
+        b.attach(SESSION, node);
+        b.attach(SESSION, driver);
+        b.attach(SESSION, watcher);
+
+        a.applyControl(SESSION, { held: true, untilMs: Date.now() + 60_000 });
+        expect(b.getControl(SESSION)).toMatchObject({ held: true });
+        expect(b.deliverInbound(SESSION, 'driver', input)).toBe(true);
+        expect(watcher.received).toEqual([{ kind: 'mode', mode: 'controlling' }]);
+
+        a.applyControl(SESSION, { held: false, untilMs: null });
+        expect(b.getControl(SESSION)).toEqual({ held: false, untilMs: null });
+        expect(b.deliverInbound(SESSION, 'driver', input)).toBe(false);
+        expect(driver.received.at(-1)).toMatchObject({ kind: 'error' });
+        expect(watcher.received).toEqual([
+            { kind: 'mode', mode: 'controlling' },
+            { kind: 'mode', mode: 'watching' },
+        ]);
+        expect(node.received).toEqual([
+            { kind: 'mode', mode: 'controlling' },
+            input,
+            { kind: 'mode', mode: 'watching' },
+        ]);
+        // B applied what it heard and published none of it back (only the input it forwarded).
+        const controlStates = (calls: unknown[][]) =>
+            calls.filter(([, wire]) => String(wire).includes('relay-control-state'));
+        expect(controlStates(busB.publishRemote.mock.calls)).toEqual([]);
+        expect(controlStates(busA.publishRemote.mock.calls)).toHaveLength(2);
+    });
+
+    it('carries a renewed deadline to peers, so a hold renewed elsewhere does not run out on them', () => {
+        const { a, b } = linkedReplicas();
+        b.attach(SESSION, client('driver', 'driver'));
+        a.applyControl(SESSION, { held: true, untilMs: Date.now() - 1 });
+        expect(b.deliverInbound(SESSION, 'driver', input)).toBe(false);
+
+        const renewed = Date.now() + 60_000;
+        a.applyControl(SESSION, { held: true, untilMs: renewed });
+        expect(b.getControl(SESSION)).toEqual({ held: true, untilMs: renewed });
+    });
+
+    it('never treats a frame or a malformed control-state message from the bus as a hold', () => {
+        let remoteHandler: ((sessionId: string, wire: string) => void) | null = null;
+        const relay = new ComputerRelayRegistry(
+            {
+                publishRemote: jest.fn(),
+                onRemote: (handler) => {
+                    remoteHandler = handler;
+                },
+            },
+            true,
+        );
+        relay.attach(SESSION, client('driver', 'driver'));
+        for (const wire of [
+            JSON.stringify({ kind: 'mode', mode: 'controlling' }),
+            JSON.stringify({ kind: 'relay-control-state', held: 'yes', untilMs: null }),
+            JSON.stringify({ kind: 'relay-control-state', held: true, untilMs: 'later' }),
+            `{"kind":"relay-control-state","held":true,"untilMs":null${' '.repeat(300)}}`,
+            'relay-control-state',
+        ]) {
+            remoteHandler!(SESSION, wire);
+        }
+        expect(relay.getControl(SESSION)).toBeNull();
+        expect(relay.deliverInbound(SESSION, 'driver', input)).toBe(false);
+    });
+
     it('tells no peer about a request for a view that has ended here', () => {
         const bus = { publishRemote: jest.fn(() => true), onRemote: () => undefined };
         const relay = new ComputerRelayRegistry(bus);
@@ -516,6 +616,56 @@ describe('ComputerRelayRegistry — taking control', () => {
         const late = client('late', 'viewer');
         relay.attach(SESSION, late);
         expect(late.received).toEqual([{ kind: 'mode', mode: 'controlling' }]);
+    });
+
+    it('tells a machine leg or browser that joins after the hold ran out or was given back that the view is watching', () => {
+        const { relay } = controlled();
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+        // The deadline passes with no word from the arbiter yet.
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() - 1 });
+
+        const rejoined = client('node-again', 'worker');
+        relay.attach(SESSION, rejoined);
+        expect(rejoined.received).toEqual([{ kind: 'mode', mode: 'watching' }]);
+        const late = client('late', 'viewer');
+        relay.attach(SESSION, late);
+        expect(late.received).toEqual([{ kind: 'mode', mode: 'watching' }]);
+
+        relay.applyControl(SESSION, { held: false, untilMs: null });
+        const afterRelease = client('node-third', 'worker');
+        relay.attach(SESSION, afterRelease);
+        expect(afterRelease.received).toEqual([{ kind: 'mode', mode: 'watching' }]);
+    });
+
+    it('tells everyone controlling again when a hold that ran out here is confirmed', () => {
+        const { relay, node } = controlled();
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() - 1 });
+        const rejoined = client('node-again', 'worker');
+        relay.attach(SESSION, rejoined);
+        node.received.length = 0;
+
+        // Renewed on the arbiter (input, keep or extend elsewhere).
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+        expect(rejoined.received).toEqual([
+            { kind: 'mode', mode: 'watching' },
+            { kind: 'mode', mode: 'controlling' },
+        ]);
+        expect(node.received).toEqual([{ kind: 'mode', mode: 'controlling' }]);
+    });
+
+    it('replays no mode at all for a view nobody here was told holds control', () => {
+        const relay = new ComputerRelayRegistry(undefined, true);
+        const node = client('node', 'worker');
+        relay.attach(SESSION, node);
+        // A release for a view this replica never saw held changes nothing here.
+        relay.applyControl(SESSION, { held: false, untilMs: null });
+        expect(relay.getControl(SESSION)).toBeNull();
+        const viewer = client('viewer', 'viewer');
+        relay.attach(SESSION, viewer);
+        relay.attach(SESSION, client('node-again', 'worker'));
+        expect(node.received).toEqual([]);
+        expect(viewer.received).toEqual([]);
     });
 
     it('forgets control when the view ends, and creates no state for a release it never saw', () => {

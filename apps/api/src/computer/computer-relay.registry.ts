@@ -61,7 +61,8 @@ import {
  *    else is answered with an `error` frame and never forwarded. A change of
  *    control is told to the view's sockets and to the machine's own leg as a
  *    `mode` frame, which is how the machine knows to pause the Agent's own
- *    input and when to resume it.
+ *    input and when to resume it. Peer replicas are told the hold itself
+ *    (held and deadline), so every replica gates input on the same hold.
  *  - **Reclaim.** Memory is released only when no client is attached AND
  *    the session ended AND at least one attach saw it (`force` overrides).
  *    A periodic {@link ComputerRelayRegistry.sweep} is what applies that in
@@ -161,6 +162,12 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
         this.requiresControl = requiresControl === true;
         this.bus = bus ?? new InProcessTerminalFanoutBus();
         this.bus.onRemote((sessionId, wire) => {
+            const hold = decodeControlStateForBus(wire);
+            if (hold) {
+                // A peer's word on this view's hold: applied here, never re-published.
+                this.applyControl(sessionId, hold, { fromRemote: true });
+                return;
+            }
             const frame = decodeComputerFrame(wire);
             if (!frame) return;
             if (isComputerNodeToServerFrame(frame)) {
@@ -245,14 +252,14 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
     attach(sessionId: string, client: ComputerRelayClient): ComputerSessionRelayStatus {
         const session = this.getOrCreate(sessionId);
         session.lastActivityMs = Date.now();
+        const mode = this.replayMode(session);
         if (client.role === 'worker') {
             session.clients.set(client.id, client);
             // A machine leg that (re)joins while this view holds control must
-            // keep the Agent's own input paused.
-            if (session.control?.held && !session.end) {
-                if (!this.trySend(client, { kind: 'mode', mode: 'controlling' })) {
-                    session.clients.delete(client.id);
-                }
+            // keep the Agent's own input paused — and one that rejoins after
+            // the hold ran out or was given back must resume it.
+            if (mode && !this.trySend(client, { kind: 'mode', mode })) {
+                session.clients.delete(client.id);
             }
             return this.getStatus(sessionId);
         }
@@ -262,8 +269,7 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
         const replay: ComputerFrame[] = [...session.banners];
         if (session.keyframe) replay.push(session.keyframe);
         if (session.stats) replay.push(session.stats);
-        if (session.control?.held && !session.end)
-            replay.push({ kind: 'mode', mode: 'controlling' });
+        if (mode) replay.push({ kind: 'mode', mode });
         if (session.end) replay.push(session.end);
         for (const frame of replay) {
             if (!this.trySend(client, frame)) {
@@ -349,31 +355,53 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
 
     /**
      * The arbiter's latest word on this view's hold on control. A change of
-     * held / not held is told, as a `mode` frame, to the view's browser
-     * sockets and to the machine's own leg (and to peer replicas, where the
-     * machine's leg may be attached); a renewed deadline alone is only
-     * recorded. A view this replica has never seen gets local state only
-     * when it holds control.
+     * held / not held — or a hold confirmed again after it had run out here —
+     * is told, as a `mode` frame, to the view's browser sockets and to the
+     * machine's own leg attached to this replica; a renewed deadline alone is
+     * only recorded. A view this replica has never been told holds control
+     * gets no local state for a release.
+     *
+     * Peer replicas are told the hold itself (held and deadline) through a
+     * control-state message on the bus, never just a `mode` frame: each peer
+     * applies it here with `fromRemote` — gating its own sockets' input on it
+     * and telling its own sockets and machine leg — and never re-publishes
+     * it, so a view released on one replica cannot keep sending input
+     * through another.
      */
-    applyControl(sessionId: string, hold: ComputerRelayControlHold): void {
+    applyControl(
+        sessionId: string,
+        hold: ComputerRelayControlHold,
+        opts: { fromRemote?: boolean } = {},
+    ): void {
         const existing = this.sessions.get(sessionId);
         if (existing?.end) return;
+        const tellPeers = (): void => {
+            if (!opts.fromRemote) this.safePublishRemote(sessionId, encodeControlStateForBus(hold));
+        };
+        if (!hold.held && !existing?.control) {
+            // Nothing attached here was ever told this view holds control.
+            tellPeers();
+            return;
+        }
+        const session = existing ?? this.getOrCreate(sessionId);
+        const now = Date.now();
+        const wasHeld = session.control?.held === true;
+        const wasInForce = this.holdsControl(session, now);
+        const renewed = session.control?.untilMs !== hold.untilMs;
+        // A hold confirmed after it ran out here counts as a change: a socket
+        // or machine leg that joined meanwhile was told `watching`.
+        const changed = wasHeld !== hold.held || (hold.held && !wasInForce);
+        session.control = { held: hold.held, untilMs: hold.untilMs };
+        if (changed || renewed) tellPeers();
+        if (!changed) return;
         const wire = encodeComputerFrame({
             kind: 'mode',
             mode: hold.held ? 'controlling' : 'watching',
         });
-        if (!existing && !hold.held) {
-            if (wire !== null) this.safePublishRemote(sessionId, wire);
-            return;
-        }
-        const session = existing ?? this.getOrCreate(sessionId);
-        const changed = (session.control?.held === true) !== hold.held;
-        session.control = { held: hold.held, untilMs: hold.untilMs };
-        if (!changed || wire === null) return;
-        session.lastActivityMs = Date.now();
+        if (wire === null) return;
+        session.lastActivityMs = now;
         this.fanOut(session, wire);
         this.sendToRole(session, wire, 'worker');
-        this.safePublishRemote(sessionId, wire);
     }
 
     /** This view's hold on control as this replica knows it, or null when it has heard nothing. */
@@ -484,6 +512,17 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
         return control.untilMs === null || now < control.untilMs;
     }
 
+    /**
+     * The `mode` a joining socket or machine leg is told: `controlling` only
+     * while the hold is in force, `watching` once a hold this replica knew of
+     * ran out or was given back, and nothing at all for a view nobody here
+     * was ever told holds control (watch-only views replay exactly as before).
+     */
+    private replayMode(session: ComputerRelaySession): 'controlling' | 'watching' | null {
+        if (session.end || !session.control) return null;
+        return this.holdsControl(session) ? 'controlling' : 'watching';
+    }
+
     private trySend(client: ComputerRelayClient, frame: ComputerFrame): boolean {
         const wire = encodeComputerFrame(frame);
         if (wire === null) return true;
@@ -558,6 +597,42 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
             );
             return false;
         }
+    }
+}
+
+/**
+ * The bus envelope one replica uses to tell its peers a view's hold on
+ * control. Deliberately NOT a {@link ComputerFrame} kind: every wire a socket
+ * or the machine can put on the bus is rebuilt by the frame codec first, so
+ * nothing but this registry can produce one.
+ */
+const CONTROL_STATE_BUS_KIND = 'relay-control-state';
+/** Longer than any control-state message; a picture on the bus is never parsed twice. */
+const CONTROL_STATE_BUS_MAX_LENGTH = 256;
+
+function encodeControlStateForBus(hold: ComputerRelayControlHold): string {
+    return JSON.stringify({ kind: CONTROL_STATE_BUS_KIND, held: hold.held, untilMs: hold.untilMs });
+}
+
+function decodeControlStateForBus(wire: string): ComputerRelayControlHold | null {
+    if (
+        typeof wire !== 'string' ||
+        wire.length > CONTROL_STATE_BUS_MAX_LENGTH ||
+        !wire.includes(CONTROL_STATE_BUS_KIND)
+    ) {
+        return null;
+    }
+    try {
+        const value = JSON.parse(wire) as Record<string, unknown> | null;
+        if (!value || value.kind !== CONTROL_STATE_BUS_KIND || typeof value.held !== 'boolean') {
+            return null;
+        }
+        const untilMs = value.untilMs;
+        if (untilMs === null) return { held: value.held, untilMs: null };
+        if (typeof untilMs !== 'number' || !Number.isFinite(untilMs)) return null;
+        return { held: value.held, untilMs };
+    } catch {
+        return null;
     }
 }
 
