@@ -4,6 +4,12 @@ import { PLATFORM_DEFAULT_TOOL_GRANT, type ToolGrantChainEntry } from '../../pol
 import {
 	CONNECTION_SCOPE_PRESET_ORDER,
 	applyConnectionScopePresetToToolGrant,
+	applyConnectionScopePresetWithOwnership,
+	connectionScopePresetBlockingDeny,
+	connectionScopePresetOperatorDeny,
+	normalizeConnectionScopePresetOwnership,
+	pruneConnectionScopePresetOwnership,
+	storedConnectionScopePresetWithOwnership,
 	connectionScopePresetClampSource,
 	connectionScopePresetCoversTool,
 	connectionScopePresetDenyPatterns,
@@ -191,6 +197,184 @@ describe('connection scope presets', () => {
 			expect(connectionScopePresetClampSource(PRESETS, 'write', 'read', { source: 'work', chain: [] })).toBe(
 				'work'
 			);
+		});
+	});
+
+	describe('ownership — an operator deny is never removed by a level change', () => {
+		/** Apply a sequence of levels, threading the stored row + record through. */
+		function run(
+			start: { deny?: string[]; allow?: string[] } | null,
+			ownership: unknown,
+			steps: Array<'read' | 'write'>
+		) {
+			let grant = start;
+			let record: unknown = ownership;
+			for (const step of steps) {
+				const next = applyConnectionScopePresetWithOwnership(grant, record, 'github', PRESETS, step);
+				grant = next.grant;
+				record = next.ownership;
+			}
+			return { grant, record };
+		}
+
+		it('an operator deny present before the first level change survives read → read and write → read', () => {
+			const afterRead = run({ deny: ['commitToRepo'] }, null, ['read']);
+			expect(afterRead.grant?.deny).toEqual(['commitToRepo', 'openPullRequest']);
+			// Only the pattern the control added is recorded.
+			expect(afterRead.record).toEqual({ github: { preset: 'read', deny: ['openPullRequest'] } });
+
+			const afterWrite = run(afterRead.grant, afterRead.record, ['write']);
+			expect(afterWrite.grant?.deny).toEqual(['commitToRepo']);
+			expect(afterWrite.record).toEqual({ github: { preset: 'write', deny: [] } });
+
+			const backToRead = run(afterWrite.grant, afterWrite.record, ['read']);
+			expect(backToRead.grant?.deny).toEqual(['commitToRepo', 'openPullRequest']);
+			expect(backToRead.record).toEqual({ github: { preset: 'read', deny: ['openPullRequest'] } });
+		});
+
+		it('an operator who denied every managed name keeps all of them through any sequence', () => {
+			const { grant, record } = run({ deny: ['COMMITTOREPO', 'openPullRequest'] }, null, [
+				'write',
+				'read',
+				'write',
+				'write'
+			]);
+			expect(grant?.deny).toEqual(['COMMITTOREPO', 'openPullRequest']);
+			expect(record).toEqual({ github: { preset: 'write', deny: [] } });
+		});
+
+		it('preset-owned patterns swap cleanly and leave unrelated operator rules and allow alone', () => {
+			const read = run({ allow: ['*'], deny: ['deploy_*'] }, null, ['read']);
+			expect(read.grant).toEqual({ allow: ['*'], deny: ['deploy_*', 'commitToRepo', 'openPullRequest'] });
+			expect(read.record).toEqual({ github: { preset: 'read', deny: ['commitToRepo', 'openPullRequest'] } });
+
+			const write = run(read.grant, read.record, ['write']);
+			expect(write.grant).toEqual({ allow: ['*'], deny: ['deploy_*'] });
+		});
+
+		it('mixed: one operator-owned and one preset-owned managed pattern', () => {
+			const { grant } = run(
+				{ deny: ['openPullRequest'] },
+				{ github: { preset: 'read', deny: ['commitToRepo'] } },
+				['write']
+			);
+			// commitToRepo is not in the row, so the record is pruned first; openPullRequest was never owned.
+			expect(grant?.deny).toEqual(['openPullRequest']);
+
+			const both = run(
+				{ deny: ['openPullRequest', 'commitToRepo'] },
+				{ github: { preset: 'read', deny: ['commitToRepo'] } },
+				['write']
+			);
+			expect(both.grant?.deny).toEqual(['openPullRequest']);
+			expect(both.record).toEqual({ github: { preset: 'write', deny: [] } });
+		});
+
+		it('is idempotent', () => {
+			const once = run(null, null, ['read']);
+			const twice = run(once.grant, once.record, ['read']);
+			expect(twice).toEqual(once);
+		});
+
+		it('never removes a pattern another provider’s level still owns', () => {
+			const { grant, record } = run(
+				{ deny: ['commitToRepo', 'openPullRequest'] },
+				{
+					github: { preset: 'read', deny: ['commitToRepo', 'openPullRequest'] },
+					gitlab: { preset: 'read', deny: ['commitToRepo'] }
+				},
+				['write']
+			);
+			expect(grant?.deny).toEqual(['commitToRepo']);
+			expect(record).toEqual({
+				gitlab: { preset: 'read', deny: ['commitToRepo'] },
+				github: { preset: 'write', deny: [] }
+			});
+		});
+
+		it('pruning drops owned patterns an operator removed by hand, so re-adding them later is operator-owned', () => {
+			const pruned = pruneConnectionScopePresetOwnership(
+				{ github: { preset: 'read', deny: ['commitToRepo', 'openPullRequest'] } },
+				['openPullRequest']
+			);
+			expect(pruned).toEqual({ github: { preset: 'read', deny: ['openPullRequest'] } });
+
+			// The operator re-adds commitToRepo by hand: widening must keep it.
+			const { grant } = run({ deny: ['openPullRequest', 'commitToRepo'] }, pruned, ['write']);
+			expect(grant?.deny).toEqual(['commitToRepo']);
+			expect(pruneConnectionScopePresetOwnership(null, ['x'])).toBeNull();
+		});
+
+		it('a malformed record owns nothing — the safe direction is keeping patterns', () => {
+			expect(normalizeConnectionScopePresetOwnership('junk')).toBeNull();
+			expect(
+				normalizeConnectionScopePresetOwnership({
+					github: { preset: 'admin', deny: ['commitToRepo'] },
+					gitlab: { preset: 'read', deny: ['bad pattern', 'ok_*'] },
+					'': { preset: 'read', deny: [] }
+				})
+			).toEqual({ gitlab: { preset: 'read', deny: ['ok_*'] } });
+
+			const { grant } = run({ deny: ['commitToRepo', 'openPullRequest'] }, { github: { preset: 'nope' } }, [
+				'write'
+			]);
+			expect(grant?.deny).toEqual(['commitToRepo', 'openPullRequest']);
+		});
+
+		it('operator deny is every pattern no level owns', () => {
+			expect(
+				connectionScopePresetOperatorDeny(['deploy_*', 'commitToRepo', 'openPullRequest'], {
+					github: { preset: 'read', deny: ['openPullRequest'] }
+				})
+			).toEqual(['deploy_*', 'commitToRepo']);
+			expect(connectionScopePresetOperatorDeny(null, null)).toEqual([]);
+		});
+
+		it('the stored level follows the recorded choice while the row still carries it', () => {
+			// Operator denies both write tools; the owner chose "Read and write".
+			expect(
+				storedConnectionScopePresetWithOwnership(
+					{ deny: ['commitToRepo', 'openPullRequest'] },
+					{ github: { preset: 'write', deny: [] } },
+					'github',
+					PRESETS
+				)
+			).toBe('write');
+			// A recorded "read" whose patterns were removed by hand no longer holds.
+			expect(
+				storedConnectionScopePresetWithOwnership(
+					{ deny: ['commitToRepo'] },
+					{ github: { preset: 'read', deny: ['commitToRepo'] } },
+					'github',
+					PRESETS
+				)
+			).toBe('write');
+			// No record: the row's patterns alone decide, exactly as before.
+			expect(
+				storedConnectionScopePresetWithOwnership(
+					{ deny: ['commitToRepo', 'openPullRequest'] },
+					null,
+					'github',
+					PRESETS
+				)
+			).toBe('read');
+			expect(storedConnectionScopePresetWithOwnership(null, null, 'github', [])).toBeNull();
+		});
+
+		it('reports the operator rules that hold a tool of the chosen level closed', () => {
+			const record = { github: { preset: 'write' as const, deny: [] } };
+			expect(connectionScopePresetBlockingDeny(PRESETS, 'write', ['commitToRepo', 'deploy_*'], record)).toEqual([
+				'commitToRepo'
+			]);
+			// A broad operator pattern counts too.
+			expect(connectionScopePresetBlockingDeny(PRESETS, 'write', ['open*'], record)).toEqual(['open*']);
+			// Patterns the control owns are not "existing rules".
+			expect(
+				connectionScopePresetBlockingDeny(PRESETS, 'read', ['commitToRepo', 'openPullRequest'], {
+					github: { preset: 'read', deny: ['commitToRepo', 'openPullRequest'] }
+				})
+			).toEqual([]);
+			expect(connectionScopePresetBlockingDeny(PRESETS, null, ['commitToRepo'], null)).toEqual([]);
 		});
 	});
 

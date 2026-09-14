@@ -1,3 +1,8 @@
+import {
+    REQUIRE_HTTPS_FOR_CREDENTIALS_SETTING_LABEL,
+    assessCredentialTransport,
+    type CredentialTransportVerdict,
+} from '@ever-works/contracts';
 import { collectCredentialRefs, interpolateCredentials } from '../policy/credential-interpolation';
 
 /**
@@ -24,16 +29,52 @@ import { collectCredentialRefs, interpolateCredentials } from '../policy/credent
  *   3. A reference the resolver cannot supply is reported by KEY and the
  *      caller refuses to connect. The literal `{{cred.key}}` text is never
  *      sent as a header value, and nothing is sent half-authenticated.
- *   4. Credentials never travel over plain HTTP. A connection whose headers
- *      carry any value is refused unless its endpoint is `https:`.
+ *   4. A `{{cred.key}}` reference is never resolved for a plain-HTTP
+ *      endpoint: the connection is refused before the key is looked up.
+ *   5. LITERAL header values keep working over plain HTTP, exactly as they
+ *      did before references existed — the attempt is stamped with the
+ *      `insecure_transport` warning so the owner sees it is unencrypted. An
+ *      organization that turns on "Require https for connection
+ *      credentials" refuses them too. See `assessCredentialTransport` in
+ *      `@ever-works/contracts`.
  */
 
 /** Stable code the health classifier and the Settings screen key on. */
 export const MCP_CREDENTIAL_MISSING_CODE = 'credential_missing' as const;
+/** The WARNING code: literal credentials were sent over plain http and the attempt worked. */
 export const MCP_INSECURE_CREDENTIAL_TRANSPORT_CODE = 'insecure_transport' as const;
+/** The REFUSAL code: nothing was sent because the endpoint is not https. */
+export const MCP_HTTPS_REQUIRED_CODE = 'https_required' as const;
 
-/** Message stored on the row and returned to callers when the endpoint is not TLS. */
+/**
+ * Message stored on the row and returned to callers when a credential is
+ * refused on a non-TLS endpoint. Every transport refusal starts with it.
+ */
 export const MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE = 'Credentials require an https:// endpoint';
+
+/**
+ * The refusal when the organization setting is on. Names the setting so the
+ * owner knows exactly what to change, and never names a header value.
+ */
+export const MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE = `${MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE} (organization setting "${REQUIRE_HTTPS_FOR_CREDENTIALS_SETTING_LABEL}" is on)`;
+
+/**
+ * The refusal when that organization setting could not be read. Credentials
+ * are not sent over plain http on a guess that the setting is off.
+ */
+export const MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE = `${MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE} (organization setting "${REQUIRE_HTTPS_FOR_CREDENTIALS_SETTING_LABEL}" could not be checked)`;
+
+/** Why a credential transport was refused. */
+export type McpCredentialTransportRefusal =
+    | 'credential_references'
+    | 'organization_policy'
+    | 'policy_unavailable';
+
+const TRANSPORT_REFUSAL_MESSAGES: Record<McpCredentialTransportRefusal, string> = {
+    credential_references: MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
+    organization_policy: MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
+    policy_unavailable: MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE,
+};
 
 /** Prefix of the stored message for an unresolvable reference. Keys only, never values. */
 export const MCP_MISSING_CREDENTIAL_MESSAGE_PREFIX = 'Missing credential';
@@ -52,15 +93,18 @@ export class McpHeaderCredentialMissingError extends Error {
 }
 
 /**
- * Thrown BEFORE the SDK factory is called when a connection that carries
- * credentials points at a non-`https:` endpoint (a row written before the
- * create/update rule, or edited out of band).
+ * Thrown BEFORE the SDK factory is called, and before any credential is looked
+ * up, when a connection must not send its headers to a non-`https:` endpoint:
+ * a `{{cred.key}}` reference (a row edited out of band), or any credential
+ * while the organization requires https (`reason: 'organization_policy'`) or
+ * while that setting cannot be read (`reason: 'policy_unavailable'`). The
+ * message is fixed and value-free.
  */
 export class McpInsecureCredentialTransportError extends Error {
-    readonly code = MCP_INSECURE_CREDENTIAL_TRANSPORT_CODE;
+    readonly code = MCP_HTTPS_REQUIRED_CODE;
 
-    constructor() {
-        super(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE);
+    constructor(readonly reason: McpCredentialTransportRefusal = 'credential_references') {
+        super(TRANSPORT_REFUSAL_MESSAGES[reason]);
         this.name = 'McpInsecureCredentialTransportError';
     }
 }
@@ -106,7 +150,13 @@ export function isHttpsUrl(url: string | null | undefined): boolean {
 }
 
 /**
- * May this connection send its headers over this endpoint?
+ * Does this connection send its headers ONLY over TLS? The strict predicate:
+ * any credential on a plain-http endpoint is `false`, literal or reference.
+ *
+ * It is what an organization with "Require https for connection credentials"
+ * enforces. Without that setting, literal credentials over plain http stay
+ * allowed (with a warning) — use `mcpCredentialTransport` for the verdict a
+ * create, update or connection attempt acts on.
  *
  * `stdio` rows are exempt: they never dial a network address (their `url` is
  * an opaque `stdio:<package>/<server>` pointer) and never carry headers.
@@ -119,6 +169,20 @@ export function credentialTransportAllowed(input: {
     if (input.transport === 'stdio') return true;
     if (!headersCarryCredentials(input.headers)) return true;
     return isHttpsUrl(input.url);
+}
+
+/**
+ * The verdict a create, update or connection attempt acts on:
+ * `secure` / `insecure` (literal credentials over plain http — allowed, with
+ * the `insecure_transport` warning) / `refused` (nothing is sent).
+ */
+export function mcpCredentialTransport(input: {
+    url: string | null | undefined;
+    transport?: string | null;
+    headers: Readonly<Record<string, string>> | null | undefined;
+    requireHttpsForCredentials?: boolean;
+}): CredentialTransportVerdict {
+    return assessCredentialTransport(input);
 }
 
 export interface ResolvedHeaderCredentials {

@@ -9,6 +9,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { setAgentAccessLevelAction } from '@/app/actions/agent-capabilities';
 import {
+    blockingRules,
     composeAgentAccessLevels,
     describeAccessLevel,
     selectedAccessLevel,
@@ -98,6 +99,7 @@ export function AgentAccessLevelsSection({
                     const selected = selectedAccessLevel(row);
                     const hint = describeAccessLevel(row);
                     const busy = busyProvider === row.providerId;
+                    const blocked = blockingRules(row);
                     return (
                         <article
                             key={row.providerId}
@@ -123,6 +125,15 @@ export function AgentAccessLevelsSection({
                                             })
                                           : t(`levelHints.${hint.level}`)}
                                 </p>
+                                {blocked.length > 0 && (
+                                    <p
+                                        className="mt-1 text-xs text-warning"
+                                        role="status"
+                                        data-testid={`capabilities-access-level-blocked-${row.providerId}`}
+                                    >
+                                        {t('blockedByExistingRule', { rules: blocked.join(', ') })}
+                                    </p>
+                                )}
                                 {reapprovalProvider === row.providerId && (
                                     <p
                                         className="mt-1 text-xs text-warning"

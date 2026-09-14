@@ -1,6 +1,8 @@
 import { MCP_ERROR_MESSAGES, mcpHealthErrorCode } from '../mcp-connection-health';
 import {
     MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
+    MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE,
+    MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
     formatMissingCredentialMessage,
 } from '../mcp-header-credentials';
 import { McpServerConnectionRepository } from '../../database/repositories/mcp-server-connection.repository';
@@ -10,8 +12,12 @@ describe('mcpHealthErrorCode', () => {
         expect(mcpHealthErrorCode(formatMissingCredentialMessage(['docs_token']))).toBe(
             'credential_missing',
         );
-        expect(mcpHealthErrorCode(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE)).toBe(
-            'insecure_transport',
+        // Every transport REFUSAL maps to https_required (expires); a refusal is
+        // never the insecure_transport warning.
+        expect(mcpHealthErrorCode(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE)).toBe('https_required');
+        expect(mcpHealthErrorCode(MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE)).toBe('https_required');
+        expect(mcpHealthErrorCode(MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE)).toBe(
+            'https_required',
         );
         expect(mcpHealthErrorCode(MCP_ERROR_MESSAGES.unauthorized)).toBe('credential_rejected');
         expect(mcpHealthErrorCode(MCP_ERROR_MESSAGES.forbidden)).toBe('credential_rejected');
@@ -56,6 +62,35 @@ describe('McpServerConnectionRepository.stampConnectionResult — health', () =>
                 lastConnectedAt: expect.any(Date),
                 healthCheckedAt: expect.any(Date),
             }),
+        );
+    });
+
+    it('a success that sent literal credentials over plain http records the warning, not healthy', async () => {
+        const { repo, typeorm } = makeRepo(2);
+        await repo.stampConnectionResult('c1', { ok: true, warning: 'insecure_transport' });
+
+        expect(typeorm.findOne).not.toHaveBeenCalled();
+        expect(typeorm.update).toHaveBeenCalledWith(
+            'c1',
+            expect.objectContaining({
+                lastError: null,
+                health: 'insecure_transport',
+                healthFailureCount: 0,
+                lastErrorCode: 'insecure_transport',
+                lastConnectedAt: expect.any(Date),
+            }),
+        );
+    });
+
+    it('a transport refusal expires the row', async () => {
+        const { repo, typeorm } = makeRepo(0);
+        await repo.stampConnectionResult('c1', {
+            ok: false,
+            error: MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
+        });
+        expect(typeorm.update).toHaveBeenCalledWith(
+            'c1',
+            expect.objectContaining({ health: 'expired', lastErrorCode: 'https_required' }),
         );
     });
 

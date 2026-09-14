@@ -16,9 +16,12 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
     countNeedingAttention,
+    countSendingUnencrypted,
     healthHintKey,
+    healthLabelKey,
     healthTone,
     rowHealth,
+    sendsCredentialsUnencrypted,
     type HealthTone,
 } from './mcp-connection-health.shared';
 
@@ -48,6 +51,10 @@ interface TestState {
  * AW-15 — each row also shows its health (derived from every real
  * connection attempt) and a banner counts the connections that need the
  * owner. Additive: every existing control, string and test id is unchanged.
+ *
+ * A connection that sends literal credentials to a plain http:// address
+ * keeps working; it gets a warning pill, a one-line fix hint, and a separate
+ * (non-danger) banner — never the "needs attention" count.
  */
 export function McpConnectionsClient({ initial }: Props) {
     const t = useTranslations('dashboard.settings.connections');
@@ -64,6 +71,7 @@ export function McpConnectionsClient({ initial }: Props) {
     const [headerName, setHeaderName] = useState('');
     const [headerValue, setHeaderValue] = useState('');
     const attentionCount = countNeedingAttention(rows);
+    const unencryptedCount = countSendingUnencrypted(rows);
 
     const refresh = async () => {
         const next = await listMcpConnectionsAction();
@@ -180,6 +188,17 @@ export function McpConnectionsClient({ initial }: Props) {
                 </div>
             )}
 
+            {unencryptedCount > 0 && (
+                <div
+                    role="status"
+                    className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning"
+                    data-testid="mcp-connections-insecure-banner"
+                >
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    {t('banner.insecureTransport', { count: unencryptedCount })}
+                </div>
+            )}
+
             {showForm && (
                 <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4 space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -269,7 +288,7 @@ export function McpConnectionsClient({ initial }: Props) {
                                             data-testid={`mcp-connection-health-${row.name}`}
                                             data-health={health}
                                         >
-                                            {t(`health.${health}`)}
+                                            {t(`health.${healthLabelKey(health)}`)}
                                         </span>
                                     </div>
                                     <div className="mt-0.5 text-[11px] font-mono text-text-muted dark:text-text-muted-dark truncate">
@@ -298,6 +317,17 @@ export function McpConnectionsClient({ initial }: Props) {
                                             </span>
                                         )}
                                     </div>
+                                    {sendsCredentialsUnencrypted(row) && (
+                                        <p
+                                            className="mt-1 text-[11px] text-warning"
+                                            data-testid={`mcp-connection-insecure-${row.name}`}
+                                        >
+                                            {t('health.insecureTransportWarning')}{' '}
+                                            <span className="text-text-muted dark:text-text-muted-dark">
+                                                {t('health.insecureTransportHint')}
+                                            </span>
+                                        </p>
+                                    )}
                                     {row.lastError && hintKey && (
                                         <p
                                             className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark"

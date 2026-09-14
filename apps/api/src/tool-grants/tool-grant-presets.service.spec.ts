@@ -31,7 +31,18 @@ const TARGET = {
     scopeId: '00000000-0000-4000-8000-000000000001',
 };
 
-type Row = { id: string; allow: string[] | null; deny: string[] | null; note: string | null };
+type Row = {
+    id: string;
+    allow: string[] | null;
+    deny: string[] | null;
+    note: string | null;
+    presetOwnership?: unknown;
+};
+
+/** The record a row carries after "Read only" was chosen there by the level control. */
+const READ_CHOSEN_HERE = {
+    github: { preset: 'read', deny: ['commitToRepo', 'openPullRequest'] },
+};
 
 function make(options: {
     presets?: ConnectionScopePresetDeclaration[];
@@ -60,12 +71,14 @@ function make(options: {
             async (input: {
                 grant: { allow?: string[]; deny?: string[] };
                 note: string | null;
+                presetOwnership?: unknown;
             }) => {
                 row = {
                     id: row?.id ?? 'g1',
                     allow: input.grant.allow ?? null,
                     deny: input.grant.deny ?? null,
                     note: input.note,
+                    presetOwnership: input.presetOwnership ?? null,
                 };
                 return row;
             },
@@ -103,6 +116,7 @@ describe('ToolGrantPresetsService', () => {
                 requested: 'write',
                 effective: 'write',
                 clampedBy: null,
+                blockedByExistingDeny: [],
             });
         });
 
@@ -148,6 +162,10 @@ describe('ToolGrantPresetsService', () => {
                     deny: ['deploy_*', 'commitToRepo', 'openPullRequest'],
                 },
                 note: 'keep me',
+                // Exactly the two patterns this control added; deploy_* stays the operator's.
+                presetOwnership: {
+                    github: { preset: 'read', deny: ['commitToRepo', 'openPullRequest'] },
+                },
             });
             expect(current()?.note).toBe('keep me');
             expect(state.requested).toBe('read');
@@ -169,6 +187,7 @@ describe('ToolGrantPresetsService', () => {
                     allow: null,
                     deny: ['deploy_*', 'commitToRepo', 'openPullRequest'],
                     note: null,
+                    presetOwnership: READ_CHOSEN_HERE,
                 },
             });
 
@@ -186,6 +205,7 @@ describe('ToolGrantPresetsService', () => {
                     allow: null,
                     deny: ['commitToRepo', 'openPullRequest'],
                     note: null,
+                    presetOwnership: READ_CHOSEN_HERE,
                 },
             });
 
@@ -211,6 +231,7 @@ describe('ToolGrantPresetsService', () => {
                     allow: null,
                     deny: ['commitToRepo', 'openPullRequest'],
                     note: null,
+                    presetOwnership: READ_CHOSEN_HERE,
                 },
                 account: { accessToken: 'token', scope: 'read:user,repo' },
             });
@@ -236,6 +257,7 @@ describe('ToolGrantPresetsService', () => {
                     allow: null,
                     deny: ['commitToRepo', 'openPullRequest'],
                     note: null,
+                    presetOwnership: READ_CHOSEN_HERE,
                 },
                 account: { accessToken: 'token', scope: 'read:user,repo,workflow' },
             });
@@ -255,6 +277,7 @@ describe('ToolGrantPresetsService', () => {
                         allow: null,
                         deny: ['commitToRepo', 'openPullRequest'],
                         note: null,
+                        presetOwnership: READ_CHOSEN_HERE,
                     },
                     account,
                 });
@@ -270,11 +293,93 @@ describe('ToolGrantPresetsService', () => {
                     allow: null,
                     deny: ['commitToRepo', 'openPullRequest'],
                     note: null,
+                    presetOwnership: READ_CHOSEN_HERE,
                 },
                 withAccounts: false,
             });
             await service.apply(TARGET, 'write');
             expect(toolGrants.remove).toHaveBeenCalled();
+        });
+
+        it('an operator deny present before the first level change survives read → read and write → read', async () => {
+            const { service, current } = make({
+                row: { id: 'g1', allow: null, deny: ['commitToRepo'], note: 'operator' },
+            });
+
+            await service.apply(TARGET, 'read');
+            expect(current()?.deny).toEqual(['commitToRepo', 'openPullRequest']);
+
+            const wide = await service.apply(TARGET, 'write');
+            expect(current()?.deny).toEqual(['commitToRepo']);
+            expect(current()?.note).toBe('operator');
+            expect(wide.requested).toBe('write');
+            // The operator's rule still holds commitToRepo closed, and the state says so.
+            expect(wide.effective).toBe('read');
+            expect(wide.blockedByExistingDeny).toEqual(['commitToRepo']);
+
+            await service.apply(TARGET, 'read');
+            expect(current()?.deny).toEqual(['commitToRepo', 'openPullRequest']);
+
+            const wideAgain = await service.apply(TARGET, 'write');
+            expect(current()?.deny).toEqual(['commitToRepo']);
+            expect(wideAgain.blockedByExistingDeny).toEqual(['commitToRepo']);
+        });
+
+        it('an operator who denied every managed tool by hand keeps both through "Read and write"', async () => {
+            const { service, toolGrants, current } = make({
+                row: {
+                    id: 'g1',
+                    allow: null,
+                    deny: ['commitToRepo', 'openPullRequest'],
+                    note: null,
+                },
+            });
+
+            const state = await service.apply(TARGET, 'write');
+
+            expect(toolGrants.remove).not.toHaveBeenCalled();
+            expect(current()?.deny).toEqual(['commitToRepo', 'openPullRequest']);
+            expect(current()?.presetOwnership).toEqual({ github: { preset: 'write', deny: [] } });
+            expect(state).toEqual(
+                expect.objectContaining({
+                    requested: 'write',
+                    effective: 'read',
+                    clampedBy: 'agent',
+                    blockedByExistingDeny: ['commitToRepo', 'openPullRequest'],
+                }),
+            );
+        });
+
+        it('mixed: removes only the pattern the control added and keeps the operator one', async () => {
+            const { service, current } = make({
+                row: {
+                    id: 'g1',
+                    allow: null,
+                    deny: ['openPullRequest', 'commitToRepo'],
+                    note: null,
+                    presetOwnership: { github: { preset: 'read', deny: ['commitToRepo'] } },
+                },
+            });
+
+            const state = await service.apply(TARGET, 'write');
+
+            expect(current()?.deny).toEqual(['openPullRequest']);
+            expect(state.blockedByExistingDeny).toEqual(['openPullRequest']);
+        });
+
+        it('reports no blocking rule when the chosen level is fully in effect', async () => {
+            const { service } = make({
+                row: {
+                    id: 'g1',
+                    allow: null,
+                    deny: ['deploy_*', 'commitToRepo', 'openPullRequest'],
+                    note: null,
+                    presetOwnership: READ_CHOSEN_HERE,
+                },
+            });
+            const state = await service.getState(TARGET);
+            expect(state.requested).toBe('read');
+            expect(state.blockedByExistingDeny).toEqual([]);
         });
 
         it('refuses a level the provider does not declare', async () => {

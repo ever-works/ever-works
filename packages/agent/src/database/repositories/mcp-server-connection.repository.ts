@@ -61,6 +61,11 @@ export class McpServerConnectionRepository {
      * can be lost, which only delays `unreachable` by one attempt and never
      * flips a working connection. `errorCode` is optional — when absent it is
      * derived from the classified message the MCP client already produced.
+     *
+     * A success may carry `warning: 'insecure_transport'` (literal
+     * credentials sent over plain http). It is still a success —
+     * `lastConnectedAt` advances, `lastError` clears, the failure count
+     * resets — but health records the warning instead of `healthy`.
      */
     async stampConnectionResult(
         id: string,
@@ -68,17 +73,19 @@ export class McpServerConnectionRepository {
             ok: boolean;
             error?: string | null;
             errorCode?: ConnectionHealthErrorCode | null;
+            warning?: ConnectionHealthErrorCode | null;
         },
     ): Promise<void> {
         const now = new Date();
         if (result.ok) {
+            const classified = classifyProbeResult({ ok: true, warning: result.warning ?? null });
             await this.repository.update(id, {
                 lastConnectedAt: now,
                 lastError: null,
-                health: 'healthy',
+                health: classified.health,
                 healthCheckedAt: now,
                 healthFailureCount: 0,
-                lastErrorCode: null,
+                lastErrorCode: classified.errorCode,
             });
             return;
         }

@@ -8,6 +8,9 @@ import {
     headersCarryCredentials,
     isHttpsUrl,
     resolveHeaderCredentials,
+    MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE,
+    MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
+    mcpCredentialTransport,
 } from '../mcp-header-credentials';
 
 /**
@@ -138,6 +141,37 @@ describe('mcp-header-credentials', () => {
             ).toBe(true);
         });
 
+        it('the acted-on verdict keeps literal http working and refuses references', () => {
+            expect(
+                mcpCredentialTransport({
+                    url: 'http://mcp.example.com',
+                    headers: { Authorization: 'Bearer x' },
+                }),
+            ).toEqual({ verdict: 'insecure' });
+            expect(
+                mcpCredentialTransport({
+                    url: 'http://mcp.example.com',
+                    headers: { Authorization: '{{cred.k1}}' },
+                }),
+            ).toEqual({ verdict: 'refused', reason: 'credential_references' });
+            expect(
+                mcpCredentialTransport({
+                    url: 'http://mcp.example.com',
+                    headers: { Authorization: 'Bearer x' },
+                    requireHttpsForCredentials: true,
+                }),
+            ).toEqual({ verdict: 'refused', reason: 'organization_policy' });
+            expect(
+                mcpCredentialTransport({ url: 'http://mcp.example.com', headers: null }),
+            ).toEqual({ verdict: 'secure' });
+            expect(
+                mcpCredentialTransport({
+                    url: 'https://mcp.example.com',
+                    headers: { Authorization: '{{cred.k1}}' },
+                }),
+            ).toEqual({ verdict: 'secure' });
+        });
+
         it('exempts stdio rows, which never dial a network address', () => {
             expect(
                 credentialTransportAllowed({
@@ -161,7 +195,21 @@ describe('mcp-header-credentials', () => {
         it('the insecure-transport refusal carries the fixed message', () => {
             const err = new McpInsecureCredentialTransportError();
             expect(err.message).toBe(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE);
-            expect(err.code).toBe('insecure_transport');
+            // A refusal is https_required; insecure_transport is the warning
+            // for credentials that were sent and worked.
+            expect(err.code).toBe('https_required');
+            expect(err.reason).toBe('credential_references');
+        });
+
+        it('a refusal under the organization setting names the setting', () => {
+            const err = new McpInsecureCredentialTransportError('organization_policy');
+            expect(err.message).toBe(MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE);
+            expect(err.message).toContain('Require https for connection credentials');
+            expect(err.message.startsWith(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE)).toBe(true);
+
+            const unavailable = new McpInsecureCredentialTransportError('policy_unavailable');
+            expect(unavailable.message).toBe(MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE);
+            expect(unavailable.message).toContain('Require https for connection credentials');
         });
     });
 });

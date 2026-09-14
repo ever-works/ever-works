@@ -145,6 +145,11 @@ function sameToolPattern(a: string, b: string): boolean {
  * that the preset control does not own, drops the ones it does, and adds the
  * target's deny set. The result may carry no `allow` and an empty `deny` — the
  * caller then removes the row so the scope inherits again.
+ *
+ * This form cannot tell an operator's hand-written deny of a managed name from
+ * one the control added, so it would remove both. Any path that writes a stored
+ * row must use `applyConnectionScopePresetWithOwnership`, which never removes a
+ * pattern the operator owned before the control touched it.
  */
 export function applyConnectionScopePresetToToolGrant(
 	current: ToolGrantOverride | null | undefined,
@@ -256,6 +261,207 @@ export function isNarrowerConnectionScopePreset(a: ConnectionScopePresetId, b: C
 	return presetRank(a) < presetRank(b);
 }
 
+// ── Ownership (who put a deny pattern on the row) ────────────────────
+
+/**
+ * What the access-level control ITSELF wrote on one scope's tool-grant row,
+ * for one provider: the level chosen there and the deny patterns the control
+ * added. Stored beside the row (`tool_grants.presetOwnership`), keyed by
+ * provider id.
+ *
+ * ## Why ownership is recorded, not inferred
+ *
+ * A level is ordinary deny patterns, and an operator can deny the very same
+ * names by hand (`commitToRepo` at this agent, say). Inferring "the control
+ * owns every pattern it manages" would let "Read and write" silently delete
+ * that operator's safety control. So the control records exactly what it
+ * added, and only ever removes what it recorded:
+ *
+ *   - A pattern that was already in `deny` when the control first touched it
+ *     is operator-owned. No level change ever removes it.
+ *   - Narrowing adds only the patterns that are not already denied, and
+ *     records those.
+ *   - Widening removes only recorded patterns (and never one another
+ *     provider's level still records).
+ *
+ * A pattern the operator later removes by hand drops out of the record on
+ * that write (`pruneConnectionScopePresetOwnership`), so re-adding it by hand
+ * afterwards makes it operator-owned again.
+ */
+export interface ConnectionScopePresetOwnershipEntry {
+	/** The level last chosen at this scope for this provider. */
+	preset: ConnectionScopePresetId;
+	/** Deny patterns the access-level control added and still owns. */
+	deny: string[];
+}
+
+/** Provider id → what the access-level control owns on one row. */
+export type ConnectionScopePresetOwnership = Record<string, ConnectionScopePresetOwnershipEntry>;
+
+/**
+ * Shape guard for a stored ownership record. Malformed entries are DROPPED —
+ * a dropped entry only means the control owns less, so the worst case is a
+ * pattern treated as operator-owned (kept), never one silently removed.
+ */
+export function normalizeConnectionScopePresetOwnership(raw: unknown): ConnectionScopePresetOwnership | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const out: ConnectionScopePresetOwnership = {};
+	for (const [providerId, value] of Object.entries(raw as Record<string, unknown>)) {
+		if (providerId.length === 0 || providerId.length > 128 || !value || typeof value !== 'object') continue;
+		const entry = value as Record<string, unknown>;
+		if (!isConnectionScopePresetId(entry.preset)) continue;
+		out[providerId] = { preset: entry.preset, deny: cleanPatterns(entry.deny) };
+	}
+	return Object.keys(out).length > 0 ? out : null;
+}
+
+function hasToolPattern(list: readonly string[], pattern: string): boolean {
+	return list.some((entry) => sameToolPattern(entry, pattern));
+}
+
+/** Every pattern ANY provider's level owns on this row. */
+function ownedByAnyProvider(ownership: ConnectionScopePresetOwnership | null | undefined): string[] {
+	const out: string[] = [];
+	for (const entry of Object.values(ownership ?? {})) {
+		for (const pattern of entry.deny) {
+			if (!hasToolPattern(out, pattern)) out.push(pattern);
+		}
+	}
+	return out;
+}
+
+/**
+ * Keep only owned patterns that are still in `deny`. Run on every write that
+ * does not come from the access-level control, so a pattern the operator
+ * removed by hand is no longer the control's to manage. The chosen level is
+ * kept. `null` when there was no usable record.
+ */
+export function pruneConnectionScopePresetOwnership(
+	ownership: unknown,
+	deny: readonly string[] | null | undefined
+): ConnectionScopePresetOwnership | null {
+	const normalized = normalizeConnectionScopePresetOwnership(ownership);
+	if (!normalized) return null;
+	const present = deny ?? [];
+	const out: ConnectionScopePresetOwnership = {};
+	for (const [providerId, entry] of Object.entries(normalized)) {
+		out[providerId] = {
+			preset: entry.preset,
+			deny: entry.deny.filter((pattern) => hasToolPattern(present, pattern))
+		};
+	}
+	return out;
+}
+
+/** Deny patterns on this row that no level owns — the operator's own rules. */
+export function connectionScopePresetOperatorDeny(
+	deny: readonly string[] | null | undefined,
+	ownership: unknown
+): string[] {
+	const owned = ownedByAnyProvider(normalizeConnectionScopePresetOwnership(ownership));
+	return (deny ?? []).filter((pattern) => !hasToolPattern(owned, pattern));
+}
+
+/** What to store at one scope after choosing a level there. */
+export interface ConnectionScopePresetApplication {
+	/** The override to store: `allow` untouched, `deny` recomputed. */
+	grant: ToolGrantOverride;
+	/** The ownership record to store alongside it. */
+	ownership: ConnectionScopePresetOwnership;
+}
+
+/**
+ * The override AND ownership record to store at ONE scope after choosing
+ * `target` for `providerId` there — the ownership-aware counterpart of
+ * `applyConnectionScopePresetToToolGrant`:
+ *
+ *   - operator-owned patterns (in `deny`, owned by no level) are never removed
+ *     and never recorded as owned;
+ *   - this provider's owned patterns that `target` does not deny are removed,
+ *     unless another provider's level still owns them;
+ *   - `target`'s deny patterns that are not already present are added and
+ *     recorded.
+ */
+export function applyConnectionScopePresetWithOwnership(
+	current: ToolGrantOverride | null | undefined,
+	ownership: unknown,
+	providerId: string,
+	presets: readonly ConnectionScopePresetDeclaration[],
+	target: ConnectionScopePresetId
+): ConnectionScopePresetApplication {
+	const before = [...(current?.deny ?? [])];
+	const record = pruneConnectionScopePresetOwnership(ownership, before) ?? {};
+	const mine = record[providerId]?.deny ?? [];
+	const others: ConnectionScopePresetOwnership = {};
+	for (const [id, entry] of Object.entries(record)) {
+		if (id !== providerId) others[id] = entry;
+	}
+	const ownedElsewhere = ownedByAnyProvider(others);
+	const operator = before.filter(
+		(pattern) => !hasToolPattern(mine, pattern) && !hasToolPattern(ownedElsewhere, pattern)
+	);
+	const wanted = connectionScopePresetDenyPatterns(presets, target);
+
+	const deny = before.filter(
+		(pattern) =>
+			!hasToolPattern(mine, pattern) || hasToolPattern(wanted, pattern) || hasToolPattern(ownedElsewhere, pattern)
+	);
+	for (const pattern of wanted) {
+		if (!hasToolPattern(deny, pattern)) deny.push(pattern);
+	}
+
+	const grant: ToolGrantOverride = { deny };
+	if (current?.allow !== undefined) grant.allow = [...current.allow];
+	return {
+		grant,
+		ownership: {
+			...others,
+			[providerId]: { preset: target, deny: wanted.filter((pattern) => !hasToolPattern(operator, pattern)) }
+		}
+	};
+}
+
+/**
+ * The level a scope selects for one provider, reading the ownership record
+ * first: the recorded choice wins while the row still carries that level's
+ * whole deny set (whoever owns each pattern). Without a usable record it falls
+ * back to `storedConnectionScopePreset`, which reads the row's patterns alone.
+ */
+export function storedConnectionScopePresetWithOwnership(
+	override: ToolGrantOverride | null | undefined,
+	ownership: unknown,
+	providerId: string,
+	presets: readonly ConnectionScopePresetDeclaration[]
+): ConnectionScopePresetId | null {
+	if (presets.length === 0) return null;
+	const entry = normalizeConnectionScopePresetOwnership(ownership)?.[providerId];
+	if (entry && presets.some((preset) => preset.id === entry.preset)) {
+		const deny = override?.deny ?? [];
+		const needed = connectionScopePresetDenyPatterns(presets, entry.preset);
+		if (needed.every((pattern) => hasToolPattern(deny, pattern))) return entry.preset;
+	}
+	return storedConnectionScopePreset(override, presets);
+}
+
+/**
+ * Operator-owned deny patterns on this scope's OWN row that keep a tool of the
+ * `requested` level closed — "blocked by an existing rule". Choosing a level
+ * never removes these, so the UI says so instead of looking broken.
+ */
+export function connectionScopePresetBlockingDeny(
+	presets: readonly ConnectionScopePresetDeclaration[],
+	requested: ConnectionScopePresetId | null,
+	deny: readonly string[] | null | undefined,
+	ownership: unknown
+): string[] {
+	if (requested === null) return [];
+	const tools = presets.find((preset) => preset.id === requested)?.toolPatterns ?? [];
+	if (tools.length === 0) return [];
+	return connectionScopePresetOperatorDeny(deny, ownership).filter((pattern) =>
+		tools.some((tool) => patternsOverlap(pattern, tool))
+	);
+}
+
 // ── Wire shapes ──────────────────────────────────────────────────────
 
 /** One provider that declares levels, as the API lists it. Provider scope strings are deliberately absent. */
@@ -278,4 +484,10 @@ export interface ConnectionScopePresetStateDto {
 	effective: ConnectionScopePresetId | null;
 	/** The scope that narrowed `effective` below `requested`; `null` when nothing did. */
 	clampedBy: ToolGrantSource | null;
+	/**
+	 * Deny patterns an operator wrote on THIS scope's own row (not by choosing a
+	 * level) that keep a tool of `requested` closed. Choosing a level never
+	 * removes them. Absent / empty when nothing is blocked.
+	 */
+	blockedByExistingDeny?: string[];
 }

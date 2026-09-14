@@ -15,8 +15,13 @@ import {
  * connection kind) lands on the same rules instead of re-deriving them.
  *
  *   success                          → healthy, failure count reset to 0
+ *   success carrying a warning       → the warning state (today only
+ *     (`insecure_transport`)            `insecure_transport`), count reset to 0.
+ *                                       A warning is a WORKING connection: it is
+ *                                       never expired and never blocks anything.
  *   credential rejected / missing /
- *   cannot be sent safely            → expired immediately (retrying fixes nothing)
+ *   refused on plain http            → expired immediately (retrying fixes nothing)
+ *     (`https_required`)
  *   anything else, 1–2 in a row      → degraded
  *   anything else, 3+ in a row       → unreachable
  *
@@ -29,6 +34,12 @@ export interface ConnectionProbeOutcome {
     ok: boolean;
     /** Classified reason for a failure. Unknown / absent ⇒ `failed`. */
     errorCode?: ConnectionHealthErrorCode | string | null;
+    /**
+     * A successful attempt the owner should still hear about. Only codes in
+     * `CONNECTION_HEALTH_WARNING_CODES` count; anything else is ignored and
+     * the success stays `healthy`.
+     */
+    warning?: ConnectionHealthErrorCode | string | null;
 }
 
 export interface ClassifiedConnectionHealth {
@@ -44,6 +55,13 @@ export function classifyProbeResult(
     previousFailureCount = 0,
 ): ClassifiedConnectionHealth {
     if (outcome.ok) {
+        if (outcome.warning === 'insecure_transport') {
+            return {
+                health: 'insecure_transport',
+                errorCode: 'insecure_transport',
+                failureCount: 0,
+            };
+        }
         return { health: 'healthy', errorCode: null, failureCount: 0 };
     }
 

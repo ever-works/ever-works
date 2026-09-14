@@ -495,9 +495,72 @@ describe('McpClientService', () => {
             });
         });
 
-        it('a legacy http row with a literal header is refused too', async () => {
+        it('a legacy http row with a literal header keeps connecting, marked insecure_transport', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const service = new McpClientService(repo as never, factory);
+            const connection = makeConnection({ url: 'http://mcp.example.com/mcp' });
+
+            const result = await service.callTool(connection, 'search_issues', {});
+            const tools = await service.listTools(connection, { bypassCache: true });
+
+            expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+            expect(tools).toHaveLength(1);
+            // Sent exactly as before this change: the literal header, untouched.
+            expect(factory.connect).toHaveBeenCalledWith({
+                url: 'http://mcp.example.com/mcp',
+                transport: 'streamable-http',
+                headers: { Authorization: 'Bearer secret-token-value' },
+            });
+            for (const call of repo.stampConnectionResult.mock.calls) {
+                expect(call).toEqual(['c1', { ok: true, warning: 'insecure_transport' }]);
+            }
+            expect(repo.stampConnectionResult).toHaveBeenCalledTimes(2);
+        });
+
+        it('a legacy http row with a literal header keeps connecting when the organization setting is off', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(false) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            await service.listTools(
+                makeConnection({
+                    url: 'http://mcp.example.com/mcp',
+                    organizationId: 'o1',
+                    tenantId: 't1',
+                }),
+            );
+
+            expect(policy.requiresHttpsForCredentials).toHaveBeenCalledWith({
+                userId: 'u1',
+                organizationId: 'o1',
+                tenantId: 't1',
+            });
+            expect(factory.connect).toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                ok: true,
+                warning: 'insecure_transport',
+            });
+        });
+
+        it('with the organization setting on, a literal header over http is refused before dialing and names the setting', async () => {
+            const repo = makeRepo();
             const factory: McpClientFactory = { connect: jest.fn() };
-            const service = new McpClientService(makeRepo() as never, factory);
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
 
             const result = (await service.callTool(
                 makeConnection({ url: 'http://mcp.example.com/mcp' }),
@@ -506,9 +569,97 @@ describe('McpClientService', () => {
             )) as { error: string };
 
             expect(result.error).toBe(
-                'MCP server "github": Credentials require an https:// endpoint',
+                'MCP server "github": Credentials require an https:// endpoint (organization setting "Require https for connection credentials" is on)',
             );
             expect(factory.connect).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                ok: false,
+                error: 'Credentials require an https:// endpoint (organization setting "Require https for connection credentials" is on)',
+            });
+        });
+
+        it('an unreadable organization setting refuses literal http rather than guessing it is off', async () => {
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const policy = {
+                requiresHttpsForCredentials: jest.fn().mockRejectedValue(new Error('db down')),
+            };
+            const service = new McpClientService(
+                makeRepo() as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            await expect(
+                service.listTools(makeConnection({ url: 'http://mcp.example.com/mcp' })),
+            ).rejects.toThrow(/could not be checked/);
+            expect(factory.connect).not.toHaveBeenCalled();
+        });
+
+        it('https rows never consult the organization setting and stay plainly healthy', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            await service.listTools(makeConnection());
+
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', { ok: true });
+        });
+
+        it('a credential reference over http is refused even when the organization setting is off', async () => {
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(false) };
+            const resolver = { resolve: jest.fn() };
+            const service = new McpClientService(
+                makeRepo() as never,
+                factory,
+                resolver,
+                policy as never,
+            );
+
+            await expect(
+                service.listTools(
+                    makeConnection({
+                        url: 'http://mcp.example.com/mcp',
+                        authHeaders: {
+                            'X-Api-Key': 'literal',
+                            Authorization: '{{cred.docs_token}}',
+                        },
+                    }),
+                ),
+            ).rejects.toThrow('Credentials require an https:// endpoint');
+            expect(factory.connect).not.toHaveBeenCalled();
+            expect(resolver.resolve).not.toHaveBeenCalled();
+            // References are refused without needing the setting.
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+        });
+
+        it('an unauthenticated plain-http connection never consults the organization setting', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            await service.listTools(
+                makeConnection({ url: 'http://mcp.example.com/mcp', authHeaders: null }),
+            );
+
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', { ok: true });
         });
 
         it('an unauthenticated plain-http connection keeps working exactly as before', async () => {

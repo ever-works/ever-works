@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
+    ServiceUnavailableException,
+} from '@nestjs/common';
 import { McpConnectionsService } from '../mcp-connections.service';
 import type { McpServerConnection } from '../../entities/mcp-server-connection.entity';
 
@@ -22,7 +27,10 @@ function makeRow(over: Partial<McpServerConnection> = {}): McpServerConnection {
     } as McpServerConnection;
 }
 
-function makeHarness(rows: McpServerConnection[] = [makeRow()]) {
+function makeHarness(
+    rows: McpServerConnection[] = [makeRow()],
+    transportPolicy?: { requiresHttpsForCredentials: jest.Mock },
+) {
     const connectionsRepo = {
         findByUser: jest.fn().mockResolvedValue(rows),
         findEnabledByUser: jest.fn().mockResolvedValue(rows.filter((r) => r.enabled)),
@@ -72,6 +80,7 @@ function makeHarness(rows: McpServerConnection[] = [makeRow()]) {
         client as never,
         agents as never,
         undefined,
+        transportPolicy as never,
     );
     return { service, connectionsRepo, bindingsRepo, client, agents };
 }
@@ -255,8 +264,63 @@ describe('McpConnectionsService', () => {
             expect(connectionsRepo.create).not.toHaveBeenCalled();
         });
 
-        it('create rejects http + a literal header value', async () => {
-            const { service } = makeHarness([]);
+        it('create accepts http + a literal header value, exactly as before, and flags it', async () => {
+            const { service, connectionsRepo } = makeHarness([]);
+            const view = await service.create('u1', {
+                name: 'docs',
+                url: 'http://mcp.example.com/mcp',
+                transport: 'sse',
+                authHeaders: { 'X-Api-Key': 'literal-key' },
+            });
+            expect(connectionsRepo.create).toHaveBeenCalled();
+            expect(view.insecureCredentialTransport).toBe(true);
+            expect(JSON.stringify(view)).not.toContain('literal-key');
+        });
+
+        it('create rejects http + a literal header value when the organization requires https, naming the setting', async () => {
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const { service, connectionsRepo } = makeHarness([], policy);
+            const attempt = service.create(
+                'u1',
+                {
+                    name: 'docs',
+                    url: 'http://mcp.example.com/mcp',
+                    transport: 'sse',
+                    authHeaders: { 'X-Api-Key': 'literal-key' },
+                },
+                { organizationId: 'o1' },
+            );
+            await expect(attempt).rejects.toThrow(BadRequestException);
+            await expect(attempt).rejects.toThrow(
+                /organization setting "Require https for connection credentials" is on/,
+            );
+            expect(policy.requiresHttpsForCredentials).toHaveBeenCalledWith({
+                userId: 'u1',
+                organizationId: 'o1',
+            });
+            expect(connectionsRepo.create).not.toHaveBeenCalled();
+        });
+
+        it('create treats a connection with no known organization as tenant-wide', async () => {
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(false) };
+            const { service } = makeHarness([], policy);
+            await service.create('u1', {
+                name: 'docs',
+                url: 'http://mcp.example.com/mcp',
+                transport: 'sse',
+                authHeaders: { 'X-Api-Key': 'literal-key' },
+            });
+            expect(policy.requiresHttpsForCredentials).toHaveBeenCalledWith({
+                userId: 'u1',
+                organizationId: null,
+            });
+        });
+
+        it('create refuses literal http when the organization setting cannot be read', async () => {
+            const policy = {
+                requiresHttpsForCredentials: jest.fn().mockRejectedValue(new Error('down')),
+            };
+            const { service, connectionsRepo } = makeHarness([], policy);
             await expect(
                 service.create('u1', {
                     name: 'docs',
@@ -264,7 +328,42 @@ describe('McpConnectionsService', () => {
                     transport: 'sse',
                     authHeaders: { 'X-Api-Key': 'literal-key' },
                 }),
-            ).rejects.toThrow(BadRequestException);
+            ).rejects.toThrow(ServiceUnavailableException);
+            expect(connectionsRepo.create).not.toHaveBeenCalled();
+        });
+
+        it('create refuses a credential reference over http even with the organization setting off', async () => {
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(false) };
+            const { service, connectionsRepo } = makeHarness([], policy);
+            await expect(
+                service.create('u1', {
+                    name: 'docs',
+                    url: 'http://mcp.example.com/mcp',
+                    transport: 'streamable-http',
+                    authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+                }),
+            ).rejects.toThrow(/Credentials require an https:\/\/ endpoint/);
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+            expect(connectionsRepo.create).not.toHaveBeenCalled();
+        });
+
+        it('https and header-less http never consult the organization setting', async () => {
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const { service } = makeHarness([], policy);
+            const secure = await service.create('u1', {
+                name: 'docs',
+                url: 'https://mcp.example.com/mcp',
+                transport: 'streamable-http',
+                authHeaders: { Authorization: 'Bearer literal' },
+            });
+            const open = await service.create('u1', {
+                name: 'open',
+                url: 'http://mcp.example.com/mcp',
+                transport: 'streamable-http',
+            });
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+            expect(secure.insecureCredentialTransport).toBe(false);
+            expect(open.insecureCredentialTransport).toBe(false);
         });
 
         it('create still accepts plain http with no headers', async () => {
@@ -289,12 +388,49 @@ describe('McpConnectionsService', () => {
             expect(view.authHeaderNames).toEqual(['Authorization']);
         });
 
-        it('update rejects moving a keyed connection to http', async () => {
-            const { service, connectionsRepo } = makeHarness();
+        it('update rejects moving a referencing connection to http', async () => {
+            const { service, connectionsRepo } = makeHarness([
+                makeRow({ authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' } }),
+            ]);
             await expect(
                 service.update('u1', 'c1', { url: 'http://mcp.example.com/mcp' }),
             ).rejects.toThrow(/Credentials require an https:\/\/ endpoint/);
             expect(connectionsRepo.save).not.toHaveBeenCalled();
+        });
+
+        it('update keeps accepting a literal-header connection on http, exactly as before', async () => {
+            const { service, connectionsRepo } = makeHarness();
+            const view = await service.update('u1', 'c1', { url: 'http://mcp.example.com/mcp' });
+            expect(connectionsRepo.save).toHaveBeenCalled();
+            expect(view.insecureCredentialTransport).toBe(true);
+        });
+
+        it('update rejects literal http when the row organization requires https, naming the setting', async () => {
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const { service, connectionsRepo } = makeHarness(
+                [makeRow({ organizationId: 'o1', tenantId: 't1' })],
+                policy,
+            );
+            await expect(
+                service.update('u1', 'c1', { url: 'http://mcp.example.com/mcp' }),
+            ).rejects.toThrow(/Require https for connection credentials/);
+            expect(policy.requiresHttpsForCredentials).toHaveBeenCalledWith({
+                userId: 'u1',
+                organizationId: 'o1',
+                tenantId: 't1',
+            });
+            expect(connectionsRepo.save).not.toHaveBeenCalled();
+        });
+
+        it('a rename of a legacy literal-http row is never blocked, even with the setting on', async () => {
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const { service, connectionsRepo } = makeHarness(
+                [makeRow({ url: 'http://mcp.example.com/mcp' })],
+                policy,
+            );
+            await service.update('u1', 'c1', { enabled: false });
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+            expect(connectionsRepo.save).toHaveBeenCalled();
         });
 
         it('update rejects adding a credential reference to an http connection', async () => {

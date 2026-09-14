@@ -44,6 +44,12 @@ export interface McpConnection {
     healthCheckedAt?: string | null;
     /** Classified reason for `lastError` (e.g. `credential_missing`). Never a value. */
     lastErrorCode?: ConnectionHealthErrorCode | null;
+    /**
+     * AW-15 — the connection sends literal auth header values to a plain
+     * http:// address. It works, but the credential travels unencrypted.
+     * Optional for the same reason as `health`.
+     */
+    insecureCredentialTransport?: boolean;
     createdAt: string;
     updatedAt: string;
 }

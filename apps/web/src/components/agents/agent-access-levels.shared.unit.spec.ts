@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ConnectionScopePresetStateDto } from '@ever-works/contracts';
 import {
+    blockingRules,
     composeAgentAccessLevels,
     describeAccessLevel,
     selectedAccessLevel,
@@ -72,6 +73,25 @@ describe('agent access levels policy', () => {
         expect(describeAccessLevel(row({ state: state({ requested: null }) }))).toEqual({
             kind: 'unavailable',
         });
+    });
+
+    it('names the existing rules that block the chosen level', () => {
+        expect(
+            blockingRules(
+                row({
+                    state: state({
+                        requested: 'write',
+                        effective: 'read',
+                        clampedBy: 'agent',
+                        blockedByExistingDeny: ['commitToRepo'],
+                    }),
+                }),
+            ),
+        ).toEqual(['commitToRepo']);
+        // An API without the field, an unreadable level, or nothing blocked.
+        expect(blockingRules(row())).toEqual([]);
+        expect(blockingRules(row({ state: null }))).toEqual([]);
+        expect(blockingRules(row({ state: state({ blockedByExistingDeny: [] }) }))).toEqual([]);
     });
 
     it('drops providers without levels and sorts by name', () => {

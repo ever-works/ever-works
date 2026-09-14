@@ -26,10 +26,33 @@ describe('classifyProbeResult', () => {
         });
     });
 
-    it('credentials that cannot be sent safely also need the owner, so they expire', () => {
+    it('credentials refused on a plain-http endpoint need the owner, so they expire', () => {
+        expect(classifyProbeResult({ ok: false, errorCode: 'https_required' })).toEqual({
+            health: 'expired',
+            errorCode: 'https_required',
+            failureCount: 1,
+        });
+    });
+
+    it('literal credentials sent over plain http are a WARNING on a working connection, never expired', () => {
+        expect(classifyProbeResult({ ok: true, warning: 'insecure_transport' }, 4)).toEqual({
+            health: 'insecure_transport',
+            errorCode: 'insecure_transport',
+            failureCount: 0,
+        });
+        // A failed attempt is classified by its own cause; insecure_transport
+        // alone can never expire a connection.
         expect(classifyProbeResult({ ok: false, errorCode: 'insecure_transport' }).health).toBe(
-            'expired',
+            'degraded',
         );
+    });
+
+    it('an unknown warning leaves a success healthy', () => {
+        expect(classifyProbeResult({ ok: true, warning: 'something_else' })).toEqual({
+            health: 'healthy',
+            errorCode: null,
+            failureCount: 0,
+        });
     });
 
     it('1–2 consecutive other failures are degraded, the 3rd is unreachable', () => {

@@ -107,4 +107,70 @@ describe('McpConnectionsClient — health', () => {
         expect(screen.getByText('Missing credential `docs_token`')).toBeInTheDocument();
         expect(screen.queryByTestId('mcp-connection-health-hint-slow')).not.toBeInTheDocument();
     });
+    it('a legacy literal-header http connection shows a warning pill, a fix hint and its own banner — not "needs attention"', () => {
+        render(
+            <McpConnectionsClient
+                initial={[
+                    connection({
+                        name: 'legacy',
+                        url: 'http://mcp.example.com/mcp',
+                        health: 'insecure_transport',
+                        lastErrorCode: 'insecure_transport',
+                        insecureCredentialTransport: true,
+                    }),
+                    connection({
+                        id: 'c2',
+                        name: 'fresh',
+                        url: 'http://mcp2.example.com/mcp',
+                        health: 'unknown',
+                        insecureCredentialTransport: true,
+                    }),
+                    connection({ id: 'c3', name: 'secure', health: 'healthy' }),
+                ]}
+            />,
+        );
+
+        const pill = screen.getByTestId('mcp-connection-health-legacy');
+        expect(pill).toHaveAttribute('data-health', 'insecure_transport');
+        expect(pill).toHaveTextContent('health.insecureTransport');
+        expect(pill.className).toContain('text-warning');
+
+        expect(screen.getByTestId('mcp-connection-insecure-legacy')).toHaveTextContent(
+            'health.insecureTransportWarning',
+        );
+        expect(screen.getByTestId('mcp-connection-insecure-legacy')).toHaveTextContent(
+            'health.insecureTransportHint',
+        );
+        // Known from the stored URL + headers before the first attempt.
+        expect(screen.getByTestId('mcp-connection-insecure-fresh')).toBeInTheDocument();
+        expect(screen.queryByTestId('mcp-connection-insecure-secure')).not.toBeInTheDocument();
+
+        expect(screen.getByTestId('mcp-connections-insecure-banner')).toHaveTextContent(
+            'banner.insecureTransport:2',
+        );
+        expect(screen.queryByTestId('mcp-connections-attention-banner')).not.toBeInTheDocument();
+    });
+
+    it('a refused credential transport explains the https fix', () => {
+        render(
+            <McpConnectionsClient
+                initial={[
+                    connection({
+                        name: 'strict',
+                        url: 'http://mcp.example.com/mcp',
+                        health: 'expired',
+                        lastErrorCode: 'https_required',
+                        lastError:
+                            'Credentials require an https:// endpoint (organization setting "Require https for connection credentials" is on)',
+                    }),
+                ]}
+            />,
+        );
+        expect(screen.getByTestId('mcp-connection-health-hint-strict')).toHaveTextContent(
+            'health.httpsRequiredHint',
+        );
+        expect(screen.getByTestId('mcp-connections-attention-banner')).toHaveTextContent(
+            'banner.needsAttention:1',
+        );
+    });
 });

@@ -13,6 +13,7 @@ import { DatabaseModule } from '../database/database.module';
 import { McpClientService } from './mcp-client.service';
 import { McpConnectionsService } from './mcp-connections.service';
 import { McpToolSource } from './mcp-tool-source';
+import { McpCredentialTransportPolicyService } from './mcp-credential-transport-policy.service';
 import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
 import { PolicyModule } from '../policy/policy.module';
 
@@ -69,6 +70,11 @@ import { PolicyModule } from '../policy/policy.module';
         McpClientService,
         McpConnectionsService,
         McpToolSource,
+        // AW-15 — reads "Require https for connection credentials" for the
+        // client and the CRUD service. Both inject it @Optional(); it must be
+        // provided HERE so neither silently runs without it. Its two
+        // repositories come from DatabaseModule, imported above.
+        McpCredentialTransportPolicyService,
     ],
     exports: [
         McpServerConnectionRepository,
@@ -76,6 +82,7 @@ import { PolicyModule } from '../policy/policy.module';
         McpClientService,
         McpConnectionsService,
         McpToolSource,
+        McpCredentialTransportPolicyService,
     ],
 })
 export class McpModule {}

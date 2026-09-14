@@ -13,12 +13,12 @@ import {
 import {
     McpHeaderCredentialMissingError,
     McpInsecureCredentialTransportError,
-    MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
     collectHeaderCredentialRefs,
-    credentialTransportAllowed,
+    mcpCredentialTransport,
     resolveHeaderCredentials,
 } from './mcp-header-credentials';
 import { MCP_ERROR_MESSAGES } from './mcp-connection-health';
+import { McpCredentialTransportPolicyService } from './mcp-credential-transport-policy.service';
 
 /** Default per-call timeout (ms) — the spec's 30s default. */
 export const MCP_CALL_TIMEOUT_MS = 30_000;
@@ -37,6 +37,12 @@ export const MCP_TOOLS_CACHE_TTL_MS = 60_000;
  */
 interface ResolvedSecretsSink {
     secrets?: ReadonlyMap<string, string>;
+    /**
+     * Set when this attempt sends LITERAL credentials to a plain-http
+     * endpoint — allowed, as it always was, and stamped as the
+     * `insecure_transport` warning on success.
+     */
+    insecureTransport?: boolean;
 }
 
 export interface McpToolInfo {
@@ -63,9 +69,12 @@ export interface McpToolInfo {
  *     `CREDENTIAL_RESOLVER` port immediately before EVERY connection attempt
  *     (listing tools, calling a tool, a Settings test alike). The resolved
  *     values exist only inside that attempt; a key the resolver cannot
- *     supply refuses the attempt before any request is sent, and a
- *     connection carrying credentials is refused unless its endpoint is
- *     `https:`.
+ *     supply refuses the attempt before any request is sent.
+ *   - Transport: a `{{cred.key}}` reference is refused on a plain-http
+ *     endpoint (before any lookup). LITERAL header values keep working over
+ *     plain http exactly as before, and a successful attempt is stamped with
+ *     the `insecure_transport` warning. An organization with "Require https
+ *     for connection credentials" on refuses those too.
  */
 @Injectable()
 export class McpClientService {
@@ -88,6 +97,13 @@ export class McpClientService {
         @Optional()
         @Inject(CREDENTIAL_RESOLVER)
         private readonly credentials?: CredentialResolver,
+        /**
+         * Reads the organization setting "Require https for connection
+         * credentials". Consulted only for literal credentials over plain
+         * http. Unbound ⇒ the setting cannot be on, so those keep working.
+         */
+        @Optional()
+        private readonly transportPolicy?: McpCredentialTransportPolicyService,
     ) {
         this.factory = factory ?? createSdkMcpClientFactory();
     }
@@ -164,7 +180,7 @@ export class McpClientService {
             const result = await client.listTools(undefined, { timeout: MCP_LIST_TIMEOUT_MS });
             const tools = (result.tools ?? []).map((tool) => this.normalizeTool(tool));
             this.toolsCache.set(connection.id, { at: Date.now(), tools });
-            await this.stamp(connection, { ok: true });
+            await this.stamp(connection, this.successOutcome(resolved));
             return tools;
         } catch (err) {
             const message = this.classifyError(err, connection, resolved.secrets);
@@ -196,7 +212,7 @@ export class McpClientService {
                 timeout,
                 `MCP tool "${toolName}" timed out after ${timeout}ms.`,
             );
-            await this.stamp(connection, { ok: true });
+            await this.stamp(connection, this.successOutcome(resolved));
             // A server that reflects its own auth header in a RESULT must
             // not hand a resolved credential to the model.
             return this.capResultSize(
@@ -262,9 +278,12 @@ export class McpClientService {
     /**
      * Build the headers for ONE connection attempt.
      *
-     *  1. Scheme re-check. A row carrying credentials whose endpoint is not
-     *     `https:` (written before the create/update rule, or edited out of
-     *     band) is refused here, before any credential is looked up.
+     *  1. Scheme re-check, before any credential is looked up. A
+     *     `{{cred.key}}` reference aimed at a plain-http endpoint is refused.
+     *     LITERAL values over plain http are sent exactly as before and the
+     *     attempt is marked `insecure_transport` — unless the connection's
+     *     organization requires https, which refuses them (and so does a
+     *     setting that cannot be read).
      *  2. No `{{cred.key}}` reference ⇒ the stored headers are used exactly
      *     as today.
      *  3. Otherwise the keys are resolved for the connection's owner, a
@@ -279,14 +298,17 @@ export class McpClientService {
         sink?: ResolvedSecretsSink,
     ): Promise<Record<string, string>> {
         const stored = connection.authHeaders ?? {};
-        if (
-            !credentialTransportAllowed({
-                url: connection.url,
-                transport: connection.transport,
-                headers: stored,
-            })
-        ) {
-            throw new McpInsecureCredentialTransportError();
+        const transport = mcpCredentialTransport({
+            url: connection.url,
+            transport: connection.transport,
+            headers: stored,
+        });
+        if (transport.verdict === 'refused') {
+            throw new McpInsecureCredentialTransportError(transport.reason);
+        }
+        if (transport.verdict === 'insecure') {
+            await this.assertOrganizationAllowsPlainHttp(connection);
+            if (sink) sink.insecureTransport = true;
         }
 
         const keys = collectHeaderCredentialRefs(stored);
@@ -321,6 +343,36 @@ export class McpClientService {
         }
         if (sink) sink.secrets = result.secrets;
         return result.headers;
+    }
+
+    /**
+     * Literal credentials over plain http: refused only when the connection's
+     * organization turned on "Require https for connection credentials", or
+     * when that setting cannot be read. Otherwise allowed, as before.
+     */
+    private async assertOrganizationAllowsPlainHttp(
+        connection: McpServerConnection,
+    ): Promise<void> {
+        if (!this.transportPolicy) return;
+        let strict: boolean;
+        try {
+            strict = await this.transportPolicy.requiresHttpsForCredentials({
+                userId: connection.userId,
+                organizationId: connection.organizationId ?? null,
+                tenantId: connection.tenantId ?? null,
+            });
+        } catch {
+            throw new McpInsecureCredentialTransportError('policy_unavailable');
+        }
+        if (strict) throw new McpInsecureCredentialTransportError('organization_policy');
+    }
+
+    /** `{ ok: true }` — plus the `insecure_transport` warning when this attempt sent literal credentials over plain http. */
+    private successOutcome(sink: ResolvedSecretsSink): {
+        ok: true;
+        warning?: 'insecure_transport';
+    } {
+        return sink.insecureTransport ? { ok: true, warning: 'insecure_transport' } : { ok: true };
     }
 
     private normalizeTool(tool: McpSdkTool): McpToolInfo {
@@ -417,9 +469,7 @@ export class McpClientService {
         // Refusals raised before any request was sent carry their own fixed,
         // value-free message (key names only).
         if (err instanceof McpHeaderCredentialMissingError) return err.message;
-        if (err instanceof McpInsecureCredentialTransportError) {
-            return MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE;
-        }
+        if (err instanceof McpInsecureCredentialTransportError) return err.message;
         const raw = this.redactHeaderValues(
             err instanceof Error ? err.message : String(err),
             connection,
@@ -454,7 +504,7 @@ export class McpClientService {
 
     private async stamp(
         connection: McpServerConnection,
-        result: { ok: boolean; error?: string },
+        result: { ok: boolean; error?: string; warning?: 'insecure_transport' },
     ): Promise<void> {
         try {
             await this.connections.stampConnectionResult(connection.id, result);

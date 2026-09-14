@@ -99,10 +99,13 @@ export class McpServerConnection {
      * AW-15 — connection health, derived from every real connection attempt
      * (a run listing tools, a tool call, a Settings test) by the pure
      * `classifyProbeResult`: `unknown` until the first attempt, then
-     * `healthy` / `degraded` / `expired` / `unreachable`. Additive: nothing
-     * that reads `lastConnectedAt` / `lastError` changes.
+     * `healthy` / `degraded` / `expired` / `unreachable`, or the
+     * `insecure_transport` WARNING (a working connection that sent literal
+     * credentials over plain http). Additive: nothing that reads
+     * `lastConnectedAt` / `lastError` changes. Widened from 16 to 32 by
+     * `1791150200000-AddConnectionCredentialTransportPolicy`.
      */
-    @Column({ type: 'varchar', length: 16, default: 'unknown' })
+    @Column({ type: 'varchar', length: 32, default: 'unknown' })
     health: ConnectionHealth;
 
     /** When `health` was last written. Portable for the same reason as `lastConnectedAt`. */

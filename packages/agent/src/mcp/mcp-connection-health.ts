@@ -30,7 +30,12 @@ export const MCP_ERROR_MESSAGES = Object.freeze({
 export function mcpHealthErrorCode(message: string | null | undefined): ConnectionHealthErrorCode {
     if (typeof message !== 'string' || message.length === 0) return 'failed';
     if (message.startsWith(MCP_MISSING_CREDENTIAL_MESSAGE_PREFIX)) return 'credential_missing';
-    if (message === MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE) return 'insecure_transport';
+    // Refusals: a `{{cred.key}}` reference over plain http, or any credential
+    // there while the organization requires https. Both start with the same
+    // fixed sentence. (Literal credentials that were SENT over plain http are
+    // not a failure at all — that success is stamped with the
+    // `insecure_transport` warning instead.)
+    if (message.startsWith(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE)) return 'https_required';
     if (message === MCP_ERROR_MESSAGES.unauthorized || message === MCP_ERROR_MESSAGES.forbidden) {
         return 'credential_rejected';
     }

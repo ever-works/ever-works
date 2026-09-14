@@ -18,6 +18,7 @@ export {
 export * from './mcp-client.service';
 export * from './mcp-header-credentials';
 export * from './mcp-connection-health';
+export * from './mcp-credential-transport-policy.service';
 export * from './mcp-connections.service';
 export * from './mcp-tool-source';
 export * from './mcp-stdio-launcher';

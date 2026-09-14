@@ -127,7 +127,7 @@ export class ToolGrantsController {
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     @ApiOperation({
         summary:
-            'Choose an access level for one provider at one scope. Written as deny patterns on that scope’s tool-grant row, so it only ever narrows; widening that needs the connected account re-approved returns 409 preset_requires_reapproval and changes nothing.',
+            'Choose an access level for one provider at one scope. Written as deny patterns on that scope’s tool-grant row, so it only ever narrows; a deny pattern the operator wrote before the level control touched the row is never removed (it is reported as blockedByExistingDeny). Widening that needs the connected account re-approved returns 409 preset_requires_reapproval and changes nothing.',
     })
     @HttpCode(HttpStatus.OK)
     async applyPreset(

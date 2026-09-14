@@ -1630,7 +1630,8 @@
                     "reapproval": "{provider} needs one more approval before agents can make changes with it.",
                     "reapprovalLink": "Reconnect it in Plugins",
                     "saved": "Access level for {provider} saved",
-                    "appliesNext": "Changes apply on this agent's next tool call. Nothing restarts."
+                    "appliesNext": "Changes apply on this agent's next tool call. Nothing restarts.",
+                    "blockedByExistingRule": "Blocked by an existing rule: {rules}. Access levels never remove a rule added on this agent. Turn the tool back on to use this level."
                 },
                 "initScript": {
                     "title": "Init Script",
@@ -4030,10 +4031,11 @@
                     "headerValueHelp": "Stored encrypted. Never shown again.",
                     "cancel": "Cancel",
                     "save": "Save",
-                    "urlHelp": "Auth headers are only ever sent to an https:// address."
+                    "urlHelp": "Use an https:// address so auth headers are encrypted. Credential references only work with https://."
                 },
                 "banner": {
-                    "needsAttention": "{count, plural, one {# connection needs attention.} other {# connections need attention.}}"
+                    "needsAttention": "{count, plural, one {# connection needs attention.} other {# connections need attention.}}",
+                    "insecureTransport": "{count, plural, one {# connection sends credentials unencrypted.} other {# connections send credentials unencrypted.}}"
                 },
                 "health": {
                     "unknown": "Not checked yet",
@@ -4042,8 +4044,11 @@
                     "expired": "Expired",
                     "unreachable": "Unreachable",
                     "credentialMissingHint": "This connection refers to a credential that isn't available. Make the credential available or replace the auth header, then test again.",
-                    "insecureTransportHint": "Auth headers are only sent over https://. Change the server URL to https:// or remove the auth header.",
-                    "credentialRejectedHint": "The server rejected this credential. Replace the auth header, then test again."
+                    "insecureTransportHint": "Change the server URL to https:// to encrypt them.",
+                    "credentialRejectedHint": "The server rejected this credential. Replace the auth header, then test again.",
+                    "insecureTransport": "Unencrypted",
+                    "insecureTransportWarning": "Credentials are sent unencrypted over http://.",
+                    "httpsRequiredHint": "These credentials are only sent to an https:// address (always for credential references, and for any credential when your organization requires https). Change the server URL to https://."
                 }
             },
             "repositories": {

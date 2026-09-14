@@ -197,6 +197,33 @@ describe('AgentAccessLevelsSection', () => {
         );
     });
 
+    it('says when an existing rule holds a tool closed despite the chosen level', () => {
+        renderSection(
+            rows({
+                state: state({
+                    requested: 'write',
+                    effective: 'read',
+                    clampedBy: 'agent',
+                    blockedByExistingDeny: ['commitToRepo', 'openPullRequest'],
+                }),
+            }),
+        );
+        expect(screen.getByTestId('capabilities-access-level-github-write')).toHaveAttribute(
+            'aria-checked',
+            'true',
+        );
+        expect(screen.getByTestId('capabilities-access-level-blocked-github')).toHaveTextContent(
+            'blockedByExistingRule:commitToRepo, openPullRequest',
+        );
+    });
+
+    it('shows no blocked note when nothing blocks the chosen level', () => {
+        renderSection();
+        expect(
+            screen.queryByTestId('capabilities-access-level-blocked-github'),
+        ).not.toBeInTheDocument();
+    });
+
     it('disables the picker when the level could not be loaded', () => {
         renderSection(rows({ state: null }));
         expect(screen.getByTestId('capabilities-access-level-github-read')).toBeDisabled();

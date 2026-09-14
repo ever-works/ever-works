@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, Optional } from '@nestjs/common';
 import {
-    applyConnectionScopePresetToToolGrant,
+    applyConnectionScopePresetWithOwnership,
+    connectionScopePresetBlockingDeny,
     connectionScopePresetClampSource,
     resolveEffectiveConnectionScopePreset,
-    storedConnectionScopePreset,
+    storedConnectionScopePresetWithOwnership,
     type ConnectionScopePresetDeclaration,
     type ConnectionScopePresetId,
     type ConnectionScopePresetProviderDto,
@@ -36,10 +37,16 @@ export const PRESET_REQUIRES_REAPPROVAL = 'preset_requires_reapproval' as const;
  * Reads a provider's declared levels from `ConnectionScopesFacadeService`,
  * and reads/writes ONE scope's existing `tool_grants` row through the
  * policy module. The mapping itself is the pure
- * `applyConnectionScopePresetToToolGrant` in `@ever-works/contracts`, so
+ * `applyConnectionScopePresetWithOwnership` in `@ever-works/contracts`, so
  * there is no second permission model: a level is ordinary deny patterns,
  * `decideToolGrant` stays the only decision point, and the resolution chain
  * already explains which scope narrowed a tool.
+ *
+ * An operator's own deny is never removed. The row's `presetOwnership`
+ * records exactly which patterns THIS control added; a pattern that was
+ * already denied when the control first touched the row stays operator-owned
+ * through every level change, and the state reports it as
+ * `blockedByExistingDeny` whenever it holds a tool of the chosen level closed.
  *
  * Owner scoping is NOT done here — every caller goes through
  * `ToolGrantsController`, which runs the same ownership checks as a raw
@@ -89,26 +96,40 @@ export class ToolGrantPresetsService {
 
         const row = await this.grants.findOne(target.userId, target);
         const current = row ? { allow: row.allow ?? undefined, deny: row.deny ?? undefined } : null;
-        const before = storedConnectionScopePreset(current, presets);
+        const ownership = row?.presetOwnership ?? null;
+        const before = storedConnectionScopePresetWithOwnership(
+            current,
+            ownership,
+            target.providerId,
+            presets,
+        );
 
         if (before !== preset && presets[presets.length - 1].id === preset) {
             await this.assertNoReapprovalNeeded(target, chosen);
         }
 
-        const next = applyConnectionScopePresetToToolGrant(current, presets, preset);
-        const nothingLeft = next.allow === undefined && (next.deny ?? []).length === 0;
+        const next = applyConnectionScopePresetWithOwnership(
+            current,
+            ownership,
+            target.providerId,
+            presets,
+            preset,
+        );
+        const nothingLeft = next.grant.allow === undefined && (next.grant.deny ?? []).length === 0;
         if (nothingLeft) {
-            // The scope no longer narrows anything: remove the row so it
-            // inherits again, exactly as a DELETE /api/tool-grants/:id would.
+            // The scope no longer narrows anything — no operator rule, no
+            // level-owned pattern: remove the row so it inherits again,
+            // exactly as a DELETE /api/tool-grants/:id would.
             if (row) await this.toolGrants.remove(target.userId, row.id);
         } else {
             await this.toolGrants.upsert({
                 userId: target.userId,
                 scopeType: target.scopeType,
                 scopeId: target.scopeId,
-                grant: next,
+                grant: next.grant,
                 // A preset change must not erase the operator's note.
                 note: row?.note ?? null,
+                presetOwnership: next.ownership,
             });
         }
 
@@ -132,8 +153,10 @@ export class ToolGrantPresetsService {
         presets: ConnectionScopePresetDeclaration[],
     ): Promise<ConnectionScopePresetStateDto> {
         const row = await this.grants.findOne(target.userId, target);
-        const requested = storedConnectionScopePreset(
+        const requested = storedConnectionScopePresetWithOwnership(
             row ? { allow: row.allow ?? undefined, deny: row.deny ?? undefined } : null,
+            row?.presetOwnership ?? null,
+            target.providerId,
             presets,
         );
         const resolved = await this.toolGrants.resolve(resolveInputFor(target));
@@ -146,6 +169,15 @@ export class ToolGrantPresetsService {
             requested,
             effective,
             clampedBy: connectionScopePresetClampSource(presets, requested, effective, resolved),
+            // An operator's own deny on THIS row that holds a tool of the
+            // chosen level closed. Never removed by a level change, so the
+            // UI must say so rather than look like the choice did nothing.
+            blockedByExistingDeny: connectionScopePresetBlockingDeny(
+                presets,
+                requested,
+                row?.deny ?? null,
+                row?.presetOwnership ?? null,
+            ),
         };
     }
 

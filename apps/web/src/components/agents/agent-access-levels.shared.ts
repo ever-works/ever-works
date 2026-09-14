@@ -51,6 +51,17 @@ export function describeAccessLevel(row: AgentAccessLevelRow): AgentAccessLevelH
     return { kind: 'level', level: state.requested };
 }
 
+/**
+ * Deny rules an operator added on this agent that hold a tool of the chosen
+ * level closed ("Blocked by an existing rule"). Choosing a level never removes
+ * them, so the section names them instead of looking like the choice failed.
+ * Empty when the level could not be read or nothing is blocked.
+ */
+export function blockingRules(row: AgentAccessLevelRow): string[] {
+    const blocked = row.state?.blockedByExistingDeny;
+    return Array.isArray(blocked) ? blocked.filter((rule) => typeof rule === 'string') : [];
+}
+
 /** Rows sorted by provider name, dropping providers that declare nothing. */
 export function composeAgentAccessLevels(rows: AgentAccessLevelRow[]): AgentAccessLevelRow[] {
     return rows
