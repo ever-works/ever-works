@@ -30,6 +30,34 @@ export function useChatPanel(): ChatPanelControls | null {
     return useContext(ChatPanelContext);
 }
 
+/**
+ * Whether the docked panel's contents are on screen. On desktop the panel
+ * stays mounted while closed or collapsed (so its view stack, drafts and
+ * scroll position survive), which means anything inside it that holds a
+ * connection open has to ask this instead of relying on unmount. Outside the
+ * panel there is no provider and the answer is `true`: a view rendered
+ * elsewhere is on screen whenever it is mounted.
+ */
+const ChatPanelVisibleContext = createContext<boolean>(true);
+
+export function ChatPanelVisibleProvider({
+    visible,
+    children,
+}: {
+    visible: boolean;
+    children?: ReactNode;
+}) {
+    return (
+        <ChatPanelVisibleContext.Provider value={visible}>
+            {children}
+        </ChatPanelVisibleContext.Provider>
+    );
+}
+
+export function useChatPanelVisible(): boolean {
+    return useContext(ChatPanelVisibleContext);
+}
+
 // ── Resize affordances for the docked panel's drag handle ─────────────────
 //
 // Pure helpers, so the layout's handle and its spec agree on the numbers. The

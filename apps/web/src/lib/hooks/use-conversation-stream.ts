@@ -18,6 +18,16 @@ export interface ConversationStreamHandlers {
     onResync: () => void;
 }
 
+export interface ConversationStreamOptions {
+    /**
+     * Hold live delivery while the Conversation is out of sight — the docked
+     * panel closed or collapsed, where it stays mounted to keep its state.
+     * The stream is closed and the fallback poll stops; un-pausing opens the
+     * stream again and catches up once on whatever landed in between.
+     */
+    paused?: boolean;
+}
+
 /** The same-origin stream URL for a Conversation, carrying the tab's workspace selector. */
 export function conversationStreamUrl(conversationId: string, pathname: string): string {
     const href = `/api/conversations/stream?conversationId=${encodeURIComponent(conversationId)}`;
@@ -39,27 +49,53 @@ export function conversationStreamUrl(conversationId: string, pathname: string):
  * Unlike the inbox hook, a dropped stream is not given up for good: the API
  * closes every stream after ten minutes by design, so each fallback tick also
  * tries to reopen it, and polling stops as soon as it is back.
+ *
+ * While `paused`, nothing is held open: no stream and no poll timer. Resuming
+ * the same Conversation re-reads it exactly once, whether the stream comes
+ * back, fails to, or the browser has no `EventSource` at all.
  */
 export function useConversationStream(
     conversationId: string | null,
     handlers: ConversationStreamHandlers,
+    options: ConversationStreamOptions = {},
 ): void {
+    const paused = options.paused === true;
     const handlersRef = useRef(handlers);
     useEffect(() => {
         handlersRef.current = handlers;
     });
 
+    // The Conversation whose delivery was paused, so un-pausing it (and only
+    // it) is told apart from opening a Conversation for the first time.
+    const pausedFor = useRef<string | null>(null);
+
     useEffect(() => {
         if (!conversationId) return;
         const streamId = conversationId;
+        if (paused) {
+            // The previous run's cleanup already closed the stream and the poll.
+            pausedFor.current = streamId;
+            return;
+        }
+        const resumed = pausedFor.current === streamId;
+        pausedFor.current = null;
 
         let disposed = false;
+        // One re-read owed after a resume, paid by whichever comes first: the
+        // stream opening, or the stream failing and the poll taking over.
+        let catchUpOwed = resumed;
         let source: EventSource | null = null;
         let pollTimer: ReturnType<typeof setInterval> | null = null;
 
         function stopPolling() {
             if (pollTimer) clearInterval(pollTimer);
             pollTimer = null;
+        }
+
+        function catchUpOnce() {
+            if (!catchUpOwed) return;
+            catchUpOwed = false;
+            handlersRef.current.onResync();
         }
 
         function startPolling() {
@@ -79,6 +115,7 @@ export function useConversationStream(
                 source = next;
                 next.onopen = () => {
                     stopPolling();
+                    catchUpOwed = false;
                     handlersRef.current.onResync();
                 };
                 next.addEventListener('message', (event: MessageEvent<string>) => {
@@ -92,15 +129,18 @@ export function useConversationStream(
                     // close it (no browser auto-retry storm) and poll instead.
                     next.close();
                     if (source === next) source = null;
+                    catchUpOnce();
                     startPolling();
                 };
             } catch {
                 source = null;
+                catchUpOnce();
                 startPolling();
             }
         }
 
         if (typeof EventSource === 'undefined') {
+            catchUpOnce();
             startPolling();
         } else {
             open();
@@ -112,7 +152,7 @@ export function useConversationStream(
             source = null;
             stopPolling();
         };
-    }, [conversationId]);
+    }, [conversationId, paused]);
 }
 
 function parseStreamEvent(data: string): ConversationStreamEvent | null {

@@ -1,12 +1,16 @@
+import { createElement, type ReactNode } from 'react';
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
     CHAT_PANEL_KEYBOARD_STEP,
     CHAT_PANEL_MIN_WIDTH,
     CHAT_PANEL_RESET_WIDTH,
+    ChatPanelVisibleProvider,
     chatPanelWidthForKey,
     clampChatPanelWidth,
     resetChatPanelWidth,
+    useChatPanelVisible,
 } from './use-chat-panel';
 
 /**
@@ -48,5 +52,31 @@ describe('chat panel resize helpers', () => {
     it('ignores every other key', () => {
         expect(chatPanelWidthForKey('Enter', 500, viewport)).toBeNull();
         expect(chatPanelWidthForKey('a', 500, viewport)).toBeNull();
+    });
+});
+
+/**
+ * The docked panel stays mounted while closed or collapsed; views inside it
+ * read this flag to stand down live delivery until it is on screen again.
+ */
+describe('useChatPanelVisible', () => {
+    it('is on screen outside the docked panel', () => {
+        const { result } = renderHook(() => useChatPanelVisible());
+        expect(result.current).toBe(true);
+    });
+
+    it('follows the docked panel open and closed', () => {
+        let panelOpen = true;
+        const { result, rerender } = renderHook(() => useChatPanelVisible(), {
+            wrapper: ({ children }: { children: ReactNode }) =>
+                createElement(ChatPanelVisibleProvider, { visible: panelOpen }, children),
+        });
+        expect(result.current).toBe(true);
+        panelOpen = false;
+        rerender();
+        expect(result.current).toBe(false);
+        panelOpen = true;
+        rerender();
+        expect(result.current).toBe(true);
     });
 });

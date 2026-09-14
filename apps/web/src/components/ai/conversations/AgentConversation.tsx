@@ -11,6 +11,7 @@ import {
     type ConversationActionResult,
 } from '@/app/actions/dashboard/conversations';
 import { attachmentUploadIds } from '@/lib/ai/attachments';
+import { useChatPanelVisible } from '@/lib/hooks/use-chat-panel';
 import { useConversationOutbox, type OutboxRow } from '@/lib/hooks/use-conversation-outbox';
 import { useConversationStream } from '@/lib/hooks/use-conversation-stream';
 import { cn } from '@/lib/utils/cn';
@@ -93,10 +94,17 @@ export function AgentConversation() {
         onGone: panelBack,
     });
 
-    useConversationStream(conversationId, {
-        onMessage: outbox.receive,
-        onResync: () => void outbox.reload(),
-    });
+    // The docked panel keeps this view mounted while closed or collapsed; the
+    // stream and its poll stand down until it is back on screen.
+    const panelVisible = useChatPanelVisible();
+    useConversationStream(
+        conversationId,
+        {
+            onMessage: outbox.receive,
+            onResync: () => void outbox.reload(),
+        },
+        { paused: !panelVisible },
+    );
 
     const { scrollRef, contentRef, isAtBottom, scrollToBottom } = useStickToBottom();
     const rows = outbox.rows;
