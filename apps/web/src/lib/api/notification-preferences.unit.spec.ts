@@ -63,6 +63,26 @@ describe('notificationPreferencesAPI — endpoint URL shape (no /api double-pref
         expect(serverFetchMock).toHaveBeenCalledWith('/notifications/preferences');
     });
 
+    it('setMatrixEventTargets PUTs /notifications/matrix/event/:key with the list, an empty one included', async () => {
+        const { notificationPreferencesAPI } = await importApi();
+        await notificationPreferencesAPI.setMatrixEventTargets('generation_error', []);
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                method: 'PUT',
+                endpoint: '/notifications/matrix/event/generation_error',
+                data: { channelIds: [] },
+                wrapInData: false,
+            }),
+        );
+        await notificationPreferencesAPI.setMatrixEventTargets('acme:deploy failed', ['email']);
+        expect(serverMutationMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                endpoint: '/notifications/matrix/event/acme%3Adeploy%20failed',
+                data: { channelIds: ['email'] },
+            }),
+        );
+    });
+
     it('setEventSubscription PUTs /notifications/preferences/event/:key', async () => {
         const { notificationPreferencesAPI } = await importApi();
         await notificationPreferencesAPI.setEventSubscription('work.completed', ['c1']);

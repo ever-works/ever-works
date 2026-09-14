@@ -5,6 +5,7 @@ const {
     revalidatePathMock,
     getAuthFromCookieMock,
     setEventSubscriptionMock,
+    setMatrixEventTargetsMock,
     resetMatrixMock,
     getMatrixMock,
     setQuietHoursMock,
@@ -16,6 +17,7 @@ const {
     revalidatePathMock: vi.fn(),
     getAuthFromCookieMock: vi.fn(),
     setEventSubscriptionMock: vi.fn(),
+    setMatrixEventTargetsMock: vi.fn(),
     resetMatrixMock: vi.fn(),
     getMatrixMock: vi.fn(),
     setQuietHoursMock: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock('@/lib/constants', () => ({ ROUTES: { AUTH_LOGIN: '/login' } }));
 vi.mock('@/lib/api/notification-preferences', () => ({
     notificationPreferencesAPI: {
         setEventSubscription: setEventSubscriptionMock,
+        setMatrixEventTargets: setMatrixEventTargetsMock,
         resetMatrix: resetMatrixMock,
         getMatrix: getMatrixMock,
         setQuietHours: setQuietHoursMock,
@@ -55,6 +58,9 @@ describe('notification matrix server actions', () => {
         getAuthFromCookieMock.mockResolvedValue({ id: 'user-1' });
         setEventSubscriptionMock.mockImplementation(async (key: string, ids: string[]) => ({
             subscription: { eventTypeKey: key, channelIds: ids },
+        }));
+        setMatrixEventTargetsMock.mockImplementation(async (key: string, ids: string[]) => ({
+            subscription: { eventTypeKey: key, channelIds: ids, origin: 'matrix' },
         }));
         resetMatrixMock.mockResolvedValue({ changed: 4 });
         getMatrixMock.mockResolvedValue({ events: [], columns: [] });
@@ -83,6 +89,7 @@ describe('notification matrix server actions', () => {
             await expect(call()).rejects.toThrow('__REDIRECT__');
             expect(redirectMock).toHaveBeenCalledWith('/login');
             expect(setEventSubscriptionMock).not.toHaveBeenCalled();
+            expect(setMatrixEventTargetsMock).not.toHaveBeenCalled();
             expect(resetMatrixMock).not.toHaveBeenCalled();
             expect(getMatrixMock).not.toHaveBeenCalled();
             expect(setQuietHoursMock).not.toHaveBeenCalled();
@@ -90,25 +97,27 @@ describe('notification matrix server actions', () => {
         },
     );
 
-    it('forwards exactly the target list it was given, an empty one included', async () => {
+    it('forwards exactly the target list it was given, an empty one included, through the matrix write', async () => {
         await expect(
             setNotificationEventTargets('agent_run_escalated', ['email', 'ch-1']),
         ).resolves.toEqual({
             success: true,
             data: { targetIds: ['email', 'ch-1'] },
         });
-        expect(setEventSubscriptionMock).toHaveBeenCalledWith('agent_run_escalated', [
+        expect(setMatrixEventTargetsMock).toHaveBeenCalledWith('agent_run_escalated', [
             'email',
             'ch-1',
         ]);
 
         await setNotificationEventTargets('generation_error', []);
-        expect(setEventSubscriptionMock).toHaveBeenLastCalledWith('generation_error', []);
+        expect(setMatrixEventTargetsMock).toHaveBeenLastCalledWith('generation_error', []);
         expect(revalidatePathMock).toHaveBeenCalledWith('/', 'layout');
+        // Never through the generic per-event write, which stores no matrix marker.
+        expect(setEventSubscriptionMock).not.toHaveBeenCalled();
     });
 
     it('returns the API message when a save is refused', async () => {
-        setEventSubscriptionMock.mockRejectedValue(
+        setMatrixEventTargetsMock.mockRejectedValue(
             new Error('Unknown or unauthorized notification channel: ch-gone'),
         );
         await expect(setNotificationEventTargets('generation_error', ['ch-gone'])).resolves.toEqual(
@@ -147,5 +156,22 @@ describe('notification matrix server actions', () => {
         });
         await expect(unmuteNotificationCategory('agent')).resolves.toEqual({ success: true });
         expect(unmuteCategoryMock).toHaveBeenCalledWith('agent');
+    });
+
+    it('forwards the urgent quiet-hours opt-in when it is named', async () => {
+        await expect(
+            setNotificationQuietHours({
+                quietHoursStart: '22:00:00',
+                quietHoursEnd: '07:00:00',
+                timezone: 'UTC',
+                urgentBypassesQuietHours: true,
+            }),
+        ).resolves.toEqual({ success: true });
+        expect(setQuietHoursMock).toHaveBeenCalledWith({
+            quietHoursStart: '22:00:00',
+            quietHoursEnd: '07:00:00',
+            timezone: 'UTC',
+            urgentBypassesQuietHours: true,
+        });
     });
 });

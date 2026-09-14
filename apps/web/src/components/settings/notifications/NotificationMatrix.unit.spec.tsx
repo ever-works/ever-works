@@ -327,6 +327,84 @@ describe('NotificationMatrix', () => {
         expect(box('Generation failed → Email').getAttribute('aria-checked')).toBe('true');
         visibility.mockRestore();
     });
+
+    describe('quiet hours — urgent events opt-in', () => {
+        const OPT_IN = 'quietHours.urgentBypass';
+        const withWindow = (urgentBypassesQuietHours?: boolean) =>
+            matrix({
+                quietHours: {
+                    start: '22:00:00',
+                    end: '07:00:00',
+                    timezone: 'UTC',
+                    ...(urgentBypassesQuietHours === undefined ? {} : { urgentBypassesQuietHours }),
+                },
+            });
+        const optIn = () => screen.getByRole('checkbox', { name: OPT_IN }) as HTMLInputElement;
+
+        beforeEach(() => {
+            setQuietHours.mockReset();
+            setQuietHours.mockResolvedValue({ success: true });
+        });
+
+        it('is offered only while a window is set, off by default, with its explanation attached', () => {
+            const { unmount } = render(<NotificationMatrix initialMatrix={matrix()} />);
+            expect(screen.queryByRole('checkbox', { name: OPT_IN })).toBeNull();
+            unmount();
+
+            render(<NotificationMatrix initialMatrix={withWindow()} />);
+            expect(optIn().checked).toBe(false);
+            const hintId = optIn().getAttribute('aria-describedby');
+            expect(hintId).toBeTruthy();
+            expect(document.getElementById(hintId!)?.textContent).toBe(
+                'quietHours.urgentBypassHint',
+            );
+        });
+
+        it('reflects a stored opt-in', () => {
+            render(<NotificationMatrix initialMatrix={withWindow(true)} />);
+            expect(optIn().checked).toBe(true);
+        });
+
+        it('saves the opt-in with the window unchanged, and then shows it on', async () => {
+            render(<NotificationMatrix initialMatrix={withWindow(false)} />);
+            await act(async () => {
+                fireEvent.click(optIn());
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            expect(setQuietHours).toHaveBeenCalledTimes(1);
+            expect(setQuietHours).toHaveBeenCalledWith({
+                quietHoursStart: '22:00:00',
+                quietHoursEnd: '07:00:00',
+                timezone: 'UTC',
+                urgentBypassesQuietHours: true,
+            });
+            expect(optIn().checked).toBe(true);
+        });
+
+        it('keeps the stored opt-in when only the window changes: clearing does not name it', async () => {
+            render(<NotificationMatrix initialMatrix={withWindow(true)} />);
+            await act(async () => {
+                fireEvent.click(screen.getByText('quietHours.clear'));
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            expect(setQuietHours).toHaveBeenCalledWith({
+                quietHoursStart: null,
+                quietHoursEnd: null,
+                timezone: null,
+            });
+        });
+
+        it('stays off and says so when saving the opt-in fails', async () => {
+            setQuietHours.mockResolvedValue({ success: false, error: 'down' });
+            render(<NotificationMatrix initialMatrix={withWindow(false)} />);
+            await act(async () => {
+                fireEvent.click(optIn());
+                await vi.advanceTimersByTimeAsync(0);
+            });
+            expect(optIn().checked).toBe(false);
+            expect(screen.getByText("Couldn't save")).toBeTruthy();
+        });
+    });
 });
 
 describe('NotificationPreferencesSettings', () => {

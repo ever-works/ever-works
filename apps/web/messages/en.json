@@ -9869,7 +9869,9 @@
                 "change": "Change",
                 "clear": "Clear",
                 "save": "Save",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "urgentBypass": "Let every urgent event through during quiet hours",
+                "urgentBypassHint": "Off: only the alerts that always came through during quiet hours do. Every other email and chat message waits until quiet hours end."
             },
             "mute": {
                 "title": "Mute category",

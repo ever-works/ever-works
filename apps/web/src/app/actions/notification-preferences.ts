@@ -54,6 +54,10 @@ export async function loadNotificationMatrix(): Promise<
 /**
  * Save one row: the exact list of delivery targets for one event. An empty
  * list is an explicit "nothing" and is stored as such.
+ *
+ * Goes through the matrix write, which stores the choice with the matrix
+ * marker: only a choice made here may leave the bell or every external target
+ * out. The generic per-event write keeps its original meaning for other callers.
  */
 export async function setNotificationEventTargets(
     eventKey: string,
@@ -61,7 +65,7 @@ export async function setNotificationEventTargets(
 ): Promise<NotificationMatrixActionResult<{ targetIds: string[] }>> {
     await ensureAuth();
     try {
-        const { subscription } = await notificationPreferencesAPI.setEventSubscription(
+        const { subscription } = await notificationPreferencesAPI.setMatrixEventTargets(
             eventKey,
             targetIds,
         );
@@ -86,11 +90,15 @@ export async function resetNotificationMatrix(
     }
 }
 
-/** Set or clear quiet hours. */
+/**
+ * Set or clear quiet hours. `urgentBypassesQuietHours` is the person's opt-in
+ * to let every urgent event through; leave it out to keep what is stored.
+ */
 export async function setNotificationQuietHours(input: {
     quietHoursStart: string | null;
     quietHoursEnd: string | null;
     timezone: string | null;
+    urgentBypassesQuietHours?: boolean;
 }): Promise<NotificationMatrixActionResult> {
     await ensureAuth();
     try {

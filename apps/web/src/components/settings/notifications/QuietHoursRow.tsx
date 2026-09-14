@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import type { NotificationMatrixQuietHoursDto } from '@ever-works/contracts';
 import { setNotificationQuietHours } from '@/app/actions/notification-preferences';
@@ -19,7 +19,11 @@ function browserTimeZone(): string {
 /**
  * AW-13 — quiet hours, surfaced on the matrix over the existing quiet-hours
  * preference: shows the window, offers the 22:00 – 07:00 preset, and lets
- * the window be changed or cleared. Urgent events are never deferred by it.
+ * the window be changed or cleared.
+ *
+ * While a window is set, it also offers the person's own opt-in to let every
+ * urgent event through. Off by default: only the alerts that always came
+ * through quiet hours do, and everything else keeps waiting until they end.
  */
 export function QuietHoursRow({
     quietHours,
@@ -35,6 +39,9 @@ export function QuietHoursRow({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
+    const urgentThrough = quietHours.urgentBypassesQuietHours === true;
+    const urgentHintId = useId();
+
     const save = (next: NotificationMatrixQuietHoursDto) => {
         setError(null);
         startTransition(async () => {
@@ -42,9 +49,13 @@ export function QuietHoursRow({
                 quietHoursStart: next.start,
                 quietHoursEnd: next.end,
                 timezone: next.timezone,
+                // Only named when the person changes it; a window change keeps it.
+                ...(typeof next.urgentBypassesQuietHours === 'boolean'
+                    ? { urgentBypassesQuietHours: next.urgentBypassesQuietHours }
+                    : {}),
             });
             if (result.success) {
-                onChange(next);
+                onChange({ ...quietHours, ...next });
                 setEditing(false);
             } else {
                 setError(t('rowState.failed'));
@@ -114,6 +125,31 @@ export function QuietHoursRow({
                     >
                         {t('quietHours.clear')}
                     </button>
+                    <div className="basis-full">
+                        <label className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={urgentThrough}
+                                disabled={pending}
+                                aria-describedby={urgentHintId}
+                                onChange={(e) =>
+                                    save({
+                                        start: quietHours.start,
+                                        end: quietHours.end,
+                                        timezone: quietHours.timezone,
+                                        urgentBypassesQuietHours: e.target.checked,
+                                    })
+                                }
+                            />
+                            <span>{t('quietHours.urgentBypass')}</span>
+                        </label>
+                        <p
+                            id={urgentHintId}
+                            className="pl-6 text-xs text-text-muted dark:text-text-muted-dark"
+                        >
+                            {t('quietHours.urgentBypassHint')}
+                        </p>
+                    </div>
                 </>
             ) : (
                 <>
