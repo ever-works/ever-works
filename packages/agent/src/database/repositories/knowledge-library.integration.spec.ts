@@ -203,6 +203,44 @@ describe('Knowledge library repositories (integration)', () => {
             expect(created.revision).toBe(1);
         });
 
+        it('two concurrent revision bumps land on two distinct revisions', async () => {
+            const d = await seed({ slug: 'contended', revision: 3 });
+            const at = new Date('2026-09-14T09:00:00Z');
+
+            const bumps = await Promise.all([
+                documents.bumpRevision(d.id, at),
+                documents.bumpRevision(d.id, at),
+            ]);
+
+            expect(bumps.map((b) => b?.revision ?? 0).sort((a, b) => a - b)).toEqual([4, 5]);
+            const reloaded = await docs.findOneByOrFail({ id: d.id });
+            expect(reloaded.revision).toBe(5);
+            expect(reloaded.revisionAt?.getTime()).toBe(at.getTime());
+        });
+
+        it('a bump that read a revision another edit already moved retries onto the next one', async () => {
+            const d = await seed({ slug: 'stale', revision: 3 });
+            // The first read sees revision 3; before its compare-and-set runs,
+            // another edit moves the row to 4 — so the first attempt must not
+            // land, and the retry must take 5 rather than write 4 twice.
+            const findOne = docs.findOne.bind(docs);
+            const spy = jest.spyOn(docs, 'findOne').mockImplementationOnce(async (options) => {
+                const row = await findOne(options);
+                await docs.update({ id: d.id }, { revision: 4 });
+                return row;
+            });
+
+            const bumped = await documents.bumpRevision(d.id);
+
+            expect(bumped?.revision).toBe(5);
+            expect(spy).toHaveBeenCalledTimes(2);
+            expect((await docs.findOneByOrFail({ id: d.id })).revision).toBe(5);
+        });
+
+        it('a bump on a document that no longer exists writes nothing', async () => {
+            expect(await documents.bumpRevision('00000000-0000-0000-0000-00000000dead')).toBeNull();
+        });
+
         it('filters archived documents out by default, alone, or mixed in', async () => {
             await seed({ slug: 'live', title: 'Live' });
             await seed({ slug: 'gone', title: 'Gone', status: KbDocumentStatus.ARCHIVED });

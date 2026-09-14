@@ -71,6 +71,7 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
         pathExists: jest.Mock;
         list: jest.Mock;
         setLock: jest.Mock;
+        bumpRevision: jest.Mock;
     };
     let ownership: { ensureCanEdit: jest.Mock; ensureCanView: jest.Mock };
     let activityLog: { log: jest.Mock };
@@ -89,6 +90,10 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
             pathExists: jest.fn(async () => false),
             list: jest.fn(async () => ({ items: [], total: 0 })),
             setLock: jest.fn(async () => buildDocument({ locked: true })),
+            bumpRevision: jest.fn(async () => ({
+                revision: 4,
+                revisionAt: new Date('2026-09-14T09:00:00Z'),
+            })),
         };
         ownership = {
             ensureCanEdit: jest.fn(async () => ({ role: 'owner' })),
@@ -156,17 +161,49 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
 
         it('bumps the revision when the body changes', async () => {
             const patch = await update({ body: `${BODY} Always within 30 days.` });
-            expect(patch.revision).toBe(4);
-            expect(patch.revisionAt).toBeInstanceOf(Date);
+            expect(docRepo.bumpRevision).toHaveBeenCalledTimes(1);
+            expect(docRepo.bumpRevision).toHaveBeenCalledWith(DOC_ID);
             expect(patch.normalizedContentHash).toBe(
                 hashNormalizedBody(`${BODY} Always within 30 days.`),
             );
+        });
+
+        it('moves the revision in the database after the write, never as revision + 1 in the patch', async () => {
+            docRepo.findById.mockResolvedValue(buildDocument());
+            await service.updateDocument(WORK_ID, DOC_ID, USER_ID, {
+                body: `${BODY} Always within 30 days.`,
+            });
+            const patch = docRepo.update.mock.calls[0][1] as Partial<WorkKnowledgeDocument>;
+            expect(patch.revision).toBeUndefined();
+            expect(patch.revisionAt).toBeUndefined();
+            expect(docRepo.update.mock.invocationCallOrder[0]).toBeLessThan(
+                docRepo.bumpRevision.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('two concurrent edits read from the same revision each move it through the database', async () => {
+            let revision = 3;
+            docRepo.findById.mockResolvedValue(buildDocument({ revision: 3 }));
+            docRepo.bumpRevision.mockImplementation(async () => {
+                revision += 1;
+                return { revision, revisionAt: new Date() };
+            });
+            await Promise.all([
+                service.updateDocument(WORK_ID, DOC_ID, USER_ID, { title: 'Refunds' }),
+                service.updateDocument(WORK_ID, DOC_ID, USER_ID, { body: 'Never.' }),
+            ]);
+            expect(docRepo.bumpRevision).toHaveBeenCalledTimes(2);
+            for (const [, patch] of docRepo.update.mock.calls) {
+                expect(patch.revision).toBeUndefined();
+            }
+            expect(revision).toBe(5);
         });
 
         it('does NOT bump on a whitespace-only reformat', async () => {
             const patch = await update({ body: '  When we refund,   when we do not.\r\n\r\n' });
             expect(patch.revision).toBeUndefined();
             expect(patch.revisionAt).toBeUndefined();
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
         });
 
         it.each([
@@ -176,18 +213,20 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
             ['added tag', { tags: ['support', 'billing', 'vip'] }],
             ['removed tag', { tags: ['support'] }],
         ])('bumps the revision when the %s changes', async (_label, input) => {
-            const patch = await update(input);
-            expect(patch.revision).toBe(4);
+            await update(input);
+            expect(docRepo.bumpRevision).toHaveBeenCalledWith(DOC_ID);
         });
 
         it('does NOT bump when the tags are only reordered', async () => {
             const patch = await update({ tags: ['billing', 'support'] });
             expect(patch.revision).toBeUndefined();
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
         });
 
         it('does NOT bump on a language or status change', async () => {
             const patch = await update({ language: 'fr', status: KbDocumentStatus.DRAFT });
             expect(patch.revision).toBeUndefined();
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
         });
 
         it('seeds a NULL fingerprint without bumping, even when the body changes', async () => {
@@ -196,6 +235,7 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
                 buildDocument({ normalizedContentHash: null, revision: 1 }),
             );
             expect(patch.revision).toBeUndefined();
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
             expect(patch.normalizedContentHash).toBe(hashNormalizedBody('An entirely new body'));
         });
 
@@ -206,6 +246,7 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
             );
             expect(patch.normalizedContentHash).toBe(hashNormalizedBody(BODY));
             expect(patch.revision).toBeUndefined();
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
         });
     });
 
@@ -215,6 +256,7 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
             await service.lockDocument(WORK_ID, DOC_ID, USER_ID, 'full' as never);
             expect(docRepo.update).not.toHaveBeenCalled();
             expect(docRepo.setLock).toHaveBeenCalledWith(DOC_ID, true, 'full');
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
         });
     });
 
@@ -224,10 +266,10 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
                 .mockResolvedValueOnce(buildDocument())
                 .mockResolvedValueOnce(buildDocument({ metadata: { body: 'The old policy' } }));
             await service.restoreDocumentFromHistory(WORK_ID, DOC_ID, USER_ID, 'abc123');
-            expect(docRepo.update).toHaveBeenCalledWith(
-                DOC_ID,
-                expect.objectContaining({ revision: 4 }),
-            );
+            expect(docRepo.update).toHaveBeenCalledWith(DOC_ID, {
+                normalizedContentHash: hashNormalizedBody('The old policy'),
+            });
+            expect(docRepo.bumpRevision).toHaveBeenCalledWith(DOC_ID);
         });
 
         it('does not bump when the restored body is the same text reflowed', async () => {
@@ -236,6 +278,7 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
                 .mockResolvedValueOnce(buildDocument({ metadata: { body: `\n${BODY}\n\n` } }));
             await service.restoreDocumentFromHistory(WORK_ID, DOC_ID, USER_ID, 'abc123');
             expect(docRepo.update).not.toHaveBeenCalled();
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
         });
     });
 
@@ -268,6 +311,7 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
             docRepo.findById.mockResolvedValue(buildDocument());
             await service.archiveDocument(WORK_ID, DOC_ID, USER_ID);
             expect(docRepo.update.mock.calls[0][1].revision).toBeUndefined();
+            expect(docRepo.bumpRevision).not.toHaveBeenCalled();
         });
 
         it('records the decision status it replaces on a decision document', async () => {

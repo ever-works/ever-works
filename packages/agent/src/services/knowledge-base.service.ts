@@ -1432,21 +1432,21 @@ export class KnowledgeBaseService {
             } as Record<string, unknown>;
         }
 
-        Object.assign(
-            patch,
-            this.revisionPatch(existing, {
-                title: patch.title ?? existing.title,
-                description:
-                    input.description !== undefined ? input.description : existing.description,
-                tags: input.tags !== undefined ? input.tags : existing.tags,
-                kbDocumentClass: patch.kbDocumentClass ?? existing.kbDocumentClass,
-                body: input.body !== undefined ? input.body : this.bodyOf(existing),
-            }),
-        );
+        const revision = this.revisionPatch(existing, {
+            title: patch.title ?? existing.title,
+            description: input.description !== undefined ? input.description : existing.description,
+            tags: input.tags !== undefined ? input.tags : existing.tags,
+            kbDocumentClass: patch.kbDocumentClass ?? existing.kbDocumentClass,
+            body: input.body !== undefined ? input.body : this.bodyOf(existing),
+        });
+        Object.assign(patch, revision.patch);
 
-        const updated = await this.documentRepository.update(docId, patch);
+        let updated = await this.documentRepository.update(docId, patch);
         if (!updated) {
             throw new NotFoundException(`KB document not found after update: ${docId}`);
+        }
+        if (revision.bump) {
+            updated = await this.bumpRevision(updated);
         }
 
         if (input.tags?.length) {
@@ -1900,8 +1900,11 @@ export class KnowledgeBaseService {
             kbDocumentClass: updated.kbDocumentClass,
             body: this.bodyOf(updated),
         });
-        if (Object.keys(revision).length > 0) {
-            updated = (await this.documentRepository.update(docId, revision)) ?? updated;
+        if (Object.keys(revision.patch).length > 0) {
+            updated = (await this.documentRepository.update(docId, revision.patch)) ?? updated;
+        }
+        if (revision.bump) {
+            updated = await this.bumpRevision(updated);
         }
 
         await this.enqueueMirror(
@@ -3927,9 +3930,13 @@ export class KnowledgeBaseService {
      *    hash and DO NOT move `revision`: shipping the library must not
      *    flag every existing document as changed.
      *  - Title, description, tag set, class or normalized-body hash changed
-     *    → `revision + 1`, `revisionAt = now`, new hash.
+     *    → new hash, and `bump` so the caller moves `revision` through
+     *    {@link bumpRevision} once the write has landed.
      *  - Otherwise (a whitespace-only edit, a status / language / lock /
      *    bookkeeping write) → nothing.
+     *
+     * The patch never carries `revision` itself: computing `existing.revision
+     * + 1` here would let two concurrent edits write the same number.
      */
     private revisionPatch(
         existing: WorkKnowledgeDocument,
@@ -3940,10 +3947,10 @@ export class KnowledgeBaseService {
             kbDocumentClass: KbDocumentClass;
             body: string;
         },
-    ): Partial<WorkKnowledgeDocument> {
+    ): { patch: Partial<WorkKnowledgeDocument>; bump: boolean } {
         const nextHash = hashNormalizedBody(next.body);
         if (!existing.normalizedContentHash) {
-            return { normalizedContentHash: nextHash };
+            return { patch: { normalizedContentHash: nextHash }, bump: false };
         }
         const substantive =
             nextHash !== existing.normalizedContentHash ||
@@ -3951,12 +3958,23 @@ export class KnowledgeBaseService {
             (next.description ?? null) !== (existing.description ?? null) ||
             next.kbDocumentClass !== existing.kbDocumentClass ||
             !sameTagSet(next.tags, existing.tags);
-        if (!substantive) return {};
-        return {
-            normalizedContentHash: nextHash,
-            revision: (existing.revision ?? 1) + 1,
-            revisionAt: new Date(),
-        };
+        if (!substantive) return { patch: {}, bump: false };
+        return { patch: { normalizedContentHash: nextHash }, bump: true };
+    }
+
+    /**
+     * Move a document's `revision` forward by one in the database (see
+     * {@link WorkKnowledgeDocumentRepository.bumpRevision} for the
+     * concurrency contract) and carry the revision this edit wrote onto the
+     * row the caller returns.
+     */
+    private async bumpRevision(doc: WorkKnowledgeDocument): Promise<WorkKnowledgeDocument> {
+        const bumped = await this.documentRepository.bumpRevision(doc.id);
+        if (bumped) {
+            doc.revision = bumped.revision;
+            doc.revisionAt = bumped.revisionAt;
+        }
+        return doc;
     }
 
     private bodyOf(doc: WorkKnowledgeDocument): string {

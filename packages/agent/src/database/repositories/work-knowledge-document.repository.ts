@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, IsNull, Like, Not, Repository, SelectQueryBuilder } from 'typeorm';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
@@ -15,6 +15,14 @@ import {
     prepareCaseInsensitiveContainsPattern,
     sanitizeLikePattern,
 } from '../utils';
+
+/**
+ * Knowledge library — how many read-and-compare rounds
+ * {@link WorkKnowledgeDocumentRepository.bumpRevision} makes before giving
+ * up. Each lost round means another edit of the same document landed in
+ * between, so five in a row is contention no human edit produces.
+ */
+const REVISION_BUMP_MAX_ATTEMPTS = 5;
 
 export interface KbDocumentListOptions {
     workId?: string;
@@ -764,6 +772,49 @@ export class WorkKnowledgeDocumentRepository {
             .where('id IN (:...docIds)', { docIds })
             .execute();
         return result.affected ?? docIds.length;
+    }
+
+    /**
+     * Move `revision` forward by exactly one and stamp `revisionAt`, safely
+     * under concurrent edits.
+     *
+     * A compare-and-set on the revision just read: the UPDATE lands only
+     * while the row still carries that revision, so two edits racing on the
+     * same document can never write the same number — the one that loses
+     * sees no affected row, re-reads and takes the next number. Each caller
+     * therefore knows exactly which revision it wrote, without a read-back
+     * that a later edit may already have moved.
+     *
+     * Touches only `revision` and `revisionAt` (and the `updatedAt` stamp
+     * every update carries). `null` when the document no longer exists; a
+     * {@link ConflictException} only if the row keeps changing for
+     * {@link REVISION_BUMP_MAX_ATTEMPTS} reads in a row.
+     */
+    async bumpRevision(
+        docId: string,
+        at: Date = new Date(),
+    ): Promise<{ revision: number; revisionAt: Date } | null> {
+        for (let attempt = 0; attempt < REVISION_BUMP_MAX_ATTEMPTS; attempt += 1) {
+            const current = await this.repository.findOne({
+                where: { id: docId },
+                select: { id: true, revision: true },
+            });
+            if (!current) return null;
+            const next = current.revision + 1;
+            const result = await this.repository
+                .createQueryBuilder()
+                .update(WorkKnowledgeDocument)
+                .set({ revision: next, revisionAt: at })
+                .where('id = :docId', { docId })
+                .andWhere('revision = :expected', { expected: current.revision })
+                .execute();
+            if ((result.affected ?? 0) > 0) {
+                return { revision: next, revisionAt: at };
+            }
+        }
+        throw new ConflictException(
+            `KB document ${docId} changed too often to record its revision; retry the edit`,
+        );
     }
 
     /** Unfile every document filed in any of `folderIds`; returns how many moved. */
