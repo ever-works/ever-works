@@ -122,13 +122,40 @@ describe('ConversationParticipantRepository', () => {
         await expect(participants.markLeft('c1', 'agent', 'a1')).resolves.toBe(false);
     });
 
-    it('moves the read position', async () => {
+    it('moves the read position, only forward, in one conditional write', async () => {
         const at = new Date('2026-09-01T00:00:00Z');
-        await participants.markRead('c1', 'user', 'u1', 'm9', at);
-        expect(repository.update).toHaveBeenCalledWith(
-            { conversationId: 'c1', participantType: 'user', participantId: 'u1' },
-            { lastReadMessageId: 'm9', lastReadAt: at },
+        const builder = {
+            update: jest.fn().mockReturnThis(),
+            set: jest.fn().mockReturnThis(),
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            execute: jest.fn().mockResolvedValue({ affected: 1 }),
+        };
+        (repository as any).createQueryBuilder = jest.fn(() => builder);
+
+        await expect(participants.markRead('c1', 'user', 'u1', 'm9', at)).resolves.toBe(true);
+
+        expect(builder.set).toHaveBeenCalledWith({ lastReadMessageId: 'm9', lastReadAt: at });
+        expect(builder.where).toHaveBeenCalledWith('"conversationId" = :conversationId', {
+            conversationId: 'c1',
+        });
+        expect(builder.andWhere).toHaveBeenCalledWith('"participantType" = :participantType', {
+            participantType: 'user',
+        });
+        expect(builder.andWhere).toHaveBeenCalledWith('"participantId" = :participantId', {
+            participantId: 'u1',
+        });
+        // The guard that keeps a delayed, older read from moving it back.
+        expect(builder.andWhere).toHaveBeenCalledWith(
+            '("lastReadAt" IS NULL OR "lastReadAt" <= :readAt)',
+            { readAt: at },
         );
+        // Read-then-write would reopen the race; nothing is read first.
+        expect(repository.update).not.toHaveBeenCalled();
+        expect(repository.findOne).not.toHaveBeenCalled();
+
+        builder.execute.mockResolvedValueOnce({ affected: 0 });
+        await expect(participants.markRead('c1', 'user', 'u1', 'm1', at)).resolves.toBe(false);
     });
 
     it('counts only current Agents', async () => {

@@ -34,11 +34,13 @@ export interface AgentConversationReplyPayload {
  *     Conversation is about;
  *  4. execute through `AgentRunService`, the same runner every Agent run uses
  *     (budget, tools, memory, cost);
- *  5. record the reply as an Agent-authored message that answers the
- *     triggering one, so the run and the message point at each other — or,
- *     when the Agent's budget refused the run (`budget_exceeded`) or the
- *     model call failed (`provider_unavailable`), mark the triggering message
- *     `failed` so the failure is visible and retryable.
+ *  5. the reply is an Agent-authored message that answers the triggering one,
+ *     so the run and the message point at each other. The runner stores it
+ *     before it marks the run completed, once per run; this job only falls
+ *     back to recording it when the runner did not. When the Agent's budget
+ *     refused the run (`budget_exceeded`), the model call failed, or the
+ *     reply could not be stored (`provider_unavailable`), the triggering
+ *     message is marked `failed` so the failure is visible and retryable.
  *
  * `maxDuration` matches the chat reply job.
  */
@@ -169,6 +171,13 @@ export const agentConversationReplyTask = task<
                 scopeContext,
             });
 
+            // The runner stores the reply BEFORE it marks the run completed
+            // (`finalize` → AGENT_RUN_CONVERSATION_REPLY_POSTER), so a completed
+            // run never lost its reply. When that store failed, the run was
+            // failed instead of completed — the reply exists nowhere.
+            const replyNotStored =
+                result.status === 'dispatched' && result.finalizeResult?.status === 'failed';
+
             if (result.status === 'assembled') {
                 await runs.markCompleted(
                     run.id,
@@ -176,11 +185,16 @@ export const agentConversationReplyTask = task<
                 );
             } else if (result.status === 'agent-not-found') {
                 await runs.markFailed(run.id, 'Agent not found');
-            } else if (result.status === 'budget-blocked' || result.status === 'dispatch-failed') {
-                // The runner already failed the run — the budget refused it, or
-                // the model call errored. Without this the person would see
-                // nothing: their message moves to `failed` with the reason, so
-                // the Conversation can say why and offer Retry.
+            } else if (
+                result.status === 'budget-blocked' ||
+                result.status === 'dispatch-failed' ||
+                replyNotStored
+            ) {
+                // The runner already failed the run — the budget refused it,
+                // the model call errored, or its reply could not be stored.
+                // Without this the person would see nothing: their message
+                // moves to `failed` with the reason, so the Conversation can say
+                // why and offer Retry.
                 await messages.markReplyRefused({
                     conversationId: payload.conversationId,
                     messageId: payload.triggeringMessageId,
@@ -192,8 +206,14 @@ export const agentConversationReplyTask = task<
             }
 
             const reply = result.outcome?.replyBody?.trim();
-            let replyMessageId: string | undefined;
-            if (reply && result.status === 'dispatched') {
+            // Stored by the runner before completion; its id comes back here.
+            let replyMessageId: string | undefined = replyNotStored
+                ? undefined
+                : result.finalizeResult?.postedMessageId;
+            if (reply && result.status === 'dispatched' && !replyNotStored && !replyMessageId) {
+                // A runner that does not store Conversation replies itself (its
+                // API predates the reply poster): record the reply here, as
+                // before.
                 const stored = await messages.appendAgentMessage({
                     conversationId: payload.conversationId,
                     agentId: agent.id,
@@ -204,10 +224,11 @@ export const agentConversationReplyTask = task<
             }
 
             return {
-                status:
-                    result.status === 'assembled' || result.status === 'dispatched'
-                        ? 'completed'
-                        : result.status,
+                status: replyNotStored
+                    ? 'reply-not-stored'
+                    : result.status === 'assembled' || result.status === 'dispatched'
+                      ? 'completed'
+                      : result.status,
                 agentId: agent.id,
                 conversationId: payload.conversationId,
                 triggeringMessageId: payload.triggeringMessageId,

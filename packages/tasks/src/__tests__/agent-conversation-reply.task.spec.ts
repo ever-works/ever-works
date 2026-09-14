@@ -239,6 +239,39 @@ describe('agentConversationReplyTask', () => {
         expect(result).toMatchObject({ status: 'dispatch-failed', runId: RUN_ID });
     });
 
+    it('uses the reply the runner stored before completing the run, and records no second one', async () => {
+        runner.execute.mockResolvedValue({
+            status: 'dispatched',
+            outcome: { replyBody: 'Here is the plan.' },
+            finalizeResult: { status: 'completed', postedMessageId: 'reply-stored' },
+        });
+
+        const result = await config.run(payload);
+
+        expect(messages.appendAgentMessage).not.toHaveBeenCalled();
+        expect(messages.markReplyRefused).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ status: 'completed', replyMessageId: 'reply-stored' });
+    });
+
+    it('surfaces a reply the runner could not store on the person’s message, never as completed', async () => {
+        runner.execute.mockResolvedValue({
+            status: 'dispatched',
+            outcome: { replyBody: 'Here is the plan.' },
+            finalizeResult: { status: 'failed' },
+        });
+
+        const result = await config.run(payload);
+
+        expect(messages.markReplyRefused).toHaveBeenCalledWith({
+            conversationId: CONVERSATION_ID,
+            messageId: MESSAGE_ID,
+            failureCode: 'provider_unavailable',
+        });
+        expect(messages.appendAgentMessage).not.toHaveBeenCalled();
+        expect(result.status).not.toBe('completed');
+        expect(result.replyMessageId).toBeUndefined();
+    });
+
     it('marks nothing failed when the reply ran', async () => {
         await config.run(payload);
         expect(messages.markReplyRefused).not.toHaveBeenCalled();

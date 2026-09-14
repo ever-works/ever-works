@@ -7,7 +7,10 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { QUEUED_REASON_INSUFFICIENT_CREDITS } from '../agents/run-admission-chain';
-import { ConversationRepository } from '../database/repositories/conversation.repository';
+import {
+    ConversationRepository,
+    type ConversationMessageCursor,
+} from '../database/repositories/conversation.repository';
 import type { OwnershipScope } from '../database/ownership-scope';
 import type { Conversation } from '../entities/conversation.entity';
 import type { ConversationMessage } from '../entities/conversation-message.entity';
@@ -47,6 +50,28 @@ export interface AppendAgentMessageInput {
     body: string;
     replyToMessageId?: string | null;
     model?: string | null;
+}
+
+export interface RecordAgentReplyInput {
+    /** The run that produced the reply; one reply is stored per run. */
+    runId: string;
+    /** The run's owner — the Conversation must be theirs. */
+    userId: string;
+    agentId: string;
+    /** The Conversation message the reply answers. */
+    replyToMessageId: string;
+    body: string;
+    model?: string | null;
+}
+
+/**
+ * The key an Agent reply is stored under, so a run records its reply at most
+ * once. It lives in the Conversation's client-id column, whose unique index
+ * enforces it. A person's client id can never contain `/` (the send DTO refuses
+ * it), so this key cannot collide with a message someone sent.
+ */
+export function agentReplyClientMessageId(runId: string): string {
+    return `agent-run/${runId}`;
 }
 
 export interface MarkReplyRefusedInput {
@@ -186,6 +211,11 @@ export class ConversationMessageService {
      * Send a `failed` message again. Only a failed message can be retried —
      * anything else is a 409, which is also what makes a double-tapped Retry
      * safe: the first one moves the message out of `failed`.
+     *
+     * The move is a compare-and-set in the database, not the status read
+     * above it: two Retries that arrive together both read `failed`, but only
+     * the one whose write moves the message dispatches; the other is a 409.
+     * Without it both would dispatch, and the message would be answered twice.
      */
     async retry(
         userId: string,
@@ -199,7 +229,12 @@ export class ConversationMessageService {
             scope,
         );
         const message = await this.ownFailedMessage(conversation, messageId, userId);
-        await this.conversations.updateMessageStatus(message.id, 'sent', null);
+        const claimed = await this.conversations.claimFailedMessage(conversation.id, message.id);
+        if (!claimed) {
+            const current = await this.conversations.findMessageById(conversation.id, message.id);
+            if (!current) throw new NotFoundException();
+            throw notRetryable(current.status);
+        }
         const sent = { ...message, status: 'sent', failureCode: null } as ConversationMessage;
 
         const candidates = sent.content.includes('@')
@@ -242,6 +277,29 @@ export class ConversationMessageService {
     }
 
     /**
+     * A page of the messages written after `after`, oldest first; with no
+     * `after`, from the start. The live stream pages with it from its cursor
+     * until it is caught up, so a burst larger than one page is never skipped.
+     */
+    async listMessagesAfter(
+        userId: string,
+        conversationId: string,
+        options: { limit: number; after?: ConversationMessageCursor | null },
+        scope?: OwnershipScope,
+    ): Promise<ConversationMessage[]> {
+        const conversation = await this.conversationService.assertParticipant(
+            conversationId,
+            userId,
+            scope,
+        );
+        return this.conversations.findMessagesAfter(
+            conversation.id,
+            options.after ?? null,
+            options.limit,
+        );
+    }
+
+    /**
      * Record an Agent's reply. Called by the reply job once its run finished.
      * Credentials an Agent echoed are redacted before storage, never stored.
      */
@@ -260,6 +318,58 @@ export class ConversationMessageService {
             tenantId: conversation.tenantId ?? null,
             organizationId: conversation.organizationId ?? null,
         });
+    }
+
+    /**
+     * Record an Agent run's reply, idempotently: the first call for a run
+     * stores the message, every later call for that run returns the same one.
+     * Called while the run is being finalized and BEFORE it is marked
+     * completed, so a run never reads as completed without its reply, and a
+     * run finalized again (a redelivered job) never answers twice.
+     *
+     * The Conversation is found through the message the reply answers and must
+     * belong to the run's owner; otherwise it is a 404 and nothing is stored.
+     */
+    async recordAgentReply(input: RecordAgentReplyInput): Promise<ConversationMessage> {
+        const answered = await this.conversations.findMessageByIdUnscoped(input.replyToMessageId);
+        if (!answered) throw new NotFoundException();
+        const conversation = await this.conversations.findByIdForUser(
+            answered.conversationId,
+            input.userId,
+        );
+        if (!conversation) throw new NotFoundException();
+
+        const clientMessageId = agentReplyClientMessageId(input.runId);
+        const existing = await this.conversations.findByClientMessageId(
+            conversation.id,
+            clientMessageId,
+        );
+        if (existing) return existing;
+        try {
+            return await this.conversations.insertMessage({
+                conversationId: conversation.id,
+                role: 'assistant',
+                content: redactSecrets(input.body ?? '').cleaned,
+                ...(input.model ? { model: input.model } : {}),
+                authorType: 'agent',
+                authorId: input.agentId,
+                status: 'sent',
+                clientMessageId,
+                replyToMessageId: answered.id,
+                tenantId: conversation.tenantId ?? null,
+                organizationId: conversation.organizationId ?? null,
+            });
+        } catch (err) {
+            // The same run was finalized twice at once; the unique index let
+            // exactly one reply land. Answer with that one.
+            if (!isUniqueConstraintError(err)) throw err;
+            const winner = await this.conversations.findByClientMessageId(
+                conversation.id,
+                clientMessageId,
+            );
+            if (!winner) throw err;
+            return winner;
+        }
     }
 
     /**
@@ -390,10 +500,7 @@ export class ConversationMessageService {
             throw new NotFoundException();
         }
         if (message.status !== 'failed') {
-            throw new ConflictException({
-                message: 'Only a message that failed to send can be retried or discarded.',
-                status: message.status,
-            });
+            throw notRetryable(message.status);
         }
         return message;
     }
@@ -431,6 +538,13 @@ export class ConversationMessageService {
             );
         }
     }
+}
+
+function notRetryable(status: ConversationMessage['status'] | undefined): ConflictException {
+    return new ConflictException({
+        message: 'Only a message that failed to send can be retried or discarded.',
+        status,
+    });
 }
 
 function refusal(

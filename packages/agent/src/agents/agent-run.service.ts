@@ -23,8 +23,10 @@ import {
 import { getCurrentPeriodStart, getNextPeriodStart } from './budget-period';
 import {
     AGENT_RUN_CHAT_BACK_POSTER,
+    AGENT_RUN_CONVERSATION_REPLY_POSTER,
     AGENT_RUN_TASK_FINISHER,
     type AgentRunChatBackPoster,
+    type AgentRunConversationReplyPoster,
     type AgentRunOutcome,
     type AgentRunTaskFinisher,
 } from './agent-run-post-processor';
@@ -250,6 +252,14 @@ export class AgentRunService {
         // `DatabaseModule`. Absent, a capped budget is UNEVALUABLE and the
         // run is refused (see `checkBudget`) — never silently "0 spent".
         @Optional() private readonly pluginUsage?: PluginUsageRepository,
+        // Named Conversations — records a Conversation reply before the run
+        // is marked completed (see `finalize`). Bound by the api-side
+        // @Global() AgentsModule. Trailing + `@Optional()` so every positional
+        // constructor call keeps working; absent, the reply is left to the job
+        // that started the run, exactly as before.
+        @Optional()
+        @Inject(AGENT_RUN_CONVERSATION_REPLY_POSTER)
+        private readonly conversationReplyPoster?: AgentRunConversationReplyPoster,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -1533,6 +1543,50 @@ export class AgentRunService {
             return { runId: context.runId, status: 'failed' };
         }
 
+        // Named Conversations — a reply to a Conversation message is stored
+        // BEFORE the run is marked completed. Completing first could lose the
+        // reply for good: once the run reads as completed, a failed store is
+        // never retried (a redelivered job skips a finished run). The poster is
+        // idempotent per run, so finalizing the same run again stores nothing
+        // new. A reply that cannot be stored fails the run instead, and the job
+        // that started it marks the person's message failed so it can be retried.
+        let postedMessageId: string | undefined;
+        const conversationMessageId = context.conversationMessageId ?? null;
+        const conversationReply =
+            context.kind === 'chat' && !context.taskId && conversationMessageId
+                ? (outcome.replyBody?.trim() ?? '')
+                : '';
+        if (conversationReply.length > 0 && conversationMessageId && this.conversationReplyPoster) {
+            try {
+                const posted = await this.conversationReplyPoster.postReply({
+                    runId: context.runId,
+                    userId: context.userId,
+                    agentId: context.agentId,
+                    conversationMessageId,
+                    body: outcome.replyBody as string,
+                });
+                postedMessageId = posted.messageId;
+            } catch (err) {
+                const reason = err instanceof Error ? err.message : String(err);
+                this.logger.warn(
+                    `Conversation reply could not be stored for run ${context.runId}: ${reason}`,
+                );
+                await this.runLogs
+                    .append({
+                        runId: context.runId,
+                        level: 'ERROR',
+                        step: 'post-process',
+                        message: `Conversation reply could not be stored: ${reason}`,
+                    })
+                    .catch(() => undefined);
+                await this.runs
+                    .markFailed(context.runId, 'The reply could not be stored in the Conversation')
+                    .catch(() => undefined);
+                await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
+                return { runId: context.runId, status: 'failed' };
+            }
+        }
+
         await this.runs.markCompleted(context.runId, summary ?? undefined).catch(() => undefined);
         // Run steering (Wave 4 M5) — a run that finished WITHOUT a definitive
         // outcome because it needs a human is parked here, at the one place
@@ -1559,13 +1613,15 @@ export class AgentRunService {
             });
         }
 
-        let postedMessageId: string | undefined;
         let finishedTaskStatus: string | undefined;
 
         // Kind-specific side effects. Best-effort — a chat-back failure
         // or transition rejection does not unwind the LLM work.
         if (context.kind === 'chat' && outcome.replyBody && outcome.replyBody.trim().length > 0) {
-            postedMessageId = await this.tryPostChatReply(context, outcome.replyBody);
+            // A Conversation reply was stored above; the Task chat-back
+            // returns nothing for it, which must not erase that message id.
+            postedMessageId =
+                (await this.tryPostChatReply(context, outcome.replyBody)) ?? postedMessageId;
         }
         if (context.kind === 'task' && outcome.taskFinishStatus) {
             finishedTaskStatus = await this.tryFinishTask(

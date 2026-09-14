@@ -120,7 +120,16 @@ export class ConversationParticipantRepository {
         return (result.affected ?? 0) > 0;
     }
 
-    /** Move the read position forward to `messageId`. */
+    /**
+     * Move the read position forward to `messageId`, and never backward.
+     *
+     * The write is conditional in the database: it only lands while the stored
+     * position is unset or not later than `readAt`. A delayed request for an
+     * older message that arrives after a newer one was read therefore changes
+     * nothing, instead of turning messages the person already read unread
+     * again. Returns whether the position moved (`false` also when there is no
+     * participant row).
+     */
     async markRead(
         conversationId: string,
         participantType: ConversationParticipantType,
@@ -128,10 +137,15 @@ export class ConversationParticipantRepository {
         messageId: string,
         readAt: Date = new Date(),
     ): Promise<boolean> {
-        const result = await this.repository.update(
-            { conversationId, participantType, participantId },
-            { lastReadMessageId: messageId, lastReadAt: readAt },
-        );
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(ConversationParticipant)
+            .set({ lastReadMessageId: messageId, lastReadAt: readAt })
+            .where('"conversationId" = :conversationId', { conversationId })
+            .andWhere('"participantType" = :participantType', { participantType })
+            .andWhere('"participantId" = :participantId', { participantId })
+            .andWhere('("lastReadAt" IS NULL OR "lastReadAt" <= :readAt)', { readAt })
+            .execute();
         return (result.affected ?? 0) > 0;
     }
 

@@ -53,13 +53,16 @@ const flush = async () => {
 
 describe('ConversationStreamController', () => {
     let conversations: { assertParticipant: jest.Mock };
-    let messages: { listMessages: jest.Mock };
+    let messages: { listMessages: jest.Mock; listMessagesAfter: jest.Mock };
     let controller: ConversationStreamController;
 
     beforeEach(() => {
         jest.useFakeTimers();
         conversations = { assertParticipant: jest.fn().mockResolvedValue({ id: CONVERSATION_ID }) };
-        messages = { listMessages: jest.fn().mockResolvedValue([]) };
+        messages = {
+            listMessages: jest.fn().mockResolvedValue([]),
+            listMessagesAfter: jest.fn().mockResolvedValue([]),
+        };
         controller = new ConversationStreamController(
             conversations as any,
             messages as any,
@@ -133,6 +136,58 @@ describe('ConversationStreamController', () => {
 
         jest.advanceTimersByTime(CONVERSATION_STREAM_HEARTBEAT_MS);
         expect(res.chunks).toContain(': ping\n\n');
+        res.close();
+    });
+
+    it('delivers every message of a burst larger than one page, oldest first', async () => {
+        // A Conversation store: the newest-window read and the cursor read
+        // both look at the same rows, as the database would.
+        const store: Array<{ id: string; status: string; createdAt: Date }> = [];
+        const write = (id: string) =>
+            store.push({ id, status: 'sent', createdAt: new Date(1_000 + store.length) });
+        write('m0');
+        messages.listMessages.mockImplementation(
+            async (_user: string, _conversation: string, options: { limit: number }) =>
+                store.slice(-options.limit),
+        );
+        messages.listMessagesAfter.mockImplementation(
+            async (
+                _user: string,
+                _conversation: string,
+                options: { limit: number; after: { id: string } | null },
+            ) => {
+                const start = options.after
+                    ? store.findIndex((row) => row.id === options.after?.id) + 1
+                    : 0;
+                return store.slice(start, start + options.limit);
+            },
+        );
+        const res = fakeResponse();
+        await controller.stream(auth, CONVERSATION_ID, res as any, fakeRequest() as any);
+        expect(res.chunks).toEqual([]);
+
+        // 51 messages land between two polls — one more than a page holds.
+        const burst = Array.from({ length: 51 }, (_, i) => `n${i + 1}`);
+        burst.forEach(write);
+        jest.advanceTimersByTime(CONVERSATION_STREAM_POLL_MS);
+        for (let i = 0; i < 50; i += 1) await Promise.resolve();
+
+        const delivered = res.chunks
+            .filter((chunk) => chunk.startsWith('event: message'))
+            .map((chunk) => JSON.parse(chunk.split('data: ')[1]).message.id);
+        expect(delivered).toEqual(burst);
+        // Paged from the cursor at the newest message it had seen, then on.
+        expect(messages.listMessagesAfter).toHaveBeenCalledWith(
+            'user-1',
+            CONVERSATION_ID,
+            { limit: 50, after: expect.objectContaining({ id: 'm0' }) },
+            SCOPE,
+        );
+
+        // Nothing is announced twice on the next poll.
+        jest.advanceTimersByTime(CONVERSATION_STREAM_POLL_MS);
+        for (let i = 0; i < 50; i += 1) await Promise.resolve();
+        expect(res.chunks.filter((chunk) => chunk.startsWith('event: message'))).toHaveLength(51);
         res.close();
     });
 

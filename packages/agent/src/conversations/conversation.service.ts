@@ -8,6 +8,7 @@ import {
 import { AgentRepository } from '../database/repositories/agent.repository';
 import {
     ConversationRepository,
+    type ConversationInitialParticipant,
     type ListConversationSummariesFilter,
 } from '../database/repositories/conversation.repository';
 import { ConversationParticipantRepository } from '../database/repositories/conversation-participant.repository';
@@ -79,7 +80,8 @@ export class ConversationService {
      * Open a Conversation. A `direct` Conversation may be addressed at one
      * Agent the caller can see; that address is fixed for its lifetime (FR-2).
      * A context object must exist in the caller's scope and is fixed too
-     * (FR-9). The caller is seeded as `owner`, the Agent as `member`.
+     * (FR-9). The caller is seeded as `owner`, the Agent as `member`, in the
+     * same transaction as the Conversation itself.
      */
     async create(
         userId: string,
@@ -115,36 +117,32 @@ export class ConversationService {
         }
 
         const title = request.title?.trim() ? request.title.trim() : undefined;
-        const conversation = await this.conversations.create({
-            userId,
-            kind,
-            agentId,
-            contextType,
-            contextId,
-            ...(title ? { title, titleSource: 'user' as const } : {}),
-            ...(request.providerId ? { providerId: request.providerId } : {}),
-            ...(request.model ? { model: request.model } : {}),
-            ...ownershipStamp(scope),
-        });
-
-        const stamp = scopeStampOf(conversation);
-        await this.participants.addIfAbsent({
-            conversationId: conversation.id,
-            participantType: 'user',
-            participantId: userId,
-            role: 'owner',
-            ...stamp,
-        });
+        const initialParticipants: ConversationInitialParticipant[] = [
+            { participantType: 'user', participantId: userId, role: 'owner' },
+        ];
         if (agentId) {
-            await this.participants.addIfAbsent({
-                conversationId: conversation.id,
+            initialParticipants.push({
                 participantType: 'agent',
                 participantId: agentId,
                 role: 'member',
-                ...stamp,
             });
         }
-        return conversation;
+        // One transaction: a participant that fails to insert leaves no
+        // Conversation behind, so a retried create never finds a half-made one.
+        return this.conversations.createWithParticipants(
+            {
+                userId,
+                kind,
+                agentId,
+                contextType,
+                contextId,
+                ...(title ? { title, titleSource: 'user' as const } : {}),
+                ...(request.providerId ? { providerId: request.providerId } : {}),
+                ...(request.model ? { model: request.model } : {}),
+                ...ownershipStamp(scope),
+            },
+            initialParticipants,
+        );
     }
 
     /**

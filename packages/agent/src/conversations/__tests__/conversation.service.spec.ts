@@ -16,6 +16,11 @@ describe('ConversationService', () => {
     beforeEach(() => {
         conversations = {
             create: jest.fn(async (input) => ({ id: 'c1', createdAt: new Date(), ...input })),
+            createWithParticipants: jest.fn(async (input) => ({
+                id: 'c1',
+                createdAt: new Date(),
+                ...input,
+            })),
             findByIdForUser: jest.fn(),
             findSummariesByUser: jest.fn().mockResolvedValue({ conversations: [], total: 0 }),
             unreadCountsFor: jest.fn().mockResolvedValue(new Map()),
@@ -44,7 +49,9 @@ describe('ConversationService', () => {
             const created = await service.create('u1', { agentId: 'a1' }, SCOPE);
 
             expect(agents.findByIdAndUser).toHaveBeenCalledWith('a1', 'u1', SCOPE);
-            expect(conversations.create).toHaveBeenCalledWith(
+            // The Conversation and both participants go to storage in ONE write.
+            expect(conversations.createWithParticipants).toHaveBeenCalledTimes(1);
+            expect(conversations.createWithParticipants).toHaveBeenCalledWith(
                 expect.objectContaining({
                     userId: 'u1',
                     kind: 'direct',
@@ -52,22 +59,41 @@ describe('ConversationService', () => {
                     tenantId: SCOPE.tenantId,
                     organizationId: SCOPE.organizationId,
                 }),
+                [
+                    expect.objectContaining({
+                        participantType: 'user',
+                        participantId: 'u1',
+                        role: 'owner',
+                    }),
+                    expect.objectContaining({
+                        participantType: 'agent',
+                        participantId: 'a1',
+                        role: 'member',
+                    }),
+                ],
             );
             expect(created.id).toBe('c1');
-            expect(participants.addIfAbsent).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    participantType: 'user',
-                    participantId: 'u1',
-                    role: 'owner',
-                }),
+            // Nothing is written outside that transaction.
+            expect(conversations.create).not.toHaveBeenCalled();
+            expect(participants.addIfAbsent).not.toHaveBeenCalled();
+        });
+
+        it('a Conversation with no Agent opens with its owner only', async () => {
+            await service.create('u1', {}, SCOPE);
+            expect(conversations.createWithParticipants).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 'u1', agentId: null }),
+                [{ participantType: 'user', participantId: 'u1', role: 'owner' }],
             );
-            expect(participants.addIfAbsent).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    participantType: 'agent',
-                    participantId: 'a1',
-                    role: 'member',
-                }),
+        });
+
+        it('a failed participant write fails the create and returns no Conversation', async () => {
+            conversations.createWithParticipants.mockRejectedValueOnce(
+                new Error('participant insert failed'),
             );
+            await expect(service.create('u1', { agentId: 'a1' }, SCOPE)).rejects.toThrow(
+                'participant insert failed',
+            );
+            expect(conversations.create).not.toHaveBeenCalled();
         });
 
         it('refuses an Agent the caller cannot see with the same 404 as a missing one', async () => {
@@ -76,6 +102,7 @@ describe('ConversationService', () => {
                 NotFoundException,
             );
             expect(conversations.create).not.toHaveBeenCalled();
+            expect(conversations.createWithParticipants).not.toHaveBeenCalled();
         });
 
         it('refuses kinds that cannot be opened here', async () => {
@@ -83,6 +110,7 @@ describe('ConversationService', () => {
                 await expect(service.create('u1', { kind })).rejects.toThrow(BadRequestException);
             }
             expect(conversations.create).not.toHaveBeenCalled();
+            expect(conversations.createWithParticipants).not.toHaveBeenCalled();
         });
 
         it('requires context type and id together, and a context the caller can see', async () => {
@@ -97,15 +125,18 @@ describe('ConversationService', () => {
 
             await service.create('u1', { contextType: 'mission', contextId: 'm1' }, SCOPE);
             expect(contexts.resolve).toHaveBeenLastCalledWith('u1', 'mission', 'm1', SCOPE);
-            expect(conversations.create).toHaveBeenCalledWith(
+            expect(conversations.createWithParticipants).toHaveBeenCalledTimes(1);
+            expect(conversations.createWithParticipants).toHaveBeenCalledWith(
                 expect.objectContaining({ contextType: 'mission', contextId: 'm1' }),
+                expect.any(Array),
             );
         });
 
         it('a name given at creation belongs to the person', async () => {
             await service.create('u1', { agentId: 'a1', title: '  Launch plan  ' });
-            expect(conversations.create).toHaveBeenCalledWith(
+            expect(conversations.createWithParticipants).toHaveBeenCalledWith(
                 expect.objectContaining({ title: 'Launch plan', titleSource: 'user' }),
+                expect.any(Array),
             );
         });
     });
