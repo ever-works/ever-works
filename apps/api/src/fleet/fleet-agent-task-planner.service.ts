@@ -371,6 +371,17 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
      * at dispatch), never from the queue payload, so a parked review run
      * promoted later by the dispatch-gate drain is refused too.
      *
+     * NOT the first refusal a review run meets on the fleet. The dispatcher
+     * asks the G9 delegation-scope guard
+     * ({@link refuseUnenforceableDelegationScope}) first, and the review-only
+     * scope always narrows, so with production wiring (the planner is the
+     * guard) a review run is refused there, as
+     * `fleet-delegation-scope-unenforceable`, and this method is never
+     * reached. It is reachable only behind an explicit
+     * `delegationScopeGuard` that admits the run. It stays the rule that
+     * matters if G9 is ever relaxed for nodes that can enforce a scope,
+     * because a verdict still cannot be recorded on a node.
+     *
      * Fails closed: an unbound run repository or an unreadable row refuses
      * the dispatch rather than guessing that it is not a review. No run id
      * means no pre-created run row, which a review dispatch never produces
@@ -705,6 +716,22 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
 
         const narrowing = describeDelegationScopeNarrowing(run.delegationScope);
         if (narrowing.length === 0) return;
+
+        // An agent REVIEW run (slice AD) is admitted under the review-only
+        // scope, which always narrows, so it is refused HERE — before
+        // `refuseAgentReviewRun` is ever asked. Same code (the review ledger's
+        // `refusalCode` and the specs key on it); only the wording differs, so
+        // the owner is not told a review run was a delegated sub-agent run.
+        if (isAgentReviewRunScope(run.delegationScope)) {
+            throw new FleetDelegationScopeRefusedError(
+                FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+                `run ${payload.runId} is an agent review run, and review runs cannot run on the fleet: ` +
+                    `its scope narrows what it may do (${narrowing.join('; ')}), which no fleet node can ` +
+                    `enforce, and a node has no channel to record the reviewer's verdict. Refused rather ` +
+                    `than run with more than the review admitted. Route this Work's agent runs to the ` +
+                    `platform runtime to use agent reviewers.`,
+            );
+        }
 
         throw new FleetDelegationScopeRefusedError(
             FLEET_DELEGATION_SCOPE_UNENFORCEABLE,

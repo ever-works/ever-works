@@ -577,7 +577,12 @@ export class TaskTransitionService {
              * (the owner's own words, cut to 16 KiB), which is exactly what
              * a pull request author's diff must never be presented as. The
              * fleet dispatcher therefore refuses every review run before a
-             * plan is built — see `FleetAgentTaskPlanner.refuseAgentReviewRun`.
+             * plan is built: first by its G9 delegation-scope guard
+             * (`fleet-delegation-scope-unenforceable`, because the review-only
+             * scope always narrows), and, behind a guard that admitted the
+             * run, by `FleetAgentTaskPlanner.refuseAgentReviewRun`, the rule
+             * that still holds if G9 is ever relaxed, since a verdict cannot
+             * be recorded on a node.
              *
              * Omitted for every ordinary dispatch, which leaves the run
              * row byte-for-byte as it was before this slice.

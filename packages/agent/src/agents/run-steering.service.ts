@@ -420,10 +420,14 @@ export class RunSteeringService implements RunSteeringPort {
         // `createQueued` below), so a resume is exactly as narrow as its
         // source — and exactly as strong as the lane that executes it: the
         // scope is ENFORCED by the in-process tool loop. A fleet node runs a
-        // CLI and never reads a G9 tool scope, for the original delegated
-        // dispatch and for a resume alike — a gap that predates slice AD and
-        // that this method neither opens nor widens. Review runs never reach
-        // the fleet at all (`refuseAgentReviewRun` in the fleet dispatcher).
+        // CLI and never reads a G9 tool scope, which is why the fleet
+        // dispatcher refuses any run whose scope narrows, for the original
+        // delegated dispatch and for a resume alike (its G9
+        // delegation-scope guard, `fleet-delegation-scope-unenforceable`).
+        // Review runs never reach the fleet at all: the review-only scope
+        // always narrows, so that guard refuses them first, and
+        // `refuseAgentReviewRun` refuses them behind a guard that admitted
+        // the run.
         if (isAgentReviewRunScope(run.delegationScope)) {
             throw new ConflictException(
                 `AgentRun ${runId} is a review run — review runs are not resumable. ` +
