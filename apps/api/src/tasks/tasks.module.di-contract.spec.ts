@@ -29,6 +29,7 @@ jest.mock('./tasks.controller', () => ({ TasksController: class TasksController 
 jest.mock('./task-chat.controller', () => ({ TaskChatController: class TaskChatController {} }));
 
 import { PluginSettingsService } from '@ever-works/agent/plugins';
+import { TaskBoardService } from '@ever-works/agent/tasks-domain';
 import { SkillsService } from '@ever-works/agent/skills';
 import { FleetAgentTaskPlannerService } from '../fleet/fleet-agent-task-planner.service';
 import { FleetAgentTaskReconcilerService } from '../fleet/fleet-agent-task-reconciler.service';
@@ -141,6 +142,14 @@ describe('TasksModule — the fleet providers can resolve their dependencies', (
         // and open a second one — fleet prompts carrying skills the
         // operator's tool-grant matrix denies.
         expect(resolvable.has(SkillsService)).toBe(true);
+    });
+
+    it('reaches TaskBoardService, so the board routes are not a 503 in production', () => {
+        // TasksController takes the board read model `@Optional()` (appended
+        // last, so positional spec constructions keep compiling). That makes
+        // an omission invisible at boot — the routes would just answer 503 —
+        // so the export is pinned here instead.
+        expect(resolvable.has(TaskBoardService)).toBe(true);
     });
 
     it.each(SERVICES)('%s — every class-typed constructor parameter is reachable', (_, Service) => {

@@ -40,6 +40,7 @@ import { ConversationRepository } from './repositories/conversation.repository';
 import { CreditLedgerRepository } from './repositories/credit-ledger.repository';
 import { EmailConversationRepository } from './repositories/email-conversation.repository';
 import { EmailMessageRepository } from './repositories/email-message.repository';
+import { AgentInboxRepository } from './repositories/agent-inbox.repository';
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
@@ -90,6 +91,7 @@ import { WorkScheduleRepository } from './repositories/work-schedule.repository'
 export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ActivityLogRepository,
     AgentEmailAssignmentRepository,
+    AgentInboxRepository,
     AgentRepoAttachmentRepository,
     ApiKeyRepository,
     AuthAccountRepository,

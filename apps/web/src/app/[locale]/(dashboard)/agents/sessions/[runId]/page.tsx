@@ -6,7 +6,9 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { agentsAPI } from '@/lib/api/agents';
 import { tasksAPI } from '@/lib/api/tasks';
+import { runsAPI } from '@/lib/api/runs';
 import { SessionDetailClient } from '@/components/agents/SessionDetailClient';
+import { RunReceiptView } from '@/components/runs/RunReceiptView';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.agentsPage.sessions.detail');
@@ -33,9 +35,14 @@ export default async function AgentSessionDetailPage({
     const detail = await agentsAPI.getSessionDetail(runId).catch(() => null);
     if (!detail) notFound();
 
-    const [agent, task] = await Promise.all([
+    // Runs ledger (AW-09) — the run's receipt (cost from the same usage rows
+    // the Costs dashboard reads, related work, cited knowledge) rides along
+    // below the session. Defensive like the other two reads: a receipt that
+    // cannot load simply is not shown, the session renders unchanged.
+    const [agent, task, receipt] = await Promise.all([
         agentsAPI.get(detail.run.agentId).catch(() => null),
         detail.run.taskId ? tasksAPI.get(detail.run.taskId).catch(() => null) : null,
+        runsAPI.receipt(runId).catch(() => null),
     ]);
     const agentName = agent?.name ?? `${detail.run.agentId.slice(0, 8)}…`;
 
@@ -61,6 +68,17 @@ export default async function AgentSessionDetailPage({
                 agentName={agentName}
                 taskTitle={task?.title ?? null}
             />
+            {receipt && (
+                <section
+                    className="rounded-lg border border-border/60 dark:border-border-dark/60 p-4 space-y-3"
+                    data-testid="session-detail-receipt"
+                >
+                    <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                        {t('receiptHeading')}
+                    </h2>
+                    <RunReceiptView receipt={receipt} showSessionLink={false} />
+                </section>
+            )}
         </div>
     );
 }

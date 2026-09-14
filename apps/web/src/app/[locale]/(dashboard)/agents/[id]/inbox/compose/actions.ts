@@ -1,6 +1,7 @@
 'use server';
 
 import { emailAddressesAPI } from '@/lib/api/email-addresses';
+import { describeEmailSendRefusal, type EmailSendRefusal } from '@/lib/agent-email-policy';
 
 /**
  * EW-680 / T32 — server action for the inbox composer. Splits the
@@ -11,6 +12,12 @@ export interface ComposeActionResult {
     ok: boolean;
     error?: string;
     providerMessageId?: string;
+    /**
+     * AW-05 — a structured refusal (a send limit was reached), passed as
+     * data so the composer can say which limit and when capacity returns
+     * without forwarding the backend's message text.
+     */
+    refusal?: EmailSendRefusal;
 }
 
 // Security: RFC 5321-style email format check — rejects bare hostnames
@@ -67,6 +74,10 @@ export async function sendAgentEmailAction(
         // upstream response bodies) across the server-action boundary to the
         // browser. Log server-side; return a static client-safe string.
         console.error('sendAgentEmailAction failed:', err);
+        const refusal = describeEmailSendRefusal(err);
+        if (refusal) {
+            return { ok: false, error: 'Send failed — please try again.', refusal };
+        }
         return { ok: false, error: 'Send failed — please try again.' };
     }
 }

@@ -108,6 +108,10 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
+    // Runs ledger (AW-09) — every agent run on a Day / Week / Month calendar,
+    // each with a receipt. `?g=` granularity, `?d=` anchor date, `?run=` opens
+    // a receipt; the filters ride along as `agent` / `kind` / `status` / `q`.
+    DASHBOARD_RUNS: '/runs',
     // Inbox (operator message center) — messages addressed to the human:
     // blocking agent questions, approval requests, escalations, notices.
     // `?view=archived` switches tabs; `?id=` deep-links one message (the
@@ -168,6 +172,10 @@ export const ROUTES = {
     // the same rows (`/api/meetings`).
     DASHBOARD_MEETINGS: '/meetings',
     DASHBOARD_MEETINGS_NEW: '/meetings/new',
+    // Goals — the sidebar links to the same paths; named here so the
+    // command palette's registries build every href from ROUTES.
+    DASHBOARD_GOALS: '/goals',
+    DASHBOARD_GOALS_NEW: '/goals/new',
     DASHBOARD_MEETING: (id: string) => `/meetings/${id}`,
     // Navigation consolidation (docs/specs/features/navigation-consolidation):
     // the Meetings catalog now renders as a block on the Memory page, so
@@ -197,6 +205,8 @@ export const ROUTES = {
     DASHBOARD_AGENT_COLLABORATORS: (id: string) => `/agents/${id}/collaborators`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
+    // Agent email (AW-05) — the per-Agent inbox (list, drafts, sending policy).
+    DASHBOARD_AGENT_INBOX: (id: string) => `/agents/${id}/inbox`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
     DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
     // Navigation consolidation (docs/specs/features/navigation-consolidation):
@@ -265,6 +275,9 @@ export const ROUTES = {
     DASHBOARD_NOTIFICATIONS: '/notifications',
     // The page that actually exists — /notifications has no route and soft-404s.
     DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
+    // Agent email (AW-05) — the tenant email address registry an Agent's
+    // addresses are assigned from.
+    DASHBOARD_SETTINGS_EMAILS: '/settings/integrations/emails',
 
     // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',

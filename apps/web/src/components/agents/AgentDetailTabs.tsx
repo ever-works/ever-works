@@ -67,6 +67,9 @@ export function AgentDetailTabs({
             label: t('collaborators'),
         },
         { key: 'budgets', href: ROUTES.DASHBOARD_AGENT_BUDGETS(agentId), label: t('budgets') },
+        // Agent email (AW-05) — the inbox pages shipped without a way to
+        // reach them by clicking.
+        { key: 'inbox', href: ROUTES.DASHBOARD_AGENT_INBOX(agentId), label: t('inbox') },
         { key: 'settings', href: ROUTES.DASHBOARD_AGENT_SETTINGS(agentId), label: t('settings') },
     ];
 

@@ -229,7 +229,18 @@ test.describe('Hydration & console hygiene — baseline-relative, cross-surface'
         // Read-bearing surfaces a regression would most plausibly hit: the home
         // dashboard, list pages, and a settings sub-tree. Each is hard-loaded in
         // isolation so its console fingerprint is independently attributable.
-        const routes = ['/', '/works', '/tasks', '/agents', '/settings', '/settings/security'];
+        // `/tasks?view=board` renders the Task board through the message
+        // catalogue: a missing board key or parent surfaces here as a
+        // console error on one route instead of across every board spec.
+        const routes = [
+            '/',
+            '/works',
+            '/tasks',
+            '/tasks?view=board',
+            '/agents',
+            '/settings',
+            '/settings/security',
+        ];
 
         // First, establish the live baseline from the home dashboard. We trust the
         // PROBED categories (KNOWN_BASELINE_CATEGORIES) as the contract, but also

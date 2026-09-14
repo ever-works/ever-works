@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { clickUntil } from './helpers/nav';
 
 /**
  * Settings & Profile E2E tests.
@@ -148,14 +149,31 @@ test.describe('Danger zone', () => {
     test('should show confirmation form when delete is clicked', async ({ page }) => {
         await page.goto('/en/settings/danger');
 
-        const deleteButton = page
-            .locator('button')
-            .filter({ hasText: /delete/i })
-            .first();
-        await deleteButton.click();
+        // Anchored so it can never match the panel's own "Yes, Delete My Account"
+        // button once the confirmation form is open.
+        const deleteButton = page.getByRole('button', { name: /^delete my account$/i });
+        const emailConfirmInput = page.getByPlaceholder(/enter your email/i);
+
+        // The confirmation form is client state (DangerZone `showDeleteConfirm`),
+        // and the button is server-rendered, so a click that lands before React
+        // hydrates is swallowed and the form never opens — the same race
+        // clickSettingsLink above documents for the sidebar links. A single
+        // click here has failed its first CI attempt since late July 2026 and
+        // failed all three attempts in stage run 34092395833. Re-click only
+        // while the form is still closed, so a click that did land is never
+        // repeated; the product must still open the form from the real button.
+        // 30 s budget (visible-wait capped at 30 s + 30 s click loop + the 5 s
+        // assertion below) stays inside the 90 s local test timeout, so a real
+        // regression reports toPass's assertion error rather than a test timeout;
+        // it is still wider than the siblings' 20 s retry-to-open loop.
+        await clickUntil(
+            deleteButton,
+            () => emailConfirmInput.isVisible().catch(() => false),
+            30_000,
+        );
 
         // Confirmation should appear with email input
-        const emailConfirmInput = page.locator('input[type="email"], input[type="text"]').last();
         await expect(emailConfirmInput).toBeVisible({ timeout: 5_000 });
+        await expect(emailConfirmInput).toHaveAttribute('type', 'email');
     });
 });
