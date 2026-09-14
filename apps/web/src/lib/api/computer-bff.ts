@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import {
     COMPUTER_CHANNELS,
     COMPUTER_QUALITIES,
+    isComputerControlDecision,
     type ComputerChannel,
+    type ComputerControlDecision,
     type ComputerQuality,
 } from '@ever-works/contracts';
 import { API_URL } from '@/lib/constants';
@@ -116,4 +118,27 @@ export function sanitizeUpdateBody(raw: Record<string, unknown>): {
 export function toComputerSocketUrl(apiUrl: string, wsPath: string): string {
     const origin = apiUrl.replace(/\/+$/, '').replace(/\/api$/, '');
     return origin.replace(/^http/, 'ws') + (wsPath.startsWith('/') ? wsPath : `/${wsPath}`);
+}
+
+/** The take-control body, rebuilt: only `request: true` survives. */
+export function sanitizeControlBody(raw: Record<string, unknown>): { request?: boolean } {
+    return raw.request === true ? { request: true } : {};
+}
+
+/** The hand-over answer, rebuilt from the two fields the platform accepts, or null when either is invalid. */
+export function sanitizeHandoverBody(
+    raw: Record<string, unknown>,
+): { requestId: string; decision: ComputerControlDecision } | null {
+    if (!isUuid(raw.requestId) || !isComputerControlDecision(raw.decision)) return null;
+    return { requestId: raw.requestId, decision: raw.decision };
+}
+
+/**
+ * The attach-token role a browser may ask the platform for. Only the
+ * controlling role is ever forwarded — the platform mints it only to a view
+ * that holds control and answers `viewer` otherwise — and anything else is
+ * dropped, so the default watching token is minted exactly as before.
+ */
+export function forwardedAttachRole(raw: string | null): 'controller' | null {
+    return raw === 'controller' ? 'controller' : null;
 }

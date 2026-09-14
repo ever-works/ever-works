@@ -205,6 +205,8 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.AGENT_RUN_STARTED]: 'work',
     [ActivityActionType.AGENT_RUN_COMPLETED]: 'work',
     [ActivityActionType.AGENT_RUN_FAILED]: 'problem',
+    // Agent computers — a person took control of the Agent's computer for a while.
+    [ActivityActionType.AGENT_COMPUTER_CONTROLLED]: 'work',
 
     // Environments
     [ActivityActionType.ENVIRONMENT_CREATED]: 'system',
