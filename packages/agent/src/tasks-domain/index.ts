@@ -79,6 +79,21 @@ export {
     TaskCiAutoResumeAttemptRepository,
     type ClaimAutoResumeAttemptInput,
 } from '../database/repositories/task-ci-auto-resume-attempt.repository';
+// Reviewer agent stage (slice AD, EW-811) — the pure rules, the service
+// that plans reviews + records verdicts, and the review ledger.
+export * from './task-agent-review';
+export * from './task-agent-review.service';
+export * from './task-dispatch-agents';
+export {
+    TaskAgentReview,
+    TASK_AGENT_REVIEW_STATES,
+    TASK_AGENT_REVIEW_CLAIM_KEY_MAX_CHARS,
+    type TaskAgentReviewState,
+} from '../entities/task-agent-review.entity';
+export {
+    TaskAgentReviewRepository,
+    type ClaimAgentReviewInput,
+} from '../database/repositories/task-agent-review.repository';
 // Release promotion lane (self-build slice AI, EW-808) — develop -> stage
 // -> main. Opens a promotion pull request and reports the gate; merging it
 // stays on the slice-AE human-approval path.

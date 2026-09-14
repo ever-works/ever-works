@@ -11,6 +11,7 @@ import type { Agent, Task } from '@ever-works/agent/entities';
 import { SkillsService } from '@ever-works/agent/skills';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import {
+    isAgentReviewRunScope,
     resolveAcceptanceChecks,
     resolveChecksPolicy,
     resolveSetupSteps,
@@ -348,6 +349,56 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 settings.mode === 'model-cli' ? settings.provider : null,
             ),
         };
+    }
+
+    /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — refuse an agent
+     * REVIEW run before any fleet job is built for it, in either mode.
+     *
+     * Why a review run can never run here: its only output is a verdict,
+     * recorded through `submitTaskReview`, and that tool exists only in
+     * the platform's in-process tool loop. A node runs a CLI on a prompt;
+     * its MCP bridge is off by default and exposes no verdict route. So a
+     * fleet review would spend a model run on one of the owner's PCs and
+     * could not possibly record anything, leaving its ledger row open and
+     * its budget slot spent. Worse, its brief travels on `pendingInput`,
+     * which {@link resolveOwnerMessages} renders as `# OWNER ANSWER` —
+     * the pull request author's diff, presented to the model as the owner's
+     * own words — cut to 16 KiB with no marker, and the model would be told
+     * to "make your changes here" in a worktree the node then pushes.
+     *
+     * Identified from the run ROW's admission scope (platform state written
+     * at dispatch), never from the queue payload, so a parked review run
+     * promoted later by the dispatch-gate drain is refused too.
+     *
+     * Fails closed: an unbound run repository or an unreadable row refuses
+     * the dispatch rather than guessing that it is not a review. No run id
+     * means no pre-created run row, which a review dispatch never produces
+     * (`TaskTransitionService.dispatchAgentRun` refuses to bind a review
+     * without one).
+     */
+    async refuseAgentReviewRun(payload: AgentTaskExecuteDispatchPayload): Promise<void> {
+        if (!payload.runId) return;
+        if (!this.runs) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} could not be checked before routing to the fleet (no run repository) — refusing rather than risk dispatching an agent review run a fleet node cannot complete`,
+            );
+        }
+        let run: Awaited<ReturnType<AgentRunRepository['findById']>>;
+        try {
+            run = await this.runs.findById(payload.runId);
+        } catch (err) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} could not be read before routing to the fleet — refusing rather than risk dispatching an agent review run a fleet node cannot complete: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+        if (run && isAgentReviewRunScope(run.delegationScope)) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} is an agent code-review run, and review runs cannot execute on the fleet: a fleet node has no channel to record the reviewer's verdict. Route this Work's agent runs to the platform runtime to use agent reviewers.`,
+            );
+        }
     }
 
     async plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null> {

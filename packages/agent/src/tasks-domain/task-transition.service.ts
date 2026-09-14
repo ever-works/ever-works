@@ -33,6 +33,12 @@ import { TaskRunDenormService } from './task-run-denorm.service';
 // real class reference. No cycle: run-dispatch-gate.service imports only
 // task-dispatcher (leaf), the run repository, and config.
 import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
+// Value import for the same @Optional() class-injection reason as the
+// gate above. No cycle: task-agent-review.service imports repositories,
+// the git facade and two leaf modules — never this file.
+import { TaskAgentReviewService } from './task-agent-review.service';
+import { agentReviewRunScope } from './task-agent-review';
+import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 import type { SubAgentScope } from '@ever-works/contracts';
 
 /**
@@ -132,6 +138,21 @@ export class TaskTransitionService {
         // transition fan-out, recurrence, delegation, and manual dispatch
         // cannot drift into different Agent-scope rules.
         @Optional() private readonly agents?: AgentRepository,
+        // Reviewer agent stage (self-build slice AD, EW-811) — plans the
+        // review runs an entry into `in_review` should buy. Appended LAST
+        // (same positional-constructor reasoning as every @Optional()
+        // above); absent, `in_review` behaves exactly as it did before the
+        // slice, i.e. it starts nothing.
+        //
+        // The dependency points ONE way: this service calls the review
+        // service, and the review service must never call back into this
+        // one (they are providers of the same module, so a circular pair
+        // would not resolve). That is why the review service returns a
+        // PLAN and `fanOutAgentReviews` below does the dispatching —
+        // through `dispatchAgentRun`, THE dispatch path, so a review run
+        // meets the same admission gate, credits precheck and kill switch
+        // as every other run and this slice adds no `createQueued` site.
+        @Optional() private readonly agentReviews?: TaskAgentReviewService,
     ) {}
 
     /**
@@ -239,6 +260,22 @@ export class TaskTransitionService {
             );
         }
 
+        // Reviewer agent stage (slice AD, EW-811) — the ONE automatic
+        // trigger for a review run, and the missing link in the chain
+        // slice AC → this → slice AE: the CI verdict comes back, THIS
+        // turns it into a review, and a human still signs off the merge.
+        //
+        // Fire-and-forget for the same reason the fan-out above is: a
+        // provider hiccup or a spent review budget must not roll back a
+        // status change a human or an agent just made. Bounded by the
+        // ledger claim inside `planReviews` — this hook firing twice for
+        // one commit buys zero extra runs.
+        if (to === TaskStatus.IN_REVIEW && this.agentReviews && this.dispatcher) {
+            void this.fanOutAgentReviews(refreshed).catch((err) =>
+                this.logger.warn(`Agent review fan-out failed for task ${refreshed.id}: ${err}`),
+            );
+        }
+
         // Review-fix I1: auto-unblock dependents when this Task itself
         // transitions to a "resolved" state. Done/cancelled both
         // count — a cancelled blocker no longer holds anything back.
@@ -326,15 +363,83 @@ export class TaskTransitionService {
      * Deliberately NOT error-swallowing: a repository failure propagates to
      * the caller, so a driver that cannot tell whether a Task has an agent
      * refuses to start it rather than guessing.
+     *
+     * The ladder itself now lives in the leaf `task-dispatch-agents.ts`
+     * so the reviewer agent stage (slice AD) can ask the same question —
+     * "whose work is this?" — without importing this service, which
+     * imports IT. Behaviour is unchanged; this method is still THE way to
+     * ask, and there is still exactly one implementation.
      */
     async resolveDispatchAgentIds(task: Task): Promise<string[]> {
-        const agentAssignees = this.assignees
-            ? await this.assignees.findAgentAssignees(task.id)
-            : [];
-        if (agentAssignees.length > 0) {
-            return agentAssignees.map((assignee) => assignee.assigneeId);
+        return resolveTaskDispatchAgentIds(task, this.assignees);
+    }
+
+    /**
+     * Reviewer agent stage (slice AD, EW-811) — start the review runs the
+     * review service planned for this entry into `in_review`.
+     *
+     * The planning (which approvers, which head commit, is the diff even
+     * readable, is anyone reviewing their own work, is there budget left)
+     * happens in `TaskAgentReviewService.planReviews`, which also CLAIMS
+     * the ledger row. This method only turns each claimed row into a run,
+     * through `dispatchAgentRun` — the same path a board "Run", a
+     * recurrence, a delegation and a status fan-out take.
+     *
+     * The brief is seeded onto the run row BEFORE the job runtime is told
+     * about it (`seedPendingInput`), never after: a review run that
+     * started before its diff arrived would be a reviewer with nothing to
+     * read, which is the exact failure this slice must not have.
+     */
+    private async fanOutAgentReviews(task: Task): Promise<void> {
+        if (!this.agentReviews) return;
+        const plan = await this.agentReviews.planReviews(task);
+        if (plan.dispatches.length === 0) {
+            if (plan.reason && plan.reason !== 'no-agent-approvers' && plan.reason !== 'disabled') {
+                this.logger.log(
+                    `Agent review for task ${task.id}: nothing dispatched (${plan.reason}).`,
+                );
+            }
+            return;
         }
-        return task.agentId ? [task.agentId] : [];
+        for (const planned of plan.dispatches) {
+            const result = await this.dispatchAgentRun(task, planned.reviewerAgentId, {
+                dedupKey: planned.dedupKey,
+                seedPendingInput: [planned.brief],
+                // The review-only admission scope: ONE tool, the verdict.
+                // Snapshotted on the run row, where the tool loop, the
+                // worker and the fleet dispatcher each read it to take
+                // capability away — see `AGENT_REVIEW_RUN_ALLOWED_TOOLS`.
+                delegationScope: agentReviewRunScope(),
+                // Bound to its ledger row BEFORE the enqueue.
+                reviewId: planned.reviewId,
+            });
+            await this.agentReviews.recordDispatchResult(planned.reviewId, result);
+        }
+    }
+
+    /**
+     * Reviewer agent stage — re-plan reviews for a Task that is ALREADY in
+     * `in_review`, because its pull request's head moved.
+     *
+     * The transition hook only fires on ENTRY to `in_review`, and a push
+     * while the Task sits there (slice AC's CI fix loop resumes the run
+     * without moving the Task) is not an entry — so before this, the new
+     * commit was never reviewed at all, and the review in flight for the
+     * old commit was refused `stale-head` and left the approver pending.
+     * `TaskPrStatusService` calls this when it records a new head.
+     *
+     * Bounded exactly like the entry hook: one claim per (reviewer, head),
+     * the lifetime budget, the per-entry cap. Fire-and-forget and never
+     * throws — the caller is a status poll.
+     */
+    async requestAgentReviews(task: Task): Promise<void> {
+        if (!this.agentReviews || !this.dispatcher) return;
+        if (task.status !== TaskStatus.IN_REVIEW) return;
+        try {
+            await this.fanOutAgentReviews(task);
+        } catch (err) {
+            this.logger.warn(`Agent review re-plan failed for task ${task.id}: ${err}`);
+        }
     }
 
     /**
@@ -375,6 +480,42 @@ export class TaskTransitionService {
              * byte-for-byte unchanged.
              */
             delegationScope?: SubAgentScope | null;
+            /**
+             * Reviewer agent stage (slice AD, EW-811) — messages seeded
+             * onto the pre-created run row BEFORE the job runtime is told
+             * about it, so the worker cannot start ahead of them.
+             *
+             * This is the SAME vehicle `RunSteeringService.resume` uses to
+             * hand a resumed run its first message: `AgentRunService`
+             * drains `pendingInput` at the top of the tool loop, before
+             * the first model round-trip, and pushes each entry as a
+             * `user` turn — never spliced into the system prompt, because
+             * the content is untrusted.
+             *
+             * NOT a fleet vehicle for a review brief: on the fleet path this
+             * column is rendered as the planner's `# OWNER ANSWER` block
+             * (the owner's own words, cut to 16 KiB), which is exactly what
+             * a pull request author's diff must never be presented as. The
+             * fleet dispatcher therefore refuses every review run before a
+             * plan is built — see `FleetAgentTaskPlanner.refuseAgentReviewRun`.
+             *
+             * Omitted for every ordinary dispatch, which leaves the run
+             * row byte-for-byte as it was before this slice.
+             */
+            seedPendingInput?: string[];
+            /**
+             * Reviewer agent stage (slice AD, EW-811) — the review-ledger
+             * row this run is being created for. Bound to the run row
+             * right after it is created and BEFORE the seed and the
+             * enqueue, and a binding that does not land fails the dispatch
+             * (the run is rolled back, never enqueued). The binding is the
+             * only thing that lets this run — and no other run — record a
+             * verdict, and the only thing that keeps the run's own row out
+             * of the Task's authorship evidence.
+             *
+             * Omitted for every ordinary dispatch.
+             */
+            reviewId?: string;
         } = {},
     ): Promise<{
         runId: string | null;
@@ -475,6 +616,43 @@ export class TaskTransitionService {
                 // never throws), so this cannot break the dispatch.
                 if (run) {
                     await this.runDenorm?.recordQueued(task.id, run.id);
+                }
+                // Reviewer agent stage (slice AD) — bind the run to its
+                // review FIRST, before the seed and the enqueue. Not caught,
+                // for the same reason the seed below is not: a review run
+                // nothing is bound to cannot record a verdict, so it must
+                // not start.
+                if (opts.reviewId) {
+                    // No run row means nothing to bind AND nothing to
+                    // carry the review-only scope: the worker would
+                    // create an ordinary, fully-tooled run on the fly.
+                    if (!run) {
+                        throw new Error('agent-review-binding-unavailable: no run row');
+                    }
+                    if (!this.agentReviews) {
+                        throw new Error('agent-review-binding-unavailable: no review service');
+                    }
+                    await this.agentReviews.bindRun(opts.reviewId, run.id);
+                }
+                // Then seed the run's opening message, still BEFORE the
+                // enqueue below. Ordering is the whole point: seeding after
+                // the enqueue races the worker, and a review run that wins
+                // that race is a reviewer with no diff. A parked run keeps
+                // the seed and reads it when the drain promotes it.
+                //
+                // Deliberately NOT caught here: a seed failure falls
+                // through to the rollback below, which marks the run
+                // `dispatch-failed` and skips the enqueue. That is the
+                // wanted outcome — a run whose brief did not land must
+                // not start, and the review ledger reads the failure back
+                // through `recordDispatchResult`.
+                if (run && opts.seedPendingInput && opts.seedPendingInput.length > 0) {
+                    if (!this.runs) {
+                        throw new Error('seed-pending-input-unavailable: no run repository');
+                    }
+                    await this.runs.seedResumeContext(run.id, {
+                        pendingInput: opts.seedPendingInput,
+                    });
                 }
                 // Over-limit: the run row exists (parked, queuedReason set)
                 // but the job-runtime enqueue is SKIPPED. The drain hook on
