@@ -229,6 +229,10 @@
             "types": "./dist/computer/index.d.ts",
             "default": "./dist/computer/index.js"
         },
+        "./shared-views": {
+            "types": "./dist/shared-views/index.d.ts",
+            "default": "./dist/shared-views/index.js"
+        },
         "./pr-review": {
             "types": "./dist/pr-review/index.d.ts",
             "default": "./dist/pr-review/index.js"

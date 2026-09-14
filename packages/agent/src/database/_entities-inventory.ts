@@ -165,6 +165,7 @@ import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
 import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
+import { SharedView } from '../entities/shared-view.entity';
 
 import {
     PluginEntity,
@@ -420,4 +421,7 @@ export const ENTITIES = [
     // have read. Deliberately not workspace-scoped: read state follows the
     // person, never the active Organization.
     ProductChangelogRead,
+    // AW-18 Shared view — one row per Workspace holding what its share link
+    // publishes and the hashed + encrypted token. Never a copy of content.
+    SharedView,
 ];

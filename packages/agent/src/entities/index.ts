@@ -201,3 +201,5 @@ export * from './agent-repo-attachment.entity';
 export * from './release-promotion.entity';
 // AW-14 What's new — per-person read state for product changelog entries.
 export * from './product-changelog-read.entity';
+// AW-18 Shared view — a Workspace's read-only published projection.
+export * from './shared-view.entity';

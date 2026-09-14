@@ -89,6 +89,12 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Shared view (AW-18)
+            ['SHARED_VIEW_ENABLED', 'shared_view_enabled'],
+            ['SHARED_VIEW_DISABLED', 'shared_view_disabled'],
+            ['SHARED_VIEW_REGENERATED', 'shared_view_regenerated'],
+            ['SHARED_VIEW_SECTIONS_CHANGED', 'shared_view_sections_changed'],
+            ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -159,7 +165,9 @@ describe('activity-log.types', () => {
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
-            expect(literals).toHaveLength(160);
+            // +5 shared_view_enabled / _disabled / _regenerated /
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) -> 165.
+            expect(literals).toHaveLength(165);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
