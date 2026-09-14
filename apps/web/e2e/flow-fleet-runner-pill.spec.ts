@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { API_BASE, authedHeaders, registerUserViaAPI, type RegisteredUser } from './helpers/api';
 import { loginViaUI } from './helpers/auth';
 
 /**
@@ -88,6 +88,47 @@ async function freshExpandedContext(browser: Browser) {
     return context;
 }
 
+/**
+ * A FRESH account whose first-run onboarding wizard is already dismissed.
+ *
+ * Every UI test here needs it. A brand-new account has zero Works, so the
+ * dashboard auto-opens `EverWorksOnboardingWizard` (`layout-client.tsx`:
+ * `shouldAutoOpenOnboarding = onboardingTotalWorks === 0 && !isOnboardingDismissed
+ * && !isOnboardingCompleted`). That is a Headless UI modal whose `fixed inset-0`
+ * backdrop covers the whole viewport, sidebar footer included. Read-only checks
+ * (`toBeVisible`, `toHaveText`) still pass behind it, but a click on the pill
+ * never lands, so the three tests that open the popover hung until the 150s test
+ * timeout on `stage` while the one that only reads the count passed.
+ *
+ * Dismissal is written server-side BEFORE the UI login, so the post-login
+ * server render reads `dismissedAt` and the wizard never opens. This mirrors
+ * `global-setup.ts` for the seeded user and `organization-create-switch.spec.ts`
+ * for a fresh one, but ASSERTS the 200 (as
+ * `flow-onboarding-wizard-catalog-work-chain.spec.ts`'s `dismiss()` does) instead
+ * of swallowing errors: if dismissal stops working, this fails here with the
+ * response body, not later as an unexplained click timeout. The wizard is
+ * unrelated to the pill; no pill assertion depends on it.
+ */
+async function registerUserWithOnboardingDismissed(
+    request: APIRequestContext,
+): Promise<RegisteredUser> {
+    const u = await registerUserViaAPI(request);
+    const dismissed = await request.post(`${API_BASE}/api/onboarding/dismiss`, {
+        headers: authedHeaders(u.access_token),
+    });
+    expect(dismissed.status(), `dismiss body=${await dismissed.text().catch(() => '')}`).toBe(200);
+    return u;
+}
+
+/**
+ * Bound for clicks in the sidebar footer. Playwright has no `actionTimeout` in
+ * `playwright.config.ts`, so an unbounded click on a covered element retries to
+ * the test timeout, and the `finally { context.close() }` error then replaces its
+ * call log. A bounded click fails on its own, with the call log naming whatever
+ * intercepts pointer events, while the context is still open.
+ */
+const CLICK_TIMEOUT = 15_000;
+
 test.describe('runner-status pill', () => {
     test('GET /api/fleet/runner-status: a fresh account has no runners and advertises the 30s cadence', async ({
         request,
@@ -116,7 +157,7 @@ test.describe('runner-status pill', () => {
         browser,
         request,
     }) => {
-        const u = await registerUserViaAPI(request);
+        const u = await registerUserWithOnboardingDismissed(request);
         const context = await freshExpandedContext(browser);
         const page = await context.newPage();
         try {
@@ -137,7 +178,7 @@ test.describe('runner-status pill', () => {
         browser,
         request,
     }) => {
-        const u = await registerUserViaAPI(request);
+        const u = await registerUserWithOnboardingDismissed(request);
         const node = await enrollNode(request, u.access_token);
 
         const context = await freshExpandedContext(browser);
@@ -151,7 +192,7 @@ test.describe('runner-status pill', () => {
             // Enroll flips the node online, so the count reads 1 of 1.
             await expect(page.getByTestId('runner-status-count')).toHaveText(/1\D+1/);
 
-            await pill.click();
+            await pill.click({ timeout: CLICK_TIMEOUT });
             const popover = page.getByTestId('runner-status-popover');
             await expect(popover).toBeVisible();
             const row = page.getByTestId(`runner-status-node-${node.nodeId}`);
@@ -170,7 +211,7 @@ test.describe('runner-status pill', () => {
         browser,
         request,
     }) => {
-        const u = await registerUserViaAPI(request);
+        const u = await registerUserWithOnboardingDismissed(request);
         const node = await enrollNode(request, u.access_token);
 
         const context = await freshExpandedContext(browser);
@@ -192,9 +233,9 @@ test.describe('runner-status pill', () => {
                 200,
             );
 
-            await page.getByTestId('runner-status-pill').click();
+            await page.getByTestId('runner-status-pill').click({ timeout: CLICK_TIMEOUT });
             await expect(page.getByTestId('runner-status-popover')).toBeVisible();
-            await page.getByTestId('runner-status-refresh').click();
+            await page.getByTestId('runner-status-refresh').click({ timeout: CLICK_TIMEOUT });
             await expect(page.getByTestId('runner-status-count')).toHaveText(/0\D+1/, {
                 timeout: 15_000,
             });
@@ -207,7 +248,7 @@ test.describe('runner-status pill', () => {
         browser,
         request,
     }) => {
-        const u = await registerUserViaAPI(request);
+        const u = await registerUserWithOnboardingDismissed(request);
         const node = await enrollNode(request, u.access_token);
 
         const beat = await request.post(`${API_BASE}/api/fleet/heartbeat`, {
@@ -232,7 +273,7 @@ test.describe('runner-status pill', () => {
         // The pill and the run router read ONE composer. This pins the
         // half a browser can see: what the pill renders is what the
         // endpoint returns for the same account at the same moment.
-        const u = await registerUserViaAPI(request);
+        const u = await registerUserWithOnboardingDismissed(request);
         const first = await enrollNode(request, u.access_token);
         const second = await enrollNode(request, u.access_token, ['terminal']);
 
@@ -258,7 +299,7 @@ test.describe('runner-status pill', () => {
             await expect(page.getByTestId('runner-status-count')).toHaveText(/2\D+2/, {
                 timeout: 15_000,
             });
-            await page.getByTestId('runner-status-pill').click();
+            await page.getByTestId('runner-status-pill').click({ timeout: CLICK_TIMEOUT });
             for (const row of body.nodes) {
                 await expect(page.getByTestId(`runner-status-node-${row.id}`)).toBeVisible();
             }

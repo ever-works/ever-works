@@ -1,4 +1,5 @@
 import {
+    buildCaseInsensitiveEqualsClause,
     buildCaseInsensitiveLikeClause,
     prepareCaseInsensitiveContainsPattern,
     prepareLikeSearchTerm,
@@ -27,6 +28,26 @@ describe('db.utils', () => {
         it('includes an explicit ESCAPE clause for portable LIKE behavior', () => {
             expect(buildCaseInsensitiveLikeClause('work.name')).toBe(
                 "LOWER(work.name) LIKE :search ESCAPE '\\'",
+            );
+        });
+
+        it('rejects a column expression that is not a trusted identifier', () => {
+            expect(() => buildCaseInsensitiveLikeClause('work.name) OR (1=1')).toThrow(
+                /buildCaseInsensitiveLikeClause: columnExpression must be a trusted SQL identifier/,
+            );
+        });
+    });
+
+    describe('buildCaseInsensitiveEqualsClause', () => {
+        it('compares the lower-cased column with the named parameter', () => {
+            expect(buildCaseInsensitiveEqualsClause('work.slug', 'exact')).toBe(
+                'LOWER(work.slug) = :exact',
+            );
+        });
+
+        it('rejects a column expression that is not a trusted identifier', () => {
+            expect(() => buildCaseInsensitiveEqualsClause("work.slug = '' OR 1")).toThrow(
+                /buildCaseInsensitiveEqualsClause: columnExpression must be a trusted SQL identifier/,
             );
         });
     });

@@ -32,3 +32,6 @@ export * from './release/index.js';
 // Memory facts + context-file vocabulary (AW-07) — the atomic tier of Memory
 // and the shared limits every surface validates against.
 export * from './memory/index.js';
+// Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
+// Agent run and the itemised receipt of one run, over the existing run rows.
+export * from './runs/index.js';

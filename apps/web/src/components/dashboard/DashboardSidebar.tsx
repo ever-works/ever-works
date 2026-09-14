@@ -39,6 +39,7 @@ import {
     BarChart3,
     Video,
     Inbox,
+    Receipt,
     type LucideIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -195,6 +196,10 @@ export function DashboardSidebar({
         },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
+        // Runs ledger (AW-09) — "what did my agents execute, and what did it
+        // cost", placed right above Activity ("what changed in my workspace")
+        // so the two neighbouring questions are learnt side by side.
+        { name: t('navigation.runs'), href: ROUTES.DASHBOARD_RUNS, icon: Receipt },
         { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];

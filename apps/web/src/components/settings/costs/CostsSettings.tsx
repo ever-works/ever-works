@@ -351,7 +351,16 @@ export function CostsSettings({ initialWindowDays, initialSnapshot }: CostsSetti
                                         className="border-b border-border/60 dark:border-border-dark/60 last:border-0"
                                     >
                                         <td className="py-2 pr-4 font-medium tabular-nums">
-                                            {formatCents(row.costCents)}
+                                            {/* Runs ledger (AW-09) — the cost opens the run's
+                                                receipt, which itemises this same figure. */}
+                                            <Link
+                                                href={ROUTES.DASHBOARD_AGENT_SESSION(row.runId)}
+                                                className="hover:underline"
+                                                title={t('topRuns.openReceipt')}
+                                                data-testid="costs-top-runs-receipt-link"
+                                            >
+                                                {formatCents(row.costCents)}
+                                            </Link>
                                         </td>
                                         <td className="py-2 pr-4">
                                             <Link
