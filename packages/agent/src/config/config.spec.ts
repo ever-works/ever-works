@@ -1176,6 +1176,88 @@ describe('agent/config', () => {
         });
     });
 
+    describe('email (AW-05)', () => {
+        const KEYS = [
+            'EMAIL_SEND_CAPS_ENFORCEMENT',
+            'EMAIL_SEND_CAP_INBOX_DAILY',
+            'EMAIL_SEND_CAP_INBOX_PER_MINUTE',
+            'EMAIL_SEND_CAP_INBOX_RECIPIENTS_PER_5_MINUTES',
+            'EMAIL_SEND_CAP_RECIPIENTS_PER_MESSAGE',
+            'EMAIL_SEND_CAP_WORKSPACE_DAILY',
+            'EMAIL_SEND_CAP_WORKSPACE_MONTHLY',
+            'EMAIL_DEFAULT_AGENT_SEND_MODE',
+        ];
+        const saved: Record<string, string | undefined> = {};
+        beforeEach(() => {
+            for (const key of KEYS) {
+                saved[key] = process.env[key];
+                delete process.env[key];
+            }
+        });
+        afterEach(() => {
+            for (const key of KEYS) {
+                if (saved[key] === undefined) delete process.env[key];
+                else process.env[key] = saved[key];
+            }
+        });
+
+        it('enforces the documented platform ceilings by default', () => {
+            expect(config.email.sendCaps.isEnforced()).toBe(true);
+            expect(config.email.sendCaps.getPlatformCaps()).toEqual({
+                inboxDailySends: 100,
+                inboxBurstSends: 10,
+                inboxBurstRecipients: 20,
+                recipientsPerMessage: 50,
+                workspaceDailySends: 500,
+                workspaceMonthlySends: 10_000,
+            });
+        });
+
+        it('turns ceilings off only on an explicit off value', () => {
+            process.env.EMAIL_SEND_CAPS_ENFORCEMENT = 'off';
+            expect(config.email.sendCaps.isEnforced()).toBe(false);
+            process.env.EMAIL_SEND_CAPS_ENFORCEMENT = 'of';
+            expect(config.email.sendCaps.isEnforced()).toBe(true);
+        });
+
+        it('lets the operator replace a ceiling, with 0 meaning none and garbage meaning the default', () => {
+            process.env.EMAIL_SEND_CAP_INBOX_DAILY = '250';
+            process.env.EMAIL_SEND_CAP_WORKSPACE_MONTHLY = '0';
+            process.env.EMAIL_SEND_CAP_INBOX_PER_MINUTE = 'lots';
+            process.env.EMAIL_SEND_CAP_WORKSPACE_DAILY = '-5';
+            const caps = config.email.sendCaps.getPlatformCaps();
+            expect(caps.inboxDailySends).toBe(250);
+            expect(caps.workspaceMonthlySends).toBe(0);
+            expect(caps.inboxBurstSends).toBe(10);
+            expect(caps.workspaceDailySends).toBe(500);
+        });
+
+        it('turns on NO platform ceiling until the operator sets one — unconfigured = unchanged', () => {
+            expect(config.email.sendCaps.getConfiguredPlatformCaps()).toEqual({});
+            process.env.EMAIL_SEND_CAP_INBOX_DAILY = '   ';
+            expect(config.email.sendCaps.getConfiguredPlatformCaps()).toEqual({});
+        });
+
+        it('enforces exactly the ceilings the operator sets, 0 as none and garbage as the recommended number', () => {
+            process.env.EMAIL_SEND_CAP_WORKSPACE_DAILY = '300';
+            process.env.EMAIL_SEND_CAP_WORKSPACE_MONTHLY = '0';
+            process.env.EMAIL_SEND_CAP_INBOX_PER_MINUTE = 'lots';
+            expect(config.email.sendCaps.getConfiguredPlatformCaps()).toEqual({
+                workspaceDailySends: 300,
+                workspaceMonthlySends: 0,
+                inboxBurstSends: 10,
+            });
+        });
+
+        it('keeps Agents without inbox settings sending unless the operator holds them', () => {
+            expect(config.email.getDefaultAgentMode()).toBe('auto-send');
+            process.env.EMAIL_DEFAULT_AGENT_SEND_MODE = 'draft-review';
+            expect(config.email.getDefaultAgentMode()).toBe('draft-review');
+            process.env.EMAIL_DEFAULT_AGENT_SEND_MODE = 'nonsense';
+            expect(config.email.getDefaultAgentMode()).toBe('auto-send');
+        });
+    });
+
     describe('top-level shape (regression guard)', () => {
         it('exposes the full set of config groups', () => {
             const keys = Object.keys(config).sort();
@@ -1188,6 +1270,12 @@ describe('agent/config', () => {
                 'billing',
                 'branding',
                 'database',
+                // Agent email (AW-05) — `email.*` group adds the send-ceiling
+                // operator knobs (EMAIL_SEND_CAPS_ENFORCEMENT,
+                // EMAIL_SEND_CAP_* per limit, `0` = no ceiling) and
+                // EMAIL_DEFAULT_AGENT_SEND_MODE. Defaults keep existing
+                // Agents sending. Pinned alphabetically.
+                'email',
                 'everWorks',
                 // Fleet — ONE group covering both halves of the surface:
                 // the `FLEET_ENABLED` switch that gates the whole thing

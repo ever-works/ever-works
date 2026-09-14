@@ -87,6 +87,11 @@ describe('activity-log.types', () => {
             // Skills shelf — the workspace-level on/off switch.
             ['SKILL_ENABLED', 'skill_enabled'],
             ['SKILL_DISABLED', 'skill_disabled'],
+            // Live Feed — a run starting / finishing / failing for every
+            // trigger kind other than heartbeat.
+            ['AGENT_RUN_STARTED', 'agent_run_started'],
+            ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
+            ['AGENT_RUN_FAILED', 'agent_run_failed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -155,7 +160,14 @@ describe('activity-log.types', () => {
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(159);
+            //
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            //
+            // Merging develop's Live Feed run lifecycle (+3, develop said 160)
+            // into the Skills shelf branch (+2 skill_enabled / skill_disabled,
+            // this branch said 159) -> 162, COUNTED from the merged enum.
+            expect(literals).toHaveLength(162);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

@@ -10,6 +10,7 @@ import {
 import { User } from './user.entity';
 import { TenantEmailAddress } from './tenant-email-address.entity';
 import { EmailConversation } from './email-conversation.entity';
+import type { EmailMessageStatus } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 export type EmailMessageDirection = 'outbound' | 'inbound';
@@ -31,6 +32,16 @@ export type EmailMessageDirection = 'outbound' | 'inbound';
  * of the graph and avoids the entities import cycle that has bitten
  * us before. The `agentId` / `taskId` columns are queryable via raw
  * `userId`+`agentId` indices.
+ *
+ * Agent email (AW-05) — `status` is where a message is in its life
+ * (see `EmailMessageStatus` in `@ever-works/contracts`). An outbound row
+ * is no longer only written after the provider accepted it: a message an
+ * Agent writes while its inbox is in `draft-review` is persisted first as
+ * `draft`, and only a person's approval (`approvedById` / `approvedAt`,
+ * mirrored to the linked `agent_action_proposals` row in `approvalId`)
+ * moves it on to `sending` and then `sent`. The send path refuses to
+ * release an Agent's draft that does not carry that approval.
+ * `deliveryStatus` stays what it was: post-send provider telemetry.
  */
 @Entity({ name: 'email_messages' })
 @Index('idx_email_messages_user_agent_created', ['userId', 'agentId', 'createdAt'])
@@ -40,6 +51,10 @@ export type EmailMessageDirection = 'outbound' | 'inbound';
 @Index('uq_email_messages_provider_message', ['pluginId', 'providerMessageId'], {
     unique: true,
 })
+// AW-05 — the send-ceiling windows: "how much has this Agent / this account
+// sent since T?". Both are read on every send.
+@Index('idx_email_messages_agent_direction_sent', ['agentId', 'direction', 'sentAt'])
+@Index('idx_email_messages_user_direction_sent', ['userId', 'direction', 'sentAt'])
 export class EmailMessage {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -125,6 +140,29 @@ export class EmailMessage {
      *  | open | click. NULL until the provider's delivery webhook fires. */
     @Column({ type: 'varchar', length: 16, nullable: true })
     deliveryStatus?: string | null;
+
+    /**
+     * AW-05 — lifecycle status. Backfilled for existing rows (`sent` for
+     * outbound, `received` for inbound); nullable only so a row written by
+     * a producer that predates the column still inserts.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    status?: EmailMessageStatus | null;
+
+    /** AW-05 — the `agent_action_proposals` row that mirrors this draft. */
+    @Column({ type: 'uuid', nullable: true })
+    approvalId?: string | null;
+
+    /** AW-05 — the person who released this draft. NULL until approved. */
+    @Column({ type: 'uuid', nullable: true })
+    approvedById?: string | null;
+
+    @PortableDateColumn({ nullable: true })
+    approvedAt?: Date | null;
+
+    /** AW-05 — why the last send attempt did not go out (provider error or a refused ceiling). */
+    @Column({ type: 'varchar', length: 500, nullable: true })
+    failureReason?: string | null;
 
     // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
     @Column({ type: 'uuid', nullable: true })

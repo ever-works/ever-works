@@ -134,7 +134,9 @@ export class AgentEscalationService {
      * from a missing one.
      */
     async resolve(id: string, userId: string, note?: string | null): Promise<boolean> {
-        return this.repository.resolve(id, userId, note ?? null);
+        const resolved = await this.repository.resolve(id, userId, note ?? null);
+        if (resolved) await this.closeInboxMirror(id, userId, note ?? null);
+        return resolved;
     }
 
     async resolveForTask(
@@ -144,7 +146,40 @@ export class AgentEscalationService {
         scope: OwnershipScope,
         note?: string | null,
     ): Promise<boolean> {
-        return this.repository.resolveForTask(id, userId, taskId, scope, note ?? null);
+        const resolved = await this.repository.resolveForTask(
+            id,
+            userId,
+            taskId,
+            scope,
+            note ?? null,
+        );
+        if (resolved) await this.closeInboxMirror(id, userId, note ?? null);
+        return resolved;
+    }
+
+    /**
+     * My Decisions — every door that resolves an escalation (this endpoint,
+     * the Task page, the chat tool, the Inbox reply) leaves the owner's
+     * Inbox and the parked work in the same state: the mirror item closes
+     * and the answer reaches the run. The Inbox reply claims its item
+     * before it gets here, so on that door this is a no-op. Best-effort:
+     * the escalation IS resolved whatever the mirror does.
+     */
+    private async closeInboxMirror(
+        escalationId: string,
+        resolvedByUserId: string,
+        note: string | null,
+    ): Promise<void> {
+        if (!this.inbox?.escalationResolved) return;
+        try {
+            await this.inbox.escalationResolved({ escalationId, resolvedByUserId, note });
+        } catch (error) {
+            this.logger.warn(
+                `Escalation ${escalationId} inbox close failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /** Mirror one recorded escalation into the owner's inbox. Best-effort. */

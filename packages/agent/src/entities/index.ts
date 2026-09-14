@@ -95,6 +95,8 @@ export * from './tenant-email-address.entity';
 export * from './agent-email-assignment.entity';
 export * from './email-conversation.entity';
 export * from './email-message.entity';
+// Agent email (AW-05) — per-Agent mail policy (approval mode + send ceilings)
+export * from './agent-inbox.entity';
 export * from './notification-channel.entity';
 export * from './notification-channel-delivery-log.entity';
 export * from './notification-event-type.entity';
@@ -198,3 +200,5 @@ export * from './agent-repo-attachment.entity';
 // Release promotion lane (self-build slice AI, EW-808) — one row per
 // attempt to move a Work one rung along develop -> stage -> main.
 export * from './release-promotion.entity';
+// AW-14 What's new — per-person read state for product changelog entries.
+export * from './product-changelog-read.entity';

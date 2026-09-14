@@ -26,6 +26,7 @@
 | `budgets/admin-usage.controller.ts`                            | [x]    | budgets.spec.ts                                                |
 | `budgets/budgets.controller.ts`                                | [x]    | budgets.spec.ts                                                |
 | `budgets/usage.controller.ts`                                  | [x]    | budgets.spec.ts                                                |
+| `changelog/changelog.controller.ts`                            | [x]    | whats-new-panel.spec.ts, whats-new-degraded.spec.ts            |
 | `data-sync.controller.ts`                                      | [x]    | data-sync.spec.ts                                              |
 | `integrations/github-app/github-app.controller.ts`             | [x]    | github-app.spec.ts                                             |
 | `integrations/github-app/github-app-webhook.controller.ts`     | [x]    | github-app.spec.ts                                             |
@@ -43,6 +44,7 @@
 | `plugins-capabilities/screenshot/screenshot.controller.ts`     | [x]    | screenshot-and-deploy.spec.ts                                  |
 | `plugins-capabilities/search/search.controller.ts`             | [x]    | plugins-search.spec.ts                                         |
 | `plugins/plugins.controller.ts`                                | [x]    | plugins.spec.ts                                                |
+| `runs/runs.controller.ts`                                      | [x]    | runs-ledger.spec.ts                                            |
 | `subscriptions/subscriptions.controller.ts`                    | [x]    | subscriptions.spec.ts                                          |
 | `telemetry/telemetry.controller.ts`                            | [x]    | telemetry.spec.ts                                              |
 | `template-catalog/template-catalog.controller.ts`              | [x]    | website-templates.spec.ts                                      |
@@ -78,6 +80,7 @@
 | `/[locale]/(dashboard)/plugins`                     | [x]    | plugins.spec.ts                                    |
 | `/[locale]/(dashboard)/plugins/[pluginId]`          | [x]    | plugin-detail-ui.spec.ts, plugins.spec.ts          |
 | `/[locale]/(dashboard)/profile`                     | [x]    | profile.spec.ts                                    |
+| `/[locale]/(dashboard)/runs`                        | [x]    | runs-ledger.spec.ts                                |
 | `/[locale]/(dashboard)/templates`                   | [x]    | website-templates.spec.ts                          |
 | `/[locale]/(dashboard)/settings`                    | [x]    | settings.spec.ts                                   |
 | `/[locale]/(dashboard)/settings/api-keys`           | [x]    | api-keys.spec.ts                                   |

@@ -166,6 +166,8 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
             bodyHtml: payload.bodyHtml ?? null,
             receivedAt: payload.receivedAt,
             deliveryStatus: 'delivered',
+            // AW-05 — lifecycle status; inbound mail is always `received`.
+            status: 'received',
         } as Parameters<EmailMessageRepository['save']>[0]);
     }
 }
