@@ -228,6 +228,21 @@ The **Files** panel is one list over both upload spines — chat and plain uploa
 
 The same operations are available over REST at `/api/memory/files`: `tree`, the unified list, `upload`, `folders`, `folders/:id/sync`, `move` and `:id/download`. Uploads on this route are capped at 50 MB.
 
+## Knowledge library
+
+The knowledge library is the organization's shelf over the Knowledge Base: every document of every Work in the Organization, plus the Organization's own documents, organized into **shared folders** the whole team sees. It is not a second store — documents are the same Knowledge Base rows the per-Work workbench edits, and shared folders are Memory folders with an organization scope.
+
+- **Shared folders** nest up to 5 levels, hold at most 500 per Organization, and refuse two sibling names that differ only by case. Personal Files folders are untouched: a shared folder never shows up in anyone's Files tree, and a personal folder never shows up on the shelf.
+- **Filing** moves up to 100 documents into one folder of the same Organization in a single action, or back to **Unfiled**. Moving a document is not a change to what it says, so it never counts as an edit.
+- **Deleting a shared folder never deletes a document.** Every document in its subtree moves to Unfiled.
+- **Archive and restore.** An archived document leaves the default shelf and agent context but stays readable. Restoring returns it to the folder it was archived from, or to Unfiled when that folder is gone — and says which.
+- **Recently changed** means the last _substantive_ change: title, description, tags, class, or the body ignoring whitespace. Background writes (Git mirroring, re-embedding) and reformatting never move a document up the shelf.
+- **Export** any document you can view as a single `<slug>.md` file with its metadata as YAML front matter.
+
+Filing, archiving, restoring, folder create / rename / delete and exports each leave an activity entry.
+
+The Library view on this page is coming; the shelf is available over REST today (see the API reference below).
+
 ## Agent Memory
 
 This is the half of Memory that is **not** a knowledge base: what the agents themselves remember from their runs. The panel lists recent memory sessions with their start time and whether each is **Open** or **Closed**.
@@ -295,6 +310,7 @@ The org-wide surfaces — the aggregation, the review queue, consolidation and F
 
 - **External memory and RAG plugins.** The plugin manifest carries `memory` and `rag` categories with capability contracts (`IMemoryPlugin`, `IRagPlugin`) for pluggable organization memory frameworks and composed retrieval pipelines. **No plugin ships under either category yet** — they are contracts only, sitting beside the existing `vector-store` and `content-extractor` seams rather than replacing them. Built-in retrieval is unchanged and remains the default.
 - **Mission and Team facets, and the graph view** of the Memory feed, are deferred behind cross-feature prerequisites.
+- **The Library view** — the folder rail, shelf and Archived view for the knowledge library — follows its REST surface.
 
 Everything else on this page is shipped and reachable today.
 
@@ -320,6 +336,15 @@ Everything else on this page is shipped and reachable today.
 | `POST`  | `/api/memory/files/folders/:id/sync`           | "Sync now" — commit the folder to its repository                                 |
 | `PATCH` | `/api/memory/files/move`                       | File or unfile documents                                                         |
 | `GET`   | `/api/memory/files/:id/download`               | Download a file's bytes                                                          |
+| `GET`   | `/api/memory/files/tree?scope=organization`    | The Organization's shared library folders                                        |
+| `POST`  | `/api/memory/files/folders` (`scope`)          | `"scope": "organization"` creates a shared library folder                        |
+| `GET`   | `/api/knowledge/library`                       | The shelf — `folderId`, `archived`, `q`, `class`, `workId`, `sort`, `cursor`     |
+| `GET`   | `/api/knowledge/tree`                          | Shared folder tree with document counts, Unfiled and Archived totals             |
+| `PATCH` | `/api/knowledge/documents/file`                | File up to 100 documents into a shared folder, or `folderId: null` to unfile     |
+| `POST`  | `/api/knowledge/documents/:docId/archive`      | Archive a document from the shelf                                                |
+| `POST`  | `/api/knowledge/documents/:docId/unarchive`    | Restore an archived document to its folder                                       |
+| `GET`   | `/api/knowledge/documents/:docId/export`       | Download one document as Markdown with YAML front matter                         |
+| `POST`  | `/api/works/:id/kb/documents/:docId/unarchive` | Restore an archived Work document (the inverse of `/archive`)                    |
 | `GET`   | `/api/organizations/:orgId/kb/documents`       | List organization-level documents                                                |
 | `POST`  | `/api/organizations/:orgId/kb/documents`       | Create an organization-level document                                            |
 
