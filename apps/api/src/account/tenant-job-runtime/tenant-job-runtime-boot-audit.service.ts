@@ -32,10 +32,15 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
  *
  * **NULL tenantId:**
  *
- * Boot-time state is not tied to any one tenant, so `tenantId = NULL`.
- * Migration `1781200000000-RelaxTenantJobRuntimeAuditTenantNullable`
- * relaxes the audit table's NOT NULL constraint to permit it. Per-
- * tenant audit rows are unaffected and still carry a real tenant id.
+ * The row is instance-level, so it is written with `tenantId = NULL`.
+ * It is never tied to a tenant: no tenant may exist yet at bootstrap,
+ * and platform-wide state must stay out of every tenant's audit trail.
+ * Both the `TenantJobRuntimeAudit` entity (the schema source when
+ * `DATABASE_AUTOMIGRATE=true` builds tables via `synchronize`) and
+ * migration `1781200000000-RelaxTenantJobRuntimeAuditTenantNullable`
+ * (the schema source on the migrations path) declare `tenantId`
+ * nullable. Per-tenant audit rows are unaffected and still carry a
+ * real tenant id; `findLatestBootAudit` reads only NULL-tenant rows.
  *
  * **Failure mode:**
  *
