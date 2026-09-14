@@ -47,6 +47,23 @@ import {
  * | `PATCH|DELETE /files/folders/:id`   | `update|delete` | no      | no     |
  * | `GET  /files/:id/download`          | `download`    | yes       | navigation |
  *
+ * **Shared (organization) folders.** The folder handlers also serve the
+ * Knowledge library's shared folders, and for those they ARE org-aware:
+ * `getTree` with `scope=organization` lists the Organization in scope,
+ * `createFolder` with body `scope: 'organization'` creates in it, and
+ * `updateFolder` / `deleteFolder` look the id up among its shared folders.
+ * A shared-folder call names itself the same way the API does, so a personal
+ * call is byte-identical to before and only a shared-folder call is scoped:
+ *
+ * | shared-folder call                             | scoped | carrier        |
+ * | ---------------------------------------------- | ------ | -------------- |
+ * | `GET  /files/tree?scope=organization`           | yes    | forwarded      |
+ * | `POST /files/folders` `{ scope: 'organization' }` | yes  | body           |
+ * | `PATCH|DELETE /files/folders/:id?scope=organization` | yes | consumed here |
+ *
+ * `scope=organization` on the `:id` routes is consumed (`upstreamSearch`),
+ * because the API's DELETE query DTO rejects unknown keys.
+ *
  * The four `no`-org handlers key off `auth.userId` (and, for folders,
  * `MemoryFoldersService` ownership) and never touch
  * `ScopeContextService`, so scoping them would buy nothing and would
@@ -57,7 +74,16 @@ import {
 export async function proxyMemoryFiles(
     request: NextRequest,
     upstreamPath: string,
-    init: { method: string; body?: BodyInit | null; scoped: boolean | 'navigation' },
+    init: {
+        method: string;
+        body?: BodyInit | null;
+        scoped: boolean | 'navigation';
+        /**
+         * Upstream query string (with its leading `?`, or `''`) when the route
+         * consumed part of the incoming one. Omitted = the incoming query as-is.
+         */
+        upstreamSearch?: string;
+    },
 ): Promise<Response> {
     const token = await getAuthAccessCookie();
 
@@ -85,9 +111,11 @@ export async function proxyMemoryFiles(
 
     // The carrier is consumed here; the API's DTOs do not know `scope`.
     const search =
-        init.scoped === 'navigation'
-            ? upstreamSearchWithoutScope(request.nextUrl.searchParams)
-            : request.nextUrl.search;
+        init.upstreamSearch !== undefined
+            ? init.upstreamSearch
+            : init.scoped === 'navigation'
+              ? upstreamSearchWithoutScope(request.nextUrl.searchParams)
+              : request.nextUrl.search;
 
     const upstream = await fetch(`${API_URL}${upstreamPath}${search}`, {
         method: init.method,
