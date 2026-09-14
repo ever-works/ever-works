@@ -97,14 +97,12 @@ describe('SchedulesController — run-now / pause / resume', () => {
                 .mockRejectedValue(
                     new ConflictException({ code: 'MISSION_PAUSE_NOT_ACKNOWLEDGED' }),
                 ),
-            resume: jest
-                .fn()
-                .mockRejectedValue(
-                    new ConflictException({
-                        code: 'SCHEDULE_CONTROL_UNAVAILABLE',
-                        reasonKey: 'managedOnWork',
-                    }),
-                ),
+            resume: jest.fn().mockRejectedValue(
+                new ConflictException({
+                    code: 'SCHEDULE_CONTROL_UNAVAILABLE',
+                    reasonKey: 'managedOnWork',
+                }),
+            ),
         };
         const controller = build(controls);
         await expect(controller.runNow(auth, SCHEDULE_ID)).rejects.toBeInstanceOf(

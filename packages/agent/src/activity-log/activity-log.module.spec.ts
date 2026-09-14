@@ -4,6 +4,7 @@ jest.mock('../database/database.module', () => ({
 
 import { ActivityLogModule } from './activity-log.module';
 import { ActivityLogService } from './activity-log.service';
+import { FeedService } from './feed.service';
 
 describe('ActivityLogModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, ActivityLogModule) ?? [];
@@ -21,6 +22,11 @@ describe('ActivityLogModule', () => {
         expect(imports.map((m) => m?.name)).toContain('DatabaseModule');
     });
 
+    it('provides and exports the Live Feed read model beside the service', () => {
+        expect(meta('providers')).toContain(FeedService);
+        expect(meta('exports')).toContain(FeedService);
+    });
+
     it('keeps the imports list at the documented 1-module shape', () => {
         expect(meta('imports')).toHaveLength(1);
     });
@@ -33,5 +39,11 @@ describe('activity-log barrel', () => {
     it('re-exports ActivityLogService and ActivityLogModule', () => {
         expect(barrel.ActivityLogService).toBe(ActivityLogService);
         expect(barrel.ActivityLogModule).toBe(ActivityLogModule);
+    });
+
+    it('re-exports the Live Feed read model', () => {
+        expect(barrel.FeedService).toBe(FeedService);
+        expect(typeof barrel.narrate).toBe('function');
+        expect(typeof barrel.resolveFeedKind).toBe('function');
     });
 });

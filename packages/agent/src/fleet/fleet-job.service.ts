@@ -66,6 +66,32 @@ export interface LeaseFleetJobsInput {
     leaseTtlSec?: number;
     /** Overrides the node's last-reported tags for this poll only. */
     capabilities?: string[];
+    /** Claim only these kinds on this poll (Agent computers' live-view lane). Omitted = every kind. */
+    kinds?: FleetJobKind[];
+    /** Never claim these kinds on this poll (an attended node's work lane). Omitted = none excluded. */
+    excludeKinds?: FleetJobKind[];
+}
+
+/**
+ * The poll's kind filter for one candidate. Empty or absent lists filter
+ * nothing, so a lease that names neither behaves exactly as leases always
+ * have — the filter only ever narrows what a node asked for.
+ */
+export function isLeasableKind(
+    kind: string,
+    filter: Pick<LeaseFleetJobsInput, 'kinds' | 'excludeKinds'>,
+): boolean {
+    if (
+        Array.isArray(filter.kinds) &&
+        filter.kinds.length > 0 &&
+        !filter.kinds.includes(kind as FleetJobKind)
+    ) {
+        return false;
+    }
+    if (Array.isArray(filter.excludeKinds) && filter.excludeKinds.includes(kind as FleetJobKind)) {
+        return false;
+    }
+    return true;
 }
 
 export interface CompleteFleetJobInput {
@@ -366,16 +392,37 @@ export class FleetJobService {
         // Over-fetch: capability filtering is in-memory (the tag set is a
         // JSON column and must behave identically on Postgres and sqlite),
         // and CAS losses to a racing node also consume candidates.
-        const candidates = await this.jobs.findQueuedForNode(
-            node.userId,
-            node.id,
-            Math.max(max * 4, FLEET_JOB_MAX_LEASE_BATCH),
-        );
+        // The kind filter narrows the query itself (so a lane that asks for
+        // one kind is not starved by a queue full of others) AND each
+        // candidate below, so a repository that ignores it still cannot
+        // hand a lane a kind it did not ask for.
+        const kindFilter: Pick<LeaseFleetJobsInput, 'kinds' | 'excludeKinds'> = {};
+        if (Array.isArray(input.kinds) && input.kinds.length > 0) kindFilter.kinds = input.kinds;
+        if (Array.isArray(input.excludeKinds) && input.excludeKinds.length > 0) {
+            kindFilter.excludeKinds = input.excludeKinds;
+        }
+        const hasKindFilter =
+            kindFilter.kinds !== undefined || kindFilter.excludeKinds !== undefined;
+        const candidates = hasKindFilter
+            ? await this.jobs.findQueuedForNode(
+                  node.userId,
+                  node.id,
+                  Math.max(max * 4, FLEET_JOB_MAX_LEASE_BATCH),
+                  kindFilter,
+              )
+            : await this.jobs.findQueuedForNode(
+                  node.userId,
+                  node.id,
+                  Math.max(max * 4, FLEET_JOB_MAX_LEASE_BATCH),
+              );
 
         const leased: FleetJobView[] = [];
         for (const candidate of candidates) {
             if (leased.length >= max) break;
             if (candidate.targetNodeId && candidate.targetNodeId !== node.id) {
+                continue;
+            }
+            if (!isLeasableKind(candidate.kind, kindFilter)) {
                 continue;
             }
             if (!nodeSatisfiesCapabilities(capabilities, candidate.requiredCapabilities)) {

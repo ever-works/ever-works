@@ -1,7 +1,11 @@
+import { isComputerCloseReason } from '@ever-works/contracts';
 import type {
+	ComputerCloseReason,
+	ComputerNodeToServerFrame,
 	FleetJobCompleteResponse,
 	FleetJobEnvFilesResponse,
 	FleetJobHeartbeatResponse,
+	FleetJobKind,
 	FleetJobLeaseResponse,
 	FleetJobMcpCredentialResponse,
 	FleetJobMcpCredentialRevokeResponse,
@@ -67,6 +71,15 @@ export interface FleetJobClientOptions {
 
 export const DEFAULT_JOB_REQUEST_TIMEOUT_MS = 30_000;
 
+/** The platform's answer to one live-view publish. */
+export interface ComputerPublishAnswer {
+	accepted: number;
+	dropped: number;
+	/** The platform has ended this view — stop capturing. */
+	ended: boolean;
+	closeReason: ComputerCloseReason | null;
+}
+
 export class FleetJobClient {
 	private readonly apiUrl: string;
 	private readonly nodeId: string;
@@ -107,13 +120,28 @@ export class FleetJobClient {
 	 * response, so an empty array must not be treated as an error.
 	 */
 	async lease(
-		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] } = {},
+		request: {
+			max?: number;
+			leaseTtlSec?: number;
+			capabilities?: string[];
+			/** Claim only these kinds (the attended live-view lane). Sent only when set. */
+			kinds?: FleetJobKind[];
+			/** Never claim these kinds (an attended node's work lane). Sent only when set. */
+			excludeKinds?: FleetJobKind[];
+		} = {},
 		signal?: AbortSignal
 	): Promise<FleetJobView[]> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
 		if (request.max !== undefined) body.max = request.max;
 		if (request.leaseTtlSec !== undefined) body.leaseTtlSec = request.leaseTtlSec;
 		if (request.capabilities !== undefined) body.capabilities = request.capabilities;
+		// Both kind filters ride only when a lane set them: the API validates
+		// lease bodies with `forbidNonWhitelisted`, so an unasked-for field
+		// would 400 every poll against a platform that predates it.
+		if (request.kinds !== undefined && request.kinds.length > 0) body.kinds = [...request.kinds];
+		if (request.excludeKinds !== undefined && request.excludeKinds.length > 0) {
+			body.excludeKinds = [...request.excludeKinds];
+		}
 
 		const payload = (await this.post('api/fleet/jobs/lease', 'lease', body, signal)) as FleetJobLeaseResponse;
 		if (!payload || !Array.isArray(payload.jobs)) {
@@ -341,6 +369,94 @@ export class FleetJobClient {
 			this.logger?.protect(push.token);
 		}
 		return payload;
+	}
+
+	// ── Agent computers — the live-view publish leg ─────────────────────
+	//
+	// The node-facing half of a live view, under `api/internal/computer`:
+	// the SAME node credential in the body, the SAME undifferentiated 401
+	// for every refusal (a session of another machine included), the SAME
+	// "never surface a server body" posture as the lease calls above.
+
+	/**
+	 * Publish captured frames (pictures, terminal output, stats, banners, the
+	 * end frame). The caller has already scrubbed every string and kept the
+	 * batch within the protocol caps. `ended` true means the platform closed
+	 * the view — stop capturing.
+	 */
+	async publishComputerFrames(
+		sessionId: string,
+		frames: readonly ComputerNodeToServerFrame[],
+		signal?: AbortSignal
+	): Promise<ComputerPublishAnswer> {
+		const payload = (await this.post(
+			`api/internal/computer/${encodeURIComponent(sessionId)}/frames`,
+			'computer-frames',
+			{ nodeId: this.nodeId, secret: this.secret, frames },
+			signal
+		)) as Partial<ComputerPublishAnswer> | null;
+		return {
+			accepted: typeof payload?.accepted === 'number' ? payload.accepted : 0,
+			dropped: typeof payload?.dropped === 'number' ? payload.dropped : 0,
+			ended: payload?.ended === true,
+			closeReason: isComputerCloseReason(payload?.closeReason) ? payload.closeReason : null
+		};
+	}
+
+	/** The view's lifecycle report; the answer says whether the platform ended it (stop switch, owner, reaper). */
+	async computerSessionHeartbeat(
+		sessionId: string,
+		report: { status?: 'live' | 'stalled' | 'ended'; closeReason?: ComputerCloseReason } = {}
+	): Promise<{ ended: boolean; closeReason: ComputerCloseReason | null }> {
+		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
+		if (report.status) body.status = report.status;
+		if (report.closeReason) body.closeReason = report.closeReason;
+		const payload = (await this.post(
+			`api/internal/computer/${encodeURIComponent(sessionId)}/heartbeat`,
+			'computer-heartbeat',
+			body
+		)) as { ended?: unknown; closeReason?: unknown } | null;
+		return {
+			ended: payload?.ended === true,
+			closeReason: isComputerCloseReason(payload?.closeReason) ? payload.closeReason : null
+		};
+	}
+
+	/** The token for this machine's own inbound socket leg (quality and refresh requests). Never logged. */
+	async mintComputerWorkerToken(sessionId: string): Promise<{ token: string; wsPath: string; expiresInSec: number }> {
+		const payload = (await this.post(
+			`api/internal/computer/${encodeURIComponent(sessionId)}/worker-token`,
+			'computer-worker-token',
+			{ nodeId: this.nodeId, secret: this.secret }
+		)) as { token?: unknown; wsPath?: unknown; expiresInSec?: unknown } | null;
+		if (typeof payload?.token !== 'string' || !payload.token || typeof payload.wsPath !== 'string') {
+			throw new FleetClientError('malformed', 'Live-view worker token response did not contain a token');
+		}
+		this.logger?.protect(payload.token);
+		return {
+			token: payload.token,
+			wsPath: payload.wsPath,
+			expiresInSec: typeof payload.expiresInSec === 'number' ? payload.expiresInSec : 60
+		};
+	}
+
+	/** Report what the watched Agent's profile holds here (counts only — never a path, never a cookie). */
+	async reportComputerProfile(
+		sessionId: string,
+		report: { profileKey: string; signedInSiteCount: number; diskBytes: number }
+	): Promise<boolean> {
+		const payload = (await this.post(
+			`api/internal/computer/${encodeURIComponent(sessionId)}/profile`,
+			'computer-profile',
+			{
+				nodeId: this.nodeId,
+				secret: this.secret,
+				profileKey: report.profileKey,
+				signedInSiteCount: Math.max(0, Math.floor(report.signedInSiteCount)),
+				diskBytes: Math.max(0, Math.floor(report.diskBytes))
+			}
+		)) as { accepted?: unknown } | null;
+		return payload?.accepted === true;
 	}
 
 	private async post(

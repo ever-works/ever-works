@@ -8,6 +8,8 @@ import { serverFetch, serverMutation } from './server-api';
  *
  *   GET    /api/inbox                 my messages (?status= ?taskId=) + unread count
  *   GET    /api/inbox/unread-count    the sidebar badge
+ *   GET    /api/inbox/decisions       My Decisions — the decision view (ranked, filtered)
+ *   GET    /api/inbox/decisions/counts open + blocking decision counts
  *   GET    /api/inbox/:id             one message
  *   POST   /api/inbox/:id/reply       answer it (routed per kind)
  *   PATCH  /api/inbox/:id/read        read / unread
@@ -23,10 +25,14 @@ import { serverFetch, serverMutation } from './server-api';
  */
 
 export {
+    INBOX_DECISION_PAGE_SIZE,
     INBOX_MAX_REPLY_CHARS,
     INBOX_POLL_INTERVAL_MS,
     isAwaitingReply,
     isFleetQuestion,
+    type InboxDecision,
+    type InboxDecisionCounts,
+    type InboxDecisionFilters,
     type InboxItem,
     type InboxItemKind,
     type InboxItemOption,
@@ -36,7 +42,14 @@ export {
     type InboxReplyOutcome,
     type InboxReplyRouted,
 } from './inbox.shared';
-import type { InboxItem, InboxItemStatus, InboxReplyOutcome } from './inbox.shared';
+import type {
+    InboxDecision,
+    InboxDecisionCounts,
+    InboxDecisionFilters,
+    InboxItem,
+    InboxItemStatus,
+    InboxReplyOutcome,
+} from './inbox.shared';
 
 export interface InboxListResult {
     data: InboxItem[];
@@ -56,6 +69,55 @@ export interface ListInboxInput {
 export interface ReplyInboxInput {
     text?: string;
     optionId?: string;
+    /**
+     * My Decisions — opt into the decision answer rule: a rejection, or an
+     * option other than the recommended one, must carry `text` saying why.
+     */
+    requireReason?: boolean;
+}
+
+export interface InboxDecisionListResult {
+    data: InboxDecision[];
+    meta: {
+        total: number;
+        limit: number;
+        offset: number;
+        openCount: number;
+        blockingCount: number;
+        lastRaisedAt: string | null;
+        /**
+         * Continues right after the last row of this page; `null` when
+         * nothing ranks after it. Optional: an API that predates it omits it.
+         */
+        nextCursor?: string | null;
+    };
+}
+
+export interface ListInboxDecisionsInput extends Partial<InboxDecisionFilters> {
+    /** The API refuses above 100 and defaults to 25. */
+    limit?: number;
+    offset?: number;
+    /**
+     * The previous page's `meta.nextCursor`. Prefer it to `offset` for
+     * "Load more": a live queue re-ranks between reads, and an offset into
+     * it skips or repeats decisions.
+     */
+    cursor?: string;
+}
+
+function buildDecisionsEndpoint(input?: ListInboxDecisionsInput): string {
+    const params = new URLSearchParams();
+    if (input?.tab) params.set('status', input.tab);
+    if (input?.kind) params.set('kind', input.kind);
+    if (input?.agentId) params.set('agentId', input.agentId);
+    if (input?.taskId) params.set('taskId', input.taskId);
+    if (input?.missionId) params.set('missionId', input.missionId);
+    if (input?.q) params.set('q', input.q);
+    if (input?.limit) params.set('limit', String(input.limit));
+    if (input?.offset && input.offset > 0) params.set('offset', String(input.offset));
+    if (input?.cursor) params.set('cursor', input.cursor);
+    const qs = params.toString();
+    return qs ? `/inbox/decisions?${qs}` : '/inbox/decisions';
 }
 
 function buildListEndpoint(input?: ListInboxInput): string {
@@ -78,6 +140,20 @@ export const inboxAPI = {
             method: 'GET',
         });
         return result?.count ?? 0;
+    },
+
+    /**
+     * My Decisions — the Inbox items that need the human to decide,
+     * ranked blocking-first on the open tab, plus the header counts.
+     */
+    async listDecisions(input?: ListInboxDecisionsInput): Promise<InboxDecisionListResult> {
+        return serverFetch<InboxDecisionListResult>(buildDecisionsEndpoint(input), {
+            method: 'GET',
+        });
+    },
+
+    async decisionCounts(): Promise<InboxDecisionCounts> {
+        return serverFetch<InboxDecisionCounts>('/inbox/decisions/counts', { method: 'GET' });
     },
 
     /**

@@ -7,7 +7,7 @@ import {
     Bot,
     CircleAlert,
     Inbox as InboxIcon,
-    Loader2,
+    ListChecks,
     MailOpen,
     MoreVertical,
     ShieldQuestion,
@@ -15,8 +15,7 @@ import {
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { Link, useRouter } from '@/i18n/navigation';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,22 +25,26 @@ import {
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { cn } from '@/lib/utils/cn';
 import {
-    INBOX_MAX_REPLY_CHARS,
     INBOX_POLL_INTERVAL_MS,
+    buildDecisionsHref,
     isAwaitingReply,
+    isInboxDecisionKind,
     type InboxItem,
     type InboxItemKind,
+    type InboxReplyOutcome,
     type InboxReplyRouted,
 } from '@/lib/api/inbox.shared';
 import {
     deleteInboxItemAction,
-    replyToInboxItemAction,
     setInboxItemArchivedAction,
     setInboxItemReadAction,
 } from '@/app/actions/dashboard/inbox';
+import { InboxAnswerSummary } from './InboxAnswerSummary';
 import { InboxFleetSource } from './InboxFleetSource';
+import { InboxReplyComposer } from './InboxReplyComposer';
+import { InboxTabs, type InboxView } from './InboxTabs';
 
-export type InboxView = 'active' | 'archived';
+export type { InboxView };
 
 interface InboxClientProps {
     items: InboxItem[];
@@ -100,10 +103,6 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
             ? selectedId
             : (items[0]?.id ?? null),
     );
-    const [replyText, setReplyText] = useState('');
-    const [optionId, setOptionId] = useState<string | null>(null);
-    const [otherSelected, setOtherSelected] = useState(false);
-    const [isSending, setIsSending] = useState(false);
     const [busyRowId, setBusyRowId] = useState<string | null>(null);
     const sendingRef = useRef(false);
 
@@ -124,14 +123,9 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
         [rows, activeId],
     );
 
-    // Reset the composer whenever a different message is opened —
-    // carrying half-typed text into someone else's question is the one
-    // mistake this surface must not make.
-    useEffect(() => {
-        setReplyText('');
-        setOptionId(null);
-        setOtherSelected(false);
-    }, [activeId]);
+    // The composer resets itself whenever a different message is opened
+    // (it is keyed by the item) — carrying half-typed text into someone
+    // else's question is the one mistake this surface must not make.
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -218,34 +212,18 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
         [router, t],
     );
 
-    const handleSend = useCallback(async () => {
-        if (!active || isSending) return;
-        const text = replyText.trim();
-        const chosen = otherSelected ? null : optionId;
-        if (!text && !chosen) {
-            toast.error(t('reply.needsAnswer'));
-            return;
-        }
-        setIsSending(true);
-        sendingRef.current = true;
-        try {
-            const outcome = await replyToInboxItemAction(active.id, {
-                ...(text ? { text } : {}),
-                ...(chosen ? { optionId: chosen } : {}),
-            });
+    const handleSendingChange = useCallback((sending: boolean) => {
+        sendingRef.current = sending;
+    }, []);
+
+    const handleReplied = useCallback(
+        (outcome: InboxReplyOutcome) => {
             setRows((prev) => prev.map((row) => (row.id === outcome.item.id ? outcome.item : row)));
-            setReplyText('');
-            setOptionId(null);
-            setOtherSelected(false);
             toast.success(t(ROUTED_MESSAGE_KEY[outcome.routed] ?? ROUTED_MESSAGE_KEY.none));
             router.refresh();
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : t('toast.error'));
-        } finally {
-            sendingRef.current = false;
-            setIsSending(false);
-        }
-    }, [active, isSending, optionId, otherSelected, replyText, router, t]);
+        },
+        [router, t],
+    );
 
     return (
         <div className="p-4 sm:p-6 lg:p-8" data-testid="inbox-page">
@@ -268,21 +246,7 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
                 )}
             </header>
 
-            <div className="mb-4 flex items-center gap-2" role="tablist">
-                {(['active', 'archived'] as const).map((tab) => (
-                    <Button
-                        key={tab}
-                        href={tab === 'active' ? '/inbox' : '/inbox?view=archived'}
-                        variant={view === tab ? 'primary' : 'secondary'}
-                        size="sm"
-                        role="tab"
-                        aria-selected={view === tab}
-                        data-testid={`inbox-tab-${tab}`}
-                    >
-                        {t(`tabs.${tab}`)}
-                    </Button>
-                ))}
-            </div>
+            <InboxTabs view={view} />
 
             {loadError && (
                 <div className="mb-4 rounded-lg border border-red-200 dark:border-red-500/25 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-800 dark:text-red-300">
@@ -441,150 +405,32 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
                                 {active.body}
                             </p>
 
-                            {active.status !== 'open' && (
-                                <div
-                                    className="rounded-lg border border-border dark:border-border-dark bg-surface-secondary dark:bg-white/4 px-4 py-3"
-                                    data-testid="inbox-answer"
-                                >
-                                    <p className="text-xs font-medium text-text-secondary dark:text-text-secondary-dark">
-                                        {t('detail.yourReply')}
-                                    </p>
-                                    <p className="mt-1 whitespace-pre-wrap text-sm text-text dark:text-text-dark">
-                                        {[
-                                            active.answerOptionId
-                                                ? (active.options?.find(
-                                                      (option) =>
-                                                          option.id === active.answerOptionId,
-                                                  )?.label ?? active.answerOptionId)
-                                                : null,
-                                            active.answerText,
-                                        ]
-                                            .filter(Boolean)
-                                            .join(' — ') || t('detail.noReplyText')}
-                                    </p>
-                                    {active.answeredAt && (
-                                        <p className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
-                                            <ShowDateTime value={active.answeredAt} />
-                                        </p>
-                                    )}
-                                </div>
-                            )}
+                            {active.status !== 'open' && <InboxAnswerSummary item={active} />}
 
                             {active.status === 'open' && (
-                                <div className="space-y-3" data-testid="inbox-composer">
-                                    {active.options && active.options.length > 0 && (
-                                        <fieldset className="space-y-2">
-                                            <legend className="text-xs font-medium text-text-secondary dark:text-text-secondary-dark mb-1">
-                                                {t('reply.chooseOption')}
-                                            </legend>
-                                            {active.options.map((option) => (
-                                                <label
-                                                    key={option.id}
-                                                    className={cn(
-                                                        'flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors',
-                                                        optionId === option.id && !otherSelected
-                                                            ? 'border-blue-400 bg-blue-50 dark:border-blue-500/40 dark:bg-blue-500/10'
-                                                            : 'border-border dark:border-border-dark hover:bg-surface-secondary dark:hover:bg-white/4',
-                                                    )}
-                                                >
-                                                    <input
-                                                        type="radio"
-                                                        name="inbox-option"
-                                                        className="mt-1"
-                                                        checked={
-                                                            optionId === option.id && !otherSelected
-                                                        }
-                                                        onChange={() => {
-                                                            setOptionId(option.id);
-                                                            setOtherSelected(false);
-                                                        }}
-                                                    />
-                                                    <span className="min-w-0">
-                                                        <span className="block text-sm text-text dark:text-text-dark">
-                                                            {option.label}
-                                                            {option.recommended && (
-                                                                <span className="ml-2 text-xs text-blue-700 dark:text-blue-300">
-                                                                    {t('reply.recommended')}
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                        {option.description && (
-                                                            <span className="block mt-0.5 text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                {option.description}
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                </label>
-                                            ))}
-                                            {/* "Other" is only offered where a free-text
-                                                answer is actually routable: an approval
-                                                reply MUST pick approve or reject. */}
-                                            {active.kind !== 'approval' && (
-                                                <label
-                                                    className={cn(
-                                                        'flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors',
-                                                        otherSelected
-                                                            ? 'border-blue-400 bg-blue-50 dark:border-blue-500/40 dark:bg-blue-500/10'
-                                                            : 'border-border dark:border-border-dark hover:bg-surface-secondary dark:hover:bg-white/4',
-                                                    )}
-                                                >
-                                                    <input
-                                                        type="radio"
-                                                        name="inbox-option"
-                                                        checked={otherSelected}
-                                                        onChange={() => {
-                                                            setOtherSelected(true);
-                                                            setOptionId(null);
-                                                        }}
-                                                    />
-                                                    <span className="text-sm text-text dark:text-text-dark">
-                                                        {t('reply.other')}
-                                                    </span>
-                                                </label>
-                                            )}
-                                        </fieldset>
-                                    )}
+                                <InboxReplyComposer
+                                    key={active.id}
+                                    item={active}
+                                    onSendingChange={handleSendingChange}
+                                    onReplied={handleReplied}
+                                />
+                            )}
 
-                                    {(active.kind !== 'approval' ||
-                                        !active.options ||
-                                        active.options.length === 0) && (
-                                        <textarea
-                                            value={replyText}
-                                            onChange={(event) =>
-                                                setReplyText(
-                                                    event.target.value.slice(
-                                                        0,
-                                                        INBOX_MAX_REPLY_CHARS,
-                                                    ),
-                                                )
-                                            }
-                                            rows={4}
-                                            maxLength={INBOX_MAX_REPLY_CHARS}
-                                            placeholder={t('reply.placeholder')}
-                                            aria-label={t('reply.placeholder')}
-                                            data-testid="inbox-reply-textarea"
-                                            className="w-full rounded-lg border border-border dark:border-border-dark bg-transparent px-3 py-2 text-sm text-text dark:text-text-dark focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                                        />
+                            {/* My Decisions — the same item, read with what is
+                                waiting behind it and ranked against every other
+                                decision. Notices are not decisions. */}
+                            {isInboxDecisionKind(active.kind) && (
+                                <Link
+                                    href={buildDecisionsHref(
+                                        { tab: active.status === 'open' ? 'open' : active.status },
+                                        active.id,
                                     )}
-
-                                    <div className="flex items-center gap-3">
-                                        <Button
-                                            variant="primary"
-                                            size="sm"
-                                            onClick={() => void handleSend()}
-                                            disabled={isSending}
-                                            data-testid="inbox-send-reply"
-                                        >
-                                            {isSending && (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                            )}
-                                            {t('reply.send')}
-                                        </Button>
-                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                            {t('reply.hint')}
-                                        </span>
-                                    </div>
-                                </div>
+                                    className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                                    data-testid="inbox-open-in-decisions"
+                                >
+                                    <ListChecks className="w-3.5 h-3.5" />
+                                    {t('detail.openInDecisions')}
+                                </Link>
                             )}
                         </div>
                     )}

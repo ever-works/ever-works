@@ -102,8 +102,131 @@ export interface InboxItemDto {
 	answeredAt: string | null;
 	answerText: string | null;
 	answerOptionId: string | null;
+	/**
+	 * When a human first opened the item (the first read flip or the
+	 * answer, whichever came first). Optional on the wire so an older API
+	 * may omit it; NULL = nobody has looked yet.
+	 */
+	firstViewedAt?: string | null;
 	createdAt: string;
 	updatedAt: string;
+}
+
+// ── My Decisions — the decision view of the Inbox ──────────────────────
+//
+// A "decision" is not a second record: it is an Inbox item that asks the
+// human to decide something — a question an agent is parked on, an
+// approval an agent is waiting for, or an escalation where an agent gave
+// up. The Inbox already mirrors every escalation and every pending
+// approval (idempotent per record) and already routes the answer back to
+// the record and the run, so My Decisions is the Inbox read through a
+// ranking and a handful of filters, never a parallel queue.
+
+/** The Inbox kinds that ask the human to decide (everything but `notice`). */
+export const INBOX_DECISION_KINDS: readonly InboxItemKind[] = ['question', 'approval', 'escalation'];
+
+/** Default page of the decision view. */
+export const INBOX_DECISION_PAGE_SIZE = 25;
+
+/** Largest page a caller may request; larger values are refused by the API edge. */
+export const INBOX_DECISION_MAX_LIMIT = 100;
+
+/**
+ * Rank used for a decision nobody scored. Only escalations carry a
+ * confidence; an unscored decision sorts as if the platform were
+ * half-sure, above a weak score and below a strong one, and is shown as
+ * "not scored" rather than as a percentage.
+ */
+export const INBOX_DECISION_UNSCORED_RANK = 0.5;
+
+/** An open decision older than this, with no live work behind it, is flagged dormant (never auto-archived). */
+export const INBOX_DECISION_DORMANT_AFTER_DAYS = 30;
+
+/** No decision raised within this window reads as "quiet" rather than "all clear". */
+export const INBOX_DECISION_QUIET_WINDOW_DAYS = 14;
+
+/** Why an open decision is holding work back. */
+export type InboxDecisionBlockingReason = 'run-parked' | 'task-blocked';
+
+/**
+ * What the decision view adds to an Inbox item — read at list time from
+ * the records the item already links to (the run, the Task, the
+ * escalation, the proposal, the Agent). Nothing here is stored twice.
+ */
+export interface InboxDecisionContext {
+	/** A parked run or a blocked Task sits behind this decision. */
+	blocking: boolean;
+	blockingReason: InboxDecisionBlockingReason | null;
+	/** Escalation confidence 0..1; NULL = not scored (ranks at {@link INBOX_DECISION_UNSCORED_RANK}). */
+	confidence: number | null;
+	confidenceSource: 'ai-judge' | 'heuristic' | null;
+	/** Escalation reason code, when the item mirrors an escalation. */
+	reasonCode: string | null;
+	/** What the agent already tried, when the escalation recorded it. Plain text. */
+	attempted: Array<{ label: string; outcome: string; detail?: string }>;
+	/** Proposal action type, when the item mirrors an approval. */
+	actionType: string | null;
+	riskFlags: string[];
+	agentName: string | null;
+	/**
+	 * The Task this decision belongs to — the item's own link, or the linked run's.
+	 * NULL when that Task is gone or belongs to another owner.
+	 */
+	taskId: string | null;
+	taskTitle: string | null;
+	taskStatus: string | null;
+	/** The Mission the Task was raised under. Provenance only: a Mission is never blocked. */
+	missionId: string | null;
+	runStatus: string | null;
+	/** Open for longer than {@link INBOX_DECISION_DORMANT_AFTER_DAYS} with no live work behind it. */
+	dormant: boolean;
+}
+
+/** One row of the decision view: the Inbox item plus its decision context. */
+export interface InboxDecisionDto extends InboxItemDto {
+	decision: InboxDecisionContext;
+}
+
+/** Header counts of the decision view (and the sidebar badge). */
+export interface InboxDecisionCounts {
+	/** Open decisions. */
+	open: number;
+	/** Open decisions with a parked run or a blocked Task behind them. */
+	blocking: number;
+	/** When the most recent decision was raised, any status; NULL = never. */
+	lastRaisedAt: string | null;
+}
+
+/** Whether an Inbox kind asks the human to decide. */
+export function isInboxDecisionKind(kind: unknown): kind is InboxItemKind {
+	return typeof kind === 'string' && (INBOX_DECISION_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * Whether answering a decision this way must carry a reason.
+ *
+ * Saying no, or sending the agent a different way than it recommended, is
+ * exactly the answer the agent learns the most from — and the one it
+ * cannot interpret from a bare button press. So:
+ *
+ *   - an approval answered with `reject` needs a reason;
+ *   - a question whose options mark one as recommended, answered with a
+ *     different option, needs a reason.
+ *
+ * Every other answer (approve, the recommended option, free text, a
+ * question with no recommendation) does not. Opt-in at the API edge, so
+ * callers that never asked for the rule keep today's behaviour.
+ */
+export function inboxDecisionNeedsReason(
+	item: { kind: InboxItemKind; options?: readonly InboxItemOption[] | null },
+	optionId: string | null | undefined
+): boolean {
+	if (!optionId) return false;
+	if (item.kind === 'approval') return optionId === 'reject';
+	if (item.kind !== 'question') return false;
+	const options = Array.isArray(item.options) ? item.options : [];
+	const recommended = options.find((option) => option.recommended === true);
+	return recommended !== undefined && recommended.id !== optionId;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

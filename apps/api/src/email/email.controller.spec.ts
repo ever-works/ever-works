@@ -9,6 +9,10 @@ jest.mock('@ever-works/agent/notifications', () => ({
 }));
 const AGENT_INBOUND_EMAIL_DISPATCHER = 'AGENT_INBOUND_EMAIL_DISPATCHER';
 jest.mock('@ever-works/agent/database', () => ({}));
+// AW-05 — the draft loop is an optional collaborator; stub its subpath too.
+jest.mock('@ever-works/agent/email', () => ({
+    EmailDraftService: class EmailDraftService {},
+}));
 // Stub the React-Email renderer so the api test never loads React.
 jest.mock('./templates/render', () => ({
     renderTemplate: jest.fn(),
@@ -24,6 +28,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { EmailController } from './email.controller';
 import { EmailService } from './email.service';
 import { EmailFacadeService } from '@ever-works/agent/facades';
+import { EmailDraftService } from '@ever-works/agent/email';
 import { AuthSessionGuard } from '../auth';
 
 /**
@@ -139,6 +144,97 @@ describe('EmailController', () => {
                     subject: 'hi',
                 }),
             );
+        });
+    });
+
+    describe('compose + held drafts (AW-05)', () => {
+        let drafts: { approve: jest.Mock; discard: jest.Mock };
+        let withDrafts: EmailController;
+
+        beforeEach(async () => {
+            (service as any).sendMessage = jest
+                .fn()
+                .mockResolvedValue({ messageRef: 'ref', providerMessageId: 'pm-1' });
+            drafts = {
+                approve: jest.fn().mockResolvedValue({
+                    message: {
+                        id: 'm-1',
+                        status: 'sent',
+                        approvedById: 'user-1',
+                        approvedAt: new Date('2026-09-14T12:00:00Z'),
+                        sentAt: new Date('2026-09-14T12:00:01Z'),
+                        failureReason: null,
+                        bodyText: 'never echoed back',
+                    },
+                    result: { providerMessageId: 'pm-1' },
+                }),
+                discard: jest.fn().mockResolvedValue({
+                    message: { id: 'm-1', status: 'discarded', bodyText: 'never echoed back' },
+                }),
+            };
+            const moduleRef: TestingModule = await Test.createTestingModule({
+                controllers: [EmailController],
+                providers: [
+                    { provide: EmailService, useValue: service },
+                    { provide: EmailFacadeService, useValue: facade },
+                    { provide: EmailDraftService, useValue: drafts },
+                ],
+            })
+                .overrideGuard(AuthSessionGuard)
+                .useValue({ canActivate: () => true })
+                .compile();
+            withDrafts = moduleRef.get(EmailController);
+        });
+
+        it('sends a composed message as a person — the server sets the origin, not the body', async () => {
+            const body = { agentId: 'agent-1', to: ['a@x.com'], subject: 's', bodyText: 'b' };
+            await withDrafts.sendMessage({ userId: 'user-1' } as any, body as any);
+            expect((service as any).sendMessage).toHaveBeenCalledWith('user-1', body, {
+                origin: 'human',
+            });
+        });
+
+        it('approves a draft for the caller and reports the decision without the body', async () => {
+            const res = await withDrafts.approveDraft({ userId: 'user-1' } as any, 'm-1');
+            expect(drafts.approve).toHaveBeenCalledWith('user-1', 'm-1');
+            expect(res).toEqual({
+                message: {
+                    id: 'm-1',
+                    status: 'sent',
+                    approvedById: 'user-1',
+                    approvedAt: '2026-09-14T12:00:00.000Z',
+                    sentAt: '2026-09-14T12:00:01.000Z',
+                    failureReason: null,
+                },
+                result: { providerMessageId: 'pm-1' },
+            });
+            expect(JSON.stringify(res)).not.toContain('never echoed back');
+        });
+
+        it('discards a draft for the caller', async () => {
+            const res = await withDrafts.discardDraft({ userId: 'user-1' } as any, 'm-1');
+            expect(drafts.discard).toHaveBeenCalledWith('user-1', 'm-1');
+            expect(res.message).toMatchObject({ id: 'm-1', status: 'discarded' });
+        });
+
+        it('passes a draft-loop refusal through unchanged (e.g. 409 already decided)', async () => {
+            const conflict = Object.assign(new Error('already decided'), { status: 409 });
+            drafts.approve.mockRejectedValue(conflict);
+            await expect(withDrafts.approveDraft({ userId: 'user-1' } as any, 'm-1')).rejects.toBe(
+                conflict,
+            );
+        });
+
+        it('answers 404 when the draft loop is not wired, like a missing message', async () => {
+            await expect(
+                controller.approveDraft({ userId: 'user-1' } as any, 'm-1'),
+            ).rejects.toMatchObject({ status: 404 });
+        });
+
+        it('declares the draft routes before messages/:id so ":id" cannot capture them', () => {
+            const names = Object.getOwnPropertyNames(EmailController.prototype);
+            expect(names.indexOf('approveDraft')).toBeLessThan(names.indexOf('getMessage'));
+            expect(names.indexOf('discardDraft')).toBeLessThan(names.indexOf('getMessage'));
         });
     });
 });

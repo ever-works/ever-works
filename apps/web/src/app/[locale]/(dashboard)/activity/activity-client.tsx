@@ -12,6 +12,13 @@ import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView
 import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { SchedulesList } from '@/components/schedules/SchedulesList';
 import { TriggersManager } from '@/components/schedules/TriggersManager';
+import { LiveFeed } from '@/components/feed/LiveFeed';
+import {
+    feedFiltersToQuery,
+    hasFeedFilterParams,
+    parseFeedFilters,
+} from '@/components/feed/feed-filters';
+import type { FeedActorSummaryDto, FeedPageDto } from '@ever-works/contracts';
 import { toast } from 'sonner';
 import {
     Activity as ActivityIcon,
@@ -20,12 +27,19 @@ import {
     Loader2,
     List,
     CalendarClock,
+    Radio,
 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 
-type ActivityTab = 'log' | 'schedules';
+// `feed` is the Live Feed: the narrated, filterable view of the same
+// activity records the Log lists. Log stays the default.
+type ActivityTab = 'log' | 'schedules' | 'feed';
+
+function isActivityTab(value: string | null): value is ActivityTab {
+    return value === 'log' || value === 'schedules' || value === 'feed';
+}
 
 const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
@@ -34,9 +48,17 @@ const KANBAN_LIMIT = 500;
 interface ActivityClientProps {
     initialActivities: ActivityLogEntry[];
     totalActivities: number;
+    /** Server-rendered Live Feed first page, when the page was opened on `?view=feed`. */
+    initialFeedPage?: FeedPageDto | null;
+    initialFeedActors?: FeedActorSummaryDto[] | null;
 }
 
-export function ActivityClient({ initialActivities, totalActivities }: ActivityClientProps) {
+export function ActivityClient({
+    initialActivities,
+    totalActivities,
+    initialFeedPage = null,
+    initialFeedActors = null,
+}: ActivityClientProps) {
     const t = useTranslations('dashboard.activity');
     const tSchedules = useTranslations('dashboard.schedules');
     const searchParams = useSearchParams();
@@ -91,16 +113,22 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     // a hydration mismatch.
     const [activeTab, setActiveTab] = useState<ActivityTab>(() => {
         const fromUrl = searchParams.get('view');
-        return fromUrl === 'schedules' || fromUrl === 'log' ? fromUrl : 'log';
+        return isActivityTab(fromUrl) ? fromUrl : 'log';
     });
+
+    // The Live Feed owns its own filters and reports them here, so this
+    // component stays the single writer of the page URL.
+    const [feedQuery, setFeedQuery] = useState(() =>
+        hasFeedFilterParams(searchParams) ? feedFiltersToQuery(parseFeedFilters(searchParams)) : '',
+    );
 
     // Restore the persisted tab after mount (localStorage is unavailable
     // during SSR). The URL ?view= param always wins when present.
     useEffect(() => {
         const fromUrl = searchParams.get('view');
-        if (fromUrl === 'schedules' || fromUrl === 'log') return;
+        if (isActivityTab(fromUrl)) return;
         const stored = localStorage.getItem('activity-tab');
-        if (stored === 'schedules' || stored === 'log') {
+        if (isActivityTab(stored)) {
             setActiveTab(stored);
         }
         // Mount-only restore; intentionally not reactive to searchParams.
@@ -115,6 +143,8 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     };
 
     const isLogTab = activeTab === 'log';
+    const isSchedulesTab = activeTab === 'schedules';
+    const isFeedTab = activeTab === 'feed';
     const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
 
     // Sync filters → URL query params
@@ -125,13 +155,19 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         }
         const params = new URLSearchParams();
         if (activeTab === 'schedules') params.set('view', 'schedules');
+        if (activeTab === 'feed') {
+            params.set('view', 'feed');
+            for (const [key, value] of new URLSearchParams(feedQuery)) {
+                params.set(key, value);
+            }
+        }
         if (actionType) params.set('actionType', actionType);
         if (status) params.set('status', status);
         if (debouncedSearch) params.set('search', debouncedSearch);
         if (page > 1) params.set('page', String(page));
         const query = params.toString();
         router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
-    }, [activeTab, actionType, status, debouncedSearch, page, pathname, router]);
+    }, [activeTab, feedQuery, actionType, status, debouncedSearch, page, pathname, router]);
 
     // Debounce search
     useEffect(() => {
@@ -433,11 +469,26 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                                 </span>
                             </button>
                             <button
+                                onClick={() => handleTabChange('feed')}
+                                aria-pressed={isFeedTab}
+                                aria-label={t('viewToggle.feed')}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                                    isFeedTab
+                                        ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                        : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
+                                }`}
+                            >
+                                <Radio className="w-3.5 h-3.5" />
+                                <span className="hidden @xs/main:inline">
+                                    {t('viewToggle.feed')}
+                                </span>
+                            </button>
+                            <button
                                 onClick={() => handleTabChange('schedules')}
-                                aria-pressed={!isLogTab}
+                                aria-pressed={isSchedulesTab}
                                 aria-label={t('viewToggle.schedules')}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
-                                    !isLogTab
+                                    isSchedulesTab
                                         ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
                                         : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
                                 }`}
@@ -469,7 +520,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 }
             />
 
-            {!isLogTab && (
+            {isSchedulesTab && (
                 <>
                     {/* Schedules workspace — the same projection with run-now,
                         pause and resume. Kept OUTSIDE the `schedules-list`
@@ -487,6 +538,15 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                     <SchedulesList />
                     <TriggersManager />
                 </>
+            )}
+
+            {isFeedTab && (
+                <LiveFeed
+                    initialPage={initialFeedPage}
+                    initialActors={initialFeedActors}
+                    onFiltersChange={setFeedQuery}
+                    onOpenActivityLog={() => handleTabChange('log')}
+                />
             )}
 
             {isLogTab && (

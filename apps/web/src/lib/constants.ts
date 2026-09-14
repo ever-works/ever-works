@@ -199,6 +199,8 @@ export const ROUTES = {
     DASHBOARD_AGENT_DASHBOARD: (id: string) => `/agents/${id}`,
     DASHBOARD_AGENT_ACTIVITY: (id: string) => `/agents/${id}/activity`,
     DASHBOARD_AGENT_TERMINAL: (id: string) => `/agents/${id}/terminal`,
+    // Agent computers — watch the machine an Agent works on (fleet-gated).
+    DASHBOARD_AGENT_COMPUTER: (id: string) => `/agents/${id}/computer`,
     DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
     DASHBOARD_AGENT_MCP_SERVERS: (id: string) => `/agents/${id}/mcp-servers`,
@@ -207,6 +209,8 @@ export const ROUTES = {
     DASHBOARD_AGENT_COLLABORATORS: (id: string) => `/agents/${id}/collaborators`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
+    // Agent email (AW-05) — the per-Agent inbox (list, drafts, sending policy).
+    DASHBOARD_AGENT_INBOX: (id: string) => `/agents/${id}/inbox`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
     DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
     // Navigation consolidation (docs/specs/features/navigation-consolidation):
@@ -275,6 +279,9 @@ export const ROUTES = {
     DASHBOARD_NOTIFICATIONS: '/notifications',
     // The page that actually exists — /notifications has no route and soft-404s.
     DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
+    // Agent email (AW-05) — the tenant email address registry an Agent's
+    // addresses are assigned from.
+    DASHBOARD_SETTINGS_EMAILS: '/settings/integrations/emails',
 
     // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',

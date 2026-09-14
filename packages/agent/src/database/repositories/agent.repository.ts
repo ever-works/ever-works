@@ -83,6 +83,57 @@ export class AgentRepository {
     }
 
     /**
+     * Live Feed — one batched lookup for the agents a page of activity
+     * records refers to (at most one `IN (...)` query per page, never one
+     * query per row). Owner-bounded by `userId`; archived agents are
+     * included on purpose, because history about an archived agent still
+     * names it. Ids the user does not own simply do not come back, which is
+     * how a deleted (or foreign) agent is told apart from a live one.
+     */
+    async findManyByIdsForUser(userId: string, ids: readonly string[]): Promise<Agent[]> {
+        const unique = [...new Set(ids)].filter((id) => typeof id === 'string' && id.length > 0);
+        if (unique.length === 0) return [];
+        return this.repository.find({
+            where: { userId, id: In(unique) },
+            select: ['id', 'userId', 'name', 'status', 'avatarMode'],
+        });
+    }
+
+    /**
+     * Live Feed actor roster — one keyset page of the agents in an ownership
+     * scope, in id order, with only the columns the roster shows. Archived
+     * agents are left out, as on every catalog surface.
+     *
+     * Keyset rather than offset: an agent archived, deleted or edited between
+     * two pages cannot shift a later agent out of reach, so a caller that
+     * follows `afterId` until a short page reads every agent exactly once.
+     */
+    async findRosterPage(
+        userId: string,
+        ownershipScope: OwnershipScope | undefined,
+        options: { afterId?: string | null; limit: number },
+    ): Promise<Agent[]> {
+        const qb = this.repository
+            .createQueryBuilder('agent')
+            .select(['agent.id', 'agent.userId', 'agent.name', 'agent.status', 'agent.avatarMode'])
+            .where('agent.userId = :userId', { userId })
+            .andWhere('agent.status != :archived', { archived: AgentStatus.ARCHIVED });
+
+        const ownership = ownershipSqlPredicate('agent', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        if (options.afterId) {
+            qb.andWhere('agent.id > :afterId', { afterId: options.afterId });
+        }
+
+        return qb
+            .orderBy('agent.id', 'ASC')
+            .limit(Math.max(1, Math.trunc(options.limit)))
+            .getMany();
+    }
+
+    /**
      * Uniqueness check used by `AgentService.create`. This intentionally
      * follows the durable database key, which is global to the user + Agent
      * scope and does not include Tenant/Organization columns. Catalog and

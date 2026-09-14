@@ -86,6 +86,11 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Live Feed — a run starting / finishing / failing for every
+            // trigger kind other than heartbeat.
+            ['AGENT_RUN_STARTED', 'agent_run_started'],
+            ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
+            ['AGENT_RUN_FAILED', 'agent_run_failed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -149,13 +154,20 @@ describe('activity-log.types', () => {
             // +2 schedule_paused / schedule_resumed (Schedules workspace
             //    pause that keeps the cadence) -> 159.
             //
-            // 🛑 159 is COUNTED from the merged enum, never added up from the
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop, which did not yet carry schedule_paused /
+            //    schedule_resumed.
+            // Merge of develop's Live Feed members with this branch's Schedules
+            // workspace pause/resume members: 157 base + 2 + 3 -> 162.
+            //
+            // 🛑 162 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
-            // (this one said 157, develop was at 153), so after a merge neither
+            // (this one said 159, develop was at 160), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(159);
+            expect(literals).toHaveLength(162);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

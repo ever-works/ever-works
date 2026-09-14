@@ -434,3 +434,42 @@ describe('HeartbeatLoop', () => {
 		});
 	});
 });
+
+describe('HeartbeatLoop onAccepted (Agent computers — the pending live-view hint)', () => {
+	function loopWith(responses: Array<HeartbeatResponse | Error>, onAccepted: (response: HeartbeatResponse) => void) {
+		const scheduler = fakeScheduler();
+		const scripted = scriptedClient(responses);
+		return new HeartbeatLoop({
+			client: scripted.client,
+			nodeId: NODE_ID,
+			secret: SECRET,
+			describe: async () => ({ platform: 'linux/x64', version: '0.1.0', capabilities: ['os:linux', 'attended'] }),
+			intervalMs: INTERVAL,
+			scheduler: scheduler.scheduler,
+			now: () => 1_700_000_000_000,
+			onAccepted
+		});
+	}
+
+	it('hands every accepted beat, including pendingComputerSessions, to the listener', async () => {
+		const seen: HeartbeatResponse[] = [];
+		const withPending: HeartbeatResponse = { ...ok, pendingComputerSessions: ['session-1'] };
+		const loop = loopWith([withPending], (response) => seen.push(response));
+		await loop.start();
+		expect(seen).toHaveLength(1);
+		expect(seen[0].pendingComputerSessions).toEqual(['session-1']);
+	});
+
+	it('never calls it for a failed beat, and a throwing listener cannot fail the beat', async () => {
+		const failing: HeartbeatResponse[] = [];
+		const failed = loopWith([new Error('ECONNREFUSED')], (response) => failing.push(response));
+		await failed.start();
+		expect(failing).toHaveLength(0);
+
+		const throwing = loopWith([ok], () => {
+			throw new Error('listener broke');
+		});
+		await throwing.start();
+		expect(throwing.getState().state).toBe('connected');
+	});
+});

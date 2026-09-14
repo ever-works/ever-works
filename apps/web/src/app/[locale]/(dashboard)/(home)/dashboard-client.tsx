@@ -17,6 +17,7 @@ import type { Mission } from '@/lib/api/missions';
 import { RecentTasks } from '@/components/dashboard/RecentTasks';
 import { AgentsPreviewSection } from '@/components/dashboard/AgentsPreviewSection';
 import { ApprovalsQueue } from '@/components/approvals/ApprovalsQueue';
+import { buildDecisionsHref } from '@/lib/api/inbox.shared';
 import { AttentionSection } from '@/components/dashboard/AttentionSection';
 import { SoonSection } from '@/components/dashboard/SoonSection';
 import type { Task } from '@/lib/api/tasks';
@@ -162,6 +163,16 @@ export default function DashboardClient({
                 {initialApprovals.length > 0 && (
                     <div className="py-8 lg:py-10">
                         <ApprovalsQueue initialApprovals={initialApprovals} />
+                        {/* My Decisions — the same approvals, ranked with every
+                            other decision waiting on the owner (questions,
+                            escalations) in the Inbox's decision view. */}
+                        <Link
+                            href={buildDecisionsHref({ tab: 'open' })}
+                            className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
+                            data-testid="approvals-see-all-decisions"
+                        >
+                            {t('approvals.seeAll')}
+                        </Link>
                     </div>
                 )}
                 {/* Dashboard blocks (spec §4.5) — Attention then Soon lead
