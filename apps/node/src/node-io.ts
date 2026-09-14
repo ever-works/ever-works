@@ -72,6 +72,40 @@ export function restrictFileToOwnerWindows(filePath: string): void {
 	});
 }
 
+/**
+ * `icacls` arguments that make a directory owner-only on Windows: inherited
+ * entries stripped, full control granted to `user` alone, and that grant
+ * inherited by every file (`OI`) and subdirectory (`CI`) created inside it
+ * later — a browser profile writes its cookies long after the directory
+ * was made.
+ */
+export function windowsOwnerOnlyDirectoryAclArgs(dirPath: string, user: string): string[] {
+	return [dirPath, '/inheritance:r', '/grant:r', `${user}:(OI)(CI)(F)`];
+}
+
+/**
+ * Owner-only ACL for a directory on Windows (an Agent's profile: its browser
+ * sessions and files). Asynchronous, so a slow `icacls` never stalls the
+ * node's heartbeat. Rejects when the ACL could not be applied; the caller
+ * fails closed.
+ */
+export function restrictDirectoryToOwnerWindows(dirPath: string): Promise<void> {
+	const user = process.env.USERDOMAIN
+		? `${process.env.USERDOMAIN}\\${process.env.USERNAME ?? ''}`
+		: (process.env.USERNAME ?? '');
+	if (!user.trim() || user.trim() === '\\' || user.trim().endsWith('\\')) {
+		return Promise.reject(new Error('Cannot determine the current Windows user to grant the directory to'));
+	}
+	return new Promise((resolve, reject) => {
+		execFile(
+			'icacls',
+			windowsOwnerOnlyDirectoryAclArgs(dirPath, user),
+			{ windowsHide: true, timeout: 10_000 },
+			(error) => (error ? reject(new Error(`icacls failed: ${error.message}`)) : resolve())
+		);
+	});
+}
+
 export function createConfigFileSystem(): ConfigFileSystem {
 	return {
 		readFile: async (filePath) => {

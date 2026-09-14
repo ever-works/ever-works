@@ -8,6 +8,7 @@ import * as connections from '../connections/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
+import * as feed from '../feed/index.js';
 import * as fleet from '../fleet/index.js';
 import * as form from '../form/index.js';
 import * as github from '../github/index.js';
@@ -49,6 +50,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
+	['feed', feed],
 	['fleet', fleet],
 	['form', form],
 	['github', github],
@@ -72,7 +74,7 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(22);
+		expect(exportLines).toBe(23);
 	});
 
 	it('has no name exported by two different areas', () => {

@@ -182,6 +182,83 @@ describe('AgentFileService', () => {
             expect(repo.updateById).not.toHaveBeenCalled();
         });
 
+        describe('activity actor', () => {
+            const RUN = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+            it('names the signed-in user as the actor of a save and of a refused save', async () => {
+                repo.findByIdAndUser.mockResolvedValueOnce(makeAgent({ contentHash: null }));
+                await svc.write({ userId: 'u1', agentId: 'a1', name: 'SOUL.md', body: 'A' });
+                repo.findByIdAndUser.mockResolvedValueOnce(makeAgent({ contentHash: 'current' }));
+                await expect(
+                    svc.write({
+                        userId: 'u1',
+                        agentId: 'a1',
+                        name: 'SOUL.md',
+                        body: 'B',
+                        expectedHash: 'stale',
+                    }),
+                ).rejects.toThrow(/etag mismatch/);
+
+                expect(activity.log).toHaveBeenCalledTimes(2);
+                const [edited, reverted] = activity.log.mock.calls.map(
+                    ([payload]: [Record<string, any>]) => payload,
+                );
+                expect(edited.actionType).toBe(ActivityActionType.AGENT_FILE_EDITED);
+                expect(reverted.actionType).toBe(ActivityActionType.AGENT_FILE_REVERTED);
+                for (const payload of [edited, reverted]) {
+                    expect(payload.actorKind).toBe('user');
+                    expect(payload.actorAgentId).toBeUndefined();
+                    // The agent whose file changed stays referenced as the subject.
+                    expect(payload.details.agentId).toBe('a1');
+                    expect(payload.details.runId).toBeUndefined();
+                }
+            });
+
+            it('names the agent as the actor when it saves its own file from a run', async () => {
+                repo.findByIdAndUser.mockResolvedValueOnce(makeAgent({ contentHash: null }));
+                await svc.write({
+                    userId: 'u1',
+                    agentId: 'a1',
+                    name: 'TOOLS.md',
+                    body: 'A',
+                    actor: 'agent',
+                    runId: RUN,
+                });
+                repo.findByIdAndUser.mockResolvedValueOnce(makeAgent({ contentHash: 'current' }));
+                await expect(
+                    svc.write({
+                        userId: 'u1',
+                        agentId: 'a1',
+                        name: 'TOOLS.md',
+                        body: 'B',
+                        expectedHash: 'stale',
+                        actor: 'agent',
+                        runId: RUN,
+                    }),
+                ).rejects.toThrow(/etag mismatch/);
+
+                for (const [payload] of activity.log.mock.calls) {
+                    expect(payload).toMatchObject({ actorKind: 'agent', actorAgentId: 'a1' });
+                    expect(payload.details).toMatchObject({ agentId: 'a1', runId: RUN });
+                }
+            });
+
+            it('does not record a run id that is not a uuid', async () => {
+                repo.findByIdAndUser.mockResolvedValueOnce(makeAgent({ contentHash: null }));
+                await svc.write({
+                    userId: 'u1',
+                    agentId: 'a1',
+                    name: 'SOUL.md',
+                    body: 'A',
+                    actor: 'agent',
+                    runId: 'no-run',
+                });
+                const [payload] = activity.log.mock.calls[0];
+                expect(payload.actorKind).toBe('agent');
+                expect(payload.details.runId).toBeUndefined();
+            });
+        });
+
         it('hash differs across distinct file edits (content addressing)', async () => {
             repo.findByIdAndUser.mockResolvedValueOnce(makeAgent({ contentHash: null }));
             const r1 = await svc.write({ userId: 'u1', agentId: 'a1', name: 'SOUL.md', body: 'A' });

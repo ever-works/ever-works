@@ -35,6 +35,9 @@ export * from './release/index.js';
 // Connections (AW-15) — plain-English scope presets expressed on the
 // tool-grant lattice, and the shared connection-health vocabulary.
 export * from './connections/index.js';
+// Live Feed — the narrated, filterable view of the activity log. Structure
+// only (narration keys + typed destinations); renderers own the words.
+export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';

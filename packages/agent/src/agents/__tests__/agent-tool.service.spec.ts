@@ -130,6 +130,27 @@ describe('AgentToolService.resolveAllowedTools', () => {
             expect((second as any).error).toMatch(/already edited once in this run/);
         });
 
+        it('saves as the agent itself, inside its run', async () => {
+            files.write.mockResolvedValue({ newHash: 'h' });
+            const tools = svc.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canEditAgentFiles: true },
+                }),
+                { runId: 'r1', editsThisRunByFile: new Set() },
+            );
+            const tool = tools.find((t) => t.name === 'editAgentFile')!;
+            await tool.invoke({ name: 'SOUL.md', body: '# v1', expectedHash: 'h0' });
+            expect(files.write).toHaveBeenCalledWith({
+                userId: 'u1',
+                agentId: 'a1',
+                name: 'SOUL.md',
+                body: '# v1',
+                expectedHash: 'h0',
+                actor: 'agent',
+                runId: 'r1',
+            });
+        });
+
         it('allows edits to DIFFERENT files in the same run', async () => {
             files.write.mockResolvedValue({ newHash: 'h' });
             const ctx = { runId: 'r1', editsThisRunByFile: new Set<string>() };
