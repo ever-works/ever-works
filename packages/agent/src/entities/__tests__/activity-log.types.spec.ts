@@ -84,6 +84,13 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Knowledge library — shelf curation (filing, archive, export)
+            // and shared-folder rename.
+            ['KB_DOCUMENT_ARCHIVED', 'kb_document_archived'],
+            ['KB_DOCUMENT_UNARCHIVED', 'kb_document_unarchived'],
+            ['KB_DOCUMENT_FILED', 'kb_document_filed'],
+            ['KB_DOCUMENT_EXPORTED', 'kb_document_exported'],
+            ['MEMORY_FOLDER_RENAMED', 'memory_folder_renamed'],
             // Live Feed — a run starting / finishing / failing for every
             // trigger kind other than heartbeat.
             ['AGENT_RUN_STARTED', 'agent_run_started'],
@@ -149,8 +156,10 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
+            // +5 kb_document_archived / _unarchived / _filed / _exported and
+            //    memory_folder_renamed (Knowledge library shelf) -> 162.
             //
-            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // 🛑 162 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -158,8 +167,9 @@ describe('activity-log.types', () => {
             // ActivityStatus, and including it inflates the total by 5.
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
-            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
-            expect(literals).toHaveLength(160);
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) and +5 knowledge
+            //    library literals -> 165.
+            expect(literals).toHaveLength(165);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

@@ -126,6 +126,18 @@ export enum ActivityActionType {
     MEMORY_FOLDER_CREATED = 'memory_folder_created',
     MEMORY_FOLDER_DELETED = 'memory_folder_deleted',
     MEMORY_FOLDER_SYNCED = 'memory_folder_synced',
+    // Knowledge library — curation of the shared shelf. Read / unread and
+    // pins are personal and high-frequency, so they are never logged.
+    //   ARCHIVED   `{ documentId, workId, organizationId, folderId }`
+    //   UNARCHIVED `{ documentId, workId, organizationId, folderId, restoredToUnfiled }`
+    //   FILED      `{ documentId, workId, organizationId, fromFolderId, toFolderId }`
+    //   EXPORTED   `{ documentIds, format, documentCount, missingCount }`
+    //   MEMORY_FOLDER_RENAMED `{ folderId, oldPath, newPath, scope }`
+    KB_DOCUMENT_ARCHIVED = 'kb_document_archived',
+    KB_DOCUMENT_UNARCHIVED = 'kb_document_unarchived',
+    KB_DOCUMENT_FILED = 'kb_document_filed',
+    KB_DOCUMENT_EXPORTED = 'kb_document_exported',
+    MEMORY_FOLDER_RENAMED = 'memory_folder_renamed',
     // EW-643 Phase 3 slice 4b — wikilink rename rewriter. Fires when a
     // KB document is renamed and the rewriter sweeps the rest of the
     // Work's docs replacing `[[oldPath]]` with `[[newPath]]`. Details
