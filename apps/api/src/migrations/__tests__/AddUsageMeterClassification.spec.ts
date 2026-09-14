@@ -12,6 +12,8 @@ import { AddUsageMeterClassification1791170000000 } from '../1791170000000-AddUs
  *  - `missionId` IS backfilled from the row's Task, and only from the Task;
  *  - a second `up()` — and an `up()` over a partially applied earlier attempt —
  *    converges without error and changes nothing;
+ *  - an index whose name exists over the wrong columns, or the right columns
+ *    in the wrong order, is rebuilt — the guard checks columns, not the name;
  *  - `down()` removes exactly what `up()` added.
  */
 describe('AddUsageMeterClassification1791170000000', () => {
@@ -108,6 +110,13 @@ describe('AddUsageMeterClassification1791170000000', () => {
         return rows.map((row) => row.name);
     }
 
+    async function indexColumns(name: string): Promise<string[]> {
+        const rows: Array<{ seqno: number; name: string }> = await dataSource.query(
+            `PRAGMA index_info("${name}")`,
+        );
+        return [...rows].sort((a, b) => a.seqno - b.seqno).map((row) => row.name);
+    }
+
     async function missionOf(id: string): Promise<string | null> {
         const [row] = await dataSource.query(
             `SELECT "missionId" FROM "plugin_usage_events" WHERE "id" = ?`,
@@ -165,6 +174,56 @@ describe('AddUsageMeterClassification1791170000000', () => {
 
         expect(await columnNames()).toEqual(expect.arrayContaining(NEW_COLUMNS));
         expect(await indexNames()).toEqual(expect.arrayContaining(NEW_INDEXES));
+        // The name was taken by an index over the wrong column. A name-only
+        // guard keeps it; the Mission reads need (missionId, occurredAt).
+        expect(await indexColumns('idx_plugin_usage_mission_occurred')).toEqual([
+            'missionId',
+            'occurredAt',
+        ]);
+    });
+
+    it('rebuilds an index of the right name whose columns are in the wrong order', async () => {
+        await dataSource.query(
+            `ALTER TABLE "plugin_usage_events" ADD COLUMN "priceKey" varchar(64)`,
+        );
+        await dataSource.query(
+            `CREATE INDEX "idx_plugin_usage_pricekey_user_occurred" ON "plugin_usage_events" ("priceKey", "userId", "occurredAt")`,
+        );
+
+        await expect(up()).resolves.toBeUndefined();
+
+        expect(await indexColumns('idx_plugin_usage_pricekey_user_occurred')).toEqual([
+            'userId',
+            'priceKey',
+            'occurredAt',
+        ]);
+    });
+
+    it('creates every index with its declared columns and leaves a correct one untouched', async () => {
+        await up();
+
+        expect(await indexColumns('idx_plugin_usage_meter_user_occurred')).toEqual([
+            'userId',
+            'meter',
+            'occurredAt',
+        ]);
+        expect(await indexColumns('idx_plugin_usage_pricekey_user_occurred')).toEqual([
+            'userId',
+            'priceKey',
+            'occurredAt',
+        ]);
+        expect(await indexColumns('idx_plugin_usage_mission_occurred')).toEqual([
+            'missionId',
+            'occurredAt',
+        ]);
+
+        // A second run over correct indexes drops nothing.
+        const runner = dataSource.createQueryRunner();
+        const query = jest.spyOn(runner, 'query');
+        await migration.up(runner);
+        await runner.release();
+        const dropped = query.mock.calls.filter(([sql]) => /DROP INDEX/i.test(String(sql)));
+        expect(dropped).toHaveLength(0);
     });
 
     it('down() removes exactly the columns and indexes up() added', async () => {
