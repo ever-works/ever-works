@@ -4,6 +4,7 @@ import {
 	SKILL_CAPTURE_BODY_MIN_CHARS,
 	SKILL_CAPTURE_BUDGET_MS,
 	SKILL_CARD_STATES,
+	SKILL_CARD_STATES_NEEDING_ATTENTION,
 	SKILL_PROVENANCES,
 	SKILL_READINESS_AGENTS_MAX,
 	SKILL_READINESS_FILTERS,
@@ -22,6 +23,7 @@ import {
 	SKILL_TAG_MAX_LENGTH,
 	SKILL_TAG_PATTERN,
 	SKILL_TAGS_PER_SKILL_MAX,
+	countSkillsNeedingAttention,
 	deriveSkillCardState,
 	isSkillCardState,
 	isSkillReadinessState,
@@ -122,10 +124,51 @@ describe('deriveSkillCardState', () => {
 		expect(deriveSkillCardState({ readiness: 'ready', disabledAt: '2026-09-01T00:00:00.000Z' })).toBe('disabled');
 	});
 
-	it('only ready asks nothing of a person', () => {
+	it('only ready and not-checked-yet ask nothing of a person', () => {
 		for (const state of SKILL_CARD_STATES) {
-			expect(skillCardStateNeedsAttention(state)).toBe(state !== 'ready');
+			expect(skillCardStateNeedsAttention(state)).toBe(state !== 'ready' && state !== 'unknown');
 		}
+		expect([...SKILL_CARD_STATES_NEEDING_ATTENTION]).toEqual([
+			'needs_setup',
+			'missing_requirements',
+			'blocked_by_access',
+			'check_failed',
+			'disabled',
+			'needs_review'
+		]);
+	});
+});
+
+describe('countSkillsNeedingAttention', () => {
+	const zero = Object.fromEntries(SKILL_CARD_STATES.map((state) => [state, 0])) as Record<
+		(typeof SKILL_CARD_STATES)[number],
+		number
+	>;
+
+	it('a shelf of Skills nothing has checked yet needs nobody', () => {
+		expect(countSkillsNeedingAttention({ ...zero, unknown: 34 })).toBe(0);
+	});
+
+	it('counts real problems, never ready or not-checked-yet', () => {
+		expect(
+			countSkillsNeedingAttention({
+				...zero,
+				ready: 20,
+				unknown: 9,
+				needs_setup: 1,
+				missing_requirements: 2,
+				blocked_by_access: 3,
+				check_failed: 4,
+				disabled: 5,
+				needs_review: 6
+			})
+		).toBe(21);
+	});
+
+	it('treats a missing bucket or missing counts as zero', () => {
+		expect(countSkillsNeedingAttention({ check_failed: 2 })).toBe(2);
+		expect(countSkillsNeedingAttention(null)).toBe(0);
+		expect(countSkillsNeedingAttention(undefined)).toBe(0);
 	});
 });
 

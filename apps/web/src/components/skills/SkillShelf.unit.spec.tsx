@@ -107,6 +107,50 @@ describe('SkillShelf', () => {
         expect(screen.getByTestId('skill-shelf-summary').textContent).toBe('attentionAllReady(28)');
     });
 
+    it('a shelf of Skills nothing has checked yet reports 0 needing attention', () => {
+        renderShelf({
+            counts: {
+                ...COUNTS,
+                ready: 0,
+                needs_setup: 0,
+                missing_requirements: 0,
+                unknown: 34,
+            },
+        });
+        // Not "34 of 34 Skills need you", and not "All 34 Skills are ready" either.
+        expect(screen.getByTestId('skill-shelf-summary').textContent).toBe(
+            'attentionNoneNotChecked(34,34)',
+        );
+        expect(screen.queryByTestId('skill-shelf-attention-toggle')).toBeNull();
+    });
+
+    it('counts real problems only, leaving not-checked-yet Skills out of the number', () => {
+        renderShelf({
+            counts: {
+                ...COUNTS,
+                ready: 20,
+                needs_setup: 1,
+                missing_requirements: 1,
+                blocked_by_access: 1,
+                check_failed: 2,
+                disabled: 1,
+                needs_review: 1,
+                unknown: 7,
+            },
+        });
+        expect(screen.getByTestId('skill-shelf-summary').textContent).toBe(
+            'attentionSummary(7,34)',
+        );
+    });
+
+    it('keeps not-checked-yet selectable in the state filter', () => {
+        const { onFiltersChange } = renderShelf();
+        const select = screen.getByTestId('skill-shelf-readiness') as HTMLSelectElement;
+        expect([...select.options].map((option) => option.value)).toContain('unknown');
+        fireEvent.change(select, { target: { value: 'unknown' } });
+        expect(onFiltersChange).toHaveBeenCalledWith({ readiness: 'unknown' });
+    });
+
     it('changes sort and readiness through the host, omitting defaults', () => {
         const { onFiltersChange } = renderShelf();
         fireEvent.change(screen.getByTestId('skill-shelf-sort'), { target: { value: 'name' } });

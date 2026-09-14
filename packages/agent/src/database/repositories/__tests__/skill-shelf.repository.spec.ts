@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { DataSource, type Repository } from 'typeorm';
+import { countSkillsNeedingAttention } from '@ever-works/contracts';
 import { ENTITIES } from '../../_entities-inventory';
 import { Skill } from '../../../entities/skill.entity';
 import { SkillBinding } from '../../../entities/skill-binding.entity';
@@ -173,13 +174,39 @@ describe('Skills shelf repositories (better-sqlite3)', () => {
             expect(await slugs({ readiness: 'disabled' })).toEqual(['off']);
             expect(await slugs({ readiness: 'needs_review' })).toEqual(['draft']);
             expect(await slugs({ readiness: 'unknown' })).toEqual(['fresh']);
+            // "Not checked yet" is selectable on its own, but is not a problem.
             expect(await slugs({ readiness: 'attention' })).toEqual([
                 'draft',
-                'fresh',
                 'missing',
                 'off',
                 'setup',
             ]);
+        });
+
+        it('a shelf of Skills nothing has checked yet has nothing needing attention', async () => {
+            for (let i = 0; i < 4; i += 1) await makeSkill({ slug: `fresh-${i}` });
+
+            const counts = await skills.countsByCardState(USER);
+            expect(counts.unknown).toBe(4);
+            expect(countSkillsNeedingAttention(counts)).toBe(0);
+            expect(await slugs({ readiness: 'attention' })).toEqual([]);
+            // Still reachable through the explicit state filter.
+            expect(await slugs({ readiness: 'unknown' })).toHaveLength(4);
+        });
+
+        it('counts and selects only real problems as needing attention', async () => {
+            await seedStates();
+            await makeSkill({ slug: 'failed', readiness: 'check_failed' });
+            await makeSkill({ slug: 'blocked', readiness: 'blocked_by_access' });
+            await makeSkill({ slug: 'bogus', readiness: 'not-a-state' as never });
+
+            const counts = await skills.countsByCardState(USER);
+            const attention = await slugs({ readiness: 'attention' });
+            expect(attention).toEqual(['blocked', 'draft', 'failed', 'missing', 'off', 'setup']);
+            // The summary number and the filter agree, row for row.
+            expect(countSkillsNeedingAttention(counts)).toBe(attention.length);
+            // An unrecognised stored verdict reads as not-checked-yet, not as a problem.
+            expect(counts.unknown).toBe(2);
         });
 
         it('filters by the on/off switch', async () => {
@@ -241,6 +268,20 @@ describe('Skills shelf repositories (better-sqlite3)', () => {
             expect(byAttention.rows[0].slug).toBe('a-setup');
             const byDefault = await skills.findByUserIdFiltered(USER, {});
             expect(byDefault.rows).toHaveLength(3);
+        });
+
+        it('sorts not-checked-yet Skills with the ones that need nothing', async () => {
+            const t0 = Date.now();
+            await makeSkill({ slug: 'fresh', updatedAt: new Date(t0 - 1000) });
+            await makeSkill({
+                slug: 'failed',
+                readiness: 'check_failed',
+                updatedAt: new Date(t0 - 3000),
+            });
+            await makeSkill({ slug: 'ready', readiness: 'ready', updatedAt: new Date(t0 - 2000) });
+
+            const byAttention = await skills.findByUserIdFiltered(USER, { sort: 'attention' });
+            expect(byAttention.rows.map((s) => s.slug)).toEqual(['failed', 'fresh', 'ready']);
         });
 
         it('filters by provenance against caller-supplied provider ids', async () => {

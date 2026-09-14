@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { Plus } from 'lucide-react';
 import {
     SKILL_CARD_STATES,
+    countSkillsNeedingAttention,
     type SkillReadinessFilter,
     type SkillShelfSort,
 } from '@ever-works/contracts';
@@ -49,7 +50,10 @@ const SORT_KEYS = {
  * Skills shelf — the installed Skills as a filterable grid.
  *
  * Above the grid: the summary line ("{n} of {total} Skills need you"), which
- * is itself the needs-attention filter; the sort and state controls; and the
+ * is itself the needs-attention filter. It counts real problems only — a Skill
+ * nothing has checked yet ("Not checked yet") is not one, so a shelf of
+ * unchecked Skills says nothing needs you rather than that everything does.
+ * Then the sort and state controls (where `unknown` stays selectable), and the
  * tag chips. The grid renders from server-fetched rows, badges included, so
  * nothing reflows after first paint. Three empty states are kept distinct:
  * no Skills at all, nothing matching the filters, and a page past the end.
@@ -71,7 +75,8 @@ export function SkillShelf({
     const total = counts
         ? SKILL_CARD_STATES.reduce((sum, state) => sum + (counts[state] ?? 0), 0)
         : null;
-    const needAttention = counts && total !== null ? total - (counts.ready ?? 0) : null;
+    const needAttention = counts && total !== null ? countSkillsNeedingAttention(counts) : null;
+    const notChecked = counts?.unknown ?? 0;
     const attentionOn = filters.readiness === 'attention';
     const hasFilters = Boolean(filters.search.trim() || tags.length || filters.readiness);
 
@@ -101,6 +106,13 @@ export function SkillShelf({
                                 {attentionOn ? t('attentionFilterOff') : t('attentionFilterOn')}
                             </button>
                         </>
+                    ) : notChecked > 0 ? (
+                        <span
+                            data-testid="skill-shelf-summary"
+                            className="text-text-secondary dark:text-text-secondary-dark"
+                        >
+                            {t('attentionNoneNotChecked', { count: notChecked, total })}
+                        </span>
                     ) : (
                         <span
                             data-testid="skill-shelf-summary"

@@ -3,8 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository, type SelectQueryBuilder } from 'typeorm';
 import {
     SKILL_CARD_STATES,
+    SKILL_CARD_STATES_NEEDING_ATTENTION,
     SKILL_REVIEW_STATE_PROPOSED,
     deriveSkillCardState,
+    isSkillReadinessState,
     type SkillCardState,
     type SkillProvenance,
     type SkillReadinessDetail,
@@ -25,7 +27,10 @@ export interface ListSkillsFilter {
     // -- Skills shelf (all optional; omitted = exactly the pre-shelf query) --
     /** Skills carrying ALL of these normalised tags (AND). */
     tags?: string[];
-    /** A card state, or `attention` for every state except `ready`. */
+    /**
+     * A card state (`unknown` included), or `attention` for the states in
+     * `SKILL_CARD_STATES_NEEDING_ATTENTION` — never `ready`, never `unknown`.
+     */
     readiness?: SkillReadinessFilter;
     /** Where the Skill came from; resolved against `provenanceSources`. */
     provenance?: SkillProvenance;
@@ -52,6 +57,21 @@ export interface SkillProvenanceSources {
 export type SkillCardStateCounts = Record<SkillCardState, number>;
 
 const NOT_IN_REVIEW = `(skill.reviewState IS NULL OR skill.reviewState <> '${SKILL_REVIEW_STATE_PROPOSED}')`;
+
+/**
+ * The SQL twin of `skillCardStateNeedsAttention`: switched off, in review, or a
+ * stored verdict that is a real problem. `ready` and `unknown` ("Not checked
+ * yet") are not in the list, and neither is an unrecognised stored value —
+ * which `deriveSkillCardState` also reads as `unknown`. Built from the shared
+ * contracts list (constants, never input), so the filter, the sort and the
+ * web summary cannot disagree about what needs a person.
+ */
+const PROBLEM_READINESS_SQL = SKILL_CARD_STATES_NEEDING_ATTENTION.filter((state) =>
+    isSkillReadinessState(state),
+)
+    .map((state) => `'${state}'`)
+    .join(', ');
+const NEEDS_ATTENTION = `(skill.disabledAt IS NOT NULL OR skill.reviewState = '${SKILL_REVIEW_STATE_PROPOSED}' OR skill.readiness IN (${PROBLEM_READINESS_SQL}))`;
 
 /**
  * Skills feature — Phase 8.4 (`features/skills/plan.md §2`).
@@ -138,7 +158,10 @@ export class SkillRepository {
 
     /**
      * Skills shelf: how many of the user's Skills sit in each card state, for
-     * the "{n} of {total} Skills need you" line. Honours the owner filters but
+     * the "{n} of {total} Skills need you" line. `unknown` ("Not checked yet")
+     * is its own bucket; the "need you" number is `countSkillsNeedingAttention`
+     * over these counts, which leaves it (and `ready`) out — the same set the
+     * `attention` filter selects. Honours the owner filters but
      * deliberately NOT search / tags / readiness / enabled: the summary
      * describes the whole shelf, so it does not jump while a person narrows
      * the grid.
@@ -281,9 +304,7 @@ export class SkillRepository {
                     `skill.reviewState = '${SKILL_REVIEW_STATE_PROPOSED}'`,
                 );
             } else if (filter.readiness === 'attention') {
-                qb.andWhere(
-                    `NOT (skill.readiness = 'ready' AND skill.disabledAt IS NULL AND ${NOT_IN_REVIEW})`,
-                );
+                qb.andWhere(NEEDS_ATTENTION);
             } else {
                 qb.andWhere('skill.disabledAt IS NULL')
                     .andWhere(NOT_IN_REVIEW)
@@ -333,10 +354,10 @@ export class SkillRepository {
             return;
         }
         if (sort === 'attention') {
-            qb.orderBy(
-                `CASE WHEN skill.readiness = 'ready' AND skill.disabledAt IS NULL AND ${NOT_IN_REVIEW} THEN 1 ELSE 0 END`,
-                'ASC',
-            ).addOrderBy('skill.updatedAt', 'DESC');
+            qb.orderBy(`CASE WHEN ${NEEDS_ATTENTION} THEN 0 ELSE 1 END`, 'ASC').addOrderBy(
+                'skill.updatedAt',
+                'DESC',
+            );
             return;
         }
         qb.orderBy('skill.updatedAt', 'DESC');

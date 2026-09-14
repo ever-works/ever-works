@@ -42,7 +42,24 @@ export const SKILL_CARD_STATES = [...SKILL_READINESS_STATES, 'disabled', 'needs_
 
 export type SkillCardState = (typeof SKILL_CARD_STATES)[number];
 
-/** Readiness filter values accepted by the shelf: any card state, or every state except `ready`. */
+/**
+ * The card states that ask something of a person. `ready` asks nothing, and
+ * neither does `unknown`: a Skill nothing has checked yet is not a problem, so
+ * a freshly deployed shelf does not claim that every Skill needs its owner.
+ */
+export const SKILL_CARD_STATES_NEEDING_ATTENTION = [
+	'needs_setup',
+	'missing_requirements',
+	'blocked_by_access',
+	'check_failed',
+	'disabled',
+	'needs_review'
+] as const satisfies readonly SkillCardState[];
+
+/**
+ * Readiness filter values accepted by the shelf: any card state (`unknown`
+ * included), or `attention` for {@link SKILL_CARD_STATES_NEEDING_ATTENTION}.
+ */
 export const SKILL_READINESS_FILTERS = [...SKILL_CARD_STATES, 'attention'] as const;
 
 export type SkillReadinessFilter = (typeof SKILL_READINESS_FILTERS)[number];
@@ -179,9 +196,23 @@ export function deriveSkillCardState(input: {
 	return isSkillReadinessState(input.readiness) ? input.readiness : 'unknown';
 }
 
-/** True for every card state that asks something of a person. */
+/**
+ * True for every card state that asks something of a person — never `ready`,
+ * and never `unknown` ("Not checked yet").
+ */
 export function skillCardStateNeedsAttention(state: SkillCardState): boolean {
-	return state !== 'ready';
+	return (SKILL_CARD_STATES_NEEDING_ATTENTION as readonly string[]).includes(state);
+}
+
+/**
+ * How many Skills need a person, from per-card-state counts: the sum over
+ * {@link SKILL_CARD_STATES_NEEDING_ATTENTION}. A missing bucket counts as 0.
+ */
+export function countSkillsNeedingAttention(
+	counts: Partial<Record<SkillCardState, number>> | null | undefined
+): number {
+	if (!counts) return 0;
+	return SKILL_CARD_STATES_NEEDING_ATTENTION.reduce((sum, state) => sum + (Number(counts[state]) || 0), 0);
 }
 
 /** Normalise one raw tag. Returns `null` when nothing usable is left. */
