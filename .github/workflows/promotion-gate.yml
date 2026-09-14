@@ -31,7 +31,7 @@ name: Promotion Gate
 # over-read: on a PR into `stage` the `e2e-result` job below SKIPS (its
 # `if:` requires a `stage` head), so a green gate there means the NODE
 # CONTRACT held and nothing more. That is not an oversight: e2e.yml runs on
-# push to `develop` only, so the develop -> stage PR shows zero e2e shards
+# push to `stage` only, so the develop -> stage PR shows zero e2e shards
 # BY DESIGN and there is no e2e signal to gate on. The first e2e result for
 # a batch arrives on `stage` and is what the SECOND rung gates on.
 on:
@@ -52,7 +52,7 @@ jobs:
     # Only gate promotions from stage. Hotfix branches targeting main directly
     # are a different conversation and are not covered here, and so is the
     # develop -> stage rung, which has no e2e result to consult (e2e.yml runs
-    # on push to `develop` only).
+    # on push to `stage` only).
     #
     # This job SKIPS in both those cases, and a skipped job reports as SUCCESS
     # in branch protection. The release promotion lane does not read job
@@ -212,9 +212,20 @@ jobs:
   #     red run followed by a label toggle would flip the gate green.
   #
   # Like `e2e-result`, being red is only advisory until this check is added to
-  # the branch-protection list in repository settings. The genuinely-required
-  # half is that these same specs run inside `pnpm test` under `lint-and-test`
-  # (see ci.yml), which IS required today.
+  # the branch-protection list in repository settings.
+  #
+  # UPDATED 2026-09-14. This used to end "...the genuinely-required half is that
+  # these same specs run inside `pnpm test` under `lint-and-test` (see ci.yml),
+  # which IS required today." Both halves of that stopped being true on 2026-09-14:
+  # `lint-and-test` no longer runs on pull requests (ci.yml was narrowed to pushes
+  # on stage/main), and it was removed from the `develop` branch-protection
+  # required-checks list in the same change, because a required check that can
+  # never report blocks every PR.
+  #
+  # So THIS JOB is now the only automatic check on a promotion PR, on either rung.
+  # It is still advisory-by-default. If you want one enforced gate on the cascade,
+  # this is the check to add to branch protection on `stage` and `main`:
+  #   "node contract must hold for the commit being promoted"
   node-contract:
     name: node contract must hold for the commit being promoted
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
