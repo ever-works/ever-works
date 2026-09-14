@@ -1,10 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import {
+    EMPTY_MEMORY_FACT_LIST,
     buildMemoryFactsQuery,
     refusalMessage,
+    settleInitialMemoryFacts,
     viewFilter,
     viewOfFact,
+    type MemoryFactListDto,
 } from './memory-facts-types';
+
+describe('settleInitialMemoryFacts', () => {
+    it('passes a loaded page through, marked as loaded — even an empty one', async () => {
+        const empty: MemoryFactListDto = {
+            facts: [],
+            total: 0,
+            counts: { active: 0, proposed: 0, forgotten: 0, pinned: 0 },
+            semantic: true,
+        };
+        await expect(settleInitialMemoryFacts(Promise.resolve(empty))).resolves.toEqual({
+            facts: empty,
+            loadFailed: false,
+        });
+    });
+
+    it('never rejects, and tells a failed load apart from an empty workspace', async () => {
+        await expect(
+            settleInitialMemoryFacts(Promise.reject(new Error('API unavailable'))),
+        ).resolves.toEqual({ facts: EMPTY_MEMORY_FACT_LIST, loadFailed: true });
+    });
+});
 
 describe('memory facts query helpers', () => {
     it('maps each view onto the API status / pinned filter', () => {

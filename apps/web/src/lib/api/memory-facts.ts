@@ -3,6 +3,8 @@ import { serverFetch } from './server-api';
 import {
     buildMemoryFactsQuery,
     EMPTY_MEMORY_FACT_LIST,
+    settleInitialMemoryFacts,
+    type InitialMemoryFacts,
     type MemoryFactListDto,
     type MemoryFactsQuery,
     type MemoryFactStatsDto,
@@ -29,5 +31,5 @@ export const memoryFactsAPI = {
     },
 };
 
-export { EMPTY_MEMORY_FACT_LIST };
-export type { MemoryFactListDto, MemoryFactsQuery, MemoryFactStatsDto };
+export { EMPTY_MEMORY_FACT_LIST, settleInitialMemoryFacts };
+export type { InitialMemoryFacts, MemoryFactListDto, MemoryFactsQuery, MemoryFactStatsDto };

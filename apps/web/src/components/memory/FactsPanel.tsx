@@ -26,6 +26,11 @@ import { MemoryRail } from './MemoryRail';
 interface FactsPanelProps {
     /** First page of the "All" view, server-fetched by the page. */
     initial: MemoryFactListDto;
+    /**
+     * The server-side fetch of `initial` failed, so `initial` is only a
+     * placeholder: show the load error with Retry, never an empty workspace.
+     */
+    initialLoadFailed?: boolean;
     /** Opens the existing consolidation review — the "Tidy up" action. */
     onTidyUp?: () => void;
 }
@@ -35,6 +40,38 @@ const UNDO_WINDOW_MS = 10_000;
 const SKELETON_ROWS = 6;
 
 type WriteResult = { ok: true; body: unknown } | { ok: false; message: string | null };
+
+/** Where a row sat before an optimistic change took it out of the list. */
+interface RowPlace {
+    /** Its index then, or -1 when it was not in the list at all. */
+    index: number;
+    /** The id of the row right after it then, if any. */
+    nextId: string | null;
+}
+
+function rowPlace(rows: readonly MemoryFactDto[], id: string): RowPlace {
+    const index = rows.findIndex((row) => row.id === id);
+    return { index, nextId: index >= 0 ? (rows[index + 1]?.id ?? null) : null };
+}
+
+/**
+ * Put one row back where it was — before the row that followed it, when that
+ * row is still listed — and count it back into the total. A no-op when the row
+ * is already listed again, or was never listed.
+ */
+function reinsertRow(
+    list: MemoryFactListDto,
+    fact: MemoryFactDto,
+    place: RowPlace,
+): MemoryFactListDto {
+    if (place.index < 0 || list.facts.some((row) => row.id === fact.id)) {
+        return list;
+    }
+    const nextIndex = place.nextId ? list.facts.findIndex((row) => row.id === place.nextId) : -1;
+    const at = nextIndex >= 0 ? nextIndex : Math.min(place.index, list.facts.length);
+    const facts = [...list.facts.slice(0, at), fact, ...list.facts.slice(at)];
+    return { ...list, facts, total: list.total + 1 };
+}
 
 /**
  * Memory ▸ Facts (AW-07) — the atomic tier of Memory, listed.
@@ -55,8 +92,11 @@ type WriteResult = { ok: true; body: unknown } | { ok: false; message: string | 
  * ## Optimism, deliberately uneven
  *
  * Pin, forget, restore, accept and discard move the row immediately and roll
- * back if the API refuses. An EDIT is not optimistic: a failed save must
- * never look saved, so the composer keeps the text until the API confirms.
+ * back if the API refuses — that one change only, and only while no newer
+ * list has replaced the one it was made on, so overlapping actions on
+ * different rows can never undo each other. An EDIT is not optimistic: a
+ * failed save must never look saved, so the composer keeps the text until the
+ * API confirms.
  *
  * ## States
  *
@@ -67,7 +107,7 @@ type WriteResult = { ok: true; body: unknown } | { ok: false; message: string | 
  *
  * Keys: `/` focuses the search box; `G` then `F` jumps to the first fact.
  */
-export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
+export function FactsPanel({ initial, initialLoadFailed, onTidyUp }: FactsPanelProps) {
     const t = useTranslations('dashboard.memoryPage.facts');
     const tForgetAll = useTranslations('dashboard.memoryPage.forgetAllDialog');
 
@@ -79,7 +119,7 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
     const [answeredQuery, setAnsweredQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [skeleton, setSkeleton] = useState(false);
-    const [loadFailed, setLoadFailed] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(initialLoadFailed === true);
     const [composer, setComposer] = useState<{ prefill: string } | null>(null);
     const [forgetAllOpen, setForgetAllOpen] = useState(false);
     const [busyIds, setBusyIds] = useState<ReadonlySet<string>>(new Set());
@@ -98,6 +138,12 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
     const queryRef = useRef(query);
     viewRef.current = view;
     queryRef.current = query;
+    // Bumped whenever the list is replaced wholesale (a page from the server,
+    // or a view switch clearing it). An optimistic change that fails rolls
+    // back only while the list is still the one it changed — once a newer
+    // list has landed, that list already reflects the server, and undoing
+    // the change on top of it would put back rows other actions removed.
+    const listEpochRef = useRef(0);
 
     const searching = answeredQuery.trim().length > 0;
 
@@ -139,6 +185,7 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
                 if (inflightRef.current !== controller) return;
                 setLoadFailed(false);
                 setAnsweredQuery(next.query.trim());
+                if (!next.cursor) listEpochRef.current += 1;
                 setData((previous) =>
                     next.cursor ? { ...body, facts: [...previous.facts, ...body.facts] } : body,
                 );
@@ -182,6 +229,7 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
         viewRef.current = next;
         setView(next);
         setActionError(null);
+        listEpochRef.current += 1;
         setData((previous) => ({ ...previous, facts: [], total: 0, nextCursor: undefined }));
         void runFetch({ view: next, query, showSkeleton: true });
     };
@@ -269,13 +317,18 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
             return next;
         });
 
-    /** Remove a row now; put it (and the counts) back if the API refuses. */
+    /**
+     * Remove a row now; put THAT row back if the API refuses. Only this
+     * change is undone — never a whole earlier copy of the list, which would
+     * also revive rows that other, successful actions removed meanwhile.
+     */
     const optimisticRemove = async (
         fact: MemoryFactDto,
         path: string,
         onSuccess?: (body: unknown) => void,
     ) => {
-        const snapshot = data;
+        const epoch = listEpochRef.current;
+        const place = rowPlace(data.facts, fact.id);
         setActionError(null);
         markBusy(fact.id, true);
         setData((previous) => ({
@@ -286,7 +339,9 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
         const result = await write(path, 'POST');
         markBusy(fact.id, false);
         if (!result.ok) {
-            setData(snapshot);
+            if (listEpochRef.current === epoch) {
+                setData((previous) => reinsertRow(previous, fact, place));
+            }
             setActionError(result.message ?? t('actionFailed'));
             return;
         }
@@ -326,7 +381,8 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
     };
 
     const togglePin = async (fact: MemoryFactDto) => {
-        const snapshot = data;
+        const epoch = listEpochRef.current;
+        const place = rowPlace(data.facts, fact.id);
         setActionError(null);
         markBusy(fact.id, true);
         const pinned = !fact.pinned;
@@ -346,7 +402,31 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
         });
         markBusy(fact.id, false);
         if (!result.ok) {
-            setData(snapshot);
+            if (listEpochRef.current === epoch) {
+                // Undo this pin change only: the flag on this row, the one
+                // count it moved, and the row itself if unpinning had taken it
+                // out of the Pinned view.
+                setData((previous) => {
+                    const withCount = {
+                        ...previous,
+                        counts: {
+                            ...previous.counts,
+                            pinned: Math.max(0, previous.counts.pinned + (pinned ? -1 : 1)),
+                        },
+                    };
+                    if (withCount.facts.some((row) => row.id === fact.id)) {
+                        return {
+                            ...withCount,
+                            facts: withCount.facts.map((row) =>
+                                row.id === fact.id ? { ...row, pinned: fact.pinned } : row,
+                            ),
+                        };
+                    }
+                    const restored = reinsertRow(withCount, fact, place);
+                    // The row came out of the list, not out of the total.
+                    return { ...restored, total: withCount.total };
+                });
+            }
             setActionError(result.message ?? t('actionFailed'));
         }
     };
@@ -413,7 +493,9 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
     const { facts, counts, total } = data;
     const liveCount = counts.active + counts.proposed;
     const memoryFull = counts.active >= MEMORY_FACT_ACTIVE_MAX;
-    const workspaceEmpty = !searching && view === 'all' && facts.length === 0 && liveCount === 0;
+    // A failed load knows nothing about the workspace: never call it empty.
+    const workspaceEmpty =
+        !loadFailed && !searching && view === 'all' && facts.length === 0 && liveCount === 0;
     rowRefs.current = [];
 
     return (
@@ -637,7 +719,7 @@ export function FactsPanel({ initial, onTidyUp }: FactsPanelProps) {
                                 </li>
                             ))}
                         </ul>
-                    ) : searching ? (
+                    ) : loadFailed ? null : searching ? (
                         <div
                             data-testid="memory-facts-no-results"
                             className="flex flex-col items-center gap-3 py-10 text-center"

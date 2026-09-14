@@ -99,6 +99,32 @@ export const EMPTY_MEMORY_FACT_LIST: MemoryFactListDto = {
     semantic: false,
 };
 
+/** The first page of facts as the page hands it to the panel. */
+export interface InitialMemoryFacts {
+    facts: MemoryFactListDto;
+    /**
+     * `true` when the server-side fetch failed. `facts` is then the empty
+     * placeholder, and the panel must say the load failed (with Retry) rather
+     * than present the workspace as having no facts.
+     */
+    loadFailed: boolean;
+}
+
+/**
+ * Settle the server-side first-page fetch without ever rejecting — the page
+ * must not 500 on a flaky API — while keeping "it failed" distinct from "it
+ * is empty".
+ */
+export async function settleInitialMemoryFacts(
+    load: Promise<MemoryFactListDto>,
+): Promise<InitialMemoryFacts> {
+    try {
+        return { facts: await load, loadFailed: false };
+    } catch {
+        return { facts: EMPTY_MEMORY_FACT_LIST, loadFailed: true };
+    }
+}
+
 /**
  * Pull the human message out of an API refusal body (`{ message }`, Nest's
  * `{ message: string | string[] }`, or a nested `{ message: { message } }`).

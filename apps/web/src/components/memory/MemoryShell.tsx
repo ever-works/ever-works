@@ -46,6 +46,11 @@ interface MemoryShellProps {
      * (and in specs) without it — the Facts block is simply absent.
      */
     facts?: MemoryFactListDto;
+    /**
+     * `true` when the page's server fetch of `facts` failed. The Facts block
+     * then shows its load error with Retry instead of an empty workspace.
+     */
+    factsLoadFailed?: boolean;
 }
 
 /** Facet kinds that map to a filter chip group. */
@@ -78,7 +83,7 @@ function formatDate(iso: string): string {
  * (they depend on cross-feature prerequisites — see the Memory spec
  * §2.4 / §4.3).
  */
-export function MemoryShell({ initial, meetings, facts }: MemoryShellProps) {
+export function MemoryShell({ initial, meetings, facts, factsLoadFailed }: MemoryShellProps) {
     const t = useTranslations('dashboard.memoryPage');
 
     const [data, setData] = useState<MemoryResponse>(initial);
@@ -287,7 +292,13 @@ export function MemoryShell({ initial, meetings, facts }: MemoryShellProps) {
             {/* Facts (AW-07) — the atomic tier of Memory, with the section rail
                 that jumps to every panel below. Additive: nothing below moved.
                 "Tidy up" reuses the existing consolidation pass. */}
-            {facts && <FactsPanel initial={facts} onTidyUp={() => void runConsolidation(false)} />}
+            {facts && (
+                <FactsPanel
+                    initial={facts}
+                    initialLoadFailed={factsLoadFailed}
+                    onTidyUp={() => void runConsolidation(false)}
+                />
+            )}
 
             {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
             <MemoryReviewPanel />

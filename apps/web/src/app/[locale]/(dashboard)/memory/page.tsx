@@ -3,8 +3,8 @@ import { getTranslations } from 'next-intl/server';
 import { memoryAPI, EMPTY_MEMORY_RESPONSE, type MemoryResponse } from '@/lib/api/memory';
 import {
     memoryFactsAPI,
-    EMPTY_MEMORY_FACT_LIST,
-    type MemoryFactListDto,
+    settleInitialMemoryFacts,
+    type InitialMemoryFacts,
 } from '@/lib/api/memory-facts';
 import { meetingsAPI, type Meeting } from '@/lib/api/meetings';
 import {
@@ -82,11 +82,12 @@ export default async function MemoryPage({
         }));
 
     // Memory facts (AW-07) — first page of the "All" view. Defensive like the
-    // two fetches above: a failure renders the Facts block empty (its own
-    // Retry and every write still work) instead of taking the page down.
-    const factsPromise: Promise<MemoryFactListDto> = memoryFactsAPI
-        .list({ view: 'all' })
-        .catch(() => EMPTY_MEMORY_FACT_LIST);
+    // two fetches above: a failure never takes the page down. It is not passed
+    // off as an empty workspace either — the Facts block says the load failed
+    // and offers Retry, and every write still works.
+    const factsPromise: Promise<InitialMemoryFacts> = settleInitialMemoryFacts(
+        memoryFactsAPI.list({ view: 'all' }),
+    );
 
     const [initial, works, meetingsResult, facts] = await Promise.all([
         initialPromise,
@@ -122,5 +123,12 @@ export default async function MemoryPage({
         },
     };
 
-    return <MemoryShell initial={initial} meetings={meetings} facts={facts} />;
+    return (
+        <MemoryShell
+            initial={initial}
+            meetings={meetings}
+            facts={facts.facts}
+            factsLoadFailed={facts.loadFailed}
+        />
+    );
 }

@@ -122,6 +122,23 @@ describe('FactsPanel', () => {
             fireEvent.click(screen.getByTestId('memory-facts-tidy-up'));
             expect(onTidyUp).toHaveBeenCalledTimes(1);
         });
+
+        it('says the first load failed, with Retry, instead of presenting an empty workspace', async () => {
+            fetchMock.mockResolvedValue(json(list([fact('f-1'), fact('f-2')])));
+            render(<FactsPanel initial={list([])} initialLoadFailed />);
+
+            expect(screen.getByTestId('memory-facts-load-error')).toHaveTextContent('loadFailed');
+            expect(screen.queryByTestId('memory-facts-empty')).toBeNull();
+            expect(screen.queryByTestId('memory-facts-empty-view')).toBeNull();
+            expect(screen.queryByTestId('memory-facts-add-first')).toBeNull();
+
+            fireEvent.click(screen.getByRole('button', { name: 'retry' }));
+
+            expect(await screen.findByTestId('fact-row-f-1')).toBeInTheDocument();
+            expect(screen.getByTestId('fact-row-f-2')).toBeInTheDocument();
+            expect(screen.queryByTestId('memory-facts-load-error')).toBeNull();
+            expect(calls()[0].url).toBe('/api/memory/facts?status=active&limit=50');
+        });
     });
 
     describe('search', () => {
@@ -329,6 +346,134 @@ describe('FactsPanel', () => {
                 'aria-pressed',
                 'false',
             );
+        });
+
+        describe('overlapping actions on different rows', () => {
+            const rowIds = () =>
+                screen
+                    .queryAllByTestId(/^fact-row-f-\d+$/)
+                    .map((row) => row.getAttribute('data-testid'));
+
+            it('a failed forget never revives a row that a newer, successful forget removed', async () => {
+                let finishFirst: (value: Response) => void = () => undefined;
+                fetchMock.mockImplementation((url: string) => {
+                    if (url === '/api/memory/facts/f-1/forget') {
+                        return new Promise<Response>((resolve) => (finishFirst = resolve));
+                    }
+                    if (url === '/api/memory/facts/f-2/forget') {
+                        return Promise.resolve(json({ id: 'f-2', status: 'forgotten' }));
+                    }
+                    // The server after f-2 was forgotten (f-1's forget has not landed).
+                    return Promise.resolve(json(list([fact('f-1')])));
+                });
+                render(<FactsPanel initial={list([fact('f-1'), fact('f-2')])} />);
+
+                fireEvent.click(screen.getByTestId('fact-forget-button-f-1'));
+                fireEvent.click(screen.getByTestId('fact-forget-button-f-2'));
+                // f-2's forget succeeds and its refresh lands first.
+                expect(await screen.findByTestId('fact-row-f-1')).toBeInTheDocument();
+
+                await act(async () => finishFirst(json({ message: 'nope' }, 500)));
+
+                expect(await screen.findByTestId('memory-facts-action-error')).toHaveTextContent(
+                    'nope',
+                );
+                expect(rowIds()).toEqual(['fact-row-f-1']);
+            });
+
+            it('puts back only the row whose forget failed, where it was, while another is still in flight', async () => {
+                let finishFirst: (value: Response) => void = () => undefined;
+                fetchMock.mockImplementation((url: string) => {
+                    if (url === '/api/memory/facts/f-1/forget') {
+                        return new Promise<Response>((resolve) => (finishFirst = resolve));
+                    }
+                    if (url === '/api/memory/facts/f-2/forget') {
+                        return new Promise<Response>(() => undefined);
+                    }
+                    return Promise.resolve(json(list([])));
+                });
+                render(
+                    <FactsPanel
+                        initial={list([fact('f-1'), fact('f-2'), fact('f-3')], { total: 3 })}
+                    />,
+                );
+
+                fireEvent.click(screen.getByTestId('fact-forget-button-f-1'));
+                fireEvent.click(screen.getByTestId('fact-forget-button-f-2'));
+                expect(rowIds()).toEqual(['fact-row-f-3']);
+
+                await act(async () => finishFirst(json({ message: 'nope' }, 500)));
+
+                // f-2 is still being forgotten: it stays out.
+                expect(rowIds()).toEqual(['fact-row-f-1', 'fact-row-f-3']);
+            });
+
+            it("a failed pin undoes only its own row and count, never another row's newer pin", async () => {
+                let finishFirst: (value: Response) => void = () => undefined;
+                fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+                    if (url === '/api/memory/facts/f-1' && init?.method === 'PATCH') {
+                        return new Promise<Response>((resolve) => (finishFirst = resolve));
+                    }
+                    if (url === '/api/memory/facts/f-2' && init?.method === 'PATCH') {
+                        return Promise.resolve(json(fact('f-2', { pinned: true })));
+                    }
+                    return Promise.resolve(json(list([])));
+                });
+                render(<FactsPanel initial={list([fact('f-1'), fact('f-2')])} />);
+
+                fireEvent.click(screen.getByTestId('fact-pin-button-f-1'));
+                fireEvent.click(screen.getByTestId('fact-pin-button-f-2'));
+                await waitFor(() =>
+                    expect(calls().filter((c) => c.init?.method === 'PATCH')).toHaveLength(2),
+                );
+
+                await act(async () =>
+                    finishFirst(json({ message: 'At most 20 facts can be pinned.' }, 409)),
+                );
+
+                expect(await screen.findByTestId('memory-facts-action-error')).toHaveTextContent(
+                    'At most 20',
+                );
+                expect(screen.getByTestId('fact-pin-button-f-1')).toHaveAttribute(
+                    'aria-pressed',
+                    'false',
+                );
+                expect(screen.getByTestId('fact-pin-button-f-2')).toHaveAttribute(
+                    'aria-pressed',
+                    'true',
+                );
+                expect(screen.getByTestId('memory-rail-count-pinned')).toHaveTextContent('1');
+            });
+
+            it('puts an unpinned row back into the Pinned view, in place, when the unpin fails', async () => {
+                fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+                    if (init?.method === 'PATCH') {
+                        return Promise.resolve(json({ message: 'nope' }, 500));
+                    }
+                    return Promise.resolve(
+                        json(
+                            list([fact('f-1', { pinned: true }), fact('f-2', { pinned: true })], {
+                                counts: { active: 2, proposed: 0, forgotten: 0, pinned: 2 },
+                            }),
+                        ),
+                    );
+                });
+                render(<FactsPanel initial={list([fact('f-1'), fact('f-2')])} />);
+                fireEvent.click(screen.getByTestId('memory-rail-view-pinned'));
+                expect(await screen.findByTestId('fact-row-f-2')).toBeInTheDocument();
+
+                fireEvent.click(screen.getByTestId('fact-pin-button-f-1'));
+
+                expect(await screen.findByTestId('memory-facts-action-error')).toHaveTextContent(
+                    'nope',
+                );
+                expect(rowIds()).toEqual(['fact-row-f-1', 'fact-row-f-2']);
+                expect(screen.getByTestId('fact-pin-button-f-1')).toHaveAttribute(
+                    'aria-pressed',
+                    'true',
+                );
+                expect(screen.getByTestId('memory-rail-count-pinned')).toHaveTextContent('2');
+            });
         });
 
         it('forgets everything behind the typed confirmation', async () => {

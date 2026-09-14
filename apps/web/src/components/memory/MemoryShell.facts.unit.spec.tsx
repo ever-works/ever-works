@@ -37,8 +37,17 @@ vi.mock('./MemoryConsolidationSettings', () => ({
     MemoryConsolidationSettings: () => <div data-testid="memory-consolidation-settings" />,
 }));
 vi.mock('./FactsPanel', () => ({
-    FactsPanel: ({ onTidyUp }: { onTidyUp?: () => void }) => (
-        <div data-testid="memory-facts-panel">
+    FactsPanel: ({
+        onTidyUp,
+        initialLoadFailed,
+    }: {
+        onTidyUp?: () => void;
+        initialLoadFailed?: boolean;
+    }) => (
+        <div
+            data-testid="memory-facts-panel"
+            data-initial-load-failed={String(initialLoadFailed === true)}
+        >
             <button type="button" data-testid="stub-tidy-up" onClick={onTidyUp} />
         </div>
     ),
@@ -95,6 +104,21 @@ describe('MemoryShell — Facts block', () => {
         ]) {
             expect(screen.getByTestId(id)).not.toBeNull();
         }
+    });
+
+    it('tells the Facts block when the page could not load its first page', () => {
+        const { unmount } = render(<MemoryShell initial={initial} facts={facts} factsLoadFailed />);
+        expect(screen.getByTestId('memory-facts-panel')).toHaveAttribute(
+            'data-initial-load-failed',
+            'true',
+        );
+        unmount();
+
+        render(<MemoryShell initial={initial} facts={facts} />);
+        expect(screen.getByTestId('memory-facts-panel')).toHaveAttribute(
+            'data-initial-load-failed',
+            'false',
+        );
     });
 
     it('wires Tidy up to the existing consolidation dry-run', () => {
