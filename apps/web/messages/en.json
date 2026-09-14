@@ -4883,15 +4883,31 @@
                     "title": "Budget exceeded",
                     "subtitle": "Account spend has reached its cap"
                 }
-            }
+            },
+            "alsoBroken": "Also broken"
         },
         "soon": {
             "title": "Coming up",
             "more": "+{n} more",
             "source": {
                 "work": "Work",
-                "mission": "Mission"
-            }
+                "mission": "Mission",
+                "recurringTask": "recurring task",
+                "agentHeartbeat": "heartbeat",
+                "workSchedule": "work schedule",
+                "missionTick": "mission tick",
+                "sourceValidation": "source check",
+                "dataSync": "data sync",
+                "inboundTrigger": "trigger"
+            },
+            "todayTitle": "Today",
+            "ranAt": "ran at {time}",
+            "emptyTitle": "Nothing scheduled today.",
+            "emptyAction": "Set something up",
+            "nothingElse": "Nothing else scheduled today.",
+            "statusPaused": "paused",
+            "statusError": "error",
+            "ranLabel": "Already ran today"
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -9396,6 +9412,126 @@
                 "stageLabelWatching": "Live view of {agent}'s computer {node}. Watching.",
                 "modeChanged": "Mode changed to {mode}.",
                 "modeWatchingName": "watching"
+            }
+        },
+        "home": {
+            "greeting": {
+                "morning": "Good morning, {name}.",
+                "afternoon": "Good afternoon, {name}.",
+                "evening": "Good evening, {name}."
+            },
+            "score": {
+                "label": "Today so far",
+                "needsYou": "{count} need you",
+                "workingNow": "{count} working now",
+                "doneToday": "{count} done today",
+                "failedToday": "{count} failed"
+            },
+            "timezoneFootnote": "Times shown in UTC.",
+            "composer": {
+                "label": "Hand something to your agents",
+                "placeholder": "Hand something to your agents…",
+                "hint": "Describe a job in a sentence. An agent will pick it up.",
+                "send": "Send",
+                "sending": "Sending",
+                "counter": "{used} / {max}",
+                "created": "Task created — “{title}”",
+                "open": "Open",
+                "failed": "Couldn't create that Task.",
+                "retry": "Try again",
+                "throttled": "You're creating these faster than we can file them. Try again in a minute.",
+                "noRuntime": "Nothing will run until a job runtime is configured.",
+                "configure": "Configure",
+                "dismiss": "Dismiss"
+            },
+            "needsYou": {
+                "title": "Needs you",
+                "overdue": "{count} waiting over 3 days",
+                "openAll": "Open all ({count})",
+                "moreWaiting": "{count} more waiting",
+                "kinds": {
+                    "approval": "Approve",
+                    "question": "Question",
+                    "escalation": "Escalation"
+                },
+                "waitingMinutes": "waiting {count}m",
+                "waitingHours": "waiting {count}h",
+                "waitingDays": "waiting {count}d",
+                "blocking": "blocking work",
+                "open": "Open",
+                "emptyTitle": "Nothing needs you right now.",
+                "emptyBody": "Your agents will raise anything they can't decide themselves."
+            },
+            "glance": {
+                "title": "Today at a glance",
+                "needsYou": "need you",
+                "workingNow": "working now",
+                "doneToday": "done today",
+                "failedToday": "failed today",
+                "overflow": "999+"
+            },
+            "thisWeek": {
+                "title": "This week",
+                "window": "last 7 days in {scope}",
+                "personalScope": "Personal",
+                "organizationScope": "this Organization",
+                "runs": "{count, plural, one {# run} other {# runs}} · {avg} avg per run",
+                "noAverage": "—",
+                "capBar": "{percent}% of your account-wide cap this billing period",
+                "capScopeNote": "The cap applies across all your Organizations.",
+                "manageDescription": "Opens account-wide spend",
+                "blocked": "New runs are blocked.",
+                "overage": "Overage is allowed.",
+                "noCap": "No spend cap set.",
+                "setCap": "Set a cap",
+                "manage": "Manage spend"
+            },
+            "workingNow": {
+                "title": "Working now ({count})",
+                "heading": "Working now",
+                "fallback": "Working…",
+                "elapsedMinutes": "{minutes}m",
+                "elapsedHours": "{hours}h {minutes}m",
+                "longRun": "long run",
+                "stillGoing": "still going",
+                "seeAll": "See all runs",
+                "seeAllCount": "See all runs ({count})",
+                "empty": "Nobody is working right now.",
+                "emptyAction": "Hand out some work",
+                "unknownAgent": "An agent"
+            },
+            "recentActivity": {
+                "title": "Recent activity",
+                "openFeed": "Open the feed",
+                "empty": "Nothing has happened yet."
+            },
+            "block": {
+                "errorTitle": "Couldn't load {block}.",
+                "retry": "Retry",
+                "loading": "Loading",
+                "names": {
+                    "needsYou": "what needs you",
+                    "glance": "today at a glance",
+                    "today": "today's schedule",
+                    "thisWeek": "this week's spend",
+                    "workingNow": "who is working now",
+                    "recentActivity": "recent activity"
+                }
+            },
+            "summaryError": {
+                "title": "We couldn't load your morning report.",
+                "body": "Everything is still running — this screen just can't see it right now.",
+                "action": "Try again"
+            },
+            "firstRun": {
+                "title": "Nothing yet.",
+                "body": "Once your agents start working, this is where the morning report lands — what needs you, what ran, what it cost.",
+                "action": "Set up your first agent"
+            },
+            "workspace": {
+                "title": "Your workspace",
+                "show": "Show your workspace",
+                "hide": "Hide your workspace"
             }
         }
     },

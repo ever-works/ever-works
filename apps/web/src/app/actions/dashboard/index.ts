@@ -3,3 +3,4 @@ export * from './oauth';
 export * from './works';
 export * from './navigation';
 export * from './generator';
+export * from './home';
