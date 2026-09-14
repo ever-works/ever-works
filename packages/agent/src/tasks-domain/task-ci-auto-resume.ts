@@ -334,6 +334,13 @@ export type AutoResumeOutcomeReason =
     | 'already-claimed'
     /** The Task has no run to resume. */
     | 'no-run'
+    /**
+     * The Task has runs, but every one is a REVIEW run or a run of a
+     * reviewer agent (reviewer agent stage, slice AD). CI feedback belongs
+     * to the agent that wrote the code; a reviewer is never resumed in its
+     * place.
+     */
+    | 'no-authoring-run'
     /** A run is queued or running — the fix may already be in flight. */
     | 'run-in-flight'
     /** The run is parked on a QUESTION; that is the human's to answer. */

@@ -218,6 +218,69 @@ describe('FleetAgentTaskPlannerService', () => {
     });
 
     /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — an agent REVIEW
+     * run never becomes a fleet job.
+     *
+     * The findings: `submitTaskReview` exists only in the platform's
+     * in-process tool loop, so a fleet review could never record a verdict
+     * (every one pure spend, its ledger row open forever); its brief rode
+     * `pendingInput` into `# OWNER ANSWER`, presenting the PR author's diff
+     * as the owner's own words, cut to 16 KiB with no marker; and the node
+     * was told to "make your changes here" in a worktree it then pushes.
+     */
+    describe('refuseAgentReviewRun', () => {
+        const REVIEW_SCOPE = { allowedTools: ['submitTaskReview'] };
+
+        it('refuses a run admitted with the review-only scope — in ANY execution mode', async () => {
+            runs.findById.mockResolvedValue({
+                id: 'run-1',
+                userId: USER,
+                delegationScope: REVIEW_SCOPE,
+                pendingInput: ['CODE REVIEW ASSIGNMENT — diff here'],
+            });
+            // Default (command) mode: `plan()` would return null and write
+            // the legacy job. The refusal comes first regardless.
+            await expect(build().refuseAgentReviewRun(payload)).rejects.toThrow(
+                /agent code-review run.*cannot execute on the fleet/,
+            );
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            await expect(build().refuseAgentReviewRun(payload)).rejects.toThrow(
+                FleetAgentTaskPlanError,
+            );
+            expect(runs.findById).toHaveBeenCalledWith('run-1');
+        });
+
+        it('lets an ordinary run through untouched', async () => {
+            runs.findById.mockResolvedValue({ id: 'run-1', userId: USER, delegationScope: null });
+            await expect(build().refuseAgentReviewRun(payload)).resolves.toBeUndefined();
+            // A delegated (non-review) child is not a review run either.
+            runs.findById.mockResolvedValue({
+                id: 'run-1',
+                userId: USER,
+                delegationScope: { allowedTools: ['submitTaskReview', 'commitToRepo'] },
+            });
+            await expect(build().refuseAgentReviewRun(payload)).resolves.toBeUndefined();
+        });
+
+        it('has nothing to check without a pre-created run row', async () => {
+            await expect(
+                build().refuseAgentReviewRun({ ...payload, runId: undefined }),
+            ).resolves.toBeUndefined();
+            expect(runs.findById).not.toHaveBeenCalled();
+        });
+
+        it('FAILS CLOSED when the run row cannot be read, or the repository is unbound', async () => {
+            runs.findById.mockRejectedValue(new Error('db down'));
+            await expect(build().refuseAgentReviewRun(payload)).rejects.toThrow(
+                FleetAgentTaskPlanError,
+            );
+            await expect(build({ runs: false }).refuseAgentReviewRun(payload)).rejects.toThrow(
+                FleetAgentTaskPlanError,
+            );
+        });
+    });
+
+    /**
      * Scoped push credentials (self-build slice AM, EW-810) — the PLATFORM
      * half of the pre-dispatch push-capability probe.
      *

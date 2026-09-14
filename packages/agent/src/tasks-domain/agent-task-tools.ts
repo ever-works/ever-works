@@ -8,6 +8,11 @@ import type {
 } from '../database/repositories/task-side.repositories';
 import type { TaskStatus } from '../entities/task.entity';
 import { ownershipScopeOf } from '../database/ownership-scope';
+// Type-only import of the service, VALUE import of the tool name from the
+// pure module: naming the tool must not drag the review service's runtime
+// graph (repositories + the git facade) into the chat-tool assembly path.
+import type { TaskAgentReviewService } from './task-agent-review.service';
+import { SUBMIT_TASK_REVIEW_TOOL } from './task-agent-review';
 
 /**
  * Tasks feature — Phase 16.2 / 16.3 / 16.4.
@@ -70,6 +75,12 @@ export interface TransitionTaskArgs {
     force?: boolean;
 }
 
+export interface SubmitTaskReviewArgs {
+    taskId?: string;
+    verdict: string;
+    summary?: string;
+}
+
 export function buildAgentTaskTools(args: {
     agent: Agent;
     tasksService: TasksService;
@@ -83,6 +94,21 @@ export function buildAgentTaskTools(args: {
     assignees?: TaskAssigneeRepository;
     reviewers?: TaskReviewerRepository;
     approvers?: TaskApproverRepository;
+    /**
+     * Reviewer agent stage (slice AD, EW-811). Absent, `submitTaskReview`
+     * is NOT offered at all — the model never sees a tool whose backing
+     * service is unbound, and an unwired install therefore records no
+     * agent approvals rather than recording unverified ones.
+     */
+    agentReviews?: Pick<TaskAgentReviewService, 'submitVerdict'>;
+    /**
+     * The id of the run these tools are being assembled for — platform
+     * state from the tool loop's run context, never model input. It is
+     * what `submitTaskReview` authorizes on: only the run a review was
+     * bound to may answer it. Absent (a tool catalogue, a context with no
+     * run), the verdict tool is still listed but records nothing.
+     */
+    runId?: string | null;
 }): TaskToolDescriptor[] {
     const out: TaskToolDescriptor[] = [];
 
@@ -253,6 +279,89 @@ export function buildAgentTaskTools(args: {
                 }
             },
         } satisfies TaskToolDescriptor<TransitionTaskArgs, { id: string; status: TaskStatus }>);
+    }
+
+    // Reviewer agent stage (slice AD, EW-811) — the ONE way a review run
+    // records a verdict.
+    //
+    // Deliberately NOT gated on `canAssignTasks` or any other permission
+    // flag: the authorization is not a permission on the agent, it is an
+    // OPEN review row the platform bound to THIS RUN before the run was
+    // enqueued. `TaskAgentReviewService.submitVerdict` looks that up
+    // before it looks at anything else, so the tool is inert in every run
+    // that was not dispatched as that review — including every other run
+    // of the same agent.
+    //
+    // The tool takes no review id, no approver id and no run id: the run
+    // id comes from the tool loop's own context, the identity from the
+    // agent whose run is speaking, the Task and the commit from the row
+    // the platform bound. The optional `taskId` is only a cross-check — a
+    // run briefed with one Task's diff cannot record a verdict on another.
+    if (args.agentReviews) {
+        const reviews = args.agentReviews;
+        const runId = args.runId && args.runId !== 'no-run' ? args.runId : null;
+        out.push({
+            name: SUBMIT_TASK_REVIEW_TOOL,
+            description:
+                'Record your verdict on the code review this run was dispatched to perform. Only usable inside that review run. verdict must be exactly "approve" or "request-changes" — anything else records nothing, and finishing without calling this records nothing either. This is an AGENT approval on the Task; it is never the human sign-off required before a merge.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    taskId: {
+                        type: 'string',
+                        description:
+                            'Optional. The Task UUID under review; if given it must match the review this run was dispatched for.',
+                    },
+                    verdict: {
+                        type: 'string',
+                        // The vocabulary contract. `parseAgentReviewVerdict`
+                        // accepts exactly `AGENT_REVIEW_VERDICTS` and nothing
+                        // else — no casing, `_` or past-tense variants.
+                        description:
+                            'Exactly "approve" or "request-changes". No other spelling, casing or tense counts.',
+                    },
+                    summary: {
+                        type: 'string',
+                        description:
+                            'Short note on what you actually checked and why (≤4000 chars).',
+                    },
+                },
+                required: ['verdict'],
+            },
+            invoke: async (raw) => {
+                const a = raw as SubmitTaskReviewArgs;
+                if (!a?.verdict) {
+                    return { error: 'verdict is required' };
+                }
+                if (!runId) {
+                    return { error: 'review not recorded: no-open-review' };
+                }
+                try {
+                    const result = await reviews.submitVerdict({
+                        // Platform state: the run and the agent that are
+                        // speaking, never fields the model filled in.
+                        runId,
+                        reviewerAgentId: args.agent.id,
+                        taskId: a.taskId ?? null,
+                        verdict: a.verdict,
+                        summary: a.summary ?? null,
+                    });
+                    if (result.reason !== 'recorded') {
+                        return { error: `review not recorded: ${result.reason}` };
+                    }
+                    return {
+                        recorded: true,
+                        verdict: result.verdict as string,
+                        headSha: result.headSha ?? null,
+                    };
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        } satisfies TaskToolDescriptor<
+            SubmitTaskReviewArgs,
+            { recorded: boolean; verdict: string; headSha: string | null }
+        >);
     }
 
     return out;

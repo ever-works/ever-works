@@ -119,17 +119,42 @@ export class TaskApproverRepository {
         const entity = this.repo.create({ taskId, approverType, approverId });
         return this.repo.save(entity);
     }
+    /**
+     * Write an approver row's decision.
+     *
+     * `provenance` (reviewer agent stage, slice AD, EW-811) is APPENDED
+     * LAST and optional so every existing positional call keeps its
+     * meaning. When omitted the three provenance columns are left exactly
+     * as they were — this method has one production caller today
+     * (`TaskAgentReviewService`) and it always supplies them; a future
+     * human-decision route should supply `decidedVia: 'user'`.
+     *
+     * These columns are provenance, never authorization: `task_approvers`
+     * gates `in_review → done` and nothing else, and the merge gate reads
+     * a different table entirely (see the entity doc).
+     */
     async setState(
         id: string,
         approvalState: 'pending' | 'approved' | 'rejected',
         taskId?: string,
+        provenance?: {
+            decidedVia?: string | null;
+            decidedByRunId?: string | null;
+            decidedHeadSha?: string | null;
+        },
     ): Promise<void> {
-        // Security (IDOR): optional `taskId` scopes the update so an
-        // approver row from another task can't be mutated by PK alone.
-        await this.repo.update(taskId ? { id, taskId } : id, {
+        const patch: Partial<TaskApprover> = {
             approvalState,
             approvedAt: new Date(),
-        });
+        };
+        if (provenance) {
+            patch.decidedVia = provenance.decidedVia ?? null;
+            patch.decidedByRunId = provenance.decidedByRunId ?? null;
+            patch.decidedHeadSha = provenance.decidedHeadSha ?? null;
+        }
+        // Security (IDOR): optional `taskId` scopes the update so an
+        // approver row from another task can't be mutated by PK alone.
+        await this.repo.update(taskId ? { id, taskId } : id, patch);
     }
     // Security (IDOR): optional `taskId` scopes the delete (see
     // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
