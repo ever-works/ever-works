@@ -124,7 +124,18 @@ export {
     ATTENTION_REASON_STALE_PARKED,
     STALE_PARK_SUMMARY_PREFIX,
     type WorkRunsSummary,
+    type RunLedgerAggregateRow,
+    type RunLedgerLabels,
+    type RunLedgerQueryFilters,
 } from '../database/repositories/agent-run.repository';
+// Runs ledger + run receipt (AW-09) — calendar windows, window statistics,
+// the ledger/receipt read model and the cost port a receipt reads through.
+export * from './run-window';
+export * from './run-window-stats';
+export * from './run-cost-breakdown-reader';
+export * from './run-ledger.service';
+export * from './run-receipt.service';
+export * from './run-ledger.module';
 export { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 export { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 export { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';

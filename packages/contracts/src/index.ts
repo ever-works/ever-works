@@ -29,3 +29,6 @@ export * from './inbox/index.js';
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
+// Agent run and the itemised receipt of one run, over the existing run rows.
+export * from './runs/index.js';
