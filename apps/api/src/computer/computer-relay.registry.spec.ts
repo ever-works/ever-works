@@ -430,3 +430,112 @@ describe('ComputerRelayRegistry — cross-replica seam', () => {
         expect(bus.publishRemote).not.toHaveBeenCalled();
     });
 });
+
+describe('ComputerRelayRegistry — taking control', () => {
+    const HOLD_MS = 60_000;
+
+    function controlled() {
+        const relay = new ComputerRelayRegistry(undefined, true);
+        const node = client('node', 'worker');
+        const viewer = client('viewer', 'viewer');
+        const driver = client('driver', 'driver');
+        relay.attach(SESSION, node);
+        relay.attach(SESSION, viewer);
+        relay.attach(SESSION, driver);
+        return { relay, node, viewer, driver };
+    }
+
+    const key: ComputerFrame = {
+        kind: 'key',
+        action: 'down',
+        key: 'a',
+        code: 'KeyA',
+        modifiers: 0,
+    };
+
+    it('refuses a driving socket’s input until its view holds control, telling the sender', () => {
+        const { relay, node, driver } = controlled();
+
+        expect(relay.deliverInbound(SESSION, 'driver', key)).toBe(false);
+        expect(node.received).toEqual([]);
+        expect(driver.received).toEqual([
+            { kind: 'error', message: 'You do not have control of this computer.' },
+        ]);
+    });
+
+    it('forwards input while the view holds control, and refuses it once the hold has run out', () => {
+        const { relay, node, driver } = controlled();
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+        node.received.length = 0;
+        driver.received.length = 0;
+
+        expect(relay.deliverInbound(SESSION, 'driver', key)).toBe(true);
+        expect(node.received).toEqual([key]);
+
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() - 1 });
+        expect(relay.deliverInbound(SESSION, 'driver', key)).toBe(false);
+        expect(node.received).toEqual([key]);
+        expect(driver.received.at(-1)).toMatchObject({ kind: 'error' });
+    });
+
+    it('never lets a watching socket inject input, even into a view that holds control', () => {
+        const { relay, node, viewer } = controlled();
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+        node.received.length = 0;
+
+        expect(relay.deliverInbound(SESSION, 'viewer', key)).toBe(false);
+        expect(node.received).toEqual([]);
+        expect(viewer.received.at(-1)).toMatchObject({ kind: 'error' });
+    });
+
+    it('tells the view’s sockets and the machine when control is taken and given back, once each', () => {
+        const { relay, node, viewer, driver } = controlled();
+
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + 2 * HOLD_MS });
+        relay.applyControl(SESSION, { held: false, untilMs: null });
+
+        const modes = [
+            { kind: 'mode', mode: 'controlling' },
+            { kind: 'mode', mode: 'watching' },
+        ];
+        expect(node.received).toEqual(modes);
+        expect(viewer.received).toEqual(modes);
+        expect(driver.received).toEqual(modes);
+        expect(relay.deliverInbound(SESSION, 'driver', key)).toBe(false);
+    });
+
+    it('keeps a machine leg that rejoins, and a browser that attaches, in the controlling mode', () => {
+        const { relay } = controlled();
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+
+        const rejoined = client('node-again', 'worker');
+        relay.attach(SESSION, rejoined);
+        expect(rejoined.received).toEqual([{ kind: 'mode', mode: 'controlling' }]);
+
+        const late = client('late', 'viewer');
+        relay.attach(SESSION, late);
+        expect(late.received).toEqual([{ kind: 'mode', mode: 'controlling' }]);
+    });
+
+    it('forgets control when the view ends, and creates no state for a release it never saw', () => {
+        const { relay, driver } = controlled();
+        relay.applyControl(SESSION, { held: true, untilMs: Date.now() + HOLD_MS });
+        relay.end(SESSION, 'closed-by-user');
+        expect(relay.getControl(SESSION)).toBeNull();
+        expect(driver.received.at(-1)).toMatchObject({ kind: 'end' });
+        expect(relay.deliverInbound(SESSION, 'driver', key)).toBe(false);
+
+        relay.applyControl('never-seen', { held: false, untilMs: null });
+        expect(relay.getStatus('never-seen').exists).toBe(false);
+    });
+
+    it('answers a control frame over the socket with where control is taken instead', () => {
+        const { relay, node, driver } = controlled();
+        expect(
+            relay.deliverInbound(SESSION, 'driver', { kind: 'control', action: 'release' }),
+        ).toBe(false);
+        expect(node.received).toEqual([]);
+        expect(driver.received.at(-1)).toMatchObject({ kind: 'error' });
+    });
+});

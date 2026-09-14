@@ -12,11 +12,13 @@ import {
 import type { FleetJobClient } from '../job-client';
 import type { Logger } from '../logger';
 import { LEASE_TERMINATION_SAFETY_MS } from '../worker-loop';
-import type { AgentProfileManager } from '../screen/agent-profile';
+import { createAgentControlMarker } from '../screen/agent-control-marker';
+import type { AgentProfileFs, AgentProfileManager } from '../screen/agent-profile';
 import type { CaptureBackend } from '../screen/capture-backend';
 import { CapturePump } from '../screen/capture-pump';
 import type { WebSocketFactory } from '../screen/cdp-connection';
 import { ComputerFrameOutbox } from '../screen/frame-outbox';
+import { ComputerInputInjector } from '../screen/input-injector';
 import { openNodeLeg, type NodeLeg } from '../screen/node-leg';
 import { startNodeTerminalChannel, type NodeTerminalChannel } from '../screen/terminal-channel';
 
@@ -34,7 +36,9 @@ import { startNodeTerminalChannel, type NodeTerminalChannel } from '../screen/te
  *      `terminal-stream` provider — both publishing through ONE outbox that
  *      secret-scans and batches every frame before it leaves the machine;
  *   3. opens this machine's own OUTBOUND socket leg so the owner's quality
- *      and refresh requests reach the capture;
+ *      and refresh requests reach the capture — and, while a person holds
+ *      control of the view, their input reaches the Agent's browser through
+ *      the input injector, with the Agent told it is paused;
  *   4. reports the view's lifecycle every few seconds, which is how a stop
  *      switch or an owner's "End session" reaches the machine;
  *   5. ends cleanly: when the platform ends the view it just stops; when
@@ -42,7 +46,9 @@ import { startNodeTerminalChannel, type NodeTerminalChannel } from '../screen/te
  *      frame (`node-unavailable`) inside the lease-termination budget, so
  *      the owner sees why the picture stopped rather than a frozen one.
  *
- * It never alters a Run: it only reads what the Agent's browser shows.
+ * Watching never alters a Run: it only reads what the Agent's browser shows.
+ * Only a person who took control drives that browser, and only until they
+ * give control back.
  */
 
 export const COMPUTER_SESSION_HEARTBEAT_MS = 4000;
@@ -112,6 +118,12 @@ export interface ComputerSessionExecutorDeps {
 	platform?: string;
 	/** The environment a terminal channel's shell is built from (scrubbed there); defaults to this process's. */
 	parentEnv?: NodeJS.ProcessEnv;
+	/**
+	 * Where the "a person has control" marker is written in the Agent's own
+	 * profile directory. Optional: without it control still injects input,
+	 * but the Agent is not told it is paused.
+	 */
+	profileFs?: Pick<AgentProfileFs, 'writeTextFile' | 'rm'>;
 }
 
 export interface ComputerSessionResult extends Record<string, unknown> {
@@ -160,6 +172,7 @@ export async function runComputerSessionJob(
 	let pump: CapturePump | null = null;
 	let terminal: NodeTerminalChannel | null = null;
 	let leg: NodeLeg | null = null;
+	let injector: ComputerInputInjector | null = null;
 	let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
 	let fatal: ComputerCloseReason | null = null;
 
@@ -210,6 +223,15 @@ export async function runComputerSessionJob(
 			void reportProfile(deps, payload, pump);
 			if (deps.webSocketFactory && pump) {
 				const capture = pump;
+				const marker = deps.profileFs
+					? createAgentControlMarker({ profileDir: profile.dir, fs: deps.profileFs })
+					: null;
+				const inputs = new ComputerInputInjector({
+					target: () => capture.captureSource,
+					...(marker ? { onControlChange: (controlled: boolean) => marker.set(controlled) } : {}),
+					...(logger ? { logger } : {})
+				});
+				injector = inputs;
 				leg = openNodeLeg({
 					apiUrl: deps.apiUrl,
 					mintToken: () => deps.client.mintComputerWorkerToken(sessionId),
@@ -218,6 +240,8 @@ export async function runComputerSessionJob(
 						if (frame.kind === 'refresh') capture.refresh();
 						else capture.setQuality(frame.quality);
 					},
+					onMode: (mode) => inputs.setControlled(mode === 'controlling'),
+					onInput: (frame) => void inputs.inject(frame),
 					...(logger ? { logger } : {})
 				});
 			}
@@ -247,7 +271,10 @@ export async function runComputerSessionJob(
 		signal.removeEventListener('abort', onAbort);
 		if (heartbeatTimer) clearTimeout(heartbeatTimer);
 		leg?.close();
-		await Promise.allSettled([pump?.stop(), terminal?.stop()]);
+		// The view is over: whatever control it held is over too, and the
+		// Agent is told it may use its browser again.
+		injector?.setControlled(false);
+		await Promise.allSettled([injector?.idle(), pump?.stop(), terminal?.stop()]);
 	}
 
 	const nodeReason: ComputerCloseReason | null = platformEnded ? null : (fatal ?? 'node-unavailable');

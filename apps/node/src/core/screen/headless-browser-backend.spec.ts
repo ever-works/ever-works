@@ -12,6 +12,7 @@ import {
 	buildHeadlessCaptureArgs,
 	countSessionCookieSites,
 	HeadlessBrowserCaptureBackend,
+	inputToProtocolCall,
 	parseDevToolsActivePort,
 	parseDevToolsListeningLine,
 	scaleForWidth
@@ -339,5 +340,62 @@ describe('HeadlessBrowserCaptureBackend — which tab is pictured', () => {
 		expect(browser.pictured()).toEqual(['tab-only', 'tab-only']);
 		expect(browser.calls.filter((call) => call.method === 'Target.attachToTarget')).toHaveLength(1);
 		await source.stop();
+	});
+});
+
+describe('HeadlessBrowserCaptureBackend — a person driving the Agent’s browser', () => {
+	it('maps picture pixels back to page pixels by the scale the last picture was taken at', () => {
+		expect(inputToProtocolCall({ kind: 'pointer', action: 'down', x: 640, y: 360, button: 'left' }, 0.5)).toEqual({
+			method: 'Input.dispatchMouseEvent',
+			params: { type: 'mousePressed', x: 1280, y: 720, button: 'left', clickCount: 1 }
+		});
+		expect(inputToProtocolCall({ kind: 'pointer', action: 'move', x: 3, y: 4, button: null }, 0)).toMatchObject({
+			params: { type: 'mouseMoved', x: 3, y: 4, button: 'none', clickCount: 0 }
+		});
+		expect(inputToProtocolCall({ kind: 'scroll', x: 10, y: 10, dx: 0, dy: 120 }, 1)).toEqual({
+			method: 'Input.dispatchMouseEvent',
+			params: { type: 'mouseWheel', x: 10, y: 10, deltaX: 0, deltaY: 120 }
+		});
+	});
+
+	it('types characters, sends raw keys for everything else, and inserts text as one edit', () => {
+		expect(inputToProtocolCall({ kind: 'key', action: 'down', key: 'a', code: 'KeyA', modifiers: 8 }, 1)).toEqual({
+			method: 'Input.dispatchKeyEvent',
+			params: { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 8, text: 'a' }
+		});
+		expect(
+			inputToProtocolCall({ kind: 'key', action: 'down', key: 'Enter', code: 'Enter', modifiers: 0 }, 1)
+		).toMatchObject({ params: { type: 'rawKeyDown', text: '\r', windowsVirtualKeyCode: 13 } });
+		expect(
+			inputToProtocolCall({ kind: 'key', action: 'down', key: 'a', code: 'KeyA', modifiers: 2 }, 1).params
+		).toEqual({ type: 'rawKeyDown', key: 'a', code: 'KeyA', modifiers: 2 });
+		expect(
+			inputToProtocolCall({ kind: 'key', action: 'up', key: 'ArrowLeft', code: 'ArrowLeft', modifiers: 0 }, 1)
+		).toMatchObject({ params: { type: 'keyUp', windowsVirtualKeyCode: 37 } });
+		expect(inputToProtocolCall({ kind: 'text', text: 'héllo' }, 1)).toEqual({
+			method: 'Input.insertText',
+			params: { text: 'héllo' }
+		});
+	});
+
+	it('drives the tab on screen, at the scale of the picture the person is looking at', async () => {
+		const browser = fakeTabbedBrowser({ 'tab-mail': 'hidden:false', 'tab-work': 'visible:true' });
+		const source = await new HeadlessBrowserCaptureBackend({
+			browserPath: '/usr/bin/chromium',
+			readTextFile: async () => '9222\n/devtools/browser/abc\n',
+			webSocketFactory: () => browser.open()
+		}).start({ profileDir: '/profiles/abc/browser' });
+		// A 1280-wide page pictured at the 800-wide preset: scale 0.625.
+		await source.capture({ width: 800, quality: 45 });
+		await source.dispatchInput?.({ kind: 'pointer', action: 'down', x: 400, y: 250, button: 'left' });
+
+		const click = browser.calls.find((call) => call.method === 'Input.dispatchMouseEvent');
+		expect(click).toEqual({
+			method: 'Input.dispatchMouseEvent',
+			sessionId: browser.sessionOf.get('tab-work'),
+			params: { type: 'mousePressed', x: 640, y: 400, button: 'left', clickCount: 1 }
+		});
+		await source.stop();
+		await expect(source.dispatchInput?.({ kind: 'text', text: 'after the view ended' })).rejects.toThrow(/stopped/);
 	});
 });

@@ -53,6 +53,15 @@ import {
  *    (`pointer`, `key`, `text`, `scroll`) is accepted only from a `driver`;
  *    from a `viewer` it is answered with an `error` frame to that sender and
  *    NEVER forwarded. Nothing inbound is ever fanned out to other viewers.
+ *  - **Control-checked input.** Where the API wires the control arbiter
+ *    ({@link COMPUTER_RELAY_REQUIRES_CONTROL}), a `driver` token is not
+ *    enough: input is forwarded only while THIS view holds control of the
+ *    machine and its hold has not run out
+ *    ({@link ComputerRelayRegistry.applyControl} keeps that current). Anything
+ *    else is answered with an `error` frame and never forwarded. A change of
+ *    control is told to the view's sockets and to the machine's own leg as a
+ *    `mode` frame, which is how the machine knows to pause the Agent's own
+ *    input and when to resume it.
  *  - **Reclaim.** Memory is released only when no client is attached AND
  *    the session ended AND at least one attach saw it (`force` overrides).
  *    A periodic {@link ComputerRelayRegistry.sweep} is what applies that in
@@ -70,6 +79,13 @@ import {
 export type ComputerRelayClient = TerminalRelayClient;
 
 export const COMPUTER_FANOUT_BUS = 'COMPUTER_FANOUT_BUS' as const;
+/**
+ * Bound to `true` by the API module: input is forwarded only from the view
+ * that holds control. Unbound, the relay keeps its Phase 1 rule (a `driver`
+ * token is enough), which is all a relay used on its own — without the
+ * arbiter that decides who holds control — can honestly enforce.
+ */
+export const COMPUTER_RELAY_REQUIRES_CONTROL = 'COMPUTER_RELAY_REQUIRES_CONTROL' as const;
 export const COMPUTER_BANNERS_CAP_DEFAULT = 16;
 /** An ended view nobody attached to is kept this long for a late viewer. */
 export const COMPUTER_RELAY_ENDED_RETENTION_MS = 5 * 60_000;
@@ -103,8 +119,17 @@ export interface ComputerSessionRelayStatus {
     lastSeq: number | null;
 }
 
+/** A view's hold on control, as this replica last heard it. */
+export interface ComputerRelayControlHold {
+    held: boolean;
+    /** When the hold runs out unless renewed (epoch ms); null = no deadline known. */
+    untilMs: number | null;
+}
+
 interface ComputerRelaySession {
     clients: Map<string, ComputerRelayClient>;
+    /** This view's hold on control, null until the arbiter said anything about it. */
+    control: ComputerRelayControlHold | null;
     banners: ComputerErrorFrame[];
     keyframe: ComputerScreenFrame | null;
     stats: ComputerStatsFrame | null;
@@ -126,7 +151,14 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
     private readonly bus: ComputerFanoutBus;
     private sweeper: NodeJS.Timeout | null = null;
 
-    constructor(@Optional() @Inject(COMPUTER_FANOUT_BUS) bus?: ComputerFanoutBus) {
+    private readonly requiresControl: boolean;
+
+    constructor(
+        @Optional() @Inject(COMPUTER_FANOUT_BUS) bus?: ComputerFanoutBus,
+        // Appended LAST + @Optional(): see COMPUTER_RELAY_REQUIRES_CONTROL.
+        @Optional() @Inject(COMPUTER_RELAY_REQUIRES_CONTROL) requiresControl?: boolean,
+    ) {
+        this.requiresControl = requiresControl === true;
         this.bus = bus ?? new InProcessTerminalFanoutBus();
         this.bus.onRemote((sessionId, wire) => {
             const frame = decodeComputerFrame(wire);
@@ -188,6 +220,7 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
             case 'end':
                 session.end = frame;
                 session.endedAtMs = session.lastActivityMs;
+                session.control = null;
                 break;
             default:
                 break;
@@ -214,6 +247,13 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
         session.lastActivityMs = Date.now();
         if (client.role === 'worker') {
             session.clients.set(client.id, client);
+            // A machine leg that (re)joins while this view holds control must
+            // keep the Agent's own input paused.
+            if (session.control?.held && !session.end) {
+                if (!this.trySend(client, { kind: 'mode', mode: 'controlling' })) {
+                    session.clients.delete(client.id);
+                }
+            }
             return this.getStatus(sessionId);
         }
         const keyframeBeforeReplay = session.keyframe;
@@ -222,6 +262,8 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
         const replay: ComputerFrame[] = [...session.banners];
         if (session.keyframe) replay.push(session.keyframe);
         if (session.stats) replay.push(session.stats);
+        if (session.control?.held && !session.end)
+            replay.push({ kind: 'mode', mode: 'controlling' });
         if (session.end) replay.push(session.end);
         for (const frame of replay) {
             if (!this.trySend(client, frame)) {
@@ -266,8 +308,18 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
                 this.answer(session, sender, 'Watching only — input is not sent to this computer.');
                 return false;
             }
+            if (this.requiresControl && !this.holdsControl(session)) {
+                this.answer(session, sender, 'You do not have control of this computer.');
+                return false;
+            }
         } else if (frame.kind === 'control') {
-            this.answer(session, sender, 'Taking control of this computer is not available yet.');
+            // Control is taken, handed over and given back through the owner's
+            // routes (throttled, authorized and audited), never over this socket.
+            this.answer(
+                session,
+                sender,
+                'Take over and give back control from the page, not over this socket.',
+            );
             return false;
         } else if (frame.kind !== 'quality' && frame.kind !== 'refresh') {
             return false;
@@ -293,6 +345,40 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
         const delivered = session ? this.sendToRole(session, wire, 'worker') : 0;
         const acceptedByPeer = this.safePublishRemote(sessionId, wire);
         return delivered > 0 || acceptedByPeer;
+    }
+
+    /**
+     * The arbiter's latest word on this view's hold on control. A change of
+     * held / not held is told, as a `mode` frame, to the view's browser
+     * sockets and to the machine's own leg (and to peer replicas, where the
+     * machine's leg may be attached); a renewed deadline alone is only
+     * recorded. A view this replica has never seen gets local state only
+     * when it holds control.
+     */
+    applyControl(sessionId: string, hold: ComputerRelayControlHold): void {
+        const existing = this.sessions.get(sessionId);
+        if (existing?.end) return;
+        const wire = encodeComputerFrame({
+            kind: 'mode',
+            mode: hold.held ? 'controlling' : 'watching',
+        });
+        if (!existing && !hold.held) {
+            if (wire !== null) this.safePublishRemote(sessionId, wire);
+            return;
+        }
+        const session = existing ?? this.getOrCreate(sessionId);
+        const changed = (session.control?.held === true) !== hold.held;
+        session.control = { held: hold.held, untilMs: hold.untilMs };
+        if (!changed || wire === null) return;
+        session.lastActivityMs = Date.now();
+        this.fanOut(session, wire);
+        this.sendToRole(session, wire, 'worker');
+        this.safePublishRemote(sessionId, wire);
+    }
+
+    /** This view's hold on control as this replica knows it, or null when it has heard nothing. */
+    getControl(sessionId: string): ComputerRelayControlHold | null {
+        return this.sessions.get(sessionId)?.control ?? null;
     }
 
     getStatus(sessionId: string): ComputerSessionRelayStatus {
@@ -377,6 +463,7 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
         if (!session) {
             session = {
                 clients: new Map(),
+                control: null,
                 banners: [],
                 keyframe: null,
                 stats: null,
@@ -389,6 +476,12 @@ export class ComputerRelayRegistry implements OnModuleInit, OnModuleDestroy {
             this.sessions.set(sessionId, session);
         }
         return session;
+    }
+
+    private holdsControl(session: ComputerRelaySession, now: number = Date.now()): boolean {
+        const control = session.control;
+        if (!control?.held) return false;
+        return control.untilMs === null || now < control.untilMs;
     }
 
     private trySend(client: ComputerRelayClient, frame: ComputerFrame): boolean {

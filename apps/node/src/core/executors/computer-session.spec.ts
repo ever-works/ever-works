@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ITerminalStreamPlugin, TerminalSessionHandle, TerminalTransport } from '@ever-works/plugin';
 import type { ComputerNodeToServerFrame, FleetJobView } from '@ever-works/contracts';
 import type { CaptureBackend } from '../screen/capture-backend';
+import type { WebSocketLike } from '../screen/cdp-connection';
 import {
 	ComputerSessionPayloadError,
 	normalizeComputerSessionPayload,
@@ -235,6 +236,71 @@ describe('runComputerSessionJob', () => {
 		expect(published.find((frame) => frame.kind === 'error')).toBeTruthy();
 		expect(published.at(-1)).toEqual({ kind: 'end', reason: 'error' });
 		expect(result).toMatchObject({ endedBy: 'node', closeReason: 'error' });
+	});
+
+	it('lets the person holding control drive the Agent’s browser, pauses the Agent meanwhile, and resumes it after', async () => {
+		const dispatched: unknown[] = [];
+		const backend: CaptureBackend = {
+			id: 'fake-driveable',
+			isAvailable: () => true,
+			start: async () => ({
+				capture: async () => ({ mime: 'image/jpeg' as const, width: 800, height: 600, data: 'QUJD' }),
+				dispatchInput: async (frame) => {
+					dispatched.push(frame);
+				},
+				stop: async () => undefined
+			})
+		};
+		const { deps, published } = harness({ backend });
+		const files = new Map<string, string>();
+		let leg: WebSocketLike | null = null;
+		deps.profileFs = {
+			writeTextFile: vi.fn(async (path: string, content: string) => {
+				files.set(path, content);
+			}),
+			rm: vi.fn(async (path: string) => {
+				files.delete(path);
+			})
+		};
+		deps.webSocketFactory = () => {
+			leg = {
+				readyState: 1,
+				onopen: null,
+				onmessage: null,
+				onerror: null,
+				onclose: null,
+				send: () => undefined,
+				close: () => undefined
+			};
+			return leg;
+		};
+		const controller = new AbortController();
+		const running = runComputerSessionJob(job(payload(['screen'])), deps, controller.signal);
+		await vi.waitFor(() => expect(published.some((frame) => frame.kind === 'frame')).toBe(true));
+		await vi.waitFor(() => expect(leg).not.toBeNull());
+		const socket = leg as unknown as WebSocketLike;
+		socket.onopen?.({});
+		const send = (frame: Record<string, unknown>) => socket.onmessage?.({ data: JSON.stringify(frame) });
+
+		// Before control is taken, input is not injected.
+		send({ kind: 'pointer', action: 'down', x: 1, y: 2, button: 'left' });
+		send({ kind: 'mode', mode: 'controlling' });
+		send({ kind: 'text', text: 'invoice 42' });
+		await vi.waitFor(() => expect(dispatched).toEqual([{ kind: 'text', text: 'invoice 42' }]));
+		await vi.waitFor(() => expect(files.size).toBe(1));
+		expect([...files.values()][0]).toContain('controlledByPerson');
+
+		send({ kind: 'mode', mode: 'watching' });
+		send({ kind: 'text', text: 'too late' });
+		await vi.waitFor(() => expect(files.size).toBe(0));
+		expect(dispatched).toHaveLength(1);
+
+		// A view that ends while control is held tells the Agent it may resume.
+		send({ kind: 'mode', mode: 'controlling' });
+		await vi.waitFor(() => expect(files.size).toBe(1));
+		controller.abort(new Error('draining'));
+		await running;
+		expect(files.size).toBe(0);
 	});
 
 	it('refuses a job for another machine before touching any profile', async () => {
