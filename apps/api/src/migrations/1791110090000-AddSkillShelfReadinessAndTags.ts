@@ -42,8 +42,8 @@ import {
  * Postgres while CI runs better-sqlite3. `down()` drops exactly what `up()`
  * added, in reverse, and touches no pre-existing column.
  */
-export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInterface {
-    name = 'AddSkillShelfReadinessAndTags1791110080000';
+export class AddSkillShelfReadinessAndTags1791110090000 implements MigrationInterface {
+    name = 'AddSkillShelfReadinessAndTags1791110090000';
 
     private static readonly BACKFILL_PAGE = 500;
     private static readonly TAG_MAX_LENGTH = 40;
@@ -110,7 +110,7 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
     public async up(queryRunner: QueryRunner): Promise<void> {
         const skills = await queryRunner.getTable('skills');
         if (skills) {
-            for (const column of AddSkillShelfReadinessAndTags1791110080000.SKILL_COLUMNS) {
+            for (const column of AddSkillShelfReadinessAndTags1791110090000.SKILL_COLUMNS) {
                 const current = await queryRunner.getTable('skills');
                 if (!current?.findColumnByName(column.name)) {
                     await queryRunner.addColumn('skills', column);
@@ -119,7 +119,7 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
             await this.ensureIndexes(
                 queryRunner,
                 'skills',
-                AddSkillShelfReadinessAndTags1791110080000.SKILL_INDEXES,
+                AddSkillShelfReadinessAndTags1791110090000.SKILL_INDEXES,
             );
         }
 
@@ -152,13 +152,13 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
         await this.ensureIndexes(
             queryRunner,
             'skill_tags',
-            AddSkillShelfReadinessAndTags1791110080000.TAG_INDEXES,
+            AddSkillShelfReadinessAndTags1791110090000.TAG_INDEXES,
         );
         if (skills) {
             await this.ensureForeignKeys(
                 queryRunner,
                 'skill_tags',
-                AddSkillShelfReadinessAndTags1791110080000.TAG_FKS,
+                AddSkillShelfReadinessAndTags1791110090000.TAG_FKS,
             );
             await this.backfillTags(queryRunner);
         }
@@ -169,7 +169,7 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
             await queryRunner.dropTable('skill_tags', true, true, true);
         }
         for (const index of [
-            ...AddSkillShelfReadinessAndTags1791110080000.SKILL_INDEXES,
+            ...AddSkillShelfReadinessAndTags1791110090000.SKILL_INDEXES,
         ].reverse()) {
             const table = await queryRunner.getTable('skills');
             if (table?.indices.some((existing) => existing.name === index.name)) {
@@ -180,7 +180,7 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
         // query runner rebuilds the table on drivers that cannot drop a
         // column in place, and each rebuild replaces the Table object.
         for (const column of [
-            ...AddSkillShelfReadinessAndTags1791110080000.SKILL_COLUMNS,
+            ...AddSkillShelfReadinessAndTags1791110090000.SKILL_COLUMNS,
         ].reverse()) {
             const table = await queryRunner.getTable('skills');
             const existing = table?.findColumnByName(column.name);
@@ -197,7 +197,7 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
      * valid JSON, or whose `tags` is not an array, contributes no rows.
      */
     private async backfillTags(queryRunner: QueryRunner): Promise<void> {
-        const page = AddSkillShelfReadinessAndTags1791110080000.BACKFILL_PAGE;
+        const page = AddSkillShelfReadinessAndTags1791110090000.BACKFILL_PAGE;
         let lastId: string | null = null;
         for (;;) {
             const qb = queryRunner.manager
@@ -224,7 +224,7 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
 
             const values: Array<Record<string, unknown>> = [];
             for (const row of rows) {
-                for (const tag of AddSkillShelfReadinessAndTags1791110080000.tagsOf(
+                for (const tag of AddSkillShelfReadinessAndTags1791110090000.tagsOf(
                     row.frontmatter,
                 )) {
                     values.push({
@@ -282,11 +282,11 @@ export class AddSkillShelfReadinessAndTags1791110080000 implements MigrationInte
                 .replace(/[^a-z0-9-]/g, '')
                 .replace(/-{2,}/g, '-')
                 .replace(/^-+/, '')
-                .slice(0, AddSkillShelfReadinessAndTags1791110080000.TAG_MAX_LENGTH)
+                .slice(0, AddSkillShelfReadinessAndTags1791110090000.TAG_MAX_LENGTH)
                 .replace(/-+$/, '');
             if (!tag || out.includes(tag)) continue;
             out.push(tag);
-            if (out.length === AddSkillShelfReadinessAndTags1791110080000.TAGS_PER_SKILL_MAX) break;
+            if (out.length === AddSkillShelfReadinessAndTags1791110090000.TAGS_PER_SKILL_MAX) break;
         }
         return out;
     }

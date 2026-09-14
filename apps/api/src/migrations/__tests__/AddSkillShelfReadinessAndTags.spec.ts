@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
-import { AddSkillShelfReadinessAndTags1791110080000 } from '../1791110080000-AddSkillShelfReadinessAndTags';
+import { AddSkillShelfReadinessAndTags1791110090000 } from '../1791110090000-AddSkillShelfReadinessAndTags';
 
 /**
  * Migration test for the Skills shelf columns and the `skill_tags` table.
@@ -16,9 +16,9 @@ import { AddSkillShelfReadinessAndTags1791110080000 } from '../1791110080000-Add
  *  - `up()` is re-runnable and inserts no extra tag rows the second time;
  *  - `down()` removes exactly what `up()` added and no pre-existing column.
  */
-describe('AddSkillShelfReadinessAndTags1791110080000', () => {
+describe('AddSkillShelfReadinessAndTags1791110090000', () => {
     let dataSource: DataSource;
-    const migration = new AddSkillShelfReadinessAndTags1791110080000();
+    const migration = new AddSkillShelfReadinessAndTags1791110090000();
 
     const run = async (direction: 'up' | 'down') => {
         const runner = dataSource.createQueryRunner();
@@ -203,7 +203,7 @@ describe('AddSkillShelfReadinessAndTags1791110080000', () => {
 
     it('never drops or renames a pre-existing column in up()', () => {
         const source = readFileSync(
-            join(__dirname, '..', '1791110080000-AddSkillShelfReadinessAndTags.ts'),
+            join(__dirname, '..', '1791110090000-AddSkillShelfReadinessAndTags.ts'),
             'utf8',
         );
         const upBody = source.slice(
@@ -215,7 +215,7 @@ describe('AddSkillShelfReadinessAndTags1791110080000', () => {
 
     it('normalises tags exactly like the runtime normaliser', () => {
         expect(
-            AddSkillShelfReadinessAndTags1791110080000.tagsOf({
+            AddSkillShelfReadinessAndTags1791110090000.tagsOf({
                 tags: ['  Go To Market ', 'go-to-market', 'x'.repeat(50), '!!!', 3],
             }),
         ).toEqual(['go-to-market', 'x'.repeat(40)]);

@@ -132,7 +132,7 @@ export class Skill {
     @UpdateDateColumn()
     updatedAt: Date;
 
-    // ── Skills shelf (additive; migration 1791110080000) ──────────────
+    // ── Skills shelf (additive; migration 1791110090000) ──────────────
     // Appended after every pre-existing column on purpose — nothing above
     // this line changed type, order or default.
 
