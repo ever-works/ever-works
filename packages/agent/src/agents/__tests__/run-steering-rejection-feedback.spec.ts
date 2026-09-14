@@ -75,6 +75,14 @@ describe('RunSteeringService — rejection feedback on resume (M9)', () => {
             setAwaitingInput: jest.fn().mockResolvedValue(undefined),
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            // Resume single-flight — an uncontended claim always wins.
+            claimResume: jest.fn().mockImplementation(async (id: string) => ({
+                runId: id,
+                token: 'claim-1',
+                previousToken: null,
+            })),
+            releaseResumeClaim: jest.fn().mockResolvedValue(true),
+            consumeResumeClaim: jest.fn().mockResolvedValue(true),
         };
         rejections = {
             findPendingForTask: jest.fn().mockResolvedValue([]),

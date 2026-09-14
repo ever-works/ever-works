@@ -68,6 +68,14 @@ describe('RunSteeringService', () => {
             createQueued: jest.fn().mockResolvedValue({ id: 'run-2' }),
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            // Resume single-flight — an uncontended claim always wins.
+            claimResume: jest.fn().mockImplementation(async (id: string) => ({
+                runId: id,
+                token: 'claim-1',
+                previousToken: null,
+            })),
+            releaseResumeClaim: jest.fn().mockResolvedValue(true),
+            consumeResumeClaim: jest.fn().mockResolvedValue(true),
         };
         runLogs = { append: jest.fn().mockResolvedValue(undefined) };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trigger-run-2' }) };
@@ -372,6 +380,155 @@ describe('RunSteeringService', () => {
         it('404s a run owned by another user', async () => {
             runs.findByIdAndUser.mockResolvedValue(null);
             await expect(makeSvc().resume(runId, userId)).rejects.toBeInstanceOf(NotFoundException);
+        });
+    });
+
+    // ── resume single-flight: the claim's place in the ordering ─────
+    //
+    // The concurrency itself is proven against a real database in
+    // `run-steering-resume-single-flight.integration.spec.ts`; these pin
+    // WHERE the claim sits relative to every write `resume` makes.
+
+    describe('resume — single-flight claim', () => {
+        const parkedAwaiting = () =>
+            makeRun({ status: 'completed', awaitingInput: true, resumeClaimToken: 'read-token' });
+
+        it('⭐ claims the source run with the token it READ, before anything is created', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            const before = Date.now();
+
+            await makeSvc().resume(runId, userId, 'option B');
+
+            expect(runs.claimResume).toHaveBeenCalledWith(runId, {
+                observedToken: 'read-token',
+                staleBefore: expect.any(Date),
+            });
+            // The expiry window is in the past — never "everything expired".
+            const { staleBefore } = runs.claimResume.mock.calls[0][1];
+            expect(staleBefore.getTime()).toBeLessThan(before);
+            expect(runs.claimResume.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.createQueued.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('⭐ the loser gets the non-resumable 409 and creates, enqueues and releases nothing', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.claimResume.mockResolvedValue(null);
+
+            const error = await makeSvc()
+                .resume(runId, userId, 'option B')
+                .catch((err: unknown) => err);
+
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).message).toContain('is not resumable');
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).not.toHaveBeenCalled();
+            expect(runs.consumeResumeClaim).not.toHaveBeenCalled();
+        });
+
+        it('never claims a run that fails the cheap refusals', async () => {
+            runs.findByIdAndUser.mockResolvedValue(makeRun({ status: 'running' }));
+            await expect(makeSvc().resume(runId, userId)).rejects.toBeInstanceOf(ConflictException);
+
+            runs.findByIdAndUser.mockResolvedValue({ ...parkedAwaiting(), taskId: null });
+            await expect(makeSvc().resume(runId, userId)).rejects.toBeInstanceOf(ConflictException);
+
+            expect(runs.claimResume).not.toHaveBeenCalled();
+        });
+
+        it('consumes the claim only AFTER clearing awaitingInput on success', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+
+            await makeSvc().resume(runId, userId, 'option B');
+
+            expect(runs.consumeResumeClaim).toHaveBeenCalledWith({
+                runId,
+                token: 'claim-1',
+                previousToken: null,
+            });
+            expect(runs.consumeResumeClaim.mock.invocationCallOrder[0]).toBeGreaterThan(
+                runs.setAwaitingInput.mock.invocationCallOrder[0],
+            );
+            expect(runs.releaseResumeClaim).not.toHaveBeenCalled();
+        });
+
+        it('consumes the claim when the gate parks the successor instead of enqueuing it', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            gate.admit.mockResolvedValue({ admitted: false, queuedReason: 'concurrency-limit' });
+
+            await makeSvc().resume(runId, userId, 'option B');
+
+            expect(runs.consumeResumeClaim).toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).not.toHaveBeenCalled();
+        });
+
+        it('⭐ releases the claim (and keeps the source parked) when the enqueue throws', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            dispatcher.enqueue.mockRejectedValue(new Error('runtime down'));
+
+            await expect(makeSvc().resume(runId, userId, 'option B')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+
+            expect(runs.releaseResumeClaim).toHaveBeenCalledWith({
+                runId,
+                token: 'claim-1',
+                previousToken: null,
+            });
+            expect(runs.consumeResumeClaim).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+            // Rolled back once, by the enqueue path — not twice.
+            expect(runs.markDispatchFailed).toHaveBeenCalledTimes(1);
+        });
+
+        it('releases the claim and rolls the orphan back when seeding throws', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.seedResumeContext.mockRejectedValue(new Error('db blip'));
+
+            await expect(makeSvc().resume(runId, userId, 'option B')).rejects.toThrow('db blip');
+
+            expect(runs.markDispatchFailed).toHaveBeenCalledWith(
+                'run-2',
+                expect.stringContaining('resume aborted before enqueue'),
+            );
+            expect(runs.releaseResumeClaim).toHaveBeenCalled();
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+        });
+
+        it('releases the claim without a rollback when the successor was never created', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            gate.admit.mockRejectedValue(new Error('gate unavailable'));
+
+            await expect(makeSvc().resume(runId, userId, 'option B')).rejects.toThrow(
+                'gate unavailable',
+            );
+
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(runs.markDispatchFailed).not.toHaveBeenCalled();
+            expect(runs.releaseResumeClaim).toHaveBeenCalled();
+        });
+
+        it('a release that itself fails never masks the original error', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            dispatcher.enqueue.mockRejectedValue(new Error('runtime down'));
+            runs.releaseResumeClaim.mockRejectedValue(new Error('db down'));
+
+            await expect(makeSvc().resume(runId, userId, 'option B')).rejects.toThrow(
+                'Resume could not be dispatched',
+            );
+        });
+
+        it('a consume that fails never fails a resume that already dispatched', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parkedAwaiting());
+            runs.consumeResumeClaim.mockRejectedValue(new Error('db down'));
+
+            const outcome = await makeSvc().resume(runId, userId, 'option B');
+
+            expect(outcome.dispatched).toBe('new-run');
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
         });
     });
 
