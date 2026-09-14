@@ -15,6 +15,8 @@
  * one of these must say so instead of printing `0`.
  */
 
+import type { CreditSettlementMode } from '../billing/meter.types.js';
+
 /** The three window granularities the ledger navigates by. */
 export const RUN_LEDGER_GRANULARITIES = ['day', 'week', 'month'] as const;
 export type RunLedgerGranularity = (typeof RUN_LEDGER_GRANULARITIES)[number];
@@ -221,6 +223,11 @@ export interface RunCostCreditLine {
 	failedCalls: number;
 	/** Calls whose paying credential the platform could not confirm. */
 	unconfirmedCalls: number;
+	/**
+	 * Credits these calls account for at the published price list. Debited as
+	 * such only in the `price_list` settlement mode; what the run was actually
+	 * debited is always {@link RunCostBreakdown.creditsDebited}.
+	 */
 	credits: number;
 	/** Provider cost the rows carry, in cents. */
 	costCents: number;
@@ -241,6 +248,12 @@ export interface RunCostMeters {
 	priceVersions: number[];
 	/** Rows with no meter (recorded before meters were separated). */
 	preMeterCalls: number;
+	/**
+	 * The deployment's settlement mode when this split was read: whether the
+	 * `credits` figures above are what was debited (`price_list`) or list-price
+	 * figures beside a debit taken from provider cost (`provider_cost`).
+	 */
+	settlementMode?: CreditSettlementMode;
 }
 
 /**

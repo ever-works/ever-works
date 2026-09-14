@@ -1,7 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { isFleetModelPluginId } from '@ever-works/contracts';
+import { isFleetModelPluginId, type CreditSettlementMode } from '@ever-works/contracts';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import {
     PluginUsageRepository,
@@ -55,8 +55,16 @@ import { PaygService } from '../billing/payg.service';
  *
  * METERS (AW-17): usage rows now carry their meter, payer and — for a fixed
  * `per-unit` price-list entry — the credits and price-list version that
- * priced them, stamped when each row was written. Settlement reads that
- * classification beside the per-plugin totals:
+ * priced them, stamped when each row was written. Whether that stamp takes
+ * part in the debit is the configured SETTLEMENT MODE
+ * (`CREDITS_SETTLEMENT_MODE`):
+ *
+ * `provider_cost` (the default) never reads the classification: the run
+ * settles exactly as it did before meters existed — every row's provider cost
+ * through the provenance exemption above and the configured conversion. The
+ * stamped credits stay on the rows as the list-price figure for reports.
+ *
+ * `price_list` (opt-in) reads the classification beside the per-plugin totals:
  *
  *  - a fixed-priced credits row debits exactly its stamped credits (0 for a
  *    cached or failed call);
@@ -68,7 +76,8 @@ import { PaygService } from '../billing/payg.service';
  *    provider cost goes through the provenance exemption above and converts
  *    at the configured rate. No price known ⇒ no change in what is debited.
  *
- * If the classified read fails, the whole run settles the pre-meter way.
+ * If the classified read fails, the whole run settles the pre-meter way. In
+ * both modes a Workspace-owned key is never debited.
  */
 @Injectable()
 export class RunCostSettlementService implements RunCostSettler, RunCreditsPrecheck {
@@ -138,7 +147,17 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 this.logger.warn(`Run ${runId}: costCents stamp failed (ignored): ${err}`);
             }
 
-            const metered = splitMeteredSpend(spend, await this.readMeterGroups(runId));
+            // AW-17 — the configured settlement mode decides whether the
+            // classification stamped at capture takes part in the debit at all.
+            // `provider_cost` (the default) never reads it: every row settles
+            // from its provider cost through the provenance exemption and the
+            // configured conversion, exactly as before meters existed.
+            const settlementMode = this.settlementMode();
+            result.settlementMode = settlementMode;
+            const metered =
+                settlementMode === 'price_list'
+                    ? splitMeteredSpend(spend, await this.readMeterGroups(runId))
+                    : settleEverythingFromProviderCost(spend);
 
             const exempt = await this.resolveExemptPlugins(
                 metered.legacySpend,
@@ -380,6 +399,16 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
     }
 
     /**
+     * AW-17 — the settlement mode, read per settlement like every other
+     * credits knob: instance-level `CREDITS_SETTLEMENT_MODE`, default
+     * `provider_cost`. Billing has no tenant- or organization-level override
+     * today; one would resolve here, the single place the mode is read.
+     */
+    private settlementMode(): CreditSettlementMode {
+        return config.billing.credits.getSettlementMode();
+    }
+
+    /**
      * AW-17 — the run's rows grouped by meter / payer / fixed price. A failed
      * read is not an error: the run settles the pre-meter way.
      */
@@ -509,6 +538,18 @@ export function splitMeteredSpend(
     }));
 
     return { fixedRows, workspacePluginIds: unique(workspacePluginIds), legacySpend };
+}
+
+/**
+ * AW-17 — the `provider_cost` settlement: no fixed-priced rows, no rows
+ * treated as Workspace-paid from their capture-time stamp, and the run's
+ * per-plugin spend passed through untouched to the provenance exemption and
+ * the configured conversion. Pure.
+ */
+function settleEverythingFromProviderCost(
+    spend: RunPluginSpend[],
+): ReturnType<typeof splitMeteredSpend> {
+    return { fixedRows: [], workspacePluginIds: [], legacySpend: spend };
 }
 
 function unique(values: string[]): string[] {

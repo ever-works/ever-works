@@ -3,11 +3,13 @@ import {
     BREAKDOWN_EVERYTHING_ELSE_KEY,
     RUN_LEDGER_TERMINAL_STATUSES,
     RUN_USAGE_DETAIL_RETENTION_MONTHS,
+    type CreditSettlementMode,
     type RunCostBreakdown,
     type RunCostMeters,
     type UsageMeterTotals,
     type UsagePreMeterResidual,
 } from '@ever-works/contracts';
+import { config } from '@src/config';
 import { AgentRunRepository } from '@src/database/repositories/agent-run.repository';
 import { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
@@ -217,14 +219,25 @@ export interface CostsBreakdownRow extends SpendBreakdownRow {
     label: string | null;
 }
 
-/** AW-17 — a ranked breakdown of classified spend for the window. */
+/**
+ * AW-17 — a ranked breakdown of classified spend for the window. Row `calls`
+ * include cached and failed calls (both zero-rated); the by-meter cards count
+ * those apart.
+ */
 export interface CostsBreakdown extends CostsWindowEcho {
     dimension: 'tool' | 'mission';
+    /**
+     * Credits at the published price list. Debited as such only when
+     * `settlementMode` is `price_list`; in `provider_cost` mode runs are
+     * debited from provider cost and this is the list-price figure.
+     */
     totalCredits: number;
     totalCostCents: number;
     /** Top 10 by credits, then "Everything else", then the NULL row. */
     rows: CostsBreakdownRow[];
     foldedCount: number;
+    /** How this deployment debits runs — what the `credits` figures mean. */
+    settlementMode: CreditSettlementMode;
 }
 
 /** AW-17 — the three meter cards for the window, plus the pre-meter residual. */
@@ -233,6 +246,8 @@ export interface CostsByMeter extends CostsWindowEcho {
     meters: UsageMeterTotals[];
     /** Rows recorded before meters were separated; null when there are none. */
     preMeterResidual: UsagePreMeterResidual | null;
+    /** How this deployment debits runs — what the meters' `credits` figures mean. */
+    settlementMode: CreditSettlementMode;
 }
 
 /**
@@ -328,7 +343,9 @@ export class CostsSummaryService implements RunCostBreakdownReader {
     private async findRunMeters(runId: string): Promise<RunCostMeters | null | undefined> {
         try {
             const lines = await this.pluginUsageRepository.getRunMeterLines(runId);
-            return Array.isArray(lines) ? foldRunMeters(lines) : undefined;
+            return Array.isArray(lines)
+                ? foldRunMeters(lines, config.billing.credits.getSettlementMode())
+                : undefined;
         } catch {
             return undefined;
         }
@@ -526,6 +543,7 @@ export class CostsSummaryService implements RunCostBreakdownReader {
                 ...row,
                 label: capabilityByKey.get(row.key) ?? null,
             })),
+            settlementMode: config.billing.credits.getSettlementMode(),
         };
     }
 
@@ -559,6 +577,7 @@ export class CostsSummaryService implements RunCostBreakdownReader {
                 ...row,
                 label: isMissionKey(row.key) ? (titles.get(row.key) ?? null) : null,
             })),
+            settlementMode: config.billing.credits.getSettlementMode(),
         };
     }
 
@@ -574,7 +593,11 @@ export class CostsSummaryService implements RunCostBreakdownReader {
             window.from,
             window.to,
         );
-        return { ...echo(window), ...foldMeterTotals(rows) };
+        return {
+            ...echo(window),
+            ...foldMeterTotals(rows),
+            settlementMode: config.billing.credits.getSettlementMode(),
+        };
     }
 
     /** The window's most expensive runs, with their Agent/Task/model. */

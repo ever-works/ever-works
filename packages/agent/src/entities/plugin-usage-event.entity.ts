@@ -186,6 +186,12 @@ export class PluginUsageEvent {
      * entry this is the published price; for a `provider-cost` entry it is
      * the provider's own cost at the published conversion (the run's
      * settlement still converts the summed cost, so rounding never drifts).
+     *
+     * Stamped the same way in both settlement modes. Only in the opt-in
+     * `price_list` mode (`CREDITS_SETTLEMENT_MODE`) is a `per-unit` figure what
+     * the run is debited; in the default `provider_cost` mode it is what the
+     * price list WOULD charge, and the run is debited from `costCents`. The
+     * credits actually debited for a run live on its `run:{runId}` ledger row.
      */
     @Column({ type: 'int', default: 0 })
     creditsCharged: number;
@@ -198,7 +204,8 @@ export class PluginUsageEvent {
      * AW-17 — the price-list version whose fixed `per-unit` price priced this
      * row. NULL when no fixed price applied (workspace-owned, provider-cost,
      * or no entry), in which case settlement falls back to the row's
-     * provider cost exactly as it did before meters existed.
+     * provider cost exactly as it did before meters existed. Only read by
+     * settlement in the `price_list` mode.
      */
     @Column({ type: 'int', nullable: true })
     priceVersion?: number | null;

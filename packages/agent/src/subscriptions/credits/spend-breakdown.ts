@@ -2,6 +2,7 @@ import {
     BREAKDOWN_EVERYTHING_ELSE_KEY,
     BREAKDOWN_TOP_N,
     USAGE_METER_IDS,
+    type CreditSettlementMode,
     type RunCostCreditLine,
     type RunCostMeters,
     type UsageMeterTotals,
@@ -148,8 +149,15 @@ export function foldMeterTotals(rows: UserMeterSpendRow[]): {
     };
 }
 
-/** A run's meter itemisation from its grouped rows. Null when the run has no retained rows. */
-export function foldRunMeters(lines: RunMeterLine[]): RunCostMeters | null {
+/**
+ * A run's meter itemisation from its grouped rows. Null when the run has no
+ * retained rows. `settlementMode`, when given, is echoed so a receipt can say
+ * whether the credits figures were debited or are list-price figures.
+ */
+export function foldRunMeters(
+    lines: RunMeterLine[],
+    settlementMode?: CreditSettlementMode,
+): RunCostMeters | null {
     if (lines.length === 0) {
         return null;
     }
@@ -210,7 +218,7 @@ export function foldRunMeters(lines: RunMeterLine[]): RunCostMeters | null {
         (a, b) =>
             b.credits - a.credits || b.calls - a.calls || a.priceKey.localeCompare(b.priceKey),
     );
-    return {
+    const meters: RunCostMeters = {
         model,
         credits: {
             calls: sortedLines.reduce((sum, line) => sum + line.calls, 0),
@@ -221,6 +229,10 @@ export function foldRunMeters(lines: RunMeterLine[]): RunCostMeters | null {
         priceVersions: Array.from(versions).sort((a, b) => a - b),
         preMeterCalls,
     };
+    if (settlementMode) {
+        meters.settlementMode = settlementMode;
+    }
+    return meters;
 }
 
 function sumCalls(rows: Array<{ calls: number }>): number {

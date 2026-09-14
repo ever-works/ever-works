@@ -64,6 +64,30 @@ export const BREAKDOWN_EVERYTHING_ELSE_KEY = 'everything-else';
 export const CREDIT_PRICE_BASES = ['per-unit', 'provider-cost'] as const;
 export type CreditPriceBasis = (typeof CREDIT_PRICE_BASES)[number];
 
+/**
+ * How a run's platform-paid spend turns into a credits debit.
+ *
+ * - `provider_cost` — the default. Every billable row settles from the
+ *   provider's own metered cost at the configured credits-per-dollar rate and
+ *   margin, exactly as runs settled before the price list existed. Rows are
+ *   still classified and stamped with what the price list would charge, but
+ *   no fixed price is debited.
+ * - `price_list` — opt-in. A row priced by a fixed `per-unit` entry debits its
+ *   published credits (zero when cached or failed); every other row still
+ *   settles from its provider cost.
+ *
+ * Workspace-paid calls are never debited in either mode.
+ */
+export const CREDIT_SETTLEMENT_MODES = ['provider_cost', 'price_list'] as const;
+export type CreditSettlementMode = (typeof CREDIT_SETTLEMENT_MODES)[number];
+
+/** The mode an install that configures nothing settles in. */
+export const DEFAULT_CREDIT_SETTLEMENT_MODE: CreditSettlementMode = 'provider_cost';
+
+export function isCreditSettlementMode(value: unknown): value is CreditSettlementMode {
+	return typeof value === 'string' && (CREDIT_SETTLEMENT_MODES as readonly string[]).includes(value);
+}
+
 /** Display groups of the price list. */
 export const CREDIT_PRICE_GROUPS = ['research', 'data', 'tools', 'models'] as const;
 export type CreditPriceGroup = (typeof CREDIT_PRICE_GROUPS)[number];
@@ -102,6 +126,13 @@ export interface CreditPriceListView extends CreditPriceListVersion {
 	creditsPerDollar: number;
 	/** Every version ever published, oldest first; nothing is ever re-priced. */
 	versions: number[];
+	/**
+	 * How runs on this deployment are actually debited. When `provider_cost`
+	 * the `per-unit` credits above are reference prices — what the list would
+	 * charge — and are not what a run is debited; a surface must say so rather
+	 * than present them as charges.
+	 */
+	settlementMode: CreditSettlementMode;
 }
 
 /** Totals for one meter over a window. */
@@ -111,7 +142,12 @@ export interface UsageMeterTotals {
 	calls: number;
 	/** Provider cost the rows carry, in cents; null when none was measured. */
 	costCents: number | null;
-	/** Credits the rows account for (always 0 for `model` and `addon`). */
+	/**
+	 * Credits the rows account for at the published price list (always 0 for
+	 * `model` and `addon`). Debited as such only in the `price_list` settlement
+	 * mode; in `provider_cost` mode runs are debited from provider cost and this
+	 * is the list-price figure, not the amount taken from the balance.
+	 */
 	credits: number;
 	/** Of `calls`, how many were zero-rated because they came from cache. */
 	cachedCalls: number;

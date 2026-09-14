@@ -19,6 +19,7 @@ describe('creditsPricingView', () => {
         process.env = { ...originalEnv };
         delete process.env.CREDITS_PER_DOLLAR;
         delete process.env.STRIPE_SECRET_KEY;
+        delete process.env.CREDITS_SETTLEMENT_MODE;
     });
 
     afterAll(() => {
@@ -90,6 +91,19 @@ describe('creditsPricingView', () => {
             },
         ]);
         expect(view.priceList.versions).toEqual([7]);
+    });
+
+    it('says the list is for reference by default — runs are debited from provider cost', () => {
+        const view = creditsPricingView();
+        expect(view.settlementMode).toBe('provider_cost');
+        expect(view.priceList.settlementMode).toBe('provider_cost');
+    });
+
+    it('says the list is what is charged once the deployment opts into price_list', () => {
+        process.env.CREDITS_SETTLEMENT_MODE = 'price_list';
+        const view = creditsPricingView();
+        expect(view.settlementMode).toBe('price_list');
+        expect(view.priceList.settlementMode).toBe('price_list');
     });
 
     it('follows the configured credits-per-dollar rate', () => {

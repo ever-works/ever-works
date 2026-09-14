@@ -153,7 +153,9 @@ export class CreditsController {
             'How a credit is priced on this deployment (billing spec FR-13): credits per dollar, ' +
             'platform margin, daily allowance, credit packs and the pay-as-you-go tiers — plus the ' +
             'published credit price list (what each kind of call costs, its version and the date ' +
-            'it took effect). Readable with no payment provider configured. Read-only; ' +
+            'it took effect) and settlementMode, which says whether those prices are charged ' +
+            '(price_list) or are reference prices beside a debit from provider cost ' +
+            '(provider_cost, the default). Readable with no payment provider configured. Read-only; ' +
             'server-authored; nothing here is writable over HTTP.',
     })
     @ApiResponse({ status: 200, description: 'Credits pricing view' })

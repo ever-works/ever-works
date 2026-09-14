@@ -128,11 +128,20 @@ export interface CostsMeterTotals {
     unconfirmedCalls: number;
 }
 
+/**
+ * AW-17 — how runs are debited: `provider_cost` (default) means `credits`
+ * figures are list-price figures beside a debit from provider cost;
+ * `price_list` means they are what was debited.
+ */
+export type CostsSettlementMode = 'provider_cost' | 'price_list';
+
 /** AW-17 — `GET /api/usage/costs/by-meter`. */
 export interface CostsByMeter extends CostsWindowEcho {
     meters: CostsMeterTotals[];
     /** Usage recorded before meters were separated; null when there is none. */
     preMeterResidual: { calls: number; costCents: number } | null;
+    /** Optional: older APIs omit it. */
+    settlementMode?: CostsSettlementMode;
 }
 
 /** AW-17 — one row of `by-tool` / `by-mission`. */
@@ -153,6 +162,8 @@ export interface CostsBreakdown extends CostsWindowEcho {
     totalCostCents: number;
     rows: CostsBreakdownRow[];
     foldedCount: number;
+    /** Optional: older APIs omit it. */
+    settlementMode?: CostsSettlementMode;
 }
 
 /** Everything the Costs tab renders for ONE window. */

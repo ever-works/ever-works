@@ -1,6 +1,8 @@
 import { RunCostSettlementService, splitMeteredSpend } from './run-cost-settlement.service';
-import { InsufficientCreditsError } from './credit-ledger.service';
+import { CreditLedgerService, InsufficientCreditsError } from './credit-ledger.service';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
+import { config } from '@src/config';
+import { PublishedCreditPriceList } from '../../usage/credit-price-list';
 
 /**
  * Pricing Wave 9 M2 — the metering → credits bridge fired by
@@ -113,11 +115,13 @@ function makeService(
         settings?: Record<string, jest.Mock> | null;
         /** Pay-as-you-go collaborator (billing spec §3.5); absent by default. */
         payg?: Record<string, jest.Mock>;
+        /** A real ledger service in place of the jest.fn() shell (conversion under test). */
+        ledgerInstance?: CreditLedgerService;
     } = {},
 ) {
     const agentRuns = makeAgentRuns(parts.agentRuns);
     const usage = makeUsage(parts.usage);
-    const ledger = makeLedger(parts.ledger);
+    const ledger = parts.ledgerInstance ?? makeLedger(parts.ledger);
     const entitlements = makeEntitlements(parts.entitlements);
     const users = makeUsers(parts.users);
     const notifications =
@@ -139,7 +143,7 @@ function makeService(
         service,
         agentRuns,
         usage,
-        ledger,
+        ledger: ledger as ReturnType<typeof makeLedger>,
         entitlements,
         users,
         notifications,
@@ -156,6 +160,7 @@ describe('RunCostSettlementService', () => {
         delete process.env.CREDITS_ENFORCEMENT;
         delete process.env.CREDITS_PER_DOLLAR;
         delete process.env.CREDITS_MARGIN_PERCENT;
+        delete process.env.CREDITS_SETTLEMENT_MODE;
     });
 
     afterAll(() => {
@@ -531,11 +536,16 @@ describe('RunCostSettlementService', () => {
     });
 
     /**
-     * AW-17 — rows classified at capture. A fixed-priced credits row debits
-     * its stamped credits; a Workspace-paid or add-on row debits nothing;
-     * everything else settles from provider cost exactly as before.
+     * AW-17 — rows classified at capture, in the opt-in `price_list` settlement
+     * mode. A fixed-priced credits row debits its stamped credits; a
+     * Workspace-paid or add-on row debits nothing; everything else settles
+     * from provider cost exactly as before.
      */
-    describe('settleRun — meters classified at capture (AW-17)', () => {
+    describe('settleRun — meters classified at capture, price_list mode (AW-17)', () => {
+        beforeEach(() => {
+            process.env.CREDITS_SETTLEMENT_MODE = 'price_list';
+        });
+
         const group = (overrides: Record<string, unknown>) => ({
             pluginId: 'search-a',
             meter: 'credits',
@@ -809,6 +819,197 @@ describe('RunCostSettlementService', () => {
             expect(ledger.record).toHaveBeenCalledWith(
                 expect.objectContaining({ amountCredits: -4, idempotencyKey: 'run:run-1' }),
             );
+        });
+    });
+
+    /**
+     * AW-17 — the settlement mode is configuration, and the default changes
+     * nothing a customer is charged. The debit is computed by a REAL
+     * CreditLedgerService (only its storage port is a shell), so the expected
+     * credits come from the configured conversion rather than a mock's 1:1.
+     */
+    describe('settleRun — settlement mode (AW-17)', () => {
+        const SEARCH_COST_CENTS = 5;
+        /** A web search the platform paid for, classified and stamped at capture. */
+        const platformSearch = {
+            spend: [{ pluginId: 'tavily', costCents: SEARCH_COST_CENTS }],
+            groups: [
+                {
+                    pluginId: 'tavily',
+                    meter: 'credits',
+                    payer: 'platform',
+                    priceKey: 'search.query',
+                    priceVersion: 1,
+                    calls: 1,
+                    costCents: SEARCH_COST_CENTS,
+                    creditsCharged: 2,
+                },
+            ],
+        };
+
+        function makeRealLedger() {
+            const recordAtomic = jest.fn(async (write: Record<string, unknown>) => ({
+                status: 'created',
+                entry: { id: 'entry-real', ...write },
+            }));
+            const ledger = new CreditLedgerService(
+                { recordAtomic } as never,
+                {} as never,
+                {} as never,
+            );
+            return { ledger, recordAtomic };
+        }
+
+        function settleSearch(settings?: Record<string, jest.Mock>) {
+            const { ledger, recordAtomic } = makeRealLedger();
+            const getRunMeterGroups = jest.fn().mockResolvedValue(platformSearch.groups);
+            const made = makeService({
+                ledgerInstance: ledger,
+                usage: {
+                    getRunCostByPlugin: jest.fn().mockResolvedValue(platformSearch.spend),
+                    getRunMeterGroups,
+                },
+                ...(settings ? { settings } : {}),
+            });
+            return { ...made, recordAtomic, getRunMeterGroups };
+        }
+
+        /**
+         * The run conversion as it stands on the branch this PR targets:
+         * `ceil(costCents × creditsPerDollar/100 × (1 + margin/100))`, read from
+         * the configured knobs.
+         */
+        function preMeterCredits(costCents: number): number {
+            const creditsPerCent = config.billing.credits.getCreditsPerDollar() / 100;
+            const margin = 1 + config.billing.credits.getMarginPercent() / 100;
+            return Math.ceil(costCents * creditsPerCent * margin);
+        }
+
+        it('defaults to provider_cost: a platform-paid search settles to exactly the pre-meter credits', async () => {
+            const expected = preMeterCredits(SEARCH_COST_CENTS);
+            // Guard the fixture: the two modes must disagree, or this proves nothing.
+            expect(expected).not.toBe(2);
+
+            const { service, recordAtomic, getRunMeterGroups } = settleSearch();
+            const result = await service.settleRun('run-1');
+
+            expect(result.settlementMode).toBe('provider_cost');
+            expect(result.status).toBe('settled');
+            expect(result.billableCostCents).toBe(SEARCH_COST_CENTS);
+            expect(result.debitedCredits).toBe(expected);
+            expect(recordAtomic).toHaveBeenCalledTimes(1);
+            expect(recordAtomic.mock.calls[0][0]).toMatchObject({
+                kind: CreditLedgerKind.CONSUMPTION,
+                amountCredits: -expected,
+                costCentsRef: SEARCH_COST_CENTS,
+                idempotencyKey: 'run:run-1',
+            });
+            // The classification never takes part in a provider_cost debit.
+            expect(getRunMeterGroups).not.toHaveBeenCalled();
+        });
+
+        it('the same row under a different configured margin still follows the conversion, not the list', async () => {
+            process.env.CREDITS_MARGIN_PERCENT = '80';
+            const expected = preMeterCredits(SEARCH_COST_CENTS);
+
+            const { service } = settleSearch();
+            const result = await service.settleRun('run-1');
+
+            expect(result.debitedCredits).toBe(expected);
+        });
+
+        it('price_list: the same platform-paid search settles at its published 2 credits', async () => {
+            process.env.CREDITS_SETTLEMENT_MODE = 'price_list';
+            const published = new PublishedCreditPriceList().find('search.query');
+            expect(published?.credits).toBe(2);
+
+            const { service, recordAtomic, getRunMeterGroups } = settleSearch();
+            const result = await service.settleRun('run-1');
+
+            expect(result.settlementMode).toBe('price_list');
+            expect(getRunMeterGroups).toHaveBeenCalledWith('run-1');
+            expect(result.debitedCredits).toBe(2);
+            expect(recordAtomic.mock.calls[0][0]).toMatchObject({ amountCredits: -2 });
+        });
+
+        it('an unrecognised mode value settles the default way', async () => {
+            process.env.CREDITS_SETTLEMENT_MODE = 'fixed';
+
+            const { service, getRunMeterGroups } = settleSearch();
+            const result = await service.settleRun('run-1');
+
+            expect(result.settlementMode).toBe('provider_cost');
+            expect(result.debitedCredits).toBe(preMeterCredits(SEARCH_COST_CENTS));
+            expect(getRunMeterGroups).not.toHaveBeenCalled();
+        });
+
+        it.each(['provider_cost', 'price_list'])(
+            '%s: a search on a Workspace-owned key is exempt and debits nothing',
+            async (mode) => {
+                process.env.CREDITS_SETTLEMENT_MODE = mode;
+                const { ledger, recordAtomic } = makeRealLedger();
+                const { service } = makeService({
+                    ledgerInstance: ledger,
+                    usage: {
+                        getRunCostByPlugin: jest.fn().mockResolvedValue(platformSearch.spend),
+                        // What capture stamps for an own-key call.
+                        getRunMeterGroups: jest.fn().mockResolvedValue([
+                            {
+                                ...platformSearch.groups[0],
+                                meter: 'model',
+                                payer: 'workspace',
+                                priceVersion: null,
+                                creditsCharged: 0,
+                            },
+                        ]),
+                    },
+                    settings: {
+                        getResolvedSettings: jest.fn().mockResolvedValue({
+                            apiKey: {
+                                key: 'apiKey',
+                                value: 'sk',
+                                source: 'user',
+                                isFallback: false,
+                            },
+                        }),
+                    },
+                });
+
+                const result = await service.settleRun('run-1');
+
+                expect(result.status).toBe('settled');
+                expect(result.totalCostCents).toBe(SEARCH_COST_CENTS);
+                expect(result.billableCostCents).toBe(0);
+                expect(result.exemptPluginIds).toEqual(['tavily']);
+                expect(result.debitedCredits).toBe(0);
+                expect(recordAtomic).not.toHaveBeenCalled();
+            },
+        );
+
+        it('provider_cost ignores the capture-time stamp and resolves provenance exactly as before', async () => {
+            // Capture said "Workspace-paid", but the key now resolves to the
+            // platform's: the pre-meter settlement billed it, so this one does too.
+            const { ledger } = makeRealLedger();
+            const { service, settings } = makeService({
+                ledgerInstance: ledger,
+                usage: {
+                    getRunCostByPlugin: jest.fn().mockResolvedValue(platformSearch.spend),
+                    getRunMeterGroups: jest
+                        .fn()
+                        .mockResolvedValue([
+                            { ...platformSearch.groups[0], meter: 'model', payer: 'workspace' },
+                        ]),
+                },
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(settings?.getResolvedSettings).toHaveBeenCalledWith(
+                'tavily',
+                expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
+            );
+            expect(result.exemptPluginIds).toEqual([]);
+            expect(result.debitedCredits).toBe(preMeterCredits(SEARCH_COST_CENTS));
         });
     });
 

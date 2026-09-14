@@ -1,4 +1,4 @@
-import type { CreditPriceListView } from '@ever-works/contracts';
+import type { CreditPriceListView, CreditSettlementMode } from '@ever-works/contracts';
 import { config } from '@src/config';
 import { PublishedCreditPriceList, type CreditPriceList } from '../../usage/credit-price-list';
 import { CREDIT_PACKS, type CreditPack } from './credit-packs';
@@ -36,6 +36,14 @@ export interface CreditsPricingView {
     pricebookEffectiveFrom: string;
     /** AW-17 — the published price list itself: what each kind of call costs. */
     priceList: CreditPriceListView;
+    /**
+     * AW-17 — how runs on this deployment are actually debited
+     * (`CREDITS_SETTLEMENT_MODE`). `provider_cost` (default): from provider
+     * cost at `creditsPerDollar` and `marginPercent`, and the list's `per-unit`
+     * credits are reference prices only. `price_list`: those credits are what
+     * a call is charged. Mirrored on `priceList.settlementMode`.
+     */
+    settlementMode: CreditSettlementMode;
 }
 
 /**
@@ -47,6 +55,7 @@ export function creditsPricingView(
 ): CreditsPricingView {
     const payg = getPaygCatalog();
     const creditsPerDollar = config.billing.credits.getCreditsPerDollar();
+    const settlementMode = config.billing.credits.getSettlementMode();
     const current = priceList.getVersion();
     return {
         creditsPerDollar,
@@ -67,7 +76,9 @@ export function creditsPricingView(
             entries: current?.entries ?? [],
             creditsPerDollar,
             versions: priceList.versions(),
+            settlementMode,
         },
+        settlementMode,
     };
 }
 

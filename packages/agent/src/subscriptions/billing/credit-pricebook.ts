@@ -31,6 +31,15 @@ import type {
  *                    (priced from the model's own list price in its metadata),
  *                    metrics reads and tool calls, whose cost varies by call.
  *
+ * ## Charged, or for reference
+ *
+ * Every row is stamped with its list price either way. Whether a `per-unit`
+ * price is what a run is DEBITED is the deployment's settlement mode
+ * (`CREDITS_SETTLEMENT_MODE`): the default `provider_cost` debits every run
+ * from its provider cost at the conversion and margin, exactly as before this
+ * list existed; `price_list` debits the listed credits. The pricing view
+ * publishes the active mode beside the list.
+ *
  * Only kinds of call a capability in this codebase actually makes are
  * listed. A kind is added here in the same change that adds the capability
  * that produces it — a published price for a call nothing can make would be

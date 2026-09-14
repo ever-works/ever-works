@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
 	BREAKDOWN_TOP_N,
 	CREDIT_PRICE_BASES,
+	CREDIT_SETTLEMENT_MODES,
+	DEFAULT_CREDIT_SETTLEMENT_MODE,
+	isCreditSettlementMode,
 	SPEND_CAP_MIN_CENTS,
 	SPEND_CAP_THRESHOLDS,
 	UNCONFIRMED_PAYER_ALERT_RATIO,
@@ -22,6 +25,16 @@ describe('billing meter contracts', () => {
 		expect(USAGE_PAYER_IDS).toEqual(['workspace', 'platform', 'unconfirmed']);
 		expect(USAGE_OUTCOME_IDS).toEqual(['ok', 'cached', 'failed']);
 		expect(CREDIT_PRICE_BASES).toEqual(['per-unit', 'provider-cost']);
+	});
+
+	it('settles from provider cost unless a deployment opts into the price list', () => {
+		expect(CREDIT_SETTLEMENT_MODES).toEqual(['provider_cost', 'price_list']);
+		expect(DEFAULT_CREDIT_SETTLEMENT_MODE).toBe('provider_cost');
+		expect(isCreditSettlementMode('price_list')).toBe(true);
+		expect(isCreditSettlementMode('provider_cost')).toBe(true);
+		for (const value of ['', 'price-list', 'PRICE_LIST', 'fixed', null, undefined, 1]) {
+			expect(isCreditSettlementMode(value)).toBe(false);
+		}
 	});
 
 	it('carries the published limits as numbers', () => {

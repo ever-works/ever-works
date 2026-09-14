@@ -153,6 +153,17 @@ describe('foldRunMeters', () => {
         expect(foldRunMeters([])).toBeNull();
     });
 
+    it('echoes the settlement mode only when one is given', () => {
+        expect(foldRunMeters([line({ calls: 1, creditsCharged: 2 })])).not.toHaveProperty(
+            'settlementMode',
+        );
+        expect(
+            foldRunMeters([line({ calls: 1, creditsCharged: 2 })], 'provider_cost')?.settlementMode,
+        ).toBe('provider_cost');
+        expect(foldRunMeters([line({})], 'price_list')?.settlementMode).toBe('price_list');
+        expect(foldRunMeters([], 'price_list')).toBeNull();
+    });
+
     it('itemises credits per kind of call with charged, cached and failed counts', () => {
         const meters = foldRunMeters([
             line({ calls: 4, creditsCharged: 8 }),

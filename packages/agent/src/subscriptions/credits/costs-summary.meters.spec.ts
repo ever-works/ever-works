@@ -10,8 +10,15 @@ import { CostsSummaryService, InvalidCostsWindowError } from './costs-summary.se
 describe('CostsSummaryService — meters and breakdowns (AW-17)', () => {
     let usage: Record<string, jest.Mock>;
     let service: CostsSummaryService;
+    const originalEnv = process.env;
+
+    afterAll(() => {
+        process.env = originalEnv;
+    });
 
     beforeEach(() => {
+        process.env = { ...originalEnv };
+        delete process.env.CREDITS_SETTLEMENT_MODE;
         usage = {
             getSpendByPriceKeyForUser: jest.fn().mockResolvedValue([
                 { key: 'search.query', capability: 'search', calls: 5, costCents: 5, credits: 10 },
@@ -119,6 +126,31 @@ describe('CostsSummaryService — meters and breakdowns (AW-17)', () => {
         expect(result.preMeterResidual).toEqual({ calls: 2, costCents: 12 });
     });
 
+    it('every credits figure says which settlement mode it belongs to — provider_cost by default', async () => {
+        const [tool, mission, meter] = await Promise.all([
+            service.getByTool('user-1', 30),
+            service.getByMission('user-1', 30),
+            service.getByMeter('user-1', 30),
+        ]);
+        expect([tool, mission, meter].map((view) => view.settlementMode)).toEqual([
+            'provider_cost',
+            'provider_cost',
+            'provider_cost',
+        ]);
+        // The list-price figures are still reported; only their label changes.
+        expect(tool.totalCredits).toBe(64);
+    });
+
+    it('reports price_list once the deployment opts in', async () => {
+        process.env.CREDITS_SETTLEMENT_MODE = 'price_list';
+        const [tool, meter] = await Promise.all([
+            service.getByTool('user-1', 30),
+            service.getByMeter('user-1', 30),
+        ]);
+        expect(tool.settlementMode).toBe('price_list');
+        expect(meter.settlementMode).toBe('price_list');
+    });
+
     it('rejects a window outside the vocabulary', async () => {
         await expect(service.getByMeter('user-1', 31)).rejects.toBeInstanceOf(
             InvalidCostsWindowError,
@@ -160,6 +192,8 @@ describe('CostsSummaryService — meters and breakdowns (AW-17)', () => {
             expect(breakdown.soFar).toBe(true);
             expect(breakdown.meters?.credits).toMatchObject({ calls: 2, credits: 4 });
             expect(breakdown.meters?.priceVersions).toEqual([1]);
+            // List-price credits beside a debit taken from provider cost.
+            expect(breakdown.meters?.settlementMode).toBe('provider_cost');
         });
 
         it('reports meters as null when no rows are retained', async () => {
