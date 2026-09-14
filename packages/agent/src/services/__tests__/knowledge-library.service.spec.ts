@@ -387,6 +387,52 @@ describe('KnowledgeLibraryService', () => {
         });
     });
 
+    describe('getDocument', () => {
+        it('returns one shelf row with its folder path, Work name and edit right', async () => {
+            documents.findInLibraryScope.mockResolvedValue([doc({ folderId: 'folder-playbooks' })]);
+            folders.listOrganizationFolders.mockResolvedValue([sharedFolder()]);
+            ownership.getUserRole.mockResolvedValue(WorkMemberRole.VIEWER);
+
+            const row = await service.getDocument(actor(), 'doc-1');
+
+            expect(ownership.ensureCanView).toHaveBeenCalledWith(WORK_A, USER);
+            expect(row).toMatchObject({
+                id: 'doc-1',
+                folderId: 'folder-playbooks',
+                folderPath: '/Playbooks',
+                workName: 'Marketing',
+                canEdit: false,
+            });
+        });
+
+        it('reports a document the person cannot view exactly like a missing one', async () => {
+            documents.findInLibraryScope.mockResolvedValue([doc()]);
+            ownership.ensureCanView.mockRejectedValue(new ForbiddenException('no access'));
+            const denied = await service
+                .getDocument(actor(), 'doc-1')
+                .catch((error: unknown) => error);
+            documents.findInLibraryScope.mockResolvedValue([]);
+            const missing = await service
+                .getDocument(actor(), 'doc-1')
+                .catch((error: unknown) => error);
+            expect(denied).toBeInstanceOf(NotFoundException);
+            expect(missing).toBeInstanceOf(NotFoundException);
+            expect((denied as NotFoundException).getResponse()).toEqual(
+                (missing as NotFoundException).getResponse(),
+            );
+        });
+
+        it('lets any member read an organization document, editable only by managers', async () => {
+            documents.findInLibraryScope.mockResolvedValue([
+                doc({ workId: null, organizationId: ORG }),
+            ]);
+            const row = await service.getDocument(actor({ canManageOrganization: false }), 'doc-1');
+            expect(ownership.ensureCanView).not.toHaveBeenCalled();
+            expect(row.canEdit).toBe(false);
+            expect(row.workName).toBeNull();
+        });
+    });
+
     describe('archive and unarchive', () => {
         it('archives a Work document through the Knowledge Base', async () => {
             documents.findInLibraryScope.mockResolvedValue([doc()]);
