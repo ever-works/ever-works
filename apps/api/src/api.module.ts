@@ -50,6 +50,7 @@ import { MissionsModule } from './missions/missions.module';
 import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
 import { RunsModule } from './runs/runs.module';
+import { ModelRoutingApiModule } from './model-routing/model-routing.module';
 import { EnvironmentsApiModule } from './environments/environments.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
@@ -195,6 +196,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // calendar-navigated ledger of every Agent run and the itemised
         // receipt of one, over the same run rows the Sessions endpoints read.
         RunsModule,
+        // Model accounts (AW-16) — /api/model-accounts and /api/model-policies:
+        // several credentials per AI provider, in order, and the workspace /
+        // Agent / schedule model ladder. The planner the AI facade consults is
+        // bound through FacadesModule, not here.
+        ModelRoutingApiModule,
         // Environments (Settings → Environments) — named, reusable
         // runtime recipes (packages + networking) assigned per-Agent.
         EnvironmentsApiModule,
