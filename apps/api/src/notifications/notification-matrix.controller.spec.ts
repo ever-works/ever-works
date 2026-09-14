@@ -3,6 +3,9 @@ jest.mock('../auth', () => ({
     AuthSessionGuard: class AuthSessionGuard {},
 }));
 jest.mock('./notification-matrix.service', () => ({ NotificationMatrixService: class {} }));
+jest.mock('./notification-preferences.service', () => ({
+    NotificationPreferencesService: class {},
+}));
 
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
@@ -11,12 +14,14 @@ import { GUARDS_METADATA } from '@nestjs/common/constants';
 import {
     NotificationMatrixController,
     ResetNotificationMatrixBody,
+    SetNotificationMatrixEventBody,
 } from './notification-matrix.controller';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
 describe('NotificationMatrixController', () => {
     const auth = { userId: 'user-1' } as AuthenticatedUser;
     let matrix: { getMatrix: jest.Mock; reset: jest.Mock };
+    let preferences: { setEventSubscription: jest.Mock };
     let controller: NotificationMatrixController;
 
     beforeEach(() => {
@@ -24,7 +29,46 @@ describe('NotificationMatrixController', () => {
             getMatrix: jest.fn().mockResolvedValue({ events: [], columns: [] }),
             reset: jest.fn().mockResolvedValue({ changed: 2 }),
         };
-        controller = new NotificationMatrixController(matrix as never);
+        preferences = {
+            setEventSubscription: jest.fn().mockResolvedValue({
+                eventTypeKey: 'generation_error',
+                channelIds: [],
+                origin: 'matrix',
+            }),
+        };
+        controller = new NotificationMatrixController(matrix as never, preferences as never);
+    });
+
+    it('saves a matrix row for the calling user with the matrix marker, an empty list included', async () => {
+        await expect(
+            controller.setEventTargets(auth, 'generation_error', { channelIds: [] }),
+        ).resolves.toEqual({
+            subscription: { eventTypeKey: 'generation_error', channelIds: [], origin: 'matrix' },
+        });
+        expect(preferences.setEventSubscription).toHaveBeenCalledWith(
+            'user-1',
+            'generation_error',
+            [],
+            'matrix',
+        );
+    });
+
+    describe('matrix row body validation', () => {
+        async function errorsFor(body: unknown) {
+            return validate(plainToInstance(SetNotificationMatrixEventBody, body));
+        }
+
+        it('accepts an empty list and a list of target ids', async () => {
+            expect(await errorsFor({ channelIds: [] })).toHaveLength(0);
+            expect(await errorsFor({ channelIds: ['in-app', 'email'] })).toHaveLength(0);
+        });
+
+        it('rejects a missing list, a non-array, non-string members and over-long ids', async () => {
+            expect(await errorsFor({})).not.toHaveLength(0);
+            expect(await errorsFor({ channelIds: 'email' })).not.toHaveLength(0);
+            expect(await errorsFor({ channelIds: [42] })).not.toHaveLength(0);
+            expect(await errorsFor({ channelIds: ['x'.repeat(121)] })).not.toHaveLength(0);
+        });
     });
 
     it('is session-guarded as a whole', () => {

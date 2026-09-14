@@ -32,7 +32,11 @@ export interface CoreNotificationEvent {
     readonly category: string;
     readonly title: string;
     readonly description: string;
-    /** `true` → never deferred by quiet hours. */
+    /**
+     * `true` → only the owner can unblock it. An urgent event's external
+     * deliveries come through quiet hours, unless
+     * {@link CoreNotificationEvent.quietHoursBypassNeedsOptIn} is set.
+     */
     readonly urgent: boolean;
     readonly defaultChannels: readonly string[];
     /** The producer writes persistent rows: they always show in the app. */
@@ -41,6 +45,15 @@ export interface CoreNotificationEvent {
     readonly alternativeSurface?: NotificationAlternativeSurface;
     /** Email is sent by a dedicated producer and governed by a profile setting. */
     readonly emailGovernedByProfile?: boolean;
+    /**
+     * Set on urgent rows whose external deliveries did NOT come through quiet
+     * hours before AW-13 — either the row was not urgent then, or it was not
+     * registered at all. They keep waiting until the person's quiet hours end
+     * unless that person opted in to let every urgent event through
+     * (`user_notification_preferences.urgentBypassesQuietHours`). AW-13 never
+     * widens what breaks through a quiet-hours window a person chose.
+     */
+    readonly quietHoursBypassNeedsOptIn?: boolean;
 }
 
 const IN_APP = ['in-app'] as const;
@@ -122,6 +135,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         title: 'Mission blocked',
         description: 'A mission can no longer progress — review its blocking task to unblock.',
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP_AND_EMAIL,
     },
     {
@@ -140,6 +154,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         description:
             'An agent stopped without finishing (checks exhausted, guardrail refusal, budget stop or refused merge) and a human decision is required.',
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP_AND_EMAIL,
         persistent: true,
     },
@@ -159,6 +174,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         description:
             'An agent proposed a side-effectful action and is waiting for your approval in the Inbox.',
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP_AND_EMAIL,
     },
     {
@@ -168,6 +184,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         description:
             'An agent stopped without finishing and the escalation is waiting in your Inbox.',
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP_AND_EMAIL,
     },
     {
@@ -195,6 +212,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         description:
             "Your credit balance could not cover a run's metered usage. Top up credits to keep usage billing normally.",
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP_AND_EMAIL,
         persistent: true,
     },
@@ -213,6 +231,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         description:
             'Your pay-as-you-go usage reached your monthly cap. New runs that need credits are paused until you raise the cap, buy a credit pack, or the cycle resets.',
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP_AND_EMAIL,
         persistent: true,
     },
@@ -223,6 +242,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         description:
             'A pay-as-you-go invoice could not be collected. Pay-as-you-go is paused until it is settled.',
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP_AND_EMAIL,
         persistent: true,
     },
@@ -241,6 +261,7 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         title: 'Budget cap reached',
         description: 'A Work budget reached its cap for this period, or is running in overage.',
         urgent: true,
+        quietHoursBypassNeedsOptIn: true,
         defaultChannels: IN_APP,
         persistent: true,
         emailGovernedByProfile: true,
@@ -270,6 +291,25 @@ const CORE_EVENTS_BY_KEY: ReadonlyMap<string, CoreNotificationEvent> = new Map(
 /** The catalogue row for a core event key, or undefined for plugin / unknown keys. */
 export function findCoreNotificationEvent(key: string): CoreNotificationEvent | undefined {
     return CORE_EVENTS_BY_KEY.get(key);
+}
+
+/**
+ * Does this urgent registry row come through the person's quiet hours?
+ *
+ * - Not urgent: never.
+ * - Urgent and it came through before AW-13 (a core row without
+ *   `quietHoursBypassNeedsOptIn`, or any plugin row): always, as before.
+ * - Urgent since AW-13: only when the person opted in.
+ */
+export function urgentEventBypassesQuietHours(
+    event: { readonly key: string; readonly urgent: boolean; readonly source?: string | null },
+    optedIn: boolean,
+): boolean {
+    if (!event.urgent) return false;
+    const needsOptIn =
+        event.source !== 'plugin' &&
+        findCoreNotificationEvent(event.key)?.quietHoursBypassNeedsOptIn === true;
+    return needsOptIn ? optedIn : true;
 }
 
 /**

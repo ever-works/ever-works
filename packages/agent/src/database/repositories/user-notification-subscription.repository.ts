@@ -16,13 +16,26 @@ export class UserNotificationSubscriptionRepository {
         private readonly repository: Repository<UserNotificationSubscription>,
     ) {}
 
-    async upsert(userId: string, eventTypeKey: string, channelIds: string[]): Promise<void> {
+    /**
+     * Store the channel list for one event.
+     *
+     * `origin` (AW-13) records where this write came from and is replaced on
+     * every write, so it always describes the latest one: the notification
+     * matrix passes `'matrix'`; every other caller leaves it out, which stores
+     * NULL and keeps the row's pre-AW-13 meaning (see `notification-choice.ts`).
+     */
+    async upsert(
+        userId: string,
+        eventTypeKey: string,
+        channelIds: string[],
+        origin: string | null = null,
+    ): Promise<void> {
         const existing = await this.repository.findOne({ where: { userId, eventTypeKey } });
         if (existing) {
-            await this.repository.update({ id: existing.id }, { channelIds });
+            await this.repository.update({ id: existing.id }, { channelIds, origin });
         } else {
             await this.repository.save(
-                this.repository.create({ userId, eventTypeKey, channelIds }),
+                this.repository.create({ userId, eventTypeKey, channelIds, origin }),
             );
         }
     }

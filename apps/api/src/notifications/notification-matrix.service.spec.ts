@@ -12,6 +12,7 @@ jest.mock('@ever-works/agent/database', () => ({
 jest.mock('@ever-works/agent/plugins', () => ({ PluginRegistryService: class {} }));
 jest.mock('@ever-works/agent/notifications', () => ({
     ...jest.requireActual('../../../../packages/agent/src/notifications/core-event-catalogue'),
+    ...jest.requireActual('../../../../packages/agent/src/notifications/notification-choice'),
     UserNotificationSubscriptionService: class {},
 }));
 jest.mock('@src/mail/mail.service', () => ({ MailService: class {} }));
@@ -122,10 +123,10 @@ describe('NotificationMatrixService', () => {
         expect(budget).toMatchObject({ emailGovernedByProfile: true, group: 'signals' });
     });
 
-    it('shows a stored choice, including an explicit empty one, instead of the defaults', async () => {
+    it('shows a choice saved in the matrix, including an explicit empty one, instead of the defaults', async () => {
         subscriptions.findByUser.mockResolvedValue([
-            { eventTypeKey: 'agent_run_escalated', channelIds: [] },
-            { eventTypeKey: 'generation_error', channelIds: ['email', 'ch-1'] },
+            { eventTypeKey: 'agent_run_escalated', channelIds: [], origin: 'matrix' },
+            { eventTypeKey: 'generation_error', channelIds: ['email', 'ch-1'], origin: 'matrix' },
         ]);
         const matrix = await build().getMatrix('u1');
         expect(matrix.events.find((e) => e.key === 'agent_run_escalated')).toMatchObject({
@@ -135,6 +136,33 @@ describe('NotificationMatrixService', () => {
         expect(matrix.events.find((e) => e.key === 'generation_error')).toMatchObject({
             explicit: true,
             selectedTargets: ['email', 'ch-1'],
+        });
+    });
+
+    it('shows a stored row without the matrix marker as it behaves: an empty one follows the defaults, and in-app stays on', async () => {
+        subscriptions.findByUser.mockResolvedValue([
+            { eventTypeKey: 'agent_run_escalated', channelIds: [] },
+            { eventTypeKey: 'generation_error', channelIds: ['email', 'ch-1'], origin: null },
+            { eventTypeKey: 'schedule_paused', channelIds: ['in-app'] },
+        ]);
+        resolver.loadOrgDefaultMap.mockResolvedValue({ mission_blocked: ['ch-org'] });
+        const matrix = await build().getMatrix('u1');
+        expect(matrix.events.find((e) => e.key === 'agent_run_escalated')).toMatchObject({
+            explicit: true,
+            selectedTargets: ['in-app', 'email'],
+        });
+        expect(matrix.events.find((e) => e.key === 'generation_error')).toMatchObject({
+            explicit: true,
+            selectedTargets: ['in-app', 'email', 'ch-1'],
+        });
+        expect(matrix.events.find((e) => e.key === 'schedule_paused')).toMatchObject({
+            explicit: true,
+            selectedTargets: ['in-app'],
+        });
+        // An organisation default never silences the bell either.
+        expect(matrix.events.find((e) => e.key === 'mission_blocked')).toMatchObject({
+            explicit: false,
+            selectedTargets: ['in-app', 'ch-org'],
         });
     });
 
@@ -232,10 +260,27 @@ describe('NotificationMatrixService', () => {
             start: '22:00',
             end: '07:00',
             timezone: 'Europe/Sofia',
+            urgentBypassesQuietHours: false,
         });
         expect(matrix.email.profileBudgetAlerts).toBe(false);
         expect(matrix.limits).toEqual({ maxTargets: 20, maxColumns: 6 });
         expect(matrix.budgets).toEqual([]);
+    });
+
+    it('carries the urgent quiet-hours opt-in, off unless the person turned it on', async () => {
+        expect((await build().getMatrix('u1')).quietHours.urgentBypassesQuietHours).toBe(false);
+        preferences.findByUser.mockResolvedValue({
+            quietHoursStart: '22:00',
+            quietHoursEnd: '07:00',
+            timezone: 'UTC',
+            urgentBypassesQuietHours: true,
+        });
+        expect((await build().getMatrix('u1')).quietHours).toEqual({
+            start: '22:00',
+            end: '07:00',
+            timezone: 'UTC',
+            urgentBypassesQuietHours: true,
+        });
     });
 
     it('includes a plugin-contributed event without any code change', async () => {

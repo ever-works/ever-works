@@ -6,6 +6,7 @@ import {
     UserNotificationCategoryMuteRepository,
     NotificationChannelRepository,
 } from '@ever-works/agent/database';
+import { NOTIFICATION_CHOICE_ORIGIN_MATRIX } from '@ever-works/contracts';
 
 /**
  * Channel ids that are not rows in `notification_channels` — always
@@ -74,10 +75,21 @@ export class NotificationPreferencesService {
         };
     }
 
+    /**
+     * Store the channel list for one event.
+     *
+     * `origin` (AW-13) is passed only by the notification matrix write path
+     * (`'matrix'`), whose list is taken literally by the resolver. Every other
+     * caller leaves it out: the row is stored without the marker and keeps its
+     * pre-AW-13 meaning (an empty list falls back to the defaults and the
+     * notification keeps reaching the bell) — see
+     * `packages/agent/src/notifications/notification-choice.ts`.
+     */
     async setEventSubscription(
         userId: string,
         eventTypeKey: string,
         channelIds: string[],
+        origin?: typeof NOTIFICATION_CHOICE_ORIGIN_MATRIX,
     ): Promise<UserNotificationSubscription> {
         // Reject unknown event types so a typo can't persist a dead
         // subscription row that silently never resolves.
@@ -108,20 +120,39 @@ export class NotificationPreferencesService {
             }
         }
 
-        await this.subscriptions.upsert(userId, eventTypeKey, unique);
+        if (origin === NOTIFICATION_CHOICE_ORIGIN_MATRIX) {
+            await this.subscriptions.upsert(userId, eventTypeKey, unique, origin);
+        } else {
+            await this.subscriptions.upsert(userId, eventTypeKey, unique);
+        }
         return (await this.subscriptions.findForEvent(
             userId,
             eventTypeKey,
         )) as UserNotificationSubscription;
     }
 
+    /**
+     * Set the quiet-hours window. `urgentBypassesQuietHours` (AW-13) is the
+     * person's opt-in to let every urgent event through the window; when it
+     * is left out the stored value is kept, so a caller that only knows about
+     * the window never flips it.
+     */
     async setQuietHours(
         userId: string,
         quietHoursStart: string | null,
         quietHoursEnd: string | null,
         timezone: string | null,
+        urgentBypassesQuietHours?: boolean,
     ): Promise<UserNotificationPreference> {
-        return this.preferences.upsert(userId, { quietHoursStart, quietHoursEnd, timezone });
+        const patch: Partial<UserNotificationPreference> = {
+            quietHoursStart,
+            quietHoursEnd,
+            timezone,
+        };
+        if (typeof urgentBypassesQuietHours === 'boolean') {
+            patch.urgentBypassesQuietHours = urgentBypassesQuietHours;
+        }
+        return this.preferences.upsert(userId, patch);
     }
 
     async muteCategory(

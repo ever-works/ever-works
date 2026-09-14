@@ -7,7 +7,9 @@ import { AttentionMatrixFoundations1791141300000 } from '../1791141300000-Attent
  * Same in-memory better-sqlite3 harness as the sibling migration specs. What
  * matters: existing notifications read as interrupting, existing delivery log
  * rows survive with their channel, a built-in delivery can be recorded
- * without one, re-running is a no-op, `down()` never deletes a row, and the
+ * without one, existing per-event choices read without the matrix marker (so
+ * they keep their pre-AW-13 meaning), existing quiet-hours rows read "not
+ * opted in", re-running is a no-op, `down()` never deletes a row, and the
  * migration contains nothing destructive.
  */
 describe('AttentionMatrixFoundations1791141300000', () => {
@@ -63,6 +65,36 @@ describe('AttentionMatrixFoundations1791141300000', () => {
                 referencedColumnNames: ['id'],
                 onDelete: 'CASCADE',
             }),
+        );
+        await runner.createTable(
+            new Table({
+                name: 'user_notification_subscriptions',
+                columns: [
+                    { name: 'id', type: 'uuid', isPrimary: true },
+                    { name: 'userId', type: 'uuid' },
+                    { name: 'eventTypeKey', type: 'varchar', length: '120' },
+                    { name: 'channelIds', type: 'text' },
+                ],
+            }),
+        );
+        await runner.createTable(
+            new Table({
+                name: 'user_notification_preferences',
+                columns: [
+                    { name: 'userId', type: 'uuid', isPrimary: true },
+                    { name: 'quietHoursStart', type: 'varchar', length: '8', isNullable: true },
+                    { name: 'quietHoursEnd', type: 'varchar', length: '8', isNullable: true },
+                    { name: 'timezone', type: 'varchar', length: '64', isNullable: true },
+                ],
+            }),
+        );
+        await runner.query(
+            `INSERT INTO user_notification_subscriptions (id, "userId", "eventTypeKey", "channelIds") VALUES (?, ?, ?, ?)`,
+            ['sub-1', 'user-1', 'agent_run_escalated', '[]'],
+        );
+        await runner.query(
+            `INSERT INTO user_notification_preferences ("userId", "quietHoursStart", "quietHoursEnd", timezone) VALUES (?, ?, ?, ?)`,
+            ['user-1', '22:00:00', '07:00:00', 'UTC'],
         );
         await runner.query(
             `INSERT INTO notifications (id, "userId", title, "isRead") VALUES (?, ?, ?, ?)`,
@@ -144,6 +176,47 @@ describe('AttentionMatrixFoundations1791141300000', () => {
         expect(builtIn).toEqual({ channelId: null, builtInChannel: 'email' });
     });
 
+    it('adds a nullable origin to stored choices, leaving every existing row without the matrix marker', async () => {
+        await runUp();
+        const subscriptions = await table('user_notification_subscriptions');
+        expect(subscriptions?.findColumnByName('origin')).toMatchObject({ isNullable: true });
+        expect(
+            await dataSource.query(
+                `SELECT id, "channelIds", origin FROM user_notification_subscriptions`,
+            ),
+        ).toEqual([{ id: 'sub-1', channelIds: '[]', origin: null }]);
+
+        await dataSource.query(
+            `INSERT INTO user_notification_subscriptions (id, "userId", "eventTypeKey", "channelIds", origin) VALUES (?, ?, ?, ?, ?)`,
+            ['sub-2', 'user-1', 'generation_error', '[]', 'matrix'],
+        );
+        const [marked] = await dataSource.query(
+            `SELECT origin FROM user_notification_subscriptions WHERE id = ?`,
+            ['sub-2'],
+        );
+        expect(marked).toEqual({ origin: 'matrix' });
+    });
+
+    it('adds the urgent quiet-hours opt-in defaulting to off, and keeps the stored window', async () => {
+        await runUp();
+        const preferences = await table('user_notification_preferences');
+        expect(preferences?.findColumnByName('urgentBypassesQuietHours')).toMatchObject({
+            isNullable: false,
+        });
+        const [row] = await dataSource.query(
+            `SELECT "quietHoursStart", "quietHoursEnd", timezone, "urgentBypassesQuietHours" FROM user_notification_preferences WHERE "userId" = ?`,
+            ['user-1'],
+        );
+        expect({ ...row, urgentBypassesQuietHours: Boolean(row.urgentBypassesQuietHours) }).toEqual(
+            {
+                quietHoursStart: '22:00:00',
+                quietHoursEnd: '07:00:00',
+                timezone: 'UTC',
+                urgentBypassesQuietHours: false,
+            },
+        );
+    });
+
     it('is idempotent on re-run', async () => {
         await runUp();
         await runUp();
@@ -151,6 +224,12 @@ describe('AttentionMatrixFoundations1791141300000', () => {
         expect(log?.columns.filter((c) => c.name === 'userId')).toHaveLength(1);
         const notifications = await table('notifications');
         expect(notifications?.columns.filter((c) => c.name === 'isSilent')).toHaveLength(1);
+        const subscriptions = await table('user_notification_subscriptions');
+        expect(subscriptions?.columns.filter((c) => c.name === 'origin')).toHaveLength(1);
+        const preferences = await table('user_notification_preferences');
+        expect(
+            preferences?.columns.filter((c) => c.name === 'urgentBypassesQuietHours'),
+        ).toHaveLength(1);
     });
 
     it('reverses cleanly when no built-in delivery was recorded', async () => {
@@ -161,7 +240,41 @@ describe('AttentionMatrixFoundations1791141300000', () => {
         expect(log?.findColumnByName('builtInChannel')).toBeUndefined();
         expect(log?.findColumnByName('userId')).toBeUndefined();
         expect((await table('notifications'))?.findColumnByName('isSilent')).toBeUndefined();
+        expect(
+            (await table('user_notification_subscriptions'))?.findColumnByName('origin'),
+        ).toBeUndefined();
+        expect(
+            (await table('user_notification_preferences'))?.findColumnByName(
+                'urgentBypassesQuietHours',
+            ),
+        ).toBeUndefined();
         await runDown();
+    });
+
+    it('never deletes a stored choice or a quiet-hours row on the way down', async () => {
+        await runUp();
+        await dataSource.query(
+            `INSERT INTO user_notification_subscriptions (id, "userId", "eventTypeKey", "channelIds", origin) VALUES (?, ?, ?, ?, ?)`,
+            ['sub-2', 'user-1', 'generation_error', '["email"]', 'matrix'],
+        );
+        await dataSource.query(
+            `UPDATE user_notification_preferences SET "urgentBypassesQuietHours" = ? WHERE "userId" = ?`,
+            [1, 'user-1'],
+        );
+        await runDown();
+        expect(
+            await dataSource.query(
+                `SELECT id, "channelIds" FROM user_notification_subscriptions ORDER BY id`,
+            ),
+        ).toEqual([
+            { id: 'sub-1', channelIds: '[]' },
+            { id: 'sub-2', channelIds: '["email"]' },
+        ]);
+        expect(
+            await dataSource.query(
+                `SELECT "userId", "quietHoursStart" FROM user_notification_preferences`,
+            ),
+        ).toEqual([{ userId: 'user-1', quietHoursStart: '22:00:00' }]);
     });
 
     it('never deletes a built-in delivery row on the way down', async () => {

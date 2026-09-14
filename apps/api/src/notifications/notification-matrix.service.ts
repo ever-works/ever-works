@@ -12,8 +12,10 @@ import {
     CORE_NOTIFICATION_EVENTS,
     UserNotificationSubscriptionService,
     deriveNotificationMatrixGroup,
+    effectiveNotificationTargets,
     findCoreNotificationEvent,
     resolveMuteCategory,
+    type StoredNotificationChoice,
 } from '@ever-works/agent/notifications';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import {
@@ -74,8 +76,8 @@ export class NotificationMatrixService {
                 this.loadOrgDefaults(userId),
             ]);
 
-        const subsByKey = new Map<string, string[]>(
-            subs.map((s) => [s.eventTypeKey, s.channelIds ?? []]),
+        const subsByKey = new Map<string, StoredNotificationChoice>(
+            subs.map((s) => [s.eventTypeKey, { channelIds: s.channelIds ?? [], origin: s.origin }]),
         );
         const mutesByCategory = new Map(
             activeMutes.map((m) => [m.category, m.mutedUntil ?? null] as const),
@@ -96,6 +98,7 @@ export class NotificationMatrixService {
                 start: preference?.quietHoursStart ?? null,
                 end: preference?.quietHoursEnd ?? null,
                 timezone: preference?.timezone ?? null,
+                urgentBypassesQuietHours: preference?.urgentBypassesQuietHours === true,
             },
             mutes: activeMutes.map((m) => ({
                 category: m.category,
@@ -128,7 +131,7 @@ export class NotificationMatrixService {
 
     private toEventDto(
         row: NotificationEventType,
-        subsByKey: ReadonlyMap<string, string[]>,
+        subsByKey: ReadonlyMap<string, StoredNotificationChoice>,
         orgDefaults: Record<string, string[]> | undefined,
         mutesByCategory: ReadonlyMap<string, Date | null>,
     ): NotificationMatrixEventDto {
@@ -136,14 +139,16 @@ export class NotificationMatrixService {
         const alternativeSurface = core?.alternativeSurface ?? null;
         const defaultTargets = [...(row.defaultChannels ?? [])];
         const stored = subsByKey.get(row.key);
-        const orgDefault = orgDefaults?.[row.key];
-        const selectedTargets = stored
-            ? [...stored]
-            : Array.isArray(orgDefault) && orgDefault.length > 0
-              ? [...orgDefault]
-              : defaultTargets.length > 0
-                ? defaultTargets
-                : [NOTIFICATION_TARGET_IN_APP];
+        // The resolver's rules, not a copy of them (notification-choice.ts):
+        // a choice saved in the matrix shows exactly as saved; any other
+        // stored row (before AW-13, or through the API / chat assistant)
+        // shows its non-empty list or, when empty, the defaults; and in-app
+        // shows on whenever the notification still reaches the bell.
+        const selectedTargets = effectiveNotificationTargets(
+            stored,
+            orgDefaults?.[row.key],
+            defaultTargets,
+        );
         const muteCategory = resolveMuteCategory(row.category);
         const muted = muteCategory !== null && mutesByCategory.has(muteCategory);
         const mutedUntil = muted

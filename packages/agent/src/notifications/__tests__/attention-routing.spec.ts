@@ -14,9 +14,15 @@ import { NotificationCategory, NotificationType } from '../../entities/notificat
 
 /**
  * Attention controls (AW-13) — routing behaviour the notification matrix
- * depends on: an explicit "nothing" sticks, the built-in email target
- * survives the whole chain, every event can be muted, and a user who turned
- * in-app off gets the record written silently instead of not at all.
+ * depends on: an explicit "nothing" saved in the matrix sticks, the built-in
+ * email target survives the whole chain, every event can be muted, and a user
+ * who turned in-app off in the matrix gets the record written silently instead
+ * of not at all.
+ *
+ * And what must NOT change for anyone who never used the matrix: a stored row
+ * without the matrix marker (stored before AW-13, or through the API / chat
+ * assistant) keeps falling back to the defaults when empty and keeps reaching
+ * the bell, and quiet hours keep deferring every event they deferred before.
  */
 describe('UserNotificationSubscriptionService — attention controls', () => {
     let service: UserNotificationSubscriptionService;
@@ -58,10 +64,10 @@ describe('UserNotificationSubscriptionService — attention controls', () => {
         defaultChannels: ['in-app', 'email'],
     };
 
-    describe('an explicit empty selection', () => {
+    describe('an explicit empty selection saved in the matrix', () => {
         it('resolves to no targets instead of falling back to the defaults', async () => {
             eventTypes.findByKey.mockResolvedValue(escalation);
-            subscriptions.findForEvent.mockResolvedValue({ channelIds: [] });
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: [], origin: 'matrix' });
             await expect(service.resolvePlan('u', 'agent_run_escalated')).resolves.toEqual({
                 immediate: [],
                 deferred: [],
@@ -70,7 +76,7 @@ describe('UserNotificationSubscriptionService — attention controls', () => {
 
         it('also wins over an organisation default', async () => {
             eventTypes.findByKey.mockResolvedValue(escalation);
-            subscriptions.findForEvent.mockResolvedValue({ channelIds: [] });
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: [], origin: 'matrix' });
             orgDefaults.findByOrg.mockResolvedValue({
                 defaults: { agent_run_escalated: ['in-app', 'ch-org'] },
             });
@@ -80,8 +86,53 @@ describe('UserNotificationSubscriptionService — attention controls', () => {
 
         it('treats a row with a missing list as empty, not as "no choice"', async () => {
             eventTypes.findByKey.mockResolvedValue(escalation);
-            subscriptions.findForEvent.mockResolvedValue({ channelIds: null });
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: null, origin: 'matrix' });
             await expect(service.resolveChannels('u', 'agent_run_escalated')).resolves.toEqual([]);
+        });
+    });
+
+    describe('an empty selection without the matrix marker (stored before AW-13, or via the API / chat assistant)', () => {
+        it('falls back to the event defaults for external targets, exactly as before', async () => {
+            eventTypes.findByKey.mockResolvedValue({
+                key: 'generation_error',
+                category: 'generation',
+                urgent: false,
+                defaultChannels: ['in-app', 'ch-default'],
+            });
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: [], origin: null });
+            await expect(service.resolvePlan('u', 'generation_error')).resolves.toEqual({
+                immediate: ['in-app', 'ch-default'],
+                deferred: [],
+            });
+        });
+
+        it('falls back to the organisation default before the event default', async () => {
+            eventTypes.findByKey.mockResolvedValue(escalation);
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: [] });
+            orgDefaults.findByOrg.mockResolvedValue({
+                defaults: { agent_run_escalated: ['in-app', 'ch-org'] },
+            });
+            await expect(service.resolveChannels('u', 'agent_run_escalated')).resolves.toEqual([
+                'in-app',
+                'ch-org',
+            ]);
+        });
+
+        it('treats a missing list as "no choice" too', async () => {
+            eventTypes.findByKey.mockResolvedValue(escalation);
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: null });
+            await expect(service.resolveChannels('u', 'agent_run_escalated')).resolves.toEqual([
+                'in-app',
+                'email',
+            ]);
+        });
+
+        it('still uses a non-empty list as stored', async () => {
+            eventTypes.findByKey.mockResolvedValue(escalation);
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: ['ch-1'], origin: null });
+            await expect(service.resolveChannels('u', 'agent_run_escalated')).resolves.toEqual([
+                'ch-1',
+            ]);
         });
     });
 
@@ -121,17 +172,107 @@ describe('UserNotificationSubscriptionService — attention controls', () => {
             expect(typeof plan.deferUntil).toBe('string');
         });
 
-        it('is never deferred by quiet hours for an urgent event', async () => {
+        it('is never deferred by quiet hours for an urgent event the person let through', async () => {
             eventTypes.findByKey.mockResolvedValue(escalation);
             preferences.findByUser.mockResolvedValue({
                 quietHoursStart: '00:00:00',
                 quietHoursEnd: '23:59:59',
                 timezone: 'UTC',
+                urgentBypassesQuietHours: true,
             });
             await expect(service.resolvePlan('u', 'agent_run_escalated')).resolves.toEqual({
                 immediate: ['in-app', 'email'],
                 deferred: [],
             });
+        });
+    });
+
+    describe('quiet hours keep deferring what they deferred before AW-13', () => {
+        const allDay = {
+            quietHoursStart: '00:00:00',
+            quietHoursEnd: '23:59:59',
+            timezone: 'UTC',
+        };
+
+        it.each([
+            'agent_run_escalated',
+            'inbox_approval_requested',
+            'inbox_escalation',
+            'mission_blocked',
+        ])('defers %s by default, although AW-13 marks it urgent', async (key) => {
+            eventTypes.findByKey.mockResolvedValue({
+                key,
+                category: 'agent',
+                urgent: true,
+                defaultChannels: ['in-app', 'email'],
+                source: 'core',
+            });
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'ch-1'] });
+            preferences.findByUser.mockResolvedValue({ ...allDay });
+            const plan = await service.resolvePlan('u', key);
+            expect(plan.immediate).toEqual(['in-app']);
+            expect(plan.deferred).toEqual(['ch-1']);
+            expect(typeof plan.deferUntil).toBe('string');
+        });
+
+        it('also defers when the opt-in is explicitly off', async () => {
+            eventTypes.findByKey.mockResolvedValue(escalation);
+            preferences.findByUser.mockResolvedValue({
+                ...allDay,
+                urgentBypassesQuietHours: false,
+            });
+            const plan = await service.resolvePlan('u', 'agent_run_escalated');
+            expect(plan.immediate).toEqual(['in-app']);
+            expect(plan.deferred).toEqual(['email']);
+        });
+
+        it.each(['ai_credits_depleted', 'git_auth_expired', 'inbox_question'])(
+            'lets %s through without any opt-in, as before',
+            async (key) => {
+                eventTypes.findByKey.mockResolvedValue({
+                    key,
+                    category: 'agent',
+                    urgent: true,
+                    defaultChannels: ['in-app'],
+                    source: 'core',
+                });
+                subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'ch-1'] });
+                preferences.findByUser.mockResolvedValue({ ...allDay });
+                await expect(service.resolvePlan('u', key)).resolves.toEqual({
+                    immediate: ['in-app', 'ch-1'],
+                    deferred: [],
+                });
+                expect(preferences.findByUser).not.toHaveBeenCalled();
+            },
+        );
+
+        it('lets an urgent plugin event through without any opt-in, as before', async () => {
+            eventTypes.findByKey.mockResolvedValue({
+                key: 'agent_run_escalated',
+                category: 'integrations',
+                urgent: true,
+                defaultChannels: ['in-app', 'ch-1'],
+                source: 'plugin',
+            });
+            preferences.findByUser.mockResolvedValue({ ...allDay });
+            await expect(service.resolvePlan('u', 'agent_run_escalated')).resolves.toEqual({
+                immediate: ['in-app', 'ch-1'],
+                deferred: [],
+            });
+        });
+
+        it('never lets a non-urgent event through, even with the opt-in on', async () => {
+            eventTypes.findByKey.mockResolvedValue({
+                key: 'generation_error',
+                category: 'generation',
+                urgent: false,
+                defaultChannels: ['in-app'],
+            });
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'email'] });
+            preferences.findByUser.mockResolvedValue({ ...allDay, urgentBypassesQuietHours: true });
+            const plan = await service.resolvePlan('u', 'generation_error');
+            expect(plan.immediate).toEqual(['in-app']);
+            expect(plan.deferred).toEqual(['email']);
         });
     });
 
@@ -173,12 +314,34 @@ describe('UserNotificationSubscriptionService — attention controls', () => {
             await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(true);
         });
 
-        it('is false when the user’s own choice leaves in-app out, an empty choice included', async () => {
+        it('is false when the user’s own matrix choice leaves in-app out, an empty choice included', async () => {
+            eventTypes.findByKey.mockResolvedValue(escalation);
+            subscriptions.findForEvent.mockResolvedValue({
+                channelIds: ['email'],
+                origin: 'matrix',
+            });
+            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(false);
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: [], origin: 'matrix' });
+            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(false);
+        });
+
+        it('is true when a matrix choice keeps in-app', async () => {
+            eventTypes.findByKey.mockResolvedValue(escalation);
+            subscriptions.findForEvent.mockResolvedValue({
+                channelIds: ['email', 'in-app'],
+                origin: 'matrix',
+            });
+            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(true);
+        });
+
+        it('is true for a stored row without the matrix marker that leaves in-app out, an empty one included — it keeps reaching the bell as before', async () => {
             eventTypes.findByKey.mockResolvedValue(escalation);
             subscriptions.findForEvent.mockResolvedValue({ channelIds: ['email'] });
-            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(false);
-            subscriptions.findForEvent.mockResolvedValue({ channelIds: [] });
-            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(false);
+            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(true);
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: [], origin: null });
+            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(true);
+            subscriptions.findForEvent.mockResolvedValue({ channelIds: ['ch-1'], origin: 'api' });
+            await expect(service.isInAppSelected('u', 'agent_run_escalated')).resolves.toBe(true);
         });
 
         it('is true for an unknown event key', async () => {

@@ -6,6 +6,7 @@ import {
     deriveNotificationMatrixGroup,
     findCoreNotificationEvent,
     resolveMuteCategory,
+    urgentEventBypassesQuietHours,
 } from '../core-event-catalogue';
 import { NotificationCategory } from '../../entities/notification.types';
 
@@ -122,6 +123,61 @@ describe('core notification event catalogue', () => {
         ]) {
             expect(findCoreNotificationEvent(key)?.urgent).toBe(true);
         }
+    });
+
+    it('lets through quiet hours by default only the urgent rows that came through before AW-13', () => {
+        // Before AW-13 exactly these three registered rows were urgent, so only
+        // their external deliveries came through a quiet-hours window. Every
+        // other urgent row waits unless the person opts in.
+        const throughByDefault = CORE_NOTIFICATION_EVENTS.filter((e) =>
+            urgentEventBypassesQuietHours({ ...e, source: 'core' }, false),
+        ).map((e) => e.key);
+        expect(throughByDefault.sort()).toEqual([
+            'ai_credits_depleted',
+            'git_auth_expired',
+            'inbox_question',
+        ]);
+
+        const throughWhenOptedIn = CORE_NOTIFICATION_EVENTS.filter((e) =>
+            urgentEventBypassesQuietHours({ ...e, source: 'core' }, true),
+        ).map((e) => e.key);
+        expect(throughWhenOptedIn.sort()).toEqual(
+            CORE_NOTIFICATION_EVENTS.filter((e) => e.urgent)
+                .map((e) => e.key)
+                .sort(),
+        );
+    });
+
+    it('keeps the four events AW-13 marks urgent waiting for quiet hours unless the person opts in', () => {
+        for (const key of [
+            'agent_run_escalated',
+            'inbox_approval_requested',
+            'inbox_escalation',
+            'mission_blocked',
+        ]) {
+            const event = findCoreNotificationEvent(key)!;
+            expect({ key, needsOptIn: event.quietHoursBypassNeedsOptIn }).toEqual({
+                key,
+                needsOptIn: true,
+            });
+            expect(urgentEventBypassesQuietHours({ ...event, source: 'core' }, false)).toBe(false);
+            expect(urgentEventBypassesQuietHours({ ...event, source: 'core' }, true)).toBe(true);
+        }
+    });
+
+    it('sets the quiet-hours opt-in flag on urgent rows only, and never lets a non-urgent or plugin row change', () => {
+        for (const event of CORE_NOTIFICATION_EVENTS) {
+            if (event.quietHoursBypassNeedsOptIn) expect(event.urgent).toBe(true);
+            if (!event.urgent) {
+                expect(urgentEventBypassesQuietHours(event, true)).toBe(false);
+            }
+        }
+        expect(
+            urgentEventBypassesQuietHours(
+                { key: 'agent_run_escalated', urgent: true, source: 'plugin' },
+                false,
+            ),
+        ).toBe(true);
     });
 
     it('groups the catalogue into the four matrix headings', () => {

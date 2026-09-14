@@ -17,6 +17,16 @@ export const NOTIFICATION_TARGET_EMAIL = 'email';
 /** Every built-in target id, in column order. */
 export const NOTIFICATION_BUILT_IN_TARGETS: readonly string[] = [NOTIFICATION_TARGET_IN_APP, NOTIFICATION_TARGET_EMAIL];
 
+/**
+ * Stored with a per-event choice saved from the notification matrix
+ * (`user_notification_subscriptions.origin`). Only such a choice is taken
+ * literally: an empty list means "nothing" and a list without in-app keeps the
+ * notification out of the bell. Choices stored any other way (before the
+ * matrix existed, or through the API / chat assistant) carry no marker and
+ * keep their original meaning.
+ */
+export const NOTIFICATION_CHOICE_ORIGIN_MATRIX = 'matrix';
+
 /** A single event may name at most this many delivery targets. */
 export const NOTIFICATION_MATRIX_MAX_TARGETS = 20;
 
@@ -93,7 +103,11 @@ export interface NotificationMatrixEventDto {
 	readonly emailGovernedByProfile: boolean;
 	/** The shipped default target list for this event. */
 	readonly defaultTargets: readonly string[];
-	/** The targets that apply right now (the user's choice, else the defaults). */
+	/**
+	 * The targets that apply right now: the user's choice, else the defaults.
+	 * In-app is included whenever the notification reaches the bell, which is
+	 * always unless a choice saved in the matrix leaves it out.
+	 */
 	readonly selectedTargets: readonly string[];
 	/** True when the user has stored a choice for this event (an empty choice included). */
 	readonly explicit: boolean;
@@ -106,6 +120,13 @@ export interface NotificationMatrixQuietHoursDto {
 	readonly start: string | null;
 	readonly end: string | null;
 	readonly timezone: string | null;
+	/**
+	 * The person's opt-in to let every urgent event through quiet hours.
+	 * Off (the default): only the urgent events that always came through do;
+	 * every other email and chat delivery waits until the window ends. The
+	 * server always sends it; optional so older readers keep compiling.
+	 */
+	readonly urgentBypassesQuietHours?: boolean;
 }
 
 export interface NotificationMatrixDto {

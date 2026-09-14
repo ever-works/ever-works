@@ -4,6 +4,7 @@ import * as root from '../../index.js';
 import {
 	ATTENTION_TARGET_CLASSES,
 	NOTIFICATION_BUILT_IN_TARGETS,
+	NOTIFICATION_CHOICE_ORIGIN_MATRIX,
 	NOTIFICATION_MATRIX_GROUPS,
 	NOTIFICATION_MATRIX_MAX_COLUMNS,
 	NOTIFICATION_MATRIX_MAX_TARGETS,
@@ -25,6 +26,11 @@ describe('notifications contracts', () => {
 
 	it('renders the four groups in the order the page reads them', () => {
 		expect(NOTIFICATION_MATRIX_GROUPS).toEqual(['needsYou', 'signals', 'routine', 'digest']);
+	});
+
+	it('pins the marker stored with a choice saved in the matrix, reachable from the root', () => {
+		expect(NOTIFICATION_CHOICE_ORIGIN_MATRIX).toBe('matrix');
+		expect(root.NOTIFICATION_CHOICE_ORIGIN_MATRIX).toBe('matrix');
 	});
 
 	it('pins the limits the API enforces', () => {

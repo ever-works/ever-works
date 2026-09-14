@@ -8,7 +8,8 @@ import {
     OrganizationRepository,
     UserRepository,
 } from '@src/database';
-import { resolveMuteCategory } from './core-event-catalogue';
+import { resolveMuteCategory, urgentEventBypassesQuietHours } from './core-event-catalogue';
+import { storedChoiceDecidesTargets, storedChoiceKeepsInApp } from './notification-choice';
 
 /**
  * Notifications v2 (EW-664 / EW-677 / T22).
@@ -16,7 +17,9 @@ import { resolveMuteCategory } from './core-event-catalogue';
  * Resolves the channel list for a given `(userId, eventTypeKey)` pair
  * with full fallback semantics:
  *
- * 1. Per-user subscription row, if any.
+ * 1. Per-user subscription row, when it decides the targets (a choice saved
+ *    in the notification matrix, even an empty one; any other row only when
+ *    it names at least one target — see `notification-choice.ts`).
  * 2. Organisation default channel map (when the user's tenant owns
  *    exactly one organisation — see `resolveOrgDefaultChannels`).
  * 3. Event-type default channels.
@@ -28,8 +31,11 @@ import { resolveMuteCategory } from './core-event-catalogue';
  *    mute, drop all non-`in-app` channels (in-app still records the
  *    notification for retrospective viewing).
  * 5. Quiet hours: when `now ∈ [quietHoursStart, quietHoursEnd]` in
- *    the user's configured timezone AND `eventType.urgent === false`,
- *    drop all non-`in-app` channels.
+ *    the user's configured timezone, defer all non-`in-app` channels —
+ *    unless the event comes through quiet hours
+ *    (`urgentEventBypassesQuietHours`: urgent events that came through
+ *    before AW-13 always do; urgent events since AW-13 only when the user
+ *    opted in with `urgentBypassesQuietHours`).
  *
  * **Deferred from v1**:
  * - BullMQ delayed-delivery: quiet-hours-caught non-urgent events
@@ -92,7 +98,8 @@ export class UserNotificationSubscriptionService {
 
     /**
      * Deferral-aware resolution. `immediate` always carries `'in-app'`
-     * (unless muted). For a non-urgent event inside the user's quiet
+     * (unless muted). For an event that does not come through quiet hours
+     * (see `urgentEventBypassesQuietHours`) inside the user's quiet
      * hours, non-in-app channels move to `deferred` with `deferUntil`
      * set to the end-of-window instant (ISO) — the producer enqueues
      * them on the Trigger.dev delivery task with that `delay` instead of
@@ -125,11 +132,24 @@ export class UserNotificationSubscriptionService {
             }
         }
 
-        // Quiet hours: defer (not drop) non-in-app channels for non-urgent
-        // events so they fire at end-of-window.
-        if (this.preferences && !eventType.urgent && channels.some((c) => c !== 'in-app')) {
+        // Quiet hours: defer (not drop) non-in-app channels so they fire at
+        // end-of-window. Urgent events come through — except, since AW-13,
+        // the ones that did not come through before: those wait unless the
+        // person opted in (`urgentBypassesQuietHours`). Checking "always
+        // through" first keeps the preference read off the hot path for
+        // events that never wait.
+        const eventRef = { key: eventTypeKey, urgent: eventType.urgent, source: eventType.source };
+        if (
+            this.preferences &&
+            !urgentEventBypassesQuietHours(eventRef, false) &&
+            channels.some((c) => c !== 'in-app')
+        ) {
             const pref = await this.preferences.findByUser(userId);
-            if (pref?.quietHoursStart && pref?.quietHoursEnd) {
+            if (
+                pref?.quietHoursStart &&
+                pref?.quietHoursEnd &&
+                !urgentEventBypassesQuietHours(eventRef, pref.urgentBypassesQuietHours === true)
+            ) {
                 const now = new Date();
                 const timeZone = pref.timezone ?? 'UTC';
                 if (isWithinQuietHours(now, pref.quietHoursStart, pref.quietHoursEnd, timeZone)) {
@@ -151,17 +171,18 @@ export class UserNotificationSubscriptionService {
      * Attention controls (AW-13) — does the user's own choice for this event
      * keep the in-app notification interrupting?
      *
-     * Only an explicit per-user subscription that leaves `in-app` out answers
-     * no. No subscription, an organisation default or an event default all
-     * answer yes, so a user who never opened the matrix keeps today's
-     * behaviour. An unknown event key also answers yes.
+     * Only a choice the user saved in the notification matrix that leaves
+     * `in-app` out answers no. No subscription, a subscription stored before
+     * AW-13 or through the API / chat assistant (no matrix marker), an
+     * organisation default or an event default all answer yes, so those
+     * notifications keep reaching the bell exactly as before. An unknown
+     * event key also answers yes. See `notification-choice.ts`.
      */
     async isInAppSelected(userId: string, eventTypeKey: string): Promise<boolean> {
         const eventType = await this.eventTypes.findByKey(eventTypeKey);
         if (!eventType) return true;
         const sub = await this.subscriptions.findForEvent(userId, eventTypeKey);
-        if (!sub) return true;
-        return (sub.channelIds ?? []).includes('in-app');
+        return storedChoiceKeepsInApp(sub);
     }
 
     /**
@@ -191,11 +212,13 @@ export class UserNotificationSubscriptionService {
     ): Promise<string[]> {
         const sub = await this.subscriptions.findForEvent(userId, eventTypeKey);
         // Attention controls (AW-13, "turning everything off for one row
-        // sticks"): a stored subscription wins even when it is EMPTY. An
-        // explicit "nothing" must never fall back to the organisation or
-        // event defaults, or the one gesture a user reaches for to silence an
-        // event would quietly re-enable it. Do not restore a length check.
-        if (sub) {
+        // sticks"): a choice saved in the notification matrix wins even when
+        // it is EMPTY, so that gesture never quietly re-enables the defaults.
+        // Every other stored row (stored before AW-13, or written through the
+        // API / chat assistant) keeps its original meaning: an empty list
+        // falls back to the organisation / event defaults, so nobody who had
+        // one stored stops receiving anything. See `notification-choice.ts`.
+        if (sub && storedChoiceDecidesTargets(sub)) {
             return [...(sub.channelIds ?? [])];
         }
         // Organisation defaults sit between the per-user subscription and
