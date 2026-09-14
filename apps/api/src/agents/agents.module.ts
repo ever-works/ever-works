@@ -141,10 +141,12 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
 
 /**
  * AW-05 — what an Agent is told when its message is held for a person.
- * Worded so the model does not retry or resend the same message.
+ * Worded so the model does not retry or resend the same message, and does
+ * not promise delivery: an approved draft is still subject to the send
+ * limits, which can refuse it.
  */
 const HELD_FOR_APPROVAL_NOTE =
-    "Not sent yet: this agent's inbox holds email for review. The message is saved as a draft and will go out when a person approves it. Do not send it again.";
+    "Not sent yet: this agent's inbox holds email for review. The message is saved as a draft and can be sent after a person approves it, subject to send limits. Do not send it again.";
 
 /**
  * Agents/Skills/Tasks PR #1017 — api-side AgentsModule (Phase 3 + 15.5 + 16.10).

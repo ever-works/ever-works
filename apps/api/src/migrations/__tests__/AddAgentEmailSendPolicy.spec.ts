@@ -1,4 +1,4 @@
-import { DataSource, Table } from 'typeorm';
+import { DataSource, Table, TableColumn } from 'typeorm';
 import { AddAgentEmailSendPolicy1791050000000 } from '../1791050000000-AddAgentEmailSendPolicy';
 
 /**
@@ -139,6 +139,39 @@ describe('AddAgentEmailSendPolicy1791050000000', () => {
             { id: 'm-in', status: 'received', approvedById: null },
             { id: 'm-out', status: 'sent', approvedById: null },
         ]);
+    });
+
+    it('finishes a backfill a previous attempt left half-done (status column already present)', async () => {
+        // A first attempt added the column and stopped before backfilling.
+        const runner = dataSource.createQueryRunner();
+        await runner.addColumn(
+            'email_messages',
+            new TableColumn({ name: 'status', type: 'varchar', length: '16', isNullable: true }),
+        );
+        await runner.query(`UPDATE email_messages SET status = 'sent' WHERE id = ?`, ['m-out']);
+        await runner.release();
+
+        await runUp();
+
+        const rows: Array<{ id: string; status: string | null }> = await dataSource.query(
+            `SELECT id, status FROM email_messages ORDER BY id`,
+        );
+        expect(rows).toEqual([
+            { id: 'm-in', status: 'received' },
+            { id: 'm-out', status: 'sent' },
+        ]);
+    });
+
+    it('never rewrites a lifecycle state a message already has', async () => {
+        await runUp();
+        await dataSource.query(`UPDATE email_messages SET status = 'draft' WHERE id = ?`, [
+            'm-out',
+        ]);
+        await runUp();
+        const [row] = await dataSource.query(`SELECT status FROM email_messages WHERE id = ?`, [
+            'm-out',
+        ]);
+        expect(row).toEqual({ status: 'draft' });
     });
 
     it('indexes the send-ceiling windows', async () => {

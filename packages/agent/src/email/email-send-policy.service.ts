@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import {
@@ -61,6 +61,11 @@ export interface EffectiveEmailSendPolicy {
     configured: boolean;
     inbox: AgentInbox | null;
     organizationId: string | null;
+    /**
+     * The Agent this policy was resolved for, when it belongs to the owner;
+     * `null` when no Agent was named or the named one is not theirs.
+     */
+    agentId?: string | null;
 }
 
 /** Usage for a send whose only applicable ceiling is per message (no window is read). */
@@ -308,12 +313,22 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
             configured,
             inbox,
             organizationId,
+            agentId: agent?.id ?? null,
         };
     }
 
-    /** A live reading of every ceiling for one of the owner's Agents. */
+    /**
+     * A live reading of every ceiling for one of the owner's Agents.
+     *
+     * Owner-scoped HERE, not only at the route: the usage windows are keyed
+     * on the Agent id alone, so an Agent that does not belong to `userId` is
+     * a 404 before anything is counted — the same answer a missing one gets.
+     */
     async getMeter(userId: string, agentId: string): Promise<EmailCapMeterDto> {
         const policy = await this.resolvePolicy(userId, agentId);
+        if (policy.agentId !== agentId) {
+            throw new NotFoundException('Agent not found');
+        }
         const now = this.now();
         const usage = await this.readUsage(userId, agentId, now);
         const recentRecipients = distinctEmailRecipients(usage.inboxRecentRecipients).length;
@@ -363,26 +378,45 @@ export class EmailSendPolicyService implements EmailSendPolicyGate {
      * `patch` (field by field; `null` clears a field back to inherit). The
      * CALLER authorizes — this is reached only after an organization admin
      * check at the API edge.
+     *
+     * Read, merge and write run in ONE transaction holding a row lock on the
+     * organization (`SELECT … FOR UPDATE` on Postgres / MySQL, the credit
+     * ledger's pattern), so two administrators patching different fields at
+     * once both land: the second merge starts from the first one's write
+     * instead of silently dropping it — which could otherwise lift a ceiling
+     * or an approval mode nobody meant to change. SQLite has no row locks;
+     * its single writer serializes the transactions instead.
      */
     async updateOrganizationPolicy(
         organizationId: string,
         patch: EmailSendPolicyOverride,
     ): Promise<EmailSendPolicyOverride | null> {
-        const current = (await this.readOrganizationPolicy(organizationId)) ?? {};
-        const next: EmailSendPolicyOverride = { ...current };
-        if (patch.defaultMode !== undefined) {
-            next.defaultMode = patch.defaultMode ?? null;
-        }
-        if (patch.caps !== undefined) {
-            const caps = { ...(current.caps ?? {}) } as Record<string, number | null>;
-            for (const [field, value] of Object.entries(patch.caps ?? {})) {
-                caps[field] = value ?? null;
+        return this.organizations.manager.transaction(async (manager) => {
+            const organizations = manager.getRepository(Organization);
+            const driver = manager.connection.options.type;
+            const lockable = driver === 'postgres' || driver === 'mysql' || driver === 'mariadb';
+            const org = await organizations.findOne({
+                where: { id: organizationId },
+                select: { id: true, emailSendPolicy: true },
+                loadEagerRelations: false,
+                ...(lockable ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+            });
+            const current = normalizeOrganizationPolicy(org?.emailSendPolicy ?? null) ?? {};
+            const next: EmailSendPolicyOverride = { ...current };
+            if (patch.defaultMode !== undefined) {
+                next.defaultMode = patch.defaultMode ?? null;
             }
-            next.caps = caps;
-        }
-        const stored = normalizeOrganizationPolicy(next);
-        await this.organizations.update({ id: organizationId }, { emailSendPolicy: stored });
-        return stored;
+            if (patch.caps !== undefined) {
+                const caps = { ...(current.caps ?? {}) } as Record<string, number | null>;
+                for (const [field, value] of Object.entries(patch.caps ?? {})) {
+                    caps[field] = value ?? null;
+                }
+                next.caps = caps;
+            }
+            const stored = normalizeOrganizationPolicy(next);
+            await organizations.update({ id: organizationId }, { emailSendPolicy: stored });
+            return stored;
+        });
     }
 
     private async assertApprovedDraft(

@@ -46,6 +46,14 @@ export interface CreateAgentActionProposalInput {
      * from anything a model wrote.
      */
     subjectKey?: string | null;
+    /**
+     * AW-05 — the action must be decided by a PERSON: a guardrail may still
+     * block it (saved `rejected`), but never auto-approve it — the proposal
+     * stays `pending` in the queue. PLATFORM-SUPPLIED ONLY (a held email
+     * draft, whose approval sends mail). Absent = the guardrails decide
+     * exactly as before.
+     */
+    humanDecisionRequired?: boolean;
 }
 
 export interface ListAgentActionProposalsFilter {
@@ -142,7 +150,7 @@ export class AgentApprovalsService {
             createdAt: now,
             updatedAt: now,
         });
-        if (decision === 'auto_approve') {
+        if (decision === 'auto_approve' && !input.humanDecisionRequired) {
             // Auto-decided rows keep decidedById null — no human made
             // the call; `decidedVia: 'guardrail'` is the audit marker.
             row.status = 'approved';
@@ -226,6 +234,13 @@ export class AgentApprovalsService {
      * Approve or reject a PENDING proposal. Idempotent guard:
      * re-deciding an already-decided proposal throws 409 (the decision
      * is final for this increment; re-opening is not modelled).
+     *
+     * The decision is a compare-and-set (`UPDATE … WHERE status =
+     * 'pending'`), not a read-then-save: two people deciding the same
+     * proposal at once record exactly one decision, and only that one emits
+     * the decision event — the loser gets the same 409 a late re-decide
+     * gets. Without it both saves land, both events fire, and an approval
+     * could send an email whose proposal ends up recorded as rejected.
      */
     async decide(
         userId: string,
@@ -236,21 +251,17 @@ export class AgentApprovalsService {
             throw new BadRequestException(`Invalid decision: ${decision}`);
         }
         const row = await this.requireOwned(userId, id);
-        if (row.status !== 'pending') {
+        if (row.status !== 'pending' || !(await this.claimDecision(row, userId, decision))) {
+            const current =
+                row.status !== 'pending'
+                    ? row
+                    : await this.proposals.findOne({ where: { id, userId } });
             throw new ConflictException(
-                `Proposal ${id} is already ${row.status} and cannot be re-decided.`,
+                `Proposal ${id} is already ${current?.status ?? 'decided'} and cannot be re-decided.`,
             );
         }
-
-        const now = new Date();
-        row.status = decision;
-        row.decidedById = userId;
-        row.decidedAt = now;
-        row.decidedVia = 'user';
-        row.updatedAt = now;
-        const saved = await this.proposals.save(row);
-        this.emitDecided(saved);
-        return toAgentActionProposalDto(saved);
+        this.emitDecided(row);
+        return toAgentActionProposalDto(row);
     }
 
     /**
@@ -303,22 +314,57 @@ export class AgentApprovalsService {
             return { approved: 0, skipped, excluded };
         }
 
+        // Each row is claimed with the same compare-and-set `decide` uses: a
+        // row somebody decided between the read above and this write is not
+        // overwritten, emits nothing, and is counted as skipped.
         const now = new Date();
+        const decided: AgentActionProposal[] = [];
         for (const row of pending) {
-            row.status = 'approved';
-            row.decidedById = userId;
-            row.decidedAt = now;
-            row.decidedVia = 'user';
-            row.updatedAt = now;
+            if (await this.claimDecision(row, userId, 'approved', now)) {
+                decided.push(row);
+            }
         }
-        await this.proposals.save(pending);
-        for (const row of pending) {
+        for (const row of decided) {
             this.emitDecided(row);
         }
-        return { approved: pending.length, skipped, excluded };
+        return {
+            approved: decided.length,
+            skipped: skipped + (pending.length - decided.length),
+            excluded,
+        };
     }
 
     // ── internals ─────────────────────────────────────────────────
+
+    /**
+     * Record a person's decision on a proposal only if it is still pending.
+     * Returns `false` when another decision got there first; on `true` the
+     * in-memory row carries the recorded decision.
+     */
+    private async claimDecision(
+        row: AgentActionProposal,
+        userId: string,
+        decision: 'approved' | 'rejected',
+        now: Date = new Date(),
+    ): Promise<boolean> {
+        const result = await this.proposals.update(
+            { id: row.id, userId, status: 'pending' },
+            {
+                status: decision,
+                decidedById: userId,
+                decidedAt: now,
+                decidedVia: 'user',
+                updatedAt: now,
+            },
+        );
+        if ((result.affected ?? 0) === 0) return false;
+        row.status = decision;
+        row.decidedById = userId;
+        row.decidedAt = now;
+        row.decidedVia = 'user';
+        row.updatedAt = now;
+        return true;
+    }
 
     /**
      * Fire-and-forget: a listener that throws (or an emitter that is not

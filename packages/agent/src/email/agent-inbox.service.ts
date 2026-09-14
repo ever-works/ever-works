@@ -118,6 +118,18 @@ export class AgentInboxService {
             } else {
                 const address = await this.addresses.findByIdForUser(patch.emailAddressId, userId);
                 if (!address) throw new NotFoundException('Email address not found');
+                // A disabled address is retired: the send path would skip the
+                // pin, so pinning it would only claim an address that is not used.
+                if (address.disabledAt) {
+                    throw new BadRequestException(
+                        'This email address is disabled and cannot be used to send.',
+                    );
+                }
+                if (address.direction === 'inbound') {
+                    throw new BadRequestException(
+                        'This address only receives mail and cannot be used to send.',
+                    );
+                }
                 row.emailAddressId = address.id;
             }
         }

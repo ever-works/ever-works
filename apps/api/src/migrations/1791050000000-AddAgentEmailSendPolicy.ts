@@ -106,7 +106,6 @@ export class AddAgentEmailSendPolicy1791050000000 implements MigrationInterface 
 
         const messages = await queryRunner.getTable('email_messages');
         if (messages) {
-            const hadStatus = !!messages.findColumnByName('status');
             for (const column of AddAgentEmailSendPolicy1791050000000.MESSAGE_COLUMNS) {
                 if (!messages.findColumnByName(column.name)) {
                     await queryRunner.addColumn('email_messages', column);
@@ -118,12 +117,13 @@ export class AddAgentEmailSendPolicy1791050000000 implements MigrationInterface 
                     await queryRunner.createIndex('email_messages', index);
                 }
             }
-            // A re-run is harmless either way (IS NULL guard); skipping it
-            // when the column pre-existed only saves the scan.
-            if (!hadStatus) {
-                await this.backfillStatus(queryRunner, 'outbound', 'sent');
-                await this.backfillStatus(queryRunner, 'inbound', 'received');
-            }
+            // Always run: a previous attempt may have added `status` and then
+            // stopped part-way through the backfill (without a wrapping
+            // transaction), and the `IS NULL` guard makes a re-run pick up
+            // exactly the rows it left. Skipping when the column already
+            // existed would strand those rows with no lifecycle state.
+            await this.backfillStatus(queryRunner, 'outbound', 'sent');
+            await this.backfillStatus(queryRunner, 'inbound', 'received');
         }
 
         const organizations = await queryRunner.getTable('organizations');

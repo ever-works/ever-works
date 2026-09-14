@@ -5,6 +5,7 @@ jest.mock('@ever-works/agent/database', () => ({
 }));
 
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { AgentEmailAssignmentsService } from './agent-email-assignments.service';
 
 /**
@@ -107,6 +108,69 @@ describe('AgentEmailAssignmentsService', () => {
         await expect(
             service.create('user-1', 'agent-1', { emailAddressId: 'addr-1', direction: 'inbound' }),
         ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('answers the loser of two concurrent assigns with the same 409, not a 500', async () => {
+        // Both requests pass the duplicate check; the unique index lets one
+        // INSERT land and rejects the other with SQLSTATE 23505 — a REAL
+        // QueryFailedError, which is what the translation narrows on.
+        let inserted = false;
+        assignments.save.mockImplementation(async (entry: Record<string, unknown>) => {
+            if (inserted) {
+                throw new QueryFailedError(
+                    'INSERT INTO "agent_email_assignments" ...',
+                    [],
+                    Object.assign(
+                        new Error(
+                            'duplicate key value violates unique constraint "uq_agent_email_assignment"',
+                        ),
+                        { code: '23505' },
+                    ) as never,
+                );
+            }
+            inserted = true;
+            return { id: 'as-1', createdAt: new Date('2026-09-14T00:00:00Z'), ...entry };
+        });
+
+        const outcomes = await Promise.allSettled([
+            service.create('user-1', 'agent-1', {
+                emailAddressId: 'addr-1',
+                direction: 'outbound',
+            }),
+            service.create('user-1', 'agent-1', {
+                emailAddressId: 'addr-1',
+                direction: 'outbound',
+            }),
+        ]);
+
+        expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
+        const lost = outcomes.find((o): o is PromiseRejectedResult => o.status === 'rejected');
+        expect(lost?.reason).toBeInstanceOf(ConflictException);
+        expect(lost?.reason.message).toBe('This address is already assigned to this agent.');
+    });
+
+    it('re-raises a save failure that is not a unique violation', async () => {
+        assignments.save.mockRejectedValue(new Error('connection reset'));
+        await expect(
+            service.create('user-1', 'agent-1', {
+                emailAddressId: 'addr-1',
+                direction: 'outbound',
+            }),
+        ).rejects.toThrow('connection reset');
+    });
+
+    it('refuses to assign a disabled address', async () => {
+        addresses.findByIdForUser.mockResolvedValue({
+            ...address,
+            disabledAt: new Date('2026-09-01T00:00:00Z'),
+        });
+        await expect(
+            service.create('user-1', 'agent-1', {
+                emailAddressId: 'addr-1',
+                direction: 'outbound',
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(assignments.save).not.toHaveBeenCalled();
     });
 
     it('lists only rows whose address the caller owns', async () => {

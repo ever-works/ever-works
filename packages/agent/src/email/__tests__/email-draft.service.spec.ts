@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException, NotFoundException } from '@nestj
 import {
     EmailDraftService,
     EMAIL_DRAFT_PROPOSAL_KIND,
+    EMAIL_DRAFT_RELEASE_GRACE_MS,
     type SubmitAgentEmailInput,
 } from '../email-draft.service';
 import { EmailSendCapExceededException } from '../email-send-cap-exceeded.exception';
@@ -35,6 +36,12 @@ function makeHarness(mode: 'draft-review' | 'auto-send' = 'draft-review') {
                 Object.assign(row, patch, { status: to });
                 return 1;
             },
+        ),
+        findApprovedUnreleasedDrafts: jest.fn(
+            async (
+                _decidedBefore: Date,
+                _limit?: number,
+            ): Promise<Array<{ messageId: string; userId: string; decidedById: string }>> => [],
         ),
     };
     const facade = {
@@ -128,6 +135,8 @@ describe('EmailDraftService', () => {
                 actionType: 'send_message',
                 title: 'Send email to ada@example.com: Quarterly numbers',
                 runId: 'run-7',
+                // A person was asked: guardrails may block, never approve.
+                humanDecisionRequired: true,
                 payload: {
                     kind: EMAIL_DRAFT_PROPOSAL_KIND,
                     emailMessageId: 'm-1',
@@ -294,6 +303,101 @@ describe('EmailDraftService', () => {
             await expect(service.approve('user-1', 'in-1')).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+    });
+
+    describe('releaseApprovedDrafts — the durable half of a queue approval', () => {
+        it('releases a draft approved in the queue whose decision event never arrived', async () => {
+            const harness = makeHarness();
+            await harness.service.submit(INPUT);
+            harness.messages.findApprovedUnreleasedDrafts.mockResolvedValue([
+                { messageId: 'm-1', userId: 'user-1', decidedById: 'user-9' },
+            ]);
+            const before = Date.now();
+
+            const summary = await harness.service.releaseApprovedDrafts();
+            const after = Date.now();
+
+            expect(summary).toEqual({ considered: 1, released: 1, failed: 0 });
+            // Only decisions older than the grace window are considered, so the
+            // in-process listener gets the first chance.
+            const [decidedBefore] = harness.messages.findApprovedUnreleasedDrafts.mock.calls[0];
+            expect(decidedBefore.getTime()).toBeGreaterThanOrEqual(
+                before - EMAIL_DRAFT_RELEASE_GRACE_MS,
+            );
+            expect(decidedBefore.getTime()).toBeLessThanOrEqual(
+                after - EMAIL_DRAFT_RELEASE_GRACE_MS,
+            );
+            expect(harness.facade.send).toHaveBeenCalledTimes(1);
+            expect(harness.facade.send).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ draftMessageId: 'm-1', origin: 'agent' }),
+            );
+            // Released as the person who approved it, and the queue is not
+            // decided a second time.
+            expect(harness.rows.get('m-1')).toMatchObject({
+                status: 'sent',
+                approvedById: 'user-9',
+            });
+            expect(harness.approvals.decide).not.toHaveBeenCalled();
+        });
+
+        it('sends once when the late listener and the sweep release the same draft together', async () => {
+            const harness = makeHarness();
+            await harness.service.submit(INPUT);
+            harness.messages.findApprovedUnreleasedDrafts.mockResolvedValue([
+                { messageId: 'm-1', userId: 'user-1', decidedById: 'user-1' },
+            ]);
+
+            const [listener, sweep] = await Promise.allSettled([
+                harness.service.approve('user-1', 'm-1', {
+                    approvedById: 'user-1',
+                    viaDecision: true,
+                }),
+                harness.service.releaseApprovedDrafts(),
+            ]);
+
+            expect(harness.facade.send).toHaveBeenCalledTimes(1);
+            const released =
+                (listener.status === 'fulfilled' ? 1 : 0) +
+                (sweep.status === 'fulfilled' ? sweep.value.released : 0);
+            expect(released).toBe(1);
+        });
+
+        it('counts a draft it could not release and carries on with the rest', async () => {
+            const harness = makeHarness();
+            await harness.service.submit(INPUT);
+            await harness.service.submit({ ...INPUT, messageRef: 'compose-agent-1-2' });
+            harness.messages.findApprovedUnreleasedDrafts.mockResolvedValue([
+                { messageId: 'm-1', userId: 'user-1', decidedById: 'user-1' },
+                { messageId: 'm-2', userId: 'user-1', decidedById: 'user-1' },
+            ]);
+            harness.facade.send.mockRejectedValueOnce(
+                new EmailSendCapExceededException({
+                    scope: 'inbox',
+                    limitKind: 'inboxDaily',
+                    used: 100,
+                    cap: 100,
+                    windowSeconds: 86_400,
+                    retryAfterSeconds: 600,
+                }),
+            );
+            jest.spyOn(
+                (harness.service as unknown as { logger: { warn: () => void } }).logger,
+                'warn',
+            ).mockImplementation(() => undefined);
+
+            await expect(harness.service.releaseApprovedDrafts()).resolves.toEqual({
+                considered: 2,
+                released: 1,
+                failed: 1,
+            });
+            // The capped one went back to draft with its reason, for a person.
+            expect(harness.rows.get('m-1')).toMatchObject({
+                status: 'draft',
+                failureReason: expect.stringMatching(/Send limit reached/),
+            });
+            expect(harness.rows.get('m-2')?.status).toBe('sent');
         });
     });
 

@@ -1,9 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThanOrEqual, Repository, type FindOptionsWhere } from 'typeorm';
+import { In, MoreThan, MoreThanOrEqual, Repository, type FindOptionsWhere } from 'typeorm';
 import type { EmailMessageStatus } from '@ever-works/contracts';
+import { AgentActionProposal } from '../../entities/agent-action-proposal.entity';
 import { EmailMessage, EmailMessageDirection } from '../../entities/email-message.entity';
 import { advisoryLockObjectId } from './agent-run.repository';
+
+/** AW-05 — rows per page when a recipient window is read in full. */
+export const EMAIL_RECIPIENT_WINDOW_PAGE_SIZE = 500;
 
 /**
  * AW-05 — which sends a ceiling window counts: one Agent's (`agentId`) or a
@@ -214,27 +218,83 @@ export class EmailMessageRepository {
         return rows.map((row) => row.sentAt).filter((value): value is Date => !!value);
     }
 
-    /** Every recipient (to + cc + bcc) an Agent reached since `since`. */
+    /**
+     * Every recipient (to + cc + bcc) an Agent reached since `since`.
+     *
+     * Reads the WHOLE window by default. The distinct-recipient ceiling is
+     * computed from this list, so stopping at a row count would undercount a
+     * busy window and admit a recipient past the ceiling. Rows are read in
+     * pages keyed on `id` (never an offset): a reservation released while the
+     * window is being read (its `sentAt` cleared) cannot shift a later page
+     * and hide a row that is still in the window.
+     *
+     * `limit` (optional) caps the number of ROWS read, for callers that only
+     * want a sample.
+     */
     async listOutboundRecipientsSince(
         agentId: string,
         since: Date,
-        limit = 500,
+        limit?: number,
     ): Promise<string[]> {
-        const rows = await this.repository.find({
-            select: { id: true, toAddresses: true, ccAddresses: true, bccAddresses: true },
-            where: this.sentWindowWhere({ agentId }, since),
-            order: { sentAt: 'DESC' },
-            take: Math.max(1, Math.min(limit, 5_000)),
-        });
+        const base = this.sentWindowWhere({ agentId }, since);
+        const maxRows =
+            limit === undefined ? Number.POSITIVE_INFINITY : Math.max(1, Math.floor(limit));
         const recipients: string[] = [];
-        for (const row of rows) {
-            recipients.push(
-                ...(row.toAddresses ?? []),
-                ...(row.ccAddresses ?? []),
-                ...(row.bccAddresses ?? []),
-            );
+        let read = 0;
+        let afterId: string | null = null;
+        while (read < maxRows) {
+            const take = Math.min(EMAIL_RECIPIENT_WINDOW_PAGE_SIZE, maxRows - read);
+            const rows: EmailMessage[] = await this.repository.find({
+                select: { id: true, toAddresses: true, ccAddresses: true, bccAddresses: true },
+                where: afterId === null ? base : { ...base, id: MoreThan(afterId) },
+                order: { id: 'ASC' },
+                take,
+            });
+            for (const row of rows) {
+                recipients.push(
+                    ...(row.toAddresses ?? []),
+                    ...(row.ccAddresses ?? []),
+                    ...(row.bccAddresses ?? []),
+                );
+            }
+            read += rows.length;
+            if (rows.length < take) break;
+            afterId = rows[rows.length - 1].id;
         }
         return recipients;
+    }
+
+    /**
+     * Held drafts a PERSON approved in the approvals queue that were never
+     * released: still `draft`, never attempted (no `failureReason` — a draft
+     * a ceiling sent back carries one and waits for a person again), linked
+     * to a proposal decided `approved` by a user at or before `decidedBefore`.
+     *
+     * The decision event that normally releases them is in-process; this is
+     * the durable half that finds what a lost event or a failed listener
+     * left behind. Oldest decision first.
+     */
+    async findApprovedUnreleasedDrafts(
+        decidedBefore: Date,
+        limit = 50,
+    ): Promise<Array<{ messageId: string; userId: string; decidedById: string }>> {
+        const rows = await this.repository
+            .createQueryBuilder('m')
+            .innerJoin(AgentActionProposal, 'p', 'p.id = m.approvalId AND p.userId = m.userId')
+            .select('m.id', 'messageId')
+            .addSelect('m.userId', 'userId')
+            .addSelect('p.decidedById', 'decidedById')
+            .where('m.direction = :direction', { direction: 'outbound' })
+            .andWhere('m.status = :status', { status: 'draft' })
+            .andWhere('m.failureReason IS NULL')
+            .andWhere('p.status = :approved', { approved: 'approved' })
+            .andWhere('p.decidedVia = :via', { via: 'user' })
+            .andWhere('p.decidedById IS NOT NULL')
+            .andWhere('p.decidedAt <= :decidedBefore', { decidedBefore })
+            .orderBy('p.decidedAt', 'ASC')
+            .limit(Math.max(1, Math.min(limit, 500)))
+            .getRawMany<{ messageId: string; userId: string; decidedById: string }>();
+        return rows;
     }
 
     /**

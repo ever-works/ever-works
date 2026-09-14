@@ -46,7 +46,7 @@ function makeHarness() {
         ),
     };
     const service = new AgentInboxService(inboxes as never, addresses as never, agents as never);
-    return { service, store, inboxes };
+    return { service, store, inboxes, addresses };
 }
 
 describe('AgentInboxService', () => {
@@ -129,6 +129,31 @@ describe('AgentInboxService', () => {
         await expect(service.update('user-2', inbox.id, {})).rejects.toBeInstanceOf(
             NotFoundException,
         );
+    });
+
+    it('refuses to pin a disabled or receive-only address, and keeps the pin it had', async () => {
+        const { service, addresses } = makeHarness();
+        const { inbox } = await service.ensure('user-1', 'agent-1', { emailAddressId: 'addr-1' });
+
+        addresses.findByIdForUser.mockResolvedValueOnce({
+            id: 'addr-retired',
+            direction: 'outbound',
+            disabledAt: new Date('2026-09-01T00:00:00Z'),
+        } as never);
+        await expect(
+            service.update('user-1', inbox.id, { emailAddressId: 'addr-retired' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        addresses.findByIdForUser.mockResolvedValueOnce({
+            id: 'addr-in',
+            direction: 'inbound',
+            disabledAt: null,
+        } as never);
+        await expect(
+            service.update('user-1', inbox.id, { emailAddressId: 'addr-in' }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect((await service.findForAgent('user-1', 'agent-1'))?.emailAddressId).toBe('addr-1');
     });
 
     it('projects a row to the wire shape with ISO dates', async () => {

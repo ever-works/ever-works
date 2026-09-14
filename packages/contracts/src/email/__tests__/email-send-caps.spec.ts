@@ -175,6 +175,30 @@ describe('resolveEmailSendCaps — unconfigured = unchanged, every source opts i
 		expect(emailSendCapWindowsInForce(resolved.caps, true)).toEqual({ inbox: false, workspace: true });
 	});
 
+	it('OPERATOR: a malformed platform value takes the recommended number instead of lifting the ceiling', () => {
+		// The pure resolver is exported and its `platform` accepts any number,
+		// so a direct caller can hand it values the env reader never produces.
+		for (const bad of [-1, Number.NaN, 2.5, EMAIL_SEND_CAP_MAX_CONFIGURABLE + 1, Number.POSITIVE_INFINITY]) {
+			const resolved = resolveEmailSendCaps({ platform: { workspaceDailySends: bad, inboxDailySends: bad } });
+			expect(resolved.configured).toBe(true);
+			expect(resolved.caps.workspaceDailySends).toBe(EMAIL_WORKSPACE_DAILY_CAP);
+			expect(resolved.sources.workspaceDailySends).toBe('platform');
+			expect(resolved.caps.inboxDailySends).toBe(EMAIL_INBOX_DEFAULT_DAILY_CAP);
+			expect(emailSendCapWindowsInForce(resolved.caps, true)).toEqual({ inbox: true, workspace: true });
+		}
+		// Absent and null still mean "the operator said nothing".
+		const silent = resolveEmailSendCaps({ platform: { workspaceDailySends: null } });
+		expect(silent.caps.workspaceDailySends).toBeNull();
+		expect(silent.sources.workspaceDailySends).toBe('unconfigured');
+		// A malformed operator value still yields to an organization value above it.
+		const overridden = resolveEmailSendCaps({
+			platform: { workspaceDailySends: -1 },
+			organization: { workspaceDailySends: 40 }
+		});
+		expect(overridden.caps.workspaceDailySends).toBe(40);
+		expect(overridden.sources.workspaceDailySends).toBe('organization');
+	});
+
 	it('OPERATOR: an explicit 0 is configured-as-unlimited, and beats the recommended fallback', () => {
 		const resolved = resolveEmailSendCaps({ platform: { inboxDailySends: 0 }, inbox: {} });
 		expect(resolved.caps.inboxDailySends).toBeNull();

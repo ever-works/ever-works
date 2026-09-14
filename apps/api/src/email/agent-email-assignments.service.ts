@@ -16,6 +16,9 @@ import type {
     AgentEmailAssignmentDirection,
     AgentEmailDispatchMode,
 } from '@ever-works/agent/entities';
+import { isUniqueConstraintError } from '@ever-works/agent/utils';
+
+const ALREADY_ASSIGNED = 'This address is already assigned to this agent.';
 
 const DIRECTIONS: readonly AgentEmailAssignmentDirection[] = ['outbound', 'inbound'];
 const DISPATCH_MODES: readonly AgentEmailDispatchMode[] = ['task-spawn', 'conversation'];
@@ -95,6 +98,14 @@ export class AgentEmailAssignmentsService {
         await this.requireOwnedAgent(userId, agentId);
         const address = await this.addresses.findByIdForUser(input.emailAddressId, userId);
         if (!address) throw new NotFoundException('Email address not found');
+        // A disabled address is retired: it is out of the active address
+        // list, and binding an Agent to it would route mail through an
+        // address its owner turned off.
+        if (address.disabledAt) {
+            throw new BadRequestException(
+                'This email address is disabled and cannot be assigned to an agent.',
+            );
+        }
         if (address.direction !== 'both' && address.direction !== input.direction) {
             throw new BadRequestException(
                 `This address is ${address.direction}-only and cannot be assigned for ${input.direction} mail.`,
@@ -102,17 +113,28 @@ export class AgentEmailAssignmentsService {
         }
         const existing = await this.assignments.findByAgent(agentId, input.direction);
         if (existing.some((row) => row.emailAddressId === address.id)) {
-            throw new ConflictException('This address is already assigned to this agent.');
+            throw new ConflictException(ALREADY_ASSIGNED);
         }
-        const saved = await this.assignments.save(
-            this.assignments.create({
-                agentId,
-                emailAddressId: address.id,
-                direction: input.direction,
-                priority: input.priority ?? 100,
-                dispatchMode: input.dispatchMode ?? 'task-spawn',
-            }),
-        );
+        let saved: AgentEmailAssignment;
+        try {
+            saved = await this.assignments.save(
+                this.assignments.create({
+                    agentId,
+                    emailAddressId: address.id,
+                    direction: input.direction,
+                    priority: input.priority ?? 100,
+                    dispatchMode: input.dispatchMode ?? 'task-spawn',
+                }),
+            );
+        } catch (error) {
+            // Two concurrent assigns both pass the check above; the unique
+            // index (agentId, emailAddressId, direction) lets one land. The
+            // loser gets the same 409 a sequential repeat gets, not a 500.
+            if (isUniqueConstraintError(error)) {
+                throw new ConflictException(ALREADY_ASSIGNED);
+            }
+            throw error;
+        }
         return toView({ ...saved, emailAddress: address } as AgentEmailAssignment);
     }
 

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { NotificationsModule as AgentNotificationsModule } from '@ever-works/agent/notifications';
@@ -15,6 +16,7 @@ import { EmailService } from './email.service';
 import { EmailSendPolicyController } from './email-send-policy.controller';
 import { AgentEmailAssignmentsController } from './agent-email-assignments.controller';
 import { AgentEmailAssignmentsService } from './agent-email-assignments.service';
+import { EmailDraftReleaseCronService } from './email-draft-release-cron.service';
 
 /**
  * EW-650 / EW-669 — Email module wiring.
@@ -45,7 +47,16 @@ import { AgentEmailAssignmentsService } from './agent-email-assignments.service'
         OrganizationsModule,
     ],
     controllers: [EmailController, EmailSendPolicyController, AgentEmailAssignmentsController],
-    providers: [EmailService, AgentEmailAssignmentsService],
+    providers: [
+        EmailService,
+        AgentEmailAssignmentsService,
+        // AW-05 — releases approved drafts the in-process decision listener
+        // missed. The lock service is not global: providing it here is what
+        // makes the cron resolvable (DatabaseModule supplies its CacheEntry
+        // repository), the same wiring NotificationsModule uses.
+        EmailDraftReleaseCronService,
+        DistributedTaskLockService,
+    ],
     exports: [EmailService],
 })
 export class EmailModule {}

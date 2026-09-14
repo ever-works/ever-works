@@ -470,6 +470,9 @@ describe('api-side AgentsModule — AGENT_EMAIL_FACADE approve-before-send', () 
         });
         expect(result).toMatchObject({ held: true, messageId: 'm-1', providerMessageId: '' });
         expect(String(result.note)).toMatch(/Do not send it again/);
+        // Approval does not guarantee delivery — a send limit can still refuse it.
+        expect(String(result.note)).toMatch(/subject to send limits/);
+        expect(String(result.note)).not.toMatch(/will go out/);
     });
 
     it('holds an agent-to-agent message the same way', async () => {

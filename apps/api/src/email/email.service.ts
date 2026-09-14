@@ -19,6 +19,7 @@ import {
     AgentEmailAssignmentRepository,
     EmailMessageRepository,
     AgentRepository,
+    AgentInboxRepository,
 } from '@ever-works/agent/database';
 import type { TenantEmailAddress, EmailAddressDirection } from '@ever-works/agent/entities';
 import { EmailFacadeService } from '@ever-works/agent/facades';
@@ -175,6 +176,10 @@ export class EmailService {
         // through the facade's send-policy gate, which refuses a held
         // Agent's direct send rather than letting it out.
         @Optional() private readonly drafts?: EmailDraftService,
+        // AW-05 — the Agent's inbox settings, read for the pinned sending
+        // address. @Optional() and appended LAST: absent, the sending address
+        // resolves exactly as before (explicit, then primary assignment).
+        @Optional() private readonly inboxes?: AgentInboxRepository,
     ) {}
 
     async listAddresses(
@@ -290,6 +295,12 @@ export class EmailService {
             address = await this.addresses.findByIdForUser(input.fromAddressId, userId);
             if (!address) throw new NotFoundException('From address not found');
         } else {
+            // AW-05 — the address pinned on the Agent's inbox settings is the
+            // one a person chose for this Agent to send from, so it comes
+            // before the primary assignment.
+            address = await this.resolvePinnedAddress(userId, input.agentId);
+        }
+        if (!address && !input.fromAddressId) {
             const assignment = await this.assignments.findPrimaryOutboundForAgent(input.agentId);
             if (assignment) {
                 // Codex P1 (PR #1085): scope the resolved address to the caller. Otherwise
@@ -374,6 +385,26 @@ export class EmailService {
             throw new NotFoundException('Message not found');
         }
         return row;
+    }
+
+    /**
+     * AW-05 — the sending address pinned on the Agent's inbox settings, when
+     * it is still usable: owned by the caller, not disabled and able to send.
+     * A pin that no longer resolves (the address was deleted — the FK sets
+     * the pin to NULL — disabled, or turned receive-only) behaves like no pin,
+     * so the Agent keeps sending through its primary assignment exactly as an
+     * unpinned Agent does.
+     */
+    private async resolvePinnedAddress(
+        userId: string,
+        agentId: string,
+    ): Promise<TenantEmailAddress | null> {
+        if (!this.inboxes) return null;
+        const inbox = await this.inboxes.findByAgentForUser(agentId, userId);
+        if (!inbox?.emailAddressId) return null;
+        const pinned = await this.addresses.findByIdForUser(inbox.emailAddressId, userId);
+        if (!pinned || pinned.disabledAt || pinned.direction === 'inbound') return null;
+        return pinned;
     }
 
     private async findOwnedOrThrow(userId: string, id: string): Promise<TenantEmailAddress> {

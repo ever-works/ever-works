@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { EmailApprovalRequiredException } from '../email-approval-required.exception';
 import { EmailSendCapExceededException } from '../email-send-cap-exceeded.exception';
 import { EmailSendPolicyService, normalizeOrganizationPolicy } from '../email-send-policy.service';
@@ -40,9 +41,26 @@ function makeHarness() {
             .fn()
             .mockResolvedValue({ id: 'agent-1', userId: 'user-1', organizationId: null }),
     };
-    const organizations = {
+    const organizations: {
+        findOne: jest.Mock;
+        update: jest.Mock;
+        manager: {
+            connection: { options: { type: string } };
+            transaction: jest.Mock;
+            getRepository: jest.Mock;
+        };
+    } = {
         findOne: jest.fn().mockResolvedValue(null),
         update: jest.fn().mockResolvedValue(undefined),
+        // The organization-policy write runs in a transaction; this one runs
+        // the work on the same mocked repository.
+        manager: {
+            connection: { options: { type: 'postgres' } },
+            transaction: jest.fn(async (work: (manager: unknown) => Promise<unknown>) =>
+                work(organizations.manager),
+            ),
+            getRepository: jest.fn(() => organizations),
+        },
     };
     const proposals = {
         findOne: jest.fn().mockResolvedValue({ id: 'prop-1', status: 'approved' }),
@@ -694,6 +712,21 @@ describe('EmailSendPolicyService', () => {
             });
         });
 
+        it("refuses another account's Agent before counting anything (usage windows are keyed on the Agent alone)", async () => {
+            const { service, agents, messages } = makeHarness();
+            agents.findOne.mockResolvedValue(null);
+
+            await expect(service.getMeter('user-2', 'agent-1')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+
+            expect(agents.findOne).toHaveBeenCalledWith(
+                expect.objectContaining({ where: { id: 'agent-1', userId: 'user-2' } }),
+            );
+            expect(messages.countOutboundSentSince).not.toHaveBeenCalled();
+            expect(messages.listOutboundRecipientsSince).not.toHaveBeenCalled();
+        });
+
         it('shows no ceilings while enforcement is off', async () => {
             process.env.EMAIL_SEND_CAPS_ENFORCEMENT = 'off';
             const { service } = makeHarness();
@@ -723,6 +756,131 @@ describe('EmailSendPolicyService', () => {
                 { id: 'org-1' },
                 { emailSendPolicy: stored },
             );
+        });
+
+        it('reads, merges and writes inside one transaction, holding a row lock on Postgres', async () => {
+            const { service, organizations } = makeHarness();
+            const order: string[] = [];
+            organizations.manager.transaction.mockImplementation(
+                async (work: (manager: unknown) => Promise<unknown>) => {
+                    order.push('begin');
+                    try {
+                        return await work(organizations.manager);
+                    } finally {
+                        order.push('commit');
+                    }
+                },
+            );
+            organizations.findOne.mockImplementation(async () => {
+                order.push('read');
+                return { id: 'org-1', emailSendPolicy: null };
+            });
+            organizations.update.mockImplementation(async () => {
+                order.push('write');
+            });
+
+            await service.updateOrganizationPolicy('org-1', { defaultMode: 'draft-review' });
+
+            expect(order).toEqual(['begin', 'read', 'write', 'commit']);
+            expect(organizations.findOne).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { id: 'org-1' },
+                    lock: { mode: 'pessimistic_write' },
+                }),
+            );
+        });
+
+        it('asks for no row lock on SQLite, which has none (its single writer serializes)', async () => {
+            const { service, organizations } = makeHarness();
+            organizations.manager.connection.options.type = 'better-sqlite3';
+
+            await service.updateOrganizationPolicy('org-1', { defaultMode: 'auto-send' });
+
+            expect(organizations.manager.transaction).toHaveBeenCalledTimes(1);
+            expect(organizations.findOne.mock.calls[0][0]).not.toHaveProperty('lock');
+        });
+
+        describe('two administrators patching at once', () => {
+            /**
+             * A stored organization row, and a transaction whose
+             * `pessimistic_write` read is a real row lock held until the
+             * transaction ends — the database behaviour the service relies on.
+             */
+            function concurrentHarness(options: { honourLock: boolean }) {
+                const harness = makeHarness();
+                const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+                let stored: unknown = { caps: { inboxDailySends: 40 } };
+                let held: Promise<void> | null = null;
+                harness.organizations.manager.transaction.mockImplementation(
+                    async (work: (manager: unknown) => Promise<unknown>) => {
+                        let release: (() => void) | null = null;
+                        const repository = {
+                            findOne: async (args: { lock?: unknown }) => {
+                                if (args.lock && options.honourLock) {
+                                    while (held) await held;
+                                    held = new Promise<void>((resolve) => {
+                                        release = () => {
+                                            held = null;
+                                            resolve();
+                                        };
+                                    });
+                                }
+                                await tick();
+                                return { id: 'org-1', emailSendPolicy: stored };
+                            },
+                            update: async (
+                                _where: unknown,
+                                patch: { emailSendPolicy: unknown },
+                            ) => {
+                                await tick();
+                                stored = patch.emailSendPolicy;
+                            },
+                        };
+                        try {
+                            return await work({
+                                connection: harness.organizations.manager.connection,
+                                getRepository: () => repository,
+                            });
+                        } finally {
+                            (release as (() => void) | null)?.();
+                        }
+                    },
+                );
+                return { ...harness, read: () => stored };
+            }
+
+            it('keeps both changes: the second merge starts from the first write', async () => {
+                const { service, read } = concurrentHarness({ honourLock: true });
+
+                await Promise.all([
+                    service.updateOrganizationPolicy('org-1', { defaultMode: 'draft-review' }),
+                    service.updateOrganizationPolicy('org-1', {
+                        caps: { workspaceDailySends: 300 },
+                    }),
+                ]);
+
+                expect(read()).toEqual({
+                    defaultMode: 'draft-review',
+                    caps: { inboxDailySends: 40, workspaceDailySends: 300 },
+                });
+            });
+
+            it('CONTROL: without the row lock the same two patches lose one of them', async () => {
+                const { service, read } = concurrentHarness({ honourLock: false });
+
+                await Promise.all([
+                    service.updateOrganizationPolicy('org-1', { defaultMode: 'draft-review' }),
+                    service.updateOrganizationPolicy('org-1', {
+                        caps: { workspaceDailySends: 300 },
+                    }),
+                ]);
+
+                // If this ever keeps both, the test above proves nothing.
+                expect(read()).not.toEqual({
+                    defaultMode: 'draft-review',
+                    caps: { inboxDailySends: 40, workspaceDailySends: 300 },
+                });
+            });
         });
 
         it('drops malformed stored values instead of lifting a ceiling', () => {

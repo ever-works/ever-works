@@ -17,6 +17,12 @@ import { EmailSendPolicyService } from './email-send-policy.service';
 /** Proposal payload discriminator for a held email draft. */
 export const EMAIL_DRAFT_PROPOSAL_KIND = 'email-draft' as const;
 
+/**
+ * How long after a person's approval the release sweep leaves a draft to the
+ * in-process decision listener before releasing it itself.
+ */
+export const EMAIL_DRAFT_RELEASE_GRACE_MS = 2 * 60_000;
+
 /** An Agent-written message, fully resolved by the caller (address, rendered body). */
 export interface SubmitAgentEmailInput {
     userId: string;
@@ -138,6 +144,11 @@ export class EmailDraftService {
                 actionType: 'send_message',
                 title: draftTitle(input.to, input.subject),
                 runId: input.runId ?? null,
+                // The inbox asked a PERSON to review this message: the
+                // Agent's guardrails may block the send, never approve it
+                // on the person's behalf (an auto-approved proposal would
+                // leave a held draft nobody is asked about).
+                humanDecisionRequired: true,
                 payload: {
                     kind: EMAIL_DRAFT_PROPOSAL_KIND,
                     emailMessageId: draft.id,
@@ -241,6 +252,48 @@ export class EmailDraftService {
             }
             throw error;
         }
+    }
+
+    /**
+     * The durable half of "approved in the queue → released". The decision
+     * event is in-process, so a replica that stops between recording the
+     * decision and the listener running — or a listener that fails before
+     * it moves the draft — leaves an approved proposal over a draft that
+     * never went out. This finds those drafts (a person's approval, recorded
+     * at least `graceMs` ago so the listener has had its chance, never
+     * attempted) and releases each through {@link approve}, whose
+     * compare-and-set on the row makes a concurrent listener or a second
+     * replica a no-op rather than a second send.
+     *
+     * A draft a ceiling sent back is NOT retried here: it carries a reason
+     * and waits for a person to approve it again, as it always has.
+     * Per-draft failures are logged and counted, never thrown.
+     */
+    async releaseApprovedDrafts(
+        options: { graceMs?: number; limit?: number } = {},
+    ): Promise<{ considered: number; released: number; failed: number }> {
+        const graceMs = Math.max(0, options.graceMs ?? EMAIL_DRAFT_RELEASE_GRACE_MS);
+        const stranded = await this.messages.findApprovedUnreleasedDrafts(
+            new Date(Date.now() - graceMs),
+            options.limit,
+        );
+        let released = 0;
+        let failed = 0;
+        for (const draft of stranded) {
+            try {
+                await this.approve(draft.userId, draft.messageId, {
+                    approvedById: draft.decidedById,
+                    viaDecision: true,
+                });
+                released += 1;
+            } catch (error) {
+                failed += 1;
+                this.logger.warn(
+                    `Approved draft ${draft.messageId} could not be released: ${describe(error)}`,
+                );
+            }
+        }
+        return { considered: stranded.length, released, failed };
     }
 
     async discard(

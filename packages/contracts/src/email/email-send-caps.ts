@@ -75,7 +75,10 @@ export interface ResolveEmailSendCapsInput {
 	/**
 	 * Platform ceilings THE OPERATOR CONFIGURED (one per `EMAIL_SEND_CAP_*`
 	 * env var that is set). A field that is absent, `null` or `undefined` is
-	 * NOT configured and enforces nothing; `0` is an explicit "no ceiling".
+	 * NOT configured and enforces nothing; `0` is an explicit "no ceiling";
+	 * any other value that is not a usable ceiling (negative, fractional,
+	 * `NaN`, above `EMAIL_SEND_CAP_MAX_CONFIGURABLE`) is configured and takes
+	 * the recommended number.
 	 * A full record (every field a number) behaves as before: every field is
 	 * then configured.
 	 */
@@ -110,9 +113,14 @@ export function resolveEmailSendCaps(input: ResolveEmailSendCapsInput): Resolved
 		// `undefined` = nobody has spoken about this ceiling yet.
 		let value: number | undefined;
 		let source: EmailSendCapValueSource = 'unconfigured';
-		const platformValue = normalizeEmailSendCapValue(input.platform?.[field]);
-		if (platformValue !== undefined) {
-			value = platformValue;
+		const rawPlatform: unknown = input.platform?.[field];
+		if (rawPlatform !== undefined && rawPlatform !== null) {
+			// The operator spoke about this ceiling. A value that is not a
+			// usable ceiling (negative, fractional, NaN, above the maximum)
+			// takes the recommended number — the same rule the env reader
+			// applies — so a malformed platform value can never resolve to
+			// "no ceiling".
+			value = normalizeEmailSendCapValue(rawPlatform) ?? EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS[field];
 			source = 'platform';
 		}
 		const orgValue = organization[field];
