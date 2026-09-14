@@ -35,7 +35,9 @@ export interface AgentConversationReplyPayload {
  *  4. execute through `AgentRunService`, the same runner every Agent run uses
  *     (budget, tools, memory, cost);
  *  5. record the reply as an Agent-authored message that answers the
- *     triggering one, so the run and the message point at each other.
+ *     triggering one, so the run and the message point at each other — or,
+ *     when the Agent's budget refused the run, mark the triggering message
+ *     `failed` with `budget_exceeded` so the refusal is visible and retryable.
  *
  * `maxDuration` matches the chat reply job.
  */
@@ -173,6 +175,15 @@ export const agentConversationReplyTask = task<
                 );
             } else if (result.status === 'agent-not-found') {
                 await runs.markFailed(run.id, 'Agent not found');
+            } else if (result.status === 'budget-blocked') {
+                // The runner already failed the run. Without this the person
+                // would see nothing: their message moves to `failed` with the
+                // reason, so the Conversation can say why and offer Retry.
+                await messages.markReplyRefused({
+                    conversationId: payload.conversationId,
+                    messageId: payload.triggeringMessageId,
+                    failureCode: 'budget_exceeded',
+                });
             }
 
             const reply = result.outcome?.replyBody?.trim();

@@ -9,7 +9,9 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
  *  - the Agent is briefed with the message it answers (unresolved mentions
  *    stripped) and the recent history, through the shared runner;
  *  - a reply is recorded as the Agent's message answering the triggering one,
- *    and nothing is recorded when the run produced no reply.
+ *    and nothing is recorded when the run produced no reply;
+ *  - a reply the Agent's budget refused leaves a trace: the triggering
+ *    message is marked failed with `budget_exceeded`.
  */
 const {
     taskMock,
@@ -136,6 +138,7 @@ describe('agentConversationReplyTask', () => {
             }),
             agentVisibleBody: vi.fn().mockResolvedValue('draft the plan'),
             appendAgentMessage: vi.fn().mockResolvedValue({ id: 'reply-1' }),
+            markReplyRefused: vi.fn().mockResolvedValue(true),
         };
         createApplicationContextMock.mockResolvedValue({
             useLogger: vi.fn(),
@@ -200,6 +203,26 @@ describe('agentConversationReplyTask', () => {
         const blocked = await config.run(payload);
         expect(messages.appendAgentMessage).not.toHaveBeenCalled();
         expect(blocked.status).toBe('budget-blocked');
+    });
+
+    it('surfaces a budget-refused reply on the person’s message so it can be retried', async () => {
+        runner.execute.mockResolvedValue({ status: 'budget-blocked' });
+
+        const result = await config.run(payload);
+
+        expect(messages.markReplyRefused).toHaveBeenCalledTimes(1);
+        expect(messages.markReplyRefused).toHaveBeenCalledWith({
+            conversationId: CONVERSATION_ID,
+            messageId: MESSAGE_ID,
+            failureCode: 'budget_exceeded',
+        });
+        expect(messages.appendAgentMessage).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ status: 'budget-blocked', runId: RUN_ID });
+    });
+
+    it('marks nothing failed when the reply ran', async () => {
+        await config.run(payload);
+        expect(messages.markReplyRefused).not.toHaveBeenCalled();
     });
 
     it('never executes a run that belongs to another message or already finished', async () => {

@@ -393,6 +393,55 @@ describe('ConversationMessageService', () => {
         });
     });
 
+    describe('markReplyRefused', () => {
+        it('moves the person’s sent message to failed with the reason', async () => {
+            conversations.findMessageById.mockResolvedValue({
+                id: 'm1',
+                authorType: 'user',
+                authorId: 'u1',
+                status: 'sent',
+            });
+
+            await expect(
+                service.markReplyRefused({
+                    conversationId: 'c1',
+                    messageId: 'm1',
+                    failureCode: 'budget_exceeded',
+                }),
+            ).resolves.toBe(true);
+
+            expect(conversations.findMessageById).toHaveBeenCalledWith('c1', 'm1');
+            expect(conversations.updateMessageStatus).toHaveBeenCalledWith(
+                'm1',
+                'failed',
+                'budget_exceeded',
+            );
+        });
+
+        it('leaves a missing, already failed, or non-person message alone', async () => {
+            const input = {
+                conversationId: 'c1',
+                messageId: 'm1',
+                failureCode: 'budget_exceeded' as const,
+            };
+            conversations.findMessageById.mockResolvedValueOnce(null);
+            await expect(service.markReplyRefused(input)).resolves.toBe(false);
+            conversations.findMessageById.mockResolvedValueOnce({
+                id: 'm1',
+                authorType: 'user',
+                status: 'failed',
+            });
+            await expect(service.markReplyRefused(input)).resolves.toBe(false);
+            conversations.findMessageById.mockResolvedValueOnce({
+                id: 'm1',
+                authorType: 'agent',
+                status: 'sent',
+            });
+            await expect(service.markReplyRefused(input)).resolves.toBe(false);
+            expect(conversations.updateMessageStatus).not.toHaveBeenCalled();
+        });
+    });
+
     describe('appendAgentMessage', () => {
         it('records the reply as Agent-authored, answering the triggering message', async () => {
             await service.appendAgentMessage({

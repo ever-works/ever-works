@@ -49,6 +49,13 @@ export interface AppendAgentMessageInput {
     model?: string | null;
 }
 
+export interface MarkReplyRefusedInput {
+    conversationId: string;
+    /** The person's message the refused reply was answering. */
+    messageId: string;
+    failureCode: ConversationFailureCode;
+}
+
 export interface ConversationReplyContext {
     conversation: Pick<
         Conversation,
@@ -85,6 +92,9 @@ const REPLY_CONTEXT_MESSAGES = 20;
  *      dispatch gate would not start a reply (no capacity right now, or out
  *      of credits) — the message is marked `failed` with that reason so the
  *      sender can Retry it (FR-42) — nothing retries on its own (FR-45).
+ *
+ * A reply the Agent's budget refuses after dispatch is surfaced the same way
+ * by the reply job, through {@link markReplyRefused}.
  *
  * Refusals carry a stable `failureCode` so the composer can say why in plain
  * language and keep the text (FR-39, FR-46). No message body, mention or
@@ -250,6 +260,29 @@ export class ConversationMessageService {
             tenantId: conversation.tenantId ?? null,
             organizationId: conversation.organizationId ?? null,
         });
+    }
+
+    /**
+     * Surface a reply that was dispatched but refused before it could run —
+     * the Agent's budget stopped it. The run is already failed; without this
+     * the Conversation would show nothing. The person's message moves to
+     * `failed` with the reason, so the composer can say why and offer Retry,
+     * and the live stream pushes the change.
+     *
+     * Only a person's message that is still `sent` moves: a message already
+     * failed, or one that is not a person's, is left as it is. Returns
+     * whether the message changed.
+     */
+    async markReplyRefused(input: MarkReplyRefusedInput): Promise<boolean> {
+        const message = await this.conversations.findMessageById(
+            input.conversationId,
+            input.messageId,
+        );
+        if (!message || message.authorType !== 'user' || message.status !== 'sent') {
+            return false;
+        }
+        await this.conversations.updateMessageStatus(message.id, 'failed', input.failureCode);
+        return true;
     }
 
     /**
