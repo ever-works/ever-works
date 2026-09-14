@@ -1,13 +1,19 @@
 import { Global, Module } from '@nestjs/common';
 import { AuthModule } from '@src/auth';
 import {
+    CostsSummaryService,
     SeatsService,
     SubscriptionsModule as AgentSubscriptionsModule,
     RunCostSettlementService,
     PlanRunLimitsService,
 } from '@ever-works/agent/subscriptions';
 import { RUN_COST_SETTLER } from '@ever-works/agent/database';
-import { RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS, SEAT_GUARD } from '@ever-works/agent/agents';
+import {
+    RUN_COST_BREAKDOWN_READER,
+    RUN_CREDITS_PRECHECK,
+    RUN_PLAN_LIMITS,
+    SEAT_GUARD,
+} from '@ever-works/agent/agents';
 import { SubscriptionsController } from './subscriptions.controller';
 import { CreditsController } from './credits.controller';
 import { CostsController } from './costs.controller';
@@ -51,7 +57,19 @@ import { CostsController } from './costs.controller';
         // consults it through an @Optional() @Inject() and would silently
         // resolve undefined (never seat-checking) without a global binding.
         { provide: SEAT_GUARD, useExisting: SeatsService },
+        // Run receipt (AW-09) — the receipt reads one run's cost through this
+        // port, bound to the SAME service the Costs dashboard is served by, so
+        // a receipt and the dashboard can never disagree about a run. Global
+        // for the same reason as the tokens above: the consumer
+        // (RunReceiptService) lives in an agent-package module.
+        { provide: RUN_COST_BREAKDOWN_READER, useExisting: CostsSummaryService },
     ],
-    exports: [RUN_COST_SETTLER, RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS, SEAT_GUARD],
+    exports: [
+        RUN_COST_SETTLER,
+        RUN_CREDITS_PRECHECK,
+        RUN_PLAN_LIMITS,
+        SEAT_GUARD,
+        RUN_COST_BREAKDOWN_READER,
+    ],
 })
 export class SubscriptionsModule {}

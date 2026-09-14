@@ -1,70 +1,82 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { isModKey, SHORTCUT_PRIORITY, SHORTCUT_SCOPE } from '@/lib/keyboard/shortcut-registry';
+import { useShortcut } from './use-shortcut';
 
 interface KeyboardShortcutsOptions {
     onOpenHelp?: () => void;
+    /**
+     * Open the dashboard command palette. When provided, `Ctrl/Cmd+K` and `/`
+     * open it. When omitted, `Ctrl/Cmd+K` keeps its original behaviour — go to
+     * the Works list with its search box focused — and `/` is not bound.
+     */
+    onOpenPalette?: (source: 'shortcut' | 'slash') => void;
 }
 
+/** Destination of the original `Ctrl/Cmd+K`, kept reachable as the "Search Works" command. */
+export const WORKS_SEARCH_HREF = `${ROUTES.DASHBOARD_WORKS}?focus=search`;
+
 /**
- * Global keyboard shortcuts for the dashboard
- * - Ctrl/Cmd + K: Navigate to works and focus search
- * - C: Create new work
- * - ?: Open help drawer (when not in an input field)
+ * Global keyboard shortcuts for the dashboard, registered through the shared
+ * shortcut registry at global scope (so a screen-scoped binding for the same
+ * key — e.g. the Knowledge-Base workbench palette — wins on its own screen):
+ * - Ctrl/Cmd + K: open the command palette (or, without one, go to Works search)
+ * - /: open the command palette (only outside text fields, only with a palette)
+ * - C: create new work (only outside text fields)
+ * - ?: open help drawer (only outside text fields)
  */
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
     const router = useRouter();
-    const { onOpenHelp } = options;
+    const { onOpenHelp, onOpenPalette } = options;
 
-    const handleKeyDown = useCallback(
-        (event: KeyboardEvent) => {
-            const target = event.target as HTMLElement;
-            const tagName = target.tagName.toLowerCase();
-            const isInputField =
-                tagName === 'input' ||
-                tagName === 'textarea' ||
-                tagName === 'select' ||
-                target.isContentEditable;
-
-            // Check for modifier key (Ctrl on Windows/Linux, Cmd on Mac)
-            const modifier = event.ctrlKey || event.metaKey;
-
-            // Ctrl/Cmd + K: Focus search on works page
-            if (modifier && event.key.toLowerCase() === 'k') {
-                event.preventDefault();
-                // Navigate to works page with focus param
-                router.push(`${ROUTES.DASHBOARD_WORKS}?focus=search`);
-                return;
-            }
-
-            // The following shortcuts only work when not in an input field
-            if (isInputField) {
-                return;
-            }
-
-            // C: Create new work
-            if (event.key.toLowerCase() === 'c' && !modifier) {
-                event.preventDefault();
-                router.push(ROUTES.DASHBOARD_WORKS_NEW);
-                return;
-            }
-
-            // ?: Open help
-            if (event.key === '?' && onOpenHelp) {
-                event.preventDefault();
-                onOpenHelp();
-                return;
-            }
+    useShortcut(
+        {
+            id: 'dashboard.palette',
+            scope: SHORTCUT_SCOPE.global,
+            priority: SHORTCUT_PRIORITY.global,
+            allowInInput: true,
         },
-        [router, onOpenHelp],
+        (event) => isModKey(event, 'k'),
+        () => {
+            if (onOpenPalette) {
+                onOpenPalette('shortcut');
+                return;
+            }
+            router.push(WORKS_SEARCH_HREF);
+        },
     );
 
-    useEffect(() => {
-        document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [handleKeyDown]);
+    useShortcut(
+        {
+            id: 'dashboard.paletteSlash',
+            scope: SHORTCUT_SCOPE.global,
+            priority: SHORTCUT_PRIORITY.global,
+            enabled: Boolean(onOpenPalette),
+        },
+        (event) => event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey,
+        () => onOpenPalette?.('slash'),
+    );
+
+    useShortcut(
+        {
+            id: 'dashboard.newWork',
+            scope: SHORTCUT_SCOPE.global,
+            priority: SHORTCUT_PRIORITY.global,
+        },
+        (event) => event.key.toLowerCase() === 'c' && !event.ctrlKey && !event.metaKey,
+        () => router.push(ROUTES.DASHBOARD_WORKS_NEW),
+    );
+
+    useShortcut(
+        {
+            id: 'dashboard.help',
+            scope: SHORTCUT_SCOPE.global,
+            priority: SHORTCUT_PRIORITY.global,
+            enabled: Boolean(onOpenHelp),
+        },
+        (event) => event.key === '?',
+        () => onOpenHelp?.(),
+    );
 }
