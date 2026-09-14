@@ -1,4 +1,4 @@
-import { DataSource, QueryRunner, Table } from 'typeorm';
+import { DataSource, QueryRunner, Table, TableColumn } from 'typeorm';
 import { CreateMemoryFolders1786830000000 } from '../1786830000000-CreateMemoryFolders';
 import { AddKnowledgeLibraryFoldersAndReadState1791110060000 } from '../1791110060000-AddKnowledgeLibraryFoldersAndReadState';
 
@@ -157,6 +157,49 @@ describe('AddKnowledgeLibraryFoldersAndReadState1791110060000', () => {
                 ),
             ).resolves.not.toThrow();
         });
+
+        it('creates the case-insensitive shared-path index idempotently on Postgres', async () => {
+            const statements: string[] = [];
+            await migration.up(recordingPostgresRunner(statements));
+            const ddl = statements.find((sql) => sql.includes('"uq_memory_folders_org_path_ci"'));
+            expect(ddl).toMatch(
+                /CREATE UNIQUE INDEX IF NOT EXISTS "uq_memory_folders_org_path_ci"/,
+            );
+            expect(ddl).toMatch(/\("organizationId", lower\("path"\)\)/);
+            expect(ddl).toMatch(/WHERE "scope" = 'organization'/);
+        });
+
+        it('drops the case-insensitive shared-path index on a Postgres revert', async () => {
+            const statements: string[] = [];
+            await migration.down(recordingPostgresRunner(statements));
+            expect(statements).toContain('DROP INDEX IF EXISTS "uq_memory_folders_org_path_ci"');
+        });
+
+        it('leaves the expression index off SQLite, so a later column still rebuilds the table', async () => {
+            await runUp();
+            expect((await indexes('memory_folders')).uq_memory_folders_org_path_ci).toBeUndefined();
+            // SQLite adds a column by rebuilding the table, which TypeORM
+            // cannot do around an expression index.
+            const runner = dataSource.createQueryRunner();
+            await expect(
+                runner.addColumn(
+                    'memory_folders',
+                    new TableColumn({ name: 'later_column', type: 'varchar', isNullable: true }),
+                ),
+            ).resolves.not.toThrow();
+            await runner.release();
+            // The exact-path rule survives the rebuild.
+            await dataSource.query(
+                `INSERT INTO "memory_folders" ("id","userId","organizationId","scope","name","path","createdAt","updatedAt")
+                 VALUES ('r1','u1','org-1','organization','Guides','/Guides','2026-08-14','2026-08-14')`,
+            );
+            await expect(
+                dataSource.query(
+                    `INSERT INTO "memory_folders" ("id","userId","organizationId","scope","name","path","createdAt","updatedAt")
+                     VALUES ('r2','u2','org-1','organization','Guides','/Guides','2026-08-14','2026-08-14')`,
+                ),
+            ).rejects.toThrow();
+        });
     });
 
     describe('work_knowledge_documents', () => {
@@ -305,6 +348,7 @@ describe('AddKnowledgeLibraryFoldersAndReadState1791110060000', () => {
         const idx = await indexes('memory_folders');
         expect(idx.uq_memory_folders_user_path).toEqual({ unique: 1, partial: 0 });
         expect(idx.uq_memory_folders_org_path).toBeUndefined();
+        expect(idx.uq_memory_folders_org_path_ci).toBeUndefined();
         // Shared folders are discarded; the personal one stays.
         const ids = (await dataSource.query(`SELECT "id" FROM "memory_folders"`)).map(
             (row: { id: string }) => row.id,
@@ -332,6 +376,8 @@ function recordingPostgresRunner(statements: string[]): QueryRunner {
         createIndex: async () => undefined,
         dropIndex: async () => undefined,
         createTable: async () => undefined,
+        dropTable: async () => undefined,
+        dropColumn: async () => undefined,
         createForeignKey: async () => undefined,
         query: async (sql: string) => {
             statements.push(sql);

@@ -26,17 +26,20 @@ import {
  * change is a WIDENING. `uq_memory_folders_user_path` is dropped and
  * immediately recreated as a PARTIAL unique index over the same columns
  * `WHERE scope = 'user'` — since every existing row is `'user'`, it enforces
- * exactly what the original index enforced over existing data. Two partial
- * indexes are added for the shared scope: path uniqueness per Organization
- * and the `(organizationId, parentId)` child lookup.
+ * exactly what the original index enforced over existing data. Three partial
+ * indexes are added for the shared scope: path uniqueness per Organization,
+ * the same uniqueness case-insensitively (`lower(path)`, a Postgres-only
+ * expression index in raw DDL — no existing row is organization-scope, so it
+ * cannot collide) and the `(organizationId, parentId)` child lookup.
  *
  * ## `work_knowledge_documents`
  *
  * `folder_id` (NULL = Unfiled, FK → `memory_folders` SET NULL, so deleting a
  * folder unfiles and never deletes), `revision` (NOT NULL DEFAULT 1),
- * `revision_at`, `normalized_content_hash` (left NULL: the first write seeds
- * it without moving `revision`, so no existing document is flagged as
- * changed on the day this ships), `archived_at` and `archived_by_id`
+ * `revision_at`, `normalized_content_hash` (left NULL: no existing document
+ * is flagged as changed on the day this ships; the first write seeds it and
+ * moves `revision` only when that write really changes the document),
+ * `archived_at` and `archived_by_id`
  * (FK → `users` SET NULL). `revision_at` is backfilled from `updatedAt`
  * (falling back to `createdAt`) so the first library render has a sort key;
  * `archived_at` is backfilled from `updatedAt` for already-archived rows.
@@ -65,6 +68,7 @@ export class AddKnowledgeLibraryFoldersAndReadState1791110060000 implements Migr
     private static readonly READER_STATES = 'knowledge_document_reader_states';
 
     private static readonly USER_PATH_INDEX = 'uq_memory_folders_user_path';
+    private static readonly ORG_PATH_CASE_INSENSITIVE_INDEX = 'uq_memory_folders_org_path_ci';
 
     private static readonly DOCUMENT_COLUMNS = [
         new TableColumn({ name: 'folder_id', type: 'uuid', isNullable: true }),
@@ -155,6 +159,13 @@ export class AddKnowledgeLibraryFoldersAndReadState1791110060000 implements Migr
             // never deleted — their `folder_id` column is dropped above, so
             // they simply become unfiled.
             await queryRunner.query(`DELETE FROM "${self.FOLDERS}" WHERE "scope" = 'organization'`);
+            // The Postgres-only expression index goes first, by raw DDL: it
+            // references `scope`, which is dropped below.
+            if (isPostgres) {
+                await queryRunner.query(
+                    `DROP INDEX IF EXISTS "${self.ORG_PATH_CASE_INSENSITIVE_INDEX}"`,
+                );
+            }
             for (const name of [
                 'idx_memory_folders_org_parent',
                 'uq_memory_folders_org_path',
@@ -232,6 +243,29 @@ export class AddKnowledgeLibraryFoldersAndReadState1791110060000 implements Migr
                 where: `"scope" = 'organization'`,
             }),
         ]);
+
+        // Sibling names on a shared shelf are unique case-insensitively
+        // ("Support" and "support" cannot sit side by side). Every ancestor
+        // is itself unique that way, so `lower(path)` per Organization is
+        // exactly that rule, held by the database even when two creates
+        // race. An expression index, so raw DDL — `TableIndex` cannot model
+        // an expression column portably; the same posture as
+        // `idx_users_username_lower_unique`. `IF NOT EXISTS` keeps `up()`
+        // idempotent.
+        //
+        // Postgres-only, like the two document FKs below: better-sqlite3
+        // adds a column by rebuilding the table, and TypeORM's rebuild cannot
+        // recreate an expression index, so any later column added to
+        // `memory_folders` would fail there. On SQLite the rule is held by
+        // `MemoryFoldersService`, whose check and insert share one
+        // transaction on a single-writer database.
+        if (queryRunner.connection.options.type === 'postgres') {
+            await queryRunner.query(
+                `CREATE UNIQUE INDEX IF NOT EXISTS "${self.ORG_PATH_CASE_INSENSITIVE_INDEX}"
+                 ON "${self.FOLDERS}" ("organizationId", lower("path"))
+                 WHERE "scope" = 'organization'`,
+            );
+        }
     }
 
     // ─── work_knowledge_documents ────────────────────────────────────────
