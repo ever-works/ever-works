@@ -258,6 +258,10 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // Inbox — the decisions only a person can make
     [ActivityActionType.INBOX_ITEM_CREATED]: 'decision',
     [ActivityActionType.INBOX_ITEM_ANSWERED]: 'decision',
+
+    // Skills shelf — a person switching a Skill on or off.
+    [ActivityActionType.SKILL_ENABLED]: 'system',
+    [ActivityActionType.SKILL_DISABLED]: 'system',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */
