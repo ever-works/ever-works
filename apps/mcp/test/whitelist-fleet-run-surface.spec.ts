@@ -119,6 +119,31 @@ describe('fleet-run token surface vs. the MCP whitelist', () => {
 		expect(isFleetRunTokenRouteAllowed('POST', '/api/agents/a1/runs/r1/terminal/start')).toBe(false);
 	});
 
+	it('refuses every human-in-the-loop gate route this surface deliberately withholds', () => {
+		// Found in review of slice AD (EW-811). The whitelist withholds these
+		// because they ANSWER a gate, and a caller holding the owner's
+		// credential is indistinguishable from the owner — but the run
+		// token's coarse families admitted all three, so the token was
+		// strictly broader than the whitelist on exactly the routes that
+		// matter. The inbox reply is the one that decides a merge approval
+		// as the owner (`decidedVia: 'user'`).
+		const withheldGates = [
+			{ method: 'POST', path: '/api/inbox/{id}/reply' },
+			{ method: 'POST', path: '/api/tasks/{id}/escalations/{escalationId}/resolve' },
+			{ method: 'POST', path: '/api/me/goals/{id}/dod/approve' }
+		];
+		for (const gate of withheldGates) {
+			expect(
+				WHITELIST.some((entry) => entry.method === gate.method && entry.path === gate.path),
+				`${gate.method} ${gate.path} must stay off the MCP surface`
+			).toBe(false);
+			expect(
+				isFleetRunTokenRouteAllowed(gate.method, concretePath(gate.path)),
+				`${gate.method} ${gate.path} must stay refused for run tokens`
+			).toBe(false);
+		}
+	});
+
 	it('the segment carve-outs never bite a shipped tool', () => {
 		// The counterweight to the test above. Denying a segment inside a
 		// granted family is only safe while no whitelisted path uses it —

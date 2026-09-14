@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { TaskChatService } from '../task-chat.service';
 import { ActivityActionType } from '../../entities/activity-log.types';
+import { agentReviewRunScope } from '../task-agent-review';
 
 describe('TaskChatService', () => {
     const everScope = {
@@ -402,6 +403,39 @@ describe('TaskChatService', () => {
             });
             await postMention(svcUnderTest);
             expect(runs.createQueued).toHaveBeenCalled();
+        });
+
+        it('a LIVE REVIEW run is neither steered nor doubled up on (slice AD)', async () => {
+            // Review of slice AD: `findInFlightForTaskAgent` does not filter by
+            // run kind, so an `@reviewer` post — including one the implementer
+            // makes through MCP — was pushed into the review run as a bare user
+            // turn. Falling back to a second, ordinary chat run instead would
+            // make the reviewer an AUTHOR and cancel its own review as
+            // `self-review`. The message is stored (above); nothing else runs.
+            const { svcUnderTest, runs, chatDispatcher, steering } = makeSteeringSvc({
+                live: {
+                    id: 'run-review-1',
+                    delegationScope: JSON.parse(JSON.stringify(agentReviewRunScope())),
+                } as { id: string },
+            });
+            await postMention(svcUnderTest);
+
+            expect(messages.create).toHaveBeenCalled();
+            expect(steering.steer).not.toHaveBeenCalled();
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(chatDispatcher.enqueue).not.toHaveBeenCalled();
+        });
+
+        it('still steers a live DELEGATED run whose scope merely includes the verdict tool', async () => {
+            const { svcUnderTest, runs, steering } = makeSteeringSvc({
+                live: {
+                    id: 'run-live-1',
+                    delegationScope: { allowedTools: ['submitTaskReview', 'commentOnTask'] },
+                } as { id: string },
+            });
+            await postMention(svcUnderTest);
+            expect(steering.steer).toHaveBeenCalledTimes(1);
+            expect(runs.createQueued).not.toHaveBeenCalled();
         });
 
         it('falls back to a new run when steering itself throws — a message is never swallowed', async () => {

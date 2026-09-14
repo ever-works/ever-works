@@ -93,6 +93,7 @@ import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
 import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
 import { TaskCiAutoResumeAttempt } from '../entities/task-ci-auto-resume-attempt.entity';
+import { TaskAgentReview } from '../entities/task-agent-review.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
 import { TaskRelation } from '../entities/task-relation.entity';
@@ -262,6 +263,9 @@ export const ENTITIES = [
     // CI feedback + autonomous fix loop (slice AC, EW-806) - the durable
     // auto-resume attempt ledger, which IS the retry budget.
     TaskCiAutoResumeAttempt,
+    // Reviewer agent stage (slice AD, EW-811) - the review ledger, which
+    // IS the review budget and the run -> approver-row binding.
+    TaskAgentReview,
     TaskApprover,
     TaskBlock,
     TaskRelation,

@@ -27,6 +27,7 @@ import {
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
 import { TaskTransitionService, type TransitionOptions } from './task-transition.service';
+import { approverDecisionCountsTowardDone, resolveCompletionGateHead } from './task-agent-review';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
@@ -555,7 +556,18 @@ export class TasksService {
 
         const subtasks: TaskSubtaskRow[] = rows.map((row) => {
             const rowApprovers = approversByTask.get(row.id) ?? [];
-            const approved = rowApprovers.filter((a) => a.approvalState === 'approved').length;
+            // Reviewer agent stage (review of Greptile P1-A on PR #2419): an
+            // AGENT approval counts only for the commit it was rendered
+            // against, as at the `→ done` gate. This used to count
+            // `approvalState` alone, so an agent approval of an old head
+            // showed the gate "cleared" while every `done` was refused. A
+            // display cannot make the gate's live provider read, so it binds
+            // to the head the sub-task row records — the gate is still the
+            // authority. User approvers count exactly as before.
+            const recordedHead = resolveCompletionGateHead(row);
+            const approved = rowApprovers.filter((a) =>
+                approverDecisionCountsTowardDone(a, recordedHead),
+            ).length;
             return {
                 ...row,
                 agentAssigneeIds: agentsByTask.get(row.id) ?? [],

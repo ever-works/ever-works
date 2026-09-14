@@ -5,7 +5,12 @@ import { AgentRepository, WorkRepository } from '@ever-works/agent/database';
 import type { Agent, Task } from '@ever-works/agent/entities';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import { SkillsService } from '@ever-works/agent/skills';
-import { TaskRepository, TaskStatus, TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
+import {
+    agentReviewRunScope,
+    TaskRepository,
+    TaskStatus,
+    TaskWorkspaceService,
+} from '@ever-works/agent/tasks-domain';
 import {
     FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES,
     fleetAgentExecutionProviderSupportsMountGrants,
@@ -215,6 +220,69 @@ describe('FleetAgentTaskPlannerService', () => {
         await expect(build().plan(payload)).resolves.toBeNull();
         expect(tasks.findById).not.toHaveBeenCalled();
         expect(taskWorkspace.describeFleetWorkspace).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — an agent REVIEW
+     * run never becomes a fleet job.
+     *
+     * The findings: `submitTaskReview` exists only in the platform's
+     * in-process tool loop, so a fleet review could never record a verdict
+     * (every one pure spend, its ledger row open forever); its brief rode
+     * `pendingInput` into `# OWNER ANSWER`, presenting the PR author's diff
+     * as the owner's own words, cut to 16 KiB with no marker; and the node
+     * was told to "make your changes here" in a worktree it then pushes.
+     */
+    describe('refuseAgentReviewRun', () => {
+        const REVIEW_SCOPE = { allowedTools: ['submitTaskReview'] };
+
+        it('refuses a run admitted with the review-only scope — in ANY execution mode', async () => {
+            runs.findById.mockResolvedValue({
+                id: 'run-1',
+                userId: USER,
+                delegationScope: REVIEW_SCOPE,
+                pendingInput: ['CODE REVIEW ASSIGNMENT — diff here'],
+            });
+            // Default (command) mode: `plan()` would return null and write
+            // the legacy job. The refusal comes first regardless.
+            await expect(build().refuseAgentReviewRun(payload)).rejects.toThrow(
+                /agent code-review run.*cannot execute on the fleet/,
+            );
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            await expect(build().refuseAgentReviewRun(payload)).rejects.toThrow(
+                FleetAgentTaskPlanError,
+            );
+            expect(runs.findById).toHaveBeenCalledWith('run-1');
+        });
+
+        it('lets an ordinary run through untouched', async () => {
+            runs.findById.mockResolvedValue({ id: 'run-1', userId: USER, delegationScope: null });
+            await expect(build().refuseAgentReviewRun(payload)).resolves.toBeUndefined();
+            // A delegated (non-review) child is not a review run either.
+            runs.findById.mockResolvedValue({
+                id: 'run-1',
+                userId: USER,
+                delegationScope: { allowedTools: ['submitTaskReview', 'commitToRepo'] },
+            });
+            await expect(build().refuseAgentReviewRun(payload)).resolves.toBeUndefined();
+        });
+
+        it('has nothing to check without a pre-created run row', async () => {
+            await expect(
+                build().refuseAgentReviewRun({ ...payload, runId: undefined }),
+            ).resolves.toBeUndefined();
+            expect(runs.findById).not.toHaveBeenCalled();
+        });
+
+        it('FAILS CLOSED when the run row cannot be read, or the repository is unbound', async () => {
+            runs.findById.mockRejectedValue(new Error('db down'));
+            await expect(build().refuseAgentReviewRun(payload)).rejects.toThrow(
+                FleetAgentTaskPlanError,
+            );
+            await expect(build({ runs: false }).refuseAgentReviewRun(payload)).rejects.toThrow(
+                FleetAgentTaskPlanError,
+            );
+        });
     });
 
     /**
@@ -1587,6 +1655,45 @@ describe('FleetAgentTaskPlannerService.refuseUnenforceableDelegationScope (G9)',
         expect(error.message).toContain('allowedTools [readFile]; networkAccess off');
         expect(error.message).toContain('no fleet node can enforce a delegation scope');
         expect(error.message).toContain('platform runtime');
+    });
+
+    it('names an agent review run as a review run, under the same code', async () => {
+        // The review-only scope (slice AD) narrows, so G9 refuses it before
+        // `refuseAgentReviewRun` is asked; the owner must not be told it was
+        // a delegated sub-agent run. The code — which the review ledger's
+        // `refusalCode` and every caller key on — does not change.
+        runs.findById.mockResolvedValue(row({ delegationScope: agentReviewRunScope() }));
+
+        const refusal = await build()
+            .refuseUnenforceableDelegationScope(payload)
+            .then(
+                () => null,
+                (err: unknown) => err,
+            );
+
+        expect(refusal).toBeInstanceOf(FleetDelegationScopeRefusedError);
+        const error = refusal as FleetDelegationScopeRefusedError;
+        expect(error.code).toBe(FLEET_DELEGATION_SCOPE_UNENFORCEABLE);
+        expect(
+            error.message.startsWith(`${FLEET_DELEGATION_SCOPE_UNENFORCEABLE}: run run-1 `),
+        ).toBe(true);
+        expect(error.message).toContain('is an agent review run');
+        expect(error.message).toContain('review runs cannot run on the fleet');
+        expect(error.message).toContain('allowedTools [submitTaskReview]');
+        expect(error.message).toContain('platform runtime');
+        expect(error.message).not.toContain('delegated sub-agent run');
+        expect(error.message).not.toContain('delegate with a narrowed scope');
+    });
+
+    it('keeps the delegated wording for a scope that only resembles a review scope', async () => {
+        // `isAgentReviewRunScope` is an exact match on the one-tool list.
+        runs.findById.mockResolvedValue(
+            row({ delegationScope: { allowedTools: ['submitTaskReview', 'readFile'] } }),
+        );
+
+        await expect(build().refuseUnenforceableDelegationScope(payload)).rejects.toThrow(
+            'is a delegated sub-agent run',
+        );
     });
 
     it.each(['command', 'model-cli'])(
