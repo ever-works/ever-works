@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import {
     AlertTriangle,
     CheckCircle2,
+    CircleDashed,
     CircleHelp,
     Eye,
     Loader2,
@@ -30,7 +31,9 @@ const ICONS: Record<SkillCardState, LucideIcon> = {
     needs_setup: Unplug,
     missing_requirements: AlertTriangle,
     blocked_by_access: ShieldAlert,
-    unknown: CircleHelp,
+    // Not checked yet: a neutral, dashed "pending" mark, never a warning.
+    unknown: CircleDashed,
+    check_failed: CircleHelp,
     disabled: PowerOff,
     needs_review: Eye,
 };
@@ -42,6 +45,7 @@ const TONES: Record<SkillCardState, string> = {
     blocked_by_access: 'border-danger/30 bg-danger/10 text-danger',
     unknown:
         'border-border/60 bg-surface-secondary text-text-secondary dark:border-border-dark/60 dark:bg-surface-secondary-dark dark:text-text-secondary-dark',
+    check_failed: 'border-warning/30 bg-warning/10 text-warning',
     disabled:
         'border-border/60 bg-surface-secondary text-text-secondary dark:border-border-dark/60 dark:bg-surface-secondary-dark dark:text-text-secondary-dark',
     needs_review: 'border-primary/30 bg-primary/10 text-primary',

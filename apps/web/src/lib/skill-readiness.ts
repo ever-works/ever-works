@@ -12,13 +12,20 @@ import { ROUTES } from '@/lib/constants';
  * what a verdict is called or where its fix lives. Client-safe (no I/O).
  */
 
-/** Translation key (under `dashboard.skillsPage.readiness`) for each card state's title. */
+/**
+ * Translation key (under `dashboard.skillsPage.readiness`) for each card state's title.
+ *
+ * `unknown` is a Skill nothing has checked yet — every Skill starts there — so
+ * it reads a neutral "Not checked yet". "Couldn't check" (`unknownTitle`) is
+ * reserved for `check_failed`, a check that actually ran and could not finish.
+ */
 export const SKILL_CARD_STATE_TITLE_KEYS = {
     ready: 'readyTitle',
     needs_setup: 'needsSetupTitle',
     missing_requirements: 'missingTitle',
     blocked_by_access: 'blockedTitle',
-    unknown: 'unknownTitle',
+    unknown: 'notCheckedTitle',
+    check_failed: 'unknownTitle',
     disabled: 'disabledTitle',
     needs_review: 'reviewTitle',
 } as const satisfies Record<SkillCardState, string>;
@@ -29,7 +36,8 @@ export const SKILL_CARD_STATE_BODY_KEYS = {
     needs_setup: 'needsSetupBody',
     missing_requirements: 'missingBody',
     blocked_by_access: 'blockedBody',
-    unknown: 'unknownBody',
+    unknown: 'notCheckedBody',
+    check_failed: 'unknownBody',
     disabled: 'disabledBody',
     needs_review: 'reviewBody',
 } as const satisfies Record<SkillCardState, string>;

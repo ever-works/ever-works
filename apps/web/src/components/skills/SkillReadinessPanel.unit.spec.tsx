@@ -111,6 +111,39 @@ describe('SkillReadinessPanel', () => {
         expect(screen.getByTestId('skill-readiness-checked').textContent).toBe('neverChecked');
     });
 
+    it('reads "Not checked yet" for a Skill nothing has checked, and "Couldn’t check" only for a failed check', () => {
+        const { unmount } = render(
+            <SkillReadinessPanel
+                skill={makeSkill({
+                    readiness: 'unknown',
+                    readinessDetail: null,
+                    readinessCheckedAt: null,
+                })}
+            />,
+        );
+        const badge = screen.getByTestId('skill-readiness-badge');
+        expect(badge.getAttribute('data-state')).toBe('unknown');
+        expect(badge.textContent).toContain('notCheckedTitle');
+        expect(screen.getByText('notCheckedBody')).toBeTruthy();
+        expect(screen.queryByText('unknownTitle')).toBeNull();
+        expect(screen.queryByText('unknownBody')).toBeNull();
+        unmount();
+
+        render(
+            <SkillReadinessPanel
+                skill={makeSkill({
+                    readiness: 'check_failed',
+                    readinessCheckedAt: '2026-09-14T09:54:00.000Z',
+                })}
+            />,
+        );
+        expect(screen.getByTestId('skill-readiness-badge').getAttribute('data-state')).toBe(
+            'check_failed',
+        );
+        expect(screen.getByText('unknownTitle')).toBeTruthy();
+        expect(screen.getByText('unknownBody')).toBeTruthy();
+    });
+
     it('Re-check replaces the verdict in place', async () => {
         refreshSkillReadiness.mockResolvedValue({
             id: 'sk-1',

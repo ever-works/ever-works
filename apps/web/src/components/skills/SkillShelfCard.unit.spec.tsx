@@ -96,6 +96,25 @@ describe('SkillShelfCard', () => {
         expect(screen.getByTestId(actionId)).toBeTruthy();
     });
 
+    it('offers a re-check on a check that failed, titled apart from a Skill not checked yet', () => {
+        const { unmount } = render(
+            <SkillShelfCard
+                skill={makeSkill({ cardState: 'check_failed', readiness: 'check_failed' })}
+            />,
+        );
+        expect(screen.getByTestId('skill-readiness-badge').textContent).toContain('unknownTitle');
+        expect(screen.getByTestId('skill-card-recheck')).toBeTruthy();
+        unmount();
+
+        render(
+            <SkillShelfCard skill={makeSkill({ cardState: 'unknown', readiness: 'unknown' })} />,
+        );
+        expect(screen.getByTestId('skill-readiness-badge').textContent).toContain(
+            'notCheckedTitle',
+        );
+        expect(screen.getByTestId('skill-card-recheck')).toBeTruthy();
+    });
+
     it('the attach action links to the bindings section of the Skill', () => {
         render(
             <SkillShelfCard

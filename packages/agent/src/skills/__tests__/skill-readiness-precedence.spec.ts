@@ -5,6 +5,7 @@ import {
     type SkillRequirement,
 } from '@ever-works/contracts';
 import {
+    carryRunSuppressions,
     decideSkillReadiness,
     declaredToolsOf,
     mcpServerNameOf,
@@ -16,9 +17,9 @@ import {
  * Skills shelf — the precedence ladder (spec FR-21/FR-22) as a table test.
  *
  * Stored verdicts: needs_setup → missing_requirements → blocked_by_access →
- * unknown → ready. The two switches (disabled, needs_review) are layered on
- * top at read time by `deriveSkillCardState`. A failed check can only ever
- * produce `unknown`.
+ * check_failed → ready. The two switches (disabled, needs_review) are layered
+ * on top at read time by `deriveSkillCardState`. A failed check can only ever
+ * produce `check_failed`; `unknown` is left for a Skill nothing has checked.
  */
 const NOW = new Date('2026-09-14T10:00:00.000Z');
 
@@ -73,8 +74,36 @@ describe('decideSkillReadiness — precedence ladder', () => {
             { requirements: [refused, met] },
             'ready',
         ],
-        ['a requirement that could not be checked', { requirements: [unknownRow] }, 'unknown'],
-        ['binding lookup failed', { bindingsFailed: true, boundTargetCount: 0 }, 'unknown'],
+        ['a requirement that could not be checked', { requirements: [unknownRow] }, 'check_failed'],
+        ['binding lookup failed', { bindingsFailed: true, boundTargetCount: 0 }, 'check_failed'],
+        [
+            'a run-time suppression still in force',
+            {
+                requirements: [met],
+                runSuppressions: [
+                    {
+                        agentId: 'a7',
+                        refusedTools: ['git_commit'],
+                        suppressedAt: NOW.toISOString(),
+                    },
+                ],
+            },
+            'blocked_by_access',
+        ],
+        [
+            'missing beats a run-time suppression',
+            {
+                requirements: [missing],
+                runSuppressions: [
+                    {
+                        agentId: 'a7',
+                        refusedTools: ['git_commit'],
+                        suppressedAt: NOW.toISOString(),
+                    },
+                ],
+            },
+            'missing_requirements',
+        ],
         // Precedence between competing findings.
         [
             'needs_setup beats missing',
@@ -100,7 +129,7 @@ describe('decideSkillReadiness — precedence ladder', () => {
         [
             'a failed binding lookup beats everything',
             { bindingsFailed: true, requirements: [missing] },
-            'unknown',
+            'check_failed',
         ],
     ];
 
@@ -117,7 +146,16 @@ describe('decideSkillReadiness — precedence ladder', () => {
         }
     });
 
-    it('layers the two switches over every stored verdict for all seven card states', () => {
+    it('never produces the never-checked state — a finished check always says what it found', () => {
+        const produced = new Set<SkillReadinessState>();
+        for (const over of table.map(([, row]) => row)) {
+            produced.add(decideSkillReadiness(findings(over)).readiness);
+        }
+        expect(produced.has('unknown')).toBe(false);
+        expect(produced.has('check_failed')).toBe(true);
+    });
+
+    it('layers the two switches over every stored verdict for all eight card states', () => {
         const seen = new Set<string>();
         const verdicts: SkillReadinessState[] = [
             'ready',
@@ -125,6 +163,7 @@ describe('decideSkillReadiness — precedence ladder', () => {
             'missing_requirements',
             'blocked_by_access',
             'unknown',
+            'check_failed',
         ];
         for (const readiness of verdicts) {
             for (const disabledAt of [null, NOW]) {
@@ -251,5 +290,84 @@ describe('withRunSuppression', () => {
         );
         expect(next.readiness).toBe('missing_requirements');
         expect(next.detail.boundTargetCount).toBe(1);
+    });
+
+    it('records which agent the block applies to, one suppression per agent', () => {
+        const first = withRunSuppression({ readiness: 'ready' }, ['deploy_work'], 'a1', NOW);
+        const later = new Date(NOW.getTime() + 60_000);
+        const second = withRunSuppression(
+            { readiness: first.readiness, readinessDetail: first.detail },
+            ['deploy_work'],
+            'a2',
+            later,
+        );
+        const again = withRunSuppression(
+            { readiness: second.readiness, readinessDetail: second.detail },
+            ['deploy_work'],
+            'a1',
+            later,
+        );
+        expect(first.detail.blockedForAgentIds).toEqual(['a1']);
+        expect(second.detail.blockedForAgentIds).toEqual(['a2', 'a1']);
+        expect(again.detail.runSuppressions).toEqual([
+            { agentId: 'a1', refusedTools: ['deploy_work'], suppressedAt: later.toISOString() },
+            { agentId: 'a2', refusedTools: ['deploy_work'], suppressedAt: later.toISOString() },
+        ]);
+    });
+});
+
+describe('carryRunSuppressions', () => {
+    const suppression = (agentId: string, at: Date = NOW, refusedTools = ['deploy_work']) => ({
+        agentId,
+        refusedTools,
+        suppressedAt: at.toISOString(),
+    });
+    const check = (over: Partial<Parameters<typeof carryRunSuppressions>[1]> = {}) => ({
+        declaredTools: ['deploy_work'],
+        evaluatedAgentIds: ['a1'],
+        blockedAgentIds: [],
+        now: new Date(NOW.getTime() + 60 * 60 * 1000),
+        ...over,
+    });
+
+    it('keeps a recent suppression for an agent the check did not evaluate', () => {
+        expect(carryRunSuppressions([suppression('a7')], check())).toEqual([suppression('a7')]);
+    });
+
+    it('keeps every recent suppression when no grants were read', () => {
+        expect(
+            carryRunSuppressions([suppression('a1')], check({ evaluatedAgentIds: null })),
+        ).toHaveLength(1);
+    });
+
+    it('keeps an evaluated agent only when the check confirms the block', () => {
+        expect(carryRunSuppressions([suppression('a1')], check())).toEqual([]);
+        expect(
+            carryRunSuppressions([suppression('a1')], check({ blockedAgentIds: ['a1'] })),
+        ).toHaveLength(1);
+    });
+
+    it('drops a suppression past its window for an agent nothing re-checked', () => {
+        const old = new Date(NOW.getTime() - 24 * 60 * 60 * 1000);
+        expect(carryRunSuppressions([suppression('a7', old)], check())).toEqual([]);
+        expect(
+            carryRunSuppressions([{ ...suppression('a7'), suppressedAt: 'garbage' }], check()),
+        ).toEqual([]);
+    });
+
+    it('drops a suppression once the Skill declares a different set of tools', () => {
+        expect(
+            carryRunSuppressions(
+                [suppression('a7')],
+                check({ declaredTools: ['deploy_work', 'git_commit'] }),
+            ),
+        ).toEqual([]);
+        expect(carryRunSuppressions([suppression('a7')], check({ declaredTools: [] }))).toEqual([]);
+    });
+
+    it('tolerates a missing or malformed stored list', () => {
+        expect(carryRunSuppressions(undefined, check())).toEqual([]);
+        expect(carryRunSuppressions(null, check())).toEqual([]);
+        expect(carryRunSuppressions([null as never, { agentId: 3 } as never], check())).toEqual([]);
     });
 });

@@ -7,9 +7,12 @@ import {
 	SKILL_PROVENANCES,
 	SKILL_READINESS_AGENTS_MAX,
 	SKILL_READINESS_FILTERS,
+	SKILL_READINESS_LIST_RECHECK_MAX,
 	SKILL_READINESS_REQUIREMENTS_MAX,
+	SKILL_READINESS_RUN_SUPPRESSION_TTL_MS,
 	SKILL_READINESS_STATES,
 	SKILL_READINESS_SWEEP_BATCH,
+	SKILL_READINESS_SWEEP_CRON,
 	SKILL_READINESS_SWEEP_PER_USER,
 	SKILL_READINESS_TTL_MS,
 	SKILL_SHELF_SORTS,
@@ -34,7 +37,8 @@ describe('skill readiness unions', () => {
 			'needs_setup',
 			'missing_requirements',
 			'blocked_by_access',
-			'unknown'
+			'unknown',
+			'check_failed'
 		]);
 	});
 
@@ -45,6 +49,7 @@ describe('skill readiness unions', () => {
 			'missing_requirements',
 			'blocked_by_access',
 			'unknown',
+			'check_failed',
 			'disabled',
 			'needs_review'
 		]);
@@ -67,13 +72,20 @@ describe('skill readiness unions', () => {
 		expect(SKILL_READINESS_SWEEP_PER_USER).toBe(200);
 		expect(SKILL_READINESS_REQUIREMENTS_MAX).toBe(20);
 		expect(SKILL_READINESS_AGENTS_MAX).toBe(10);
+		expect(SKILL_READINESS_RUN_SUPPRESSION_TTL_MS).toBe(86_400_000);
+		expect(SKILL_READINESS_LIST_RECHECK_MAX).toBe(5);
 		expect(SKILL_CAPTURE_BODY_MAX_CHARS).toBe(16_000);
 		expect(SKILL_CAPTURE_BODY_MIN_CHARS).toBe(200);
 		expect(SKILL_CAPTURE_BUDGET_MS).toBe(90_000);
 	});
 
+	it('pins the sweep cron every scheduler shares', () => {
+		expect(SKILL_READINESS_SWEEP_CRON).toBe('17 * * * *');
+	});
+
 	it('type guards accept only members', () => {
 		expect(isSkillReadinessState('ready')).toBe(true);
+		expect(isSkillReadinessState('check_failed')).toBe(true);
 		expect(isSkillReadinessState('disabled')).toBe(false);
 		expect(isSkillReadinessState(undefined)).toBe(false);
 		expect(isSkillCardState('needs_review')).toBe(true);
@@ -99,6 +111,11 @@ describe('deriveSkillCardState', () => {
 	it('never reports ready for an unrecognised or missing verdict', () => {
 		expect(deriveSkillCardState({ readiness: 'bogus' })).toBe('unknown');
 		expect(deriveSkillCardState({})).toBe('unknown');
+	});
+
+	it('keeps a check that failed apart from one that never ran', () => {
+		expect(deriveSkillCardState({ readiness: 'check_failed' })).toBe('check_failed');
+		expect(deriveSkillCardState({ readiness: 'unknown' })).toBe('unknown');
 	});
 
 	it('accepts an ISO string for disabledAt', () => {

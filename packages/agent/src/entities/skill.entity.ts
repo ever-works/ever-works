@@ -147,7 +147,9 @@ export class Skill {
 
     /**
      * Cached readiness verdict (`SkillReadinessState`). Starts `'unknown'` —
-     * a verdict nobody computed is never reported as ready.
+     * a verdict nobody computed is never reported as ready, and reads "Not
+     * checked yet" rather than as a failure (a check that failed is
+     * `'check_failed'`).
      */
     @Column({ type: 'varchar', length: 24, default: 'unknown' })
     readiness: SkillReadinessState;

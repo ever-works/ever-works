@@ -110,6 +110,7 @@ export function SkillShelfCard({ skill }: { skill: Skill }) {
                 {tr('fixAttach')}
             </Link>
         ) : shownState === 'unknown' ||
+          shownState === 'check_failed' ||
           shownState === 'missing_requirements' ||
           shownState === 'blocked_by_access' ? (
             <button

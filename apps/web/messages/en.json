@@ -2286,6 +2286,8 @@
                 "disabledBody": "Off. Nothing else changed — flip it back on any time.",
                 "unknownTitle": "Couldn’t check",
                 "unknownBody": "We couldn’t work out whether this is ready.",
+                "notCheckedTitle": "Not checked yet",
+                "notCheckedBody": "Nothing has checked this Skill yet. That happens on its own shortly, or you can re-check it now.",
                 "kindTool": "Tool",
                 "kindCredential": "Credential",
                 "kindConnection": "Connection",

@@ -280,6 +280,7 @@ describe('loadSkillsPageData — shelf data', () => {
             missing_requirements: 0,
             blocked_by_access: 0,
             unknown: 0,
+            check_failed: 0,
             disabled: 0,
             needs_review: 0,
         };

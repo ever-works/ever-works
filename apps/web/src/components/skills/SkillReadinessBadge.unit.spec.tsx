@@ -66,6 +66,22 @@ describe('SkillReadinessBadge', () => {
         },
     );
 
+    it('shows a Skill nothing has checked yet neutrally, apart from a check that failed', () => {
+        const { rerender } = render(<SkillReadinessBadge state="unknown" />);
+        let badge = screen.getByTestId('skill-readiness-badge');
+        expect(badge.textContent).toContain('notCheckedTitle');
+        expect(badge.textContent).not.toContain('unknownTitle');
+        expect(badge.className).toContain('text-text-secondary');
+        expect(badge.className).not.toContain('text-warning');
+        expect(badge.className).not.toContain('text-danger');
+
+        rerender(<SkillReadinessBadge state="check_failed" />);
+        badge = screen.getByTestId('skill-readiness-badge');
+        expect(badge.getAttribute('data-state')).toBe('check_failed');
+        expect(badge.textContent).toContain('unknownTitle');
+        expect(badge.className).toContain('text-warning');
+    });
+
     it('renders nothing for ready on a card, and a title when asked', () => {
         const { container, rerender } = render(<SkillReadinessBadge state="ready" />);
         expect(container.firstChild).toBeNull();

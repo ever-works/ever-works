@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { SKILL_READINESS_SWEEP_CRON as SHARED_SKILL_READINESS_SWEEP_CRON } from '@ever-works/contracts';
 
 /**
  * Skills shelf — pins the hourly readiness sweep's schedule and its body:
@@ -123,6 +124,12 @@ describe('skillReadinessSweepTask', () => {
         }
     });
 
+    it('uses the same cron the API fallback schedules on other runtimes', async () => {
+        const { cfg, mod } = await importTask();
+        expect(cfg.cron).toBe(SHARED_SKILL_READINESS_SWEEP_CRON);
+        expect(mod.SKILL_READINESS_SWEEP_CRON).toBe(SHARED_SKILL_READINESS_SWEEP_CRON);
+    });
+
     it('boots TriggerInternalModule, calls sweepStale through the proxy and returns its summary', async () => {
         const { cfg } = await importTask();
         const result = await cfg.run();
@@ -159,6 +166,7 @@ describe('skillReadinessSweepTask', () => {
                 missing_requirements: 0,
                 blocked_by_access: 0,
                 unknown: 0,
+                check_failed: 0,
             },
             durationMs: 1,
         });

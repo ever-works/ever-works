@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     SKILL_READINESS_AGENTS_MAX,
+    SKILL_READINESS_LIST_RECHECK_MAX,
     SKILL_READINESS_SWEEP_BATCH,
     SKILL_READINESS_SWEEP_PER_USER,
     SKILL_READINESS_TTL_MS,
@@ -24,7 +25,12 @@ import { filterSkillsByToolGrants } from '../policy/skill-activation';
 import { decideToolGrant } from '../policy/tool-grant';
 import { requiredCredentialsForTool } from '../policy/tool-credentials';
 import { collectCredentialRefs } from '../policy/credential-interpolation';
-import { decideSkillReadiness, declaredToolsOf, mcpServerNameOf } from './skill-readiness.ladder';
+import {
+    carryRunSuppressions,
+    decideSkillReadiness,
+    declaredToolsOf,
+    mcpServerNameOf,
+} from './skill-readiness.ladder';
 
 export interface SkillReadinessVerdict {
     readiness: SkillReadinessState;
@@ -63,12 +69,15 @@ export interface SkillReadinessSweepSummary {
  * the resolver's answer is reduced to "which keys came back" immediately.
  *
  * Every dependency is `@Optional()`: a runtime without the policy module or
- * the MCP registry still gets a verdict, and a failed check yields `unknown`
- * for that requirement — never `ready`.
+ * the MCP registry still gets a verdict, and a failed check yields
+ * `check_failed` — never `ready`, and never the `unknown` a Skill carries
+ * before anything has checked it.
  */
 @Injectable()
 export class SkillReadinessService {
     private readonly logger = new Logger(SkillReadinessService.name);
+    /** Skill ids a background re-check is already running for (this process). */
+    private readonly recheckInFlight = new Set<string>();
 
     constructor(
         private readonly skills: SkillRepository,
@@ -100,14 +109,24 @@ export class SkillReadinessService {
         const tools = declaredToolsOf(skill.frontmatter?.allowedTools);
         const requirements: SkillRequirement[] = [];
 
-        const { rows: toolRows, blockedForEveryAgent } = await this.checkTools(
-            skill,
-            tools,
-            agents,
-        );
+        const {
+            rows: toolRows,
+            blockedForEveryAgent,
+            blockedAgentIds,
+            grantsReadForAgentIds,
+        } = await this.checkTools(skill, tools, agents);
         requirements.push(...toolRows);
         requirements.push(...(await this.checkConnections(skill.userId, tools)));
         requirements.push(...(await this.checkCredentials(skill, tools, agents)));
+
+        // A suppression a run recorded for an agent this check did not
+        // actually evaluate is kept, not silently cleared (see the ladder).
+        const runSuppressions = carryRunSuppressions(skill.readinessDetail?.runSuppressions, {
+            declaredTools: tools,
+            evaluatedAgentIds: grantsReadForAgentIds,
+            blockedAgentIds,
+            now,
+        });
 
         return decideSkillReadiness({
             bindingsFailed,
@@ -117,6 +136,8 @@ export class SkillReadinessService {
             blockedForEveryAgent,
             evaluatedForAgentIds: agents.map((agent) => agent.id),
             evaluatedAt: now,
+            blockedForAgentIds: blockedAgentIds,
+            runSuppressions,
         });
     }
 
@@ -169,6 +190,7 @@ export class SkillReadinessService {
             missing_requirements: 0,
             blocked_by_access: 0,
             unknown: 0,
+            check_failed: 0,
         };
         const batch = await this.skills.findStaleForReadiness(
             new Date(now.getTime() - SKILL_READINESS_TTL_MS),
@@ -204,6 +226,57 @@ export class SkillReadinessService {
             byState,
             durationMs: Date.now() - started,
         };
+    }
+
+    /**
+     * The shelf list's background top-up: of the Skills a person is looking
+     * at, re-check the ones nothing has checked yet or whose verdict is older
+     * than the sweep's hour, at most `max` per call and one at a time. A Skill
+     * whose re-check is already running in this process is skipped, so
+     * reloading the shelf does not queue the same work twice.
+     *
+     * Works on copies — the rows the caller is about to serialise are never
+     * mutated underneath it. Never throws: every failure is logged and the
+     * hourly sweep picks the Skill up again. Resolves with how many Skills it
+     * re-checked.
+     */
+    async recheckVisible(
+        skills: readonly Skill[],
+        options: { now?: Date; max?: number } = {},
+    ): Promise<number> {
+        const now = options.now ?? new Date();
+        const max = Math.max(0, options.max ?? SKILL_READINESS_LIST_RECHECK_MAX);
+        const staleBefore = now.getTime() - SKILL_READINESS_TTL_MS;
+        const picked: Skill[] = [];
+        for (const skill of skills) {
+            if (picked.length >= max) break;
+            if (!skill?.id || this.recheckInFlight.has(skill.id)) continue;
+            const checkedAt = skill.readinessCheckedAt
+                ? new Date(skill.readinessCheckedAt).getTime()
+                : Number.NaN;
+            const due =
+                skill.readiness === 'unknown' ||
+                !Number.isFinite(checkedAt) ||
+                checkedAt < staleBefore;
+            if (!due) continue;
+            this.recheckInFlight.add(skill.id);
+            picked.push(skill);
+        }
+
+        let rechecked = 0;
+        for (const skill of picked) {
+            try {
+                await this.refreshSkill({ ...skill } as Skill, now);
+                rechecked += 1;
+            } catch (err) {
+                this.logger.warn(
+                    `Readiness: background re-check failed for skill ${skill.id}: ${err}`,
+                );
+            } finally {
+                this.recheckInFlight.delete(skill.id);
+            }
+        }
+        return rechecked;
     }
 
     // ── checks ───────────────────────────────────────────────────
@@ -277,18 +350,36 @@ export class SkillReadinessService {
      * every agent → refused. The Skill-level "blocked" verdict comes from the
      * run path's own `filterSkillsByToolGrants`, so the shelf and the run can
      * never disagree about what suppression means.
+     *
+     * Also reports, per agent, which ones the Skill is blocked for and whose
+     * grants were actually read (`null` when none were), so a run-time
+     * suppression is only ever cleared by a check that covered its agent.
      */
     private async checkTools(
         skill: Skill,
         tools: string[],
         agents: Agent[],
-    ): Promise<{ rows: SkillRequirement[]; blockedForEveryAgent: boolean }> {
-        if (tools.length === 0) return { rows: [], blockedForEveryAgent: false };
+    ): Promise<{
+        rows: SkillRequirement[];
+        blockedForEveryAgent: boolean;
+        blockedAgentIds: string[];
+        grantsReadForAgentIds: string[] | null;
+    }> {
+        if (tools.length === 0) {
+            return {
+                rows: [],
+                blockedForEveryAgent: false,
+                blockedAgentIds: [],
+                grantsReadForAgentIds: null,
+            };
+        }
         if (!this.toolGrants) {
             // No matrix wired — the run path treats every tool as allowed.
             return {
                 rows: tools.map((tool) => ({ kind: 'tool', id: tool, status: 'met' })),
                 blockedForEveryAgent: false,
+                blockedAgentIds: [],
+                grantsReadForAgentIds: null,
             };
         }
 
@@ -319,14 +410,21 @@ export class SkillReadinessService {
                     reason: 'checkFailed',
                 })),
                 blockedForEveryAgent: false,
+                blockedAgentIds: [],
+                grantsReadForAgentIds: null,
             };
         }
 
-        const blockedForEveryAgent = matrices.every(
+        const blockedFor = matrices.map(
             ({ grants }) =>
                 filterSkillsByToolGrants([{ slug: skill.slug, allowedTools: tools }], grants)
                     .suppressed.length === 1,
         );
+        const blockedForEveryAgent = blockedFor.every(Boolean);
+        const blockedAgentIds: string[] = [];
+        matrices.forEach(({ agentId }, index) => {
+            if (agentId && blockedFor[index]) blockedAgentIds.push(agentId);
+        });
 
         const rows: SkillRequirement[] = tools.map((tool) => {
             const refusedFor = matrices.filter(
@@ -345,7 +443,12 @@ export class SkillReadinessService {
             if (agentId) row.fixTarget = { surface: 'access', ref: agentId };
             return row;
         });
-        return { rows, blockedForEveryAgent };
+        return {
+            rows,
+            blockedForEveryAgent,
+            blockedAgentIds,
+            grantsReadForAgentIds: agents.map((agent) => agent.id),
+        };
     }
 
     /** `mcp__<server>__<tool>` names its connection; read that row, never connect. */

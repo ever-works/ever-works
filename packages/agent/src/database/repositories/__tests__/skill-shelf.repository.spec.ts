@@ -197,8 +197,20 @@ describe('Skills shelf repositories (better-sqlite3)', () => {
                 missing_requirements: 1,
                 blocked_by_access: 0,
                 unknown: 1,
+                check_failed: 0,
                 disabled: 1,
                 needs_review: 1,
+            });
+        });
+
+        it('keeps a check that failed apart from a Skill nothing has checked yet', async () => {
+            await makeSkill({ slug: 'fresh' });
+            await makeSkill({ slug: 'failed', readiness: 'check_failed' });
+            expect(await slugs({ readiness: 'unknown' })).toEqual(['fresh']);
+            expect(await slugs({ readiness: 'check_failed' })).toEqual(['failed']);
+            expect(await skills.countsByCardState(USER)).toMatchObject({
+                unknown: 1,
+                check_failed: 1,
             });
         });
 

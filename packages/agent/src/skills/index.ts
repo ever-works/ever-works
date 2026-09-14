@@ -6,6 +6,7 @@ export * from './skill-files.service';
 export * from './skill-invocation';
 export * from './skill-readiness.service';
 export {
+    carryRunSuppressions,
     decideSkillReadiness,
     declaredToolsOf,
     mcpServerNameOf,

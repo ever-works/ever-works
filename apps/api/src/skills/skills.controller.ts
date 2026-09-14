@@ -181,6 +181,7 @@ export class SkillsController {
                 boundTargetCount: bindingCounts.get(row.id) ?? 0,
             }),
         );
+        this.recheckVisibleInBackground(rows);
         return {
             data,
             meta: { total, limit: filter.limit, offset: filter.offset },
@@ -549,6 +550,24 @@ export class SkillsController {
         });
     }
 
+    /**
+     * Skills shelf — top up the verdicts of the Skills on screen that nothing
+     * has checked yet (every Skill starts that way) or whose verdict is stale,
+     * a few per request (`SkillReadinessService.recheckVisible` holds the cap).
+     *
+     * Fire-and-forget, the same posture as a run folding a suppression into
+     * the cached verdict: the list has already been built and never waits on
+     * this, and nothing it does can fail the response. The fresh verdicts show
+     * on the next load; the hourly sweep covers whatever this skips.
+     */
+    private recheckVisibleInBackground(rows: Skill[]): void {
+        const readiness = this.readiness;
+        if (!readiness || rows.length === 0) return;
+        void Promise.resolve()
+            .then(() => readiness.recheckVisible(rows))
+            .catch(() => undefined);
+    }
+
     private async switchResult(
         userId: string,
         result: {
@@ -579,10 +598,14 @@ function readinessDto(skill: Skill): SkillReadinessDto {
     };
 }
 
-/** A re-check that did not land: the switches still win, everything else reads "Couldn't check". */
+/**
+ * A re-check that did not land: the switches still win, everything else reads
+ * "Couldn't check" (`check_failed`) — never the neutral "Not checked yet" a
+ * Skill carries before anything has looked at it.
+ */
 function stateOrUnknown(skill: Skill): SkillCardState {
     const state = deriveSkillCardState(skill);
-    return state === 'disabled' || state === 'needs_review' ? state : 'unknown';
+    return state === 'disabled' || state === 'needs_review' ? state : 'check_failed';
 }
 
 /**

@@ -6,6 +6,7 @@ import {
     ValidationPipe,
 } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { SkillReadinessService } from '@ever-works/agent/skills';
 import { SkillsController, SKILL_READINESS_REFRESH_BUDGET_MS } from './skills.controller';
 import { ListSkillsQueryDto, ListSkillTagsQueryDto } from './dto/skill.dto';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -62,6 +63,7 @@ const COUNTS = {
     missing_requirements: 1,
     blocked_by_access: 0,
     unknown: 0,
+    check_failed: 0,
     disabled: 1,
     needs_review: 0,
 };
@@ -81,14 +83,12 @@ function build(opts: { wired?: boolean } = {}) {
         enable: jest
             .fn()
             .mockResolvedValue({ id: ID, cardState: 'ready', disabledAt: null, changed: true }),
-        disable: jest
-            .fn()
-            .mockResolvedValue({
-                id: ID,
-                cardState: 'disabled',
-                disabledAt: new Date(),
-                changed: true,
-            }),
+        disable: jest.fn().mockResolvedValue({
+            id: ID,
+            cardState: 'disabled',
+            disabledAt: new Date(),
+            changed: true,
+        }),
         create: jest.fn(async (_u: string, input: { frontmatter?: unknown }) => ({
             id: ID,
             frontmatter: input.frontmatter,
@@ -104,6 +104,7 @@ function build(opts: { wired?: boolean } = {}) {
             skill.readinessDetail = null;
             return { readiness: 'ready' };
         }),
+        recheckVisible: jest.fn().mockResolvedValue(0),
     };
     const tags = {
         findBySkillIds: jest.fn().mockResolvedValue(new Map([[ID, ['billing', 'email']]])),
@@ -341,7 +342,7 @@ describe('SkillsController — readiness', () => {
             const out = await pending;
             expect(out).toMatchObject({
                 readiness: 'missing_requirements',
-                cardState: 'unknown',
+                cardState: 'check_failed',
                 stale: true,
             });
         } finally {
@@ -353,8 +354,93 @@ describe('SkillsController — readiness', () => {
         const { controller, readiness } = build();
         readiness.refreshSkill.mockRejectedValue(new Error('db down'));
         const out = await controller.refreshReadiness(AUTH, ID);
-        expect(out.cardState).toBe('unknown');
+        expect(out.cardState).toBe('check_failed');
         expect(out.stale).toBe(true);
+    });
+});
+
+describe('SkillsController — GET /api/skills re-checks unchecked Skills in the background', () => {
+    const flush = async () => {
+        for (let i = 0; i < 10; i += 1) await new Promise((resolve) => setImmediate(resolve));
+    };
+
+    it('hands the visible rows to the bounded re-check without waiting for it', async () => {
+        const { controller, readiness } = build();
+        let finish: () => void = () => undefined;
+        readiness.recheckVisible.mockImplementation(
+            () => new Promise<number>((resolve) => (finish = () => resolve(1))),
+        );
+        const out = await controller.list(AUTH, {} as ListSkillsQueryDto);
+        expect(out.data).toHaveLength(1);
+        await flush();
+        expect(readiness.recheckVisible).toHaveBeenCalledTimes(1);
+        expect(
+            readiness.recheckVisible.mock.calls[0][0].map((row: { id: string }) => row.id),
+        ).toEqual([ID]);
+        finish();
+    });
+
+    it('still returns the list when the re-check rejects or throws', async () => {
+        const { controller, readiness } = build();
+        readiness.recheckVisible.mockRejectedValueOnce(new Error('db down'));
+        await expect(controller.list(AUTH, {} as ListSkillsQueryDto)).resolves.toMatchObject({
+            meta: { total: 1 },
+        });
+        readiness.recheckVisible.mockImplementationOnce(() => {
+            throw new Error('boom');
+        });
+        await expect(controller.list(AUTH, {} as ListSkillsQueryDto)).resolves.toMatchObject({
+            meta: { total: 1 },
+        });
+        await flush();
+    });
+
+    it('still returns the list, unchanged, when evaluating an unchecked Skill throws', async () => {
+        const { skills, service } = build();
+        const neverChecked = skillRow({
+            readiness: 'unknown',
+            readinessDetail: null,
+            readinessCheckedAt: null,
+        });
+        skills.findByUserIdFiltered.mockResolvedValue({ rows: [neverChecked], total: 1 });
+        const failingSkills = {
+            recordReadiness: jest.fn().mockRejectedValue(new Error('write failed')),
+        };
+        const failingBindings = {
+            findBySkillId: jest.fn().mockRejectedValue(new Error('db down')),
+        };
+        const realReadiness = new SkillReadinessService(
+            failingSkills as never,
+            failingBindings as never,
+        );
+        jest.spyOn(
+            (realReadiness as unknown as { logger: { warn: () => void } }).logger,
+            'warn',
+        ).mockImplementation(() => undefined);
+        const recheck = jest.spyOn(realReadiness, 'recheckVisible');
+        const controller = new SkillsController(
+            skills as never,
+            {} as never,
+            service as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            realReadiness,
+        );
+
+        const out = await controller.list(AUTH, {} as ListSkillsQueryDto);
+        expect(out.data[0]).toMatchObject({ id: ID, readiness: 'unknown', cardState: 'unknown' });
+        await flush();
+        expect(recheck).toHaveBeenCalledTimes(1);
+        await expect(recheck.mock.results[0].value).resolves.toBe(0);
+        expect(failingSkills.recordReadiness).toHaveBeenCalledTimes(1);
+        // The row already handed back was never touched by the failed re-check.
+        expect(out.data[0]).toMatchObject({ readiness: 'unknown', readinessCheckedAt: null });
+    });
+
+    it('does nothing when readiness is not wired', async () => {
+        const { controller } = build({ wired: false });
+        await expect(controller.list(AUTH, {} as ListSkillsQueryDto)).resolves.toBeDefined();
     });
 });
 

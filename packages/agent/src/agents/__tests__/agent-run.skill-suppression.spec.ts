@@ -159,6 +159,21 @@ describe('AgentRunService — skill suppression reaches the shelf', () => {
         expect(result.prompt?.systemMessage).not.toContain('# deployer');
     });
 
+    it('records which agent the block applies to, so the next sweep cannot silently undo it', async () => {
+        await makeSvc().execute(context as never);
+        await flush();
+
+        const [, , verdict] = skillRepo.recordReadiness.mock.calls[0];
+        expect(verdict.readinessDetail.blockedForAgentIds).toEqual(['a1']);
+        expect(verdict.readinessDetail.runSuppressions).toEqual([
+            {
+                agentId: 'a1',
+                refusedTools: ['deploy_work'],
+                suppressedAt: verdict.readinessCheckedAt.toISOString(),
+            },
+        ]);
+    });
+
     it('a rejecting readiness writer does not fail the run, and the WARN is still appended', async () => {
         skillRepo.recordReadiness.mockRejectedValue(new Error('db down'));
         const result = await makeSvc().execute(context as never);

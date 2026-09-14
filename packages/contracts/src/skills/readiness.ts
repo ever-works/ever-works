@@ -15,13 +15,20 @@
  * Pure data + pure functions only — no I/O, no framework imports.
  */
 
-/** The verdict persisted on a Skill. */
+/**
+ * The verdict persisted on a Skill.
+ *
+ * `unknown` means nothing has checked the Skill yet (every Skill starts there);
+ * `check_failed` means a check ran and could not finish. The two are kept apart
+ * so a Skill nobody has looked at never reads as a failure.
+ */
 export const SKILL_READINESS_STATES = [
 	'ready',
 	'needs_setup',
 	'missing_requirements',
 	'blocked_by_access',
-	'unknown'
+	'unknown',
+	'check_failed'
 ] as const;
 
 export type SkillReadinessState = (typeof SKILL_READINESS_STATES)[number];
@@ -76,6 +83,19 @@ export interface SkillRequirement {
 	fixTarget?: { surface: SkillRequirementFixSurface; ref: string };
 }
 
+/**
+ * A run dropped the Skill because every tool it declares was refused for that
+ * run's agent. Kept on the cached verdict so a later check that did not cover
+ * the agent cannot silently undo it.
+ */
+export interface SkillRunSuppression {
+	agentId: string;
+	/** Tool names only. */
+	refusedTools: string[];
+	/** ISO timestamp of the run that observed it. */
+	suppressedAt: string;
+}
+
 export interface SkillReadinessDetail {
 	/** At most {@link SKILL_READINESS_REQUIREMENTS_MAX} rows; `truncated` says more existed. */
 	requirements: SkillRequirement[];
@@ -90,6 +110,13 @@ export interface SkillReadinessDetail {
 	evaluatedForAgentIds: string[];
 	/** ISO timestamp. */
 	evaluatedAt: string;
+	/**
+	 * The agents a `blocked_by_access` applies to: every tool the Skill declares
+	 * is refused for each of them. Absent when no agent is blocked.
+	 */
+	blockedForAgentIds?: string[];
+	/** Run-time suppressions still in force (at most {@link SKILL_READINESS_AGENTS_MAX}). */
+	runSuppressions?: SkillRunSuppression[];
 }
 
 /** Where a Skill came from. Derived from stored columns — never persisted. */
@@ -116,6 +143,12 @@ export const SKILL_READINESS_SWEEP_BATCH = 500;
 export const SKILL_READINESS_SWEEP_PER_USER = 200;
 export const SKILL_READINESS_REQUIREMENTS_MAX = 20;
 export const SKILL_READINESS_AGENTS_MAX = 10;
+/** Cron of the hourly readiness sweep — shared by every scheduler that fires it. */
+export const SKILL_READINESS_SWEEP_CRON = '17 * * * *';
+/** How long a run-time suppression holds for an agent that no later check covered. */
+export const SKILL_READINESS_RUN_SUPPRESSION_TTL_MS = 86_400_000;
+/** How many unchecked or stale Skills one shelf list request may re-check in the background. */
+export const SKILL_READINESS_LIST_RECHECK_MAX = 5;
 export const SKILL_CAPTURE_BODY_MAX_CHARS = 16_000;
 export const SKILL_CAPTURE_BODY_MIN_CHARS = 200;
 export const SKILL_CAPTURE_BUDGET_MS = 90_000;

@@ -20,9 +20,9 @@ import {
  * `disabledAt` is the workspace-level off switch (NULL = on). `readiness`
  * lands `NOT NULL DEFAULT 'unknown'` and is deliberately NOT backfilled to
  * `'ready'`: claiming a Skill works before anything checked it is the exact
- * failure the shelf exists to remove, so every existing Skill reads
- * "Couldn't check" until the hourly sweep or its next write computes a real
- * verdict. `readinessDetail` holds identifiers only (tool names, credential
+ * failure the shelf exists to remove, so every existing Skill reads "Not
+ * checked yet" (a neutral state, distinct from a check that failed) until the
+ * hourly sweep, a shelf visit or its next write computes a real verdict. `readinessDetail` holds identifiers only (tool names, credential
  * KEYS, connection names), never a value. `reviewState` and
  * `capturedFromRunId` are the landing place for a Skill drafted from a run;
  * the partial unique index makes "one draft per run" a database guarantee.
