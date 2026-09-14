@@ -13,19 +13,6 @@ export interface McpCredentialTransportScope {
 }
 
 /**
- * Thrown when the organization setting cannot be read. The caller refuses to
- * send credentials over plain http rather than guess the setting is off: a
- * safety control an organization turned on must never be skipped because a
- * lookup failed.
- */
-export class McpCredentialTransportPolicyUnavailableError extends Error {
-    constructor() {
-        super('Organization connection settings could not be read.');
-        this.name = 'McpCredentialTransportPolicyUnavailableError';
-    }
-}
-
-/**
  * AW-15 — reads the organization setting "Require https for connection
  * credentials" (`organizations.connection_policy`) for one MCP connection.
  *
@@ -40,8 +27,13 @@ export class McpCredentialTransportPolicyUnavailableError extends Error {
  *     setting applies when ANY organization in the tenant has it on.
  *   - No organization repository bound in this runtime ⇒ no organization can
  *     have the setting, so it is off.
- *   - A lookup that fails throws `McpCredentialTransportPolicyUnavailableError`
- *     and the caller refuses; it never assumes "off".
+ *   - The setting defaults to OFF, so a value that cannot be read (a failed
+ *     query, a missing organization row, a stored value that does not parse)
+ *     resolves to that default: a literal-header http connection keeps
+ *     working exactly as it did before the setting existed. A failed read is
+ *     logged with the organization (or tenant) id — never a header value or
+ *     a URL. `{{cred.key}}` references are refused over plain http before
+ *     this service is ever asked, so this default never reaches them.
  */
 @Injectable()
 export class McpCredentialTransportPolicyService {
@@ -54,13 +46,20 @@ export class McpCredentialTransportPolicyService {
 
     async requiresHttpsForCredentials(scope: McpCredentialTransportScope): Promise<boolean> {
         if (!this.organizations) return false;
-        try {
-            if (scope.organizationId) {
-                const organization = await this.organizations.findById(scope.organizationId);
-                return organizationRequiresHttpsForCredentials(organization?.connectionPolicy);
-            }
 
-            let tenantId = scope.tenantId ?? null;
+        if (scope.organizationId) {
+            try {
+                const organization = await this.organizations.findById(scope.organizationId);
+                // A missing row or an unparseable stored value is "not on".
+                return organizationRequiresHttpsForCredentials(organization?.connectionPolicy);
+            } catch (err) {
+                this.logReadFailure(`organization ${scope.organizationId}`, err);
+                return false;
+            }
+        }
+
+        let tenantId = scope.tenantId ?? null;
+        try {
             if (!tenantId && this.users) {
                 tenantId = (await this.users.findById(scope.userId))?.tenantId ?? null;
             }
@@ -70,14 +69,21 @@ export class McpCredentialTransportPolicyService {
                 organizationRequiresHttpsForCredentials(organization.connectionPolicy),
             );
         } catch (err) {
-            // Only the error class: a driver message is not trusted to be free
-            // of connection details.
-            this.logger.warn(
-                `Could not read the organization connection setting (${
-                    err instanceof Error ? err.name : 'unknown error'
-                }); refusing credentials over plain http.`,
+            this.logReadFailure(
+                tenantId ? `organizations of tenant ${tenantId}` : `tenant of user ${scope.userId}`,
+                err,
             );
-            throw new McpCredentialTransportPolicyUnavailableError();
+            return false;
         }
+    }
+
+    private logReadFailure(subject: string, err: unknown): void {
+        // Ids and the error class only: a driver message is not trusted to be
+        // free of connection details.
+        this.logger.warn(
+            `Could not read "Require https for connection credentials" for ${subject} (${
+                err instanceof Error ? err.name : 'unknown error'
+            }); using the default (off).`,
+        );
     }
 }

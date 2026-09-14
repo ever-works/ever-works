@@ -1,12 +1,10 @@
-import {
-    McpCredentialTransportPolicyService,
-    McpCredentialTransportPolicyUnavailableError,
-} from '../mcp-credential-transport-policy.service';
+import { McpCredentialTransportPolicyService } from '../mcp-credential-transport-policy.service';
 
 /**
  * AW-15 — "Require https for connection credentials" lookup. Off unless an
  * organization turned it on; a tenant-wide connection follows the strictest
- * organization in its tenant; a failed lookup is never read as "off".
+ * organization in its tenant; a value that cannot be read resolves to the
+ * default (off) and is logged with the id.
  */
 function make(options: {
     orgs?: Record<string, { tenantId: string; connectionPolicy?: unknown }>;
@@ -89,18 +87,43 @@ describe('McpCredentialTransportPolicyService', () => {
         ).resolves.toBe(false);
     });
 
-    it('a failed lookup throws instead of assuming the setting is off, and logs no driver message', async () => {
+    it('a failed read resolves to the default (off) and logs the organization id only', async () => {
         const { service } = make({
             failWith: new Error('driver said db-host-7c1e refused the connection'),
         });
         const warn = jest
             .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
             .mockImplementation(() => undefined);
+
         await expect(
             service.requiresHttpsForCredentials({ userId: 'u1', organizationId: 'o1' }),
-        ).rejects.toBeInstanceOf(McpCredentialTransportPolicyUnavailableError);
+        ).resolves.toBe(false);
+        await expect(
+            service.requiresHttpsForCredentials({ userId: 'u1', tenantId: 't1' }),
+        ).resolves.toBe(false);
+
+        expect(warn).toHaveBeenCalledTimes(2);
+        expect(String(warn.mock.calls[0][0])).toContain('organization o1');
+        expect(String(warn.mock.calls[1][0])).toContain('tenant t1');
         for (const call of warn.mock.calls) {
             expect(String(call[0])).not.toContain('db-host-7c1e');
+        }
+    });
+
+    it('a missing organization row or a stored value that does not parse is off', async () => {
+        const { service } = make({
+            orgs: {
+                junk: { tenantId: 't1', connectionPolicy: 'not-json' },
+                wrongType: {
+                    tenantId: 't1',
+                    connectionPolicy: { requireHttpsForCredentials: 'yes' },
+                },
+            },
+        });
+        for (const organizationId of ['missing', 'junk', 'wrongType']) {
+            await expect(
+                service.requiresHttpsForCredentials({ userId: 'u1', organizationId }),
+            ).resolves.toBe(false);
         }
     });
 });

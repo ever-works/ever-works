@@ -282,8 +282,8 @@ export class McpClientService {
      *     `{{cred.key}}` reference aimed at a plain-http endpoint is refused.
      *     LITERAL values over plain http are sent exactly as before and the
      *     attempt is marked `insecure_transport` — unless the connection's
-     *     organization requires https, which refuses them (and so does a
-     *     setting that cannot be read).
+     *     organization requires https, which refuses them. A setting that
+     *     cannot be read resolves to its default (off).
      *  2. No `{{cred.key}}` reference ⇒ the stored headers are used exactly
      *     as today.
      *  3. Otherwise the keys are resolved for the connection's owner, a
@@ -347,8 +347,10 @@ export class McpClientService {
 
     /**
      * Literal credentials over plain http: refused only when the connection's
-     * organization turned on "Require https for connection credentials", or
-     * when that setting cannot be read. Otherwise allowed, as before.
+     * organization turned on "Require https for connection credentials".
+     * Otherwise allowed, as before. The setting defaults to off, so a read
+     * that fails resolves to off: a working connection never stops working
+     * because a lookup failed.
      */
     private async assertOrganizationAllowsPlainHttp(
         connection: McpServerConnection,
@@ -361,8 +363,15 @@ export class McpClientService {
                 organizationId: connection.organizationId ?? null,
                 tenantId: connection.tenantId ?? null,
             });
-        } catch {
-            throw new McpInsecureCredentialTransportError('policy_unavailable');
+        } catch (err) {
+            // The policy service already resolves read failures to "off"; this
+            // only guards a differently bound implementation. Ids only.
+            this.logger.warn(
+                `Could not read "Require https for connection credentials" for organization ${
+                    connection.organizationId ?? `(tenant-wide, connection ${connection.id})`
+                } (${err instanceof Error ? err.name : 'unknown error'}); using the default (off).`,
+            );
+            return;
         }
         if (strict) throw new McpInsecureCredentialTransportError('organization_policy');
     }

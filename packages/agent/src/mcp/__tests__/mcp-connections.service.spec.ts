@@ -1,9 +1,4 @@
-import {
-    BadRequestException,
-    ConflictException,
-    NotFoundException,
-    ServiceUnavailableException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { McpConnectionsService } from '../mcp-connections.service';
 import type { McpServerConnection } from '../../entities/mcp-server-connection.entity';
 
@@ -316,7 +311,30 @@ describe('McpConnectionsService', () => {
             });
         });
 
-        it('create refuses literal http when the organization setting cannot be read', async () => {
+        it('create accepts literal http when the organization setting cannot be read (default off)', async () => {
+            const policy = {
+                requiresHttpsForCredentials: jest.fn().mockRejectedValue(new Error('down')),
+            };
+            const { service, connectionsRepo } = makeHarness([], policy);
+            jest.spyOn(
+                (service as unknown as { logger: { warn: jest.Mock } }).logger,
+                'warn',
+            ).mockImplementation(() => undefined);
+            const view = await service.create(
+                'u1',
+                {
+                    name: 'docs',
+                    url: 'http://mcp.example.com/mcp',
+                    transport: 'sse',
+                    authHeaders: { 'X-Api-Key': 'literal-key' },
+                },
+                { organizationId: 'o1' },
+            );
+            expect(connectionsRepo.create).toHaveBeenCalled();
+            expect(view.insecureCredentialTransport).toBe(true);
+        });
+
+        it('create still refuses a credential reference over http when the setting cannot be read', async () => {
             const policy = {
                 requiresHttpsForCredentials: jest.fn().mockRejectedValue(new Error('down')),
             };
@@ -326,9 +344,9 @@ describe('McpConnectionsService', () => {
                     name: 'docs',
                     url: 'http://mcp.example.com/mcp',
                     transport: 'sse',
-                    authHeaders: { 'X-Api-Key': 'literal-key' },
+                    authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
                 }),
-            ).rejects.toThrow(ServiceUnavailableException);
+            ).rejects.toThrow(BadRequestException);
             expect(connectionsRepo.create).not.toHaveBeenCalled();
         });
 

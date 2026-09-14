@@ -58,22 +58,12 @@ export const MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE = 'Credentials require an htt
  */
 export const MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE = `${MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE} (organization setting "${REQUIRE_HTTPS_FOR_CREDENTIALS_SETTING_LABEL}" is on)`;
 
-/**
- * The refusal when that organization setting could not be read. Credentials
- * are not sent over plain http on a guess that the setting is off.
- */
-export const MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE = `${MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE} (organization setting "${REQUIRE_HTTPS_FOR_CREDENTIALS_SETTING_LABEL}" could not be checked)`;
-
 /** Why a credential transport was refused. */
-export type McpCredentialTransportRefusal =
-    | 'credential_references'
-    | 'organization_policy'
-    | 'policy_unavailable';
+export type McpCredentialTransportRefusal = 'credential_references' | 'organization_policy';
 
 const TRANSPORT_REFUSAL_MESSAGES: Record<McpCredentialTransportRefusal, string> = {
     credential_references: MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
     organization_policy: MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
-    policy_unavailable: MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE,
 };
 
 /** Prefix of the stored message for an unresolvable reference. Keys only, never values. */
@@ -96,9 +86,8 @@ export class McpHeaderCredentialMissingError extends Error {
  * Thrown BEFORE the SDK factory is called, and before any credential is looked
  * up, when a connection must not send its headers to a non-`https:` endpoint:
  * a `{{cred.key}}` reference (a row edited out of band), or any credential
- * while the organization requires https (`reason: 'organization_policy'`) or
- * while that setting cannot be read (`reason: 'policy_unavailable'`). The
- * message is fixed and value-free.
+ * while the organization requires https (`reason: 'organization_policy'`).
+ * The message is fixed and value-free.
  */
 export class McpInsecureCredentialTransportError extends Error {
     readonly code = MCP_HTTPS_REQUIRED_CODE;

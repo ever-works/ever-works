@@ -5,7 +5,6 @@ import {
     Logger,
     NotFoundException,
     Optional,
-    ServiceUnavailableException,
 } from '@nestjs/common';
 import {
     isConnectionHealth,
@@ -27,7 +26,6 @@ import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 import { McpClientService } from './mcp-client.service';
 import {
     MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
-    MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE,
     MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
     mcpCredentialTransport,
 } from './mcp-header-credentials';
@@ -415,12 +413,16 @@ export class McpConnectionsService {
         }
         if (verdict.verdict !== 'insecure' || !this.transportPolicy) return;
 
-        let strict: boolean;
+        // The setting defaults to off; a read that fails resolves to that
+        // default, so an unreadable setting never blocks what worked before.
+        let strict = false;
         try {
             strict = await this.transportPolicy.requiresHttpsForCredentials(scope);
-        } catch {
-            throw new ServiceUnavailableException(
-                `${MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE}. Try again, or use an https:// URL.`,
+        } catch (err) {
+            this.logger.warn(
+                `Could not read "Require https for connection credentials" for organization ${
+                    scope.organizationId ?? '(tenant-wide)'
+                } (${err instanceof Error ? err.name : 'unknown error'}); using the default (off).`,
             );
         }
         if (strict) {

@@ -7,6 +7,7 @@ import {
 import type { McpClientFactory, McpSdkClient } from '../mcp-sdk';
 import type { McpServerConnection } from '../../entities/mcp-server-connection.entity';
 import type { McpServerConnectionRepository } from '../../database/repositories/mcp-server-connection.repository';
+import { McpCredentialTransportPolicyService } from '../mcp-credential-transport-policy.service';
 
 function makeConnection(over: Partial<McpServerConnection> = {}): McpServerConnection {
     return {
@@ -578,22 +579,112 @@ describe('McpClientService', () => {
             });
         });
 
-        it('an unreadable organization setting refuses literal http rather than guessing it is off', async () => {
-            const factory: McpClientFactory = { connect: jest.fn() };
-            const policy = {
-                requiresHttpsForCredentials: jest.fn().mockRejectedValue(new Error('db down')),
-            };
-            const service = new McpClientService(
-                makeRepo() as never,
-                factory,
-                undefined,
-                policy as never,
-            );
+        describe('the organization setting cannot be read (it defaults to off)', () => {
+            /** The real policy service over an organization store whose every read throws. */
+            function unreadablePolicy() {
+                const organizations = {
+                    findById: jest.fn().mockRejectedValue(new Error('driver: db-host-7c1e down')),
+                    findByTenantId: jest
+                        .fn()
+                        .mockRejectedValue(new Error('driver: db-host-7c1e down')),
+                };
+                const policy = new McpCredentialTransportPolicyService(organizations as never);
+                const warn = jest
+                    .spyOn((policy as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                    .mockImplementation(() => undefined);
+                return { policy, organizations, warn };
+            }
 
-            await expect(
-                service.listTools(makeConnection({ url: 'http://mcp.example.com/mcp' })),
-            ).rejects.toThrow(/could not be checked/);
-            expect(factory.connect).not.toHaveBeenCalled();
+            it('a literal-header http connection still connects and is marked insecure_transport', async () => {
+                const client = makeClient();
+                const repo = makeRepo();
+                const factory: McpClientFactory = {
+                    connect: jest.fn().mockResolvedValue(client),
+                };
+                const { policy, organizations, warn } = unreadablePolicy();
+                const service = new McpClientService(repo as never, factory, undefined, policy);
+
+                const tools = await service.listTools(
+                    makeConnection({ url: 'http://mcp.example.com/mcp', organizationId: 'org-9' }),
+                );
+
+                expect(tools).toHaveLength(1);
+                expect(organizations.findById).toHaveBeenCalledWith('org-9');
+                expect(factory.connect).toHaveBeenCalledWith({
+                    url: 'http://mcp.example.com/mcp',
+                    transport: 'streamable-http',
+                    headers: { Authorization: 'Bearer secret-token-value' },
+                });
+                expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                    ok: true,
+                    warning: 'insecure_transport',
+                });
+                // Logged with the organization id; never a header value, a URL
+                // or the driver's own message.
+                expect(warn).toHaveBeenCalledTimes(1);
+                const line = String(warn.mock.calls[0][0]);
+                expect(line).toContain('org-9');
+                expect(line).not.toContain('secret-token-value');
+                expect(line).not.toContain('mcp.example.com');
+                expect(line).not.toContain('db-host-7c1e');
+            });
+
+            it('a vault-reference http connection is still refused', async () => {
+                const factory: McpClientFactory = { connect: jest.fn() };
+                const resolver = { resolve: jest.fn() };
+                const { policy } = unreadablePolicy();
+                const service = new McpClientService(
+                    makeRepo() as never,
+                    factory,
+                    resolver,
+                    policy,
+                );
+
+                await expect(
+                    service.listTools(
+                        makeConnection({
+                            url: 'http://mcp.example.com/mcp',
+                            organizationId: 'org-9',
+                            authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+                        }),
+                    ),
+                ).rejects.toThrow('Credentials require an https:// endpoint');
+                expect(factory.connect).not.toHaveBeenCalled();
+                expect(resolver.resolve).not.toHaveBeenCalled();
+            });
+
+            it('a policy binding that throws is also read as off, never as a refusal', async () => {
+                const client = makeClient();
+                const repo = makeRepo();
+                const factory: McpClientFactory = {
+                    connect: jest.fn().mockResolvedValue(client),
+                };
+                const policy = {
+                    requiresHttpsForCredentials: jest.fn().mockRejectedValue(new Error('db down')),
+                };
+                const service = new McpClientService(
+                    repo as never,
+                    factory,
+                    undefined,
+                    policy as never,
+                );
+                jest.spyOn(
+                    (service as unknown as { logger: { warn: jest.Mock } }).logger,
+                    'warn',
+                ).mockImplementation(() => undefined);
+
+                const result = await service.callTool(
+                    makeConnection({ url: 'http://mcp.example.com/mcp' }),
+                    'search_issues',
+                    {},
+                );
+
+                expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+                expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                    ok: true,
+                    warning: 'insecure_transport',
+                });
+            });
         });
 
         it('https rows never consult the organization setting and stay plainly healthy', async () => {

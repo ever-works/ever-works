@@ -8,7 +8,6 @@ import {
     headersCarryCredentials,
     isHttpsUrl,
     resolveHeaderCredentials,
-    MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE,
     MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
     mcpCredentialTransport,
 } from '../mcp-header-credentials';
@@ -206,10 +205,7 @@ describe('mcp-header-credentials', () => {
             expect(err.message).toBe(MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE);
             expect(err.message).toContain('Require https for connection credentials');
             expect(err.message.startsWith(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE)).toBe(true);
-
-            const unavailable = new McpInsecureCredentialTransportError('policy_unavailable');
-            expect(unavailable.message).toBe(MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE);
-            expect(unavailable.message).toContain('Require https for connection credentials');
+            expect(err.reason).toBe('organization_policy');
         });
     });
 });

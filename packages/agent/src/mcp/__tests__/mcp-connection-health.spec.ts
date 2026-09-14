@@ -1,7 +1,6 @@
 import { MCP_ERROR_MESSAGES, mcpHealthErrorCode } from '../mcp-connection-health';
 import {
     MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
-    MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE,
     MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
     formatMissingCredentialMessage,
 } from '../mcp-header-credentials';
@@ -16,9 +15,6 @@ describe('mcpHealthErrorCode', () => {
         // never the insecure_transport warning.
         expect(mcpHealthErrorCode(MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE)).toBe('https_required');
         expect(mcpHealthErrorCode(MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE)).toBe('https_required');
-        expect(mcpHealthErrorCode(MCP_ORGANIZATION_POLICY_UNAVAILABLE_MESSAGE)).toBe(
-            'https_required',
-        );
         expect(mcpHealthErrorCode(MCP_ERROR_MESSAGES.unauthorized)).toBe('credential_rejected');
         expect(mcpHealthErrorCode(MCP_ERROR_MESSAGES.forbidden)).toBe('credential_rejected');
         expect(mcpHealthErrorCode(MCP_ERROR_MESSAGES.notFound)).toBe('not_found');
