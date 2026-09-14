@@ -64,7 +64,7 @@ describe('MemoryFactsModule', () => {
     it('resolves every optional collaborator by its real token', async () => {
         const dispatcher = { dispatchMemoryFactEmbed: jest.fn().mockResolvedValue('run-1') };
         const activity = { log: jest.fn().mockResolvedValue({}) };
-        const repo = {
+        const repo: Record<string, jest.Mock> = {
             countByStatus: jest
                 .fn()
                 .mockResolvedValue({ active: 0, proposed: 0, forgotten: 0, pinned: 0 }),
@@ -81,6 +81,7 @@ describe('MemoryFactsModule', () => {
                 updatedAt: new Date(),
             }),
         };
+        repo.withWorkspaceWriteLock = jest.fn(async (_userId, _ownership, fn) => fn(repo));
 
         const moduleRef = await Test.createTestingModule({
             providers: [

@@ -3,7 +3,10 @@ import {
     MEMORY_FACT_FORGET_RETENTION_DAYS,
     MEMORY_FACT_SWEEP_BATCH_MAX,
 } from '@ever-works/contracts';
-import { MemoryFactRepository } from '../database/repositories/memory-fact.repository';
+import {
+    MemoryFactRepository,
+    type MemoryFactEmbeddingScope,
+} from '../database/repositories/memory-fact.repository';
 import { MemoryFactEmbedService } from './memory-fact-embed.service';
 import { MemoryFactVectorIndexService } from './memory-fact-vector-index.service';
 
@@ -39,11 +42,17 @@ const PURGE_BATCHES_MAX = 20;
  *     automatically once a provider appears" holds.
  *  3. **Re-embed** live facts whose coordinates have drifted: a different
  *     embedding model or dimension, or a different vector store than the
- *     one facts would be written to today.
+ *     one facts would be written to today. The AI provider is chosen per
+ *     owner and the vector store per workspace namespace, so drift is
+ *     decided per provider-selection scope `(userId, organizationId)`, each
+ *     against the coordinates learned in that scope — never one scope's
+ *     facts against another's model.
  *
  * Steps 2 and 3 share one budget of {@link MEMORY_FACT_SWEEP_BATCH_MAX}
- * facts per pass, and stop at the first "no provider / no store" answer —
- * one clear reason in the log beats five hundred identical failures.
+ * embeddings per pass (a scope's coordinate probe included). The backfill
+ * stops at the first "no provider / no store" answer — one clear reason in
+ * the log beats five hundred identical failures; the re-embed step skips
+ * just the scope that answered it.
  *
  * Context-file revisions have their own retention rule; pruning them joins
  * this pass once that table exists.
@@ -65,11 +74,10 @@ export class MemoryFactSweepService {
         let embedded = 0;
         let reembedded = 0;
         let embedStoppedReason: string | null = null;
-        let current: {
-            embeddingModel: string;
-            embeddingDims: number;
-            vectorStoreId: string;
-        } | null = null;
+        // Coordinates learned per provider-selection scope. The AI provider is
+        // resolved per owner and the vector store per workspace namespace, so
+        // what one scope embeds with says nothing about another's.
+        const learned = new Map<string, EmbeddingCoordinates>();
 
         const backlog = await this.facts.dueForEmbed(budget);
         for (const fact of backlog) {
@@ -77,11 +85,11 @@ export class MemoryFactSweepService {
             budget--;
             if (outcome.status === 'embedded') {
                 embedded++;
-                current = {
+                learned.set(embeddingScopeKey(fact), {
                     embeddingModel: outcome.embeddingModel,
                     embeddingDims: outcome.embeddingDims,
                     vectorStoreId: outcome.vectorStoreId,
-                };
+                });
             } else if (outcome.status === 'unavailable') {
                 embedStoppedReason = outcome.reason;
                 break;
@@ -89,18 +97,31 @@ export class MemoryFactSweepService {
         }
 
         if (!embedStoppedReason && budget > 0) {
-            if (!current) {
-                const learned = await this.learnCurrentCoordinates();
-                if (learned.ok) {
-                    current = learned.coordinates;
-                } else {
-                    embedStoppedReason = learned.reason;
+            // Drift is decided inside each scope, against that scope's own
+            // coordinates. Scopes whose oldest embed is oldest go first, so a
+            // pass that spends its budget early starts elsewhere next night.
+            const scopes = await this.facts.embeddedScopes(budget);
+            for (const scope of scopes) {
+                if (budget <= 0) break;
+                const key = embeddingScopeKey(scope);
+                let current = learned.get(key) ?? null;
+                if (!current) {
+                    const probe = await this.learnCurrentCoordinates(scope);
+                    if (probe.spent) budget--;
+                    if (!probe.ok) {
+                        // One scope without a provider or store says nothing
+                        // about the next one: note why, and move on.
+                        embedStoppedReason = probe.reason ?? embedStoppedReason;
+                        continue;
+                    }
+                    current = probe.coordinates;
+                    learned.set(key, current);
                 }
-            }
-            if (current) {
-                const drifted = await this.facts.dueForReembed(current, budget);
+                if (budget <= 0) break;
+                const drifted = await this.facts.dueForReembed(current, budget, scope);
                 for (const fact of drifted) {
                     const outcome = await this.embedder.embedLoaded(fact, { force: true });
+                    budget--;
                     if (outcome.status === 'embedded') {
                         reembedded++;
                     } else if (outcome.status === 'unavailable') {
@@ -139,23 +160,29 @@ export class MemoryFactSweepService {
     }
 
     /**
-     * When the backfill embedded nothing, the current model is unknown
-     * without asking the provider. Embed ONE live fact (it will be
-     * re-stamped with the current coordinates either way) to learn it —
-     * one small embedding a night, instead of never noticing a model change.
+     * When the backfill embedded nothing in a scope, that scope's current
+     * model is unknown without asking its provider. Embed ONE of its live
+     * embedded facts (it is re-stamped with the current coordinates either
+     * way, which is why the embedding counts against the pass budget) to
+     * learn it — instead of never noticing a model change.
      */
-    private async learnCurrentCoordinates(): Promise<{
+    private async learnCurrentCoordinates(scope: MemoryFactEmbeddingScope): Promise<{
         ok: boolean;
-        coordinates?: { embeddingModel: string; embeddingDims: number; vectorStoreId: string };
+        /** Whether an embedding was requested — it counts against the budget. */
+        spent: boolean;
+        coordinates?: EmbeddingCoordinates;
         reason?: string | null;
     }> {
-        const probe = await this.facts.findProbeCandidate();
-        if (!probe) return { ok: false, reason: null };
+        const probe = await this.facts.findProbeCandidate(scope);
+        if (!probe) return { ok: false, spent: false, reason: null };
         const outcome = await this.embedder.embedLoaded(probe, { force: true });
-        if (outcome.status === 'unavailable') return { ok: false, reason: outcome.reason };
-        if (outcome.status !== 'embedded') return { ok: false, reason: null };
+        if (outcome.status === 'unavailable') {
+            return { ok: false, spent: true, reason: outcome.reason };
+        }
+        if (outcome.status !== 'embedded') return { ok: false, spent: true, reason: null };
         return {
             ok: true,
+            spent: true,
             coordinates: {
                 embeddingModel: outcome.embeddingModel,
                 embeddingDims: outcome.embeddingDims,
@@ -163,4 +190,16 @@ export class MemoryFactSweepService {
             },
         };
     }
+}
+
+/** Coordinates a scope's facts are embedded with today. */
+interface EmbeddingCoordinates {
+    embeddingModel: string;
+    embeddingDims: number;
+    vectorStoreId: string;
+}
+
+/** Map key of a fact's (or a scope's) provider-selection scope. */
+function embeddingScopeKey(scope: { userId: string; organizationId?: string | null }): string {
+    return `${scope.userId}:${scope.organizationId ?? 'personal'}`;
 }

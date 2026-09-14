@@ -79,6 +79,8 @@ describe('MemoryFactService', () => {
             forgetAll: jest.fn().mockResolvedValue(3),
             listForOwner: jest.fn().mockResolvedValue({ rows: [fact()], total: 1 }),
         };
+        // The lock hands its callback the repository to read and write through.
+        repo.withWorkspaceWriteLock = jest.fn(async (_userId, _ownership, fn) => fn(repo));
         search = { search: jest.fn() };
         agents = { findByIdAndUser: jest.fn().mockResolvedValue({ id: 'a-1' }) };
         vectors = { isAvailable: jest.fn().mockResolvedValue(true) };
@@ -346,6 +348,111 @@ describe('MemoryFactService', () => {
         it('refuses to accept or discard a fact that is not proposed', async () => {
             await expect(service.accept(ACTOR, 'f-1')).rejects.toBeInstanceOf(ConflictException);
             await expect(service.discard(ACTOR, 'f-1')).rejects.toBeInstanceOf(ConflictException);
+        });
+    });
+
+    describe('workspace write lock', () => {
+        /**
+         * The lock hands out the repository to use — on Postgres one bound
+         * to the transaction holding the advisory lock. A check made through
+         * any other repository would read outside the lock and the race
+         * would be back.
+         */
+        function lockedRepository() {
+            const locked: Record<string, jest.Mock> = {
+                countByStatus: jest.fn().mockResolvedValue(counts()),
+                findLiveDuplicate: jest.fn().mockResolvedValue(null),
+                create: jest.fn(async (input) => fact({ ...input, id: 'f-locked' })),
+                findOwned: jest.fn().mockResolvedValue(fact()),
+                updateOwned: jest.fn(async (_id, _u, _o, patch) => fact({ ...patch })),
+            };
+            repo.withWorkspaceWriteLock.mockImplementation(async (_u, _o, fn) => fn(locked));
+            return locked;
+        }
+
+        it('checks capacity, pins and duplicates and inserts inside the lock of the actor workspace', async () => {
+            const locked = lockedRepository();
+
+            const dto = await service.create(ACTOR, { body: 'Invoices go out on the 1st.' });
+
+            expect(dto.id).toBe('f-locked');
+            expect(repo.withWorkspaceWriteLock).toHaveBeenCalledWith(
+                'u-1',
+                ORG,
+                expect.any(Function),
+            );
+            expect(locked.countByStatus).toHaveBeenCalledWith('u-1', ORG);
+            expect(locked.findLiveDuplicate).toHaveBeenCalled();
+            expect(locked.create).toHaveBeenCalled();
+            expect(repo.countByStatus).not.toHaveBeenCalled();
+            expect(repo.findLiveDuplicate).not.toHaveBeenCalled();
+            expect(repo.create).not.toHaveBeenCalled();
+            // The activity row and the embed hand-off follow the committed write.
+            expect(activity.log).toHaveBeenCalledTimes(1);
+            expect(dispatcher.dispatchMemoryFactEmbed).toHaveBeenCalledWith({
+                factId: 'f-locked',
+                userId: 'u-1',
+            });
+        });
+
+        it.each([
+            ['update (pin)', (s: MemoryFactService) => s.update(ACTOR, 'f-1', { pinned: true })],
+            [
+                'update (body)',
+                (s: MemoryFactService) => s.update(ACTOR, 'f-1', { body: 'New body' }),
+            ],
+            ['forget', (s: MemoryFactService) => s.forget(ACTOR, 'f-1')],
+        ])('reads and writes %s through the locked repository', async (_label, run) => {
+            const locked = lockedRepository();
+
+            await run(service);
+
+            expect(locked.findOwned).toHaveBeenCalledWith('f-1', 'u-1', ORG);
+            expect(locked.updateOwned).toHaveBeenCalled();
+            expect(repo.findOwned).not.toHaveBeenCalled();
+            expect(repo.updateOwned).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            [
+                'restore',
+                fact({ status: 'forgotten', forgottenAt: new Date(Date.now() - DAY) }),
+                (s: MemoryFactService) => s.restore(ACTOR, 'f-1'),
+            ],
+            [
+                'accept',
+                fact({ status: 'proposed' }),
+                (s: MemoryFactService) => s.accept(ACTOR, 'f-1'),
+            ],
+            [
+                'discard',
+                fact({ status: 'proposed' }),
+                (s: MemoryFactService) => s.discard(ACTOR, 'f-1'),
+            ],
+        ])('reads and writes %s through the locked repository', async (_label, row, run) => {
+            const locked = lockedRepository();
+            locked.findOwned.mockResolvedValue(row);
+
+            await run(service);
+
+            expect(locked.findOwned).toHaveBeenCalledWith('f-1', 'u-1', ORG);
+            expect(locked.updateOwned).toHaveBeenCalled();
+            expect(repo.findOwned).not.toHaveBeenCalled();
+            expect(repo.countByStatus).not.toHaveBeenCalled();
+            expect(repo.updateOwned).not.toHaveBeenCalled();
+        });
+
+        it('records no activity and hands nothing to the job runtime when the locked write is refused', async () => {
+            const locked = lockedRepository();
+            locked.findLiveDuplicate.mockResolvedValue(fact({ id: 'f-existing' }));
+
+            await expect(
+                service.create(ACTOR, { body: 'We never quote a delivery date under ten days.' }),
+            ).rejects.toBeInstanceOf(ConflictException);
+
+            expect(locked.create).not.toHaveBeenCalled();
+            expect(activity.log).not.toHaveBeenCalled();
+            expect(dispatcher.dispatchMemoryFactEmbed).not.toHaveBeenCalled();
         });
     });
 

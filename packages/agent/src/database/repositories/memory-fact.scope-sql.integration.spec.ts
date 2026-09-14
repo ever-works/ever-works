@@ -212,4 +212,87 @@ describe('MemoryFactRepository owner scope SQL (integration)', () => {
         );
         expect(reembed.map((r) => r.id)).toEqual([drifted.id]);
     });
+
+    describe('provider-selection scopes (embedding drift)', () => {
+        const stamp = (id: string, body: string, model: string, embeddedAt: string) =>
+            facts.markEmbedded(id, body, {
+                vectorStoreId: 'qdrant',
+                embeddingModel: model,
+                embeddingDims: 3,
+                embeddedAt: new Date(embeddedAt),
+            });
+
+        it('lists each (owner, Organization) holding live embedded facts once, oldest embed first', async () => {
+            const a = await make('a', ORG_A);
+            const a2 = await make('a2', ORG_A);
+            const b = await make('b', ORG_B);
+            const personal = await make('personal', PERSONAL);
+            const other = await make('other', ORG_A, { userId: OTHER_USER });
+            await make('never embedded', ORG_B, { userId: OTHER_USER });
+            const gone = await make('gone', PERSONAL, { userId: OTHER_USER, status: 'forgotten' });
+            await stamp(a.id, 'a', 'm', '2026-09-03T00:00:00Z');
+            await stamp(a2.id, 'a2', 'm', '2026-09-05T00:00:00Z');
+            await stamp(b.id, 'b', 'm', '2026-09-01T00:00:00Z');
+            await stamp(personal.id, 'personal', 'm', '2026-09-04T00:00:00Z');
+            await stamp(other.id, 'other', 'm', '2026-09-02T00:00:00Z');
+            await stamp(gone.id, 'gone', 'm', '2026-08-01T00:00:00Z');
+
+            expect(await facts.embeddedScopes(10)).toEqual([
+                { userId: USER, organizationId: ORG_B.organizationId },
+                { userId: OTHER_USER, organizationId: ORG_A.organizationId },
+                { userId: USER, organizationId: ORG_A.organizationId },
+                { userId: USER, organizationId: null },
+            ]);
+            expect(await facts.embeddedScopes(2)).toHaveLength(2);
+        });
+
+        it('compares drift only inside the scope it is given, including the personal workspace', async () => {
+            const inA = await make('in org A', ORG_A);
+            const inB = await make('in org B', ORG_B);
+            const personal = await make('personal', PERSONAL);
+            const otherUser = await make('other user', ORG_A, { userId: OTHER_USER });
+            for (const row of [inA, inB, personal, otherUser]) {
+                await stamp(row.id, row.body, 'model-old', '2026-09-01T00:00:00Z');
+            }
+            const current = {
+                embeddingModel: 'model-new',
+                embeddingDims: 3,
+                vectorStoreId: 'qdrant',
+            };
+
+            const scopedA = await facts.dueForReembed(current, 10, {
+                userId: USER,
+                organizationId: ORG_A.organizationId,
+            });
+            const scopedPersonal = await facts.dueForReembed(current, 10, {
+                userId: USER,
+                organizationId: null,
+            });
+
+            expect(scopedA.map((r) => r.id)).toEqual([inA.id]);
+            expect(scopedPersonal.map((r) => r.id)).toEqual([personal.id]);
+            // Unscoped keeps its original meaning: every drifted live fact.
+            expect((await facts.dueForReembed(current, 10)).map((r) => r.id).sort()).toEqual(
+                [inA.id, inB.id, personal.id, otherUser.id].sort(),
+            );
+        });
+
+        it('probes only an already-embedded fact of the given scope', async () => {
+            await make('not embedded yet', ORG_A);
+            const older = await make('embedded in B', ORG_B);
+            const inA = await make('embedded in A', ORG_A);
+            await stamp(older.id, older.body, 'm', '2026-08-01T00:00:00Z');
+            await stamp(inA.id, inA.body, 'm', '2026-09-01T00:00:00Z');
+
+            const probe = await facts.findProbeCandidate({
+                userId: USER,
+                organizationId: ORG_A.organizationId,
+            });
+
+            expect(probe?.id).toBe(inA.id);
+            expect(
+                await facts.findProbeCandidate({ userId: OTHER_USER, organizationId: null }),
+            ).toBeNull();
+        });
+    });
 });

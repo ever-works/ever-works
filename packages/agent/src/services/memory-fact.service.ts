@@ -102,6 +102,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  *  - every mutation writes exactly one activity row whose details carry ids
  *    and counts, never the body.
  *
+ * The caps, the duplicate defence and the status transitions are checks
+ * followed by a write, so each single-fact mutation reads, checks and writes
+ * inside `MemoryFactRepository.withWorkspaceWriteLock`: two simultaneous
+ * requests in one workspace cannot both see the last free slot, or both see
+ * no duplicate.
+ *
  * Embedding is asynchronous and optional: after a write the fact is handed to
  * the job runtime through {@link MEMORY_FACT_EMBED_DISPATCHER}. A `null`
  * dispatch, a missing dispatcher or a failing one never fails the write —
@@ -235,42 +241,52 @@ export class MemoryFactService implements OnApplicationBootstrap {
         const { scope, agentId } = await this.resolveScope(actor, command.scope, command.agentId);
         const pinned = command.pinned === true;
 
-        const counts = await this.facts.countByStatus(actor.userId, actor.ownership);
-        if (status === 'active' && counts.active >= MEMORY_FACT_ACTIVE_MAX) {
-            throw memoryFullError();
-        }
-        if (status === 'proposed' && counts.proposed >= MEMORY_FACT_PROPOSED_MAX) {
-            throw new ConflictException({
-                code: 'memory_fact_proposals_full',
-                message: `Memory proposal dropped — ${MEMORY_FACT_PROPOSED_MAX} proposals are already waiting for review.`,
-            });
-        }
-        if (pinned) {
-            if (status !== 'active') {
-                throw new ConflictException({
-                    code: 'memory_fact_pin_requires_active',
-                    message: 'Only an active fact can be pinned.',
-                });
-            }
-            if (counts.pinned >= MEMORY_FACT_PINNED_MAX) {
-                throw pinsFullError();
-            }
-        }
-        await this.assertNoDuplicate(actor, body);
+        // The caps and the duplicate check are only true while nothing else
+        // writes into this workspace — so they run, with the insert, under the
+        // workspace write lock. The activity row and the embed hand-off happen
+        // after it is released, once the row is committed and visible.
+        const fact = await this.facts.withWorkspaceWriteLock(
+            actor.userId,
+            actor.ownership,
+            async (facts) => {
+                const counts = await facts.countByStatus(actor.userId, actor.ownership);
+                if (status === 'active' && counts.active >= MEMORY_FACT_ACTIVE_MAX) {
+                    throw memoryFullError();
+                }
+                if (status === 'proposed' && counts.proposed >= MEMORY_FACT_PROPOSED_MAX) {
+                    throw new ConflictException({
+                        code: 'memory_fact_proposals_full',
+                        message: `Memory proposal dropped — ${MEMORY_FACT_PROPOSED_MAX} proposals are already waiting for review.`,
+                    });
+                }
+                if (pinned) {
+                    if (status !== 'active') {
+                        throw new ConflictException({
+                            code: 'memory_fact_pin_requires_active',
+                            message: 'Only an active fact can be pinned.',
+                        });
+                    }
+                    if (counts.pinned >= MEMORY_FACT_PINNED_MAX) {
+                        throw pinsFullError();
+                    }
+                }
+                await assertNoDuplicate(facts, actor, body);
 
-        const fact = await this.facts.create({
-            userId: actor.userId,
-            ownership: actor.ownership,
-            body,
-            status,
-            origin,
-            scope,
-            agentId,
-            pinned,
-            sourceRunId: command.sourceRunId ?? null,
-            sourceConversationId: command.sourceConversationId ?? null,
-            sourceAgentId: command.sourceAgentId ?? null,
-        });
+                return facts.create({
+                    userId: actor.userId,
+                    ownership: actor.ownership,
+                    body,
+                    status,
+                    origin,
+                    scope,
+                    agentId,
+                    pinned,
+                    sourceRunId: command.sourceRunId ?? null,
+                    sourceConversationId: command.sourceConversationId ?? null,
+                    sourceAgentId: command.sourceAgentId ?? null,
+                });
+            },
+        );
 
         await this.record(actor, ActivityActionType.MEMORY_FACT_CREATED, 'Remembered a fact', {
             factId: fact.id,
@@ -289,140 +305,178 @@ export class MemoryFactService implements OnApplicationBootstrap {
         id: string,
         command: UpdateMemoryFactCommand,
     ): Promise<MemoryFactDto> {
-        const current = await this.requireOwned(actor, id);
-        if (current.status === 'forgotten') {
-            throw new ConflictException({
-                code: 'memory_fact_forgotten',
-                message: 'This fact is forgotten. Restore it before editing it.',
-            });
-        }
-
-        const patch: Parameters<MemoryFactRepository['updateOwned']>[3] = {};
-        const changed: string[] = [];
-
-        if (command.body !== undefined) {
-            const body = validateBody(command.body);
-            if (body !== current.body) {
-                await this.assertNoDuplicate(actor, body, current.id);
-                patch.body = body;
-                // A new body invalidates the stored vector's coordinates: the
-                // fact is re-embedded, and until then it is matched by words.
-                patch.vectorStoreId = null;
-                patch.embeddingModel = null;
-                patch.embeddingDims = null;
-                patch.embeddedAt = null;
-                changed.push('body');
-            }
-        }
-
-        if (command.scope !== undefined || command.agentId !== undefined) {
-            const nextScope = command.scope ?? current.scope;
-            const nextAgentInput =
-                command.agentId !== undefined
-                    ? command.agentId
-                    : nextScope === 'agent'
-                      ? (current.agentId ?? null)
-                      : null;
-            const { scope, agentId } = await this.resolveScope(actor, nextScope, nextAgentInput);
-            if (scope !== current.scope || agentId !== (current.agentId ?? null)) {
-                patch.scope = scope;
-                patch.agentId = agentId;
-                changed.push('scope');
-            }
-        }
-
-        if (command.pinned !== undefined && command.pinned !== current.pinned) {
-            if (command.pinned) {
-                if (current.status !== 'active') {
+        // Read, check and write under the workspace write lock: a pin cap or a
+        // duplicate body checked outside it could be walked past by a second
+        // edit landing between the check and the write.
+        const outcome = await this.facts.withWorkspaceWriteLock(
+            actor.userId,
+            actor.ownership,
+            async (facts) => {
+                const current = await requireOwnedIn(facts, actor, id);
+                if (current.status === 'forgotten') {
                     throw new ConflictException({
-                        code: 'memory_fact_pin_requires_active',
-                        message: 'Only an active fact can be pinned.',
+                        code: 'memory_fact_forgotten',
+                        message: 'This fact is forgotten. Restore it before editing it.',
                     });
                 }
-                const counts = await this.facts.countByStatus(actor.userId, actor.ownership);
-                if (counts.pinned >= MEMORY_FACT_PINNED_MAX) {
-                    throw pinsFullError();
+
+                const patch: Parameters<MemoryFactRepository['updateOwned']>[3] = {};
+                const changed: string[] = [];
+
+                if (command.body !== undefined) {
+                    const body = validateBody(command.body);
+                    if (body !== current.body) {
+                        await assertNoDuplicate(facts, actor, body, current.id);
+                        patch.body = body;
+                        // A new body invalidates the stored vector's coordinates: the
+                        // fact is re-embedded, and until then it is matched by words.
+                        patch.vectorStoreId = null;
+                        patch.embeddingModel = null;
+                        patch.embeddingDims = null;
+                        patch.embeddedAt = null;
+                        changed.push('body');
+                    }
                 }
-            }
-            patch.pinned = command.pinned;
-            changed.push('pinned');
-        }
 
-        if (changed.length === 0) {
-            return toMemoryFactDto(current);
-        }
+                if (command.scope !== undefined || command.agentId !== undefined) {
+                    const nextScope = command.scope ?? current.scope;
+                    const nextAgentInput =
+                        command.agentId !== undefined
+                            ? command.agentId
+                            : nextScope === 'agent'
+                              ? (current.agentId ?? null)
+                              : null;
+                    const { scope, agentId } = await this.resolveScope(
+                        actor,
+                        nextScope,
+                        nextAgentInput,
+                    );
+                    if (scope !== current.scope || agentId !== (current.agentId ?? null)) {
+                        patch.scope = scope;
+                        patch.agentId = agentId;
+                        changed.push('scope');
+                    }
+                }
 
-        const updated = await this.facts.updateOwned(id, actor.userId, actor.ownership, patch);
-        if (!updated) {
-            throw notFound(id);
+                if (command.pinned !== undefined && command.pinned !== current.pinned) {
+                    if (command.pinned) {
+                        if (current.status !== 'active') {
+                            throw new ConflictException({
+                                code: 'memory_fact_pin_requires_active',
+                                message: 'Only an active fact can be pinned.',
+                            });
+                        }
+                        const counts = await facts.countByStatus(actor.userId, actor.ownership);
+                        if (counts.pinned >= MEMORY_FACT_PINNED_MAX) {
+                            throw pinsFullError();
+                        }
+                    }
+                    patch.pinned = command.pinned;
+                    changed.push('pinned');
+                }
+
+                if (changed.length === 0) {
+                    return { fact: current, changed };
+                }
+
+                const updated = await facts.updateOwned(id, actor.userId, actor.ownership, patch);
+                if (!updated) {
+                    throw notFound(id);
+                }
+                return { fact: updated, changed };
+            },
+        );
+
+        if (outcome.changed.length === 0) {
+            return toMemoryFactDto(outcome.fact);
         }
         await this.record(actor, ActivityActionType.MEMORY_FACT_UPDATED, 'Edited a fact', {
             factId: id,
-            changed,
+            changed: outcome.changed,
         });
-        if (changed.includes('body')) {
-            await this.enqueueEmbed(updated);
+        if (outcome.changed.includes('body')) {
+            await this.enqueueEmbed(outcome.fact);
         }
-        return toMemoryFactDto(updated);
+        return toMemoryFactDto(outcome.fact);
     }
 
     async forget(actor: MemoryFactActor, id: string): Promise<MemoryFactForgetResultDto> {
-        const current = await this.requireOwned(actor, id);
-        if (current.status === 'forgotten' && current.forgottenAt) {
-            // Idempotent: a double click must not reset the retention clock.
-            return {
-                id,
-                status: 'forgotten',
-                restorableUntil: restorableUntil(current.forgottenAt).toISOString(),
-            };
+        const outcome = await this.facts.withWorkspaceWriteLock(
+            actor.userId,
+            actor.ownership,
+            async (facts) => {
+                const current = await requireOwnedIn(facts, actor, id);
+                if (current.status === 'forgotten' && current.forgottenAt) {
+                    // Idempotent: a double click must not reset the retention clock.
+                    return {
+                        forgottenAt: current.forgottenAt,
+                        previousStatus: null as MemoryFactStatus | null,
+                    };
+                }
+                const now = new Date();
+                const updated = await facts.updateOwned(id, actor.userId, actor.ownership, {
+                    status: 'forgotten',
+                    forgottenAt: now,
+                    pinned: false,
+                });
+                if (!updated) {
+                    throw notFound(id);
+                }
+                return { forgottenAt: now, previousStatus: current.status };
+            },
+        );
+
+        if (outcome.previousStatus !== null) {
+            await this.record(actor, ActivityActionType.MEMORY_FACT_FORGOTTEN, 'Forgot a fact', {
+                factId: id,
+                previousStatus: outcome.previousStatus,
+            });
         }
-        const now = new Date();
-        const updated = await this.facts.updateOwned(id, actor.userId, actor.ownership, {
-            status: 'forgotten',
-            forgottenAt: now,
-            pinned: false,
-        });
-        if (!updated) {
-            throw notFound(id);
-        }
-        await this.record(actor, ActivityActionType.MEMORY_FACT_FORGOTTEN, 'Forgot a fact', {
-            factId: id,
-            previousStatus: current.status,
-        });
         return {
             id,
             status: 'forgotten',
-            restorableUntil: restorableUntil(now).toISOString(),
+            restorableUntil: restorableUntil(outcome.forgottenAt).toISOString(),
         };
     }
 
     async restore(actor: MemoryFactActor, id: string): Promise<MemoryFactDto> {
-        const current = await this.requireOwned(actor, id);
-        if (current.status !== 'forgotten') {
-            throw new ConflictException({
-                code: 'memory_fact_not_forgotten',
-                message: 'Only a forgotten fact can be restored.',
-            });
-        }
-        if (current.forgottenAt && restorableUntil(current.forgottenAt).getTime() < Date.now()) {
-            throw new GoneException({
-                code: 'memory_fact_restore_expired',
-                message: `This fact was forgotten more than ${MEMORY_FACT_FORGET_RETENTION_DAYS} days ago and can no longer be restored.`,
-            });
-        }
-        const counts = await this.facts.countByStatus(actor.userId, actor.ownership);
-        if (counts.active >= MEMORY_FACT_ACTIVE_MAX) {
-            throw memoryFullError();
-        }
-        await this.assertNoDuplicate(actor, current.body, current.id);
+        const updated = await this.facts.withWorkspaceWriteLock(
+            actor.userId,
+            actor.ownership,
+            async (facts) => {
+                const current = await requireOwnedIn(facts, actor, id);
+                if (current.status !== 'forgotten') {
+                    throw new ConflictException({
+                        code: 'memory_fact_not_forgotten',
+                        message: 'Only a forgotten fact can be restored.',
+                    });
+                }
+                if (
+                    current.forgottenAt &&
+                    restorableUntil(current.forgottenAt).getTime() < Date.now()
+                ) {
+                    throw new GoneException({
+                        code: 'memory_fact_restore_expired',
+                        message: `This fact was forgotten more than ${MEMORY_FACT_FORGET_RETENTION_DAYS} days ago and can no longer be restored.`,
+                    });
+                }
+                const counts = await facts.countByStatus(actor.userId, actor.ownership);
+                if (counts.active >= MEMORY_FACT_ACTIVE_MAX) {
+                    throw memoryFullError();
+                }
+                await assertNoDuplicate(facts, actor, current.body, current.id);
 
-        const updated = await this.facts.updateOwned(id, actor.userId, actor.ownership, {
-            status: 'active',
-            forgottenAt: null,
-        });
-        if (!updated) {
-            throw notFound(id);
-        }
+                const restored = await facts.updateOwned(id, actor.userId, actor.ownership, {
+                    status: 'active',
+                    forgottenAt: null,
+                });
+                if (!restored) {
+                    throw notFound(id);
+                }
+                return restored;
+            },
+        );
+
         await this.record(actor, ActivityActionType.MEMORY_FACT_RESTORED, 'Restored a fact', {
             factId: id,
         });
@@ -431,23 +485,31 @@ export class MemoryFactService implements OnApplicationBootstrap {
     }
 
     async accept(actor: MemoryFactActor, id: string): Promise<MemoryFactDto> {
-        const current = await this.requireOwned(actor, id);
-        if (current.status !== 'proposed') {
-            throw new ConflictException({
-                code: 'memory_fact_not_proposed',
-                message: 'Only a proposed fact can be accepted.',
-            });
-        }
-        const counts = await this.facts.countByStatus(actor.userId, actor.ownership);
-        if (counts.active >= MEMORY_FACT_ACTIVE_MAX) {
-            throw memoryFullError();
-        }
-        const updated = await this.facts.updateOwned(id, actor.userId, actor.ownership, {
-            status: 'active',
-        });
-        if (!updated) {
-            throw notFound(id);
-        }
+        const { current, updated } = await this.facts.withWorkspaceWriteLock(
+            actor.userId,
+            actor.ownership,
+            async (facts) => {
+                const proposal = await requireOwnedIn(facts, actor, id);
+                if (proposal.status !== 'proposed') {
+                    throw new ConflictException({
+                        code: 'memory_fact_not_proposed',
+                        message: 'Only a proposed fact can be accepted.',
+                    });
+                }
+                const counts = await facts.countByStatus(actor.userId, actor.ownership);
+                if (counts.active >= MEMORY_FACT_ACTIVE_MAX) {
+                    throw memoryFullError();
+                }
+                const accepted = await facts.updateOwned(id, actor.userId, actor.ownership, {
+                    status: 'active',
+                });
+                if (!accepted) {
+                    throw notFound(id);
+                }
+                return { current: proposal, updated: accepted };
+            },
+        );
+
         await this.record(
             actor,
             ActivityActionType.MEMORY_FACT_ACCEPTED,
@@ -463,21 +525,29 @@ export class MemoryFactService implements OnApplicationBootstrap {
     }
 
     async discard(actor: MemoryFactActor, id: string): Promise<void> {
-        const current = await this.requireOwned(actor, id);
-        if (current.status !== 'proposed') {
-            throw new ConflictException({
-                code: 'memory_fact_not_proposed',
-                message: 'Only a proposed fact can be discarded.',
-            });
-        }
-        const updated = await this.facts.updateOwned(id, actor.userId, actor.ownership, {
-            status: 'forgotten',
-            forgottenAt: new Date(),
-            pinned: false,
-        });
-        if (!updated) {
-            throw notFound(id);
-        }
+        const current = await this.facts.withWorkspaceWriteLock(
+            actor.userId,
+            actor.ownership,
+            async (facts) => {
+                const proposal = await requireOwnedIn(facts, actor, id);
+                if (proposal.status !== 'proposed') {
+                    throw new ConflictException({
+                        code: 'memory_fact_not_proposed',
+                        message: 'Only a proposed fact can be discarded.',
+                    });
+                }
+                const discarded = await facts.updateOwned(id, actor.userId, actor.ownership, {
+                    status: 'forgotten',
+                    forgottenAt: new Date(),
+                    pinned: false,
+                });
+                if (!discarded) {
+                    throw notFound(id);
+                }
+                return proposal;
+            },
+        );
+
         await this.record(
             actor,
             ActivityActionType.MEMORY_FACT_DISCARDED,
@@ -502,11 +572,7 @@ export class MemoryFactService implements OnApplicationBootstrap {
     // ─── internals ──────────────────────────────────────────────────────────
 
     private async requireOwned(actor: MemoryFactActor, id: string): Promise<MemoryFact> {
-        const fact = await this.facts.findOwned(id, actor.userId, actor.ownership);
-        if (!fact) {
-            throw notFound(id);
-        }
-        return fact;
+        return requireOwnedIn(this.facts, actor, id);
     }
 
     private async resolveScope(
@@ -538,26 +604,6 @@ export class MemoryFactService implements OnApplicationBootstrap {
             }
         }
         return { scope: 'agent', agentId };
-    }
-
-    private async assertNoDuplicate(
-        actor: MemoryFactActor,
-        body: string,
-        excludeId?: string,
-    ): Promise<void> {
-        const duplicate = await this.facts.findLiveDuplicate(
-            actor.userId,
-            actor.ownership,
-            body,
-            excludeId,
-        );
-        if (duplicate) {
-            throw new ConflictException({
-                code: 'memory_fact_duplicate',
-                message: 'This fact is already remembered.',
-                existingId: duplicate.id,
-            });
-        }
     }
 
     private async semanticAvailable(actor: MemoryFactActor): Promise<boolean> {
@@ -677,6 +723,39 @@ export function validateBody(raw: unknown): string {
         });
     }
     return body;
+}
+
+/**
+ * Load an owned fact through `facts` — the service's repository, or the
+ * transaction-bound one a write lock hands out — or answer 404.
+ */
+async function requireOwnedIn(
+    facts: MemoryFactRepository,
+    actor: MemoryFactActor,
+    id: string,
+): Promise<MemoryFact> {
+    const fact = await facts.findOwned(id, actor.userId, actor.ownership);
+    if (!fact) {
+        throw notFound(id);
+    }
+    return fact;
+}
+
+/** The exact-duplicate defence, read through `facts` (see {@link requireOwnedIn}). */
+async function assertNoDuplicate(
+    facts: MemoryFactRepository,
+    actor: MemoryFactActor,
+    body: string,
+    excludeId?: string,
+): Promise<void> {
+    const duplicate = await facts.findLiveDuplicate(actor.userId, actor.ownership, body, excludeId);
+    if (duplicate) {
+        throw new ConflictException({
+            code: 'memory_fact_duplicate',
+            message: 'This fact is already remembered.',
+            existingId: duplicate.id,
+        });
+    }
 }
 
 function memoryFullError(): ConflictException {

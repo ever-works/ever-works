@@ -1,10 +1,65 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, IsNull, LessThan, Not, Repository, type SelectQueryBuilder } from 'typeorm';
 import type { MemoryFactCounts, MemoryFactScope, MemoryFactStatus } from '@ever-works/contracts';
 import { MemoryFact } from '../../entities/memory-fact.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
+import { advisoryLockObjectId } from './agent-run.repository';
+
+/**
+ * Advisory-lock namespace (`classid`) for memory-fact writes in one
+ * workspace. Apart from run admission (`0x6577_0001`), live-view admission
+ * (`0x6577_000b` / `0x6577_000c`) and email send admission
+ * (`0x6577_0e01` / `0x6577_0e02`). Arbitrary but STABLE: changing it would
+ * make an old and a new replica lock on different keys during a rolling
+ * restart — exactly the window the lock exists for.
+ */
+export const MEMORY_FACT_WRITE_LOCK_CLASS_ID = 0x6577_0701 | 0;
+
+/**
+ * The provider-selection scope of a fact: the owner and the Organization.
+ * Embeddings resolve the AI provider per user and vectors resolve the store
+ * per `(user, workspace namespace)`, so two facts can only be compared for
+ * embedding drift inside one of these.
+ */
+export interface MemoryFactEmbeddingScope {
+    userId: string;
+    organizationId: string | null;
+}
+
+/** The workspace key one write lock serializes on. */
+export function memoryFactWriteLockKey(
+    userId: string,
+    ownership: OwnershipScope | undefined,
+): string {
+    return `memory-facts:${userId}:${ownership?.tenantId ?? '-'}:${ownership?.organizationId ?? '-'}`;
+}
+
+/**
+ * In-process tail of every workspace's write chain. Process-wide on purpose:
+ * the transaction-bound repository `withWorkspaceWriteLock` hands to its
+ * callback is a separate instance and must not open a second chain.
+ */
+const workspaceWriteChains = new Map<string, Promise<void>>();
+
+/** Run `fn` after every earlier call with the same key has settled. */
+async function serializeInProcess<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const previous = workspaceWriteChains.get(key) ?? Promise.resolve();
+    const run = previous.then(fn);
+    const tail = run.then(
+        () => undefined,
+        () => undefined,
+    );
+    workspaceWriteChains.set(key, tail);
+    try {
+        return await run;
+    } finally {
+        if (workspaceWriteChains.get(key) === tail) {
+            workspaceWriteChains.delete(key);
+        }
+    }
+}
 
 /** Filters accepted by {@link MemoryFactRepository.listForOwner}. */
 export interface ListMemoryFactsFilter {
@@ -58,8 +113,9 @@ export interface MemoryFactPurgeRow {
  * statement, so a fact id from another workspace resolves to nothing — the
  * service maps that to 404. Every request path uses only these.
  *
- * **Sweep** methods (`dueForPurge`, `dueForEmbed`, `dueForReembed`,
- * `findForEmbedding`, `markEmbedded`, `deleteByIds`) are keyed by fact id or
+ * **Sweep** methods (`dueForPurge`, `dueForEmbed`, `embeddedScopes`,
+ * `dueForReembed`, `findProbeCandidate`, `findForEmbedding`, `markEmbedded`,
+ * `deleteByIds`) are keyed by fact id or
  * run across every workspace. They exist for the nightly background sweep,
  * which has no request scope, and are never reachable from a controller.
  *
@@ -68,10 +124,75 @@ export interface MemoryFactPurgeRow {
  */
 @Injectable()
 export class MemoryFactRepository {
+    private readonly logger = new Logger(MemoryFactRepository.name);
+
     constructor(
         @InjectRepository(MemoryFact)
         private readonly repo: Repository<MemoryFact>,
     ) {}
+
+    // ─── Write serialization ────────────────────────────────────────────────
+
+    /**
+     * Serialize one workspace's check-then-write (capacity, pin cap,
+     * duplicate body, status transition) against every other write in the
+     * same workspace, so two simultaneous requests can never both see the
+     * last free slot — or no duplicate — and both insert. The run-admission
+     * lock's pattern (`AgentRunRepository.withAdmissionLock`) in its own
+     * namespace.
+     *
+     * IN PROCESS (every driver): calls with the same workspace key run one
+     * after another. That alone closes the race on better-sqlite3, whose
+     * single connection only ever serves the one process holding it, and on
+     * Postgres it keeps a burst of waiters from each holding a pool
+     * connection.
+     *
+     * POSTGRES, additionally: opens ONE transaction, takes
+     * `pg_advisory_xact_lock` on the workspace key, and runs `fn` with a
+     * repository bound to THAT transaction. The counts, the duplicate check
+     * and the write commit together and the lock is released by that same
+     * commit, so a write on another API replica starts its checks only after
+     * this one's row is visible.
+     *
+     * A failure to TAKE the lock degrades to running `fn` unlocked (logged),
+     * like the run-admission lock: a broken lock must never make a fact
+     * un-saveable. A failure INSIDE `fn` (or its commit) is re-raised and
+     * `fn` is never re-run, since it may already have written.
+     *
+     * Not re-entrant: `fn` must not call this method again for the same key.
+     */
+    async withWorkspaceWriteLock<T>(
+        userId: string,
+        ownership: OwnershipScope | undefined,
+        fn: (facts: MemoryFactRepository) => Promise<T>,
+    ): Promise<T> {
+        const key = memoryFactWriteLockKey(userId, ownership);
+        return serializeInProcess(key, async () => {
+            const connection = this.repo.manager.connection;
+            if (connection.options.type !== 'postgres') {
+                return fn(this);
+            }
+            let entered = false;
+            try {
+                return await connection.transaction(async (manager) => {
+                    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+                        MEMORY_FACT_WRITE_LOCK_CLASS_ID,
+                        advisoryLockObjectId(key),
+                    ]);
+                    entered = true;
+                    return fn(new MemoryFactRepository(manager.getRepository(MemoryFact)));
+                });
+            } catch (error) {
+                if (entered) throw error;
+                this.logger.warn(
+                    `Memory-fact write lock unavailable — writing unlocked: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                return fn(this);
+            }
+        });
+    }
 
     // ─── Owner-scoped ───────────────────────────────────────────────────────
 
@@ -299,15 +420,50 @@ export class MemoryFactRepository {
         });
     }
 
-    /** Live embedded facts whose coordinates no longer match the current model / store. */
+    /**
+     * The provider-selection scopes that hold live embedded facts, the scope
+     * whose oldest embed is oldest first — so a pass that runs out of budget
+     * starts from a different scope next time instead of re-checking the
+     * same ones.
+     */
+    async embeddedScopes(limit: number): Promise<MemoryFactEmbeddingScope[]> {
+        const rows: Array<{ userId: string; organizationId: string | null }> = await this.repo
+            .createQueryBuilder('fact')
+            .select('fact.userId', 'userId')
+            .addSelect('fact.organizationId', 'organizationId')
+            .where('fact.status != :forgottenStatus', { forgottenStatus: 'forgotten' })
+            .andWhere('fact.embeddedAt IS NOT NULL')
+            .groupBy('fact.userId')
+            .addGroupBy('fact.organizationId')
+            .orderBy('MIN(fact.embeddedAt)', 'ASC')
+            .limit(limit)
+            .getRawMany();
+        return rows.map((row) => ({
+            userId: row.userId,
+            organizationId: row.organizationId ?? null,
+        }));
+    }
+
+    /**
+     * Live embedded facts whose coordinates no longer match the current model / store.
+     *
+     * Pass `scope` to compare only the facts of one provider-selection scope
+     * against the coordinates learned IN that scope — the only comparison
+     * that means anything when different owners use different providers.
+     */
     async dueForReembed(
         current: { embeddingModel: string; embeddingDims: number; vectorStoreId: string },
         limit: number,
+        scope?: MemoryFactEmbeddingScope,
     ): Promise<MemoryFact[]> {
-        return this.repo
+        const qb = this.repo
             .createQueryBuilder('fact')
             .where('fact.status != :forgottenStatus', { forgottenStatus: 'forgotten' })
-            .andWhere('fact.embeddedAt IS NOT NULL')
+            .andWhere('fact.embeddedAt IS NOT NULL');
+        if (scope) {
+            this.applyEmbeddingScope(qb, scope);
+        }
+        return qb
             .andWhere(
                 new Brackets((drift) => {
                     drift
@@ -327,12 +483,25 @@ export class MemoryFactRepository {
             .getMany();
     }
 
-    /** One live embedded fact, oldest embed first — used to learn the current model. */
-    async findProbeCandidate(): Promise<MemoryFact | null> {
-        return this.repo.findOne({
-            where: { status: Not('forgotten') },
-            order: { embeddedAt: 'ASC', createdAt: 'ASC' },
-        });
+    /**
+     * One live embedded fact, oldest embed first — used to learn the current model.
+     *
+     * With `scope`, only an already-embedded fact of that provider-selection
+     * scope qualifies, so the model learned is the one that scope embeds with.
+     */
+    async findProbeCandidate(scope?: MemoryFactEmbeddingScope): Promise<MemoryFact | null> {
+        if (!scope) {
+            return this.repo.findOne({
+                where: { status: Not('forgotten') },
+                order: { embeddedAt: 'ASC', createdAt: 'ASC' },
+            });
+        }
+        const qb = this.repo
+            .createQueryBuilder('fact')
+            .where('fact.status != :forgottenStatus', { forgottenStatus: 'forgotten' })
+            .andWhere('fact.embeddedAt IS NOT NULL');
+        this.applyEmbeddingScope(qb, scope);
+        return qb.orderBy('fact.embeddedAt', 'ASC').addOrderBy('fact.createdAt', 'ASC').getOne();
     }
 
     /** Load one fact by id for the embed job (the job carries no request scope). */
@@ -386,6 +555,20 @@ export class MemoryFactRepository {
             qb.andWhere(predicate.clause, predicate.parameters);
         }
         return qb;
+    }
+
+    private applyEmbeddingScope(
+        qb: SelectQueryBuilder<MemoryFact>,
+        scope: MemoryFactEmbeddingScope,
+    ): void {
+        qb.andWhere('fact.userId = :embedScopeUserId', { embedScopeUserId: scope.userId });
+        if (scope.organizationId) {
+            qb.andWhere('fact.organizationId = :embedScopeOrgId', {
+                embedScopeOrgId: scope.organizationId,
+            });
+        } else {
+            qb.andWhere('fact.organizationId IS NULL');
+        }
     }
 
     private applyFilter(

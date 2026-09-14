@@ -6,6 +6,7 @@ import type { MemoryFact } from '../../entities/memory-fact.entity';
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = new Date('2026-09-14T04:13:00Z');
+const SCOPE = { userId: 'u-1', organizationId: 'o-1' };
 
 function fact(id: string, overrides: Partial<MemoryFact> = {}): MemoryFact {
     return {
@@ -40,6 +41,7 @@ describe('MemoryFactSweepService (memory-fact-gc)', () => {
             deleteByIds: jest.fn(async (ids: string[]) => ids.length),
             dueForEmbed: jest.fn().mockResolvedValue([]),
             dueForReembed: jest.fn().mockResolvedValue([]),
+            embeddedScopes: jest.fn().mockResolvedValue([]),
             findProbeCandidate: jest.fn().mockResolvedValue(null),
             markEmbedded: jest.fn().mockResolvedValue(true),
         };
@@ -122,6 +124,7 @@ describe('MemoryFactSweepService (memory-fact-gc)', () => {
 
     it('re-embeds facts whose model drifted, using the model learned from the backfill', async () => {
         repo.dueForEmbed.mockResolvedValue([fact('f-new')]);
+        repo.embeddedScopes.mockResolvedValue([SCOPE]);
         repo.dueForReembed.mockResolvedValue([
             fact('f-stale', {
                 embeddedAt: new Date('2026-01-01T00:00:00Z'),
@@ -136,11 +139,15 @@ describe('MemoryFactSweepService (memory-fact-gc)', () => {
         expect(repo.dueForReembed).toHaveBeenCalledWith(
             { embeddingModel: 'model-new', embeddingDims: 2, vectorStoreId: 'store-a' },
             499,
+            SCOPE,
         );
         expect(summary.reembedded).toBe(1);
+        // The backfill already taught this scope its model: no probe spent.
+        expect(repo.findProbeCandidate).not.toHaveBeenCalled();
     });
 
     it('learns the current model from one probe when nothing needed backfilling', async () => {
+        repo.embeddedScopes.mockResolvedValue([SCOPE]);
         repo.findProbeCandidate.mockResolvedValue(
             fact('f-probe', { embeddedAt: new Date(), embeddingModel: 'model-new' }),
         );
@@ -148,10 +155,92 @@ describe('MemoryFactSweepService (memory-fact-gc)', () => {
         await sweep.sweep(NOW);
 
         expect(vectors.embed).toHaveBeenCalledTimes(1);
+        expect(repo.findProbeCandidate).toHaveBeenCalledWith(SCOPE);
+        // The probe is an embedding too, and counts against the pass budget.
         expect(repo.dueForReembed).toHaveBeenCalledWith(
             { embeddingModel: 'model-new', embeddingDims: 2, vectorStoreId: 'store-a' },
-            500,
+            499,
+            SCOPE,
         );
+    });
+
+    it("decides drift per scope, against that scope's own model — never another scope's", async () => {
+        const OTHER = { userId: 'u-2', organizationId: 'o-2' };
+        repo.embeddedScopes.mockResolvedValue([SCOPE, OTHER]);
+        repo.findProbeCandidate.mockImplementation(async (scope: typeof SCOPE) =>
+            fact(`probe-${scope.userId}`, {
+                userId: scope.userId,
+                organizationId: scope.organizationId,
+                embeddedAt: new Date('2026-01-01T00:00:00Z'),
+            }),
+        );
+        // Each owner's provider embeds with its own model.
+        vectors.embed.mockImplementation(async (_text: string, userId: string) => ({
+            ok: true,
+            value: { vector: [0.1, 0.2], model: `model-${userId}`, dims: 2 },
+        }));
+
+        await sweep.sweep(NOW);
+
+        expect(repo.findProbeCandidate).toHaveBeenCalledWith(SCOPE);
+        expect(repo.findProbeCandidate).toHaveBeenCalledWith(OTHER);
+        expect(repo.dueForReembed).toHaveBeenCalledWith(
+            { embeddingModel: 'model-u-1', embeddingDims: 2, vectorStoreId: 'store-a' },
+            499,
+            SCOPE,
+        );
+        expect(repo.dueForReembed).toHaveBeenCalledWith(
+            { embeddingModel: 'model-u-2', embeddingDims: 2, vectorStoreId: 'store-a' },
+            498,
+            OTHER,
+        );
+    });
+
+    it('skips only the scope whose provider is unavailable and keeps checking the others', async () => {
+        const OTHER = { userId: 'u-2', organizationId: null };
+        repo.embeddedScopes.mockResolvedValue([SCOPE, OTHER]);
+        repo.findProbeCandidate.mockImplementation(async (scope: typeof SCOPE) =>
+            fact(`probe-${scope.userId}`, {
+                userId: scope.userId,
+                organizationId: scope.organizationId,
+                embeddedAt: new Date('2026-01-01T00:00:00Z'),
+            }),
+        );
+        vectors.embed.mockImplementation(async (_text: string, userId: string) =>
+            userId === 'u-1'
+                ? { ok: false, reason: 'not-configured', detail: 'no ai for u-1' }
+                : { ok: true, value: { vector: [0.1, 0.2], model: 'model-b', dims: 2 } },
+        );
+
+        const summary = await sweep.sweep(NOW);
+
+        expect(repo.dueForReembed).toHaveBeenCalledTimes(1);
+        expect(repo.dueForReembed).toHaveBeenCalledWith(
+            { embeddingModel: 'model-b', embeddingDims: 2, vectorStoreId: 'store-a' },
+            498,
+            OTHER,
+        );
+        expect(summary.embedStoppedReason).toBe('no ai for u-1');
+    });
+
+    it('never spends more embeddings than the pass budget, however many scopes there are', async () => {
+        const scopes = Array.from({ length: 600 }, (_, index) => ({
+            userId: `u-${index}`,
+            organizationId: null,
+        }));
+        repo.embeddedScopes.mockResolvedValue(scopes);
+        repo.findProbeCandidate.mockImplementation(async (scope: typeof SCOPE) =>
+            fact(`probe-${scope.userId}`, {
+                userId: scope.userId,
+                organizationId: null,
+                embeddedAt: new Date('2026-01-01T00:00:00Z'),
+            }),
+        );
+
+        await sweep.sweep(NOW);
+
+        expect(vectors.embed).toHaveBeenCalledTimes(500);
+        expect(repo.embeddedScopes).toHaveBeenCalledWith(500);
     });
 
     it('is quiet and does nothing on an empty workspace', async () => {
