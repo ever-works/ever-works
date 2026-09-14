@@ -32,6 +32,9 @@ export * from './email/index.js';
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Conversations — kinds, participants, send status and delivery outcomes for
+// named conversations with Agents.
+export * from './conversations/index.js';
 // Live Feed — the narrated, filterable view of the activity log. Structure
 // only (narration keys + typed destinations); renderers own the words.
 export * from './feed/index.js';

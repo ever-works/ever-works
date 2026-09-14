@@ -33,6 +33,7 @@ export * from './repositories/work-budget.repository';
 export * from './repositories/work-budget-alert-state.repository';
 export * from './repositories/notification.repository';
 export * from './repositories/conversation.repository';
+export * from './repositories/conversation-participant.repository';
 export * from './repositories/github-app-installation.repository';
 export * from './repositories/github-app-installation-repository.repository';
 export * from './repositories/github-app-user-link.repository';

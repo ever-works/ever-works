@@ -24,12 +24,14 @@ jest.mock('@ever-works/agent/services', () => ({
 jest.mock('@ever-works/trigger-tasks', () => ({
     agentTaskExecuteTriggerAdapter: {},
     agentChatReplyTriggerAdapter: {},
+    agentConversationReplyTriggerAdapter: {},
 }));
 jest.mock('./tasks.controller', () => ({ TasksController: class TasksController {} }));
 jest.mock('./task-chat.controller', () => ({ TaskChatController: class TaskChatController {} }));
 
 import { PluginSettingsService } from '@ever-works/agent/plugins';
-import { TaskBoardService } from '@ever-works/agent/tasks-domain';
+import { AGENT_CONVERSATION_REPLY_DISPATCHER } from '@ever-works/agent/conversations';
+import { AGENT_CHAT_REPLY_DISPATCHER, TaskBoardService } from '@ever-works/agent/tasks-domain';
 import { SkillsService } from '@ever-works/agent/skills';
 import { FleetAgentTaskPlannerService } from '../fleet/fleet-agent-task-planner.service';
 import { FleetAgentTaskReconcilerService } from '../fleet/fleet-agent-task-reconciler.service';
@@ -130,6 +132,17 @@ describe('TasksModule — the fleet providers can resolve their dependencies', (
         ['FleetAgentTaskReconcilerService', FleetAgentTaskReconcilerService],
         ['FleetTaskScopeResolverService', FleetTaskScopeResolverService],
     ];
+
+    it('binds and exports the Conversation reply dispatcher next to the Task chat one', () => {
+        // The agent-side ConversationsModule injects this token @Optional().
+        // Unbound, every Conversation reply would read "refused — no job
+        // runtime" on an install that has one; not exported, the @Global()
+        // module would bind it where no consumer can see it.
+        const exported = (Reflect.getMetadata('exports', TasksModule) ?? []) as unknown[];
+        expect(moduleProviders.map(asToken)).toContain(AGENT_CONVERSATION_REPLY_DISPATCHER);
+        expect(exported).toContain(AGENT_CONVERSATION_REPLY_DISPATCHER);
+        expect(moduleProviders.map(asToken)).toContain(AGENT_CHAT_REPLY_DISPATCHER);
+    });
 
     it('reaches SkillsService, so the fleet prompt can carry ACTIVE SKILLS', () => {
         // The pointed guard. `resolveSkills` returns undefined the moment

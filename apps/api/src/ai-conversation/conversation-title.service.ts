@@ -23,6 +23,8 @@ export class ConversationTitleService {
 
         const messageCount = conversation.messages?.length ?? 0;
         if (messageCount < 4 || conversation.metadata?.aiTitle) return;
+        // A name a person chose is never overwritten by a model (FR-6).
+        if (conversation.titleSource === 'user') return;
 
         try {
             const facadeOptions = await this.resolveFacadeOptions(userId);

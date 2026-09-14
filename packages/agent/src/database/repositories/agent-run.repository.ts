@@ -580,6 +580,12 @@ export class AgentRunRepository {
         triggerKind: AgentRunTriggerKind;
         taskId?: string | null;
         chatMessageId?: string | null;
+        /**
+         * Named Conversations — the Conversation message a `conversation`
+         * run replies to. Omitted by every other caller, which leaves the
+         * column NULL exactly as before.
+         */
+        conversationMessageId?: string | null;
         /** Wave 4 M1 — denormalized from `task.workId` at creation when present. */
         workId?: string | null;
         /** Wave 4 M2 — set to `concurrency-limit` when the dispatch gate parks the run. */
@@ -616,6 +622,9 @@ export class AgentRunRepository {
             queuedReason: args.queuedReason ?? null,
             runnerKind: args.runnerKind ?? null,
             ...(args.persistent === true ? { persistent: true } : {}),
+            ...(args.conversationMessageId
+                ? { conversationMessageId: args.conversationMessageId }
+                : {}),
             // Only stamp when explicitly provided — the ambient scope
             // subscriber (EW-657) remains the default writer.
             ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),
@@ -1026,6 +1035,39 @@ export class AgentRunRepository {
             .orderBy('run.createdAt', 'DESC');
         if (userId) query.andWhere('run.userId = :userId', { userId });
         const scopePredicate = ownershipSqlPredicate('run', scope, 'inFlightRun');
+        if (scopePredicate) {
+            query.andWhere(scopePredicate.clause, scopePredicate.parameters);
+        }
+        return query.getOne();
+    }
+
+    /**
+     * Named Conversations — an in-flight run this Agent is already executing
+     * in reply to a message of this Conversation. A new message for the same
+     * Agent is steered into that run instead of starting a second one.
+     */
+    async findInFlightForConversationAgent(
+        conversationId: string,
+        agentId: string,
+        userId?: string,
+        scope?: OwnershipScope,
+    ): Promise<AgentRun | null> {
+        const query = this.repository
+            .createQueryBuilder('run')
+            .where('run.agentId = :agentId', { agentId })
+            .andWhere('run.triggerKind = :triggerKind', {
+                triggerKind: 'conversation' satisfies AgentRun['triggerKind'],
+            })
+            .andWhere('run.status IN (:...statuses)', {
+                statuses: ['queued', 'running'] satisfies AgentRunStatus[],
+            })
+            .andWhere(
+                'run.conversationMessageId IN (SELECT cm.id FROM conversation_messages cm WHERE cm."conversationId" = :conversationId)',
+                { conversationId },
+            )
+            .orderBy('run.createdAt', 'DESC');
+        if (userId) query.andWhere('run.userId = :userId', { userId });
+        const scopePredicate = ownershipSqlPredicate('run', scope, 'inFlightConversationRun');
         if (scopePredicate) {
             query.andWhere(scopePredicate.clause, scopePredicate.parameters);
         }

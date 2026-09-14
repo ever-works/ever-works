@@ -333,3 +333,168 @@ describe('ConversationRepository', () => {
         });
     });
 });
+
+/**
+ * Named Conversations — the reads and writes added beside the legacy methods.
+ * The legacy projection above stays pinned; these pin the new ones: scoped
+ * lists ordered by last activity, scoped single reads, name ownership,
+ * newest-last paging and activity tracking on insert.
+ */
+describe('ConversationRepository — named Conversations', () => {
+    const SCOPE = { tenantId: 't1', organizationId: 'o1' };
+    let convRepo: Record<string, jest.Mock>;
+    let msgRepo: Record<string, jest.Mock>;
+    let queryBuilder: Record<string, jest.Mock>;
+    let service: ConversationRepository;
+
+    beforeEach(() => {
+        queryBuilder = {};
+        for (const method of [
+            'select',
+            'addSelect',
+            'leftJoin',
+            'where',
+            'andWhere',
+            'groupBy',
+            'orderBy',
+            'take',
+        ]) {
+            queryBuilder[method] = jest.fn(() => queryBuilder);
+        }
+        queryBuilder.getRawMany = jest.fn().mockResolvedValue([]);
+        queryBuilder.getMany = jest.fn().mockResolvedValue([]);
+        convRepo = {
+            findAndCount: jest.fn().mockResolvedValue([[], 0]),
+            findOne: jest.fn().mockResolvedValue(null),
+            update: jest.fn().mockResolvedValue({ affected: 1 }),
+        };
+        msgRepo = {
+            find: jest.fn().mockResolvedValue([]),
+            findOne: jest.fn().mockResolvedValue(null),
+            create: jest.fn((row: unknown) => row),
+            save: jest.fn(async (row: unknown) => ({ id: 'm1', ...(row as object) })),
+            update: jest.fn().mockResolvedValue({ affected: 1 }),
+            delete: jest.fn().mockResolvedValue({ affected: 1 }),
+            createQueryBuilder: jest.fn(() => queryBuilder),
+        };
+        service = new ConversationRepository(convRepo as any, msgRepo as any);
+    });
+
+    it('lists one scope, newest activity first, with the named-list columns', async () => {
+        await service.findSummariesByUser(
+            'u1',
+            { kind: 'direct', agentId: 'a1', limit: 10 },
+            SCOPE,
+        );
+
+        const options = convRepo.findAndCount.mock.calls[0][0];
+        expect(options.where).toEqual([
+            { userId: 'u1', tenantId: 't1', organizationId: 'o1', kind: 'direct', agentId: 'a1' },
+        ]);
+        expect(options.order).toEqual({
+            lastMessageAt: { direction: 'DESC', nulls: 'LAST' },
+            updatedAt: 'DESC',
+        });
+        expect(options.take).toBe(10);
+        expect(options.select).toEqual(
+            expect.arrayContaining(['kind', 'agentId', 'titleSource', 'lastMessageAt']),
+        );
+    });
+
+    it('reads one Conversation only inside the caller’s scope', async () => {
+        await service.findByIdForUser('c1', 'u1', SCOPE);
+        expect(convRepo.findOne).toHaveBeenCalledWith({
+            where: [{ userId: 'u1', tenantId: 't1', organizationId: 'o1', id: 'c1' }],
+        });
+    });
+
+    it('a set name is owned by the person; a cleared one resets the source', async () => {
+        await service.setName('c1', 'u1', 'Launch');
+        expect(convRepo.update).toHaveBeenLastCalledWith(
+            { id: 'c1', userId: 'u1' },
+            { title: 'Launch', titleSource: 'user' },
+        );
+        await service.setName('c1', 'u1', null);
+        expect(convRepo.update).toHaveBeenLastCalledWith(
+            { id: 'c1', userId: 'u1' },
+            { title: null, titleSource: null },
+        );
+    });
+
+    it('pages messages newest-last, and an unknown `before` returns nothing', async () => {
+        queryBuilder.getMany.mockResolvedValue([{ id: 'm3' }, { id: 'm2' }]);
+        await expect(service.findMessagesPaged('c1', 2)).resolves.toEqual([
+            { id: 'm2' },
+            { id: 'm3' },
+        ]);
+        expect(queryBuilder.orderBy).toHaveBeenCalledWith('m.createdAt', 'DESC');
+        expect(queryBuilder.take).toHaveBeenCalledWith(2);
+
+        msgRepo.findOne.mockResolvedValue(null);
+        await expect(service.findMessagesPaged('c1', 2, 'm-unknown')).resolves.toEqual([]);
+    });
+
+    it('stores a message as sent by default and moves the Conversation’s activity', async () => {
+        await service.insertMessage({
+            conversationId: 'c1',
+            role: 'user',
+            content: 'hi',
+            authorType: 'user',
+            authorId: 'u1',
+        });
+        expect(msgRepo.create).toHaveBeenCalledWith(
+            expect.objectContaining({ status: 'sent', createdAt: expect.any(Date) }),
+        );
+        expect(convRepo.update).toHaveBeenCalledWith('c1', {
+            updatedAt: expect.any(Date),
+            lastMessageAt: expect.any(Date),
+        });
+    });
+
+    it('counts unread Agent and system messages per Conversation', async () => {
+        queryBuilder.getRawMany.mockResolvedValue([
+            { conversationId: 'c1', count: '2' },
+            { conversationId: 'c2', count: 0 },
+        ]);
+        const counts = await service.unreadCountsFor('u1', ['c1', 'c2']);
+        expect([...counts.entries()]).toEqual([['c1', 2]]);
+        expect(queryBuilder.andWhere).toHaveBeenCalledWith('m.authorType IN (:...authorTypes)', {
+            authorTypes: ['agent', 'system'],
+        });
+        await expect(service.unreadCountsFor('u1', [])).resolves.toEqual(new Map());
+    });
+
+    it('legacy appends also move last activity', async () => {
+        msgRepo.create.mockReturnValue({});
+        msgRepo.save.mockResolvedValue({ id: 'm1' });
+        await service.appendMessage({ conversationId: 'c1', role: 'assistant', content: 'x' });
+        const [, patch] = convRepo.update.mock.calls[0];
+        expect(patch.lastMessageAt).toBeInstanceOf(Date);
+    });
+
+    it('legacy appends record a model turn as system-authored, never as the person', async () => {
+        await service.appendMessage({ conversationId: 'c1', role: 'assistant', content: 'x' });
+        expect(msgRepo.create).toHaveBeenLastCalledWith(
+            expect.objectContaining({ role: 'assistant', authorType: 'system' }),
+        );
+
+        await service.appendMessages([
+            { conversationId: 'c1', role: 'user', content: 'q' },
+            { conversationId: 'c1', role: 'assistant', content: 'a' },
+            { conversationId: 'c1', role: 'tool', content: '{}' },
+        ]);
+        // A `user` turn keeps the column default, which is already `user`.
+        expect(msgRepo.create.mock.calls.slice(-3).map(([row]) => row.authorType)).toEqual([
+            undefined,
+            'system',
+            'system',
+        ]);
+    });
+
+    it('a legacy append whose read bookkeeping fails still succeeds', async () => {
+        // No `manager` on this mock: the read-position update throws inside.
+        await expect(
+            service.appendMessages([{ conversationId: 'c1', role: 'assistant', content: 'x' }]),
+        ).resolves.toEqual([expect.objectContaining({ id: 'm1', authorType: 'system' })]);
+    });
+});
