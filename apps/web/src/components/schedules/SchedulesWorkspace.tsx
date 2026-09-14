@@ -76,6 +76,13 @@ export function SchedulesWorkspace({
     const [serverOffsetMs, setServerOffsetMs] = useState(() => offsetFrom(initialPage));
     const knownAgents = useRef(new Map<string, string>());
     const firstRender = useRef(true);
+    /**
+     * Every read that writes the list (a filter change, a background refresh,
+     * a row change, load more) takes the next generation, and only a response
+     * whose generation is still the latest may touch state. A slow older read
+     * that lands after a newer one is dropped instead of replacing its rows.
+     */
+    const generation = useRef(0);
 
     for (const row of items) {
         if (row.agentId && row.agentName) knownAgents.current.set(row.agentId, row.agentName);
@@ -86,20 +93,23 @@ export function SchedulesWorkspace({
 
     const load = useCallback(
         async (pageCount: number, showSpinner: boolean) => {
+            const request = ++generation.current;
+            const isCurrent = () => request === generation.current;
             if (showSpinner) setLoading(true);
-            const collected: ScheduleEntry[] = [];
+            let collected: ScheduleEntry[] = [];
             let last: SchedulePage | null = null;
             let cursor: string | null = null;
             let loaded = 0;
             try {
                 do {
                     const response = await getSchedulePage({ ...pageParamsFor(filters), cursor });
+                    if (!isCurrent()) return;
                     if (!response.ok) {
                         setFailed(true);
                         return;
                     }
                     last = response.page;
-                    collected.push(...response.page.items);
+                    collected = [...collected, ...response.page.items];
                     cursor = response.page.nextCursor;
                     loaded += 1;
                 } while (cursor && loaded < Math.min(pageCount, MAX_REFRESH_PAGES));
@@ -109,7 +119,9 @@ export function SchedulesWorkspace({
                 setPagesLoaded(Math.max(1, loaded));
                 setServerOffsetMs(offsetFrom(last));
             } finally {
-                if (showSpinner) setLoading(false);
+                // The latest read owns the spinner — including when a
+                // superseded read was the one that raised it.
+                if (isCurrent()) setLoading(false);
             }
         },
         [filters],
@@ -172,12 +184,14 @@ export function SchedulesWorkspace({
 
     const loadMore = async () => {
         if (!page?.nextCursor) return;
+        const request = ++generation.current;
         setLoadingMore(true);
         try {
             const response = await getSchedulePage({
                 ...pageParamsFor(filters),
                 cursor: page.nextCursor,
             });
+            if (request !== generation.current) return;
             if (response.ok) {
                 setItems((current) => [...current, ...response.page.items]);
                 setPage(response.page);
