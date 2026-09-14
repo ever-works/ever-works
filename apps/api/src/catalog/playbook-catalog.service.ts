@@ -69,15 +69,26 @@ export class PlaybookCatalogService {
             )
             .sort((a, b) => a.rank - b.rank || a.index - b.index);
 
+        const limit = Math.min(query.limit ?? PLAYBOOK_LIST_DEFAULT_LIMIT, PLAYBOOK_LIST_MAX_LIMIT);
+        const offset = query.offset ?? 0;
+
+        // Without a readiness filter the page and the total are known before
+        // any readiness is resolved, so only the returned entries pay for it.
+        if (!query.readiness) {
+            const items = await Promise.all(
+                ranked
+                    .slice(offset, offset + limit)
+                    .map(async ({ entry }) => this.summarise(entry, userId)),
+            );
+            return { items, total: ranked.length };
+        }
+
+        // Filtering by readiness needs every candidate's state; the readiness
+        // service coalesces the capability lookups those entries share.
         const summaries = await Promise.all(
             ranked.map(async ({ entry }) => this.summarise(entry, userId)),
         );
-        const filtered = query.readiness
-            ? summaries.filter((summary) => summary.readiness === query.readiness)
-            : summaries;
-
-        const limit = Math.min(query.limit ?? PLAYBOOK_LIST_DEFAULT_LIMIT, PLAYBOOK_LIST_MAX_LIMIT);
-        const offset = query.offset ?? 0;
+        const filtered = summaries.filter((summary) => summary.readiness === query.readiness);
         return { items: filtered.slice(offset, offset + limit), total: filtered.length };
     }
 

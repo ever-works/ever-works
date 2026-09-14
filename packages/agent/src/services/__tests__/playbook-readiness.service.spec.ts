@@ -266,6 +266,51 @@ describe('PlaybookReadinessService', () => {
             expect(registry.getEnabledPluginsScoped).toHaveBeenCalledTimes(4);
         });
 
+        it('resolves a capability shared by many concurrent playbooks with one registry read', async () => {
+            const registry = registryProviding({ search: [{ id: 's', name: 'S' }] });
+            const service = new PlaybookReadinessService(registry);
+            const entries = Array.from({ length: 51 }, (_, index) =>
+                playbook({ slug: `playbook-${index}` }),
+            );
+
+            const answers = await Promise.all(
+                entries.map((entry) => service.getReadiness(entry, scope)),
+            );
+
+            expect(answers.every((answer) => answer.state === 'ready')).toBe(true);
+            // One read per distinct capability (search, content-extractor), not per playbook.
+            expect(registry.getEnabledPluginsScoped).toHaveBeenCalledTimes(2);
+        });
+
+        it('never lets a lookup that started before clear() repopulate the cache', async () => {
+            let release!: () => void;
+            const gate = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            const providers: Record<string, Array<{ id: string; name: string }>> = {};
+            const base = registryProviding(providers);
+            const registry = {
+                getEnabledPluginsScoped: jest.fn(async (...args: unknown[]) => {
+                    // Snapshot plugin state when the read starts, answer later.
+                    const answer = await (base.getEnabledPluginsScoped as jest.Mock)(...args);
+                    await gate;
+                    return answer;
+                }),
+            } as unknown as PluginRegistryService & { getEnabledPluginsScoped: jest.Mock };
+            const service = new PlaybookReadinessService(registry);
+            const entry = playbook({ connections: [playbook().connections[0]] });
+
+            const stale = service.getReadiness(entry, scope);
+            service.clear();
+            providers.search = [{ id: 's', name: 'S' }];
+            release();
+            expect((await stale).state).toBe('needs_connection');
+
+            // The stale answer was not kept: the next read sees the enabled plugin.
+            expect((await service.getReadiness(entry, scope)).state).toBe('ready');
+            expect(registry.getEnabledPluginsScoped).toHaveBeenCalledTimes(2);
+        });
+
         it('forgets everything on clear()', async () => {
             const registry = registryProviding({});
             const service = new PlaybookReadinessService(registry);
@@ -301,6 +346,9 @@ describe('PlaybookReadinessService', () => {
             await jest.advanceTimersByTimeAsync(2_000);
             await again;
             expect(registry.getEnabledPluginsScoped.mock.calls.length).toBeGreaterThan(1);
+            // A hung lookup is not shared past the budget: the retry asked the
+            // registry again for both capabilities.
+            expect(registry.getEnabledPluginsScoped).toHaveBeenCalledTimes(4);
         });
 
         it('treats a failing check as unknown rather than throwing', async () => {

@@ -72,6 +72,20 @@ export class PlaybookReadinessService {
         string,
         CacheEntry<PlaybookCapabilityProvider | null>
     >();
+    /**
+     * Provider lookups still in flight, by the same key as `providerCache`.
+     * A catalogue page resolves many playbooks at once and most share their
+     * capabilities, so concurrent callers await ONE registry read per
+     * capability and scope instead of each missing the cache together. A
+     * lookup is only shared while it is younger than the readiness budget, so
+     * one that hangs cannot pin every later check to `unknown`.
+     */
+    private readonly providerInFlight = new Map<
+        string,
+        { readonly promise: Promise<PlaybookCapabilityProvider | null>; readonly startedAt: number }
+    >();
+    /** Bumped by `clear()` so a check that started earlier never repopulates either cache. */
+    private generation = 0;
 
     constructor(
         private readonly registry: PluginRegistryService,
@@ -101,6 +115,7 @@ export class PlaybookReadinessService {
         const cached = this.cache.get(key);
         if (cached && cached.expiresAt > this.now()) return cached.value;
 
+        const generation = this.generation;
         const unknown: string[] = [];
         const [connections, counts, collisions] = await Promise.all([
             this.withinBudget(this.resolveConnections(entry, scope)),
@@ -163,7 +178,9 @@ export class PlaybookReadinessService {
             unknown,
         };
 
-        if (unknown.length === 0) {
+        // An answer computed across a `clear()` may describe the old plugin
+        // state, so it is returned but never cached.
+        if (unknown.length === 0 && generation === this.generation) {
             this.prune(this.cache);
             this.cache.set(key, {
                 value: readiness,
@@ -175,8 +192,10 @@ export class PlaybookReadinessService {
 
     /** Forget every cached answer — for a caller that knows plugin state just changed. */
     clear(): void {
+        this.generation++;
         this.cache.clear();
         this.providerCache.clear();
+        this.providerInFlight.clear();
     }
 
     /** Drop expired answers once a cache grows large, and everything if it is still full. */
@@ -217,6 +236,36 @@ export class PlaybookReadinessService {
         const cached = this.providerCache.get(key);
         if (cached && cached.expiresAt > this.now()) return cached.value;
 
+        const pending = this.providerInFlight.get(key);
+        if (pending && this.now() - pending.startedAt < PLAYBOOK_READINESS_BUDGET_MS) {
+            return pending.promise;
+        }
+
+        const generation = this.generation;
+        const lookup = this.lookupProvider(capability, scope).then((value) => {
+            if (generation === this.generation) {
+                this.prune(this.providerCache);
+                this.providerCache.set(key, {
+                    value,
+                    expiresAt: this.now() + PLAYBOOK_READINESS_CACHE_MS,
+                });
+            }
+            return value;
+        });
+        const tracked = lookup.finally(() => {
+            if (this.providerInFlight.get(key)?.promise === tracked) {
+                this.providerInFlight.delete(key);
+            }
+        });
+        if (this.providerInFlight.size >= MAX_CACHE_ENTRIES) this.providerInFlight.clear();
+        this.providerInFlight.set(key, { promise: tracked, startedAt: this.now() });
+        return tracked;
+    }
+
+    private async lookupProvider(
+        capability: string,
+        scope: PlaybookReadinessScope,
+    ): Promise<PlaybookCapabilityProvider | null> {
         const enabled = await this.registry.getEnabledPluginsScoped(
             capability,
             scope.workId,
@@ -225,15 +274,12 @@ export class PlaybookReadinessService {
         const preferred =
             enabled.find((p) => p.manifest.defaultForCapabilities?.includes(capability)) ??
             enabled[0];
-        const value = preferred
+        return preferred
             ? {
                   pluginId: preferred.plugin.id,
                   name: preferred.manifest.name ?? preferred.plugin.name ?? preferred.plugin.id,
               }
             : null;
-        this.prune(this.providerCache);
-        this.providerCache.set(key, { value, expiresAt: this.now() + PLAYBOOK_READINESS_CACHE_MS });
-        return value;
     }
 
     private async countAdoptions(

@@ -176,6 +176,43 @@ describe('CatalogController', () => {
             expect(page.total).toBe(4);
         });
 
+        it('resolves readiness only for the page it returns when no readiness filter is set', async () => {
+            const { controller, facade, registry } = build();
+            facade.listEntries.mockResolvedValue(
+                Array.from({ length: 51 }, (_, index) =>
+                    playbook(`entry-${index}`, {
+                        connections: [
+                            { capability: `capability-${index}`, required: true, reason: 'r' },
+                        ],
+                    }),
+                ),
+            );
+
+            const page = await controller.list(AUTH, { limit: 1, offset: 3 });
+
+            expect(page.total).toBe(51);
+            expect(page.items.map((item) => item.slug)).toEqual(['entry-3']);
+            expect(page.items[0].missingRequired).toEqual(['capability-3']);
+            expect(registry.getEnabledPluginsScoped).toHaveBeenCalledTimes(1);
+        });
+
+        it('shares capability lookups across entries when filtering by readiness', async () => {
+            const { controller, facade, registry } = build();
+            facade.listEntries.mockResolvedValue(
+                Array.from({ length: 51 }, (_, index) =>
+                    playbook(`entry-${index}`, {
+                        connections: [{ capability: 'search', required: true, reason: 'r' }],
+                    }),
+                ),
+            );
+
+            const page = await controller.list(AUTH, { readiness: 'needs_connection', limit: 1 });
+
+            expect(page.total).toBe(51);
+            expect(page.items).toHaveLength(1);
+            expect(registry.getEnabledPluginsScoped).toHaveBeenCalledTimes(1);
+        });
+
         it('serves the catalogue from the per-caller cache on a second read', async () => {
             const { controller, facade } = build();
             await controller.list(AUTH, {});
