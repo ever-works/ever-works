@@ -13,8 +13,17 @@ import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch
 import { SchedulesList } from '@/components/schedules/SchedulesList';
 import { TriggersManager } from '@/components/schedules/TriggersManager';
 import { toast } from 'sonner';
-import { Activity as ActivityIcon, Download, Loader2, List, CalendarClock } from 'lucide-react';
+import {
+    Activity as ActivityIcon,
+    ArrowUpRight,
+    Download,
+    Loader2,
+    List,
+    CalendarClock,
+} from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 
 type ActivityTab = 'log' | 'schedules';
 
@@ -29,6 +38,7 @@ interface ActivityClientProps {
 
 export function ActivityClient({ initialActivities, totalActivities }: ActivityClientProps) {
     const t = useTranslations('dashboard.activity');
+    const tSchedules = useTranslations('dashboard.schedules');
     const searchParams = useSearchParams();
     const router = useRouter();
     const pathname = usePathname();
@@ -461,6 +471,19 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
 
             {!isLogTab && (
                 <>
+                    {/* Schedules workspace — the same projection with run-now,
+                        pause and resume. Kept OUTSIDE the `schedules-list`
+                        container so the list below is untouched. */}
+                    <div className="flex justify-end">
+                        <Link
+                            href={ROUTES.DASHBOARD_SCHEDULES}
+                            data-testid="activity-open-schedules"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                            {tSchedules('openWorkspace')}
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                    </div>
                     <SchedulesList />
                     <TriggersManager />
                 </>

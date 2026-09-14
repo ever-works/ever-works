@@ -2953,11 +2953,31 @@
                 "owner": "Owner",
                 "cadence": "Cadence",
                 "nextRun": "Next run",
-                "status": "Status"
+                "status": "Status",
+                "schedule": "Schedule",
+                "agent": "Agent",
+                "next": "Next",
+                "last": "Last",
+                "health": "Health"
             },
             "filters": {
                 "all": "All",
-                "activeOnly": "Active only"
+                "activeOnly": "Active only",
+                "agent": "Agent",
+                "anyAgent": "Any agent",
+                "source": "Source",
+                "anySource": "Any source",
+                "status": "Status",
+                "anyStatus": "Any status",
+                "health": "Health",
+                "anyHealth": "Any health",
+                "healthOk": "OK",
+                "healthNeverRuns": "Never runs",
+                "search": "Search schedules…",
+                "searchLabel": "Search schedules",
+                "clear": "Clear filters",
+                "noMatchTitle": "No schedules match these filters",
+                "unfilteredTotal": "{total, plural, one {You have # schedule in total.} other {You have # schedules in total.}}"
             },
             "sourceTypes": {
                 "inboundTrigger": "Inbound trigger",
@@ -2979,6 +2999,135 @@
                 "title": "Nothing scheduled yet",
                 "description": "Recurring tasks, agent heartbeats, work schedules, mission ticks, source validation, and data sync will appear here once you set them up.",
                 "noResults": "No schedules match the current filter."
+            },
+            "pageSubtitle": "Everything that runs without you",
+            "openWorkspace": "Open Schedules",
+            "backToActivity": "Activity log",
+            "summaryLine": "{total} schedules · {active} active · {paused} paused",
+            "timezoneNote": "UTC ({local} local)",
+            "neverRunYet": "never run yet",
+            "lastNotTracked": "Not recorded for this source",
+            "loadMore": "Load more",
+            "loading": "Loading schedules…",
+            "showingRange": "Showing {shown} of {total}",
+            "pausedSince": "Paused {when}",
+            "agentNone": "—",
+            "actions": {
+                "menuLabel": "Actions for {name}",
+                "runNow": "Run now",
+                "pause": "Pause",
+                "resume": "Resume",
+                "edit": "Edit",
+                "duplicate": "Duplicate",
+                "reassign": "Reassign to another agent…",
+                "openTask": "Open the task",
+                "openAgent": "Open the agent",
+                "openMission": "Open the mission",
+                "openWork": "Open the work",
+                "openTriggers": "Open the triggers",
+                "seePastRuns": "See past runs",
+                "seeIdeasRaised": "See the ideas it raised"
+            },
+            "controlReasons": {
+                "eventDriven": "It fires when an outside event arrives, so there is nothing to run now",
+                "managedOnWork": "Managed on the work's own settings",
+                "alreadyPaused": "Already paused",
+                "notPaused": "Not paused",
+                "ended": "This schedule has ended",
+                "ownerArchived": "The owning agent is archived",
+                "ownerInactive": "The owner is not active",
+                "noAgent": "No agent is assigned to this schedule",
+                "noAuthoredForm": "This schedule has no authored form to copy or move",
+                "notAvailableYet": "Not available for this schedule yet"
+            },
+            "nextReasons": {
+                "paused": "Paused — the cadence is kept",
+                "eventDriven": "Fires on an event",
+                "ended": "Ended",
+                "beyondLookahead": "Fires more than a month from now",
+                "notScheduledYet": "No fire scheduled yet",
+                "ownerInactive": "The owner is not active"
+            },
+            "countdown": {
+                "due": "due now",
+                "in": "in {value}",
+                "days": "{days}d {hours}h",
+                "hours": "{hours}h {minutes}m",
+                "minutes": "{minutes}m {seconds}s",
+                "seconds": "{seconds}s"
+            },
+            "health": {
+                "ok": "OK",
+                "neverRuns": "NEVER RUNS",
+                "badgeLabel": "Health: {status}",
+                "bannerCount": "{count, plural, one {# schedule will never run.} other {# schedules will never run.}}",
+                "reviewAndFix": "Review",
+                "hideReview": "Hide",
+                "dismiss": "Dismiss",
+                "reviewTitle": "Schedules that will never run",
+                "reviewLead": "Nothing is changed here. Each row shows why it cannot fire and what a fix would change.",
+                "before": "Before",
+                "after": "After",
+                "needsDecision": "Needs a decision.",
+                "needsEditing": "Needs editing.",
+                "open": "Open",
+                "checkedAt": "Health checked {when}",
+                "reasons": {
+                    "impossibleDate": "The cadence names a date that never occurs",
+                    "ended": "Its end date has passed",
+                    "exhausted": "It has used up its maximum number of runs",
+                    "pastOneShot": "Its one-time slot is in the past",
+                    "unparseable": "Its cadence cannot be read",
+                    "noAgent": "No agent is assigned to run it",
+                    "ownerArchived": "The agent that runs it is archived or gone"
+                },
+                "repairs": {
+                    "clearEndDate": "No end date",
+                    "clearOccurrenceCap": "No limit on runs"
+                }
+            },
+            "runNow": {
+                "queuedToast": "Running now. This does not change the next scheduled fire.",
+                "parkedToast": "Queued behind other runs. This does not change the next scheduled fire.",
+                "creditsToast": "Your credit balance cannot cover another run right now.",
+                "missionTickToast": "Running one tick now. A tick raises ideas rather than a run — open the mission to see what it raised.",
+                "openRun": "Open the run",
+                "refused": {
+                    "alreadyRunning": "This schedule is already running.",
+                    "noAgent": "No agent is assigned to this schedule.",
+                    "ownerArchived": "The owning agent is archived.",
+                    "rateLimited": "You have run schedules 10 times in the last minute. Try again shortly.",
+                    "unavailable": "This control is not available for this schedule.",
+                    "noRuntime": "No job runtime is configured, so this schedule cannot run now.",
+                    "failed": "Could not run this schedule. Nothing was changed."
+                }
+            },
+            "pauseToast": "Paused. The cadence and instructions are kept.",
+            "resumeToast": "Resumed. It fires on its usual cadence.",
+            "pauseFailed": "Could not pause this schedule. Nothing was changed.",
+            "resumeFailed": "Could not resume this schedule. Nothing was changed.",
+            "missionPause": {
+                "confirmTitle": "Pause the whole \"{name}\" mission?",
+                "confirmBody": "This cadence belongs to the mission, so pausing it pauses the mission itself. The mission stops raising new ideas, and so stops producing new work.",
+                "alreadyRaisedNote": "The ideas and works it has already raised are left exactly as they are.",
+                "openMissionInstead": "Open the mission",
+                "confirm": "Pause the mission",
+                "cancel": "Cancel"
+            },
+            "degraded": {
+                "sourceFailed": "Some schedules could not be loaded: {sources}. Everything else is shown.",
+                "totalsExclude": "Totals below exclude them."
+            },
+            "errors": {
+                "listFailed": "Schedules could not be loaded",
+                "listFailedBody": "This is a problem on our side, not with your schedules. Nothing has been paused or changed.",
+                "healthFailed": "Health could not be checked right now."
+            },
+            "emptyWorkspace": {
+                "description": "Schedules are the work that happens without you — a morning scan, a weekly report, a nightly refresh. Start with one of these.",
+                "recurringTask": "Make a task recurring",
+                "heartbeat": "Give an agent a heartbeat",
+                "workUpdates": "Set a work to update itself"
             }
         },
         "activity": {
@@ -8070,7 +8219,8 @@
                 "skills": "Skills",
                 "templates": "Templates",
                 "settings": "Settings",
-                "teams": "Teams"
+                "teams": "Teams",
+                "schedules": "Schedules"
             },
             "tooltips": {
                 "expandSidebar": "Expand sidebar",
@@ -8939,7 +9089,8 @@
             "discover": "Discover",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "resendVerification": "Resend Verification Email"
+            "resendVerification": "Resend Verification Email",
+            "schedules": "Schedules"
         }
     },
     "api": {
