@@ -226,6 +226,22 @@ export class KnowledgeLibraryService {
         };
     }
 
+    /**
+     * One document as a shelf row — its folder, Work name, revision and
+     * whether the caller may curate it. What the per-Work workbench header
+     * reads to show the folder breadcrumb and the File / Archive / Export
+     * controls without leaving the Work. Requires view access to the
+     * document's Work; a document the person cannot view is reported exactly
+     * like one that does not exist.
+     */
+    async getDocument(
+        actor: KnowledgeLibraryActor,
+        documentId: string,
+    ): Promise<KbLibraryDocumentDto> {
+        const doc = await this.requireViewable(actor, documentId);
+        return this.reload(actor, doc.id);
+    }
+
     // ─── Curation ────────────────────────────────────────────────────────
 
     /**
@@ -398,17 +414,7 @@ export class KnowledgeLibraryService {
         actor: KnowledgeLibraryActor,
         documentId: string,
     ): Promise<{ filename: string; content: string }> {
-        const doc = await this.requireInScope(actor, documentId);
-        if (doc.workId) {
-            try {
-                await this.ownership.ensureCanView(doc.workId, actor.userId);
-            } catch (error) {
-                if (error instanceof ForbiddenException || error instanceof NotFoundException) {
-                    throw new NotFoundException({ status: 'error', message: 'Document not found' });
-                }
-                throw error;
-            }
-        }
+        const doc = await this.requireViewable(actor, documentId);
         const [scope, folders] = await Promise.all([
             this.resolveScope(actor.organizationId),
             this.folders.listOrganizationFolders(actor.organizationId),
@@ -460,6 +466,29 @@ export class KnowledgeLibraryService {
         const [doc] = await this.documents.findInLibraryScope(scope, [documentId]);
         if (!doc) {
             throw new NotFoundException({ status: 'error', message: 'Document not found' });
+        }
+        return doc;
+    }
+
+    /**
+     * A document of the library the person may view. No view access to its
+     * Work reads exactly like a document that does not exist (404, same
+     * body), so a reader cannot probe for documents they cannot see.
+     */
+    private async requireViewable(
+        actor: KnowledgeLibraryActor,
+        documentId: string,
+    ): Promise<WorkKnowledgeDocument> {
+        const doc = await this.requireInScope(actor, documentId);
+        if (doc.workId) {
+            try {
+                await this.ownership.ensureCanView(doc.workId, actor.userId);
+            } catch (error) {
+                if (error instanceof ForbiddenException || error instanceof NotFoundException) {
+                    throw new NotFoundException({ status: 'error', message: 'Document not found' });
+                }
+                throw error;
+            }
         }
         return doc;
     }

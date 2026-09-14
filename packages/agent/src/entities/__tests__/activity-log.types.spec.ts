@@ -167,8 +167,11 @@ describe('activity-log.types', () => {
             // ActivityStatus, and including it inflates the total by 5.
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
-            //    (Live Feed — run lifecycle for non-heartbeat triggers) and +5 knowledge
-            //    library literals -> 165.
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            //
+            // Both land together when the Knowledge library shelf merges
+            // develop's Live Feed work: 162 (shelf side) and 160 (develop side)
+            // each counted from their own base, and the merged enum COUNTS 165.
             expect(literals).toHaveLength(165);
         });
 

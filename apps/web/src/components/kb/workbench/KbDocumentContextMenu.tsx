@@ -17,10 +17,13 @@ import {
     Archive,
     ClipboardCopy,
     Copy,
+    Download,
     FileEdit,
+    FolderInput,
     Link2,
     Lock,
     LockOpen,
+    RotateCcw,
     Trash2,
     type LucideIcon,
 } from 'lucide-react';
@@ -28,6 +31,11 @@ import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/lib/constants';
 import { updateKbDocumentAction, deleteKbDocumentAction } from '@/app/actions/works/kb-document';
 import { lockKbDocumentAction, unlockKbDocumentAction } from '@/app/actions/works/kb-lock';
+import { unarchiveKbDocumentAction } from '@/app/actions/works/kb-review';
+import { DocumentFilePicker } from '@/components/knowledge/DocumentFilePicker';
+import { knowledgeLibraryClient } from '@/components/knowledge/library-client';
+import { shelfBlockReason } from '@/components/knowledge/shelf-block-reason';
+import { useLibraryDocument } from '@/components/knowledge/use-library-document';
 import type { KbDocumentDto, KbLockMode, UpdateKbDocumentInput } from '@ever-works/contracts';
 
 /**
@@ -44,6 +52,11 @@ import type { KbDocumentDto, KbLockMode, UpdateKbDocumentInput } from '@ever-wor
  *   - Archive → PATCH `{ status: 'archived' }`
  *   - Delete → "type the doc name to confirm" + DELETE
  *   - Copy path / Copy wikilink → navigator.clipboard
+ *   - Knowledge library: File into folder… (a shared folder of the
+ *     Organization), Restore (an archived document, back to its folder) and
+ *     Export as Markdown. The library row is read only once the menu opens;
+ *     File and Export stay visible but disabled — with the reason — outside
+ *     an Organization or without edit access.
  *
  * Full-lock semantics (slice 1 of EW-643): when `locked && lockMode ===
  * 'full'`, Rename / Duplicate / Delete are disabled and the menu shows
@@ -97,6 +110,7 @@ export function KbDocumentContextMenu({
     clipboardWrite,
 }: KbDocumentContextMenuProps) {
     const tMenu = useTranslations('dashboard.workDetail.kb.workbench.contextMenu');
+    const tLibrary = useTranslations('dashboard.memoryPage.library');
     const router = useRouter();
 
     const [position, setPosition] = useState<MenuPosition | null>(null);
@@ -104,6 +118,11 @@ export function KbDocumentContextMenu({
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, setPending] = useState(false);
+    const [filePickerOpen, setFilePickerOpen] = useState(false);
+
+    // Read the document's shelf row only while the menu (or its file picker)
+    // is open — never one request per tree row.
+    const library = useLibraryDocument(document.id, position !== null || filePickerOpen);
 
     const fullyLocked = document.locked && document.lockMode === 'full';
 
@@ -299,6 +318,44 @@ export function KbDocumentContextMenu({
         }
     }, [workId, document.id, document.path, router, closeMenu]);
 
+    const onRestore = useCallback(async () => {
+        setPending(true);
+        setError(null);
+        const result = await unarchiveKbDocumentAction({
+            workId,
+            docId: document.id,
+            path: document.path,
+        });
+        setPending(false);
+        if (result.success && result.data) {
+            onPatched?.(result.data.document);
+            router.refresh();
+            closeMenu();
+        } else {
+            setError(result.error ?? tLibrary('restoreFailed'));
+        }
+    }, [workId, document.id, document.path, onPatched, router, closeMenu, tLibrary]);
+
+    const onExportMarkdown = useCallback(async () => {
+        setPending(true);
+        setError(null);
+        try {
+            await knowledgeLibraryClient.exportMarkdown(
+                document.id,
+                `${document.slug || 'document'}.md`,
+            );
+            closeMenu();
+        } catch {
+            setError(tLibrary('exportFailed'));
+        } finally {
+            setPending(false);
+        }
+    }, [document.id, document.slug, closeMenu, tLibrary]);
+
+    const fileBlock = shelfBlockReason('file', library.state, library.document);
+    const exportBlock = shelfBlockReason('export', library.state, library.document);
+    const restoreBlock = shelfBlockReason('restore', library.state, library.document);
+
     const writeClipboard = useCallback(
         async (text: string) => {
             try {
@@ -369,6 +426,32 @@ export function KbDocumentContextMenu({
                     }}
                     onCopyPath={onCopyPath}
                     onCopyWikilink={onCopyWikilink}
+                    library={{
+                        labels: {
+                            fileInto: tLibrary('fileInto'),
+                            restore: tLibrary('restore'),
+                            exportMarkdown: tLibrary('exportMarkdown'),
+                        },
+                        fileDisabledReason: fileBlock ? tLibrary(fileBlock) : undefined,
+                        exportDisabledReason: exportBlock ? tLibrary(exportBlock) : undefined,
+                        restoreDisabledReason: restoreBlock ? tLibrary(restoreBlock) : undefined,
+                        showHints: library.state === 'ready' || library.state === 'unavailable',
+                        onFile: () => {
+                            closeMenu();
+                            setFilePickerOpen(true);
+                        },
+                        onRestore: () => void onRestore(),
+                        onExport: () => void onExportMarkdown(),
+                    }}
+                />
+            ) : null}
+
+            {filePickerOpen && library.document ? (
+                <DocumentFilePicker
+                    open={filePickerOpen}
+                    onOpenChange={setFilePickerOpen}
+                    document={library.document}
+                    onFiled={() => void library.refresh()}
                 />
             ) : null}
 
@@ -434,6 +517,21 @@ interface ContextMenuPanelProps {
     onDelete: () => void;
     onCopyPath: () => void;
     onCopyWikilink: () => void;
+    /**
+     * Knowledge library entries (File into folder…, Restore, Export as
+     * Markdown). Optional so the panel renders exactly as before without it.
+     */
+    library?: {
+        labels: { fileInto: string; restore: string; exportMarkdown: string };
+        fileDisabledReason?: string;
+        exportDisabledReason?: string;
+        restoreDisabledReason?: string;
+        /** `false` while the library row is still loading — no hint flashes. */
+        showHints: boolean;
+        onFile: () => void;
+        onRestore: () => void;
+        onExport: () => void;
+    };
 }
 
 const ContextMenuPanel = function ContextMenuPanel({
@@ -452,6 +550,7 @@ const ContextMenuPanel = function ContextMenuPanel({
     onDelete,
     onCopyPath,
     onCopyWikilink,
+    library,
 }: ContextMenuPanelProps & { ref: React.Ref<HTMLDivElement> }) {
     const [lockSubmenuOpen, setLockSubmenuOpen] = useState(false);
     const menuId = useId();
@@ -557,6 +656,42 @@ const ContextMenuPanel = function ContextMenuPanel({
                 onClick={onArchive}
             />
 
+            {library ? (
+                <>
+                    {document.status === 'archived' ? (
+                        <MenuItem
+                            testId="kb-workbench-context-restore"
+                            icon={RotateCcw}
+                            label={library.labels.restore}
+                            disabled={pending || Boolean(library.restoreDisabledReason)}
+                            disabledTitle={library.restoreDisabledReason}
+                            disabledHint={
+                                library.showHints ? library.restoreDisabledReason : undefined
+                            }
+                            onClick={library.onRestore}
+                        />
+                    ) : null}
+                    <MenuItem
+                        testId="kb-workbench-context-file"
+                        icon={FolderInput}
+                        label={library.labels.fileInto}
+                        disabled={pending || Boolean(library.fileDisabledReason)}
+                        disabledTitle={library.fileDisabledReason}
+                        disabledHint={library.showHints ? library.fileDisabledReason : undefined}
+                        onClick={library.onFile}
+                    />
+                    <MenuItem
+                        testId="kb-workbench-context-export"
+                        icon={Download}
+                        label={library.labels.exportMarkdown}
+                        disabled={pending || Boolean(library.exportDisabledReason)}
+                        disabledTitle={library.exportDisabledReason}
+                        disabledHint={library.showHints ? library.exportDisabledReason : undefined}
+                        onClick={library.onExport}
+                    />
+                </>
+            ) : null}
+
             <Separator />
 
             <MenuItem
@@ -603,6 +738,12 @@ interface MenuItemProps {
     label: string;
     disabled?: boolean;
     disabledTitle?: string;
+    /**
+     * Shown under the label while disabled. A disabled item takes no pointer
+     * events, so a `title` tooltip alone never appears; the library entries
+     * spell their reason out instead.
+     */
+    disabledHint?: string;
     tone?: 'default' | 'danger';
     onClick: () => void;
 }
@@ -613,6 +754,7 @@ function MenuItem({
     label,
     disabled,
     disabledTitle,
+    disabledHint,
     tone,
     onClick,
 }: MenuItemProps) {
@@ -628,7 +770,17 @@ function MenuItem({
             className={menuItemClasses(disabled, tone)}
         >
             <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="flex-1 text-left">{label}</span>
+            <span className="flex-1 text-left">
+                {label}
+                {disabled && disabledHint ? (
+                    <span
+                        data-testid={`${testId}-hint`}
+                        className="block text-[10px] leading-snug text-text-muted dark:text-text-muted-dark"
+                    >
+                        {disabledHint}
+                    </span>
+                ) : null}
+            </span>
         </button>
     );
 }

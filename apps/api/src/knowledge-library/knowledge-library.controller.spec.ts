@@ -54,6 +54,7 @@ describe('KnowledgeLibraryController', () => {
                 .fn()
                 .mockResolvedValue({ documents: [], nextCursor: null, total: 0, unreadCount: 0 }),
             tree: jest.fn().mockResolvedValue({ folders: [] }),
+            getDocument: jest.fn().mockResolvedValue({ id: DOC_ID, folderPath: '/Playbooks' }),
             fileDocuments: jest.fn().mockResolvedValue({ filed: 1, folderId: FOLDER_ID }),
             archive: jest.fn().mockResolvedValue({ id: DOC_ID }),
             unarchive: jest
@@ -90,6 +91,7 @@ describe('KnowledgeLibraryController', () => {
             for (const method of [
                 'list',
                 'tree',
+                'get',
                 'file',
                 'archive',
                 'unarchive',
@@ -104,6 +106,7 @@ describe('KnowledgeLibraryController', () => {
         it.each([
             ['list', 'library', RequestMethod.GET],
             ['tree', 'tree', RequestMethod.GET],
+            ['get', 'documents/:docId', RequestMethod.GET],
             ['file', 'documents/file', RequestMethod.PATCH],
             ['archive', 'documents/:docId/archive', RequestMethod.POST],
             ['unarchive', 'documents/:docId/unarchive', RequestMethod.POST],
@@ -172,6 +175,24 @@ describe('KnowledgeLibraryController', () => {
                 expect.objectContaining({ canManageOrganization: false }),
                 DOC_ID,
             );
+        });
+
+        it('reads one document as a shelf row for the Organization in scope', async () => {
+            await expect(controller.get(auth, DOC_ID)).resolves.toMatchObject({
+                id: DOC_ID,
+                folderPath: '/Playbooks',
+            });
+            expect(membership.ensureMember).toHaveBeenCalledWith('o-1', 'u-1');
+            expect(library.getDocument).toHaveBeenCalledWith(
+                { userId: 'u-1', organizationId: 'o-1', canManageOrganization: true },
+                DOC_ID,
+            );
+        });
+
+        it('404s a single-document read when there is no active Organization', async () => {
+            scopeContext.getOrganizationId.mockReturnValue(null);
+            await expect(controller.get(auth, DOC_ID)).rejects.toBeInstanceOf(NotFoundException);
+            expect(library.getDocument).not.toHaveBeenCalled();
         });
 
         it('404s a write when there is no active Organization', async () => {
