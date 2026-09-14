@@ -269,6 +269,31 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
             await service.archiveDocument(WORK_ID, DOC_ID, USER_ID);
             expect(docRepo.update.mock.calls[0][1].revision).toBeUndefined();
         });
+
+        it('records the decision status it replaces on a decision document', async () => {
+            docRepo.findById.mockResolvedValue(
+                buildDocument({
+                    kbDocumentClass: KbDocumentClass.DECISION,
+                    decision: { status: KbDecisionStatus.ACCEPTED },
+                }),
+            );
+            await service.archiveDocument(WORK_ID, DOC_ID, USER_ID);
+            const patch = docRepo.update.mock.calls[0][1];
+            expect(patch.decision).toEqual({ status: KbDecisionStatus.ARCHIVED });
+            expect(patch.metadata).toEqual({
+                body: BODY,
+                archivedFromFolderId: null,
+                archivedFromDecisionStatus: KbDecisionStatus.ACCEPTED,
+            });
+        });
+
+        it('records nothing about decisions on a document that is not a decision', async () => {
+            docRepo.findById.mockResolvedValue(buildDocument());
+            await service.archiveDocument(WORK_ID, DOC_ID, USER_ID);
+            expect(docRepo.update.mock.calls[0][1].metadata).not.toHaveProperty(
+                'archivedFromDecisionStatus',
+            );
+        });
     });
 
     describe('unarchiveDocument', () => {
@@ -329,7 +354,59 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
             expect(activityLog.log).not.toHaveBeenCalled();
         });
 
-        it('leaves the decision state alone', async () => {
+        it('leaves the decision state alone when the decision was already archived before the document was', async () => {
+            docRepo.findById.mockResolvedValue(
+                buildDocument({
+                    kbDocumentClass: KbDocumentClass.DECISION,
+                    status: KbDocumentStatus.ARCHIVED,
+                    decision: { status: KbDecisionStatus.ARCHIVED },
+                    metadata: {
+                        body: BODY,
+                        archivedFromDecisionStatus: KbDecisionStatus.ARCHIVED,
+                    },
+                }),
+            );
+            await service.unarchiveDocument(WORK_ID, DOC_ID, USER_ID);
+            const patch = docRepo.update.mock.calls[0][1];
+            expect(patch.decision).toBeUndefined();
+            expect(patch.metadata).toEqual({ body: BODY });
+        });
+
+        it('leaves the decision state alone on a document that is not a decision', async () => {
+            docRepo.findById.mockResolvedValue(
+                buildDocument({ status: KbDocumentStatus.ARCHIVED }),
+            );
+            await service.unarchiveDocument(WORK_ID, DOC_ID, USER_ID);
+            expect(docRepo.update.mock.calls[0][1].decision).toBeUndefined();
+        });
+
+        it('restores the decision status recorded when the review action archived it', async () => {
+            docRepo.findById.mockResolvedValue(
+                buildDocument({
+                    kbDocumentClass: KbDocumentClass.DECISION,
+                    status: KbDocumentStatus.ARCHIVED,
+                    decision: {
+                        status: KbDecisionStatus.ARCHIVED,
+                        rationale: 'Cheaper to run',
+                    },
+                    metadata: {
+                        body: BODY,
+                        archivedFromFolderId: null,
+                        archivedFromDecisionStatus: KbDecisionStatus.ACCEPTED,
+                    },
+                }),
+            );
+            await service.unarchiveDocument(WORK_ID, DOC_ID, USER_ID);
+            const patch = docRepo.update.mock.calls[0][1];
+            expect(patch.status).toBe(KbDocumentStatus.ACTIVE);
+            expect(patch.decision).toEqual({
+                status: KbDecisionStatus.ACCEPTED,
+                rationale: 'Cheaper to run',
+            });
+            expect(patch.metadata).toEqual({ body: BODY });
+        });
+
+        it('falls back to the neutral proposed status when no decision status was recorded', async () => {
             docRepo.findById.mockResolvedValue(
                 buildDocument({
                     kbDocumentClass: KbDocumentClass.DECISION,
@@ -338,7 +415,39 @@ describe('KnowledgeBaseService — knowledge library revisions and archive', () 
                 }),
             );
             await service.unarchiveDocument(WORK_ID, DOC_ID, USER_ID);
-            expect(docRepo.update.mock.calls[0][1].decision).toBeUndefined();
+            expect(docRepo.update.mock.calls[0][1].decision).toEqual({
+                status: KbDecisionStatus.PROPOSED,
+            });
+        });
+
+        it('an archive then a restore through the review action leaves the decision as it was', async () => {
+            let row = buildDocument({
+                kbDocumentClass: KbDocumentClass.DECISION,
+                folderId: FOLDER_ID,
+                decision: { status: KbDecisionStatus.SUPERSEDED, supersededByDocId: 'newer' },
+            });
+            docRepo.findById.mockImplementation(async () => row);
+            docRepo.update.mockImplementation(async (_id, patch) => {
+                row = buildDocument({ ...row, ...patch });
+                return row;
+            });
+
+            await service.archiveDocument(WORK_ID, DOC_ID, USER_ID);
+            expect(row.status).toBe(KbDocumentStatus.ARCHIVED);
+            expect(row.decision?.status).toBe(KbDecisionStatus.ARCHIVED);
+            expect(row.metadata).toMatchObject({
+                archivedFromFolderId: FOLDER_ID,
+                archivedFromDecisionStatus: KbDecisionStatus.SUPERSEDED,
+            });
+
+            const result = await service.unarchiveDocument(WORK_ID, DOC_ID, USER_ID);
+            expect(row.status).toBe(KbDocumentStatus.ACTIVE);
+            expect(row.decision).toEqual({
+                status: KbDecisionStatus.SUPERSEDED,
+                supersededByDocId: 'newer',
+            });
+            expect(row.metadata).toEqual({ body: BODY });
+            expect(result.document.decision?.status).toBe(KbDecisionStatus.SUPERSEDED);
         });
 
         it('requires edit access', async () => {

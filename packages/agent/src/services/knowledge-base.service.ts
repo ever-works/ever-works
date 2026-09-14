@@ -1671,6 +1671,19 @@ export class KnowledgeBaseService {
                 status: KbDecisionStatus.ARCHIVED,
             };
         }
+        // Knowledge library — remember the decision status this archive
+        // replaced, so `unarchiveDocument` can put it back. Recorded when
+        // the document leaves the shelf or when this call flips the decision;
+        // a repeat archive that changes neither keeps the first record.
+        if (
+            existing.kbDocumentClass === KbDocumentClass.DECISION &&
+            (!wasArchived || patch.decision)
+        ) {
+            patch.metadata = {
+                ...(patch.metadata ?? existing.metadata ?? {}),
+                archivedFromDecisionStatus: existing.decision?.status ?? KbDecisionStatus.PROPOSED,
+            } as Record<string, unknown>;
+        }
 
         const updated = await this.documentRepository.update(docId, patch);
         if (!updated) {
@@ -1697,10 +1710,15 @@ export class KnowledgeBaseService {
      * The inverse of {@link archiveDocument}. NOT `restoreDocumentFromHistory`
      * (that one restores a body from an old commit). Flips `status` back to
      * `active`, clears the archive bookkeeping, and leaves the folder, the
-     * decision state, the version history and everyone's read state exactly
-     * as they were. The document returns to the folder it was archived
-     * from; when that folder was deleted meanwhile the folder column is
-     * already `NULL`, so it lands in Unfiled and `restoredToUnfiled` says so.
+     * version history and everyone's read state exactly as they were. The
+     * document returns to the folder it was archived from; when that folder
+     * was deleted meanwhile the folder column is already `NULL`, so it lands
+     * in Unfiled and `restoredToUnfiled` says so.
+     *
+     * A decision archived by {@link archiveDocument} also had its decision
+     * status set to `archived`; restoring puts back the status recorded at
+     * archive time (see {@link restoredDecision}), so a document back on the
+     * shelf never carries a decision that still reads archived.
      *
      * Owner-scoped (`ensureCanEdit`). Idempotent: restoring a document that
      * is not archived returns it unchanged and writes nothing.
@@ -1721,10 +1739,15 @@ export class KnowledgeBaseService {
         }
 
         const restoredToUnfiled = this.restoresToUnfiled(existing);
-        const updated = await this.documentRepository.update(docId, {
+        const patch: Partial<WorkKnowledgeDocument> = {
             ...this.unarchivePatch(existing),
             updatedById: userId,
-        });
+        };
+        const decision = this.restoredDecision(existing);
+        if (decision) {
+            patch.decision = decision;
+        }
+        const updated = await this.documentRepository.update(docId, patch);
         if (!updated) {
             throw new NotFoundException(`KB document not found after restore: ${docId}`);
         }
@@ -3963,12 +3986,42 @@ export class KnowledgeBaseService {
     private unarchivePatch(existing: WorkKnowledgeDocument): Partial<WorkKnowledgeDocument> {
         const metadata = { ...(existing.metadata ?? {}) } as Record<string, unknown>;
         delete metadata.archivedFromFolderId;
+        delete metadata.archivedFromDecisionStatus;
         return {
             status: KbDocumentStatus.ACTIVE,
             archivedAt: null,
             archivedById: null,
             metadata,
         };
+    }
+
+    /**
+     * The decision state a restored document must carry, or `undefined` to
+     * leave it alone.
+     *
+     * Only a decision-class document whose decision still reads `archived`
+     * is touched. It gets back the status recorded when it was archived
+     * (`metadata.archivedFromDecisionStatus`) — which may itself be
+     * `archived`, when the decision had been archived before the document
+     * was, and then nothing changes. With no record (archived before the
+     * library existed) it falls back to `proposed`, the status the review
+     * flow treats as a decision without a settled status; a proposed
+     * decision is not injected by default, so the fallback never promotes
+     * anything into agent context.
+     *
+     * Restoring deliberately steps outside `KB_DECISION_STATUS_TRANSITIONS`
+     * (where `archived` is terminal): it undoes an archive, it is not a
+     * forward transition.
+     */
+    private restoredDecision(existing: WorkKnowledgeDocument): KbDecisionState | undefined {
+        if (existing.kbDocumentClass !== KbDocumentClass.DECISION) return undefined;
+        if (existing.decision?.status !== KbDecisionStatus.ARCHIVED) return undefined;
+        const recorded = (existing.metadata ?? {}).archivedFromDecisionStatus;
+        const status = (Object.values(KbDecisionStatus) as string[]).includes(recorded as string)
+            ? (recorded as KbDecisionStatus)
+            : KbDecisionStatus.PROPOSED;
+        if (status === KbDecisionStatus.ARCHIVED) return undefined;
+        return { ...existing.decision, status };
     }
 
     private restoresToUnfiled(existing: WorkKnowledgeDocument): boolean {
