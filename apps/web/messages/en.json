@@ -2628,7 +2628,15 @@
                 "buildItYourselfHint": "Start from an agent and follow the steps above. One-step setup for playbooks is on its way.",
                 "providedContentNote": "Playbook text comes from its catalog provider and is shown as the provider wrote it."
             },
+            "pagination": {
+                "showing": "Showing {from}–{to} of {total}",
+                "emptyPage": "Nothing on this page.",
+                "previous": "Previous",
+                "next": "Next"
+            },
             "workflows": {
+                "listPages": "Workflow pages",
+                "historyPages": "Run history pages",
                 "subtitle": "A workflow is a graph of steps you save once and re-run.",
                 "back": "Catalog",
                 "backToList": "Workflows",
@@ -2648,6 +2656,7 @@
                 "history": "Run history",
                 "noRuns": "No runs yet.",
                 "traceHint": "Open a run to see which nodes ran.",
+                "runNotInWorkflow": "That run belongs to a different workflow. Open one of this workflow's runs instead.",
                 "runLabel": "Run {id}",
                 "stepCount": "{count, plural, one {# step} other {# steps}}",
                 "duration": "{seconds}s",

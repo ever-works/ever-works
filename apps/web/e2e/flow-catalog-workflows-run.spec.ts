@@ -85,6 +85,36 @@ test.describe('Catalogue — saved workflows', () => {
         );
     });
 
+    test("a run from another workflow is never rendered under this workflow's page", async ({
+        page,
+        request,
+    }) => {
+        const token = await seededToken(request);
+        const suffix = Date.now().toString(36);
+        const nameA = `Owner A ${suffix}`;
+        const idA = await createWorkflow(request, token, nameA, 'active');
+        const idB = await createWorkflow(request, token, `Owner B ${suffix}`, 'active');
+
+        const started = await request.post(`${API_BASE}/api/workflows/${idB}/run`, {
+            headers: authedHeaders(token),
+        });
+        expect(started.ok(), `run body=${await started.text()}`).toBe(true);
+        const runs = await request.get(`${API_BASE}/api/workflows/${idB}/runs`, {
+            headers: authedHeaders(token),
+        });
+        const { items } = (await runs.json()) as { items: Array<{ id: string }> };
+        expect(items.length).toBe(1);
+
+        await page.goto(`/en/catalog/workflows/${idA}?run=${items[0].id}`, {
+            waitUntil: 'domcontentloaded',
+        });
+        await expect(page.getByRole('heading', { level: 1, name: nameA })).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(page.getByTestId('workflow-run-mismatch')).toBeVisible();
+        await expect(page.getByTestId('workflow-run-trace')).toHaveCount(0);
+    });
+
     test('an archived workflow offers Reactivate, not Run, and running it is refused', async ({
         page,
         request,

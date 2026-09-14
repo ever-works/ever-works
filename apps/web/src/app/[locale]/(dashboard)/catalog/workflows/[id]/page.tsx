@@ -4,14 +4,22 @@ import { getFormatter, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
+import { CatalogPager } from '@/components/catalog/CatalogPager';
 import { WorkflowList } from '@/components/catalog/WorkflowList';
 import { WorkflowRunTrace } from '@/components/catalog/WorkflowRunTrace';
+import {
+    WORKFLOW_RUNS_PAGE_SIZE,
+    catalogHref,
+    catalogPageWindow,
+    firstSearchParam,
+    isCatalogUuid,
+    parseCatalogOffset,
+    runForWorkflow,
+} from '@/components/catalog/workflow-pages';
 import { workflowsAPI } from '@/lib/api/workflows';
 
 type Params = Promise<{ id: string }>;
-type SearchParams = Promise<{ run?: string | string[] }>;
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+type SearchParams = Promise<{ run?: string | string[]; runsOffset?: string | string[] }>;
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -20,9 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * Capability catalogue (AW-21) — `/catalog/workflows/[id]`: one saved
- * workflow, its run history (newest first) and the trace of the selected run
- * (`?run=<id>`, defaulting to the latest). Everything reads the existing
- * `/api/workflows` routes.
+ * workflow, its run history (newest first, a page at a time via
+ * `?runsOffset=`) and the trace of the selected run (`?run=<id>`, defaulting
+ * to the first run on the page). A selected run must belong to THIS workflow.
+ * Everything reads the existing `/api/workflows` routes.
  */
 export default async function CatalogWorkflowPage({
     params,
@@ -32,14 +41,15 @@ export default async function CatalogWorkflowPage({
     searchParams: SearchParams;
 }) {
     const { id } = await params;
-    if (!UUID_PATTERN.test(id)) notFound();
+    if (!isCatalogUuid(id)) notFound();
     const query = await searchParams;
+    const runsOffset = parseCatalogOffset(query.runsOffset);
     const t = await getTranslations('dashboard.catalogPage.workflows');
     const format = await getFormatter();
 
     const [workflowResult, runsResult] = await Promise.all([
         workflowsAPI.get(id),
-        workflowsAPI.listRuns(id, { limit: 50 }),
+        workflowsAPI.listRuns(id, { limit: WORKFLOW_RUNS_PAGE_SIZE, offset: runsOffset }),
     ]);
     if (!workflowResult.ok) {
         if (workflowResult.status === 404 || workflowResult.status === 400) notFound();
@@ -47,10 +57,28 @@ export default async function CatalogWorkflowPage({
     }
     const workflow = workflowResult.data;
     const runs = runsResult.ok ? runsResult.data.items : [];
-    const requestedRun = Array.isArray(query.run) ? query.run[0] : query.run;
-    const selectedRunId =
-        requestedRun && UUID_PATTERN.test(requestedRun) ? requestedRun : (runs[0]?.id ?? null);
+    const requestedRun = firstSearchParam(query.run);
+    const requestedRunId = isCatalogUuid(requestedRun) ? requestedRun : null;
+    const selectedRunId = requestedRunId ?? runs[0]?.id ?? null;
     const runResult = selectedRunId ? await workflowsAPI.getRun(selectedRunId) : null;
+    // Runs are fetched by their own id; one from another workflow is never
+    // rendered under this workflow's heading and graph.
+    const selectedRun = runResult?.ok ? runForWorkflow(runResult.data, workflow.id) : null;
+    const runFromOtherWorkflow = Boolean(runResult?.ok && !selectedRun);
+
+    const runsPage = runsResult.ok
+        ? catalogPageWindow({
+              offset: runsOffset,
+              pageSize: WORKFLOW_RUNS_PAGE_SIZE,
+              itemCount: runs.length,
+              total: runsResult.data.total,
+          })
+        : null;
+    const workflowHref = (link: { run?: string | null; runsOffset?: number | null }) =>
+        catalogHref(ROUTES.DASHBOARD_CATALOG_WORKFLOW(workflow.id), {
+            runsOffset: link.runsOffset,
+            run: link.run,
+        });
 
     return (
         <div className="w-full space-y-6" data-testid="catalog-workflow-page">
@@ -97,11 +125,13 @@ export default async function CatalogWorkflowPage({
                             {runs.map((run) => (
                                 <li key={run.id}>
                                     <Link
-                                        href={`${ROUTES.DASHBOARD_CATALOG_WORKFLOW(workflow.id)}?run=${run.id}`}
-                                        aria-current={run.id === selectedRunId ? 'true' : undefined}
+                                        href={workflowHref({ runsOffset, run: run.id })}
+                                        aria-current={
+                                            run.id === selectedRun?.id ? 'true' : undefined
+                                        }
                                         className={cn(
                                             'block rounded-md px-3 py-2 text-sm hover:bg-surface-secondary dark:hover:bg-white/9',
-                                            run.id === selectedRunId &&
+                                            run.id === selectedRun?.id &&
                                                 'bg-surface-secondary dark:bg-white/9',
                                         )}
                                     >
@@ -116,11 +146,39 @@ export default async function CatalogWorkflowPage({
                             ))}
                         </ul>
                     )}
+                    {runsPage && (
+                        <CatalogPager
+                            page={runsPage}
+                            label={t('historyPages')}
+                            testId="workflow-run-history-pager"
+                            previousHref={
+                                runsPage.previousOffset === null
+                                    ? null
+                                    : workflowHref({
+                                          runsOffset: runsPage.previousOffset,
+                                          run: requestedRunId,
+                                      })
+                            }
+                            nextHref={
+                                runsPage.nextOffset === null
+                                    ? null
+                                    : workflowHref({
+                                          runsOffset: runsPage.nextOffset,
+                                          run: requestedRunId,
+                                      })
+                            }
+                        />
+                    )}
                 </section>
-                {runResult?.ok ? (
-                    <WorkflowRunTrace run={runResult.data} graph={workflow.graph} />
+                {selectedRun ? (
+                    <WorkflowRunTrace run={selectedRun} graph={workflow.graph} />
                 ) : (
-                    <p className="text-sm text-text-muted">{t('traceHint')}</p>
+                    <p
+                        className="text-sm text-text-muted"
+                        data-testid={runFromOtherWorkflow ? 'workflow-run-mismatch' : undefined}
+                    >
+                        {runFromOtherWorkflow ? t('runNotInWorkflow') : t('traceHint')}
+                    </p>
                 )}
             </div>
         </div>
