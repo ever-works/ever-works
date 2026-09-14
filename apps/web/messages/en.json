@@ -1316,7 +1316,105 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Capabilities",
+                "inbox": "Inbox"
+            },
+            "email": {
+                "policy": {
+                    "title": "Sending policy",
+                    "description": "Whether this agent's email waits for you, and how much it may send. Limits are checked when a message is sent — nothing the agent writes can raise them.",
+                    "modeLabel": "Approval",
+                    "modeDraftReview": "Draft for review — nothing sends until you approve it",
+                    "modeAutoSend": "Auto-send — the agent sends on its own, within the limits below",
+                    "modeSource": {
+                        "platform": "Currently the platform default",
+                        "organization": "Currently your organization's default",
+                        "inbox": "Set for this agent"
+                    },
+                    "autoSendConfirm": "Turn off the approval gate? This agent will send email without showing it to you first. Send limits still apply.",
+                    "keepGate": "Keep the gate",
+                    "turnItOff": "Turn it off",
+                    "limitsTitle": "Send limits",
+                    "limitsHint": "Leave a field blank to inherit it — once this agent has settings, a limit nothing else sets uses the recommended number. 0 means no limit for this agent.",
+                    "enforcedOff": "Send limits are turned off for this deployment.",
+                    "pausedUntil": "Paused — the daily limit is reached. Sending resumes on its own at {time}.",
+                    "usage": "{used} of {cap}",
+                    "usageUnlimited": "{used} · no limit",
+                    "sourceLabel": "from {source}",
+                    "source": {
+                        "platform": "the platform",
+                        "organization": "your organization",
+                        "inbox": "this agent",
+                        "recommended": "the recommended limits",
+                        "unconfigured": "nothing configured"
+                    },
+                    "noLimitsTitle": "No send limits are configured for this agent",
+                    "noLimitsConfigured": "Nothing sets a limit for this agent — not its own settings, its organization or this deployment — so it keeps sending exactly as before, with no limit of its own. Apply the recommended limits to protect it: {daily} sends per 24 hours, {perMinute} per minute, {recipients} recipients per 5 minutes and {perMessage} recipients per message.",
+                    "applyRecommended": "Apply recommended limits",
+                    "recommendedApplied": "Recommended limits applied",
+                    "notConfigured": "No limit — not configured",
+                    "usageNotConfigured": "{used} · no limit — not configured",
+                    "windows": {
+                        "recipientsPerMessage": "Recipients per message",
+                        "inboxBurst": "Sends in the last minute",
+                        "inboxRecipients": "Recipients in the last 5 minutes",
+                        "inboxDaily": "Sends in the last 24 hours",
+                        "workspaceDaily": "Account sends in the last 24 hours",
+                        "workspaceMonthly": "Account sends in the last 30 days"
+                    },
+                    "fields": {
+                        "dailySendCap": "Sends per 24 hours",
+                        "burstSendCap": "Sends per minute",
+                        "recipientBurstCap": "Recipients per 5 minutes",
+                        "recipientsPerMessageCap": "Recipients per message"
+                    },
+                    "inheritPlaceholder": "Inherit",
+                    "invalidNumber": "Enter a whole number of 0 or more, or leave it blank.",
+                    "save": "Save",
+                    "saving": "Saving…",
+                    "saved": "Sending policy saved",
+                    "saveFailed": "Could not save the sending policy."
+                },
+                "addresses": {
+                    "title": "Addresses",
+                    "description": "Which of your email addresses this agent sends from and receives at.",
+                    "empty": "No address is assigned to this agent yet.",
+                    "noAddresses": "You have no email addresses yet.",
+                    "manage": "Manage email addresses",
+                    "usedFor": "Used for",
+                    "sending": "Sending",
+                    "receiving": "Receiving",
+                    "choose": "Choose an address",
+                    "add": "Assign",
+                    "remove": "Remove",
+                    "duplicate": "That address is already assigned for that use.",
+                    "failed": "Could not update this agent's addresses."
+                },
+                "drafts": {
+                    "status": {
+                        "received": "Received",
+                        "draft": "Draft",
+                        "revising": "Revising",
+                        "scheduled": "Scheduled",
+                        "sending": "Sending",
+                        "sent": "Sent",
+                        "failed": "Failed",
+                        "escalated": "Escalated",
+                        "discarded": "Discarded",
+                        "blocked": "Blocked"
+                    },
+                    "waiting": "{count, plural, one {# draft is} other {# drafts are}} waiting for your approval.",
+                    "approve": "Approve & send",
+                    "discard": "Discard",
+                    "approved": "Approved — the message was sent.",
+                    "discarded": "Draft discarded. Nothing was sent.",
+                    "alreadyDecided": "This draft was already decided.",
+                    "sendLimit": "Not sent — {used} of {cap} ({limit}). Capacity returns in about {minutes} min.",
+                    "sendLimitRecipients": "Not sent — this message has {used} recipients and the limit is {cap}.",
+                    "approvalRequired": "This message must be approved by a person before it can be sent.",
+                    "kept": "The draft is kept.",
+                    "failed": "Could not send this draft."
+                }
             },
             "newDialog": {
                 "title": "New Agent",

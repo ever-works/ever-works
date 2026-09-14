@@ -133,3 +133,65 @@ describe('emailAddressesAPI — endpoint URL shape (no /api double-prefix)', () 
         }
     });
 });
+
+describe('emailAddressesAPI — agent email routes (AW-05)', () => {
+    it('reads and upserts an Agent sending policy', async () => {
+        const { emailAddressesAPI } = await importApi();
+        await emailAddressesAPI.getAgentSendPolicy('ag-1');
+        expect(serverFetchMock).toHaveBeenCalledWith('/email/agents/ag-1/send-policy');
+
+        await emailAddressesAPI.updateAgentInbox('ag-1', { mode: 'draft-review', dailySendCap: 0 });
+        expect(serverMutationMock).toHaveBeenCalledWith({
+            method: 'PUT',
+            endpoint: '/email/agents/ag-1/inbox',
+            data: { mode: 'draft-review', dailySendCap: 0 },
+            wrapInData: false,
+        });
+    });
+
+    it('approves and discards a draft by message id', async () => {
+        const { emailAddressesAPI } = await importApi();
+        await emailAddressesAPI.approveDraft('m-1');
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({ method: 'POST', endpoint: '/email/messages/m-1/approve' }),
+        );
+        await emailAddressesAPI.discardDraft('m-1');
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({ method: 'POST', endpoint: '/email/messages/m-1/discard' }),
+        );
+    });
+
+    it('lists, creates and removes address assignments', async () => {
+        serverFetchMock.mockResolvedValue({ assignments: [{ id: 'as-1' }] });
+        serverMutationMock.mockResolvedValue({ assignment: { id: 'as-2' } });
+        const { emailAddressesAPI } = await importApi();
+
+        await expect(emailAddressesAPI.listAgentAssignments('ag-1')).resolves.toEqual([
+            { id: 'as-1' },
+        ]);
+        expect(serverFetchMock).toHaveBeenCalledWith('/email/agents/ag-1/assignments');
+
+        await expect(
+            emailAddressesAPI.createAgentAssignment('ag-1', {
+                emailAddressId: 'e-1',
+                direction: 'outbound',
+            }),
+        ).resolves.toEqual({ id: 'as-2' });
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({ method: 'POST', endpoint: '/email/agents/ag-1/assignments' }),
+        );
+
+        await emailAddressesAPI.removeAgentAssignment('as-2');
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({ method: 'DELETE', endpoint: '/email/assignments/as-2' }),
+        );
+    });
+
+    it('encodes ids so a crafted id cannot change the route', async () => {
+        const { emailAddressesAPI } = await importApi();
+        await emailAddressesAPI.approveDraft('../addresses');
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({ endpoint: '/email/messages/..%2Faddresses/approve' }),
+        );
+    });
+});

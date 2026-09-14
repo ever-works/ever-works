@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { PLUGIN_CAPABILITIES, type FacadeOptions, type IPlugin } from '@ever-works/plugin';
 import {
     isEmailOutboundPlugin,
@@ -19,7 +19,22 @@ import { AgentEmailAssignmentRepository } from '../database/repositories/agent-e
 import { EmailMessageRepository } from '../database/repositories/email-message.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
+import { EMAIL_MAX_FAILURE_REASON_CHARS, type EmailSendOrigin } from '@ever-works/contracts';
+// Leaf token file — no runtime graph (see email-send-policy.port.ts).
+import {
+    EMAIL_SEND_POLICY_GATE,
+    type EmailSendAttempt,
+    type EmailSendPolicyGate,
+    type EmailSendReservation,
+} from '../email/email-send-policy.port';
 import { BaseFacadeService, FacadeError, NoProviderError } from './base.facade';
+
+/**
+ * AW-05 — provisional `pluginId` on a send reservation (the row is written
+ * before any provider is resolved). Replaced by the provider that actually
+ * sends, or by the address's provider when the send fails first.
+ */
+export const EMAIL_SEND_RESERVATION_PENDING_PLUGIN_ID = 'pending';
 
 export class EmailFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -50,6 +65,18 @@ export interface EmailFacadeSendInput extends Omit<EmailSendInput, 'bodyText' | 
 export interface EmailFacadeSendOptions extends FacadeOptions {
     /** Specific tenant_email_addresses.id to send from. Else uses Agent default. */
     readonly addressId?: string;
+    /**
+     * AW-05 — who asked for this send. SERVER-SET at the call site, never
+     * copied from a request body: `agent` sends are held when the Agent's
+     * inbox is in `draft-review`. Absent = `system` (the pre-gate behaviour).
+     */
+    readonly origin?: EmailSendOrigin;
+    /**
+     * AW-05 — the persisted draft this send releases. The send path verifies
+     * a person approved exactly this message, and the existing row is moved
+     * to `sent` instead of a second row being inserted.
+     */
+    readonly draftMessageId?: string;
 }
 
 /**
@@ -67,6 +94,15 @@ export interface EmailFacadeSendOptions extends FacadeOptions {
  * Per-send side effects:
  * - Persists an `email_messages` row tagged with `agentId` + `taskId`.
  * - Emits a `PluginUsageEvent` with `capability='email'` for the spend rollup.
+ *
+ * AW-05 — before any provider is resolved, `send()` asks the
+ * `EMAIL_SEND_POLICY_GATE` whether the message may go out: an Agent's mail
+ * waits for approval when its inbox says so, and every send ceiling is
+ * checked. Every outbound path converges here, so no caller can skip it.
+ * When a windowed ceiling applies, the gate also RESERVES the capacity (the
+ * audit row is written up front as `sending`); `send()` then settles that
+ * row — `sent` on success, released (`failed`, no `sentAt`) when nothing
+ * went out.
  */
 @Injectable()
 export class EmailFacadeService extends BaseFacadeService {
@@ -81,6 +117,12 @@ export class EmailFacadeService extends BaseFacadeService {
         @Optional() private readonly agentAssignments?: AgentEmailAssignmentRepository,
         @Optional() private readonly emailMessages?: EmailMessageRepository,
         @Optional() private readonly pluginUsageService?: PluginUsageService,
+        // AW-05 — approve-before-send + send ceilings. @Optional() and
+        // appended LAST so bare constructions keep working; bound by
+        // EmailSendPolicyModule, which FacadesModule imports.
+        @Optional()
+        @Inject(EMAIL_SEND_POLICY_GATE)
+        private readonly sendPolicy?: EmailSendPolicyGate,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -94,40 +136,164 @@ export class EmailFacadeService extends BaseFacadeService {
         input: EmailFacadeSendInput,
         options: EmailFacadeSendOptions,
     ): Promise<EmailSendResult> {
-        const plugin = await this.resolveOutboundPlugin(options);
-        const settings = await this.resolveSettings(plugin.id, options);
+        // AW-05 — the gate runs before plugin resolution, so a refused send
+        // never touches a provider (or its credentials).
+        let reservedMessageId: string | null = null;
+        if (this.sendPolicy) {
+            const attempt: EmailSendAttempt = {
+                userId: options.userId,
+                agentId: options.agentId,
+                origin: options.origin,
+                draftMessageId: options.draftMessageId,
+                to: input.to,
+                cc: input.cc,
+                bcc: input.bcc,
+                subject: input.subject,
+            };
+            if (typeof this.sendPolicy.admitSend === 'function') {
+                // Count + reserve atomically when a windowed ceiling applies,
+                // so a concurrent burst cannot overshoot a hard stop.
+                const admission = await this.sendPolicy.admitSend(
+                    attempt,
+                    await this.reservationFor(input, options),
+                );
+                reservedMessageId = admission?.reservedMessageId ?? null;
+            } else {
+                await this.sendPolicy.assertSendAllowed(attempt);
+            }
+        }
 
-        const { bodyText, bodyHtml } = await this.renderBody(input);
+        let plugin: IEmailOutboundPlugin;
+        let resolvedPluginId: string | undefined;
+        let wireInput: EmailSendInput;
+        let result: EmailSendResult;
+        try {
+            plugin = await this.resolveOutboundPlugin(options);
+            resolvedPluginId = plugin.id;
+            const settings = await this.resolveSettings(plugin.id, options);
 
-        const wireInput: EmailSendInput = {
-            from: input.from,
-            fromName: input.fromName,
-            to: input.to,
-            cc: input.cc,
-            bcc: input.bcc,
-            subject: input.subject,
-            bodyText,
-            bodyHtml,
-            replyTo: input.replyTo,
-            attachments: input.attachments,
-            metadata: input.metadata,
-            messageRef: input.messageRef,
-        };
+            const { bodyText, bodyHtml } = await this.renderBody(input);
 
-        const emailOpts: EmailOptions = {
-            userId: options.userId,
-            workId: options.workId,
-            agentId: options.agentId,
-            taskId: options.taskId,
-            settings,
-        };
+            wireInput = {
+                from: input.from,
+                fromName: input.fromName,
+                to: input.to,
+                cc: input.cc,
+                bcc: input.bcc,
+                subject: input.subject,
+                bodyText,
+                bodyHtml,
+                replyTo: input.replyTo,
+                attachments: input.attachments,
+                metadata: input.metadata,
+                messageRef: input.messageRef,
+            };
 
-        const result = await plugin.sendEmail(wireInput, emailOpts);
+            const emailOpts: EmailOptions = {
+                userId: options.userId,
+                workId: options.workId,
+                agentId: options.agentId,
+                taskId: options.taskId,
+                settings,
+            };
 
-        await this.persistOutboundMessage(input, wireInput, result, options);
+            result = await plugin.sendEmail(wireInput, emailOpts);
+        } catch (error) {
+            // Nothing went out: give the reserved capacity back.
+            if (reservedMessageId) {
+                await this.releaseReservation(reservedMessageId, options, error, resolvedPluginId);
+            }
+            throw error;
+        }
+
+        await this.persistOutboundMessage(input, wireInput, result, options, reservedMessageId);
         await this.recordUsage(plugin.id, 'sendEmail', options);
 
         return result;
+    }
+
+    /**
+     * AW-05 — what the gate should reserve if a windowed ceiling applies.
+     * Only offered when this facade will settle it afterwards — the same
+     * conditions under which it records a send at all.
+     */
+    private async reservationFor(
+        input: EmailFacadeSendInput,
+        options: EmailFacadeSendOptions,
+    ): Promise<EmailSendReservation | null> {
+        if (!this.emailMessages || !options.userId || !options.addressId) return null;
+        if (options.draftMessageId) return { kind: 'draft' };
+        // Pure (no provider, no I/O): the same bodies the send renders.
+        const { bodyText, bodyHtml } = await this.renderBody(input);
+        return {
+            kind: 'message',
+            row: {
+                userId: options.userId,
+                agentId: options.agentId ?? null,
+                taskId: options.taskId ?? null,
+                emailAddressId: options.addressId,
+                // Provisional — replaced by the provider that actually sends.
+                pluginId: EMAIL_SEND_RESERVATION_PENDING_PLUGIN_ID,
+                from: input.from,
+                toAddresses: [...input.to],
+                ccAddresses: input.cc ? [...input.cc] : null,
+                bccAddresses: input.bcc ? [...input.bcc] : null,
+                subject: input.subject,
+                bodyText,
+                bodyHtml: bodyHtml ?? null,
+                metadata: input.metadata ? { ...input.metadata } : null,
+                messageRef: input.messageRef ?? null,
+            },
+        };
+    }
+
+    /**
+     * AW-05 — a reserved send did not go out. Clear `sentAt` so it stops
+     * counting against every window (the counts only read sent rows). A
+     * direct send's reservation becomes a `failed` row with the reason; a
+     * released draft keeps `sending` so its owner (`EmailDraftService`)
+     * records the outcome it already knows how to. Never masks the original
+     * error.
+     */
+    private async releaseReservation(
+        messageId: string,
+        options: EmailFacadeSendOptions,
+        error: unknown,
+        pluginId?: string,
+    ): Promise<void> {
+        if (!this.emailMessages) return;
+        try {
+            if (options.draftMessageId) {
+                await this.emailMessages.transitionStatus(messageId, ['sending'], 'sending', {
+                    sentAt: null,
+                });
+                return;
+            }
+            const reason = (error instanceof Error ? error.message : String(error)).slice(
+                0,
+                EMAIL_MAX_FAILURE_REASON_CHARS,
+            );
+            let recordedPluginId = pluginId;
+            if (!recordedPluginId && options.addressId && this.emailAddresses) {
+                // No provider was resolved: name the address's provider
+                // rather than leave the provisional marker on the audit row.
+                const address = await this.emailAddresses
+                    .findById(options.addressId)
+                    .catch(() => null);
+                recordedPluginId = address?.pluginId ?? undefined;
+            }
+            await this.emailMessages.transitionStatus(messageId, ['sending'], 'failed', {
+                sentAt: null,
+                failureReason: reason,
+                ...(recordedPluginId ? { pluginId: recordedPluginId } : {}),
+            });
+        } catch (releaseError) {
+            this.logger.warn(
+                `Could not release the send reservation ${messageId}: ${
+                    releaseError instanceof Error ? releaseError.message : String(releaseError)
+                }`,
+            );
+        }
     }
 
     /**
@@ -402,8 +568,23 @@ export class EmailFacadeService extends BaseFacadeService {
         wire: EmailSendInput,
         result: EmailSendResult,
         options: EmailFacadeSendOptions,
+        reservedMessageId: string | null = null,
     ): Promise<void> {
         if (!this.emailMessages || !options.userId || !options.addressId) return;
+        const existingRowId = options.draftMessageId ?? reservedMessageId;
+        if (existingRowId) {
+            // AW-05 — an approved draft, or a send admitted with a
+            // reservation, already has its row; move it on rather than
+            // inserting a duplicate audit row.
+            await this.emailMessages.transitionStatus(existingRowId, ['sending'], 'sent', {
+                pluginId: result.provider,
+                providerMessageId: result.providerMessageId,
+                sentAt: new Date(),
+                deliveryStatus: 'accepted',
+                failureReason: null,
+            });
+            return;
+        }
         await this.emailMessages.save({
             userId: options.userId,
             agentId: options.agentId ?? null,
@@ -424,6 +605,7 @@ export class EmailFacadeService extends BaseFacadeService {
             messageRef: input.messageRef ?? null,
             sentAt: new Date(),
             deliveryStatus: 'accepted',
+            status: 'sent',
         } as Parameters<typeof this.emailMessages.save>[0]);
     }
 

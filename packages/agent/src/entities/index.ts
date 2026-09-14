@@ -94,6 +94,8 @@ export * from './tenant-email-address.entity';
 export * from './agent-email-assignment.entity';
 export * from './email-conversation.entity';
 export * from './email-message.entity';
+// Agent email (AW-05) — per-Agent mail policy (approval mode + send ceilings)
+export * from './agent-inbox.entity';
 export * from './notification-channel.entity';
 export * from './notification-channel-delivery-log.entity';
 export * from './notification-event-type.entity';

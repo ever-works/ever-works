@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
+import { minutesUntil } from '@/lib/agent-email-policy';
 import {
     sendAgentEmailAction,
     type ComposeActionResult,
@@ -16,6 +18,7 @@ interface Props {
  * React-Email template picker is a v2 follow-up.
  */
 export function Composer({ agentId }: Props) {
+    const t = useTranslations('dashboard.agentsPage.email');
     const [to, setTo] = useState('');
     const [cc, setCc] = useState('');
     const [subject, setSubject] = useState('');
@@ -54,6 +57,22 @@ export function Composer({ agentId }: Props) {
             {result && !result.ok ? (
                 <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
                     {result.error}
+                    {/* AW-05 — say which send limit refused the message and when it frees up. */}
+                    {result.refusal?.kind === 'sendLimit' ? (
+                        <p className="mt-1" data-testid="composer-send-limit">
+                            {result.refusal.limitKind === 'recipientsPerMessage'
+                                ? t('drafts.sendLimitRecipients', {
+                                      used: result.refusal.used,
+                                      cap: result.refusal.cap,
+                                  })
+                                : t('drafts.sendLimit', {
+                                      used: result.refusal.used,
+                                      cap: result.refusal.cap,
+                                      limit: t(`policy.windows.${result.refusal.limitKind}`),
+                                      minutes: minutesUntil(result.refusal.retryAfterSeconds),
+                                  })}
+                        </p>
+                    ) : null}
                 </div>
             ) : null}
 

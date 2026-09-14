@@ -5,6 +5,7 @@ import { BudgetsModule } from '../budgets/budgets.module';
 import { PolicyModule } from '../policy/policy.module';
 import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
 import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
+import { EmailSendPolicyModule } from '../email/email-send-policy.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -106,6 +107,11 @@ const FACADES = [
         // into PolicyModule) so PolicyModule stays the entity-only leaf
         // every policy consumer can depend on.
         MergeApprovalModule,
+        // Agent email (AW-05) — binds EMAIL_SEND_POLICY_GATE, which
+        // EmailFacadeService consumes before any send reaches a provider
+        // (approve-before-send + send ceilings). A DatabaseModule-only leaf,
+        // so importing it here cannot cycle.
+        EmailSendPolicyModule,
     ],
     providers: FACADES,
     exports: FACADES,
