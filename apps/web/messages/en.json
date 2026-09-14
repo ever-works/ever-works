@@ -1403,6 +1403,7 @@
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
                 "capabilities": "Capabilities",
+                "computer": "Computer",
                 "inbox": "Inbox"
             },
             "email": {
@@ -9074,6 +9075,195 @@
                 "minute": "{value}m ago",
                 "hour": "{value}h ago",
                 "day": "{value}d ago"
+            }
+        },
+        "computer": {
+            "title": "{agent}'s computer",
+            "tabLabel": "Computer",
+            "heroAction": "Watch computer",
+            "backToAgent": "Back to {agent}",
+            "modeWatching": "Watching — {agent} keeps working.",
+            "terminalOnNode": "Watching — this shell is on {node}.",
+            "terminalReadOnly": "read-only",
+            "watermark": "EVER WORKS · LIVE VIEW · {agent} @ {node}",
+            "liveBadge": "LIVE",
+            "liveBadgeTitle": "Pictures are arriving from {node}",
+            "connectingBadge": "CONNECTING",
+            "endedBadge": "ENDED",
+            "capturingBrowser": "{agent}'s own browser",
+            "localTime": "{time} local",
+            "localTimeStale": "{time} local — not updated for a while",
+            "briefLabel": "BRIEF · {task}",
+            "briefMission": "Mission: {mission}",
+            "briefIdle": "Idle — no task in flight",
+            "bandwidthUsed": "Bandwidth used: {value}",
+            "noCost": "Watching spends no model tokens and no credits.",
+            "copyLink": "Copy link to this view",
+            "linkCopied": "Link copied",
+            "endSession": "End session",
+            "moreActions": "More actions",
+            "channelLabel": "Channel",
+            "channelScreen": "Screen",
+            "channelTerminal": "Terminal",
+            "qualityLabel": "Quality",
+            "quality": {
+                "sharp": "Sharp",
+                "smooth": "Smooth",
+                "steady": "Steady",
+                "autoLowered": "Lowered to {tier} — the connection is slow. It will go back to {chosen} on its own."
+            },
+            "refresh": "Refresh",
+            "banner": "{node}: {message}",
+            "connecting": {
+                "title": "Waking up the view…",
+                "subtitle": "Asking {node} for a picture.",
+                "slow": "{node} has not answered yet. It may be busy.",
+                "cancel": "Cancel"
+            },
+            "stall": {
+                "banner": "Stream stalled — last frame {seconds}s ago",
+                "refreshNow": "Refresh now",
+                "staleNote": "The picture is stale; the work is not.",
+                "stopped": "The stream stopped.",
+                "stoppedDetail": "The computer may be busy or asleep.",
+                "reconnect": "Reconnect"
+            },
+            "empty": {
+                "title": "{agent} does not have a computer yet",
+                "body": "Agents work on machines you own. Add one and you can watch what {agent} is doing on it, live.",
+                "addComputer": "Add a computer",
+                "howItWorks": "How this works"
+            },
+            "offline": {
+                "title": "{node} is offline",
+                "lastSeen": "Last heard from {relative}.",
+                "lastSeenNever": "It has never checked in.",
+                "hint": "Start the Ever Works node app on that machine to bring it back.",
+                "tryAgain": "Try again",
+                "pickAnother": "Pick another computer"
+            },
+            "cannotShow": {
+                "noBrowserTitle": "No browser found on {node}",
+                "noBrowserBody": "{agent} needs its own browser on a machine before you can watch it work. Install Chrome, Edge or Chromium there, or point the node at one you already have.",
+                "noDisplayTitle": "{node} has no display session",
+                "noDisplayBody": "{node} cannot take a picture of {agent}'s browser right now.",
+                "noTerminalTitle": "{node} cannot serve a terminal right now",
+                "noTerminalBody": "The node on that machine is not offering a shell.",
+                "watchTerminalInstead": "Watch the terminal instead",
+                "watchScreenInstead": "Watch the screen instead"
+            },
+            "notAttended": {
+                "title": "Live view is switched off on {node}",
+                "body": "Run this on that machine to turn it on:",
+                "command": "ever-works-node start --attend",
+                "copy": "copy",
+                "copied": "copied",
+                "abandonedTitle": "{node} did not pick up the view"
+            },
+            "unwatchable": {
+                "title": "{node} cannot be watched right now",
+                "paused": "{node} is paused. Resume it to watch it.",
+                "disabled": "{node} is disabled in Fleet settings.",
+                "draining": "{node} is winding down and is not taking new views.",
+                "cluster": "{node} is a cluster node. Its work can be read in Runs, but it has no screen to show."
+            },
+            "nodePicker": {
+                "label": "Choose a computer",
+                "heading": "Watching a computer does not change where {agent}'s work runs.",
+                "pinnedNote": "{agent} is pinned to {node}. Change that on {agent}'s Capabilities tab.",
+                "unpinnedNote": "{agent} is not pinned to a computer. Change that on {agent}'s Capabilities tab.",
+                "capabilitiesLink": "Open Capabilities",
+                "pinnedBadge": "Pinned to {agent}",
+                "selected": "Selected",
+                "lastHeartbeatNever": "never",
+                "reasonOffline": "Offline",
+                "reasonPaused": "Paused",
+                "reasonDisabled": "Disabled",
+                "reasonDraining": "Draining — not available",
+                "reasonNoDisplay": "No display session",
+                "reasonNoBrowser": "No browser found",
+                "reasonNoTerminal": "No terminal",
+                "reasonNotAttended": "Live view is switched off",
+                "reasonCluster": "Cluster node — read only",
+                "capabilitiesScreenTerminal": "Screen, Terminal",
+                "capabilitiesScreen": "Screen",
+                "capabilitiesTerminal": "Terminal"
+            },
+            "overLimit": {
+                "title": "{node} already has {count} live views",
+                "titleOrganization": "This workspace already has {count} live views",
+                "body": "Close one to open another.",
+                "rowWatching": "Watching since {time}",
+                "pickAnother": "Pick another computer"
+            },
+            "stopped": {
+                "banner": "All computers are stopped — \"{reason}\" · since {time}",
+                "bannerNoReason": "All computers are stopped · since {time}",
+                "body": "Live views are closed while the stop is in force."
+            },
+            "ended": {
+                "title": "This live view has ended",
+                "openAgain": "Open a new view",
+                "reasons": {
+                    "closedByUser": "You ended it.",
+                    "noViewer": "Nobody was watching.",
+                    "sessionCeiling": "It reached the longest a live view can stay open.",
+                    "stalled": "No picture arrived for too long.",
+                    "nodeRestarted": "{node} restarted. Open a new view to reconnect.",
+                    "nodeUnavailable": "{node} stopped serving the view.",
+                    "stopped": "All computers were stopped.",
+                    "accessRevoked": "You no longer have access to this computer.",
+                    "abandoned": "{node} did not pick up the view in time.",
+                    "error": "Something went wrong on {node}."
+                }
+            },
+            "errors": {
+                "cannotConnect": "The live view could not connect. Try again in a moment.",
+                "refused": "You no longer have access to this computer.",
+                "unavailable": "Live views are not available on this install.",
+                "nodesUnavailable": "The list of computers could not be loaded."
+            },
+            "profile": {
+                "action": "Own logins and files",
+                "title": "Own logins and files",
+                "body": "{agent} has its own browser profile on {node}. No other agent can read its cookies, sessions or files.",
+                "notYet": "{agent} has not used {node} yet. Its profile is created the first time you watch it there.",
+                "loading": "Checking {agent}'s profile on {node}…",
+                "unknown": "Could not check {agent}'s profile on {node} right now.",
+                "tryAgain": "Try again",
+                "created": "Created",
+                "lastUsed": "Last used",
+                "signedInTo": "Signed in to",
+                "signedInCount": "{count, plural, one {# site} other {# sites}}",
+                "diskUsed": "Disk used",
+                "lastReset": "Last reset",
+                "never": "never",
+                "resetAction": "Reset this agent's logins and files",
+                "resetTitle": "Reset {agent}'s logins and files on {node}?",
+                "resetBody": "{agent} will be signed out of {count, plural, one {# site} other {# sites}} and its files there are deleted the next time it opens on {node}. No other agent on this computer is touched. This cannot be undone.",
+                "resetConfirmLabel": "Type the agent's name to confirm:",
+                "resetConfirm": "Reset",
+                "cancel": "Cancel",
+                "close": "Close",
+                "resetBlocked": "{agent} is working on this computer right now. Pause it or wait for the run to finish.",
+                "resetMismatch": "Type the agent's name exactly to confirm.",
+                "resetDone": "{agent}'s logins and files on {node} were reset.",
+                "resetFailed": "The reset did not go through. Try again."
+            },
+            "shortcuts": {
+                "title": "Keyboard",
+                "open": "Keyboard shortcuts",
+                "refresh": "Refresh the picture",
+                "quality": "Cycle quality: Sharp → Smooth → Steady",
+                "channel": "Switch channel: screen ↔ terminal",
+                "node": "Choose a computer",
+                "sheet": "This sheet",
+                "close": "Close"
+            },
+            "a11y": {
+                "stageLabelWatching": "Live view of {agent}'s computer {node}. Watching.",
+                "modeChanged": "Mode changed to {mode}.",
+                "modeWatchingName": "watching"
             }
         }
     },

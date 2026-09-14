@@ -1784,3 +1784,103 @@ describe('WorkerLoop — suspend-safe leases', () => {
 		await loop.stop();
 	});
 });
+
+describe('WorkerLoop — lane kind filters and cadence (Agent computers)', () => {
+	function idleClient(): JobLeaseCapableClient & { requests: Array<Record<string, unknown>> } {
+		const requests: Array<Record<string, unknown>> = [];
+		return {
+			requests,
+			heartbeat: vi.fn(async () => null),
+			complete: vi.fn(async () => true),
+			lease: vi.fn(async (request: Record<string, unknown>) => {
+				requests.push(request);
+				return [];
+			})
+		};
+	}
+
+	it('sends no kind filter unless the lane was built with one', async () => {
+		const client = idleClient();
+		const loop = new WorkerLoop({ client, scheduler: controllableScheduler() });
+		await loop.start();
+		expect(client.requests[0]).not.toHaveProperty('kinds');
+		expect(client.requests[0]).not.toHaveProperty('excludeKinds');
+		await loop.stop();
+	});
+
+	it('asks for only live views on the attended lane, and excludes them from the work lane', async () => {
+		const attended = idleClient();
+		const work = idleClient();
+		const lane = new WorkerLoop({
+			client: attended,
+			scheduler: controllableScheduler(),
+			kinds: ['computer-session']
+		});
+		const workLane = new WorkerLoop({
+			client: work,
+			scheduler: controllableScheduler(),
+			excludeKinds: ['computer-session']
+		});
+		await lane.start();
+		await workLane.start();
+		expect(attended.requests[0]).toMatchObject({ kinds: ['computer-session'] });
+		expect(work.requests[0]).toMatchObject({ excludeKinds: ['computer-session'] });
+		await lane.stop();
+		await workLane.stop();
+	});
+
+	it('arms the idle gap the cadence decides, after telling it how many jobs the poll claimed', async () => {
+		const client = idleClient();
+		const scheduler = controllableScheduler();
+		const recorded: number[] = [];
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			idlePollMs: 5000,
+			pollCadence: { recordPoll: (leased) => recorded.push(leased), nextIdleDelayMs: () => 15_000 }
+		});
+		await loop.start();
+		expect(recorded).toEqual([0]);
+		expect(scheduler.delays.at(-1)).toBe(15_000);
+		await loop.stop();
+	});
+
+	it('falls back to the fixed interval when the cadence throws or answers nonsense', async () => {
+		const client = idleClient();
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			idlePollMs: 2000,
+			pollCadence: {
+				recordPoll: () => undefined,
+				nextIdleDelayMs: () => {
+					throw new Error('broken cadence');
+				}
+			}
+		});
+		await loop.start();
+		expect(scheduler.delays.at(-1)).toBe(2000);
+		await loop.stop();
+	});
+
+	it('pollSoon polls now while idle, and does nothing when paused or stopped', async () => {
+		const client = idleClient();
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({ client, scheduler, idlePollMs: 15_000 });
+		await loop.start();
+		expect(client.requests).toHaveLength(1);
+		loop.pollSoon();
+		await vi.waitFor(() => expect(client.requests).toHaveLength(2));
+
+		void loop.pause();
+		loop.pollSoon();
+		await Promise.resolve();
+		expect(client.requests).toHaveLength(2);
+
+		await loop.stop();
+		loop.pollSoon();
+		await Promise.resolve();
+		expect(client.requests).toHaveLength(2);
+	});
+});
