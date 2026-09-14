@@ -2493,6 +2493,189 @@
                 "task": "Task"
             }
         },
+        "catalogPage": {
+            "title": "What you can do",
+            "subtitle": "Ready-made jobs your agents can run, and every capability already in this workspace.",
+            "searchLabel": "Search the catalog",
+            "searchPlaceholder": "Search…",
+            "searchShortcut": "Press / to search",
+            "searchTooShort": "Type at least 2 characters to search.",
+            "searchNoResults": "Nothing matches \"{query}\". Try a shorter word, or clear the search.",
+            "searchClear": "Clear",
+            "firstVisitBanner": "Nothing set up yet. Start with one that needs no connections.",
+            "readyCount": "{ready} of {total} work with what you already have.",
+            "seeAll": "See all ({count})",
+            "sectionCount": "{count, plural, one {# result} other {# results}}",
+            "sections": {
+                "playbooks": "Playbooks",
+                "skills": "Skills",
+                "workflows": "Workflows",
+                "taskTemplates": "Task templates",
+                "startingPoints": "Starting points"
+            },
+            "empty": {
+                "playbooks": "The playbook catalog is unavailable right now. Everything else on this page still works.",
+                "skills": "You have not installed any skills yet.",
+                "skillsAction": "Browse the catalog",
+                "workflows": "No saved workflows. A workflow is a graph of steps you save once and re-run.",
+                "taskTemplates": "No task templates yet. A template turns one click into a task and its sub-tasks.",
+                "taskTemplatesAction": "Make one",
+                "noMatches": "No matches in this section."
+            },
+            "error": {
+                "section": "This section did not load.",
+                "sectionHint": "Everything else on this page still works.",
+                "sectionAction": "Try again"
+            },
+            "categories": {
+                "reporting": "Reporting",
+                "content": "Content",
+                "operations": "Operations",
+                "research": "Research",
+                "inbox": "Inbox"
+            },
+            "filters": {
+                "all": "All",
+                "categoryGroup": "Filter playbooks by category",
+                "readinessGroup": "Filter playbooks by readiness",
+                "readyNow": "Ready now",
+                "needsConnection": "Needs a connection",
+                "alreadySetUp": "Already set up"
+            },
+            "readiness": {
+                "ready": "Ready",
+                "needsConnection": "{count, plural, one {Needs # connection} other {Needs # connections}}",
+                "adopted": "Already set up",
+                "notAvailable": "Not available"
+            },
+            "cost": {
+                "low": "~5–12k tokens",
+                "medium": "~15–60k tokens",
+                "high": "~60k+ tokens",
+                "tooltip": "Estimated tokens for one run. Your actual cost shows once it has run."
+            },
+            "card": {
+                "ariaLabel": "{title}, {category}, {readiness}"
+            },
+            "skills": {
+                "installed": "Installed",
+                "notInstalled": "Not installed"
+            },
+            "taskTemplates": {
+                "steps": "{count, plural, one {# step} other {# steps}}",
+                "needApproval": "{count, plural, one {# needs approval} other {# need approval}}",
+                "useIt": "Use it",
+                "useItAria": "Use the {name} template"
+            },
+            "startingPoints": {
+                "work": "Work blueprints",
+                "website": "Website templates",
+                "mission": "Mission templates",
+                "browse": "Browse"
+            },
+            "detail": {
+                "back": "Catalog",
+                "version": "v{version}",
+                "readinessHeading": "Readiness",
+                "readyLine": "Ready — everything it needs is available.",
+                "notReadyLine": "{count, plural, one {Not ready — # required connection missing} other {Not ready — # required connections missing}}",
+                "blockedLine": "Not available right now.",
+                "adoptedLine": "Already set up in this workspace.",
+                "uncheckedLine": "Some checks did not answer in time. Refresh in a moment to see the full picture.",
+                "providedBy": "Provided by {name}",
+                "nothingProvides": "Nothing enabled provides it.",
+                "optional": "Optional",
+                "connectAction": "Connect {capability}",
+                "whenItRuns": "When it runs",
+                "whatItCosts": "What it costs",
+                "theSteps": "The steps",
+                "whatItProduces": "What it produces",
+                "whenItAsks": "When it stops and asks",
+                "itsOwnLimits": "Its own limits",
+                "whatItMayDoAlone": "What it may do alone",
+                "noConnections": "Nothing — it works with what you already have.",
+                "asksYouFlag": "asks you",
+                "becomesApproval": "Becomes an approval",
+                "becomesEscalation": "Becomes an escalation",
+                "withRecommendation": "with a recommendation attached",
+                "tokenRange": "{min}–{max} tokens per run",
+                "alwaysAsks": "Nothing on its own at first — every action it proposes waits for your approval.",
+                "neverDoes": "Never: {actions}",
+                "canGraduate": "Once you trust it, it can be allowed to: {actions}",
+                "noCaps": "No limits declared.",
+                "caps": {
+                    "maxPerRun": "At most {count} per run",
+                    "maxSourcesTracked": "At most {count} sources",
+                    "maxWordCount": "At most {count} words",
+                    "maxDecisionsPerRun": "At most {count} decisions raised per run"
+                },
+                "artefactKinds": {
+                    "kbDocument": "Knowledge Base document",
+                    "mission": "Mission",
+                    "task": "Task",
+                    "emailDraft": "Email draft",
+                    "runReceipt": "Run receipt"
+                },
+                "actionTypes": {
+                    "spawnAgent": "start another agent",
+                    "scheduleTask": "schedule a task",
+                    "sendMessage": "send a message",
+                    "budgetOverride": "change a budget",
+                    "mergePullRequest": "merge a pull request",
+                    "other": "anything else"
+                },
+                "buildItYourself": "Build it yourself",
+                "buildItYourselfHint": "Start from an agent and follow the steps above. One-step setup for playbooks is on its way.",
+                "providedContentNote": "Playbook text comes from its catalog provider and is shown as the provider wrote it."
+            },
+            "workflows": {
+                "subtitle": "A workflow is a graph of steps you save once and re-run.",
+                "back": "Catalog",
+                "backToList": "Workflows",
+                "run": "Run",
+                "runAria": "Run {name}",
+                "running": "Starting…",
+                "queued": "Queued — run {id}",
+                "runNotQueued": "Run {id} was recorded, but the job runtime did not accept it.",
+                "runFailedToStart": "The run could not be queued: {reason}",
+                "archivedRefused": "This workflow is archived. Reactivate it to run it.",
+                "reactivate": "Reactivate",
+                "reactivateFailed": "Could not reactivate it: {reason}",
+                "nodes": "{count, plural, one {# node} other {# nodes}}",
+                "runs": "{count, plural, one {# run} other {# runs}}",
+                "lastRun": "Last run {when}",
+                "neverRun": "Never run",
+                "history": "Run history",
+                "noRuns": "No runs yet.",
+                "traceHint": "Open a run to see which nodes ran.",
+                "runLabel": "Run {id}",
+                "stepCount": "{count, plural, one {# step} other {# steps}}",
+                "duration": "{seconds}s",
+                "nodeOk": "ok",
+                "nodeFailed": "failed",
+                "edgesTraversed": "Edges traversed",
+                "decisions": "Decisions",
+                "chose": "{node} chose \"{choice}\"",
+                "errors": "Errors",
+                "output": "Output",
+                "outputTruncated": "Output was truncated.",
+                "noOutput": "No output.",
+                "traceTruncated": "The trace was truncated.",
+                "none": "None",
+                "status": {
+                    "draft": "Draft",
+                    "active": "Active",
+                    "archived": "Archived"
+                },
+                "runStatus": {
+                    "queued": "Queued",
+                    "running": "Running",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                }
+            }
+        },
         "budgetSummary": {
             "period": "{period}",
             "currentSpend": "Current spend",
@@ -8167,6 +8350,7 @@
                 "plugins": "Plugins",
                 "skills": "Skills",
                 "templates": "Templates",
+                "catalog": "Catalog",
                 "settings": "Settings",
                 "teams": "Teams"
             },
@@ -9028,6 +9212,8 @@
             "comparisons": "Comparisons",
             "plugins": "Plugins",
             "templates": "Templates",
+            "catalog": "Catalog",
+            "catalogWorkflows": "Workflows",
             "profile": "Profile",
             "security": "Security",
             "apiKeys": "API Keys",
