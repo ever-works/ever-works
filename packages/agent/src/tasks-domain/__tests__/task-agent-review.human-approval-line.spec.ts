@@ -37,7 +37,8 @@ import { TaskStatus, type Task } from '../../entities/task.entity';
  *  2. The reviewer stage cannot reach that table. `TaskAgentReviewService`
  *     is constructed with its full dependency list; there is no proposals
  *     store in it, and its whole write surface for an approval is one
- *     `TaskApproverRepository.setState` call.
+ *     `TaskAgentReviewRepository.recordVerdict` call (the review ledger row
+ *     and the `task_approvers` row, in one transaction — Greptile P1-B).
  *  3. The verifier does not read `task_approvers`. An approved agent
  *     review changes nothing about the merge verdict.
  */
@@ -222,6 +223,7 @@ describe('the reviewer stage cannot reach the merge-approval table', () => {
             })),
             listRunIdsForTask: jest.fn(async () => ['run-1']),
             casSettle: jest.fn(async () => true),
+            recordVerdict: jest.fn(async () => 'recorded'),
         };
         const runRows = [
             {
@@ -276,14 +278,31 @@ describe('the reviewer stage cannot reach the merge-approval table', () => {
         });
 
         expect(result.reason).toBe('recorded');
-        // The provenance is the thing that keeps this legible forever, and
-        // its value is not in `AgentActionProposalDecidedVia` at all.
-        expect(approvers.setState).toHaveBeenCalledWith(
-            'app-1',
-            'approved',
-            't1',
-            expect.objectContaining({ decidedVia: 'agent-review' }),
+        // REVERSED CONTRACT (Greptile P1-B on PR #2419): the approval used to
+        // be written by a bare `approvers.setState` AFTER a separate review
+        // CAS, which could leave the review settled with no approval (or
+        // report `recorded` for a write that hit no row). It is now ONE
+        // transactional write through the review ledger's `recordVerdict`,
+        // whose approver half is a `task_approvers` row and nothing else,
+        // and the provenance it stamps is `agent-review` — the value that
+        // keeps this legible forever and is not in
+        // `AgentActionProposalDecidedVia` at all (the repository pins it).
+        expect(reviews.recordVerdict).toHaveBeenCalledTimes(1);
+        expect(reviews.recordVerdict).toHaveBeenCalledWith(
+            expect.objectContaining({
+                reviewId: 'rev-1',
+                state: 'approved',
+                approver: expect.objectContaining({
+                    id: 'app-1',
+                    taskId: 't1',
+                    reviewerAgentId: 'reviewer-1',
+                    approvalState: 'approved',
+                    decidedHeadSha: HEAD,
+                }),
+            }),
         );
+        // No second, non-atomic approver write anywhere.
+        expect(approvers.setState).not.toHaveBeenCalled();
     });
 
     it('has no agent_action_proposals dependency in its constructor at all', () => {

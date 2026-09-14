@@ -352,10 +352,17 @@ describe('TaskPrStatusService', () => {
 
         const summary = await service.syncDuePrStatuses();
 
+        // EXTENDED CONTRACT (reviewer agent stage, review of Greptile P1-A on
+        // PR #2419): the completion now also hands the approver gate the head
+        // the provider just reported for the MERGED pull request, which the
+        // gate binds agent approvals to. Without it the gate fell back to the
+        // Task's two cached head columns, and a `ciHeadSha` compare-and-set
+        // lost in the same poll made it refuse — permanently, because a
+        // merged pull request is never polled again. Still an exact match.
         expect(transitions.transition).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'task-a' }),
             TaskStatus.DONE,
-            { actorType: 'agent' },
+            { actorType: 'agent', livePullRequestHeadSha: openStatus.headSha },
         );
         expect(summary).toMatchObject({ merged: 1, completed: 1 });
     });

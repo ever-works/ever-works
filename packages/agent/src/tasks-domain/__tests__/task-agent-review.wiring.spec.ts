@@ -64,14 +64,19 @@ describe('TaskAgentReview wiring — real container, real schema', () => {
         const reviews = moduleRef.get(TaskAgentReviewRepository);
         expect(reviews).toBeInstanceOf(TaskAgentReviewRepository);
 
+        // REVERSED CONTRACT (Greptile P1-C on PR #2419): `claim` returned the
+        // row or `null` and knew nothing about the budget, which a count read
+        // BEFORE it enforced — racily. It now takes the budget (`maxRuns`),
+        // allocates a unique slot, and names its outcome.
         const first = await reviews.claim({
             taskId: 'task-1',
             reviewerAgentId: 'agent-1',
             approverId: 'app-1',
             claimKey: 'agent-review:agent-1:abc123',
             headSha: 'abc123',
+            maxRuns: 4,
         });
-        expect(first).not.toBeNull();
+        expect(first).toMatchObject({ outcome: 'claimed', review: { slot: 0 } });
 
         // THE bound: the same coordinate, twice, buys one review.
         const second = await reviews.claim({
@@ -80,11 +85,12 @@ describe('TaskAgentReview wiring — real container, real schema', () => {
             approverId: 'app-1',
             claimKey: 'agent-review:agent-1:abc123',
             headSha: 'abc123',
+            maxRuns: 4,
         });
-        expect(second).toBeNull();
+        expect(second).toEqual({ outcome: 'already-claimed' });
         expect(await reviews.countForTask('task-1')).toBe(1);
 
-        // A new commit is new work, and claims cleanly.
+        // A new commit is new work, and claims cleanly — the next slot.
         expect(
             await reviews.claim({
                 taskId: 'task-1',
@@ -92,9 +98,189 @@ describe('TaskAgentReview wiring — real container, real schema', () => {
                 approverId: 'app-1',
                 claimKey: 'agent-review:agent-1:def456',
                 headSha: 'def456',
+                maxRuns: 4,
             }),
-        ).not.toBeNull();
+        ).toMatchObject({ outcome: 'claimed', review: { slot: 1 } });
         expect(await reviews.countForTask('task-1')).toBe(2);
+
+        await moduleRef.close();
+    });
+
+    /** Claim through the real repository, and insist it was won. */
+    async function claimOrFail(
+        reviews: TaskAgentReviewRepository,
+        input: Omit<Parameters<TaskAgentReviewRepository['claim']>[0], 'maxRuns'> & {
+            maxRuns?: number;
+        },
+    ): Promise<TaskAgentReview> {
+        const result = await reviews.claim({ maxRuns: 4, ...input });
+        if (result.outcome !== 'claimed') {
+            throw new Error(`expected a claim, got ${result.outcome}`);
+        }
+        return result.review;
+    }
+
+    it('the lifetime budget is a unique SLOT — two distinct claims racing past the slot read persist ONE row (Greptile P1-C)', async () => {
+        const moduleRef = await Test.createTestingModule({
+            imports: [
+                TypeOrmModule.forRoot({
+                    type: 'better-sqlite3',
+                    database: ':memory:',
+                    entities: ENTITIES,
+                    synchronize: true,
+                }),
+                ReviewLedgerTestModule,
+            ],
+        }).compile();
+        const reviews = moduleRef.get(TaskAgentReviewRepository);
+
+        // Force the worst interleave INSIDE the claim: both claimers read the
+        // taken slots (none) before either inserts, so both try slot 0 and
+        // only the `(taskId, slot)` unique index can separate them.
+        const readSlots = reviews.listTakenSlotsForTask.bind(reviews);
+        let arrived = 0;
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        reviews.listTakenSlotsForTask = async (taskId: string) => {
+            const slots = await readSlots(taskId);
+            arrived += 1;
+            if (arrived === 2) release();
+            await gate;
+            return slots;
+        };
+
+        const outcomes = await Promise.all([
+            reviews.claim({
+                taskId: 'task-1',
+                reviewerAgentId: 'agent-1',
+                approverId: 'app-1',
+                claimKey: 'agent-review:agent-1:abc123',
+                headSha: 'abc123',
+                maxRuns: 1,
+            }),
+            reviews.claim({
+                taskId: 'task-1',
+                reviewerAgentId: 'agent-2',
+                approverId: 'app-2',
+                claimKey: 'agent-review:agent-2:abc123',
+                headSha: 'abc123',
+                maxRuns: 1,
+            }),
+        ]);
+        expect(arrived).toBe(2);
+        expect(outcomes.map((outcome) => outcome.outcome).sort()).toEqual([
+            'budget-spent',
+            'claimed',
+        ]);
+        expect(await reviews.listForTask('task-1')).toHaveLength(1);
+
+        // With a second slot a later claim takes the next one. (This claim
+        // reads slot 0 as taken and inserts slot 1 directly; the race in which
+        // the LOSER of a slot collision goes on to the next slot is pinned in
+        // the test below.)
+        const third = await reviews.claim({
+            taskId: 'task-1',
+            reviewerAgentId: 'agent-3',
+            approverId: 'app-3',
+            claimKey: 'agent-review:agent-3:abc123',
+            headSha: 'abc123',
+            maxRuns: 2,
+        });
+        expect(third).toMatchObject({ outcome: 'claimed', review: { slot: 1 } });
+
+        await moduleRef.close();
+    });
+
+    it('the LOSER of a slot collision takes the next free slot — budget left over is never refused (review of P1-C)', async () => {
+        // Two claimers, room for both (maxRuns 2), forced to collide on slot
+        // 0: both read the taken slots (none) before either inserts. The one
+        // whose INSERT hits the `(taskId, slot)` unique index finds no winner
+        // for its OWN coordinate, so the slot went to a different review — and
+        // it must try slot 1, not give up as `budget-spent` with a slot free.
+        const moduleRef = await compileLedger();
+        const reviews = moduleRef.get(TaskAgentReviewRepository);
+        const readSlots = reviews.listTakenSlotsForTask.bind(reviews);
+        let arrived = 0;
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const observed: number[][] = [];
+        reviews.listTakenSlotsForTask = async (taskId: string) => {
+            const slots = await readSlots(taskId);
+            observed.push(slots);
+            arrived += 1;
+            if (arrived === 2) release();
+            await gate;
+            return slots;
+        };
+        const insert = jest.spyOn(
+            (reviews as unknown as { repository: { insert: (...args: unknown[]) => unknown } })
+                .repository,
+            'insert',
+        );
+
+        const outcomes = await Promise.all(
+            ['agent-1', 'agent-2'].map((agent) =>
+                reviews.claim({
+                    taskId: 'task-1',
+                    reviewerAgentId: agent,
+                    approverId: `app-${agent}`,
+                    claimKey: `agent-review:${agent}:abc123`,
+                    headSha: 'abc123',
+                    maxRuns: 2,
+                }),
+            ),
+        );
+
+        // The collision really happened: both saw no slot taken, and three
+        // INSERTs ran (slot 0, slot 0 refused, slot 1).
+        expect(observed).toEqual([[], []]);
+        expect(insert).toHaveBeenCalledTimes(3);
+        expect(outcomes.map((outcome) => outcome.outcome)).toEqual(['claimed', 'claimed']);
+        const slots = outcomes.map((outcome) =>
+            outcome.outcome === 'claimed' ? Number(outcome.review.slot) : -1,
+        );
+        expect(slots.sort()).toEqual([0, 1]);
+        expect((await reviews.listTakenSlotsForTask('task-1')).sort()).toEqual([0, 1]);
+
+        await moduleRef.close();
+    });
+
+    it('a failed dispatch keeps its slot, a spent budget refuses a new head, and no budget claims nothing', async () => {
+        const moduleRef = await compileLedger();
+        const reviews = moduleRef.get(TaskAgentReviewRepository);
+        const input = (reviewer: string, head: string) => ({
+            taskId: 'task-1',
+            reviewerAgentId: reviewer,
+            approverId: `app-${reviewer}`,
+            claimKey: `agent-review:${reviewer}:${head}`,
+            headSha: head,
+        });
+
+        const failed = await claimOrFail(reviews, { ...input('agent-1', 'abc123'), maxRuns: 2 });
+        expect(
+            await reviews.casSettle(failed.id, 'failed', { refusalCode: 'dispatch-failed' }),
+        ).toBe(true);
+        await claimOrFail(reviews, { ...input('agent-2', 'abc123'), maxRuns: 2 });
+        // Both slots held — one by a review that never ran. A new head is
+        // new work, and there is no budget left for it.
+        expect(await reviews.claim({ ...input('agent-1', 'def456'), maxRuns: 2 })).toEqual({
+            outcome: 'budget-spent',
+        });
+        // …while the SAME coordinate still collapses, before any budget talk.
+        expect(await reviews.claim({ ...input('agent-1', 'abc123'), maxRuns: 2 })).toEqual({
+            outcome: 'already-claimed',
+        });
+        // A budget that is not a positive number claims nothing — fail closed.
+        for (const maxRuns of [0, -1, Number.NaN]) {
+            expect(await reviews.claim({ ...input('agent-9', 'fff000'), maxRuns })).toEqual({
+                outcome: 'budget-spent',
+            });
+        }
+        expect((await reviews.listTakenSlotsForTask('task-1')).sort()).toEqual([0, 1]);
 
         await moduleRef.close();
     });
@@ -113,25 +299,25 @@ describe('TaskAgentReview wiring — real container, real schema', () => {
         }).compile();
         const reviews = moduleRef.get(TaskAgentReviewRepository);
 
-        const claimed = await reviews.claim({
+        const claimed = await claimOrFail(reviews, {
             taskId: 'task-1',
             reviewerAgentId: 'agent-1',
             approverId: 'app-1',
             claimKey: 'agent-review:agent-1:abc123',
             headSha: 'abc123',
         });
-        await reviews.stampRunId(claimed!.id, 'run-1');
+        await reviews.stampRunId(claimed.id, 'run-1');
 
         const open = await reviews.findOpenForReviewer('task-1', 'agent-1');
-        expect(open).toMatchObject({ id: claimed!.id, runId: 'run-1', state: 'dispatched' });
+        expect(open).toMatchObject({ id: claimed.id, runId: 'run-1', state: 'dispatched' });
         // Another agent has no open review, so it can record no verdict.
         expect(await reviews.findOpenForReviewer('task-1', 'agent-2')).toBeNull();
         expect(await reviews.listRunIdsForTask('task-1')).toEqual(['run-1']);
 
         // The CAS from `dispatched` is what makes one review write one
         // approver row, however many times the tool is called.
-        expect(await reviews.casSettle(claimed!.id, 'approved', { summary: 'ok' })).toBe(true);
-        expect(await reviews.casSettle(claimed!.id, 'approved', { summary: 'ok again' })).toBe(
+        expect(await reviews.casSettle(claimed.id, 'approved', { summary: 'ok' })).toBe(true);
+        expect(await reviews.casSettle(claimed.id, 'approved', { summary: 'ok again' })).toBe(
             false,
         );
         expect(await reviews.findOpenForReviewer('task-1', 'agent-1')).toBeNull();
@@ -161,7 +347,7 @@ describe('TaskAgentReview wiring — real container, real schema', () => {
     it('binds ONE run to an open review, before anything can answer it — and only that run finds it', async () => {
         const moduleRef = await compileLedger();
         const reviews = moduleRef.get(TaskAgentReviewRepository);
-        const claimed = await reviews.claim({
+        const claimed = await claimOrFail(reviews, {
             taskId: 'task-1',
             reviewerAgentId: 'agent-1',
             approverId: 'app-1',
@@ -169,16 +355,16 @@ describe('TaskAgentReview wiring — real container, real schema', () => {
             headSha: 'abc123',
         });
 
-        await reviews.bindRun(claimed!.id, 'run-review-1');
+        await reviews.bindRun(claimed.id, 'run-review-1');
         // Idempotent for the same run…
-        await expect(reviews.bindRun(claimed!.id, 'run-review-1')).resolves.toBeUndefined();
+        await expect(reviews.bindRun(claimed.id, 'run-review-1')).resolves.toBeUndefined();
         // …and refused for any other run: the binding cannot be stolen.
-        await expect(reviews.bindRun(claimed!.id, 'run-chat-7')).rejects.toThrow(
+        await expect(reviews.bindRun(claimed.id, 'run-chat-7')).rejects.toThrow(
             'agent-review-binding-refused',
         );
 
         expect(await reviews.findOpenForRun('run-review-1')).toMatchObject({
-            id: claimed!.id,
+            id: claimed.id,
             reviewerAgentId: 'agent-1',
         });
         // Another run of the SAME agent holds no binding.
@@ -188,9 +374,9 @@ describe('TaskAgentReview wiring — real container, real schema', () => {
         ]);
 
         // A settled review can be neither found nor re-bound.
-        await reviews.casSettle(claimed!.id, 'refused', { refusalCode: 'stale-head' });
+        await reviews.casSettle(claimed.id, 'refused', { refusalCode: 'stale-head' });
         expect(await reviews.findOpenForRun('run-review-1')).toBeNull();
-        await expect(reviews.bindRun(claimed!.id, 'run-review-1')).rejects.toThrow(
+        await expect(reviews.bindRun(claimed.id, 'run-review-1')).rejects.toThrow(
             'agent-review-binding-refused',
         );
 

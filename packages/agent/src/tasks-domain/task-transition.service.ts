@@ -37,9 +37,9 @@ import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
 // gate above. No cycle: task-agent-review.service imports repositories,
 // the git facade and two leaf modules — never this file.
 import { TaskAgentReviewService } from './task-agent-review.service';
-import { agentReviewRunScope } from './task-agent-review';
+import { agentReviewRunScope, resolveCompletionGateHead } from './task-agent-review';
 import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
-import type { SubAgentScope } from '@ever-works/contracts';
+import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
 
 /**
  * Tasks feature — Phase 12.1.
@@ -95,6 +95,24 @@ export interface TransitionOptions {
      * the red-gate review refusal; every human path is unaffected.
      */
     actorType?: TaskActorType;
+    /**
+     * Reviewer agent stage (review of Greptile P1-A on PR #2419) — the pull
+     * request head the CALLER read from the provider moments ago, for the
+     * `→ done` approver gate to bind agent decisions to.
+     *
+     * Platform-internal: set only by `TaskPrStatusService.completeOnMerge`,
+     * which holds the provider's answer for a MERGED pull request (a head that
+     * can never move again). No request body reaches it — the controller, the
+     * run finisher and the agent tool each build their options field by field
+     * — and a caller able to set it could pass `force` anyway, which skips
+     * the approver gate entirely.
+     *
+     * When omitted (every other caller) the gate reads the head live itself;
+     * see {@link TaskTransitionService.resolveCompletionGateLiveHead}. `null`
+     * means "the caller read the provider and got no head": no commit-bound
+     * decision counts.
+     */
+    livePullRequestHeadSha?: string | null;
 }
 
 @Injectable()
@@ -210,7 +228,24 @@ export class TaskTransitionService {
         // → done: approver gate (separate from blocker — `force` overrides this one only).
         if (to === TaskStatus.DONE) {
             if (!opts.force && task.requireAllApprovers) {
-                const ok = await this.approvers.allApproved(task.id);
+                // Reviewer agent stage (Greptile P1-A on PR #2419): an agent
+                // approval is a statement about ONE commit, so the gate counts
+                // an agent decision only for the pull request's CURRENT head,
+                // and an unknown head counts no agent decision at all.
+                //
+                // "Current" is read LIVE, not from the Task row (review of the
+                // P1-A fix): the cached head lags a push to an open pull
+                // request until the next poll, and the approval for the old
+                // commit used to open the gate inside that window. The read is
+                // lazy — `allApproved` asks for it only when every approver is
+                // approved and one of them is commit-bound — so a Task gated by
+                // people alone never costs a provider call here. Every path to
+                // `done` comes through this method: the controller, the run
+                // finisher and the agent tool via `TasksService.transition`,
+                // the workspace finalize step, and the merge completion.
+                const ok = await this.approvers.allApproved(task.id, () =>
+                    this.resolveCompletionGateLiveHead(task, opts),
+                );
                 if (!ok) {
                     throw new ConflictException(
                         'Task cannot transition to done — not all approvers have approved (pass force=true to override).',
@@ -414,6 +449,51 @@ export class TaskTransitionService {
                 reviewId: planned.reviewId,
             });
             await this.agentReviews.recordDispatchResult(planned.reviewId, result);
+        }
+    }
+
+    /**
+     * The head the `→ done` approver gate binds agent decisions to
+     * (reviewer agent stage, review of Greptile P1-A on PR #2419), or `null`
+     * — and `null` counts no commit-bound decision. Never throws.
+     *
+     *  - `opts.livePullRequestHeadSha` given (merge completion): that head,
+     *    alone. The caller read it from the provider for a MERGED pull
+     *    request, whose head can never move again; requiring the Task's
+     *    cached columns to agree as well turned a lost `ciHeadSha`
+     *    compare-and-set in the same poll into a permanent refusal, because
+     *    completion is attempted only once per merge.
+     *  - otherwise: the LIVE provider head (`TaskAgentReviewService.
+     *    readLivePullRequestHead`), and only when the Task's own head record
+     *    (`resolveCompletionGateHead`: `prHeadSha`, with `ciHeadSha` agreeing
+     *    when present) names the SAME commit. The live read is what closes
+     *    the push window — the cache still names the old commit until the
+     *    next poll. The cache must agree as well so that a provider read that
+     *    lags a push the platform has already SEEN (a poll or a check
+     *    delivery recorded the newer head) cannot vouch for the older one.
+     *    Either side unknown, or the two disagreeing, is `null` for at most a
+     *    poll interval: the poll writes the provider head into both columns.
+     *  - no review service bound (nothing can read the provider): `null`.
+     */
+    private async resolveCompletionGateLiveHead(
+        task: Task,
+        opts: TransitionOptions,
+    ): Promise<string | null> {
+        try {
+            if (opts.livePullRequestHeadSha !== undefined) {
+                return normalizeCommitSha(opts.livePullRequestHeadSha ?? null);
+            }
+            const recorded = resolveCompletionGateHead(task);
+            if (!recorded) return null;
+            const reader = this.agentReviews?.readLivePullRequestHead;
+            if (typeof reader !== 'function') return null;
+            const live = normalizeCommitSha(await reader.call(this.agentReviews, task));
+            return live && live === recorded ? live : null;
+        } catch (err) {
+            this.logger.warn(
+                `Task ${task.id}: completion gate could not resolve the pull request head: ${err}`,
+            );
+            return null;
         }
     }
 

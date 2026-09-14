@@ -4,12 +4,16 @@ import type { GitDiffResult, GitPullRequestStatus } from '@ever-works/plugin';
 import { capChecks } from '@ever-works/plugin';
 import { TaskStatus, type Task } from '../entities/task.entity';
 import type { TaskApprover } from '../entities/task-approver.entity';
+import type { TaskAgentReview } from '../entities/task-agent-review.entity';
 import type { Agent } from '../entities/agent.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
-import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
+import {
+    TaskAgentReviewRepository,
+    type ClaimAgentReviewResult,
+} from '../database/repositories/task-agent-review.repository';
 import {
     TaskApproverRepository,
     TaskAssigneeRepository,
@@ -21,6 +25,7 @@ import {
     AGENT_REVIEW_BRIEF_MISSING,
     AGENT_REVIEW_DIFF_MAX_BYTES,
     AGENT_REVIEW_DIFF_MAX_FILES,
+    agentApproverNeedsReview,
     agentReviewClaimKey,
     assessReviewDiff,
     composeAgentReviewBrief,
@@ -123,8 +128,12 @@ export interface SubmitAgentReviewInput {
  *    `agents` is unique per SCOPE, so one persona can hold several ids.
  *
  * 2. **An agent approval is not a human approval.** This file writes
- *    exactly one table, `task_approvers`, through exactly one method,
- *    `TaskApproverRepository.setState`. It never touches
+ *    an approval to exactly one table, `task_approvers`, through exactly
+ *    two methods: `TaskAgentReviewRepository.recordVerdict` (which settles
+ *    the review ledger row in the same transaction), and
+ *    `TaskApproverRepository.restoreAgentDecisionFromReview`, which only
+ *    puts a verdict that `recordVerdict` already recorded in the ledger for
+ *    the live head back onto its `pending` row. It never touches
  *    `agent_action_proposals`, which is the only table
  *    `MergeApprovalService.verifyMergeApproval` reads, and it stamps
  *    `decidedVia: 'agent-review'` — a value that does not exist in
@@ -134,8 +143,9 @@ export interface SubmitAgentReviewInput {
  *    `in_review → done`.
  *
  * 3. **Bounded cost.** One review is one model run. Every path that can
- *    start one is bounded: the lifetime budget (rows in
- *    `task_agent_reviews`), the per-entry approver cap, and the
+ *    start one is bounded: the lifetime budget (a UNIQUE `(taskId, slot)`
+ *    in `task_agent_reviews`, so the database refuses a run past it however
+ *    planners interleave), the per-entry approver cap, and the
  *    `(taskId, claimKey)` unique index keyed on `(reviewer, head commit)`
  *    which collapses a retried transition, a flip-flop, a replica race
  *    and a push re-planned by the PR-status poll into ONE run per commit.
@@ -222,8 +232,20 @@ export class TaskAgentReviewService {
         // from a request body, and never filtered by anything a caller
         // supplied.
         const approverRows = await this.approvers.findByTaskId(task.id);
-        const pendingAgentApprovers = approverRows.filter(
-            (row) => row.approverType === 'agent' && row.approvalState === 'pending',
+        const agentApproverRows = approverRows.filter((row) => row.approverType === 'agent');
+        // The head this Task last recorded. Used here ONLY to decide what
+        // might need a review and to skip provider calls; every WRITE below
+        // binds to the LIVE head read from the provider.
+        const cachedHead = normalizeCommitSha(resolveReviewHead(task));
+        // Who might need a review: every PENDING agent approver, and every
+        // agent approver whose decision is not a review of the head this
+        // Task records (Greptile P1-A on PR #2419). An approval — or a
+        // request for changes — about commit A says nothing about commit B.
+        // This used to be `approvalState === 'pending'` alone, so an agent
+        // that approved A was never asked about B, and its approval for A
+        // stood in for a review of B at the `→ done` gate.
+        const pendingAgentApprovers = agentApproverRows.filter((row) =>
+            agentApproverNeedsReview(row, cachedHead),
         );
         if (pendingAgentApprovers.length === 0) return empty('no-agent-approvers');
 
@@ -245,7 +267,18 @@ export class TaskAgentReviewService {
             );
             return empty('budget-unreadable');
         }
-        if (spent >= maxRuns) return empty('budget-spent');
+        const budgetSpent = spent >= maxRuns;
+        // A spent budget buys no review — but a verdict the ledger ALREADY
+        // holds for the head this Task records costs no budget to put back
+        // (see `restoreRecordedVerdicts` below). Only when there is one does
+        // a spent Task go on to the (one, status-only) provider read that
+        // restoring needs; otherwise it still stops here, before any.
+        if (
+            budgetSpent &&
+            !(await this.holdsRecordedVerdict(task.id, pendingAgentApprovers, cachedHead))
+        ) {
+            return empty('budget-spent');
+        }
 
         // THE self-review refusal, decided BEFORE any provider call.
         //
@@ -277,21 +310,28 @@ export class TaskAgentReviewService {
         // dragged between `in_progress` and `in_review` on one commit paid
         // two provider calls per flip, forever, for zero runs. When every
         // eligible reviewer already holds a claim for the head this Task
-        // last recorded, nothing here can buy a run, so nothing is read.
+        // last recorded, nothing here can buy a run, so nothing is read —
+        // unless one of those claims already carries a VERDICT, which the
+        // live read below can put back on its approver row.
         //
         // Using the CACHED head only to decide to do NOTHING is safe: a push
         // the cache has not seen yet is picked up by the PR-status poll,
         // which re-plans reviews when it records a new head
         // (`TaskPrStatusService`). The claim key itself is always the LIVE
-        // head below.
-        const cachedHead = normalizeCommitSha(resolveReviewHead(task));
-        if (cachedHead) {
+        // head below. A stale decision this skips is not reset here (a
+        // cached head can lag the live one, and resetting against it could
+        // erase a current approval), and it cannot pass the `→ done` gate
+        // either, which binds agent decisions to the Task's current head.
+        if (cachedHead && !budgetSpent) {
             const claimedKeys = new Set(await this.reviews.listClaimKeysForTask(task.id));
             const unclaimed = eligible.filter(
                 (approver) =>
                     !claimedKeys.has(agentReviewClaimKey(approver.approverId, cachedHead)),
             );
-            if (unclaimed.length === 0) {
+            if (
+                unclaimed.length === 0 &&
+                !(await this.holdsRecordedVerdict(task.id, eligible, cachedHead))
+            ) {
                 for (const approver of eligible) {
                     decisions.push({
                         reviewerAgentId: approver.approverId,
@@ -340,6 +380,57 @@ export class TaskAgentReviewService {
         // head would record a commit that is not the commit reviewed.
         const headSha = normalizeCommitSha(status.headSha);
         if (!headSha) return { ...empty('head-unknown'), decisions };
+
+        // STALE DECISIONS GO BACK TO PENDING — against the LIVE head only
+        // (Greptile P1-A on PR #2419). Once a plan gets this far (it has a
+        // live head), every agent approver whose decision is not an
+        // `agent-review` verdict about `headSha` is reset, whether or not
+        // this plan can then buy it a new review: a spent budget, a diff
+        // that turns out unreviewable and a reviewer that is now refused all
+        // leave it `pending` for a human — the safe direction. A plan that
+        // stops BEFORE the live read (the Task left review, no eligible
+        // reviewer, no pull request, nothing restorable on a spent budget or
+        // on an all-claimed cached head) resets nothing, because it has no
+        // live head to compare against; such a stale decision still stays
+        // shut at the `→ done` gate, which binds every agent decision to the
+        // current head. Each reset is a compare-and-set on the exact decision
+        // read above, so a verdict that lands in between is never erased.
+        for (const row of agentApproverRows) {
+            if (row.approvalState !== 'approved' && row.approvalState !== 'rejected') continue;
+            if (!agentApproverNeedsReview(row, headSha)) continue;
+            const reset = await this.approvers.resetAgentDecisionToPending({
+                id: row.id,
+                taskId: task.id,
+                approvalState: row.approvalState,
+                decidedVia: row.decidedVia ?? null,
+                decidedHeadSha: row.decidedHeadSha ?? null,
+            });
+            if (reset) {
+                this.logger.log(
+                    `Agent review for task ${task.id}: agent ${row.approverId}'s '${row.approvalState}' ` +
+                        `was about ${row.decidedHeadSha ?? 'no commit'}, not ${headSha} — reset to pending.`,
+                );
+            }
+        }
+
+        // Which eligible reviewers still need a NEW review of `headSha`. The
+        // rest either hold an `agent-review` verdict about this very head
+        // already, or hold a claim for it — and a claim that already carries
+        // a verdict is put back on its approver row here, so a head that
+        // moves away and comes back (or a verdict an older review overwrote)
+        // does not strand a reviewer's answer about this exact commit.
+        const settled = await this.restoreRecordedVerdicts(task, eligible, headSha);
+        if (budgetSpent || eligible.every((approver) => settled.has(approver.id))) {
+            for (const approver of eligible) {
+                decisions.push({
+                    reviewerAgentId: approver.approverId,
+                    reason: settled.has(approver.id) ? 'already-claimed' : 'budget-spent',
+                });
+            }
+            const plan: AgentReviewPlan = { taskId: task.id, headSha, decisions, dispatches: [] };
+            if (budgetSpent) plan.reason = 'budget-spent';
+            return plan;
+        }
 
         // The diff is pinned to THAT commit: `baseRef...headSha`, the same
         // three-dot comparison a pull request's file list is, but keyed on
@@ -422,10 +513,32 @@ export class TaskAgentReviewService {
         }
 
         const dispatches: PlannedAgentReview[] = [];
+        // The in-memory remainder only saves doomed INSERTs. The bound is
+        // the claim's unique budget slot (Greptile P1-C on PR #2419): `spent`
+        // was read before the provider calls, and another planner may have
+        // spent the same slot since.
         let remainingBudget = maxRuns - spent;
         let started = 0;
+        // Set when a claim THROWS. Everything claimed before it is still
+        // returned for dispatch — see the catch below.
+        let claimFailed = false;
 
         for (const approver of eligible) {
+            if (settled.has(approver.id)) {
+                // Its decision IS an `agent-review` verdict about this very
+                // head, or this coordinate is already claimed (and, when that
+                // claim carries a verdict, it was just put back above). There
+                // is nothing left to buy.
+                decisions.push({
+                    reviewerAgentId: approver.approverId,
+                    reason: 'already-claimed',
+                });
+                continue;
+            }
+            if (claimFailed) {
+                decisions.push({ reviewerAgentId: approver.approverId, reason: 'error' });
+                continue;
+            }
             if (started >= maxApprovers) {
                 decisions.push({ reviewerAgentId: approver.approverId, reason: 'approver-cap' });
                 continue;
@@ -434,25 +547,57 @@ export class TaskAgentReviewService {
                 decisions.push({ reviewerAgentId: approver.approverId, reason: 'budget-spent' });
                 continue;
             }
-            const claimed = await this.reviews.claim({
-                taskId: task.id,
-                reviewerAgentId: approver.approverId,
-                approverId: approver.id,
-                claimKey: agentReviewClaimKey(approver.approverId, headSha),
-                headSha,
-                prNumber: task.prNumber ?? null,
-                ciState: status.ciState,
-                workId: task.workId ?? null,
-                tenantId: task.tenantId ?? null,
-                organizationId: task.organizationId ?? null,
-            });
-            if (!claimed) {
+            let claim: ClaimAgentReviewResult;
+            try {
+                claim = await this.reviews.claim({
+                    taskId: task.id,
+                    reviewerAgentId: approver.approverId,
+                    approverId: approver.id,
+                    claimKey: agentReviewClaimKey(approver.approverId, headSha),
+                    headSha,
+                    maxRuns,
+                    prNumber: task.prNumber ?? null,
+                    ciState: status.ciState,
+                    workId: task.workId ?? null,
+                    tenantId: task.tenantId ?? null,
+                    organizationId: task.organizationId ?? null,
+                });
+            } catch (error) {
+                // A store failure on THIS claim. It used to escape to
+                // `planReviews`' catch, which returned `dispatches: []` and
+                // so dropped every review claimed earlier in this loop: those
+                // rows stayed `dispatched` with no run, holding a budget slot
+                // and a claim key that answered `already-claimed` forever
+                // (review of Greptile P1-C on PR #2419). The claims already
+                // won are returned for dispatch; nothing more is claimed in
+                // this plan, because the store that just failed is the store
+                // every further claim writes to.
+                claimFailed = true;
+                this.logger.warn(
+                    `Agent review for task ${task.id}: claim for agent ${approver.approverId} at ${headSha} failed — ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                decisions.push({ reviewerAgentId: approver.approverId, reason: 'error' });
+                continue;
+            }
+            if (claim.outcome === 'already-claimed') {
                 decisions.push({
                     reviewerAgentId: approver.approverId,
                     reason: 'already-claimed',
                 });
                 continue;
             }
+            if (claim.outcome !== 'claimed') {
+                // `budget-spent` from the DATABASE: every slot is held, some
+                // of them by a planner this one never saw. Nothing after this
+                // approver can claim one either. Any outcome this code does
+                // not know is refused the same way — fail closed.
+                remainingBudget = 0;
+                decisions.push({ reviewerAgentId: approver.approverId, reason: 'budget-spent' });
+                continue;
+            }
+            const claimed = claim.review;
             remainingBudget -= 1;
             started += 1;
             decisions.push({
@@ -472,7 +617,121 @@ export class TaskAgentReviewService {
             });
         }
 
-        return { taskId: task.id, headSha, decisions, dispatches };
+        const plan: AgentReviewPlan = { taskId: task.id, headSha, decisions, dispatches };
+        if (claimFailed) plan.reason = 'error';
+        return plan;
+    }
+
+    /**
+     * Does any of these approvers' claims for `head` already carry a
+     * VERDICT that belongs to that approver row?
+     *
+     * A cheap probe (ledger reads only, no provider call) that lets the two
+     * early exits above — the spent budget and the all-claimed cached head —
+     * keep costing nothing in the common case, while a reviewer's recorded
+     * answer about the head can still be put back. Never throws: a ledger
+     * that cannot answer is "nothing to restore", which only keeps the early
+     * exit.
+     */
+    private async holdsRecordedVerdict(
+        taskId: string,
+        approvers: TaskApprover[],
+        head: string | null,
+    ): Promise<boolean> {
+        if (!head) return false;
+        for (const approver of approvers) {
+            const claim = await this.findClaim(taskId, approver, head);
+            if (claim && isRecordedVerdictFor(claim, approver, head)) return true;
+        }
+        return false;
+    }
+
+    /** The ledger row for `(approver's agent, head)`, or `null` — never throws. */
+    private async findClaim(
+        taskId: string,
+        approver: TaskApprover,
+        head: string,
+    ): Promise<TaskAgentReview | null> {
+        try {
+            return (
+                (await this.reviews.findByClaimKey(
+                    taskId,
+                    agentReviewClaimKey(approver.approverId, head),
+                )) ?? null
+            );
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * For each eligible reviewer, decide whether `headSha` still needs a
+     * NEW review, restoring a recorded verdict on the way.
+     *
+     * Returns the ids of the approver rows that need nothing bought:
+     *
+     *  - the row's decision already IS an `agent-review` verdict about
+     *    `headSha` (it only looked stale against the cached head);
+     *  - the `(reviewer, headSha)` claim already exists. When that ledger row
+     *    is a verdict for this approver row, the verdict is put back on the
+     *    row (`TaskApproverRepository.restoreAgentDecisionFromReview`, a
+     *    compare-and-set from `pending`, so it never overwrites a decision
+     *    that landed since); a claim still in flight, refused or failed is
+     *    left alone, and the row stays as it is.
+     *
+     * Head-bound decisions plus one review per (reviewer, head) otherwise
+     * lose a verdict for good: approve A, push B (reset, B reviewed),
+     * force-push back to A — the `(reviewer, A)` claim exists, so no review
+     * of A could ever be bought again, and the approver stayed `pending` at a
+     * commit its reviewer had approved.
+     *
+     * Only ever called with the LIVE head, and after the reset above, so a
+     * restored decision is about the commit the pull request is on now.
+     * Never throws: a restore that fails leaves the row `pending`, the gate
+     * shut — the safe direction.
+     */
+    private async restoreRecordedVerdicts(
+        task: Task,
+        eligible: TaskApprover[],
+        headSha: string,
+    ): Promise<Set<string>> {
+        const settled = new Set<string>();
+        for (const approver of eligible) {
+            if (!agentApproverNeedsReview(approver, headSha)) {
+                settled.add(approver.id);
+                continue;
+            }
+            const claim = await this.findClaim(task.id, approver, headSha);
+            if (!claim) continue;
+            settled.add(approver.id);
+            if (!isRecordedVerdictFor(claim, approver, headSha)) continue;
+            const verdict = claim;
+            const restored = await this.approvers
+                .restoreAgentDecisionFromReview({
+                    id: approver.id,
+                    taskId: task.id,
+                    reviewerAgentId: approver.approverId,
+                    approvalState: verdict.state === 'approved' ? 'approved' : 'rejected',
+                    decidedByRunId: verdict.runId ?? null,
+                    decidedHeadSha: headSha,
+                })
+                .catch((error: unknown) => {
+                    this.logger.warn(
+                        `Agent review for task ${task.id}: could not restore review ${verdict.id} ` +
+                            `onto approver ${approver.id} — ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                    );
+                    return false;
+                });
+            if (restored) {
+                this.logger.log(
+                    `Agent review for task ${task.id}: restored agent ${approver.approverId}'s ` +
+                        `'${verdict.state}' about ${headSha} from review ${verdict.id}.`,
+                );
+            }
+        }
+        return settled;
     }
 
     /**
@@ -678,28 +937,52 @@ export class TaskAgentReviewService {
         }
 
         const summary = (input.summary ?? '').slice(0, AGENT_REVIEW_SUMMARY_MAX_CHARS) || null;
-        // CAS on the review row FIRST: it is the one-verdict-per-review
-        // guard, so a model that calls the tool twice writes the approver
-        // row once.
-        const settled = await this.reviews.casSettle(
-            review.id,
-            verdict === 'approve' ? 'approved' : 'changes-requested',
-            { summary },
-        );
-        if (!settled) return { reason: 'no-open-review' };
-
-        await this.approvers.setState(
-            approver.id,
-            verdict === 'approve' ? 'approved' : 'rejected',
-            task.id,
-            {
-                // The provenance that keeps this distinguishable forever.
-                // `agent-review` has no meaning in the merge-approval line.
-                decidedVia: 'agent-review',
+        // ONE write, in ONE transaction: the review leaves `dispatched` and
+        // the approver row takes the verdict together, or neither happens
+        // (Greptile P1-B on PR #2419). It used to be a review CAS followed
+        // by a separate `setState`: an approver write that threw left the
+        // review terminal and the verdict unrecordable forever, and one that
+        // matched no row was ignored and reported `recorded`. The review CAS
+        // inside the transaction is still the one-verdict-per-review guard,
+        // so a model that calls the tool twice writes the approver row once.
+        const outcome = await this.reviews.recordVerdict({
+            reviewId: review.id,
+            state: verdict === 'approve' ? 'approved' : 'changes-requested',
+            summary,
+            approver: {
+                id: approver.id,
+                taskId: task.id,
+                reviewerAgentId: input.reviewerAgentId,
+                approvalState: verdict === 'approve' ? 'approved' : 'rejected',
                 decidedByRunId: review.runId ?? null,
                 decidedHeadSha: review.headSha,
             },
-        );
+        });
+        if (outcome === 'review-not-open') return { reason: 'no-open-review' };
+        if (outcome === 'superseded') {
+            // The approver row already carries a verdict from a review that
+            // was claimed AFTER this one — a newer commit's review answered
+            // first, and this verdict passed its live-head check only because
+            // the provider read lagged that push. Nothing was written. Closed
+            // as a refusal, the same way a verdict about a head that moved is:
+            // it is a statement about code the Task has moved on from, and an
+            // open review nobody can ever record would just hold its run.
+            await this.reviews.casSettle(review.id, 'refused', { refusalCode: 'superseded' });
+            this.logger.warn(
+                `Agent review ${review.id}: the verdict from agent ${input.reviewerAgentId} on task ${task.id} ` +
+                    `at ${review.headSha} was superseded by a newer review's verdict — not recorded.`,
+            );
+            return { reason: 'stale-head', headSha: review.headSha };
+        }
+        if (outcome !== 'recorded') {
+            // `approver-not-written`, or anything this code does not know:
+            // nothing was recorded, and the review is still open.
+            this.logger.warn(
+                `Agent review ${review.id}: the verdict from agent ${input.reviewerAgentId} on task ${task.id} ` +
+                    `was not recorded — the approver row ${approver.id} was not written; the review stays open.`,
+            );
+            return { reason: 'approver-not-written', headSha: review.headSha };
+        }
         this.logger.log(
             `Agent review ${review.id}: agent ${input.reviewerAgentId} recorded '${verdict}' on task ${task.id} at ${review.headSha}.`,
         );
@@ -812,6 +1095,41 @@ export class TaskAgentReviewService {
         return null;
     }
 
+    // ── the completion gate's head ────────────────────────────────────
+
+    /**
+     * The pull request's head RIGHT NOW, read from the provider, for the
+     * `in_review → done` approver gate — or `null` when it cannot be read.
+     *
+     * Review of Greptile P1-A on PR #2419: the gate used to bind agent
+     * decisions to the Task's CACHED head (`prHeadSha` / `ciHeadSha`). Those
+     * columns are written by the PR-status poll and by check deliveries, and a
+     * push to an already-open pull request writes neither
+     * (`TaskWorkspaceService.recordRemotePush` deliberately leaves the head to
+     * the provider). So between a push and the next poll the cache still
+     * named the old commit, and an agent approval of that old commit opened
+     * the gate for code nobody reviewed — the fix loop's own run could push B
+     * and call `transitionTask('done')` inside that window.
+     *
+     * Same lookup, same posture as the verdict path's live-head check: from
+     * the provider and nowhere else, never a cached fallback. Never throws —
+     * every failure (no facade, no Work, no pull request, a provider error, an
+     * unparseable head) is `null`, and `null` counts no commit-bound decision.
+     */
+    async readLivePullRequestHead(task: Task): Promise<string | null> {
+        try {
+            const current = await this.resolveCurrentHead(task);
+            return current.kind === 'live' ? current.head : null;
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: pull request head unreadable for the completion gate — ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
     // ── helpers ───────────────────────────────────────────────────────
 
     /**
@@ -886,6 +1204,22 @@ export class TaskAgentReviewService {
 }
 
 type AgentReviewDecisionList = AgentReviewDispatchDecision[];
+
+/**
+ * Is this ledger row a terminal VERDICT (`approved` / `changes-requested`)
+ * that was dispatched for exactly this approver row and its agent, about
+ * exactly `head`? Only such a row may be put back on the approver row.
+ */
+function isRecordedVerdictFor(
+    review: TaskAgentReview,
+    approver: TaskApprover,
+    head: string,
+): boolean {
+    if (review.state !== 'approved' && review.state !== 'changes-requested') return false;
+    if (review.approverId !== approver.id) return false;
+    if (review.reviewerAgentId !== approver.approverId) return false;
+    return normalizeCommitSha(review.headSha) === head;
+}
 
 function toIdentity(agent: Agent): { id: string; userId: string; slug: string } {
     return { id: agent.id, userId: agent.userId, slug: agent.slug };
