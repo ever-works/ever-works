@@ -57,10 +57,31 @@ describe('ModelAccountHealthService', () => {
         it('falls back to the connection test when the plugin declares no identity check', async () => {
             const isAvailable = jest.fn().mockResolvedValue(false);
             const { service, descriptor } = serviceWith({ isAvailable });
+            // A failed connection test fails the check (nothing is saved) but is
+            // not a rejection: it reads false for an outage just as for a bad key.
+            await expect(
+                service.checkCredentials(descriptor, { apiKey: 'sk-bad' }, 'u1'),
+            ).resolves.toEqual({ ok: false, rejected: false, expiresAt: null });
+            expect(isAvailable).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-bad' }));
+        });
+
+        it("still counts the plugin's own identity check saying no as a rejection", async () => {
+            const { service, descriptor } = serviceWith({
+                checkCredential: jest.fn().mockResolvedValue({ ok: false }),
+            });
             await expect(
                 service.checkCredentials(descriptor, { apiKey: 'sk-bad' }, 'u1'),
             ).resolves.toEqual({ ok: false, rejected: true, expiresAt: null });
-            expect(isAvailable).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-bad' }));
+        });
+
+        it('reads only the operator settings when the account has no creator any more', async () => {
+            const checkCredential = jest.fn().mockResolvedValue({ ok: true });
+            const { service, descriptor } = serviceWith({ checkCredential });
+            await service.checkCredentials(descriptor, { apiKey: 'sk-candidate' }, null);
+            expect(getSettings).toHaveBeenCalledWith('provider-a', {
+                userId: undefined,
+                includeSecrets: false,
+            });
         });
 
         it('separates a refusal from a check that could not run', async () => {
@@ -114,9 +135,20 @@ describe('ModelAccountHealthService', () => {
         });
 
         it('sets invalid when the provider refuses the stored credential', async () => {
-            const { service } = serviceWith({ isAvailable: jest.fn().mockResolvedValue(false) });
+            const { service } = serviceWith({
+                isAvailable: jest
+                    .fn()
+                    .mockRejectedValue(Object.assign(new Error('Unauthorized'), { status: 401 })),
+            });
             const account = store.seed({ health: 'working' });
             await expect(service.probe(account, NOW)).resolves.toBe('invalid');
+        });
+
+        it('never marks an account invalid because the connection test merely failed (outage, rate limit, timeout)', async () => {
+            const { service } = serviceWith({ isAvailable: jest.fn().mockResolvedValue(false) });
+            const account = store.seed({ health: 'working' });
+            await expect(service.probe(account, NOW)).resolves.toBe('unknown');
+            expect(store.rows[0]).toMatchObject({ health: 'unknown', position: 1 });
         });
 
         it('reads a removed provider as unknown without throwing', async () => {

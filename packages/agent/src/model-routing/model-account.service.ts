@@ -23,7 +23,11 @@ import {
     modelProviderTakesNoAccounts,
     modelProviderUnknown,
 } from './model-routing.errors';
-import { modelWorkspaceKey, type ModelWorkspaceScope } from './model-workspace';
+import {
+    modelWorkspaceKey,
+    modelWorkspaceOwnerUserId,
+    type ModelWorkspaceScope,
+} from './model-workspace';
 
 export interface CreateModelAccountInput {
     providerPluginId: string;
@@ -108,6 +112,9 @@ export class ModelAccountService {
     ): Promise<ModelAccountView> {
         const workspaceKey = modelWorkspaceKey(scope);
         const provider = await this.requireProvider(input.providerPluginId);
+        // A supplementary provider is not offered in the provider list, so an
+        // account cannot be added for it by naming its id directly either.
+        if (provider.supplementary) throw modelProviderUnknown(input.providerPluginId);
         const label = normalizeLabel(input.label);
         const credentials = pickCredentials(provider, input.credentials, true);
 
@@ -144,6 +151,7 @@ export class ModelAccountService {
                 return tx.save(
                     tx.create({
                         userId: scope.userId,
+                        ownerUserId: modelWorkspaceOwnerUserId(scope),
                         tenantId: scope.tenantId,
                         organizationId: scope.organizationId,
                         workspaceKey,
@@ -159,6 +167,9 @@ export class ModelAccountService {
                     }),
                 );
             },
+            // The workspace-wide limit counts across providers: adds for
+            // different providers must serialize too.
+            { lockWorkspace: true },
         );
 
         await this.logActivity(scope, ActivityActionType.MODEL_ACCOUNT_ADDED, saved, {
@@ -174,33 +185,53 @@ export class ModelAccountService {
     ): Promise<ModelAccountView> {
         const workspaceKey = modelWorkspaceKey(scope);
         const account = await this.requireAccount(id, workspaceKey);
-        const events: Array<[ActivityActionType, Record<string, unknown>]> = [];
+        const label = input.label !== undefined ? normalizeLabel(input.label) : undefined;
+        if (label === undefined && input.enabled === undefined) {
+            return toModelAccountView(
+                account,
+                this.providers.providerName(account.providerPluginId),
+            );
+        }
 
-        if (input.label !== undefined) {
-            const label = normalizeLabel(input.label);
-            if (label !== account.label) {
-                const siblings = await this.accounts.listInWorkspace(
-                    workspaceKey,
-                    account.providerPluginId,
-                );
-                if (siblings.some((row) => row.id !== account.id && sameLabel(row.label, label))) {
-                    throw modelAccountDuplicateLabel(label);
+        // The name check and the save run under the same provider lock as an
+        // add, on rows re-read inside it: two renames (or a rename and an add)
+        // cannot both pass the case-insensitive check, and the save never
+        // writes back a position a concurrent reorder already changed.
+        const { saved, events } = await this.accounts.inTransaction(
+            workspaceKey,
+            account.providerPluginId,
+            async (tx) => {
+                const siblings = await tx.find({
+                    where: { workspaceKey, providerPluginId: account.providerPluginId },
+                    order: { position: 'ASC' },
+                });
+                const current = siblings.find((row) => row.id === account.id);
+                if (!current) throw modelAccountNotFound();
+                const changes: Array<[ActivityActionType, Record<string, unknown>]> = [];
+                if (label !== undefined && label !== current.label) {
+                    if (
+                        siblings.some((row) => row.id !== current.id && sameLabel(row.label, label))
+                    ) {
+                        throw modelAccountDuplicateLabel(label);
+                    }
+                    current.label = label;
+                    changes.push([ActivityActionType.MODEL_ACCOUNT_UPDATED, { field: 'label' }]);
                 }
-                account.label = label;
-                events.push([ActivityActionType.MODEL_ACCOUNT_UPDATED, { field: 'label' }]);
-            }
-        }
-        if (input.enabled !== undefined && input.enabled !== account.enabled) {
-            account.enabled = input.enabled;
-            events.push([
-                input.enabled
-                    ? ActivityActionType.MODEL_ACCOUNT_RESUMED
-                    : ActivityActionType.MODEL_ACCOUNT_PAUSED,
-                { field: 'enabled' },
-            ]);
-        }
-
-        const saved = events.length > 0 ? await this.accounts.save(account) : account;
+                if (input.enabled !== undefined && input.enabled !== current.enabled) {
+                    current.enabled = input.enabled;
+                    changes.push([
+                        input.enabled
+                            ? ActivityActionType.MODEL_ACCOUNT_RESUMED
+                            : ActivityActionType.MODEL_ACCOUNT_PAUSED,
+                        { field: 'enabled' },
+                    ]);
+                }
+                return {
+                    saved: changes.length > 0 ? await tx.save(current) : current,
+                    events: changes,
+                };
+            },
+        );
         for (const [actionType, details] of events) {
             await this.logActivity(scope, actionType, saved, details);
         }
@@ -225,15 +256,27 @@ export class ModelAccountService {
             throw modelAccountCredentialRejected(provider.providerName);
         }
         const now = new Date();
-        account.credentials = next;
-        account.credentialVersion = (account.credentialVersion ?? 1) + 1;
-        account.credentialExpiresAt = check.expiresAt;
-        account.health = 'working';
-        account.lastCheckedAt = now;
-        account.cooldownReason = null;
-        account.cooldownUntil = null;
-        account.consecutiveFailures = 0;
-        const saved = await this.accounts.save(account);
+        // Written on the row re-read under the provider lock, so a reorder or
+        // rename that landed while the provider was checking the key is kept.
+        const saved = await this.accounts.inTransaction(
+            account.workspaceKey,
+            account.providerPluginId,
+            async (tx) => {
+                const [current] = await tx.find({
+                    where: { id: account.id, workspaceKey: account.workspaceKey },
+                });
+                if (!current) throw modelAccountNotFound();
+                current.credentials = next;
+                current.credentialVersion = (current.credentialVersion ?? 1) + 1;
+                current.credentialExpiresAt = check.expiresAt;
+                current.health = 'working';
+                current.lastCheckedAt = now;
+                current.cooldownReason = null;
+                current.cooldownUntil = null;
+                current.consecutiveFailures = 0;
+                return tx.save(current);
+            },
+        );
         await this.logActivity(scope, ActivityActionType.MODEL_ACCOUNT_RECONNECTED, saved, {
             fields: Object.keys(next).sort(),
         });

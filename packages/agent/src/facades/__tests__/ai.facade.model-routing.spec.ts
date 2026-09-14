@@ -259,9 +259,15 @@ describe('AiFacadeService — model accounts', () => {
         settings.getResolvedSettings.mockResolvedValue({
             apiKey: { key: 'apiKey', value: 'sk-work-key', source: 'work', isFallback: false },
         });
+        settings.getSettings.mockResolvedValue({
+            apiKey: 'sk-work-key',
+            baseUrl: 'https://operator.example/v1',
+            defaultModel: 'settings-model',
+        });
         await chat(build());
         const call = (providerA.createChatCompletion as jest.Mock).mock.calls[0][0];
-        expect(call.settings.apiKey).toBe('sk-platform-key');
+        expect(call.settings.apiKey).toBe('sk-work-key');
+        expect(call.settings.apiKey).not.toBe(SECRET);
         expect(usage.record.mock.calls[0][0].metadata.modelAccountId).toBeUndefined();
     });
 
@@ -348,6 +354,78 @@ describe('AiFacadeService — model accounts', () => {
             'p',
             expect.objectContaining({ model: 'tier-model' }),
         );
+    });
+
+    it("plans with the call's own routing.scheduleId ahead of the facade options', on every call shape", async () => {
+        const schema = z.object({ name: z.string() });
+        const service = build();
+
+        await service.askJson(
+            'p',
+            schema,
+            { routing: { scheduleId: 'agent_heartbeat:call' } },
+            { userId: 'u1', scheduleId: 'agent_heartbeat:facade' },
+        );
+        expect(planner.plan).toHaveBeenLastCalledWith(
+            expect.objectContaining({ scheduleId: 'agent_heartbeat:call' }),
+        );
+
+        await service.createChatCompletion(
+            {
+                messages: [{ role: 'user', content: 'hi' }],
+                scheduleId: 'recurring_task:call',
+            } as never,
+            { userId: 'u1', scheduleId: 'recurring_task:facade' },
+        );
+        expect(planner.plan).toHaveBeenLastCalledWith(
+            expect.objectContaining({ scheduleId: 'recurring_task:call' }),
+        );
+
+        for await (const _chunk of service.createStreamingChatCompletion(
+            {
+                messages: [{ role: 'user', content: 'hi' }],
+                scheduleId: 'work_schedule:call',
+            } as never,
+            { userId: 'u1', scheduleId: 'work_schedule:facade' },
+        )) {
+            // drain
+        }
+        expect(planner.plan).toHaveBeenLastCalledWith(
+            expect.objectContaining({ scheduleId: 'work_schedule:call' }),
+        );
+
+        // Without a per-call id the facade options' still applies.
+        await chat(service, { scheduleId: 'mission_tick:facade' });
+        expect(planner.plan).toHaveBeenLastCalledWith(
+            expect.objectContaining({ scheduleId: 'mission_tick:facade' }),
+        );
+    });
+
+    it('has recorded what answered by the time a stream completes', async () => {
+        let recorded = false;
+        planner.recordAnswer.mockImplementation(async () => {
+            await new Promise((resolve) => setImmediate(resolve));
+            recorded = true;
+        });
+        for await (const _chunk of build().createStreamingChatCompletion(
+            { messages: [{ role: 'user', content: 'hi' }] },
+            { userId: 'u1', runId: 'r1' },
+        )) {
+            // drain
+        }
+        expect(recorded).toBe(true);
+    });
+
+    it('still completes a stream when recording what answered fails', async () => {
+        planner.recordAnswer.mockRejectedValue(new Error('agent_runs unreachable'));
+        const chunks = [];
+        for await (const chunk of build().createStreamingChatCompletion(
+            { messages: [{ role: 'user', content: 'hi' }] },
+            { userId: 'u1', runId: 'r1' },
+        )) {
+            chunks.push(chunk);
+        }
+        expect(chunks).toHaveLength(1);
     });
 
     it('streams on the planned route and records once the stream has produced output', async () => {

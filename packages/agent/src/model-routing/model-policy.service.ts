@@ -33,6 +33,7 @@ import {
     WORKSPACE_POLICY_SCOPE_KEY,
     agentPolicyScopeKey,
     modelWorkspaceKey,
+    modelWorkspaceOwnerUserId,
     schedulePolicyScopeKey,
     type ModelWorkspaceScope,
 } from './model-workspace';
@@ -167,17 +168,13 @@ export class ModelPolicyService {
             }
         }
 
-        if (target.type === 'agent' && input.primaryModel !== undefined) {
-            await this.agents.update(
-                { id: agent!.id },
-                {
-                    aiProviderId: primary?.providerPluginId ?? null,
-                    modelId: primary?.modelId ?? null,
-                },
-            );
-            agent!.aiProviderId = primary?.providerPluginId ?? null;
-            agent!.modelId = primary?.modelId ?? null;
-        }
+        const agentModel =
+            target.type === 'agent' && input.primaryModel !== undefined
+                ? {
+                      aiProviderId: primary?.providerPluginId ?? null,
+                      modelId: primary?.modelId ?? null,
+                  }
+                : null;
 
         const row =
             existing ??
@@ -189,6 +186,7 @@ export class ModelPolicyService {
                 scopeVariant: target.type === 'schedule' ? target.source : null,
             });
         row.userId = scope.userId;
+        row.ownerUserId = modelWorkspaceOwnerUserId(scope);
         row.tenantId = scope.tenantId;
         row.organizationId = scope.organizationId;
         if (target.type !== 'agent') {
@@ -215,7 +213,15 @@ export class ModelPolicyService {
             row.fallbackModels !== null ||
             row.reasoningEffort != null ||
             row.attemptTimeoutSeconds != null;
-        const saved = needsRow ? await this.policies.save(row) : null;
+        // The Agent's own model pair and the policy row commit together.
+        const saved = await this.policies.inTransaction(async (tx) => {
+            if (agentModel) await tx.setAgentModel(agent!.id, agentModel);
+            return needsRow ? tx.save(row) : null;
+        });
+        if (agentModel) {
+            agent!.aiProviderId = agentModel.aiProviderId;
+            agent!.modelId = agentModel.modelId;
+        }
 
         await this.logActivity(scope, scopeKey, [...new Set(changed)]);
         return {
@@ -230,11 +236,15 @@ export class ModelPolicyService {
      */
     async remove(scope: ModelWorkspaceScope, target: ModelPolicyTarget): Promise<void> {
         const workspaceKey = modelWorkspaceKey(scope);
-        if (target.type === 'agent') {
-            const agent = await this.requireAgent(scope, target.agentId);
-            await this.agents.update({ id: agent.id }, { aiProviderId: null, modelId: null });
-        }
-        await this.policies.deleteByScope(workspaceKey, scopeKeyOf(target));
+        const agent =
+            target.type === 'agent' ? await this.requireAgent(scope, target.agentId) : null;
+        // Clearing the Agent's pair and deleting its policy row commit together.
+        await this.policies.inTransaction(async (tx) => {
+            if (agent) {
+                await tx.setAgentModel(agent.id, { aiProviderId: null, modelId: null });
+            }
+            await tx.deleteByScope(workspaceKey, scopeKeyOf(target));
+        });
         await this.logActivity(scope, scopeKeyOf(target), ['reset']);
     }
 

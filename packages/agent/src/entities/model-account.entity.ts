@@ -29,7 +29,8 @@ import { PortableDateColumn } from './_types';
  * `user:<userId>` for a personal workspace. It is never null, so the unique
  * label index holds in both Postgres and SQLite (both treat NULLs as distinct
  * inside a unique index). `tenantId` / `organizationId` are the usual scope
- * stamps; `userId` is who created the row.
+ * stamps; `userId` is who created the row; `ownerUserId` is set only for a
+ * personal workspace and is what ties the row's lifetime to that person.
  *
  * # Credentials
  *
@@ -65,9 +66,22 @@ export class ModelAccount {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    /** Who created the account. */
-    @Column({ type: 'uuid' })
-    userId: string;
+    /**
+     * Who created the account. NULL once that person is deleted: in an
+     * organization the account is the workspace's, not its creator's, so it
+     * outlives them (`ON DELETE SET NULL`).
+     */
+    @Column({ type: 'uuid', nullable: true })
+    userId: string | null;
+
+    /**
+     * The person whose PERSONAL workspace holds this account; NULL for an
+     * organization workspace. Deleting that person deletes the account
+     * (`ON DELETE CASCADE`). An organization's accounts go with the
+     * organization instead (`organizationId`, `ON DELETE CASCADE`).
+     */
+    @Column({ type: 'uuid', nullable: true })
+    ownerUserId?: string | null;
 
     @Column({ type: 'uuid', nullable: true })
     tenantId?: string | null;

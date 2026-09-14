@@ -7,6 +7,7 @@ import {
     MODEL_ACCOUNT_WRITE_LOCK_CLASS_ID,
     ModelAccountRepository,
     modelAccountWriteLockKey,
+    modelAccountWriteLockKeys,
 } from './model-account.repository';
 
 /**
@@ -128,5 +129,158 @@ describe('ModelAccountRepository.inTransaction — write lock', () => {
             'lock timeout',
         );
         expect(work).not.toHaveBeenCalled();
+    });
+});
+
+describe('ModelAccountRepository.inTransaction — workspace lock for adds', () => {
+    const lockSql = (key: string) =>
+        `SELECT pg_advisory_xact_lock($1, $2)|${MODEL_ACCOUNT_WRITE_LOCK_CLASS_ID}|${advisoryLockObjectId(key)}`;
+
+    it('takes the workspace key, then the provider key, then the row lock — in the same transaction', async () => {
+        const { repository, events } = build('postgres');
+
+        await repository.inTransaction(
+            'org:org-1',
+            'openrouter',
+            async () => {
+                events.push('count-and-insert');
+            },
+            { lockWorkspace: true },
+        );
+
+        expect(events).toEqual([
+            'begin',
+            lockSql('model-accounts:org:org-1'),
+            lockSql('model-accounts:org:org-1:openrouter'),
+            'row-lock',
+            'count-and-insert',
+            'commit',
+        ]);
+    });
+
+    it('keeps one lock order for every write: the workspace key is never taken after a provider key', () => {
+        const workspace = modelAccountWriteLockKey('org:org-1', null);
+        const provider = modelAccountWriteLockKey('org:org-1', 'openrouter');
+        expect(
+            modelAccountWriteLockKeys('org:org-1', 'openrouter', { lockWorkspace: true }),
+        ).toEqual([workspace, provider]);
+        // Reorder, remove, rename and reconnect stay per provider.
+        expect(modelAccountWriteLockKeys('org:org-1', 'openrouter')).toEqual([provider]);
+        // A write about no one provider takes the workspace key alone, once.
+        expect(modelAccountWriteLockKeys('org:org-1', null, { lockWorkspace: true })).toEqual([
+            workspace,
+        ]);
+    });
+
+    it('stays a no-op off Postgres with the workspace lock requested', async () => {
+        const { repository, manager } = build('better-sqlite3');
+        await repository.inTransaction('org:org-1', 'openrouter', async () => undefined, {
+            lockWorkspace: true,
+        });
+        expect(manager.query).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Two concurrent adds for DIFFERENT providers against a workspace one
+     * account short of its limit. Advisory locks are emulated with the
+     * semantics Postgres gives `pg_advisory_xact_lock`: a key is held from the
+     * call until the holder's transaction ends, and a second caller waits.
+     */
+    function concurrentStack(limit: number, stored: number) {
+        const held = new Map<string, Promise<void>>();
+        const state = { stored, inserted: 0 };
+        const transaction = jest.fn(async (work: (m: unknown) => Promise<unknown>) => {
+            const releases: Array<() => void> = [];
+            const manager = {
+                connection: { options: { type: 'postgres' } },
+                query: async (_sql: string, params: [number, number]) => {
+                    const key = String(params[1]);
+                    while (held.has(key)) await held.get(key);
+                    let release!: () => void;
+                    held.set(
+                        key,
+                        new Promise<void>((resolve) => {
+                            release = () => {
+                                held.delete(key);
+                                resolve();
+                            };
+                        }),
+                    );
+                    releases.push(release);
+                },
+                getRepository: () => ({
+                    createQueryBuilder: () => {
+                        const qb = {
+                            select: () => qb,
+                            where: () => qb,
+                            andWhere: () => qb,
+                            setLock: () => qb,
+                            getMany: async () => [],
+                        };
+                        return qb;
+                    },
+                }),
+            };
+            try {
+                return await work(manager);
+            } finally {
+                releases.reverse().forEach((release) => release());
+            }
+        });
+        const repository = new ModelAccountRepository({ manager: { transaction } } as never);
+        const add = (provider: string, options?: { lockWorkspace?: boolean }) =>
+            repository.inTransaction(
+                'org:org-1',
+                provider,
+                async () => {
+                    const count = state.stored;
+                    // Yield between the count and the insert, as a real round trip does.
+                    await new Promise((resolve) => setImmediate(resolve));
+                    if (count >= limit) return 'limit_reached';
+                    state.stored += 1;
+                    state.inserted += 1;
+                    return 'added';
+                },
+                options,
+            );
+        return { add, state };
+    }
+
+    it('lets only one of two concurrent adds for different providers take the last workspace slot', async () => {
+        const { add, state } = concurrentStack(32, 31);
+
+        const results = await Promise.all([
+            add('openrouter', { lockWorkspace: true }),
+            add('anthropic', { lockWorkspace: true }),
+        ]);
+
+        expect(results.sort()).toEqual(['added', 'limit_reached']);
+        expect(state.stored).toBe(32);
+        expect(state.inserted).toBe(1);
+    });
+
+    it('(control) per-provider keys alone do not serialize adds for different providers', async () => {
+        const { add, state } = concurrentStack(32, 31);
+
+        await Promise.all([add('openrouter'), add('anthropic')]);
+
+        expect(state.stored).toBe(33);
+    });
+});
+
+describe('ModelAccountRepository.listDueForCheck', () => {
+    it('orders never-checked accounts first, explicitly, so Postgres cannot sort them last', async () => {
+        const find = jest.fn().mockResolvedValue([]);
+        const repository = new ModelAccountRepository({ find } as never);
+        const cutoff = new Date('2026-09-14T06:00:00.000Z');
+
+        await repository.listDueForCheck(cutoff, 50);
+
+        expect(find).toHaveBeenCalledWith(
+            expect.objectContaining({
+                order: { lastCheckedAt: { direction: 'ASC', nulls: 'FIRST' } },
+                take: 50,
+            }),
+        );
     });
 });

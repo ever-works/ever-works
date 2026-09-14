@@ -20,6 +20,7 @@ import { ModelAccountsController } from './model-accounts.controller';
 import {
     CreateModelAccountDto,
     ReorderModelAccountsDto,
+    ReplaceModelAccountCredentialsDto,
     UpdateModelAccountDto,
 } from './dto/model-accounts.dto';
 import { ModelWorkspaceAccessService } from './model-workspace-access.service';
@@ -216,8 +217,31 @@ describe('ModelAccountsController', () => {
             [{ providerPluginId: 'provider-a', label: 'x', credentials: {}, position: 'middle' }],
             [{ label: 'x', credentials: {} }],
             [{ providerPluginId: 'provider-a', label: 'x', credentials: {}, health: 'working' }],
+            [{ providerPluginId: 'provider-a', label: 'x', credentials: { apiKey: 123 } }],
+            [{ providerPluginId: 'provider-a', label: 'x', credentials: { apiKey: { v: 'k' } } }],
+            [{ providerPluginId: 'provider-a', label: 'x', credentials: { apiKey: ['k'] } }],
+            [{ providerPluginId: 'provider-a', label: 'x', credentials: { apiKey: true } }],
         ])('rejects create %j', async (body) => {
             await expect(validate(CreateModelAccountDto, body)).rejects.toBeDefined();
+        });
+
+        it('rejects a replacement credential whose value is not text', async () => {
+            await expect(
+                validate(ReplaceModelAccountCredentialsDto, { credentials: { apiKey: 123 } }),
+            ).rejects.toBeDefined();
+            await expect(
+                validate(ReplaceModelAccountCredentialsDto, { credentials: { apiKey: SECRET } }),
+            ).resolves.toMatchObject({ credentials: { apiKey: SECRET } });
+        });
+
+        it('still accepts a null credential value, which the service reads as not set', async () => {
+            await expect(
+                validate(CreateModelAccountDto, {
+                    providerPluginId: 'provider-a',
+                    label: 'Company key',
+                    credentials: { apiKey: SECRET, organizationId: null },
+                }),
+            ).resolves.toMatchObject({ credentials: { apiKey: SECRET, organizationId: null } });
         });
 
         it('rejects a reorder longer than the per-provider limit or empty', async () => {

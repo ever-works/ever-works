@@ -31,8 +31,15 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * No backfill: a workspace with no rows resolves models and credentials
  * exactly as it did before this migration.
  *
- * FKs: `userId` → `users` CASCADE on both tables (the rows mean nothing
- * without the person who owns the workspace they were created in).
+ * FKs, the same on both tables — a row's lifetime follows the WORKSPACE, never
+ * the person who happened to write it:
+ *   - `ownerUserId` → `users` CASCADE. Set only for a personal workspace, so
+ *     deleting a person deletes their personal accounts and policies.
+ *   - `organizationId` → `organizations` CASCADE. An organization's accounts
+ *     and policies go with the organization.
+ *   - `userId` → `users` SET NULL. The creator (accounts) or last writer
+ *     (policies) is a record, not an owner: deleting a member must never
+ *     delete credentials or routing the rest of the organization relies on.
  *
  * Forward-only + idempotent (`hasTable` / index-name / FK-name guards),
  * portable `Table` DDL because production runs Postgres while CI runs
@@ -75,6 +82,20 @@ export class CreateModelAccountsAndPolicies1791160000000 implements MigrationInt
             columnNames: ['userId'],
             referencedTableName: 'users',
             referencedColumnNames: ['id'],
+            onDelete: 'SET NULL',
+        }),
+        new TableForeignKey({
+            name: 'fk_model_accounts_owner_user',
+            columnNames: ['ownerUserId'],
+            referencedTableName: 'users',
+            referencedColumnNames: ['id'],
+            onDelete: 'CASCADE',
+        }),
+        new TableForeignKey({
+            name: 'fk_model_accounts_organization',
+            columnNames: ['organizationId'],
+            referencedTableName: 'organizations',
+            referencedColumnNames: ['id'],
             onDelete: 'CASCADE',
         }),
     ];
@@ -84,6 +105,20 @@ export class CreateModelAccountsAndPolicies1791160000000 implements MigrationInt
             name: 'fk_model_policies_user',
             columnNames: ['userId'],
             referencedTableName: 'users',
+            referencedColumnNames: ['id'],
+            onDelete: 'SET NULL',
+        }),
+        new TableForeignKey({
+            name: 'fk_model_policies_owner_user',
+            columnNames: ['ownerUserId'],
+            referencedTableName: 'users',
+            referencedColumnNames: ['id'],
+            onDelete: 'CASCADE',
+        }),
+        new TableForeignKey({
+            name: 'fk_model_policies_organization',
+            columnNames: ['organizationId'],
+            referencedTableName: 'organizations',
             referencedColumnNames: ['id'],
             onDelete: 'CASCADE',
         }),
@@ -104,7 +139,8 @@ export class CreateModelAccountsAndPolicies1791160000000 implements MigrationInt
                             generationStrategy: 'uuid',
                             default: isPostgres ? 'uuid_generate_v4()' : undefined,
                         },
-                        { name: 'userId', type: 'uuid' },
+                        { name: 'userId', type: 'uuid', isNullable: true },
+                        { name: 'ownerUserId', type: 'uuid', isNullable: true },
                         { name: 'tenantId', type: 'uuid', isNullable: true },
                         { name: 'organizationId', type: 'uuid', isNullable: true },
                         { name: 'workspaceKey', type: 'varchar', length: '80' },
@@ -146,7 +182,8 @@ export class CreateModelAccountsAndPolicies1791160000000 implements MigrationInt
                             generationStrategy: 'uuid',
                             default: isPostgres ? 'uuid_generate_v4()' : undefined,
                         },
-                        { name: 'userId', type: 'uuid' },
+                        { name: 'userId', type: 'uuid', isNullable: true },
+                        { name: 'ownerUserId', type: 'uuid', isNullable: true },
                         { name: 'tenantId', type: 'uuid', isNullable: true },
                         { name: 'organizationId', type: 'uuid', isNullable: true },
                         { name: 'workspaceKey', type: 'varchar', length: '80' },

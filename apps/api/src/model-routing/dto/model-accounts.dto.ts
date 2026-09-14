@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MODEL_ROUTING_LIMITS } from '@ever-works/contracts';
+import { StringRecordValues } from './validators/string-record-values.validator';
 
 /**
  * Model accounts (AW-16) — request bodies for `/api/model-accounts`.
@@ -39,6 +40,7 @@ export class CreateModelAccountDto {
         additionalProperties: { type: 'string' },
     })
     @IsObject()
+    @StringRecordValues()
     credentials: Record<string, string>;
 
     @ApiPropertyOptional({
@@ -74,6 +76,7 @@ export class ReplaceModelAccountCredentialsDto {
         additionalProperties: { type: 'string' },
     })
     @IsObject()
+    @StringRecordValues()
     credentials: Record<string, string>;
 }
 

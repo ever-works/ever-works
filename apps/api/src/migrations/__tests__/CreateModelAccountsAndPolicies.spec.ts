@@ -13,6 +13,9 @@ import { CreateModelAccountsAndPolicies1791160000000 } from '../1791160000000-Cr
  *  - one policy per scope per workspace;
  *  - a new account starts `unknown` and enabled, and every policy field
  *    starts NULL (= inherit);
+ *  - a row's lifetime follows its workspace: deleting a member (even the
+ *    creator) keeps an organization's rows, deleting a person removes their
+ *    personal rows, deleting an organization removes its rows;
  *  - `up()` is idempotent and `down()` removes exactly what `up()` added.
  */
 describe('CreateModelAccountsAndPolicies1791160000000', () => {
@@ -35,6 +38,7 @@ describe('CreateModelAccountsAndPolicies1791160000000', () => {
         await dataSource.initialize();
         await dataSource.query(`CREATE TABLE "users" ("id" varchar PRIMARY KEY NOT NULL)`);
         await dataSource.query(`INSERT INTO "users" ("id") VALUES ('u1')`);
+        await dataSource.query(`CREATE TABLE "organizations" ("id" varchar PRIMARY KEY NOT NULL)`);
     });
 
     afterEach(async () => {
@@ -69,6 +73,7 @@ describe('CreateModelAccountsAndPolicies1791160000000', () => {
                 'lastCheckedAt',
                 'lastUsedAt',
                 'organizationId',
+                'ownerUserId',
                 'position',
                 'providerPluginId',
                 'tenantId',
@@ -82,7 +87,13 @@ describe('CreateModelAccountsAndPolicies1791160000000', () => {
             'idx_model_accounts_workspace_provider_position',
             'uq_model_accounts_workspace_provider_label',
         ]);
-        expect(table?.foreignKeys.map((fk) => fk.name)).toEqual(['fk_model_accounts_user']);
+        expect(
+            table?.foreignKeys.map((fk) => [fk.name, fk.referencedTableName, fk.onDelete]).sort(),
+        ).toEqual([
+            ['fk_model_accounts_organization', 'organizations', 'CASCADE'],
+            ['fk_model_accounts_owner_user', 'users', 'CASCADE'],
+            ['fk_model_accounts_user', 'users', 'SET NULL'],
+        ]);
     });
 
     it('starts a new account unknown, enabled, at credential version 1 with no cooldown', async () => {
@@ -137,6 +148,60 @@ describe('CreateModelAccountsAndPolicies1791160000000', () => {
             attemptTimeoutSeconds: null,
             scopeId: null,
             scopeVariant: null,
+        });
+    });
+
+    describe('row lifetime follows the workspace, not the writer', () => {
+        const ORG = 'o1';
+        const accountRows = () =>
+            dataSource.query(
+                `SELECT "id", "userId", "ownerUserId", "organizationId" FROM "model_accounts" ORDER BY "id"`,
+            );
+        const policyRows = () =>
+            dataSource.query(
+                `SELECT "id", "userId", "ownerUserId", "organizationId" FROM "model_policies" ORDER BY "id"`,
+            );
+
+        beforeEach(async () => {
+            await run('up');
+            await dataSource.query(`INSERT INTO "users" ("id") VALUES ('u2')`);
+            await dataSource.query(`INSERT INTO "organizations" ("id") VALUES (?)`, [ORG]);
+            // u1 created the organization's account and last wrote its policy.
+            await dataSource.query(
+                `INSERT INTO "model_accounts" ("id", "userId", "ownerUserId", "organizationId", "workspaceKey", "providerPluginId", "label", "position")
+                 VALUES ('org-acc', 'u1', NULL, ?, 'org:o1', 'provider-a', 'Shared key', 1),
+                        ('u1-acc', 'u1', 'u1', NULL, 'user:u1', 'provider-a', 'My key', 1),
+                        ('u2-acc', 'u2', 'u2', NULL, 'user:u2', 'provider-a', 'My key', 1)`,
+                [ORG],
+            );
+            await dataSource.query(
+                `INSERT INTO "model_policies" ("id", "userId", "ownerUserId", "organizationId", "workspaceKey", "scopeKey", "scopeType")
+                 VALUES ('org-pol', 'u1', NULL, ?, 'org:o1', 'workspace', 'workspace'),
+                        ('u1-pol', 'u1', 'u1', NULL, 'user:u1', 'workspace', 'workspace')`,
+                [ORG],
+            );
+        });
+
+        it("keeps an organization's accounts and policies when their creator is deleted, and removes that person's own", async () => {
+            await dataSource.query(`DELETE FROM "users" WHERE "id" = 'u1'`);
+
+            expect(await accountRows()).toEqual([
+                { id: 'org-acc', userId: null, ownerUserId: null, organizationId: ORG },
+                { id: 'u2-acc', userId: 'u2', ownerUserId: 'u2', organizationId: null },
+            ]);
+            expect(await policyRows()).toEqual([
+                { id: 'org-pol', userId: null, ownerUserId: null, organizationId: ORG },
+            ]);
+        });
+
+        it("removes an organization's accounts and policies with the organization", async () => {
+            await dataSource.query(`DELETE FROM "organizations" WHERE "id" = ?`, [ORG]);
+
+            expect((await accountRows()).map((row: { id: string }) => row.id)).toEqual([
+                'u1-acc',
+                'u2-acc',
+            ]);
+            expect((await policyRows()).map((row: { id: string }) => row.id)).toEqual(['u1-pol']);
         });
     });
 

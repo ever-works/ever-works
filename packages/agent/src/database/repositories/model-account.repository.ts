@@ -29,6 +29,33 @@ export function modelAccountWriteLockKey(
         : `model-accounts:${workspaceKey}`;
 }
 
+export interface ModelAccountTransactionOptions {
+    /**
+     * Also serialize against every other add in the workspace, whatever its
+     * provider. An add needs it: the workspace-wide account limit counts
+     * accounts across providers, so two adds for DIFFERENT providers — which
+     * never share a per-provider key — could otherwise both pass the count.
+     */
+    lockWorkspace?: boolean;
+}
+
+/**
+ * The advisory-lock keys a write takes, in the one order every write takes
+ * them: the workspace key first (when the write needs it), then the
+ * provider key. No write ever takes the workspace key after a provider key,
+ * so two writes can never wait on each other in a cycle.
+ */
+export function modelAccountWriteLockKeys(
+    workspaceKey: string,
+    providerPluginId: string | null,
+    options: ModelAccountTransactionOptions = {},
+): string[] {
+    const workspace = modelAccountWriteLockKey(workspaceKey, null);
+    if (!providerPluginId) return [workspace];
+    const provider = modelAccountWriteLockKey(workspaceKey, providerPluginId);
+    return options.lockWorkspace ? [workspace, provider] : [provider];
+}
+
 /**
  * Model accounts (AW-16) — repository for `model_accounts`.
  *
@@ -68,6 +95,11 @@ export class ModelAccountRepository {
      * to take the lock fails the write with nothing written: unlike the run
      * admission valve, the account limit is a hard rule, not a safety valve.
      *
+     * With `lockWorkspace` (every add), the workspace-wide key is taken
+     * BEFORE the provider key, in the same transaction, so adds for different
+     * providers also serialize and the workspace limit holds. The order is
+     * fixed by {@link modelAccountWriteLockKeys} for every caller.
+     *
      * EVERY OTHER DRIVER (better-sqlite3 — the e2e/CI stack): advisory and row
      * locks do not exist, so both are a documented no-op and `work` runs in a
      * plain transaction, as before.
@@ -76,14 +108,21 @@ export class ModelAccountRepository {
         workspaceKey: string,
         providerPluginId: string | null,
         work: (tx: Repository<ModelAccount>) => Promise<T>,
+        options: ModelAccountTransactionOptions = {},
     ): Promise<T> {
         return this.repository.manager.transaction(async (manager: EntityManager) => {
             const tx = manager.getRepository(ModelAccount);
             if (manager.connection.options.type === 'postgres') {
-                await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
-                    MODEL_ACCOUNT_WRITE_LOCK_CLASS_ID,
-                    advisoryLockObjectId(modelAccountWriteLockKey(workspaceKey, providerPluginId)),
-                ]);
+                for (const key of modelAccountWriteLockKeys(
+                    workspaceKey,
+                    providerPluginId,
+                    options,
+                )) {
+                    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+                        MODEL_ACCOUNT_WRITE_LOCK_CLASS_ID,
+                        advisoryLockObjectId(key),
+                    ]);
+                }
                 const query = tx
                     .createQueryBuilder('account')
                     .select('account.id')
@@ -177,14 +216,20 @@ export class ModelAccountRepository {
         await this.repository.update({ id }, patch);
     }
 
-    /** Enabled accounts whose last check is older than `cutoff` (or never ran), oldest first. */
+    /**
+     * Enabled accounts whose last check is older than `cutoff` (or never ran),
+     * never-checked first, then oldest first. NULLS FIRST is explicit: an
+     * ascending sort puts NULL last on Postgres, so a backlog of overdue
+     * checked accounts filling `limit` would starve accounts that were never
+     * checked at all.
+     */
     async listDueForCheck(cutoff: Date, limit: number): Promise<ModelAccount[]> {
         return this.repository.find({
             where: [
                 { enabled: true, lastCheckedAt: IsNull() },
                 { enabled: true, lastCheckedAt: LessThan(cutoff) },
             ],
-            order: { lastCheckedAt: 'ASC' },
+            order: { lastCheckedAt: { direction: 'ASC', nulls: 'FIRST' } },
             take: limit,
         });
     }

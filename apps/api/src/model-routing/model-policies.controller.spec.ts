@@ -17,6 +17,7 @@ import { BadRequestException, ForbiddenException, ValidationPipe } from '@nestjs
 import { ModelPoliciesController } from './model-policies.controller';
 import { UpsertModelPolicyDto } from './dto/upsert-model-policy.dto';
 import { ModelWorkspaceAccessService } from './model-workspace-access.service';
+import { OptionalAgentIdQueryPipe, OptionalScheduleIdQueryPipe } from './model-policy-query.pipes';
 
 /**
  * Model accounts (AW-16) — the model ladder routes. The ladder itself is
@@ -122,6 +123,54 @@ describe('ModelPoliciesController', () => {
         expect(service.resolve).toHaveBeenLastCalledWith(orgScope, {
             agentId: null,
             scheduleId: null,
+        });
+    });
+
+    describe('resolved query validation', () => {
+        const agentPipe = new OptionalAgentIdQueryPipe();
+        const schedulePipe = new OptionalScheduleIdQueryPipe();
+
+        it('binds each query parameter to its pipe', () => {
+            const params = Reflect.getMetadata(
+                '__routeArguments__',
+                ModelPoliciesController,
+                'resolved',
+            ) as Record<string, { data?: string; pipes?: unknown[] }>;
+            const byName = Object.fromEntries(
+                Object.values(params)
+                    .filter((param) => param.data)
+                    .map((param) => [param.data, param.pipes]),
+            );
+            expect(byName.agentId).toEqual([OptionalAgentIdQueryPipe]);
+            expect(byName.scheduleId).toEqual([OptionalScheduleIdQueryPipe]);
+        });
+
+        it('passes an Agent id and a known schedule key with a UUID owner', () => {
+            expect(agentPipe.transform(AGENT)).toBe(AGENT);
+            expect(schedulePipe.transform(`agent_heartbeat:${AGENT}`)).toBe(
+                `agent_heartbeat:${AGENT}`,
+            );
+        });
+
+        it('reads an absent or empty parameter as not given', () => {
+            for (const value of [undefined, null, '']) {
+                expect(agentPipe.transform(value)).toBeUndefined();
+                expect(schedulePipe.transform(value)).toBeUndefined();
+            }
+        });
+
+        it.each([['not-a-uuid'], ['123'], [['a', 'b']]])('answers 400 for agentId %j', (value) => {
+            expect(() => agentPipe.transform(value)).toThrow(BadRequestException);
+        });
+
+        it.each([
+            ['agent_heartbeat:not-a-uuid'],
+            [`cron:${AGENT}`],
+            [AGENT],
+            ['agent_heartbeat:'],
+            [`agent_heartbeat:${AGENT}:extra`],
+        ])('answers 400 for scheduleId %j', (value) => {
+            expect(() => schedulePipe.transform(value)).toThrow(BadRequestException);
         });
     });
 

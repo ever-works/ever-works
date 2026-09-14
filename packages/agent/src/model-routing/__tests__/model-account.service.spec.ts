@@ -14,7 +14,9 @@ describe('ModelAccountService', () => {
     let log: jest.Mock;
     let service: ModelAccountService;
     const providerA = providerDescriptor('provider-a');
+    const providerC = providerDescriptor('provider-c');
     const noSecrets = providerDescriptor('local-provider', {}, []);
+    const supplementary = { ...providerDescriptor('helper-provider'), supplementary: true };
 
     beforeEach(() => {
         store = new InMemoryModelAccounts();
@@ -23,8 +25,14 @@ describe('ModelAccountService', () => {
             .mockResolvedValue({ ok: true, rejected: false, expiresAt: null });
         log = jest.fn().mockResolvedValue(undefined);
         const providers = {
-            getProvider: jest.fn(async (id: string) =>
-                id === 'provider-a' ? providerA : id === 'local-provider' ? noSecrets : null,
+            getProvider: jest.fn(
+                async (id: string) =>
+                    ({
+                        'provider-a': providerA,
+                        'provider-c': providerC,
+                        'local-provider': noSecrets,
+                        'helper-provider': supplementary,
+                    })[id] ?? null,
             ),
             listProviders: jest.fn(async () => [providerA, noSecrets]),
             providerName: (id: string) => `Provider ${id}`,
@@ -120,6 +128,120 @@ describe('ModelAccountService', () => {
         ).rejects.toMatchObject({ response: { code: 'limit_reached' } });
         const seededElsewhere = store.rows.filter((row) => row.providerPluginId !== 'provider-a');
         expect(seededElsewhere).toHaveLength(24);
+    });
+
+    it('adds under the workspace-wide lock as well as the provider lock', async () => {
+        await add('Company key');
+        expect(store.repository.inTransaction).toHaveBeenCalledWith(
+            'org:o1',
+            'provider-a',
+            expect.any(Function),
+            { lockWorkspace: true },
+        );
+    });
+
+    it('lets only one of two concurrent adds for different providers take the last workspace slot', async () => {
+        // 31 of 32: four other providers, the last one a slot short of full.
+        for (let index = 0; index < 31; index += 1) {
+            store.seed({
+                providerPluginId: `other-${Math.floor(index / 8)}`,
+                label: `Other ${index}`,
+                position: (index % 8) + 1,
+            });
+        }
+
+        const results = await Promise.allSettled([
+            add('Company key'),
+            service.create(ORG, {
+                providerPluginId: 'provider-c',
+                label: 'Company key',
+                credentials: { apiKey: SECRET },
+            }),
+        ]);
+
+        expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+        const refused = results.find(
+            (result) => result.status === 'rejected',
+        ) as PromiseRejectedResult;
+        expect(refused.reason).toMatchObject({
+            response: { code: 'limit_reached', scope: 'workspace', limit: 32 },
+        });
+        expect(store.rows).toHaveLength(32);
+    });
+
+    it('refuses an account for a supplementary provider, which the provider list never offers', async () => {
+        await expect(
+            service.create(ORG, {
+                providerPluginId: 'helper-provider',
+                label: 'x',
+                credentials: { apiKey: 'k' },
+            }),
+        ).rejects.toMatchObject({ response: { code: 'unknown_provider' } });
+        expect(checkCredentials).not.toHaveBeenCalled();
+        expect(store.rows).toHaveLength(0);
+    });
+
+    it('stamps a personal account with its owner, and an organization account with none', async () => {
+        await add('Company key');
+        await service.create(
+            { userId: 'u1', tenantId: 't1', organizationId: null },
+            { providerPluginId: 'provider-a', label: 'Mine', credentials: { apiKey: SECRET } },
+        );
+        expect(store.rows.map((row) => [row.workspaceKey, row.userId, row.ownerUserId])).toEqual([
+            ['org:o1', 'u1', null],
+            ['user:u1', 'u1', 'u1'],
+        ]);
+    });
+
+    it('refuses a rename to a name another account already has, case-insensitively, under the provider lock', async () => {
+        await add('Company key');
+        const second = await add('Overflow key');
+        store.repository.inTransaction.mockClear();
+
+        await expect(
+            service.update(ORG, second.id, { label: 'COMPANY key' }),
+        ).rejects.toMatchObject({ response: { code: 'duplicate_label' } });
+        expect(store.repository.inTransaction).toHaveBeenCalledWith(
+            'org:o1',
+            'provider-a',
+            expect.any(Function),
+        );
+        expect(store.rows.find((row) => row.id === second.id)?.label).toBe('Overflow key');
+    });
+
+    it('lets only one of two concurrent renames to case-equivalent names win', async () => {
+        const first = await add('One');
+        const second = await add('Two');
+
+        const results = await Promise.allSettled([
+            service.update(ORG, first.id, { label: 'Shared' }),
+            service.update(ORG, second.id, { label: 'shared' }),
+        ]);
+
+        expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+        expect(store.rows.filter((row) => row.label.toLowerCase() === 'shared')).toHaveLength(1);
+    });
+
+    it('never writes back a position a reorder changed while a rename was on its way', async () => {
+        const first = await add('One');
+        const second = await add('Two');
+        const staleFirst = { ...store.rows.find((row) => row.id === first.id)! };
+        await service.reorder(ORG, {
+            providerPluginId: 'provider-a',
+            orderedIds: [second.id, first.id],
+        });
+        // The rename loaded the row before the reorder committed.
+        (store.repository as { findInWorkspace: unknown }).findInWorkspace = async () => ({
+            ...staleFirst,
+        });
+
+        const renamed = await service.update(ORG, first.id, { label: 'Renamed' });
+
+        expect(renamed).toMatchObject({ label: 'Renamed', position: 2 });
+        expect(store.rows.find((row) => row.id === first.id)).toMatchObject({
+            label: 'Renamed',
+            position: 2,
+        });
     });
 
     it('keeps accounts in different workspaces apart', async () => {

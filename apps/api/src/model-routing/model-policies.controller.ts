@@ -23,6 +23,7 @@ import {
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { UpsertModelPolicyDto } from './dto/upsert-model-policy.dto';
+import { OptionalAgentIdQueryPipe, OptionalScheduleIdQueryPipe } from './model-policy-query.pipes';
 import { ModelWorkspaceAccessService } from './model-workspace-access.service';
 
 /**
@@ -157,8 +158,9 @@ export class ModelPoliciesController {
     })
     async resolved(
         @CurrentUser() auth: AuthenticatedUser,
-        @Query('agentId') agentId?: string,
-        @Query('scheduleId') scheduleId?: string,
+        // A malformed id is a 400 here, not a lookup that finds nothing.
+        @Query('agentId', OptionalAgentIdQueryPipe) agentId?: string,
+        @Query('scheduleId', OptionalScheduleIdQueryPipe) scheduleId?: string,
     ) {
         const scope = await this.access.resolve(auth.userId, 'read');
         return {

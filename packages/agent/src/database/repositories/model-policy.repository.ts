@@ -1,7 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
+import { Agent } from '../../entities/agent.entity';
 import { ModelPolicy } from '../../entities/model-policy.entity';
+
+/**
+ * The writes a policy change makes, bound to one transaction: either every
+ * one of them commits or none does.
+ */
+export interface ModelPolicyWriteTransaction {
+    save(entry: ModelPolicy): Promise<ModelPolicy>;
+    deleteByScope(workspaceKey: string, scopeKey: string): Promise<boolean>;
+    /**
+     * Write an Agent's own provider/model pair — the Agent-scope primary
+     * model lives on the `agents` row, not on the policy row.
+     */
+    setAgentModel(
+        agentId: string,
+        pair: { aiProviderId: string | null; modelId: string | null },
+    ): Promise<void>;
+}
 
 /**
  * Model accounts (AW-16) — repository for `model_policies`, one row per scope
@@ -20,6 +38,29 @@ export class ModelPolicyRepository {
 
     async save(entry: ModelPolicy): Promise<ModelPolicy> {
         return this.repository.save(entry);
+    }
+
+    /**
+     * Run a policy change's writes — the policy row and, for an Agent, the
+     * Agent's own model pair — in one transaction, so a failed policy write
+     * never leaves the Agent on a new primary model with its old fallbacks,
+     * effort or timeout (or the reverse).
+     */
+    async inTransaction<T>(work: (tx: ModelPolicyWriteTransaction) => Promise<T>): Promise<T> {
+        return this.repository.manager.transaction(async (manager: EntityManager) => {
+            const policies = manager.getRepository(ModelPolicy);
+            const agents = manager.getRepository(Agent);
+            return work({
+                save: (entry) => policies.save(entry),
+                deleteByScope: async (workspaceKey, scopeKey) => {
+                    const result = await policies.delete({ workspaceKey, scopeKey });
+                    return (result.affected ?? 0) > 0;
+                },
+                setAgentModel: async (agentId, pair) => {
+                    await agents.update({ id: agentId }, pair);
+                },
+            });
+        });
     }
 
     async findByScope(workspaceKey: string, scopeKey: string): Promise<ModelPolicy | null> {

@@ -17,6 +17,7 @@ describe('ModelPolicyService', () => {
     let agentUpdate: jest.Mock;
     let log: jest.Mock;
     let service: ModelPolicyService;
+    let policiesFake: ModelPolicyRepository;
 
     beforeEach(() => {
         rows = [];
@@ -59,6 +60,28 @@ describe('ModelPolicyService', () => {
                 return true;
             }),
         } as unknown as ModelPolicyRepository;
+        // One transaction: every write inside it commits, or rows and Agents
+        // are restored to what they were before it began.
+        (policies as unknown as { inTransaction: unknown }).inTransaction = async <T>(
+            work: (tx: unknown) => Promise<T>,
+        ): Promise<T> => {
+            const rowsBefore = rows.map((row) => ({ ...row }));
+            const agentsBefore = agents.map((agent) => ({ ...agent }));
+            try {
+                return await work({
+                    save: (row: ModelPolicy) => policies.save(row),
+                    deleteByScope: (workspaceKey: string, scopeKey: string) =>
+                        policies.deleteByScope(workspaceKey, scopeKey),
+                    setAgentModel: (agentId: string, pair: Partial<Agent>) =>
+                        agentUpdate({ id: agentId }, pair),
+                });
+            } catch (error) {
+                rows = rowsBefore;
+                agentsBefore.forEach((before, index) => Object.assign(agents[index], before));
+                throw error;
+            }
+        };
+        policiesFake = policies;
         const catalogued = providerDescriptor('provider-a', {
             listModels: jest.fn().mockResolvedValue([{ id: 'big' }, { id: 'fast' }]),
         });
@@ -273,6 +296,54 @@ describe('ModelPolicyService', () => {
         await service.remove(ORG, { type: 'agent', agentId: 'a1' });
         expect(agents[0]).toMatchObject({ aiProviderId: null, modelId: null });
         expect(rows).toHaveLength(0);
+    });
+
+    it("leaves the Agent's model untouched when its policy row cannot be saved", async () => {
+        (policiesFake.save as jest.Mock).mockRejectedValueOnce(new Error('policy write failed'));
+
+        await expect(
+            service.put(
+                ORG,
+                { type: 'agent', agentId: 'a1' },
+                {
+                    primaryModel: { providerPluginId: 'provider-a', modelId: 'fast' },
+                    reasoningEffort: 'high',
+                },
+            ),
+        ).rejects.toThrow('policy write failed');
+
+        // The Agent write ran inside the same transaction and was rolled back.
+        expect(agentUpdate).toHaveBeenCalledWith(
+            { id: 'a1' },
+            { aiProviderId: 'provider-a', modelId: 'fast' },
+        );
+        expect(agents[0]).toMatchObject({ aiProviderId: null, modelId: null });
+        expect(rows).toHaveLength(0);
+        expect(log).not.toHaveBeenCalled();
+    });
+
+    it("keeps the Agent's model when resetting its policy row fails", async () => {
+        agents[0].aiProviderId = 'provider-a';
+        agents[0].modelId = 'big';
+        await service.put(ORG, { type: 'agent', agentId: 'a1' }, { reasoningEffort: 'high' });
+        (policiesFake.deleteByScope as jest.Mock).mockRejectedValueOnce(new Error('delete failed'));
+
+        await expect(service.remove(ORG, { type: 'agent', agentId: 'a1' })).rejects.toThrow(
+            'delete failed',
+        );
+
+        expect(agents[0]).toMatchObject({ aiProviderId: 'provider-a', modelId: 'big' });
+        expect(rows).toHaveLength(1);
+    });
+
+    it('stamps a personal workspace policy with its owner, and an organization policy with none', async () => {
+        const personal = { userId: 'u1', tenantId: 't1', organizationId: null };
+        await service.put(personal, { type: 'workspace' }, { reasoningEffort: 'low' });
+        await service.put(ORG, { type: 'workspace' }, { reasoningEffort: 'low' });
+        expect(rows.map((row) => [row.workspaceKey, row.userId, row.ownerUserId])).toEqual([
+            ['user:u1', 'u1', 'u1'],
+            ['org:o1', 'u1', null],
+        ]);
     });
 
     it("keeps an Agent pair's either-half flexibility", async () => {

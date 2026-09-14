@@ -11,6 +11,13 @@ export interface ModelProviderDescriptor {
     /** The plugin's secret (`x-secret`) settings, in schema order. */
     credentialFields: ModelCredentialField[];
     plugin: IAiProviderPlugin;
+    /**
+     * The plugin's manifest marks it supplementary (auto-activated, never
+     * user-selectable). Such a provider is left out of {@link
+     * ModelProviderCatalogService.listProviders}, and an account cannot be
+     * added for it; routing and health checks still resolve it by id.
+     */
+    supplementary?: boolean;
 }
 
 /**
@@ -37,7 +44,11 @@ export class ModelProviderCatalogService {
         const descriptors: ModelProviderDescriptor[] = [];
         for (const registered of this.registry.getByCapability(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
             if (registered.state !== 'loaded' || registered.manifest.supplementary) continue;
-            const descriptor = await this.describe(registered.plugin, registered.manifest.name);
+            const descriptor = await this.describe(
+                registered.plugin,
+                registered.manifest.name,
+                false,
+            );
             if (descriptor) descriptors.push(descriptor);
         }
         return descriptors;
@@ -53,7 +64,11 @@ export class ModelProviderCatalogService {
         ) {
             return null;
         }
-        return this.describe(registered.plugin, registered.manifest.name);
+        return this.describe(
+            registered.plugin,
+            registered.manifest.name,
+            registered.manifest.supplementary === true,
+        );
     }
 
     /** Display name for a provider id; the id itself when the plugin is gone. */
@@ -67,15 +82,18 @@ export class ModelProviderCatalogService {
     private async describe(
         candidate: IPlugin,
         manifestName: string | undefined,
+        supplementary: boolean,
     ): Promise<ModelProviderDescriptor | null> {
         try {
             const plugin = (await materialize(candidate)) as IAiProviderPlugin;
-            return {
+            const descriptor: ModelProviderDescriptor = {
                 providerPluginId: plugin.id,
                 providerName: plugin.providerName || manifestName || plugin.id,
                 credentialFields: secretFieldsOf(plugin.settingsSchema),
                 plugin,
             };
+            if (supplementary) descriptor.supplementary = true;
+            return descriptor;
         } catch (error) {
             this.logger.warn(
                 `Could not load AI provider ${candidate.id} for model accounts: ${

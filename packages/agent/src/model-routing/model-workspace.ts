@@ -20,6 +20,16 @@ export function modelWorkspaceKey(scope: ModelWorkspaceScope): string {
     return scope.organizationId ? `org:${scope.organizationId}` : `user:${scope.userId}`;
 }
 
+/**
+ * The person whose PERSONAL workspace a row belongs to, or null for an
+ * organization workspace. Stored as `ownerUserId`: deleting that person
+ * deletes their personal accounts and policies, while an organization's rows
+ * survive any one member — including their creator — leaving.
+ */
+export function modelWorkspaceOwnerUserId(scope: ModelWorkspaceScope): string | null {
+    return scope.organizationId ? null : scope.userId;
+}
+
 export const WORKSPACE_POLICY_SCOPE_KEY = 'workspace';
 
 export function agentPolicyScopeKey(agentId: string): string {

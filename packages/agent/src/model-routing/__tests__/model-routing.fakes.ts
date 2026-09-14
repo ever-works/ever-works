@@ -1,5 +1,9 @@
 import type { IAiProviderPlugin } from '@ever-works/plugin';
-import type { ModelAccountRepository } from '../../database/repositories/model-account.repository';
+import {
+    modelAccountWriteLockKeys,
+    type ModelAccountRepository,
+    type ModelAccountTransactionOptions,
+} from '../../database/repositories/model-account.repository';
 import type { ModelAccount } from '../../entities/model-account.entity';
 import type { ModelProviderDescriptor } from '../model-provider-catalog.service';
 
@@ -7,6 +11,11 @@ import type { ModelProviderDescriptor } from '../model-provider-catalog.service'
  * Test doubles shared by the model-routing specs: an in-memory
  * `model_accounts` table with the subset of the repository surface the
  * services use, and an AI provider descriptor built from a settings schema.
+ *
+ * `inTransaction` serializes the way the Postgres repository does: it takes
+ * the same advisory-lock keys, in the same order, and holds them until the
+ * work settles, so a spec can race two writes and see what the real lock
+ * allows.
  */
 
 type Where = Partial<Record<keyof ModelAccount, unknown>>;
@@ -36,6 +45,7 @@ function sortRows(
 export class InMemoryModelAccounts {
     rows: ModelAccount[] = [];
     private seq = 0;
+    private readonly held = new Map<string, Promise<void>>();
 
     readonly table = {
         find: async (options: {
@@ -56,19 +66,30 @@ export class InMemoryModelAccounts {
     readonly repository = {
         create: (entry: Partial<ModelAccount>) => ({ ...entry }) as ModelAccount,
         save: async (row: ModelAccount) => this.upsert(row),
-        inTransaction: async <T>(
-            _workspaceKey: string,
-            _provider: string | null,
-            work: (tx: unknown) => Promise<T>,
-        ) => {
-            const snapshot = this.rows.map((row) => ({ ...row }));
-            try {
-                return await work(this.table);
-            } catch (error) {
-                this.rows = snapshot;
-                throw error;
-            }
-        },
+        inTransaction: jest.fn(
+            async (
+                workspaceKey: string,
+                provider: string | null,
+                work: (tx: unknown) => Promise<unknown>,
+                options?: ModelAccountTransactionOptions,
+            ) => {
+                const releases: Array<() => void> = [];
+                try {
+                    for (const key of modelAccountWriteLockKeys(workspaceKey, provider, options)) {
+                        releases.push(await this.acquire(key));
+                    }
+                    const snapshot = this.rows.map((row) => ({ ...row }));
+                    try {
+                        return await work(this.table);
+                    } catch (error) {
+                        this.rows = snapshot;
+                        throw error;
+                    }
+                } finally {
+                    releases.reverse().forEach((release) => release());
+                }
+            },
+        ),
         listInWorkspace: async (workspaceKey: string, providerPluginId?: string) =>
             this.table.find({
                 where: providerPluginId ? { workspaceKey, providerPluginId } : { workspaceKey },
@@ -119,6 +140,21 @@ export class InMemoryModelAccounts {
             consecutiveFailures: 0,
             ...entry,
         } as ModelAccount);
+    }
+
+    private async acquire(key: string): Promise<() => void> {
+        while (this.held.has(key)) await this.held.get(key);
+        let release!: () => void;
+        this.held.set(
+            key,
+            new Promise<void>((resolve) => {
+                release = () => {
+                    this.held.delete(key);
+                    resolve();
+                };
+            }),
+        );
+        return release;
     }
 
     private upsert(row: ModelAccount): ModelAccount {

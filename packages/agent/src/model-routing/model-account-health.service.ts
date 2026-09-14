@@ -33,7 +33,11 @@ const HOUR_MS = 60 * 60 * 1000;
  * One path answers it, before a credential is saved and on the periodic
  * check: the provider plugin's own `checkCredential` when it declares one,
  * otherwise its `isAvailable` (the same connection test the plugin settings
- * page runs).
+ * page runs). `isAvailable` answers "could I reach the provider with this?",
+ * not "did the provider refuse this credential?" — it reads false for an
+ * outage, a rate limit or a timeout just as for a bad key — so a false from
+ * it fails the check without counting as a rejection. Only a thrown
+ * 401/403, or `checkCredential` saying so, is a rejection.
  *
  * The distinction that matters: a check that could not run leaves an account
  * `unknown`; only a provider REJECTION marks it `invalid`. A check never
@@ -52,13 +56,15 @@ export class ModelAccountHealthService {
     /**
      * Check candidate credentials without saving anything. `userId` scopes
      * the non-secret provider settings (e.g. an operator-configured endpoint)
-     * the check runs against; every secret field is taken from `credentials`
-     * alone, so a key configured elsewhere can never make a bad one pass.
+     * the check runs against — none (an account whose creator was deleted)
+     * reads the operator's settings alone; every secret field is taken from
+     * `credentials` alone, so a key configured elsewhere can never make a bad
+     * one pass.
      */
     async checkCredentials(
         provider: ModelProviderDescriptor,
         credentials: Record<string, string>,
-        userId: string,
+        userId: string | null | undefined,
     ): Promise<ModelCredentialCheck> {
         const settings = await this.settingsFor(provider, credentials, userId);
         try {
@@ -70,8 +76,9 @@ export class ModelAccountHealthService {
                     expiresAt: result.expiresAt ?? null,
                 };
             }
+            // A connection test that fails is not a refusal (see the class comment).
             const available = await provider.plugin.isAvailable(settings);
-            return { ok: available, rejected: !available, expiresAt: null };
+            return { ok: available, rejected: false, expiresAt: null };
         } catch (error) {
             return { ok: false, rejected: isCredentialRejection(error), expiresAt: null };
         }
@@ -155,13 +162,13 @@ export class ModelAccountHealthService {
     private async settingsFor(
         provider: ModelProviderDescriptor,
         credentials: Record<string, string>,
-        userId: string,
+        userId: string | null | undefined,
     ): Promise<PluginSettings> {
         let base: PluginSettings = {};
         if (this.settingsService) {
             try {
                 base = await this.settingsService.getSettings(provider.providerPluginId, {
-                    userId,
+                    userId: userId ?? undefined,
                     includeSecrets: false,
                 });
             } catch {

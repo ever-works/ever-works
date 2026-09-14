@@ -119,6 +119,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             modelId?: string;
             hasComplexity?: boolean;
             effort?: ReasoningEffort;
+            /** The call's own `routing.scheduleId`; wins over the facade options'. */
+            scheduleId?: string;
         },
     ): Promise<ModelRoutePlan | null> {
         if (!this.modelRoutePlanner) return null;
@@ -128,7 +130,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 workId: facadeOptions.workId,
                 agentId: facadeOptions.agentId,
                 runId: facadeOptions.runId,
-                scheduleId: facadeOptions.scheduleId,
+                scheduleId: requested.scheduleId ?? facadeOptions.scheduleId,
                 requestedProviderId: requested.providerId,
                 requestedModelId: requested.modelId,
                 hasComplexity: requested.hasComplexity,
@@ -338,6 +340,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             modelId: options?.routing?.modelOverride,
             hasComplexity: !!options?.routing?.complexity,
             effort: options?.routing?.reasoningEffort,
+            scheduleId: options?.routing?.scheduleId,
         });
 
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
@@ -565,6 +568,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             modelId: options.model ?? routingHints.modelOverride,
             hasComplexity: !!routingHints.complexity,
             effort: routingHints.reasoningEffort,
+            scheduleId: routingHints.scheduleId,
         });
 
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
@@ -656,6 +660,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             modelId: options.model ?? routingHints.modelOverride,
             hasComplexity: !!routingHints.complexity,
             effort: routingHints.reasoningEffort,
+            scheduleId: routingHints.scheduleId,
         });
 
         const plugin = await this.resolvePlugin<IAiProviderPlugin>(
@@ -716,7 +721,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             throw error;
         } finally {
             if (chunkCount > 0) {
-                void this.recordModelAnswer(
+                // Awaited, so what answered is on the Run before the stream
+                // completes (recordModelAnswer never throws).
+                await this.recordModelAnswer(
                     route,
                     facadeOptions,
                     plugin.id,

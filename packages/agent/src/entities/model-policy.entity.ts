@@ -51,9 +51,21 @@ export class ModelPolicy {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    /** Who last wrote the policy. */
-    @Column({ type: 'uuid' })
-    userId: string;
+    /**
+     * Who last wrote the policy. NULL once that person is deleted: an
+     * organization's policy outlives its last writer (`ON DELETE SET NULL`).
+     */
+    @Column({ type: 'uuid', nullable: true })
+    userId: string | null;
+
+    /**
+     * The person whose PERSONAL workspace holds this policy; NULL for an
+     * organization workspace. Deleting that person deletes the policy
+     * (`ON DELETE CASCADE`); an organization's policies go with the
+     * organization (`organizationId`, `ON DELETE CASCADE`).
+     */
+    @Column({ type: 'uuid', nullable: true })
+    ownerUserId?: string | null;
 
     @Column({ type: 'uuid', nullable: true })
     tenantId?: string | null;
