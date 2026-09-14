@@ -217,6 +217,64 @@ describe('AgentAccessLevelsSection', () => {
         );
     });
 
+    it('adopts fresh rows from the page after another control rewrote the grant row', () => {
+        const onCapabilitiesChange = vi.fn();
+        const { rerender } = render(
+            <AgentAccessLevelsSection
+                agentId={AGENT_ID}
+                rows={rows()}
+                onCapabilitiesChange={onCapabilitiesChange}
+            />,
+        );
+        expect(
+            screen.queryByTestId('capabilities-access-level-blocked-github'),
+        ).not.toBeInTheDocument();
+
+        // A per-tool switch denied commitToRepo by hand; the page re-read the level.
+        rerender(
+            <AgentAccessLevelsSection
+                agentId={AGENT_ID}
+                rows={rows({
+                    state: state({
+                        requested: 'write',
+                        effective: 'read',
+                        clampedBy: 'agent',
+                        blockedByExistingDeny: ['commitToRepo'],
+                    }),
+                })}
+                onCapabilitiesChange={onCapabilitiesChange}
+            />,
+        );
+
+        expect(screen.getByTestId('capabilities-access-level-blocked-github')).toHaveTextContent(
+            'blockedByExistingRule:commitToRepo',
+        );
+        expect(screen.getByTestId('capabilities-access-level-hint-github')).toHaveTextContent(
+            'narrowed:',
+        );
+    });
+
+    it('a re-read that moved the level moves the picker too', () => {
+        const { rerender } = render(
+            <AgentAccessLevelsSection
+                agentId={AGENT_ID}
+                rows={rows()}
+                onCapabilitiesChange={vi.fn()}
+            />,
+        );
+        rerender(
+            <AgentAccessLevelsSection
+                agentId={AGENT_ID}
+                rows={rows({ state: state({ requested: 'read', effective: 'read' }) })}
+                onCapabilitiesChange={vi.fn()}
+            />,
+        );
+        expect(screen.getByTestId('capabilities-access-level-github-read')).toHaveAttribute(
+            'aria-checked',
+            'true',
+        );
+    });
+
     it('shows no blocked note when nothing blocks the chosen level', () => {
         renderSection();
         expect(

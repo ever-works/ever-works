@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import {
     Boxes,
     FolderGit2,
@@ -178,6 +178,7 @@ export function AgentCapabilitiesClient({
     accessLevels = null,
 }: Props) {
     const t = useTranslations('dashboard.agentsPage.capabilities');
+    const router = useRouter();
     const [caps, setCaps] = useState(initialCapabilities);
     const [boundSkills, setBoundSkills] = useState(initialBoundSkills);
     // `useTransition`'s `pending` is deliberately NOT the busy signal: the
@@ -211,6 +212,17 @@ export function AgentCapabilitiesClient({
             .filter((group) => group.tools.length > 0);
     }, [caps.tools, t]);
 
+    /**
+     * The Access levels section reads the SAME agent grant row the switches
+     * below rewrite, but its per-provider state (`requested`, `effective`,
+     * `blockedByExistingDeny`) is loaded by the page. After any write to that
+     * row the page is refreshed so the section re-reads it instead of showing
+     * the level from before the write.
+     */
+    const refreshAccessLevels = () => {
+        if (accessLevels && accessLevels.length > 0) router.refresh();
+    };
+
     const toggleTool = (tool: AgentCapabilityToolRow, next: boolean) => {
         // Second line of defence behind the disabled switches: every grant
         // is composed from the CURRENT `agentGrantRow`, so overlapping
@@ -223,6 +235,7 @@ export function AgentCapabilitiesClient({
             void (async () => {
                 try {
                     setCaps(await setAgentToolGrantAction(agent.id, grant));
+                    refreshAccessLevels();
                 } catch (err) {
                     toast.error(err instanceof Error ? err.message : String(err));
                 } finally {
@@ -240,6 +253,7 @@ export function AgentCapabilitiesClient({
             void (async () => {
                 try {
                     setCaps(await resetAgentToolGrantAction(agent.id, row.id));
+                    refreshAccessLevels();
                 } catch (err) {
                     toast.error(err instanceof Error ? err.message : String(err));
                 } finally {
@@ -565,7 +579,13 @@ export function AgentCapabilitiesClient({
                 <AgentAccessLevelsSection
                     agentId={agent.id}
                     rows={accessLevels}
-                    onCapabilitiesChange={setCaps}
+                    onCapabilitiesChange={(next) => {
+                        setCaps(next);
+                        // Also re-read after a level change, so a refresh
+                        // started by an earlier switch can never land last
+                        // with the level from before this choice.
+                        refreshAccessLevels();
+                    }}
                     className={sectionClass}
                 />
             )}

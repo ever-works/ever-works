@@ -18,6 +18,10 @@ import {
 
 interface Props {
     agentId: string;
+    /**
+     * Server-read rows. When the page hands in a new array (it re-reads them
+     * after the per-tool switches rewrite the grant row), the section adopts it.
+     */
     rows: AgentAccessLevelRow[];
     /** The per-tool switches read the same grant row, so they refresh from this. */
     onCapabilitiesChange: (capabilities: AgentCapabilitiesPayload) => void;
@@ -45,6 +49,14 @@ export function AgentAccessLevelsSection({
 }: Props) {
     const t = useTranslations('dashboard.agentsPage.capabilities.accessLevels');
     const [items, setItems] = useState(() => composeAgentAccessLevels(rows));
+    // `rows` is re-read by the page whenever something else rewrote the same
+    // grant row (a per-tool switch, "Reset to inherited"): adopt the fresh
+    // rows, or `requested`, `effective` and the blocked note go stale.
+    const [sourceRows, setSourceRows] = useState(rows);
+    if (sourceRows !== rows) {
+        setSourceRows(rows);
+        setItems(composeAgentAccessLevels(rows));
+    }
     const [busyProvider, setBusyProvider] = useState<string | null>(null);
     const [reapprovalProvider, setReapprovalProvider] = useState<string | null>(null);
     const [, startTransition] = useTransition();
