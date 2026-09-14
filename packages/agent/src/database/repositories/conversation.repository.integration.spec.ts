@@ -9,6 +9,11 @@ import { User } from '../../entities/user.entity';
 import { AgentRunRepository } from './agent-run.repository';
 import { ConversationParticipantRepository } from './conversation-participant.repository';
 import { ConversationRepository } from './conversation.repository';
+import { ConversationService } from '../../conversations/conversation.service';
+import {
+    ConversationMessageService,
+    agentReplyClientMessageId,
+} from '../../conversations/conversation-message.service';
 
 /**
  * The REAL SQL behind named Conversations, against a real (better-sqlite3,
@@ -351,5 +356,220 @@ ${'x'.repeat(400)}`,
         expect(latest.map((row) => row.content)).toEqual(['two', 'three']);
         const earlier = await conversations.findMessagesPaged(conversation.id, 2, ids[1]);
         expect(earlier.map((row) => row.content)).toEqual(['one']);
+    });
+
+    it('lets exactly one of two Retries claim a failed message', async () => {
+        const conversation = await openDirect(ORG);
+        const message = await conversations.insertMessage({
+            conversationId: conversation.id,
+            role: 'user',
+            content: 'try again',
+            authorType: 'user',
+            authorId: userId,
+            status: 'failed',
+            failureCode: 'capacity_limited',
+        });
+
+        const claims = await Promise.all([
+            conversations.claimFailedMessage(conversation.id, message.id),
+            conversations.claimFailedMessage(conversation.id, message.id),
+        ]);
+
+        expect(claims.filter(Boolean)).toHaveLength(1);
+        await expect(
+            conversations.findMessageById(conversation.id, message.id),
+        ).resolves.toMatchObject({ status: 'sent', failureCode: null });
+        // A message that is no longer failed is never claimed again.
+        await expect(conversations.claimFailedMessage(conversation.id, message.id)).resolves.toBe(
+            false,
+        );
+    });
+
+    it('leaves no Conversation behind when a participant cannot be stored', async () => {
+        const refusedAgentId = '77777777-7777-4777-8777-777777777777';
+        await dataSource.query(
+            `CREATE TRIGGER refuse_participant BEFORE INSERT ON conversation_participants
+             WHEN NEW."participantId" = '${refusedAgentId}'
+             BEGIN SELECT RAISE(ABORT, 'participant insert refused'); END;`,
+        );
+        try {
+            const service = new ConversationService(conversations, participants, {
+                findByIdAndUser: async () => ({ id: refusedAgentId, status: 'active' }),
+            } as any);
+
+            await expect(
+                service.create(
+                    userId,
+                    { agentId: refusedAgentId, title: 'Half made' },
+                    { tenantId: TENANT, organizationId: ORG },
+                ),
+            ).rejects.toThrow(/participant insert refused/);
+
+            const leftovers = await dataSource
+                .getRepository(Conversation)
+                .find({ where: { userId, agentId: refusedAgentId } });
+            expect(leftovers).toHaveLength(0);
+            const orphans = await dataSource.query(
+                `SELECT p.id FROM conversation_participants p
+                 LEFT JOIN conversations c ON c.id = p."conversationId"
+                 WHERE c.id IS NULL`,
+            );
+            expect(orphans).toHaveLength(0);
+        } finally {
+            await dataSource.query('DROP TRIGGER IF EXISTS refuse_participant');
+        }
+    });
+
+    it('creates a Conversation with its owner and Agent, stamped with its scope', async () => {
+        const service = new ConversationService(conversations, participants, {
+            findByIdAndUser: async () => ({ id: agentId, status: 'active' }),
+        } as any);
+        const created = await service.create(
+            userId,
+            { agentId },
+            { tenantId: TENANT, organizationId: ORG },
+        );
+        const rows = await participants.listForConversation(created.id);
+        expect(
+            rows.map((row) => [row.participantType, row.role, row.organizationId]).sort(),
+        ).toEqual([
+            ['agent', 'member', ORG],
+            ['user', 'owner', ORG],
+        ]);
+    });
+
+    it('never moves a read position backward when an older read arrives late', async () => {
+        const conversation = await openDirect(ORG);
+        await participants.addIfAbsent({
+            conversationId: conversation.id,
+            participantType: 'user',
+            participantId: userId,
+            role: 'owner',
+        });
+        const insert = async (content: string) => {
+            const row = await conversations.insertMessage({
+                conversationId: conversation.id,
+                role: 'assistant',
+                content,
+                authorType: 'agent',
+                authorId: agentId,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            return row;
+        };
+        const older = await insert('first');
+        const newer = await insert('second');
+
+        await expect(
+            participants.markRead(conversation.id, 'user', userId, newer.id, newer.createdAt),
+        ).resolves.toBe(true);
+        // The delayed request for the older message lands after the newer one.
+        await expect(
+            participants.markRead(conversation.id, 'user', userId, older.id, older.createdAt),
+        ).resolves.toBe(false);
+
+        const owner = await participants.findOne(conversation.id, 'user', userId);
+        expect(owner?.lastReadMessageId).toBe(newer.id);
+        expect(
+            (await conversations.unreadCountsFor(userId, [conversation.id])).has(conversation.id),
+        ).toBe(false);
+
+        // A later message still moves it forward.
+        const latest = await insert('third');
+        await expect(
+            participants.markRead(conversation.id, 'user', userId, latest.id, latest.createdAt),
+        ).resolves.toBe(true);
+    });
+
+    it('pages forward from a cursor through every message, ties and deleted anchors included', async () => {
+        const conversation = await openDirect(ORG);
+        const at = new Date('2026-09-10T10:00:00.000Z');
+        const messages = dataSource.getRepository(ConversationMessage);
+        // Seven rows, three of them sharing one timestamp.
+        const stamps = [0, 1, 1, 1, 2, 3, 4].map((offset) => new Date(at.getTime() + offset));
+        for (const [index, createdAt] of stamps.entries()) {
+            await messages.save(
+                messages.create({
+                    conversationId: conversation.id,
+                    role: 'user',
+                    content: `m${index}`,
+                    authorType: 'user',
+                    authorId: userId,
+                    createdAt,
+                }),
+            );
+        }
+        const expected = await messages
+            .createQueryBuilder('m')
+            .where('m.conversationId = :id', { id: conversation.id })
+            .orderBy('m.createdAt', 'ASC')
+            .addOrderBy('m.id', 'ASC')
+            .getMany();
+        expect(expected).toHaveLength(7);
+
+        const walked: string[] = [];
+        let cursor: { id: string; createdAt: Date } | null = null;
+        for (let page = 0; page < 10; page += 1) {
+            const rows = await conversations.findMessagesAfter(conversation.id, cursor, 2);
+            walked.push(...rows.map((row) => row.id));
+            if (rows.length < 2) break;
+            const last = rows[rows.length - 1];
+            cursor = { id: last.id, createdAt: last.createdAt };
+        }
+        expect(walked).toEqual(expected.map((row) => row.id));
+
+        // The cursor still works once the message it points at is deleted.
+        const anchor = expected[3];
+        await conversations.deleteMessages(conversation.id, [anchor.id]);
+        const after = await conversations.findMessagesAfter(
+            conversation.id,
+            { id: anchor.id, createdAt: anchor.createdAt },
+            10,
+        );
+        expect(after.map((row) => row.id)).toEqual(expected.slice(4).map((row) => row.id));
+    });
+
+    it('stores one reply per Agent run, however many times the run is finalized', async () => {
+        const conversation = await openDirect(ORG);
+        const question = await conversations.insertMessage({
+            conversationId: conversation.id,
+            role: 'user',
+            content: 'plan?',
+            authorType: 'user',
+            authorId: userId,
+        });
+        const service = new ConversationMessageService(
+            conversations,
+            {} as any,
+            {} as any,
+            {} as any,
+        );
+        const input = {
+            runId: '88888888-8888-4888-8888-888888888888',
+            userId,
+            agentId,
+            replyToMessageId: question.id,
+            body: 'Here is the plan.',
+        };
+
+        const replies = await Promise.all([
+            service.recordAgentReply(input),
+            service.recordAgentReply(input),
+        ]);
+        const again = await service.recordAgentReply(input);
+
+        expect(new Set([...replies, again].map((row) => row.id)).size).toBe(1);
+        const stored = await dataSource.getRepository(ConversationMessage).find({
+            where: {
+                conversationId: conversation.id,
+                clientMessageId: agentReplyClientMessageId(input.runId),
+            },
+        });
+        expect(stored).toHaveLength(1);
+        expect(stored[0]).toMatchObject({
+            authorType: 'agent',
+            authorId: agentId,
+            replyToMessageId: question.id,
+        });
     });
 });

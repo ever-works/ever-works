@@ -9,6 +9,8 @@ import type {
     ConversationKind,
     ConversationMention,
     ConversationMessageStatus,
+    ConversationParticipantRole,
+    ConversationParticipantType,
     ConversationTitleSource,
 } from '@ever-works/contracts';
 import { Conversation } from '../../entities/conversation.entity';
@@ -34,6 +36,19 @@ export interface CreateConversationInput {
     contextId?: string | null;
     tenantId?: string | null;
     organizationId?: string | null;
+}
+
+/** Where a forward page of messages starts: just after this message. */
+export interface ConversationMessageCursor {
+    id: string;
+    createdAt: Date | string;
+}
+
+/** A participant a Conversation is created with. */
+export interface ConversationInitialParticipant {
+    participantType: ConversationParticipantType;
+    participantId: string;
+    role?: ConversationParticipantRole;
 }
 
 export interface AppendMessageInput {
@@ -118,6 +133,38 @@ export class ConversationRepository {
     async create(input: CreateConversationInput): Promise<Conversation> {
         const conversation = this.conversationRepo.create(input);
         return this.conversationRepo.save(conversation);
+    }
+
+    /**
+     * Store a Conversation and the people and Agents it opens with in ONE
+     * transaction: either every row lands or none does. Saving them one by
+     * one could leave a Conversation its owner can see but that has no
+     * participants, and a retried create would then open a second one.
+     *
+     * Each participant takes the Conversation's scope as stored, so a scope
+     * the ambient subscriber stamped on the Conversation reaches them too.
+     */
+    async createWithParticipants(
+        input: CreateConversationInput,
+        participants: readonly ConversationInitialParticipant[],
+    ): Promise<Conversation> {
+        return this.conversationRepo.manager.transaction(async (manager) => {
+            const conversation = await manager.save(manager.create(Conversation, input));
+            for (const participant of participants) {
+                await manager.save(
+                    manager.create(ConversationParticipant, {
+                        conversationId: conversation.id,
+                        participantType: participant.participantType,
+                        participantId: participant.participantId,
+                        role: participant.role ?? 'member',
+                        joinedAt: new Date(),
+                        tenantId: conversation.tenantId ?? null,
+                        organizationId: conversation.organizationId ?? null,
+                    }),
+                );
+            }
+            return conversation;
+        });
     }
 
     async findById(id: string, userId?: string): Promise<Conversation | null> {
@@ -214,6 +261,11 @@ export class ConversationRepository {
                 .where('"conversationId" = :conversationId', { conversationId })
                 .andWhere('"participantType" = :participantType', { participantType: 'user' })
                 .andWhere('"role" = :role', { role: 'owner' })
+                // Forward only, like `markRead`: a slower append that
+                // finishes after a newer one must not pull the position back.
+                .andWhere(
+                    '("lastReadAt" IS NULL OR "lastReadAt" <= (SELECT m."createdAt" FROM conversation_messages m WHERE m.id = :readThroughMessageId))',
+                )
                 .setParameter('readThroughMessageId', newest.id)
                 .execute();
         } catch {
@@ -444,6 +496,15 @@ export class ConversationRepository {
         return this.messageRepo.findOne({ where: { id: messageId, conversationId } });
     }
 
+    /**
+     * A message by id alone, when the caller knows the message but not its
+     * Conversation (an Agent run records only the message it answers). Callers
+     * must still check the Conversation belongs to whoever they act for.
+     */
+    async findMessageByIdUnscoped(messageId: string): Promise<ConversationMessage | null> {
+        return this.messageRepo.findOne({ where: { id: messageId } });
+    }
+
     async findByClientMessageId(
         conversationId: string,
         clientMessageId: string,
@@ -466,6 +527,35 @@ export class ConversationRepository {
             .getMany();
     }
 
+    /**
+     * One page of the messages written after `after`, oldest first — a keyset
+     * page on (`createdAt`, `id`). Paging with the last row of each page as the
+     * next `after` walks every message exactly once, however many arrived at
+     * once and even when several share a timestamp. With no `after`, the page
+     * starts at the Conversation's first message.
+     *
+     * The cursor carries the row's own values, not just its id, so it keeps
+     * working when the message it points at was deleted (a discarded send).
+     */
+    async findMessagesAfter(
+        conversationId: string,
+        after: ConversationMessageCursor | null,
+        limit: number,
+    ): Promise<ConversationMessage[]> {
+        const query = this.messageRepo
+            .createQueryBuilder('m')
+            .where('m.conversationId = :conversationId', { conversationId });
+        if (after) {
+            const afterAt =
+                after.createdAt instanceof Date ? after.createdAt : new Date(after.createdAt);
+            query.andWhere(
+                '(m.createdAt > :afterAt OR (m.createdAt = :afterAt AND m.id > :afterId))',
+                { afterAt, afterId: after.id },
+            );
+        }
+        return query.orderBy('m.createdAt', 'ASC').addOrderBy('m.id', 'ASC').take(limit).getMany();
+    }
+
     /** Store one message and move the Conversation's activity forward. */
     async insertMessage(input: InsertConversationMessageInput): Promise<ConversationMessage> {
         // Explicit millisecond `createdAt`, as `appendMessages` does: a column
@@ -485,6 +575,20 @@ export class ConversationRepository {
         failureCode: ConversationFailureCode | null = null,
     ): Promise<void> {
         await this.messageRepo.update(messageId, { status, failureCode });
+    }
+
+    /**
+     * Move a `failed` message back to `sent`, but only while it is still
+     * `failed` — a compare-and-set in one statement. Two Retries that both read
+     * the message as `failed` cannot both move it: exactly one write matches,
+     * and only that caller may dispatch a reply. Returns whether this call won.
+     */
+    async claimFailedMessage(conversationId: string, messageId: string): Promise<boolean> {
+        const result = await this.messageRepo.update(
+            { id: messageId, conversationId, status: 'failed' },
+            { status: 'sent', failureCode: null },
+        );
+        return (result.affected ?? 0) > 0;
     }
 
     /** Remove messages by id inside one Conversation. Returns how many went. */

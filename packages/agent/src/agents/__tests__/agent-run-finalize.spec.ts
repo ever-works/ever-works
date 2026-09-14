@@ -1,6 +1,11 @@
 import { AgentRunService } from '../agent-run.service';
 import { PromptAssemblerService } from '../prompt-assembler.service';
-import type { AgentRunChatBackPoster, AgentRunTaskFinisher } from '../agent-run-post-processor';
+import type {
+    AgentConversationReplyPostInput,
+    AgentRunChatBackPoster,
+    AgentRunConversationReplyPoster,
+    AgentRunTaskFinisher,
+} from '../agent-run-post-processor';
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 15.5.
@@ -227,5 +232,97 @@ describe('AgentRunService.finalize()', () => {
                 message: expect.stringContaining('chat-back poster not bound'),
             }),
         );
+    });
+
+    describe('a reply to a Conversation message', () => {
+        const conversationContext = () =>
+            baseContext({ kind: 'chat', taskId: null, conversationMessageId: 'cm-1' });
+        let order: string[];
+        let poster: jest.Mocked<AgentRunConversationReplyPoster>;
+        let conversationSvc: AgentRunService;
+
+        beforeEach(() => {
+            order = [];
+            poster = {
+                postReply: jest.fn(async (_input: AgentConversationReplyPostInput) => {
+                    order.push('postReply');
+                    return { messageId: 'reply-1' };
+                }),
+            };
+            runs.markCompleted.mockImplementation(async () => {
+                order.push('markCompleted');
+            });
+            conversationSvc = new AgentRunService(
+                agents,
+                runs,
+                runLogs,
+                budgets,
+                assembler,
+                skillBindings,
+                activity,
+                chatBackPoster,
+                taskFinisher,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                poster,
+            );
+        });
+
+        it('is stored before the run is marked completed, and its message id is returned', async () => {
+            const result = await conversationSvc.finalize(conversationContext(), {
+                summary: 'answered',
+                replyBody: 'Here you go.',
+            });
+
+            expect(poster.postReply).toHaveBeenCalledWith({
+                runId: 'r1',
+                userId: 'u1',
+                agentId: 'a1',
+                conversationMessageId: 'cm-1',
+                body: 'Here you go.',
+            });
+            // The run must never read as completed while its reply is not stored.
+            expect(order).toEqual(['postReply', 'markCompleted']);
+            expect(result).toMatchObject({ status: 'completed', postedMessageId: 'reply-1' });
+            expect(chatBackPoster.postReply).not.toHaveBeenCalled();
+        });
+
+        it('fails the run instead of completing it when the reply cannot be stored', async () => {
+            poster.postReply.mockRejectedValueOnce(new Error('insert failed'));
+
+            const result = await conversationSvc.finalize(conversationContext(), {
+                summary: 'answered',
+                replyBody: 'Here you go.',
+            });
+
+            expect(result.status).toBe('failed');
+            expect(runs.markCompleted).not.toHaveBeenCalled();
+            expect(runs.markFailed).toHaveBeenCalledWith(
+                'r1',
+                'The reply could not be stored in the Conversation',
+            );
+            expect(runLogs.append).toHaveBeenCalledWith(
+                expect.objectContaining({ level: 'ERROR', step: 'post-process' }),
+            );
+        });
+
+        it('stores nothing for a blank reply, an errored run or a Task chat run', async () => {
+            await conversationSvc.finalize(conversationContext(), { replyBody: '   ' });
+            await conversationSvc.finalize(conversationContext(), {
+                errored: true,
+                errorMessage: 'AI provider 429',
+                replyBody: 'never stored',
+            });
+            await conversationSvc.finalize(baseContext({ kind: 'chat' }), { replyBody: 'hello' });
+
+            expect(poster.postReply).not.toHaveBeenCalled();
+            expect(chatBackPoster.postReply).toHaveBeenCalledTimes(1);
+        });
     });
 });

@@ -29,6 +29,7 @@ jest.mock('@ever-works/agent/agents', () => ({
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
     AGENT_RUN_CANCELLER: 'AGENT_RUN_CANCELLER',
     AGENT_RUN_CHAT_BACK_POSTER: 'AGENT_RUN_CHAT_BACK_POSTER',
+    AGENT_RUN_CONVERSATION_REPLY_POSTER: 'AGENT_RUN_CONVERSATION_REPLY_POSTER',
     AGENT_RUN_TASK_FINISHER: 'AGENT_RUN_TASK_FINISHER',
     AGENT_PLUGIN_TOOLS_FACADE: 'AGENT_PLUGIN_TOOLS_FACADE',
     AGENT_AI_DISPATCH_FACADE: 'AGENT_AI_DISPATCH_FACADE',
@@ -42,6 +43,10 @@ jest.mock('@ever-works/agent/agents', () => ({
     SKILL_FILE_CONTENT_READER: 'SKILL_FILE_CONTENT_READER',
     // Panic controls (EW-778) — the global stop flag seam.
     RUN_KILL_SWITCH: 'RUN_KILL_SWITCH',
+}));
+jest.mock('@ever-works/agent/conversations', () => ({
+    ConversationsModule: class ConversationsModule {},
+    ConversationMessageService: class ConversationMessageService {},
 }));
 jest.mock('@ever-works/agent/mcp', () => ({
     McpModule: class McpModule {},
@@ -170,6 +175,7 @@ import {
     AGENT_RUN_CANCELLER,
 } from '@ever-works/agent/agents';
 import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
+import { ConversationsModule, ConversationMessageService } from '@ever-works/agent/conversations';
 import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
 import { PullRequestGateService } from '@ever-works/agent/policy';
@@ -269,6 +275,41 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             meta('providers').map((p: unknown) => (p as { provide?: unknown })?.provide),
         ).toContain(AGENT_RUN_CANCELLER);
         expect(meta('exports')).toContain(AGENT_RUN_CANCELLER);
+    });
+
+    /**
+     * Named Conversations — `AgentRunService.finalize()` stores a Conversation
+     * reply through this port before it marks the run completed. Unbound (or
+     * not exported from this @Global() module), the @Optional() injection
+     * resolves to `undefined` and the run completes before its reply is
+     * stored — a failed store would then lose the reply for good.
+     */
+    it('binds + exports AGENT_RUN_CONVERSATION_REPLY_POSTER to the Conversation reply record', async () => {
+        expect(meta('imports')).toContain(ConversationsModule);
+        const factory = findProvider('AGENT_RUN_CONVERSATION_REPLY_POSTER');
+        expect(factory?.inject).toEqual([ConversationMessageService]);
+        expect(meta('exports')).toContain('AGENT_RUN_CONVERSATION_REPLY_POSTER');
+
+        const messages = { recordAgentReply: jest.fn().mockResolvedValue({ id: 'reply-1' }) };
+        const poster = factory?.useFactory?.(messages) as {
+            postReply: (input: Record<string, string>) => Promise<{ messageId: string }>;
+        };
+        await expect(
+            poster.postReply({
+                runId: 'r1',
+                userId: 'u1',
+                agentId: 'a1',
+                conversationMessageId: 'm1',
+                body: 'Here you go.',
+            }),
+        ).resolves.toEqual({ messageId: 'reply-1' });
+        expect(messages.recordAgentReply).toHaveBeenCalledWith({
+            runId: 'r1',
+            userId: 'u1',
+            agentId: 'a1',
+            replyToMessageId: 'm1',
+            body: 'Here you go.',
+        });
     });
 
     it('binds + exports SKILL_FILE_CONTENT_READER — without it getSkillFile refuses every read', () => {
