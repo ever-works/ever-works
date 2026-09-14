@@ -15,6 +15,7 @@ import { UserRepository } from './user.repository';
 import { OrganizationRepository } from './organization.repository';
 import { TenantRepository } from './tenant.repository';
 import { AnonymousUserCleanupService } from '../../services/anonymous-user-cleanup.service';
+import { MemoryFoldersService } from '../../services/memory-folders.service';
 
 /**
  * Knowledge library persistence, executed against a REAL SQL engine
@@ -80,6 +81,7 @@ describe('Knowledge library repositories (integration)', () => {
     });
 
     afterEach(async () => {
+        jest.restoreAllMocks();
         if (dataSource?.isInitialized) await dataSource.destroy();
     });
 
@@ -177,6 +179,77 @@ describe('Knowledge library repositories (integration)', () => {
             expect(await folders.countByOrganization(ORG)).toBe(0);
         });
 
+        it('refuses an organization-scope folder that names no Organization, and writes nothing', async () => {
+            for (const organizationId of [undefined, null, '']) {
+                await expect(
+                    folders.create({
+                        userId,
+                        name: 'Orphan',
+                        path: '/Orphan',
+                        scope: MemoryFolderScope.ORGANIZATION,
+                        organizationId,
+                    } as never),
+                ).rejects.toThrow('requires an organizationId');
+            }
+            expect(await dataSource.getRepository(MemoryFolder).count()).toBe(0);
+            // A personal folder may still carry the tenancy stamp.
+            await expect(
+                folders.create({ userId, name: 'Mine', path: '/Mine', organizationId: ORG }),
+            ).resolves.toMatchObject({ organizationId: ORG });
+            expect((await folders.listByUser(userId)).map((f) => f.name)).toEqual(['Mine']);
+        });
+
+        it('rolls a shared rename back whole when the folder-row write fails after the path rewrite', async () => {
+            const service = new MemoryFoldersService(folders, {} as never, {} as never);
+            const parent = await service.createOrganizationFolder(ORG, userId, {
+                name: 'Playbooks',
+            });
+            await service.createOrganizationFolder(ORG, userId, {
+                name: 'Support',
+                parentId: parent.id,
+            });
+            jest.spyOn(MemoryFolderRepository.prototype, 'update').mockRejectedValueOnce(
+                new Error('write failed'),
+            );
+
+            await expect(
+                service.renameOrganizationFolder(ORG, userId, parent.id, 'Guides'),
+            ).rejects.toThrow('write failed');
+
+            const rows = await folders.listByOrganization(ORG);
+            expect(rows.map((row) => [row.name, row.path])).toEqual([
+                ['Playbooks', '/Playbooks'],
+                ['Support', '/Playbooks/Support'],
+            ]);
+        });
+
+        it('rolls a shared delete back whole — documents stay filed — when the folder delete fails', async () => {
+            const service = new MemoryFoldersService(folders, {} as never, {} as never);
+            const folder = await service.createOrganizationFolder(ORG, userId, { name: 'Reports' });
+            const filed = await seed({ slug: 'filed-report', folderId: folder.id });
+            jest.spyOn(
+                MemoryFolderRepository.prototype,
+                'deleteOrganizationFoldersByIds',
+            ).mockRejectedValueOnce(new Error('delete failed'));
+
+            await expect(
+                service.deleteOrganizationFolder(ORG, userId, folder.id, (ids, manager) =>
+                    documents.clearFolders(ids, manager),
+                ),
+            ).rejects.toThrow('delete failed');
+
+            expect((await docs.findOneByOrFail({ id: filed.id })).folderId).toBe(folder.id);
+            expect(await folders.findOrganizationFolder(ORG, folder.id)).not.toBeNull();
+
+            // Without the failure the same call unfiles and deletes together.
+            await expect(
+                service.deleteOrganizationFolder(ORG, userId, folder.id, (ids, manager) =>
+                    documents.clearFolders(ids, manager),
+                ),
+            ).resolves.toEqual({ deletedFolders: 1, unfiledDocuments: 1 });
+            expect((await docs.findOneByOrFail({ id: filed.id })).folderId).toBeNull();
+        });
+
         it('lists direct children at the top level and under a parent', async () => {
             const top = await folders.create({
                 userId,
@@ -241,6 +314,29 @@ describe('Knowledge library repositories (integration)', () => {
             expect(bumped?.revision).toBe(5);
             expect(spy).toHaveBeenCalledTimes(2);
             expect((await docs.findOneByOrFail({ id: d.id })).revision).toBe(5);
+        });
+
+        it('a guarded edit lands content and revision together, and a stale one writes nothing', async () => {
+            const d = await seed({ slug: 'guarded', revision: 3, title: 'Before' });
+
+            const landed = await documents.update(
+                d.id,
+                { title: 'First edit', revision: 4, revisionAt: new Date() },
+                { expectedRevision: 3 },
+            );
+            expect(landed).toMatchObject({ title: 'First edit', revision: 4 });
+
+            // A second edit computed from revision 3 lost the race.
+            const stale = await documents.update(
+                d.id,
+                { title: 'Stale edit', revision: 4, revisionAt: new Date() },
+                { expectedRevision: 3 },
+            );
+            expect(stale).toBeNull();
+            expect(await docs.findOneByOrFail({ id: d.id })).toMatchObject({
+                title: 'First edit',
+                revision: 4,
+            });
         });
 
         it('a bump on a document that no longer exists writes nothing', async () => {
@@ -335,6 +431,83 @@ describe('Knowledge library repositories (integration)', () => {
                 'banana',
                 'cherry',
             ]);
+        });
+
+        it('a keyset page resumes after the last row served even when a newer document arrives in between', async () => {
+            for (const [slug, at] of [
+                ['d1', '2026-09-01T00:00:00Z'],
+                ['d2', '2026-09-02T00:00:00Z'],
+                ['d3', '2026-09-03T00:00:00Z'],
+                ['d4', '2026-09-04T00:00:00Z'],
+            ] as const) {
+                await seed({ slug, title: slug, revisionAt: new Date(at) });
+            }
+            const list = (after?: { sortKey: string; id: string }) =>
+                documents.listForLibrary({
+                    ...scope(),
+                    archived: 'exclude',
+                    sort: 'recent',
+                    limit: 2,
+                    offset: 0,
+                    after,
+                });
+
+            const first = await list();
+            expect(first.items.map((d) => d.title)).toEqual(['d4', 'd3']);
+            expect(first.nextAfter).not.toBeNull();
+
+            // Lands at the top of the shelf between the two requests.
+            await seed({ slug: 'd5', title: 'd5', revisionAt: new Date('2026-09-05T00:00:00Z') });
+
+            const second = await list(first.nextAfter ?? undefined);
+            expect(second.items.map((d) => d.title)).toEqual(['d2', 'd1']);
+            expect(second.nextAfter).toBeNull();
+            expect(second.total).toBe(5);
+        });
+
+        it('a keyset page never repeats or skips a row when titles are re-sorted between requests', async () => {
+            for (const title of ['banana', 'Apple', 'cherry', 'apricot']) {
+                await seed({ slug: title.toLowerCase(), title });
+            }
+            const list = (after?: { sortKey: string; id: string }) =>
+                documents.listForLibrary({
+                    ...scope(),
+                    archived: 'exclude',
+                    sort: 'title',
+                    limit: 2,
+                    offset: 0,
+                    after,
+                });
+            const first = await list();
+            expect(first.items.map((d) => d.title)).toEqual(['Apple', 'apricot']);
+            // A new first title would push an offset page back by one row.
+            await seed({ slug: 'aardvark', title: 'Aardvark' });
+            const second = await list(first.nextAfter ?? undefined);
+            expect(second.items.map((d) => d.title)).toEqual(['banana', 'cherry']);
+        });
+
+        it('keyset pages break ties on the sort key by id, across millisecond-equal timestamps', async () => {
+            const at = new Date('2026-09-10T10:00:00.123Z');
+            const ids: string[] = [];
+            for (const slug of ['t1', 't2', 't3']) {
+                ids.push((await seed({ slug, title: slug, revisionAt: at })).id);
+            }
+            const seen: string[] = [];
+            let after: { sortKey: string; id: string } | undefined;
+            for (let page = 0; page < 3; page++) {
+                const result = await documents.listForLibrary({
+                    ...scope(),
+                    archived: 'exclude',
+                    sort: 'recent',
+                    limit: 1,
+                    offset: 0,
+                    after,
+                });
+                seen.push(...result.items.map((d) => d.id));
+                after = result.nextAfter ?? undefined;
+                if (!after) break;
+            }
+            expect(seen).toEqual([...ids].sort());
         });
 
         it('filters by folder and by Unfiled, and matches free text on the slug too', async () => {
@@ -567,6 +740,63 @@ describe('Knowledge library repositories (integration)', () => {
             expect(unread.lastReadRevision).toBe(0);
             expect(unread.lastOpenedAt).not.toBeNull();
             expect(await dataSource.getRepository(KnowledgeDocumentReaderState).count()).toBe(1);
+        });
+
+        it('a read that loaded the row before a higher concurrent read never writes the lower revision back', async () => {
+            const d = await seed({ slug: 'raced-read', revision: 5 });
+            await readerStates.upsertRead(userId, d.id, 1, new Date('2026-09-01T00:00:00Z'));
+            const rows = dataSource.getRepository(KnowledgeDocumentReaderState);
+            // The slower read loads the row at revision 1; before it writes,
+            // a faster read of revision 5 lands.
+            const findOne = rows.findOne.bind(rows);
+            jest.spyOn(rows, 'findOne').mockImplementationOnce(async (options) => {
+                const row = await findOne(options);
+                await rows.update({ userId, documentId: d.id }, { lastReadRevision: 5 });
+                return row;
+            });
+
+            const slower = await readerStates.upsertRead(userId, d.id, 4);
+
+            expect(slower.lastReadRevision).toBe(5);
+            expect(
+                (await rows.findOneByOrFail({ userId, documentId: d.id })).lastReadRevision,
+            ).toBe(5);
+        });
+
+        it('two reads racing on the same row keep the higher revision', async () => {
+            const d = await seed({ slug: 'two-reads', revision: 5 });
+            await readerStates.upsertRead(userId, d.id, 1);
+            await Promise.all([
+                readerStates.upsertRead(userId, d.id, 5),
+                readerStates.upsertRead(userId, d.id, 4),
+            ]);
+            const row = await dataSource
+                .getRepository(KnowledgeDocumentReaderState)
+                .findOneByOrFail({ userId, documentId: d.id });
+            expect(row.lastReadRevision).toBe(5);
+        });
+
+        it('a pin written from a stale row never moves the read revision, and keeps the first pin time', async () => {
+            const d = await seed({ slug: 'pin-race', revision: 5 });
+            await readerStates.upsertRead(userId, d.id, 1);
+            const rows = dataSource.getRepository(KnowledgeDocumentReaderState);
+            const findOne = rows.findOne.bind(rows);
+            jest.spyOn(rows, 'findOne').mockImplementationOnce(async (options) => {
+                const row = await findOne(options);
+                await rows.update({ userId, documentId: d.id }, { lastReadRevision: 5 });
+                return row;
+            });
+
+            const firstPin = new Date('2026-09-02T00:00:00Z');
+            await readerStates.upsertPin(userId, d.id, firstPin);
+            const pinned = await readerStates.upsertPin(
+                userId,
+                d.id,
+                new Date('2026-09-03T00:00:00Z'),
+            );
+
+            expect(pinned.lastReadRevision).toBe(5);
+            expect(pinned.pinnedAt?.getTime()).toBe(firstPin.getTime());
         });
 
         it('pins and unpins per person', async () => {

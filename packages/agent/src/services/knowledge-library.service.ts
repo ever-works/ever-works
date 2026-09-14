@@ -30,6 +30,8 @@ import { KbDocumentClass, KbDocumentStatus } from '../entities/kb-types';
 import { WorkMemberRole } from '../entities/types';
 import {
     WorkKnowledgeDocumentRepository,
+    type KbLibraryKeysetBoundary,
+    type KbLibraryListOptions,
     type KbLibraryScope,
 } from '../database/repositories/work-knowledge-document.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -104,7 +106,8 @@ export class KnowledgeLibraryService {
     ): Promise<KbLibraryListDto> {
         const scope = await this.resolveScope(actor.organizationId);
         const limit = clampLimit(query.limit);
-        const offset = decodeCursor(query.cursor);
+        const sort = query.sort ?? 'recent';
+        const position = decodeLibraryCursor(query.cursor, sort);
         const folders = await this.folders.listOrganizationFolders(actor.organizationId);
         const folderById = new Map(folders.map((f) => [f.id, f]));
 
@@ -131,16 +134,20 @@ export class KnowledgeLibraryService {
             return { documents: [], nextCursor: null, total: 0, unreadCount: 0 };
         }
 
-        const { items, total } = await this.documents.listForLibrary({
+        const listOptions: KbLibraryListOptions = {
             ...listScope,
             folderId,
             archived: query.archived ?? 'exclude',
             classes: query.classes as KbDocumentClass[] | undefined,
             q: query.q,
-            sort: query.sort ?? 'recent',
+            sort,
             limit,
-            offset,
-        });
+            offset: position.offset,
+        };
+        if (position.after) {
+            listOptions.after = position.after;
+        }
+        const { items, total, nextAfter } = await this.documents.listForLibrary(listOptions);
 
         const editableWorks = await this.editableWorkIds(actor.userId, items);
         const documents = items.map((doc) =>
@@ -150,11 +157,12 @@ export class KnowledgeLibraryService {
                 canEdit: doc.workId ? editableWorks.has(doc.workId) : actor.canManageOrganization,
             }),
         );
-        const nextOffset = offset + items.length;
         return {
             documents,
-            nextCursor:
-                items.length === limit && nextOffset < total ? encodeCursor(nextOffset) : null,
+            // A keyset cursor: it resumes after the last row of this page, so
+            // documents added, removed or re-sorted meanwhile never make the
+            // next page repeat or skip one.
+            nextCursor: nextAfter ? encodeLibraryCursor(sort, nextAfter) : null,
             total,
             unreadCount: 0,
         };
@@ -369,7 +377,12 @@ export class KnowledgeLibraryService {
             actor.organizationId,
             actor.userId,
             folderId,
-            (ids) => this.documents.clearFolders(ids),
+            // Unfiled inside the folder delete's own transaction, so a delete
+            // that fails puts every document back where it was.
+            (ids, manager) =>
+                manager
+                    ? this.documents.clearFolders(ids, manager)
+                    : this.documents.clearFolders(ids),
         );
     }
 
@@ -609,7 +622,62 @@ function clampLimit(limit: number | undefined): number {
     return Math.min(Math.max(Math.trunc(limit), 1), KB_LIBRARY_PAGE_SIZE_MAX);
 }
 
-/** Opaque page cursor. Today an offset; callers must not rely on its shape. */
+/** Where a library page starts: a keyset boundary, or (legacy cursors) an offset. */
+export interface LibraryCursorPosition {
+    offset: number;
+    after?: KbLibraryKeysetBoundary;
+}
+
+type LibrarySort = NonNullable<KbLibraryListQuery['sort']>;
+
+/**
+ * Opaque keyset page cursor: the sort it was issued for, plus the sort key
+ * and id of the last row served. Callers must not rely on its shape.
+ */
+export function encodeLibraryCursor(sort: LibrarySort, after: KbLibraryKeysetBoundary): string {
+    return Buffer.from(JSON.stringify({ s: sort, k: after.sortKey, i: after.id }), 'utf8').toString(
+        'base64url',
+    );
+}
+
+/**
+ * Decode any library cursor. A keyset cursor must have been issued for the
+ * same sort — its key means nothing under another order — and an offset
+ * cursor ({@link encodeCursor}) is still honoured. Anything else is a 400.
+ */
+export function decodeLibraryCursor(
+    cursor: string | undefined,
+    sort: LibrarySort,
+): LibraryCursorPosition {
+    if (!cursor) return { offset: 0 };
+    let parsed: { s?: unknown; k?: unknown; i?: unknown; o?: unknown } | null = null;
+    try {
+        parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+            s?: unknown;
+            k?: unknown;
+            i?: unknown;
+            o?: unknown;
+        };
+    } catch {
+        parsed = null;
+    }
+    if (parsed && typeof parsed === 'object') {
+        if (
+            parsed.s === sort &&
+            typeof parsed.k === 'string' &&
+            typeof parsed.i === 'string' &&
+            parsed.i.length > 0
+        ) {
+            return { offset: 0, after: { sortKey: parsed.k, id: parsed.i } };
+        }
+        if (parsed.s === undefined && parsed.k === undefined) {
+            return { offset: decodeCursor(cursor) };
+        }
+    }
+    throw new BadRequestException({ status: 'error', message: 'Invalid cursor' });
+}
+
+/** Opaque offset page cursor, still accepted by {@link decodeLibraryCursor}. */
 export function encodeCursor(offset: number): string {
     return Buffer.from(JSON.stringify({ o: offset }), 'utf8').toString('base64url');
 }

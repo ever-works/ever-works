@@ -83,6 +83,13 @@ import type {
 export const KB_STORAGE_PLUGIN = 'KB_STORAGE_PLUGIN';
 
 /**
+ * Knowledge library — how many compare-and-set rounds an edit makes before
+ * giving up. Each lost round means another edit of the same document landed
+ * in between, so five in a row is contention no human edit produces.
+ */
+const KB_EDIT_MAX_ATTEMPTS = 5;
+
+/**
  * How much of an uploaded document the auto-classifier is allowed to see.
  * Capped for cost and for prompt-injection surface: the body is text the
  * USER uploaded, and the classifier is asked for one enum value, so there
@@ -1414,40 +1421,37 @@ export class KnowledgeBaseService {
         }
         this.assertNotLockedFull(existing);
 
-        const patch: Partial<WorkKnowledgeDocument> = { updatedById: userId };
-        if (input.title !== undefined) patch.title = input.title;
-        if (input.description !== undefined) patch.description = input.description;
-        if (input.tags !== undefined) patch.tags = input.tags;
-        if (input.categories !== undefined) patch.categories = input.categories;
-        if (input.language !== undefined) patch.language = input.language;
-        if (input.status !== undefined) patch.status = input.status;
-        if (input.class !== undefined) patch.kbDocumentClass = input.class;
+        // Content, fingerprint and revision land in one compare-and-set on
+        // the revision the patch is computed from; a lost race recomputes the
+        // patch against the row as it now is (see `writeAtRevision`).
+        const updated = await this.writeAtRevision(workId, docId, existing, (row) => {
+            const patch: Partial<WorkKnowledgeDocument> = { updatedById: userId };
+            if (input.title !== undefined) patch.title = input.title;
+            if (input.description !== undefined) patch.description = input.description;
+            if (input.tags !== undefined) patch.tags = input.tags;
+            if (input.categories !== undefined) patch.categories = input.categories;
+            if (input.language !== undefined) patch.language = input.language;
+            if (input.status !== undefined) patch.status = input.status;
+            if (input.class !== undefined) patch.kbDocumentClass = input.class;
 
-        if (input.body !== undefined) {
-            patch.wordCount = this.countWords(input.body);
-            patch.tokenCount = this.estimateTokens(input.body);
-            patch.metadata = {
-                ...(existing.metadata ?? {}),
-                body: input.body,
-            } as Record<string, unknown>;
-        }
+            if (input.body !== undefined) {
+                patch.wordCount = this.countWords(input.body);
+                patch.tokenCount = this.estimateTokens(input.body);
+                patch.metadata = {
+                    ...(row.metadata ?? {}),
+                    body: input.body,
+                } as Record<string, unknown>;
+            }
 
-        const revision = this.revisionPatch(existing, {
-            title: patch.title ?? existing.title,
-            description: input.description !== undefined ? input.description : existing.description,
-            tags: input.tags !== undefined ? input.tags : existing.tags,
-            kbDocumentClass: patch.kbDocumentClass ?? existing.kbDocumentClass,
-            body: input.body !== undefined ? input.body : this.bodyOf(existing),
+            const revision = this.revisionPatch(row, {
+                title: patch.title ?? row.title,
+                description: input.description !== undefined ? input.description : row.description,
+                tags: input.tags !== undefined ? input.tags : row.tags,
+                kbDocumentClass: patch.kbDocumentClass ?? row.kbDocumentClass,
+                body: input.body !== undefined ? input.body : this.bodyOf(row),
+            });
+            return { patch: Object.assign(patch, revision.patch), bump: revision.bump };
         });
-        Object.assign(patch, revision.patch);
-
-        let updated = await this.documentRepository.update(docId, patch);
-        if (!updated) {
-            throw new NotFoundException(`KB document not found after update: ${docId}`);
-        }
-        if (revision.bump) {
-            updated = await this.bumpRevision(updated);
-        }
 
         if (input.tags?.length) {
             await this.ensureTagsExist(workId, input.tags);
@@ -1893,6 +1897,8 @@ export class KnowledgeBaseService {
 
         // Knowledge library — a restored body is a real change for readers
         // when it differs (whitespace-insensitively) from what they read.
+        // The fingerprint and the revision move together in one
+        // compare-and-set on the revision the restored row carries.
         const revision = this.revisionPatch(existing, {
             title: updated.title,
             description: updated.description,
@@ -1900,11 +1906,22 @@ export class KnowledgeBaseService {
             kbDocumentClass: updated.kbDocumentClass,
             body: this.bodyOf(updated),
         });
-        if (Object.keys(revision.patch).length > 0) {
-            updated = (await this.documentRepository.update(docId, revision.patch)) ?? updated;
-        }
-        if (revision.bump) {
-            updated = await this.bumpRevision(updated);
+        if (Object.keys(revision.patch).length > 0 || revision.bump) {
+            const restored = updated;
+            updated = await this.writeAtRevision(workId, docId, restored, (row) =>
+                row === restored
+                    ? revision
+                    : // Another edit landed after the restore and already
+                      // recorded its own revision; only an unseeded
+                      // fingerprint is left to fill in.
+                      this.revisionPatch(row, {
+                          title: row.title,
+                          description: row.description,
+                          tags: row.tags,
+                          kbDocumentClass: row.kbDocumentClass,
+                          body: this.bodyOf(row),
+                      }),
+            );
         }
 
         await this.enqueueMirror(
@@ -3926,17 +3943,20 @@ export class KnowledgeBaseService {
      * The revision fields a write must carry, given the row before it and
      * the substantive fields after it.
      *
-     *  - Stored hash `NULL` (a row that predates the library) → seed the
-     *    hash and DO NOT move `revision`: shipping the library must not
-     *    flag every existing document as changed.
      *  - Title, description, tag set, class or normalized-body hash changed
-     *    → new hash, and `bump` so the caller moves `revision` through
-     *    {@link bumpRevision} once the write has landed.
+     *    → new hash, and `bump` so {@link writeAtRevision} writes the next
+     *    revision in the same statement.
      *  - Otherwise (a whitespace-only edit, a status / language / lock /
-     *    bookkeeping write) → nothing.
+     *    bookkeeping write) → nothing, except that a row whose stored hash
+     *    is still `NULL` (it predates the library) gets its hash seeded.
      *
-     * The patch never carries `revision` itself: computing `existing.revision
-     * + 1` here would let two concurrent edits write the same number.
+     * The body a stored `NULL` hash stands for is the row's own body, so the
+     * comparison uses a fingerprint computed from it: shipping the library
+     * flags no existing document as changed, while the first real edit of
+     * one moves its revision exactly like any later edit.
+     *
+     * The patch never carries `revision` itself: only {@link writeAtRevision}
+     * derives it, from the very row its compare-and-set is guarded on.
      */
     private revisionPatch(
         existing: WorkKnowledgeDocument,
@@ -3949,32 +3969,72 @@ export class KnowledgeBaseService {
         },
     ): { patch: Partial<WorkKnowledgeDocument>; bump: boolean } {
         const nextHash = hashNormalizedBody(next.body);
-        if (!existing.normalizedContentHash) {
-            return { patch: { normalizedContentHash: nextHash }, bump: false };
-        }
+        const storedHash = existing.normalizedContentHash || null;
+        const baselineHash = storedHash ?? hashNormalizedBody(this.bodyOf(existing));
         const substantive =
-            nextHash !== existing.normalizedContentHash ||
+            nextHash !== baselineHash ||
             next.title !== existing.title ||
             (next.description ?? null) !== (existing.description ?? null) ||
             next.kbDocumentClass !== existing.kbDocumentClass ||
             !sameTagSet(next.tags, existing.tags);
-        if (!substantive) return { patch: {}, bump: false };
-        return { patch: { normalizedContentHash: nextHash }, bump: true };
+        if (substantive) {
+            return { patch: { normalizedContentHash: nextHash }, bump: true };
+        }
+        if (!storedHash) {
+            return { patch: { normalizedContentHash: nextHash }, bump: false };
+        }
+        return { patch: {}, bump: false };
     }
 
     /**
-     * Move a document's `revision` forward by one in the database (see
-     * {@link WorkKnowledgeDocumentRepository.bumpRevision} for the
-     * concurrency contract) and carry the revision this edit wrote onto the
-     * row the caller returns.
+     * Write an edit of `existing` — its content, fingerprint and (for a
+     * substantive edit) its next revision — in ONE conditional UPDATE that
+     * lands only while the row still carries the revision the edit was
+     * computed from.
+     *
+     * When another edit moved the revision first, nothing is written: the
+     * row is read again, `build` recomputes the patch against it (so the
+     * edit applies to the current body and metadata, and takes the next free
+     * revision), and the write is retried. The stored content and its
+     * revision therefore always come from the same edit, and two concurrent
+     * edits can never share a revision number.
+     *
+     * Throws 404 when the document is gone, 403 when a retry finds it fully
+     * locked, and 409 only after {@link KB_EDIT_MAX_ATTEMPTS} lost rounds in a
+     * row — contention no human edit produces.
      */
-    private async bumpRevision(doc: WorkKnowledgeDocument): Promise<WorkKnowledgeDocument> {
-        const bumped = await this.documentRepository.bumpRevision(doc.id);
-        if (bumped) {
-            doc.revision = bumped.revision;
-            doc.revisionAt = bumped.revisionAt;
+    private async writeAtRevision(
+        workId: string,
+        docId: string,
+        existing: WorkKnowledgeDocument,
+        build: (row: WorkKnowledgeDocument) => {
+            patch: Partial<WorkKnowledgeDocument>;
+            bump: boolean;
+        },
+    ): Promise<WorkKnowledgeDocument> {
+        let current = existing;
+        for (let attempt = 0; attempt < KB_EDIT_MAX_ATTEMPTS; attempt += 1) {
+            const { patch, bump } = build(current);
+            const expectedRevision = current.revision ?? 1;
+            if (bump) {
+                patch.revision = expectedRevision + 1;
+                patch.revisionAt = new Date();
+            }
+            if (Object.keys(patch).length === 0) return current;
+            const updated = await this.documentRepository.update(docId, patch, {
+                expectedRevision,
+            });
+            if (updated) return updated;
+            const reloaded = await this.documentRepository.findById(workId, docId);
+            if (!reloaded) {
+                throw new NotFoundException(`KB document not found after update: ${docId}`);
+            }
+            this.assertNotLockedFull(reloaded);
+            current = reloaded;
         }
-        return doc;
+        throw new ConflictException(
+            `KB document ${docId} changed too often to save this edit; reload and retry`,
+        );
     }
 
     private bodyOf(doc: WorkKnowledgeDocument): string {

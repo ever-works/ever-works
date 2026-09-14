@@ -7,7 +7,9 @@ import {
 import {
     KnowledgeLibraryService,
     decodeCursor,
+    decodeLibraryCursor,
     encodeCursor,
+    encodeLibraryCursor,
     type KnowledgeLibraryActor,
 } from '../knowledge-library.service';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
@@ -227,17 +229,51 @@ describe('KnowledgeLibraryService', () => {
 
         it('pages with an opaque cursor and stops on the last page', async () => {
             const page = Array.from({ length: 50 }, (_v, i) => doc({ id: `d${i}` }));
-            documents.listForLibrary.mockResolvedValue({ items: page, total: 120 });
+            documents.listForLibrary.mockResolvedValue({
+                items: page,
+                total: 120,
+                nextAfter: { sortKey: '2026-09-01 06:04:00.000', id: 'd49' },
+            });
             const first = await service.list(actor());
             expect(first.nextCursor).not.toBeNull();
-            expect(decodeCursor(first.nextCursor as string)).toBe(50);
+            // A keyset cursor: it names the last row served, not a row count.
+            expect(decodeLibraryCursor(first.nextCursor as string, 'recent')).toEqual({
+                offset: 0,
+                after: { sortKey: '2026-09-01 06:04:00.000', id: 'd49' },
+            });
 
-            documents.listForLibrary.mockResolvedValue({ items: page.slice(0, 20), total: 120 });
-            const last = await service.list(actor(), { cursor: encodeCursor(100) });
+            documents.listForLibrary.mockResolvedValue({
+                items: page.slice(0, 20),
+                total: 120,
+                nextAfter: null,
+            });
+            const last = await service.list(actor(), { cursor: first.nextCursor as string });
+            expect(documents.listForLibrary).toHaveBeenLastCalledWith(
+                expect.objectContaining({
+                    offset: 0,
+                    after: { sortKey: '2026-09-01 06:04:00.000', id: 'd49' },
+                }),
+            );
+            expect(last.nextCursor).toBeNull();
+        });
+
+        it('still honours an offset cursor', async () => {
+            documents.listForLibrary.mockResolvedValue({ items: [], total: 120, nextAfter: null });
+            await service.list(actor(), { cursor: encodeCursor(100) });
             expect(documents.listForLibrary).toHaveBeenLastCalledWith(
                 expect.objectContaining({ offset: 100 }),
             );
-            expect(last.nextCursor).toBeNull();
+            const [options] = documents.listForLibrary.mock.calls[0];
+            expect(options.after).toBeUndefined();
+            expect(decodeCursor(encodeCursor(100))).toBe(100);
+        });
+
+        it('rejects a keyset cursor issued for another sort', async () => {
+            const cursor = encodeLibraryCursor('title', { sortKey: 'apple', id: 'd1' });
+            await expect(service.list(actor(), { cursor, sort: 'recent' })).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+            await expect(service.list(actor(), { cursor, sort: 'title' })).resolves.toBeDefined();
         });
 
         it('rejects a malformed cursor', async () => {
@@ -464,6 +500,20 @@ describe('KnowledgeLibraryService', () => {
             const result = await service.deleteFolder(actor(), 'p');
             expect(documents.clearFolders).toHaveBeenCalledWith(['p', 's']);
             expect(result).toEqual({ deletedFolders: 2, unfiledDocuments: 12 });
+        });
+
+        it('unfiles through the transaction the folder delete runs in', async () => {
+            const manager = { tx: true };
+            folders.deleteOrganizationFolder.mockImplementation(
+                async (
+                    _org: string,
+                    _user: string,
+                    _id: string,
+                    unfile: (ids: string[], manager?: unknown) => Promise<number>,
+                ) => ({ deletedFolders: 1, unfiledDocuments: await unfile(['p'], manager) }),
+            );
+            await service.deleteFolder(actor(), 'p');
+            expect(documents.clearFolders).toHaveBeenCalledWith(['p'], manager);
         });
     });
 
