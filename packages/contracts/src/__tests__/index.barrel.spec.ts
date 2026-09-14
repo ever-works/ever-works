@@ -7,6 +7,8 @@ import * as computer from '../computer/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
+import * as email from '../email/index.js';
+import * as feed from '../feed/index.js';
 import * as fleet from '../fleet/index.js';
 import * as form from '../form/index.js';
 import * as github from '../github/index.js';
@@ -15,6 +17,7 @@ import * as inbox from '../inbox/index.js';
 import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
+import * as memory from '../memory/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as runs from '../runs/index.js';
@@ -47,6 +50,8 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
+	['email', email],
+	['feed', feed],
 	['fleet', fleet],
 	['form', form],
 	['github', github],
@@ -55,6 +60,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['ingest', ingest],
 	['item', item],
 	['kb', kb],
+	['memory', memory],
 	['policy', policy],
 	['release', release],
 	['runs', runs],
@@ -70,7 +76,7 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(21);
+		expect(exportLines).toBe(24);
 	});
 
 	it('has no name exported by two different areas', () => {

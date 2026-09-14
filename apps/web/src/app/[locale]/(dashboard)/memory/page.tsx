@@ -1,6 +1,11 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { memoryAPI, EMPTY_MEMORY_RESPONSE, type MemoryResponse } from '@/lib/api/memory';
+import {
+    memoryFactsAPI,
+    settleInitialMemoryFacts,
+    type InitialMemoryFacts,
+} from '@/lib/api/memory-facts';
 import { meetingsAPI, type Meeting } from '@/lib/api/meetings';
 import {
     MEETINGS_PAGE_SIZE,
@@ -39,6 +44,10 @@ const WORK_OPTIONS_LIMIT = 100;
  * works failure just costs the "routed to" filter its options. Neither
  * can take the Memory page down.
  *
+ * The page also server-fetches the first page of **memory facts** (AW-07)
+ * for the Facts block at the top of the shell; its search, views and writes
+ * re-query the `/api/memory/facts` BFF from the client.
+ *
  * All interactivity (search, filter chips, view toggle) lives in the
  * client `MemoryShell`, which re-queries the same-origin BFF proxy
  * (`/api/memory`).
@@ -72,10 +81,19 @@ export default async function MemoryPage({
             error: err instanceof Error ? err.message : 'Failed to load meetings.',
         }));
 
-    const [initial, works, meetingsResult] = await Promise.all([
+    // Memory facts (AW-07) — first page of the "All" view. Defensive like the
+    // two fetches above: a failure never takes the page down. It is not passed
+    // off as an empty workspace either — the Facts block says the load failed
+    // and offers Retry, and every write still works.
+    const factsPromise: Promise<InitialMemoryFacts> = settleInitialMemoryFacts(
+        memoryFactsAPI.list({ view: 'all' }),
+    );
+
+    const [initial, works, meetingsResult, facts] = await Promise.all([
         initialPromise,
         worksPromise,
         meetingsPromise,
+        factsPromise,
     ]);
 
     const hasNext = meetingsResult.rows.length > MEETINGS_PAGE_SIZE;
@@ -105,5 +123,12 @@ export default async function MemoryPage({
         },
     };
 
-    return <MemoryShell initial={initial} meetings={meetings} />;
+    return (
+        <MemoryShell
+            initial={initial}
+            meetings={meetings}
+            facts={facts.facts}
+            factsLoadFailed={facts.loadFailed}
+        />
+    );
 }

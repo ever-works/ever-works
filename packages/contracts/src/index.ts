@@ -32,6 +32,9 @@ export * from './email/index.js';
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Memory facts + context-file vocabulary (AW-07) — the atomic tier of Memory
+// and the shared limits every surface validates against.
+export * from './memory/index.js';
 // Live Feed — the narrated, filterable view of the activity log. Structure
 // only (narration keys + typed destinations); renderers own the words.
 export * from './feed/index.js';

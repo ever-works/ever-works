@@ -49,6 +49,8 @@ export * from './repositories/work-knowledge-citation.repository';
 export * from './repositories/kb-retrieval-log.repository';
 export * from './repositories/work-knowledge-chunk.repository';
 export * from './repositories/work-knowledge-chunk-coordinate.repository';
+// AW-07 — pgvector chunks for vector namespaces that are not a Work.
+export * from './repositories/vector-namespace-chunk.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 6. Export Agent repositories
 // so the heartbeat worker can resolve remote-proxy versions through
 // `TriggerInternalModule`.
@@ -95,6 +97,7 @@ export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './repositories/memory-folder.repository';
+export * from './repositories/memory-fact.repository';
 // AW-14 What's new — per-person product changelog read state.
 export * from './repositories/product-changelog-read.repository';
 // Repository registry (Feature G) — repo connections + agent grants.

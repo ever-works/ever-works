@@ -308,6 +308,24 @@ export enum ActivityActionType {
     // varchar, so no migration is needed.
     INBOX_ITEM_CREATED = 'inbox_item_created',
     INBOX_ITEM_ANSWERED = 'inbox_item_answered',
+    // Memory facts + context files (AW-07). One row per create / edit /
+    // forget / restore / accept / discard of a fact, one when every fact is
+    // forgotten at once, one per context-file save / restore / load-mode
+    // change, and one when a run's instructions exceed a segment budget.
+    // `details` carries ids, counts and hashes — NEVER a fact or file body,
+    // which can hold business-sensitive prose. Additive members — storage is
+    // a plain varchar(50), so no migration is needed.
+    MEMORY_FACT_CREATED = 'memory_fact_created',
+    MEMORY_FACT_UPDATED = 'memory_fact_updated',
+    MEMORY_FACT_FORGOTTEN = 'memory_fact_forgotten',
+    MEMORY_FACT_RESTORED = 'memory_fact_restored',
+    MEMORY_FACT_ACCEPTED = 'memory_fact_accepted',
+    MEMORY_FACT_DISCARDED = 'memory_fact_discarded',
+    MEMORY_FACTS_CLEARED = 'memory_facts_cleared',
+    CONTEXT_FILE_UPDATED = 'context_file_updated',
+    CONTEXT_FILE_RESTORED = 'context_file_restored',
+    CONTEXT_FILE_MODE_CHANGED = 'context_file_mode_changed',
+    CONTEXT_BUDGET_EXCEEDED = 'context_budget_exceeded',
     // Live Feed — a run starting and a run reaching a terminal state, for
     // every trigger kind other than `heartbeat` (heartbeat runs keep the
     // three `agent_heartbeat_*` members above, unchanged). Declared here so

@@ -6,6 +6,7 @@ import { KB_NORMALIZE_MEDIA_DISPATCHER } from '../kb-normalize-media-dispatcher'
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from '../kb-org-overlay-fanout-dispatcher';
 import { KB_REEMBED_WORK_DISPATCHER } from '../kb-reembed-work-dispatcher';
 import { KB_TRANSCRIBE_DISPATCHER } from '../kb-transcribe-dispatcher';
+import { MEMORY_FACT_EMBED_DISPATCHER } from '../memory-fact-embed-dispatcher';
 import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from '../template-customization-dispatcher';
 import { WEBHOOK_DELIVERY_DISPATCHER } from '../webhook-delivery-dispatcher';
 import { WORK_GENERATION_DISPATCHER } from '../work-generation-dispatcher';
@@ -28,7 +29,7 @@ import {
  *   2. The default in-memory registry returns `null` until something is
  *      registered, and last-`register()` wins (single-active-runtime per
  *      EW-683 §4).
- *   3. {@link buildJobRuntimeProviders} returns exactly 11 NestJS providers
+ *   3. {@link buildJobRuntimeProviders} returns exactly 12 NestJS providers
  *      — one per `*_DISPATCHER` symbol exported from `@ever-works/agent/tasks`.
  *      Drift here means a dispatcher silently fails to rebind when the
  *      cutover PR flips the bindings.
@@ -128,9 +129,10 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
     });
 
     describe('buildJobRuntimeProviders()', () => {
-        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 11)', () => {
+        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 12)', () => {
             const providers = buildJobRuntimeProviders();
-            expect(providers).toHaveLength(11);
+            // 11 original dispatchers + AW-07's MEMORY_FACT_EMBED_DISPATCHER.
+            expect(providers).toHaveLength(12);
         });
 
         it('binds every *_DISPATCHER symbol exported from @ever-works/agent/tasks', () => {
@@ -151,6 +153,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
                 KB_ORG_OVERLAY_FANOUT_DISPATCHER,
                 KB_REEMBED_WORK_DISPATCHER,
                 KB_TRANSCRIBE_DISPATCHER,
+                MEMORY_FACT_EMBED_DISPATCHER,
                 TEMPLATE_CUSTOMIZATION_DISPATCHER,
                 WEBHOOK_DELIVERY_DISPATCHER,
                 WORK_GENERATION_DISPATCHER,
