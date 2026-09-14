@@ -45,7 +45,15 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'affinity.set',
 	'affinity.clear',
 	'execution-preference.set',
-	'execution-preference.clear'
+	'execution-preference.clear',
+	'computer.session-open',
+	'computer.session-close',
+	'computer.control-grant',
+	'computer.control-release',
+	'computer.control-refused',
+	'computer.teach-start',
+	'computer.teach-finish',
+	'computer.profile-reset'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */

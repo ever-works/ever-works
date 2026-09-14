@@ -7,6 +7,7 @@ import { FleetJob } from '../../entities/fleet-job.entity';
 import { FleetNode } from '../../entities/fleet-node.entity';
 import { FleetAgentNodeAffinity } from '../../entities/fleet-agent-node-affinity.entity';
 import { FleetAgentNodeAffinityRepository } from '../fleet-agent-node-affinity.repository';
+import { buildComputerSessionEnqueueRequest } from '../../computer/computer-session.dispatcher';
 
 /**
  * The fleet lease protocol.
@@ -690,6 +691,90 @@ describe('FleetJobService', () => {
             expect(leasedByB).toHaveLength(1);
             expect(leasedByB?.[0].nodeId).toBe(NODE_B);
             expect(leasedByB?.[0].attempts).toBe(2);
+        });
+    });
+
+    describe('computer-session jobs (Agent computers)', () => {
+        const SESSION = '55555555-5555-4555-8555-555555555555';
+        const secretHeadless = randomBytes(32).toString('base64url');
+
+        function sessionRequest(nodeId: string, channels: Array<'screen' | 'terminal'>) {
+            const request = buildComputerSessionEnqueueRequest({
+                sessionId: SESSION,
+                userId: 'owner-1',
+                organizationId: null,
+                agentId: AGENT,
+                nodeId,
+                profileKey: 'opaque',
+                channels,
+                quality: 'sharp',
+            });
+            // A fresh idempotency key per enqueue so one test can queue several.
+            return {
+                ...request,
+                idempotencyKey: `${request.idempotencyKey}:${channels.join('+')}:${nodeId}`,
+            };
+        }
+
+        it('pins the job to the machine it names', async () => {
+            stores.nodes.push(enrolledNode(NODE_A, secretA));
+            const job = await service.enqueue(sessionRequest(NODE_A, ['screen']));
+            expect(job.targetNodeId).toBe(NODE_A);
+            expect(job.requiredCapabilities).toEqual(['attended', 'screen']);
+        });
+
+        it('refuses a session job that names no machine, or a machine of another owner', async () => {
+            stores.nodes.push(enrolledNode(NODE_B, secretB, { userId: 'owner-2' }));
+            await expect(
+                service.enqueue({
+                    userId: 'owner-1',
+                    kind: 'computer-session',
+                    payload: { sessionId: SESSION },
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.enqueue(sessionRequest(NODE_B, ['screen'])),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(stores.jobs).toHaveLength(0);
+        });
+
+        it('lets a display-less attended machine lease a terminal-only session, and nothing that needs a screen', async () => {
+            stores.nodes.push(
+                enrolledNode(NODE_A, secretHeadless, {
+                    capabilities: ['terminal', 'workspace', 'attended'],
+                }),
+            );
+            await service.enqueue(sessionRequest(NODE_A, ['screen']));
+            await service.enqueue(sessionRequest(NODE_A, ['terminal']));
+
+            const leased = await service.lease({ nodeId: NODE_A, secret: secretHeadless, max: 5 });
+
+            expect(leased).toHaveLength(1);
+            expect(leased?.[0].payload).toMatchObject({ channels: ['terminal'] });
+        });
+
+        it('never lets an unattended machine lease a session, whatever the channel', async () => {
+            stores.nodes.push(
+                enrolledNode(NODE_A, secretA, {
+                    capabilities: ['terminal', 'workspace', 'screen'],
+                }),
+            );
+            await service.enqueue(sessionRequest(NODE_A, ['terminal']));
+            await service.enqueue(sessionRequest(NODE_A, ['screen']));
+
+            expect(await service.lease({ nodeId: NODE_A, secret: secretA, max: 5 })).toEqual([]);
+        });
+
+        it('never lets a different machine claim a session pinned to another', async () => {
+            const everything = ['terminal', 'workspace', 'attended', 'screen'];
+            stores.nodes.push(
+                enrolledNode(NODE_A, secretA, { capabilities: everything }),
+                enrolledNode(NODE_B, secretB, { capabilities: everything }),
+            );
+            await service.enqueue(sessionRequest(NODE_A, ['screen']));
+
+            expect(await service.lease({ nodeId: NODE_B, secret: secretB })).toEqual([]);
+            expect(await service.lease({ nodeId: NODE_A, secret: secretA })).toHaveLength(1);
         });
     });
 

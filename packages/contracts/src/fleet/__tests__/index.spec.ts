@@ -45,6 +45,9 @@ const JOB_EXPORTS = [
 	'FLEET_JOB_KINDS',
 	'FLEET_BROWSER_CAPABILITY',
 	'FLEET_GPU_CAPABILITY',
+	'FLEET_SCREEN_CAPABILITY',
+	'FLEET_INPUT_CAPABILITY',
+	'FLEET_ATTENDED_CAPABILITY',
 	'isFleetJobKind',
 	'FLEET_JOB_DEFAULT_LEASE_TTL_SEC',
 	'FLEET_JOB_MIN_LEASE_TTL_SEC',
@@ -341,7 +344,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 176 runtime symbols', () => {
+	it('exposes exactly these 179 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -372,7 +375,7 @@ describe('fleet barrel', () => {
 		// named export precisely so the node, the plugin and this guard
 		// cannot disagree about it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(176);
+		expect(Object.keys(fleet)).toHaveLength(179);
 	});
 
 	it.each([

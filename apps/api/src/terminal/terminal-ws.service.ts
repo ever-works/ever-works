@@ -40,6 +40,14 @@ const AUTH_TIMEOUT_MS = 5_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const WS_PATH_PATTERN = /^\/ws\/terminal\/([0-9a-f-]{36})$/i;
 
+/**
+ * Upgrade paths owned by ANOTHER gateway on the same HTTP server (the
+ * Agent computer live view). This gateway leaves them untouched instead
+ * of destroying the socket, so both gateways can share one `upgrade`
+ * event; every other unknown path is still destroyed here.
+ */
+export const TERMINAL_WS_FOREIGN_PATH_PREFIXES: readonly string[] = ['/ws/computer/'];
+
 interface SocketState {
     authenticated: boolean;
     runId: string;
@@ -107,6 +115,9 @@ export class TerminalWsService implements OnApplicationBootstrap, OnApplicationS
             socket.destroy();
             return;
         }
+        if (TERMINAL_WS_FOREIGN_PATH_PREFIXES.some((prefix) => rawUrl.startsWith(prefix))) {
+            return;
+        }
         const match = WS_PATH_PATTERN.exec(rawUrl);
         if (!match || !this.wss) {
             // Not ours — other upgrade listeners (none today) could still
@@ -166,7 +177,8 @@ export class TerminalWsService implements OnApplicationBootstrap, OnApplicationS
                     return;
                 }
                 const claims = this.attach.verify(frame.token);
-                if (!claims || claims.runId !== state.runId) {
+                // A live-view token (channel `computer`) never opens a terminal.
+                if (!claims || claims.runId !== state.runId || claims.channel !== undefined) {
                     this.safeClose(ws, 4001, 'invalid attach token');
                     return;
                 }
