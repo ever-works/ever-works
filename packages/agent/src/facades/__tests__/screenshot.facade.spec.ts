@@ -385,4 +385,68 @@ describe('ScreenshotFacadeService', () => {
             );
         });
     });
+
+    /** AW-17 — a capture the provider reports as failed is recorded, zero-rated. */
+    describe('capture — usage outcome (AW-17)', () => {
+        it('records a failed capture with outcome failed and no cost', async () => {
+            const screenshotPlugin = createMockScreenshotPlugin('screenshotone', 'ScreenshotOne');
+            (screenshotPlugin.capture as jest.Mock).mockResolvedValue({
+                success: false,
+                error: 'Failed to capture screenshot',
+            });
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(screenshotPlugin, { capabilities: ['screenshot'] }),
+            ]);
+            const usage = { record: jest.fn().mockResolvedValue(null) };
+            const facade = new ScreenshotFacadeService(
+                registry,
+                settingsService,
+                undefined,
+                usage as never,
+            );
+
+            const result = await facade.capture(
+                { url: 'https://example.com' },
+                { userId: 'test-user', runId: 'run-1', missionId: 'mission-1' },
+            );
+
+            expect(result.success).toBe(false);
+            expect(usage.record).toHaveBeenCalledTimes(1);
+            expect(usage.record.mock.calls[0][0]).toMatchObject({
+                pluginId: 'screenshotone',
+                capability: 'screenshot',
+                outcome: 'failed',
+                costCents: 0,
+                runId: 'run-1',
+                missionId: 'mission-1',
+            });
+            expect(JSON.stringify(usage.record.mock.calls[0][0])).not.toContain(
+                'Failed to capture screenshot',
+            );
+        });
+
+        it('records a successful capture with the Mission of the Task', async () => {
+            const screenshotPlugin = createMockScreenshotPlugin('screenshotone', 'ScreenshotOne');
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(screenshotPlugin, { capabilities: ['screenshot'] }),
+            ]);
+            const usage = { record: jest.fn().mockResolvedValue(null) };
+            const facade = new ScreenshotFacadeService(
+                registry,
+                settingsService,
+                undefined,
+                usage as never,
+            );
+
+            await facade.capture(
+                { url: 'https://example.com' },
+                { userId: 'test-user', missionId: 'mission-1' },
+            );
+
+            expect(usage.record).toHaveBeenCalledWith(
+                expect.objectContaining({ missionId: 'mission-1' }),
+            );
+            expect(usage.record.mock.calls[0][0].outcome).toBeUndefined();
+        });
+    });
 });

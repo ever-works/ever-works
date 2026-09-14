@@ -15,6 +15,8 @@
  * one of these must say so instead of printing `0`.
  */
 
+import type { CreditSettlementMode } from '../billing/meter.types.js';
+
 /** The three window granularities the ledger navigates by. */
 export const RUN_LEDGER_GRANULARITIES = ['day', 'week', 'month'] as const;
 export type RunLedgerGranularity = (typeof RUN_LEDGER_GRANULARITIES)[number];
@@ -206,6 +208,55 @@ export interface RunCostLine {
 }
 
 /**
+ * One kind of credit-metered call made by a run (AW-17), grouped by its
+ * price-list key. Cached and failed calls are counted, and cost nothing.
+ */
+export interface RunCostCreditLine {
+	/** `capability.operation` price-list key; never a Plugin id. */
+	priceKey: string;
+	/** `search`, `screenshot`, … as recorded on the usage row. */
+	capability: string;
+	calls: number;
+	/** Calls that did new work and were charged. */
+	chargedCalls: number;
+	cachedCalls: number;
+	failedCalls: number;
+	/** Calls whose paying credential the platform could not confirm. */
+	unconfirmedCalls: number;
+	/**
+	 * Credits these calls account for at the published price list. Debited as
+	 * such only in the `price_list` settlement mode; what the run was actually
+	 * debited is always {@link RunCostBreakdown.creditsDebited}.
+	 */
+	credits: number;
+	/** Provider cost the rows carry, in cents. */
+	costCents: number;
+}
+
+/**
+ * A run's spend split by meter (AW-17). Built from the same usage rows as
+ * {@link RunCostBreakdown.lines}; rows recorded before meters were separated
+ * are counted apart and never guessed into a meter.
+ */
+export interface RunCostMeters {
+	/** Calls paid with a credential the Workspace owns — recorded, never charged. */
+	model: { calls: number; costCents: number };
+	credits: { calls: number; credits: number; lines: RunCostCreditLine[] };
+	/** Add-ons are monthly lines; they never belong to a single run. */
+	addon: { calls: number };
+	/** Price-list versions that priced this run's rows, ascending. */
+	priceVersions: number[];
+	/** Rows with no meter (recorded before meters were separated). */
+	preMeterCalls: number;
+	/**
+	 * The deployment's settlement mode when this split was read: whether the
+	 * `credits` figures above are what was debited (`price_list`) or list-price
+	 * figures beside a debit taken from provider cost (`provider_cost`).
+	 */
+	settlementMode?: CreditSettlementMode;
+}
+
+/**
  * What one run cost. Every figure comes from the same metering rows and
  * settlement stamp the Costs dashboard reads, so the two never disagree.
  */
@@ -222,6 +273,11 @@ export interface RunCostBreakdown {
 	detailRetained: boolean;
 	tokens: RunTokenSplit;
 	lines: RunCostLine[];
+	/**
+	 * The same spend split by meter (AW-17). Absent from producers that do not
+	 * read meters; null when the run's itemised rows are no longer retained.
+	 */
+	meters?: RunCostMeters | null;
 }
 
 /** A Knowledge Base document this run cited. */

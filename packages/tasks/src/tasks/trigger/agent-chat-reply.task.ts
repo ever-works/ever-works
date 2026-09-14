@@ -191,6 +191,8 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 kind: 'chat',
                 // No `signal` — see the note on the `run` params above.
                 taskId: payload.taskId,
+                // AW-17 — the Task's own Mission, from the row already loaded.
+                missionId: taskRow?.missionId ?? undefined,
                 chatMessageId: payload.triggeringMessageId,
                 immediateInput,
                 conversationContext,

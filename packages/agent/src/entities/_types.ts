@@ -32,6 +32,41 @@ export enum BudgetOwnerType {
 }
 
 /**
+ * AW-17 — which of the three meters a usage row belongs to. Stamped once,
+ * when the row is written; a NULL column is a row recorded before meters
+ * were separated and is reported under its own label, never guessed.
+ *
+ * Lives in this leaf file for the same decorator-evaluation cycle reason as
+ * `BudgetOwnerType` above. Values mirror `UsageMeterId` in
+ * `@ever-works/contracts`.
+ */
+export enum UsageMeter {
+    /** Paid with a credential the Workspace owns — recorded, never charged. */
+    MODEL = 'model',
+    /** Paid by the platform — priced from the credit price list. */
+    CREDITS = 'credits',
+    /** A flat monthly line for a provisioned unit — never draws credits. */
+    ADDON = 'addon',
+}
+
+/** AW-17 — who paid the provider for a call. Mirrors `UsagePayerId`. */
+export enum UsagePayer {
+    WORKSPACE = 'workspace',
+    PLATFORM = 'platform',
+    /** Could not be determined — billed as platform and flagged. */
+    UNCONFIRMED = 'unconfirmed',
+}
+
+/** AW-17 — did the call do new work? Mirrors `UsageOutcomeId`. */
+export enum UsageOutcome {
+    OK = 'ok',
+    /** Served from cache — zero-rated. */
+    CACHED = 'cached',
+    /** Reached (or tried to reach) the provider and failed — zero-rated. */
+    FAILED = 'failed',
+}
+
+/**
  * Portable epoch-millis timestamp column. Stores as `bigint` (works
  * cross-DB; raw `Date` defaults to TIMESTAMP WITH TIME ZONE on
  * Postgres and INTEGER on SQLite, breaking parity). The transformer

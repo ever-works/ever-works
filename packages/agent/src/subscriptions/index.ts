@@ -7,6 +7,11 @@ export * from './billing/billing.provider';
 export * from './billing/credit-packs';
 // Credits pricing view (billing spec FR-13) + the pay-as-you-go catalog helpers the API/UI need.
 export * from './billing/credits-pricing';
+// The published credit price list (AW-17) — versioned, keyed on capability + operation.
+export * from './billing/credit-pricebook';
+// The price-list PORT the pricing view reads (bound once in UsageModule).
+export { CREDIT_PRICE_LIST, PublishedCreditPriceList } from '../usage/credit-price-list';
+export type { CreditPriceList } from '../usage/credit-price-list';
 export { estimatePaygCents, getPaygCatalog, paygLookupKey } from './billing/stripe-catalog';
 export type { CatalogPayg, CatalogPaygTier } from './billing/stripe-catalog';
 export * from './billing/stripe-billing.provider';

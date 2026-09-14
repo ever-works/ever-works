@@ -27,7 +27,12 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { InvalidCostsWindowError } from '@ever-works/agent/subscriptions';
 import type { CostsSummaryService } from '@ever-works/agent/subscriptions';
-import { CostsController, CostsTopRunsQueryDto, CostsWindowQueryDto } from './costs.controller';
+import {
+    CostsBreakdownQueryDto,
+    CostsController,
+    CostsTopRunsQueryDto,
+    CostsWindowQueryDto,
+} from './costs.controller';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
 const AUTH = { userId: 'user-1' } as AuthenticatedUser;
@@ -46,6 +51,34 @@ function makeService(): jest.Mocked<CostsSummaryService> {
             .fn()
             .mockResolvedValue({ windowDays: 30, from: 'F', to: 'T', totalCostCents: 0, rows: [] }),
         getTopRuns: jest.fn().mockResolvedValue({ windowDays: 30, from: 'F', to: 'T', rows: [] }),
+        // AW-17 — the three meter sections.
+        getByTool: jest.fn().mockResolvedValue({
+            windowDays: 30,
+            from: 'F',
+            to: 'T',
+            dimension: 'tool',
+            totalCredits: 0,
+            totalCostCents: 0,
+            rows: [],
+            foldedCount: 0,
+        }),
+        getByMission: jest.fn().mockResolvedValue({
+            windowDays: 30,
+            from: 'F',
+            to: 'T',
+            dimension: 'mission',
+            totalCredits: 0,
+            totalCostCents: 0,
+            rows: [],
+            foldedCount: 0,
+        }),
+        getByMeter: jest.fn().mockResolvedValue({
+            windowDays: 30,
+            from: 'F',
+            to: 'T',
+            meters: [],
+            preMeterResidual: null,
+        }),
     } as unknown as jest.Mocked<CostsSummaryService>;
 }
 
@@ -180,6 +213,80 @@ describe('CostsController', () => {
             await expect(validateDto(CostsTopRunsQueryDto, { windowDays: '5' })).resolves.toEqual([
                 'windowDays',
             ]);
+        });
+    });
+
+    /** AW-17 — by tool, by Mission and by meter on the same prefix. */
+    describe('meter sections (AW-17)', () => {
+        it('keys by-tool, by-mission and by-meter on the authenticated user', async () => {
+            await controller.byTool(OTHER, { windowDays: 7 });
+            await controller.byMission(OTHER, { windowDays: 90 });
+            await controller.byMeter(OTHER, { windowDays: 30 });
+
+            expect(service.getByTool).toHaveBeenCalledWith('user-2', 7, { full: false });
+            expect(service.getByMission).toHaveBeenCalledWith('user-2', 90, { full: false });
+            expect(service.getByMeter).toHaveBeenCalledWith('user-2', 30);
+        });
+
+        it('passes full=true through to unfold the breakdown', async () => {
+            await controller.byMission(AUTH, { windowDays: 30, full: 'true' });
+
+            expect(service.getByMission).toHaveBeenCalledWith('user-1', 30, { full: true });
+        });
+
+        it('wraps each payload in the status envelope, "Not in a Mission" row included', async () => {
+            service.getByMission.mockResolvedValue({
+                windowDays: 30,
+                from: 'F',
+                to: 'T',
+                dimension: 'mission',
+                totalCredits: 64,
+                totalCostCents: 45,
+                foldedCount: 0,
+                rows: [
+                    {
+                        key: 'mission-1',
+                        label: 'Weekly scan',
+                        calls: 4,
+                        credits: 41,
+                        costCents: 30,
+                        sharePercent: 64.1,
+                    },
+                    {
+                        key: null,
+                        label: null,
+                        calls: 3,
+                        credits: 23,
+                        costCents: 15,
+                        sharePercent: 35.9,
+                    },
+                ],
+            } as never);
+
+            const response = await controller.byMission(AUTH, {});
+
+            expect(response.status).toBe('success');
+            expect(response.rows.map((row) => row.key)).toEqual(['mission-1', null]);
+        });
+
+        it('maps a bad window on the new sections to 400', async () => {
+            service.getByMeter.mockRejectedValue(new InvalidCostsWindowError(31));
+            await expect(controller.byMeter(AUTH, {})).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('CostsBreakdownQueryDto accepts only true/false for full, on top of the window rules', async () => {
+            await expect(
+                validateDto(CostsBreakdownQueryDto, { windowDays: '30', full: 'true' }),
+            ).resolves.toEqual([]);
+            await expect(validateDto(CostsBreakdownQueryDto, { full: 'yes' })).resolves.toEqual([
+                'full',
+            ]);
+            await expect(
+                validateDto(CostsBreakdownQueryDto, { windowDays: '31' }),
+            ).resolves.toEqual(['windowDays']);
+            await expect(
+                validateDto(CostsBreakdownQueryDto, { userId: 'someone-else' }),
+            ).resolves.toEqual(['userId']);
         });
     });
 });

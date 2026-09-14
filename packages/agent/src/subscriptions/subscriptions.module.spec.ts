@@ -134,6 +134,14 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                 'taskId',
                 'runId',
                 'requestId',
+                // AW-17 — the meter classification, appended after every
+                // earlier column so no existing position moves.
+                'meter',
+                'priceKey',
+                'outcome',
+                'creditsCharged',
+                'priceVersion',
+                'missionId',
             ]);
         });
 
@@ -261,6 +269,19 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'COSTS_DAILY_MAX_SERIES',
                     'COSTS_UNATTRIBUTED_SERIES_KEY',
                     'COSTS_OTHER_SERIES_KEY',
+                    // AW-17 — the published credit price list, its port, the
+                    // shared cost→credits conversion, the export refusal and
+                    // the settlement's pure meter split.
+                    'CREDIT_PRICEBOOK',
+                    'CREDIT_PRICEBOOK_EFFECTIVE_FROM',
+                    'CREDIT_PRICEBOOK_HISTORY',
+                    'CREDIT_PRICEBOOK_VERSION',
+                    'CREDIT_PRICE_LIST',
+                    'PublishedCreditPriceList',
+                    'creditsForProviderCostCents',
+                    'priceFor',
+                    'UsageExportTooLargeError',
+                    'splitMeteredSpend',
                 ].sort(),
             );
         });

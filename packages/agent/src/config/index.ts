@@ -39,7 +39,10 @@ import {
     EMAIL_SEND_CAP_RECOMMENDED_DEFAULTS,
     EMAIL_WORKSPACE_DAILY_CAP,
     EMAIL_WORKSPACE_MONTHLY_CAP,
+    DEFAULT_CREDIT_SETTLEMENT_MODE,
+    isCreditSettlementMode,
     type AgentInboxMode,
+    type CreditSettlementMode,
     type EmailSendCapField,
 } from '@ever-works/contracts';
 import { DatabaseType } from '@src/database';
@@ -943,6 +946,27 @@ export const config = {
                     if (Number.isFinite(parsed) && parsed >= 0) return parsed;
                 }
                 return catalogCreditsMarginPercent();
+            },
+            /**
+             * AW-17 — how a run's platform-paid spend becomes a credits debit
+             * (`CREDITS_SETTLEMENT_MODE`).
+             *
+             * - `provider_cost` (default): every billable row settles from its
+             *   provider cost at `CREDITS_PER_DOLLAR` and the margin above —
+             *   exactly how runs were debited before the credit price list.
+             * - `price_list`: rows priced by a fixed `per-unit` entry debit their
+             *   published credits; every other row still settles from cost.
+             *
+             * Unset or unrecognised resolves to the default, so an install that
+             * configures nothing is billed exactly as before. Accepts either
+             * `_` or `-` and any case (`price-list`, `PRICE_LIST`).
+             */
+            getSettlementMode(): CreditSettlementMode {
+                const raw = (process.env.CREDITS_SETTLEMENT_MODE || '')
+                    .trim()
+                    .toLowerCase()
+                    .replace(/-/g, '_');
+                return isCreditSettlementMode(raw) ? raw : DEFAULT_CREDIT_SETTLEMENT_MODE;
             },
             /**
              * When true, consumption may take a balance below zero

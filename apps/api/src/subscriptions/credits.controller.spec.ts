@@ -13,6 +13,8 @@ jest.mock('@ever-works/agent/subscriptions', () => ({
         }
     },
     USAGE_SUMMARY_GROUP_BYS: ['day', 'model', 'agent', 'work'],
+    // AW-17 — the price-list port token the controller injects.
+    CREDIT_PRICE_LIST: 'CREDIT_PRICE_LIST',
     // Billing spec FR-13 — `GET /api/credits/pricing` is a pure projection
     // of this view; the controller adds only the `status` envelope.
     creditsPricingView: jest.fn(() => ({
@@ -71,7 +73,7 @@ jest.mock('../auth', () => ({
 import { BadRequestException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { InvalidUsagePeriodError } from '@ever-works/agent/subscriptions';
+import { InvalidUsagePeriodError, creditsPricingView } from '@ever-works/agent/subscriptions';
 import type { CreditLedgerService, UsageSummaryService } from '@ever-works/agent/subscriptions';
 import type { ScopeContextService } from '../scope';
 import {
@@ -123,7 +125,10 @@ function chunksOf(pages: Record<string, unknown>[][]) {
 describe('CreditsController', () => {
     let creditLedgerService: jest.Mocked<Pick<CreditLedgerService, 'getBalance' | 'getLedger'>>;
     let usageSummaryService: jest.Mocked<
-        Pick<UsageSummaryService, 'getTotals' | 'getGrouped' | 'createExport'>
+        Pick<
+            UsageSummaryService,
+            'getTotals' | 'getGrouped' | 'createExport' | 'assertExportWithinLimits'
+        >
     >;
     let scopeContext: jest.Mocked<Pick<ScopeContextService, 'getOrganizationId'>>;
     let controller: CreditsController;
@@ -173,6 +178,7 @@ describe('CreditsController', () => {
                 groupBy: 'day',
                 rows: [],
             }),
+            assertExportWithinLimits: jest.fn().mockResolvedValue(undefined),
             createExport: jest.fn().mockReturnValue({
                 window: {
                     period: '2026-07',
@@ -514,6 +520,74 @@ describe('CreditsController', () => {
                 controller.getLedger(auth, { kinds: 'purchase,bogus' }),
             ).rejects.toBeInstanceOf(BadRequestException);
             expect(creditLedgerService.getLedger).not.toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * AW-17 — the export is refused BEFORE a byte is written when it is too
+     * large, and the pricing view publishes the bound price list.
+     */
+    describe('AW-17 — export refusal and the published price list', () => {
+        class UsageExportTooLargeError extends Error {
+            constructor(message: string) {
+                super(message);
+                this.name = 'UsageExportTooLargeError';
+            }
+        }
+
+        it('checks the limits in the caller scope before creating the stream', async () => {
+            scopeContext.getOrganizationId.mockReturnValue('org-a');
+            const res = makeCsvResponse();
+
+            await controller.exportUsageCsv(auth, res, { period: '2026-06' });
+
+            expect(usageSummaryService.assertExportWithinLimits).toHaveBeenCalledWith('user-1', {
+                period: '2026-06',
+                organizationId: 'org-a',
+            });
+            const checkOrder =
+                usageSummaryService.assertExportWithinLimits.mock.invocationCallOrder[0];
+            const streamOrder = usageSummaryService.createExport.mock.invocationCallOrder[0];
+            expect(checkOrder).toBeLessThan(streamOrder);
+        });
+
+        it('refuses an oversized export with a 400 naming the limit, and writes nothing', async () => {
+            usageSummaryService.assertExportWithinLimits.mockRejectedValue(
+                new UsageExportTooLargeError(
+                    'That is more than 50000 rows. Narrow the period and try again.',
+                ),
+            );
+            const res = makeCsvResponse();
+
+            const refusal = controller.exportUsageCsv(auth, res, { period: '30d' });
+
+            await expect(refusal).rejects.toBeInstanceOf(BadRequestException);
+            await expect(refusal).rejects.toThrow('50000 rows');
+            expect(usageSummaryService.createExport).not.toHaveBeenCalled();
+            expect(res.written).toHaveLength(0);
+            expect(res.ended).toBe(false);
+        });
+
+        it('lets an unexpected failure of the limit check surface untouched', async () => {
+            usageSummaryService.assertExportWithinLimits.mockRejectedValue(new Error('db down'));
+
+            await expect(controller.exportUsageCsv(auth, makeCsvResponse(), {})).rejects.toThrow(
+                'db down',
+            );
+        });
+
+        it('hands the bound price list to the pricing view', () => {
+            const priceList = { currentVersion: 1 } as never;
+            const withList = new CreditsController(
+                creditLedgerService as unknown as CreditLedgerService,
+                usageSummaryService as unknown as UsageSummaryService,
+                scopeContext as unknown as ScopeContextService,
+                priceList,
+            );
+
+            withList.getPricing();
+
+            expect(creditsPricingView).toHaveBeenLastCalledWith(priceList);
         });
     });
 });

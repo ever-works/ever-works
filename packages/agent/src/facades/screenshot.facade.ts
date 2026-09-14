@@ -15,6 +15,7 @@ import { WorkPluginRepository } from '../plugins/repositories/work-plugin.reposi
 import { PluginUsageService } from '../usage/plugin-usage.service';
 import { BudgetGuardService } from '../budgets/budget-guard.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
+import { UsageOutcome } from '@src/entities/_types';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
 export class ScreenshotFacadeError extends FacadeError {
@@ -85,6 +86,8 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
                 taskId: facadeOptions.taskId,
                 // Wave 9 M2 — per-run cost attribution.
                 runId: facadeOptions.runId,
+                // AW-17 — the Mission of the run's Task.
+                missionId: facadeOptions.missionId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.SCREENSHOT,
                 units: 1,
@@ -95,6 +98,24 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
                     url: options.url,
                     fullPage: options.fullPage ?? false,
                 },
+            });
+        } else {
+            // AW-17 — a capture the provider reported as failed is still a
+            // call on the receipt, zero-rated. The provider's error text is
+            // never copied onto the row.
+            await this.pluginUsageService?.record({
+                workId: facadeOptions.workId,
+                userId: facadeOptions.userId,
+                agentId: facadeOptions.agentId,
+                taskId: facadeOptions.taskId,
+                runId: facadeOptions.runId,
+                missionId: facadeOptions.missionId,
+                pluginId: plugin.id,
+                capability: PluginUsageCapability.SCREENSHOT,
+                units: 1,
+                costCents: 0,
+                outcome: UsageOutcome.FAILED,
+                metadata: { operation: 'capture', url: options.url, failed: true },
             });
         }
 
