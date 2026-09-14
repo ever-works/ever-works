@@ -65,6 +65,7 @@ import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
+import { HomeModule } from './home/home.module';
 import { WorkspaceSearchModule } from './workspace-search/workspace-search.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { IngestModule } from './ingest/ingest.module';
@@ -247,6 +248,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // user-owned scheduled source into GET /api/schedules. Additive;
         // reuses existing entity tables (no new schema).
         SchedulesModule,
+        // Home (AW-19) — read-only GET /api/home/summary: the morning read
+        // composed from decisions, the Runs ledger, schedules, costs and the
+        // Live Feed, one status per block. Additive; no new schema.
+        HomeModule,
         // Workspace search (AW-01) — read-only GET /api/workspace-search
         // behind the dashboard command palette. Additive; reads existing
         // entity tables (no new schema).
