@@ -93,6 +93,11 @@ describe('activity-log.types', () => {
             ['MODEL_ACCOUNT_RECONNECTED', 'model_account_reconnected'],
             ['MODEL_ACCOUNT_REMOVED', 'model_account_removed'],
             ['MODEL_POLICY_UPDATED', 'model_policy_updated'],
+            // Live Feed — a run starting / finishing / failing for every
+            // trigger kind other than heartbeat.
+            ['AGENT_RUN_STARTED', 'agent_run_started'],
+            ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
+            ['AGENT_RUN_FAILED', 'agent_run_failed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -160,10 +165,17 @@ describe('activity-log.types', () => {
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
+            //
             // +8 model_account_added / _updated / _reordered / _paused /
             //    _resumed / _reconnected / _removed and model_policy_updated
-            //    (model accounts, AW-16) -> 165.
-            expect(literals).toHaveLength(165);
+            //    (model accounts, AW-16) -> 165 on this branch's base.
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop's base.
+            // 168 after the model-accounts branch merged develop's Live Feed
+            //    work — COUNTED from the merged enum (157 + 8 + 3), not taken
+            //    from either side's total.
+            expect(literals).toHaveLength(168);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

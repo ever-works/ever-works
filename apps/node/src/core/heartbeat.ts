@@ -90,6 +90,13 @@ export interface HeartbeatLoopOptions {
 	scheduler?: Scheduler;
 	now?: () => number;
 	logger?: Logger;
+	/**
+	 * Called with every ACCEPTED beat's response, after the state updates.
+	 * How optional response fields reach the rest of the node — e.g.
+	 * `pendingComputerSessions`, which wakes the attended live-view lane.
+	 * A throwing listener is swallowed: it can never fail a beat.
+	 */
+	onAccepted?: (response: HeartbeatResponse) => void;
 }
 
 /**
@@ -266,6 +273,13 @@ export class HeartbeatLoop {
 			lastErrorKind: null,
 			node: result.node
 		});
+		if (this.options.onAccepted) {
+			try {
+				this.options.onAccepted(result);
+			} catch {
+				// A listener's failure is its own; the beat was accepted.
+			}
+		}
 	}
 
 	private onFailure(error: unknown): void {

@@ -25,6 +25,7 @@ import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { BillingApiModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ChangelogModule } from './changelog/changelog.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { SearchModule } from './plugins-capabilities/search/search.module';
@@ -139,6 +140,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,
+        // AW-14 What's new — in-product product changelog: entries from the
+        // build's content source, per-person read state, /api/changelog.
+        ChangelogModule,
         BudgetsModule,
         ScreenshotModule,
         SearchModule,

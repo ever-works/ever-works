@@ -36,6 +36,9 @@ export * from './model-routing/index.js';
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Live Feed — the narrated, filterable view of the activity log. Structure
+// only (narration keys + typed destinations); renderers own the words.
+export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';

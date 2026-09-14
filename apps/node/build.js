@@ -12,15 +12,17 @@
  *
  *   dist-bundle/
  *     cli.js            the whole node, single file, CommonJS, shebang
- *     package.json      public manifest (bin, engines, optional keyring)
+ *     package.json      public manifest (bin, engines, optional native addons)
  *     packaging/        systemd unit + Windows install/uninstall scripts
  *     README.md, LICENSE
  *
- * `@napi-rs/keyring` is the one runtime dependency left external: it is
- * a native addon the secret store `require()`s lazily and degrades
- * without (loudly), so it ships as an OPTIONAL dependency — an install
- * where its prebuilt binary is unavailable still works, with the
- * credential in the owner-locked config file instead of the keychain.
+ * The runtime dependencies left external are native addons, each
+ * `require()`d lazily by a caller that degrades without it, so each ships
+ * as an OPTIONAL dependency (see `bundleExternals`):
+ *   - `@napi-rs/keyring` — the secret store; without it the credential
+ *     stays in the owner-locked config file instead of the keychain;
+ *   - the PTY prebuild — the `pty-local` terminal host; without it a live
+ *     view's terminal channel runs on that plugin's pipe floor.
  *
  * Run `pnpm --filter ever-works-node build` first (type-check + the
  * workspace dependencies must be built); `build:bundle` then calls this.
@@ -34,8 +36,34 @@ const repoRoot = path.resolve(here, '..', '..');
 const outDir = path.join(here, 'dist-bundle');
 
 const KEYRING_RANGE = '^1.1.0';
+/** The PTY prebuild the bundled `pty-local` plugin requires lazily. */
+const PTY_ADDON = '@homebridge/node-pty-prebuilt-multiarch';
+
+/**
+ * Every runtime dependency the bundle leaves EXTERNAL, with the range the
+ * published manifest installs it at. The esbuild `external` list and the
+ * manifest's `optionalDependencies` are both built from this one map, so a
+ * native addon can never be kept out of the bundle without also being
+ * shipped beside it.
+ *
+ * The PTY range is read from the `pty-local` plugin's own manifest (the
+ * package that requires it) rather than restated: that plugin is inlined
+ * into `cli.js`, so its manifest is never published, and a range copied
+ * here would drift from the one it is built and tested against.
+ */
+function bundleExternals() {
+	const ptyManifest = JSON.parse(
+		fs.readFileSync(path.join(repoRoot, 'packages', 'plugins', 'pty-local', 'package.json'), 'utf8')
+	);
+	const ptyRange = ptyManifest.optionalDependencies?.[PTY_ADDON] ?? ptyManifest.dependencies?.[PTY_ADDON];
+	if (typeof ptyRange !== 'string' || !ptyRange) {
+		throw new Error(`packages/plugins/pty-local/package.json no longer declares ${PTY_ADDON}`);
+	}
+	return { '@napi-rs/keyring': KEYRING_RANGE, [PTY_ADDON]: ptyRange };
+}
 
 async function main() {
+	const externals = bundleExternals();
 	const manifest = JSON.parse(fs.readFileSync(path.join(here, 'package.json'), 'utf8'));
 	const version = readVersionSource();
 	if (version !== manifest.version) {
@@ -58,7 +86,10 @@ async function main() {
 		// (src/cli.ts) as the first line — a second copy is a syntax error.
 		// Native addon, loaded lazily by the secret store; ships as an
 		// optional dependency rather than being inlined.
-		external: ['@napi-rs/keyring'],
+		// The PTY prebuild the `pty-local` terminal host requires at runtime
+		// is the same kind of addon: kept external, and without it a live
+		// view's terminal channel runs on that plugin's pipe floor.
+		external: Object.keys(externals),
 		keepNames: true,
 		minify: false,
 		sourcemap: false,
@@ -66,27 +97,7 @@ async function main() {
 		logLevel: 'info'
 	});
 
-	const publishable = {
-		name: 'ever-works-node',
-		version,
-		description: manifest.description,
-		author: manifest.author,
-		license: manifest.license,
-		homepage: 'https://ever.works',
-		repository: {
-			type: 'git',
-			url: 'https://github.com/ever-works/ever-works.git',
-			directory: 'apps/node'
-		},
-		bugs: { url: 'https://github.com/ever-works/ever-works/issues' },
-		keywords: ['ever-works', 'fleet', 'agent', 'node', 'runner', 'claude-code', 'codex'],
-		bin: { 'ever-works-node': './cli.js' },
-		main: './cli.js',
-		files: ['cli.js', 'packaging', 'README.md', 'LICENSE'],
-		engines: { node: '>=22.0.0' },
-		optionalDependencies: { '@napi-rs/keyring': KEYRING_RANGE },
-		publishConfig: { access: 'public' }
-	};
+	const publishable = buildPublishableManifest(manifest, version, externals);
 	fs.writeFileSync(path.join(outDir, 'package.json'), `${JSON.stringify(publishable, null, 2)}\n`);
 
 	fs.cpSync(path.join(here, 'packaging'), path.join(outDir, 'packaging'), { recursive: true });
@@ -104,12 +115,42 @@ async function main() {
 }
 
 /**
+ * The public manifest staged beside `cli.js`. Every external the bundle
+ * leaves out is an OPTIONAL dependency here: each is a native addon its
+ * caller degrades without, so an install whose prebuild is unavailable
+ * still works.
+ */
+function buildPublishableManifest(manifest, version, externals) {
+	return {
+		name: 'ever-works-node',
+		version,
+		description: manifest.description,
+		author: manifest.author,
+		license: manifest.license,
+		homepage: 'https://ever.works',
+		repository: {
+			type: 'git',
+			url: 'https://github.com/ever-works/ever-works.git',
+			directory: 'apps/node'
+		},
+		bugs: { url: 'https://github.com/ever-works/ever-works/issues' },
+		keywords: ['ever-works', 'fleet', 'agent', 'node', 'runner', 'claude-code', 'codex'],
+		bin: { 'ever-works-node': './cli.js' },
+		main: './cli.js',
+		files: ['cli.js', 'packaging', 'README.md', 'LICENSE'],
+		engines: { node: '>=22.0.0' },
+		optionalDependencies: { ...externals },
+		publishConfig: { access: 'public' }
+	};
+}
+
+/**
  * Cheap invariants on the staged file, so a broken bundle fails HERE and
  * not on the first machine that runs `npm install -g`: exactly one shebang
  * on line 1 (esbuild keeps the source one; a banner would double it),
  * no `workspace:` specifier left behind (every workspace package must be
- * inlined), and the keyring still required by name (it is the one
- * external, shipped as an optional dependency).
+ * inlined), and the keyring still required by name (it stays external,
+ * shipped as an optional dependency).
  */
 function assertBundleShape(file) {
 	const bundle = fs.readFileSync(file, 'utf8');
@@ -133,7 +174,13 @@ function readVersionSource() {
 	return match[1];
 }
 
-main().catch((error) => {
-	console.error(error instanceof Error ? error.message : error);
-	process.exit(1);
-});
+if (require.main === module) {
+	main().catch((error) => {
+		console.error(error instanceof Error ? error.message : error);
+		process.exit(1);
+	});
+}
+
+// For the packaging spec (`src/core/packaging/publishable-manifest.internal.spec.ts`);
+// `node build.js` runs `main()` above and ignores these.
+module.exports = { bundleExternals, buildPublishableManifest };

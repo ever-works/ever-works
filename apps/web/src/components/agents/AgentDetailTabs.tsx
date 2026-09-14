@@ -13,7 +13,18 @@ import { cn } from '@/lib/utils/cn';
  * incrementally across later sub-ticks (Instructions lands first
  * — it reuses the KbEditor.tsx pattern).
  */
-export function AgentDetailTabs({ agentId }: { agentId: string }) {
+export function AgentDetailTabs({
+    agentId,
+    showComputer = false,
+}: {
+    agentId: string;
+    /**
+     * Agent computers — the Computer tab. Passed down by the (server) layout
+     * from `isFleetEnabled()`, so the tab disappears with the fleet it shows.
+     * Absent keeps the strip exactly as it was.
+     */
+    showComputer?: boolean;
+}) {
     const t = useTranslations('dashboard.agentsPage.tabs');
     const pathname = usePathname() ?? '';
 
@@ -25,6 +36,15 @@ export function AgentDetailTabs({ agentId }: { agentId: string }) {
         },
         { key: 'activity', href: ROUTES.DASHBOARD_AGENT_ACTIVITY(agentId), label: t('activity') },
         { key: 'terminal', href: ROUTES.DASHBOARD_AGENT_TERMINAL(agentId), label: t('terminal') },
+        ...(showComputer
+            ? [
+                  {
+                      key: 'computer',
+                      href: ROUTES.DASHBOARD_AGENT_COMPUTER(agentId),
+                      label: t('computer'),
+                  },
+              ]
+            : []),
         {
             key: 'instructions',
             href: ROUTES.DASHBOARD_AGENT_INSTRUCTIONS(agentId),

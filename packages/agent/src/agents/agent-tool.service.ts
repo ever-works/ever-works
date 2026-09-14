@@ -893,6 +893,10 @@ export class AgentToolService {
                         name: args.name as any,
                         body: args.body,
                         expectedHash: args.expectedHash,
+                        // The agent edits its own file from a run: the
+                        // activity record names the agent, not its owner.
+                        actor: 'agent',
+                        runId: runContext.runId,
                     });
                     runContext.editsThisRunByFile.add(key);
                     return result;

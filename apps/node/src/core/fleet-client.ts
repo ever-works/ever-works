@@ -251,7 +251,15 @@ export class FleetClient {
 		if (!node) {
 			throw new FleetClientError('malformed', 'Heartbeat response did not contain a node');
 		}
-		return { ok: true, node };
+		const response: HeartbeatResponse = { ok: true, node };
+		// Agent computers — the live views already waiting for this machine.
+		// Optional and additive: copied only when it is a well-formed list, so
+		// a response without it is exactly the response it always was.
+		const pending = readPendingComputerSessions(payload);
+		if (pending.length > 0) {
+			response.pendingComputerSessions = pending;
+		}
+		return response;
 	}
 
 	/**
@@ -425,4 +433,20 @@ function readNode(payload: unknown): FleetNodeView | null {
 		return null;
 	}
 	return node as FleetNodeView;
+}
+
+/** Most pending live-view ids a heartbeat answer is read for (a wake-up hint, not a work list). */
+const MAX_PENDING_COMPUTER_SESSIONS = 16;
+const SESSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `pendingComputerSessions` from a heartbeat body: session ids only, capped; anything else is ignored. */
+export function readPendingComputerSessions(payload: unknown): string[] {
+	const raw =
+		payload && typeof payload === 'object'
+			? (payload as { pendingComputerSessions?: unknown }).pendingComputerSessions
+			: null;
+	if (!Array.isArray(raw)) return [];
+	return raw
+		.filter((id): id is string => typeof id === 'string' && SESSION_ID_PATTERN.test(id))
+		.slice(0, MAX_PENDING_COMPUTER_SESSIONS);
 }

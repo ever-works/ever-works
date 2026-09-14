@@ -1,9 +1,13 @@
 import { notFound } from 'next/navigation';
-import { Bot, CalendarClock, Clock, HeartPulse, Moon, TriangleAlert } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import { Bot, CalendarClock, Clock, HeartPulse, Monitor, Moon, TriangleAlert } from 'lucide-react';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { AgentAttachmentsPanel } from '@/components/agents/AgentAttachmentsPanel';
 import { AgentGuardrailsCard } from '@/components/agents/AgentGuardrailsCard';
 import { ShowDateTime } from '@/components/ui/show-datetime';
+import { Button } from '@/components/ui/button';
+import { ROUTES } from '@/lib/constants';
+import { isFleetEnabled } from '@/lib/fleet-flags';
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 5. Dashboard tab is the
@@ -72,6 +76,11 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
     const attachments = await agentsAPI.listAttachments(id).catch(() => []);
 
     const runFailing = agent.errorCount > 0;
+    // Agent computers — the primary action row's "Watch computer", shown
+    // with the fleet it watches. With no computer yet it still opens the
+    // page, whose empty state is the way to add one.
+    const showWatchComputer = isFleetEnabled();
+    const tComputer = await getTranslations('dashboard.computer');
 
     return (
         <div className="p-6 space-y-4 max-w-screen-2xl mx-auto">
@@ -113,6 +122,21 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
                                 {agent.slug}
                             </span>
                         </div>
+                        {showWatchComputer ? (
+                            <div
+                                className="mt-4 flex flex-wrap items-center gap-2"
+                                data-testid="agent-hero-actions"
+                            >
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    href={ROUTES.DASHBOARD_AGENT_COMPUTER(agent.id)}
+                                >
+                                    <Monitor className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                                    {tComputer('heroAction')}
+                                </Button>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             </section>
