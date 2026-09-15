@@ -1,6 +1,15 @@
 import { createHash } from 'crypto';
-import { FLEET_AUDIT_DEFAULT_LIMIT, FLEET_AUDIT_MAX_LIMIT } from '@ever-works/contracts';
+import {
+    FLEET_AUDIT_ACTIONS,
+    FLEET_AUDIT_DEFAULT_LIMIT,
+    FLEET_AUDIT_MAX_LIMIT,
+} from '@ever-works/contracts';
 import { FleetAuditService, redactAuditDetails } from '../fleet-audit.service';
+import {
+    COMPUTER_AUDIT_DETAIL_KEYS,
+    computerAuditDetails,
+    type ComputerAuditAction,
+} from '../../computer/computer-audit';
 
 /**
  * The ONE writer of `fleet_audit` (EW-778, extended by EW-799).
@@ -289,5 +298,125 @@ describe('FleetAuditService reads', () => {
         expect(repository.find).toHaveBeenLastCalledWith(
             expect.objectContaining({ take: FLEET_AUDIT_DEFAULT_LIMIT }),
         );
+    });
+});
+
+/**
+ * Agent computers — the eight computer actions are new VALUES through the
+ * same writer, not a new writer. A live view handles pictures, typed text
+ * and page selectors; none of them may reach a row, so each action records
+ * a fixed set of facts, and every one of those facts must survive the
+ * writer's key-based redaction intact (a key merely CONTAINING `hash` or
+ * `token` would silently lose its value).
+ */
+describe('FleetAuditService — computer actions', () => {
+    const SAMPLE: Record<ComputerAuditAction, Record<string, unknown>> = {
+        'computer.session-open': {
+            sessionId: 's-1',
+            agentId: 'a-1',
+            channels: ['screen'],
+            quality: 'sharp',
+            runId: null,
+        },
+        'computer.session-close': {
+            sessionId: 's-1',
+            agentId: 'a-1',
+            closeReason: 'closed-by-user',
+            durationMs: 61_000,
+            frameCount: 480,
+            recorded: false,
+        },
+        'computer.control-grant': { sessionId: 's-1', agentId: 'a-1' },
+        'computer.control-release': {
+            sessionId: 's-1',
+            releaseReason: 'given-back',
+            heldMs: 5_000,
+        },
+        'computer.control-refused': { sessionId: 's-1', policy: 'owner', holderPresent: true },
+        'computer.teach-start': { demonstrationId: 'd-1', intent: 'file an expense report' },
+        'computer.teach-finish': {
+            demonstrationId: 'd-1',
+            stepCount: 12,
+            redactedStepCount: 1,
+            stopReason: 'finished',
+        },
+        'computer.profile-reset': {
+            agentId: 'a-1',
+            profileRef: 'ab12cd34',
+            signedInSiteCountBefore: 3,
+        },
+    };
+
+    /** Keys that would carry what a live view must never write down. */
+    const PAYLOAD_KEY_RE = /^(data|frame|frames|value|text|selector|screenshot|keys?|payload)$/i;
+    const REDACTED_KEY_RE = /secret|token|credential|password|passphrase|hash|apikey|api_key/i;
+
+    it('covers exactly the computer members of the action list', () => {
+        const computerActions = FLEET_AUDIT_ACTIONS.filter((action) =>
+            action.startsWith('computer.'),
+        );
+        expect(Object.keys(COMPUTER_AUDIT_DETAIL_KEYS).sort()).toEqual([...computerActions].sort());
+        expect(computerActions).toHaveLength(8);
+    });
+
+    it.each(Object.keys(SAMPLE) as ComputerAuditAction[])(
+        '%s writes a row whose facts survive intact',
+        async (action) => {
+            const { service, saved } = build();
+            const details = computerAuditDetails(action, SAMPLE[action]);
+
+            expect(
+                await service.tryRecord({
+                    action,
+                    actorUserId: 'user-1',
+                    ownerUserId: 'user-1',
+                    nodeId: 'node-1',
+                    details,
+                }),
+            ).toBe(true);
+
+            expect(saved).toHaveLength(1);
+            expect(saved[0]).toMatchObject({ action, nodeId: 'node-1' });
+            expect(saved[0].details).toEqual(SAMPLE[action]);
+            for (const key of COMPUTER_AUDIT_DETAIL_KEYS[action]) {
+                expect(REDACTED_KEY_RE.test(key)).toBe(false);
+                expect(PAYLOAD_KEY_RE.test(key)).toBe(false);
+            }
+        },
+    );
+
+    it('drops a picture, a typed value, a selector or any other extra field before the row is built', async () => {
+        const { service, saved } = build();
+        const details = computerAuditDetails('computer.session-close', {
+            ...SAMPLE['computer.session-close'],
+            data: 'iVBORw0KGgoAAAANSUhEUgAA',
+            value: 'hunter2',
+            selector: 'input[name=password]',
+            frames: [{ kind: 'frame' }],
+        });
+
+        await service.tryRecord({ action: 'computer.session-close', actorUserId: null, details });
+
+        const stored = saved[0].details as Record<string, unknown>;
+        expect(stored).toEqual(SAMPLE['computer.session-close']);
+        for (const key of Object.keys(stored)) {
+            expect(PAYLOAD_KEY_RE.test(key)).toBe(false);
+        }
+    });
+
+    it('refuses shapes that could smuggle a payload even under an allowed key', () => {
+        expect(
+            computerAuditDetails('computer.teach-start', {
+                demonstrationId: 'd-1',
+                intent: 'x'.repeat(500),
+            }),
+        ).toEqual({ demonstrationId: 'd-1' });
+        expect(
+            computerAuditDetails('computer.session-open', {
+                sessionId: { nested: 'object' },
+                channels: [{ kind: 'frame' }],
+                quality: Number.NaN,
+            }),
+        ).toEqual({});
     });
 });

@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { buildDecisionsHref } from '@/lib/api/inbox.shared';
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 import {
     interruptAgentRunAction,
@@ -190,6 +191,17 @@ export function TaskRunControls({
                         <MessageSquareReply className="w-3.5 h-3.5" />
                         {t('answerInInbox')}
                     </Link>
+                    {/* My Decisions, filtered to this Task — every question,
+                        approval and escalation still waiting on the owner here. */}
+                    {run.taskId && (
+                        <Link
+                            href={buildDecisionsHref({ tab: 'open', taskId: run.taskId })}
+                            className="mt-2 ml-4 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                            data-testid="task-run-all-decisions-link"
+                        >
+                            {t('allDecisions')}
+                        </Link>
+                    )}
                     <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-200/80">
                         {t('parkedHintQuestion')}
                     </p>

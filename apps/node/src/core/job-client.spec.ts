@@ -481,3 +481,46 @@ describe('FleetJobClient scoped push credential', () => {
 		await expect(client.mintPushCredential(JOB, 7)).rejects.toMatchObject({ kind: 'stale-lease' });
 	});
 });
+
+describe('FleetJobClient lease kind filters (attended live-view lane)', () => {
+	function capturing(): { fetchFn: FetchLike; bodies: Record<string, unknown>[] } {
+		const bodies: Record<string, unknown>[] = [];
+		const fetchFn: FetchLike = async (_url, init) => {
+			bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+			return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+		};
+		return { fetchFn, bodies };
+	}
+
+	it('sends neither filter unless a lane set one, so an older platform never sees an unknown field', async () => {
+		const { fetchFn, bodies } = capturing();
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+		await client.lease({ max: 1 });
+		await client.lease({ max: 1, kinds: [], excludeKinds: [] });
+		expect(bodies[0]).not.toHaveProperty('kinds');
+		expect(bodies[0]).not.toHaveProperty('excludeKinds');
+		expect(bodies[1]).not.toHaveProperty('kinds');
+		expect(bodies[1]).not.toHaveProperty('excludeKinds');
+	});
+
+	it('forwards the live-view lane filter and the work-lane exclusion', async () => {
+		const { fetchFn, bodies } = capturing();
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+		await client.lease({ kinds: ['computer-session'] });
+		await client.lease({ excludeKinds: ['computer-session'] });
+		expect(bodies[0]).toMatchObject({ kinds: ['computer-session'] });
+		expect(bodies[1]).toMatchObject({ excludeKinds: ['computer-session'] });
+	});
+});

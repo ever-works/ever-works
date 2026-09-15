@@ -15,6 +15,14 @@ interface UseThemeReturn {
 const THEME_STORAGE_KEY = 'theme';
 
 /**
+ * Same-tab broadcast of a theme change. The `storage` event only reaches
+ * other tabs, so without this a second `useTheme()` in the same tab (the
+ * header toggle and the command palette's "Toggle dark mode") would keep a
+ * stale theme after the other one switched it.
+ */
+export const THEME_CHANGE_EVENT = 'ever-works:theme-change';
+
+/**
  * Applies theme to the document root
  */
 function applyTheme(newTheme: Theme): void {
@@ -85,12 +93,21 @@ export function useTheme(): UseThemeReturn {
             }
         };
 
+        const handleSameTabChange = (event: Event) => {
+            const next = (event as CustomEvent<unknown>).detail;
+            if (next === 'light' || next === 'dark') {
+                setTheme(next);
+            }
+        };
+
         mediaQuery.addEventListener('change', handleSystemThemeChange);
         window.addEventListener('storage', handleStorageChange);
+        window.addEventListener(THEME_CHANGE_EVENT, handleSameTabChange);
 
         return () => {
             mediaQuery.removeEventListener('change', handleSystemThemeChange);
             window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener(THEME_CHANGE_EVENT, handleSameTabChange);
         };
     }, []);
 
@@ -103,6 +120,11 @@ export function useTheme(): UseThemeReturn {
             // localStorage may be disabled — DOM still gets the update.
         }
         applyTheme(targetTheme);
+        try {
+            window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: targetTheme }));
+        } catch {
+            // CustomEvent unavailable — this instance is still correct.
+        }
     };
 
     return {

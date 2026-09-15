@@ -1,10 +1,35 @@
 name: CI
 
+# WHERE THIS RUNS, AND WHY IT NO LONGER RUNS ON PULL REQUESTS (owner, 2026-09-14).
+#
+# This workflow expands to ~15 check runs, and every one of them lands on the
+# shared self-hosted ARC pool (vars.RUNNER_LINUX_X64_4) that also builds Gauzy,
+# the websites and the rest of the fleet. In the seven days to 2026-09-14 it was
+# triggered 85 times by `pull_request` against 15 times by `push` — roughly 1,275
+# PR check runs a week, with 18 open PRs each holding a run. The pool could not
+# absorb it: PR runs sat `queued` for hours and starved the deploy lanes behind
+# them.
+#
+# So the verification model is now: developers run the checks LOCALLY before
+# opening a PR (see CONTRIBUTING / the commands in the jobs below), merge into
+# `develop` normally, and the full suite runs for real when a batch is cascaded
+# `develop -> stage` and `stage -> main`. `stage` is the first rung that proves a
+# batch, `main` re-proves the exact commit being promoted.
+#
+# Nothing here was deleted — every job below still exists and still runs, just on
+# fewer refs. Two escape hatches remain for running the whole thing against an
+# unmerged branch:
+#   gh workflow run ci.yml --ref <your-branch>        # this workflow, on demand
+#   gh run watch <id>
+# and `promotion-gate.yml` still runs on every PR into `stage` and `main`, so the
+# node<->platform wire contract is still checked on both rungs of the cascade.
+#
+# 🛑 If you add `pull_request` back here, also put `lint-and-test (22.x)` back into
+# the `develop` branch-protection required-checks list — it was removed on
+# 2026-09-14 because a required check that can never report blocks every PR.
 on:
   push:
-    branches: [main, develop, stage]
-  pull_request:
-    branches: [main, develop, stage]
+    branches: [main, stage]
   workflow_dispatch:
 
 # M-12: explicit minimum default permissions for every job. Individual jobs
@@ -16,7 +41,21 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # `false`, not `true` (changed 2026-09-14 together with the trigger narrowing).
+  #
+  # While CI ran on pull requests, cancelling a superseded run was free: the next
+  # push to the PR produced another full verdict moments later. Now CI runs ONLY on
+  # pushes to `stage` and `main`, and that run is the ONLY thing that verifies the
+  # batch being promoted. Measured before this change: of the last 151 CI push runs
+  # on stage/main, 41 concluded `cancelled` - 27%. A cancelled run reports neither
+  # red nor green, so with `true` roughly a quarter of all promotions would have
+  # been verified by nothing at all, and looked exactly like a promotion that was
+  # still running.
+  #
+  # k8s-build.yml and e2e.yml already set `false` for this same reason. Queuing the
+  # second push behind the first costs one extra queued run per ref; not knowing
+  # whether stage is green costs an outage.
+  cancel-in-progress: false
 
 # Raise the Node heap for every step in every job. The `@ever-works/plugin`
 # tsup build emits `.d.ts` for ~18 entry points, which exhausts the default
@@ -571,10 +610,24 @@ jobs:
   # only the slice it needs, so a failing aggregate doesn't block this
   # signal (and vice versa).
   job-runtime-plugin-matrix:
-    # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
-    # promotion pushes so k8s-build (the deploy build) is not starved on the shared
-    # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
-    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
+    # Pool-relief guard RETIRED 2026-09-14. It used to read:
+    #   if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
+    # under the rationale "these already passed on the PR; skip on main/stage
+    # promotion pushes so k8s-build is not starved on the shared ARC pool.
+    # Still runs on PRs + develop pushes."
+    #
+    # BOTH halves of that rationale are now false, which is why the line is gone:
+    #  - "already passed on the PR" - CI no longer runs on PRs at all (see the
+    #    header of this file). push-to-main/stage is now the ONLY automatic event,
+    #    so the guard would have skipped this matrix EVERY time. A skipped job
+    #    reports green, so 11 provider cells would have gone quietly dark while
+    #    the checks list stayed all-clear.
+    #  - "starved on the shared ARC pool" - k8s-build left that pool on 2026-08-24
+    #    (470beecfd, #2242): it is now `vars.RUNNER_LINUX_X64_8` while this matrix
+    #    is on `RUNNER_LINUX_X64_4`. Different scale set, no contention.
+    #
+    # To re-express a pool limit, use a runner label or a concurrency group -
+    # never an event predicate, which is indistinguishable from a pass.
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     strategy:
@@ -812,10 +865,24 @@ jobs:
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:
-    # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
-    # promotion pushes so k8s-build (the deploy build) is not starved on the shared
-    # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
-    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
+    # Pool-relief guard RETIRED 2026-09-14. It used to read:
+    #   if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
+    # under the rationale "these already passed on the PR; skip on main/stage
+    # promotion pushes so k8s-build is not starved on the shared ARC pool.
+    # Still runs on PRs + develop pushes."
+    #
+    # BOTH halves of that rationale are now false, which is why the line is gone:
+    #  - "already passed on the PR" - CI no longer runs on PRs at all (see the
+    #    header of this file). push-to-main/stage is now the ONLY automatic event,
+    #    so the guard would have skipped this matrix EVERY time. A skipped job
+    #    reports green, so 11 provider cells would have gone quietly dark while
+    #    the checks list stayed all-clear.
+    #  - "starved on the shared ARC pool" - k8s-build left that pool on 2026-08-24
+    #    (470beecfd, #2242): it is now `vars.RUNNER_LINUX_X64_8` while this matrix
+    #    is on `RUNNER_LINUX_X64_4`. Different scale set, no contention.
+    #
+    # To re-express a pool limit, use a runner label or a concurrency group -
+    # never an event predicate, which is indistinguishable from a pass.
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     strategy:

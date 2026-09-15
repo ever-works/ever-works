@@ -5,6 +5,7 @@ import { BudgetsModule } from '../budgets/budgets.module';
 import { PolicyModule } from '../policy/policy.module';
 import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
 import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
+import { EmailSendPolicyModule } from '../email/email-send-policy.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -26,6 +27,7 @@ import { TerminalStreamFacadeService } from './terminal-stream.facade';
 import { WorkspaceFacadeService } from './workspace.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
+import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -57,6 +59,9 @@ const FACADES = [
     // BudgetsModule already imported by this module. Goal evaluation
     // (PR-8) consumes it through FacadesModule.
     MetricsFacadeService,
+    // AW-15 — `connection-scopes` capability lookup (which access levels a
+    // provider declares). Depends only on the global PluginRegistryService.
+    ConnectionScopesFacadeService,
 ];
 
 /**
@@ -102,6 +107,11 @@ const FACADES = [
         // into PolicyModule) so PolicyModule stays the entity-only leaf
         // every policy consumer can depend on.
         MergeApprovalModule,
+        // Agent email (AW-05) — binds EMAIL_SEND_POLICY_GATE, which
+        // EmailFacadeService consumes before any send reaches a provider
+        // (approve-before-send + send ceilings). A DatabaseModule-only leaf,
+        // so importing it here cannot cycle.
+        EmailSendPolicyModule,
     ],
     providers: FACADES,
     exports: FACADES,

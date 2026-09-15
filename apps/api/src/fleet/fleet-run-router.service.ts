@@ -21,7 +21,12 @@ import type {
     NodeJobRuntimePlugin,
 } from '@ever-works/job-runtime-node-plugin';
 import { agentTaskRequiredCapabilities } from './fleet-agent-task-capabilities';
+import { FleetDelegationScopeRefusedError } from './fleet-agent-task-plan.error';
 import type { FleetAgentTaskPlan } from './fleet-agent-task.dispatcher';
+import {
+    consumeDelegationScopeClearance,
+    FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
+} from './fleet-delegation-scope';
 import { FleetKillSwitchActiveError } from './fleet-kill-switch.error';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
@@ -341,6 +346,12 @@ export class FleetRunRouterService {
      * `AgentRun` the same way a Trigger.dev run id is stamped, so a
      * later status lookup / cancel can reach the remote unit of work
      * through `NodeJobRuntimePlugin.getRunStatus`.
+     *
+     * Refuses (typed errors, never a cloud fallback) while the global stop
+     * flag is set, and — judgment layer G9 — for any payload the fleet-aware
+     * dispatcher did not clear through its delegation-scope guard first
+     * (`fleet-delegation-scope-unverifiable`). Enqueue through
+     * `AGENT_TASK_EXECUTE_DISPATCHER`, never by calling this directly.
      */
     async enqueueAgentTask(
         payload: AgentTaskExecuteDispatchPayload,
@@ -365,6 +376,23 @@ export class FleetRunRouterService {
         // is refused on the same flag. Fail closed.
         if (await this.halted()) {
             throw new FleetKillSwitchActiveError(payload.taskId);
+        }
+        // G9 — this is the one writer of `agent-task` fleet rows, so the
+        // delegation-scope rule is closed HERE too: only a payload the
+        // fleet-aware dispatcher cleared through
+        // `FleetAgentTaskPlanner.refuseUnenforceableDelegationScope` (one-shot)
+        // may become a job. A direct caller that skipped the dispatcher is
+        // refused rather than trusted. Fail closed.
+        if (!consumeDelegationScopeClearance(payload)) {
+            throw new FleetDelegationScopeRefusedError(
+                FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
+                `the delegation scope of ${
+                    payload.runId ? `run ${payload.runId}` : `the run for task ${payload.taskId}`
+                } was not verified before its fleet job was written (the enqueue did not come through ` +
+                    `the fleet-aware dispatcher's delegation-scope guard, or reused a payload it already ` +
+                    `enqueued). Refused: a fleet node cannot enforce a narrowed delegation scope, so a ` +
+                    `run whose scope was not checked is never assumed to be unrestricted.`,
+            );
         }
         const steps = plan ? [] : this.buildAgentTaskSteps(payload);
         const workspacePath = plan ? undefined : config.fleetNode.getAgentTaskWorkspacePath();

@@ -7,6 +7,12 @@ import {
     Optional,
 } from '@nestjs/common';
 import {
+    isConnectionHealth,
+    isConnectionHealthErrorCode,
+    type ConnectionHealth,
+    type ConnectionHealthErrorCode,
+} from '@ever-works/contracts';
+import {
     MCP_CONNECTION_NAME_PATTERN,
     type McpConnectionTransport,
     type McpServerConnection,
@@ -18,6 +24,15 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 import { McpClientService } from './mcp-client.service';
+import {
+    MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE,
+    MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE,
+    mcpCredentialTransport,
+} from './mcp-header-credentials';
+import {
+    McpCredentialTransportPolicyService,
+    type McpCredentialTransportScope,
+} from './mcp-credential-transport-policy.service';
 
 /** Masked API view — auth header VALUES never leave the service. */
 export interface McpConnectionView {
@@ -30,6 +45,19 @@ export interface McpConnectionView {
     authHeaderNames: string[];
     lastConnectedAt: Date | null;
     lastError: string | null;
+    /** AW-15 — health derived from every connection attempt; `unknown` until the first. */
+    health: ConnectionHealth;
+    /** When `health` was last written. */
+    healthCheckedAt: Date | null;
+    /** Classified code for `lastError` (e.g. `credential_missing`). Never a value. */
+    lastErrorCode: ConnectionHealthErrorCode | null;
+    /**
+     * AW-15 — this connection sends LITERAL auth header values to a
+     * plain-http endpoint: it works, but the credential travels unencrypted.
+     * Derived from the stored URL + header map, so it is known before the
+     * first attempt. Never carries a value.
+     */
+    insecureCredentialTransport: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -72,6 +100,12 @@ export class McpConnectionsService {
         private readonly client: McpClientService,
         private readonly agents: AgentRepository,
         @Optional() private readonly activityLog?: ActivityLogService,
+        /**
+         * AW-15 — the organization setting "Require https for connection
+         * credentials". Unbound ⇒ the setting cannot be on, so literal
+         * credentials over plain http are accepted exactly as before.
+         */
+        @Optional() private readonly transportPolicy?: McpCredentialTransportPolicyService,
     ) {}
 
     // ── connection CRUD ───────────────────────────────────────────
@@ -94,10 +128,20 @@ export class McpConnectionsService {
             transport: McpConnectionTransport;
             authHeaders?: Record<string, string>;
         },
+        /**
+         * The organization the new row will be stamped with, when the caller
+         * knows it (the active request scope). Absent ⇒ a tenant-wide row,
+         * which follows the strictest organization in the owner's tenant.
+         */
+        scope: { organizationId?: string | null } = {},
     ): Promise<McpConnectionView> {
         this.assertValidName(input.name);
         this.assertValidUrl(input.url);
         this.assertValidHeaders(input.authHeaders);
+        await this.assertCredentialTransport(input.url, input.transport, input.authHeaders, {
+            userId,
+            organizationId: scope.organizationId ?? null,
+        });
 
         const existing = await this.connections.findByUserAndName(userId, input.name);
         if (existing) {
@@ -157,6 +201,26 @@ export class McpConnectionsService {
         if (patch.authHeaders !== undefined) {
             this.assertValidHeaders(patch.authHeaders ?? undefined);
             row.authHeaders = patch.authHeaders;
+        }
+        // Checked on the RESULTING endpoint + headers whenever the patch
+        // touches either, so neither "add a reference to an http row" nor
+        // "move a referencing row to http" can store a connection that would
+        // resolve a credential for cleartext. Literal header values over
+        // plain http stay accepted (flagged `insecureCredentialTransport`)
+        // unless the row's organization requires https. A patch that only
+        // renames or toggles `enabled` is never blocked — the connect-time
+        // re-check in McpClientService applies the same rules before anything
+        // is sent.
+        if (
+            patch.url !== undefined ||
+            patch.authHeaders !== undefined ||
+            patch.transport !== undefined
+        ) {
+            await this.assertCredentialTransport(row.url, row.transport, row.authHeaders, {
+                userId,
+                organizationId: row.organizationId ?? null,
+                tenantId: row.tenantId ?? null,
+            });
         }
         if (patch.enabled !== undefined) row.enabled = patch.enabled;
 
@@ -324,6 +388,50 @@ export class McpConnectionsService {
         }
     }
 
+    /**
+     * Credential transport rules. Runs AFTER the SSRF check, so it only ever
+     * narrows what that guard already admits:
+     *
+     *   - a `{{cred.key}}` reference needs an `https:` endpoint (resolving
+     *     references is new, so refusing it on plain http regresses nothing);
+     *   - LITERAL header values over plain http are accepted exactly as before
+     *     — the view flags them `insecureCredentialTransport` — unless the
+     *     organization turned on "Require https for connection credentials";
+     *   - a plain-HTTP connection with no headers is accepted in every case.
+     */
+    private async assertCredentialTransport(
+        url: string,
+        transport: McpConnectionTransport | undefined,
+        headers: Record<string, string> | null | undefined,
+        scope: McpCredentialTransportScope,
+    ): Promise<void> {
+        const verdict = mcpCredentialTransport({ url, transport, headers });
+        if (verdict.verdict === 'refused') {
+            throw new BadRequestException(
+                `${MCP_CREDENTIALS_REQUIRE_HTTPS_MESSAGE}. Credential references are only resolved for https:// endpoints: use an https:// URL, or remove the reference.`,
+            );
+        }
+        if (verdict.verdict !== 'insecure' || !this.transportPolicy) return;
+
+        // The setting defaults to off; a read that fails resolves to that
+        // default, so an unreadable setting never blocks what worked before.
+        let strict = false;
+        try {
+            strict = await this.transportPolicy.requiresHttpsForCredentials(scope);
+        } catch (err) {
+            this.logger.warn(
+                `Could not read "Require https for connection credentials" for organization ${
+                    scope.organizationId ?? '(tenant-wide)'
+                } (${err instanceof Error ? err.name : 'unknown error'}); using the default (off).`,
+            );
+        }
+        if (strict) {
+            throw new BadRequestException(
+                `${MCP_ORGANIZATION_REQUIRES_HTTPS_MESSAGE}. Use an https:// URL, or remove the auth headers.`,
+            );
+        }
+    }
+
     private assertValidHeaders(headers?: Record<string, string>): void {
         if (!headers) return;
         const entries = Object.entries(headers);
@@ -365,6 +473,19 @@ export class McpConnectionsService {
             authHeaderNames: row.authHeaders ? Object.keys(row.authHeaders) : [],
             lastConnectedAt: row.lastConnectedAt ?? null,
             lastError: row.lastError ?? null,
+            // A row read before the health columns existed (or a partial
+            // fixture) reports "not checked yet" rather than guessing.
+            health: isConnectionHealth(row.health) ? row.health : 'unknown',
+            healthCheckedAt: row.healthCheckedAt ?? null,
+            lastErrorCode: isConnectionHealthErrorCode(row.lastErrorCode)
+                ? row.lastErrorCode
+                : null,
+            insecureCredentialTransport:
+                mcpCredentialTransport({
+                    url: row.url,
+                    transport: row.transport,
+                    headers: row.authHeaders,
+                }).verdict === 'insecure',
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
         };

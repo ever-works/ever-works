@@ -37,3 +37,17 @@ export * from './executors/mcp-bridge';
 export * from './executors/command-roots';
 export * from './executors/model-cli';
 export * from './model-cli-probe';
+// Agent computers — the live-view executor and the machine-side pieces it is
+// built from (capture-backend seam, capture pump, per-Agent profiles, outbox).
+export * from './executors/computer-session';
+export * from './screen/agent-control-marker';
+export * from './screen/agent-profile';
+export * from './screen/attended-cadence';
+export * from './screen/capture-backend';
+export * from './screen/capture-pump';
+export * from './screen/cdp-connection';
+export * from './screen/frame-outbox';
+export * from './screen/headless-browser-backend';
+export * from './screen/input-injector';
+export * from './screen/node-leg';
+export * from './screen/terminal-channel';

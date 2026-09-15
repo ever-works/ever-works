@@ -112,6 +112,7 @@ import { TenantEmailAddress } from '../entities/tenant-email-address.entity';
 import { AgentEmailAssignment } from '../entities/agent-email-assignment.entity';
 import { EmailConversation } from '../entities/email-conversation.entity';
 import { EmailMessage } from '../entities/email-message.entity';
+import { AgentInbox } from '../entities/agent-inbox.entity';
 import { NotificationChannel } from '../entities/notification-channel.entity';
 import { NotificationChannelDeliveryLog } from '../entities/notification-channel-delivery-log.entity';
 import { NotificationEventType } from '../entities/notification-event-type.entity';
@@ -146,6 +147,8 @@ import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.e
 import { FleetJob } from '../entities/fleet-job.entity';
 import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 import { FleetAudit } from '../entities/fleet-audit.entity';
+import { ComputerSession } from '../entities/computer-session.entity';
+import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
@@ -161,6 +164,7 @@ import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-al
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
+import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 
 import {
     PluginEntity,
@@ -300,6 +304,8 @@ export const ENTITIES = [
     AgentEmailAssignment,
     EmailConversation,
     EmailMessage,
+    // Agent email (AW-05) — per-Agent approval mode + send ceilings
+    AgentInbox,
     NotificationChannel,
     NotificationChannelDeliveryLog,
     NotificationEventType,
@@ -370,6 +376,8 @@ export const ENTITIES = [
     // append-only audit trail every panic action writes to.
     FleetKillSwitch,
     FleetAudit,
+    ComputerSession,
+    NodeAgentProfile,
     // Inbox (operator message center) — messages addressed to the human:
     // blocking questions, approval requests, escalation mirrors, notices.
     InboxItem,
@@ -408,4 +416,8 @@ export const ENTITIES = [
     // UNIQUE (workId, rung, laneKey) index on it is what stops two merges
     // to develop opening two competing promotion pull requests.
     ReleasePromotion,
+    // AW-14 What's new — one row per (person, product changelog entry) they
+    // have read. Deliberately not workspace-scoped: read state follows the
+    // person, never the active Organization.
+    ProductChangelogRead,
 ];

@@ -1,7 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import {
+    RUN_LEDGER_TERMINAL_STATUSES,
+    RUN_USAGE_DETAIL_RETENTION_MONTHS,
+    type RunCostBreakdown,
+} from '@ever-works/contracts';
 import { AgentRunRepository } from '@src/database/repositories/agent-run.repository';
+import { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
 import type { AgentRun } from '@src/entities/agent-run.entity';
+// The receipt's cost port lives in the agents leaf file (consumed by
+// RunReceiptService, implemented here, bound to RUN_COST_BREAKDOWN_READER by
+// the api-side @Global() SubscriptionsModule).
+import type { RunCostBreakdownReader } from '../../agents/run-cost-breakdown-reader';
 
 /**
  * Costs dashboard — the rolling windows the Costs view offers.
@@ -216,11 +226,70 @@ export interface CostsTopRuns extends CostsWindowEcho {
  * `docs/internal/feat-costs-notes.md` for the follow-up.
  */
 @Injectable()
-export class CostsSummaryService {
+export class CostsSummaryService implements RunCostBreakdownReader {
     constructor(
         private readonly pluginUsageRepository: PluginUsageRepository,
         private readonly agentRunRepository: AgentRunRepository,
+        // Run receipt (AW-09) — the credits line of one run's cost. Appended
+        // last + @Optional() so every positional `new CostsSummaryService(…)`
+        // keeps compiling; unbound means "credits not reported", never 0.
+        @Optional() private readonly creditLedgerRepository?: CreditLedgerRepository,
     ) {}
+
+    /**
+     * Run receipt (AW-09) — what ONE run cost, from the same two sources
+     * every other cost surface reads: the settled `agent_runs.costCents`
+     * stamp (the Top-runs table) and the run's `plugin_usage_events` rows
+     * (the per-model and per-capability panels). Nothing is re-derived, so
+     * a receipt and the Costs dashboard cannot disagree about a run.
+     *
+     * The caller has already resolved the run under the viewer's ownership
+     * scope; this method only reads rows keyed by that run's id.
+     */
+    async getRunCostBreakdown(
+        run: Pick<AgentRun, 'id' | 'userId' | 'status' | 'costCents' | 'totalTokens' | 'createdAt'>,
+        now: Date = new Date(),
+    ): Promise<RunCostBreakdown> {
+        const [lines, credits] = await Promise.all([
+            this.pluginUsageRepository.getRunSpendLines(run.id),
+            this.findRunCredits(run),
+        ]);
+
+        const retentionCutoff = new Date(now);
+        retentionCutoff.setUTCMonth(
+            retentionCutoff.getUTCMonth() - RUN_USAGE_DETAIL_RETENTION_MONTHS,
+        );
+
+        return {
+            settledCents: run.costCents ?? null,
+            meteredCents:
+                lines.length > 0 ? lines.reduce((sum, line) => sum + line.costCents, 0) : null,
+            soFar: !(RUN_LEDGER_TERMINAL_STATUSES as readonly string[]).includes(run.status),
+            creditsDebited: credits,
+            detailRetained: new Date(run.createdAt).getTime() >= retentionCutoff.getTime(),
+            tokens: {
+                // Only the per-run total is recorded today; the split is not.
+                input: null,
+                output: null,
+                cacheRead: null,
+                cacheWrite: null,
+                total: run.totalTokens ?? null,
+            },
+            lines,
+        };
+    }
+
+    /**
+     * Credits debited for a run: the settlement's CONSUMPTION row under its
+     * `run:{runId}` idempotency key. Null when no debit was recorded (not
+     * settled yet, nothing billable, or the ledger is not wired here).
+     */
+    private async findRunCredits(run: Pick<AgentRun, 'id' | 'userId'>): Promise<number | null> {
+        if (!this.creditLedgerRepository) return null;
+        const entry = await this.creditLedgerRepository.findByIdempotencyKey(`run:${run.id}`);
+        if (!entry || entry.userId !== run.userId) return null;
+        return Math.abs(entry.amountCredits);
+    }
 
     /** Headline total + run count + average cost per run. */
     async getSummary(userId: string, windowDays?: number): Promise<CostsSummary> {
