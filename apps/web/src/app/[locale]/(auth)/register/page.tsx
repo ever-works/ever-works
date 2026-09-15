@@ -9,8 +9,25 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t('createAccount') };
 }
 
-export default async function RegisterPage() {
+/**
+ * What ever.co/checkout/complete puts on the URL after a purchase.
+ *
+ * It reads the finished Stripe Checkout Session and forwards the identity Stripe
+ * collected, so someone arriving from checkout is not asked a second time for
+ * what they have already typed.
+ */
+interface RegisterSearchParams {
+    email?: string;
+    name?: string;
+}
+
+export default async function RegisterPage({
+    searchParams,
+}: {
+    searchParams: Promise<RegisterSearchParams>;
+}) {
     const availableSocialProviders = await getConfiguredAuthProviders();
+    const { email, name } = await searchParams;
 
     // Resolve the documents this signup must accept on the server, in the user's
     // locale, and hand them to the form. The form posts them straight back on
@@ -32,6 +49,7 @@ export default async function RegisterPage() {
         <RegisterForm
             availableSocialProviders={availableSocialProviders}
             termsDocuments={termsDocuments}
+            prefill={{ email, name }}
         />
     );
 }
