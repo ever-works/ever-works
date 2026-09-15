@@ -7,6 +7,12 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
  * operator allow-list change — writes one row here with the before/after
  * snapshot and the actor.
  *
+ * The single exception is the instance-level `operator_allowlist_boot`
+ * row (EW-752 P5.1 T35b): it records the platform-wide operator
+ * allow-list captured at process start, is not tied to any tenant, and
+ * is stored with `tenantId = NULL`. Every other row carries a real
+ * tenant id.
+ *
  * Behaviour spec: [`docs/specs/features/tenant-job-runtime-overlay/spec.md` §FR-13](../../../../docs/specs/features/tenant-job-runtime-overlay/spec.md)
  * Plan reference: [`plan.md` §3 + §10 P5 (T35)](../../../../docs/specs/features/tenant-job-runtime-overlay/plan.md)
  * Decision record: [ADR-017](../../../../docs/specs/decisions/017-tenant-scoped-job-runtime-overlay.md)
@@ -28,9 +34,20 @@ export class TenantJobRuntimeAudit {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    /** FK to `tenants.id`. Indexed via `idx_tenant_job_runtime_audit_tenant_occurred`. */
-    @Column({ type: 'uuid' })
-    tenantId: string;
+    /**
+     * FK to `tenants.id`. Indexed via `idx_tenant_job_runtime_audit_tenant_occurred`.
+     *
+     * NULL marks an instance-level row. Only the `operator_allowlist_boot`
+     * action writes NULL; every tenant mutation row carries a real tenant
+     * id. The database column was relaxed to nullable by migration
+     * `1781200000000-RelaxTenantJobRuntimeAuditTenantNullable`; this
+     * declaration must stay nullable too, because environments that build
+     * the schema from entities (`DATABASE_AUTOMIGRATE=true`, which turns on
+     * TypeORM `synchronize` and skips migrations) would otherwise create
+     * the column NOT NULL and reject the boot row.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    tenantId: string | null;
 
     /**
      * FK to `users.id`. NULL = system actor (background job, migration,
@@ -50,6 +67,12 @@ export class TenantJobRuntimeAudit {
      *   - `'delete'`                       — overlay reverted to inherit
      *   - `'operator_allowlist_change'`    — instance allow-list edited;
      *     emitted per affected tenant (T35).
+     *   - `'desktop_wizard_seed'`          — overlay row recorded from the
+     *     desktop install wizard's runtime choice on the tenant's first
+     *     overlay read.
+     *   - `'operator_allowlist_boot'`      — instance-level snapshot of the
+     *     operator allow-list taken at process start (T35b); the only
+     *     action written with `tenantId = NULL`.
      *
      * Stored as `varchar(64)` rather than a Postgres enum so we can add
      * new action types without a type-altering migration — same
@@ -61,10 +84,11 @@ export class TenantJobRuntimeAudit {
     /**
      * Snapshot of the relevant tenant_job_runtime_config fields BEFORE
      * the change. Secrets MUST be redacted by the writing service before
-     * storage. `simple-json` (rather than `jsonb`) for SQLite parity in
-     * the test suite — same rationale as `webhook-delivery.entity.ts`
-     * `payload`. Physical column type is `jsonb` on Postgres prod via
-     * the migration.
+     * storage. `simple-json` (rather than `jsonb`) so the SQLite test
+     * driver behaves the same — same rationale as `webhook-delivery.entity.ts`
+     * `payload`. The migration declares the physical column as `text` on
+     * every dialect, which `simple-json` round-trips via
+     * JSON.stringify/parse.
      */
     @Column({ type: 'simple-json', nullable: true })
     before: Record<string, unknown> | null;
