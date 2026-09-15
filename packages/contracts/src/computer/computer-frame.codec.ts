@@ -223,7 +223,11 @@ function normalizeUnsafe(value: unknown): ComputerFrame | null {
 				return null;
 			}
 			const pointer = { kind: 'pointer', action, x, y, button: button as ComputerPointerButton | null } as const;
-			return buttons === undefined ? pointer : { ...pointer, buttons };
+			// The guard above already proved `buttons` is a bounded integer, but that
+			// narrowing does not survive the negated union under every consumer's
+			// compiler settings (packages/agent compiles this source with its own
+			// tsconfig), so state the proven type explicitly, like `button` above.
+			return buttons === undefined ? pointer : { ...pointer, buttons: buttons as number };
 		}
 		case 'key': {
 			const action = own(value, 'action');
