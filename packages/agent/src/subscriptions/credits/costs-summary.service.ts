@@ -8,6 +8,7 @@ import { AgentRunRepository } from '@src/database/repositories/agent-run.reposit
 import { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
 import type { AgentRun } from '@src/entities/agent-run.entity';
+import type { OwnershipScope } from '@src/database/ownership-scope';
 // The receipt's cost port lives in the agents leaf file (consumed by
 // RunReceiptService, implemented here, bound to RUN_COST_BREAKDOWN_READER by
 // the api-side @Global() SubscriptionsModule).
@@ -291,9 +292,42 @@ export class CostsSummaryService implements RunCostBreakdownReader {
         return Math.abs(entry.amountCredits);
     }
 
-    /** Headline total + run count + average cost per run. */
-    async getSummary(userId: string, windowDays?: number): Promise<CostsSummary> {
+    /**
+     * Headline total + run count + average cost per run.
+     *
+     * `scope` (Home, AW-19) narrows both the spend sum and the run count to
+     * one workspace scope. Omitted — as the Costs controller calls it — the
+     * reads are exactly the user-wide ones they always were.
+     */
+    async getSummary(
+        userId: string,
+        windowDays?: number,
+        scope?: OwnershipScope,
+    ): Promise<CostsSummary> {
         const window = resolveCostsWindow(windowDays);
+        if (scope) {
+            const [scopedCostCents, scopedRuns] = await Promise.all([
+                this.pluginUsageRepository.getTotalSpendCentsForUser(
+                    userId,
+                    window.from,
+                    window.to,
+                    undefined,
+                    scope,
+                ),
+                this.agentRunRepository.countCreatedForUserInWindow(
+                    userId,
+                    window.from,
+                    window.to,
+                    scope,
+                ),
+            ]);
+            return {
+                ...echo(window),
+                totalCostCents: scopedCostCents,
+                runsCount: scopedRuns,
+                avgPerRunCents: perRun(scopedCostCents, scopedRuns),
+            };
+        }
         const [totalCostCents, counts] = await Promise.all([
             this.pluginUsageRepository.getTotalSpendCentsForUser(userId, window.from, window.to),
             this.pluginUsageRepository.getUsageCountsForUser(userId, window.from, window.to),

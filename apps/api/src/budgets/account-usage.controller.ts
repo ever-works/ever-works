@@ -1,6 +1,10 @@
 import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { BudgetService, type UserBudgetSummary } from '@ever-works/agent/budgets';
+import {
+    BudgetService,
+    toAccountWideBudgetPrefs,
+    type UserBudgetSummary,
+} from '@ever-works/agent/budgets';
 import { WorkAgentService } from '@ever-works/agent/work-agent';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -41,11 +45,6 @@ export class AccountUsageController {
     @HttpCode(HttpStatus.OK)
     async accountWide(@CurrentUser() auth: AuthenticatedUser): Promise<UserBudgetSummary> {
         const prefs = await this.workAgentService.getPreferences(auth.userId);
-        const capCentsRaw = prefs.accountWideMonthlyCapCents;
-        const capCents = capCentsRaw === null ? null : Number(capCentsRaw);
-        return this.budgetService.summarizeForUser(auth.userId, {
-            capCents: Number.isFinite(capCents) ? capCents : null,
-            allowOverage: prefs.accountWideAllowOverage,
-        });
+        return this.budgetService.summarizeForUser(auth.userId, toAccountWideBudgetPrefs(prefs));
     }
 }

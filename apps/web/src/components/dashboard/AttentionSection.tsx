@@ -60,7 +60,17 @@ const KIND_COPY: Record<AttentionKind, { titleKey: string; subtitleKey: string }
     },
 };
 
-export function AttentionSection({ items }: { items: AttentionItem[] }) {
+export function AttentionSection({
+    items,
+    title,
+}: {
+    items: AttentionItem[];
+    /**
+     * Heading override. Home (AW-19) renders this block inside Needs you as
+     * the `Also broken` sub-list; every other caller keeps `Needs attention`.
+     */
+    title?: string;
+}) {
     const t = useTranslations('dashboard.attention');
     // The per-kind copy keys are resolved dynamically, so bypass
     // next-intl's literal-key typing with a loose translator. The runtime
@@ -83,7 +93,7 @@ export function AttentionSection({ items }: { items: AttentionItem[] }) {
                         id="dashboard-attention-heading"
                         className="text-xl font-semibold text-text dark:text-text-dark truncate"
                     >
-                        {t('title')}
+                        {title ?? t('title')}
                     </h2>
                 </div>
             </div>

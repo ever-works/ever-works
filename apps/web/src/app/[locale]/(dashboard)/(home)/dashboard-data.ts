@@ -118,6 +118,11 @@ const SOON_SOURCE_KINDS: Partial<Record<ScheduleEntry['sourceType'], SoonRunItem
 /**
  * Upcoming scheduled runs for the Soon block (spec §3.3, change 4).
  *
+ * Home (AW-19) no longer calls this: the morning read's Today block
+ * (`GET /api/home/summary`, `packages/agent/src/home/builders/today.builder.ts`)
+ * covers every schedule kind for the user's local day. Kept exported, with its
+ * contract spec, for any caller that wants the soonest runs regardless of day.
+ *
  * REUSES `GET /api/schedules` from the Schedules front, via the same typed
  * client (`schedulesAPI`) the Schedules view itself uses.
  *

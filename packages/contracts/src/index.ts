@@ -41,3 +41,6 @@ export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';
+// Home (AW-19) — the composed morning read on the dashboard root: one status per
+// block, over the decision queue, the Runs ledger, schedules, costs and the feed.
+export * from './home/index.js';

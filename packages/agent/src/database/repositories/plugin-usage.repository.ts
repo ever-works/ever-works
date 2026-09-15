@@ -6,6 +6,7 @@ import { Agent } from '@src/entities/agent.entity';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import { Task, TaskStatus } from '@src/entities/task.entity';
 import { Work } from '@src/entities/work.entity';
+import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
 
 export type PerPluginSpend = {
     pluginId: string;
@@ -128,6 +129,12 @@ export class PluginUsageRepository {
         periodStart: Date,
         periodEnd: Date,
         currency?: string,
+        /**
+         * Home (AW-19) — narrow the sum to one workspace scope (an
+         * Organization, or personal usage). Omitted = every scope, which is
+         * what budget enforcement and the account-wide surfaces keep reading.
+         */
+        scope?: OwnershipScope,
     ): Promise<number> {
         const qb = this.repository
             .createQueryBuilder('e')
@@ -140,8 +147,28 @@ export class PluginUsageRepository {
             qb.andWhere('e.currency = :currency', { currency });
         }
 
+        const ownership = ownershipSqlPredicate('e', scope, 'spendScope');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+
         const row = await qb.getRawOne<{ total: string }>();
         return Number(row?.total ?? 0);
+    }
+
+    /**
+     * Home (AW-19) — has this user ever recorded metered usage, in any
+     * scope? One indexed probe (`userId, occurredAt`), used only to hide the
+     * spend panel from an account that has never spent anything.
+     */
+    async hasAnyUsageForUser(userId: string): Promise<boolean> {
+        const row = await this.repository
+            .createQueryBuilder('e')
+            .select('e.id', 'id')
+            .where('e.userId = :userId', { userId })
+            .limit(1)
+            .getRawOne<{ id: string }>();
+        return Boolean(row);
     }
 
     /**
