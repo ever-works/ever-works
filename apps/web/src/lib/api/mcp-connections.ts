@@ -1,4 +1,5 @@
 import 'server-only';
+import type { ConnectionHealth, ConnectionHealthErrorCode } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -35,6 +36,20 @@ export interface McpConnection {
     authHeaderNames: string[];
     lastConnectedAt: string | null;
     lastError: string | null;
+    /**
+     * AW-15 — health derived from every connection attempt. Optional so a
+     * client talking to an API without the health columns keeps rendering.
+     */
+    health?: ConnectionHealth;
+    healthCheckedAt?: string | null;
+    /** Classified reason for `lastError` (e.g. `credential_missing`). Never a value. */
+    lastErrorCode?: ConnectionHealthErrorCode | null;
+    /**
+     * AW-15 — the connection sends literal auth header values to a plain
+     * http:// address. It works, but the credential travels unencrypted.
+     * Optional for the same reason as `health`.
+     */
+    insecureCredentialTransport?: boolean;
     createdAt: string;
     updatedAt: string;
 }
