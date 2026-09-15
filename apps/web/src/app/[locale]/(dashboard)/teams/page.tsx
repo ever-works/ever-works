@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { HelpLink } from '@/components/help/HelpLink';
 import { getTranslations } from 'next-intl/server';
 import {
     BookOpen,
@@ -163,6 +164,7 @@ export default async function TeamsPage() {
                         <Plus className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
                         {t('empty.cta')}
                     </Link>
+                    <HelpLink target="teams#creating-a-team" variant="emptyState" />
                 </div>
             ) : (
                 <div

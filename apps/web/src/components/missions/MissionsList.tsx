@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { Target, Search, PenLine } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
@@ -239,6 +240,11 @@ export function MissionsList({
                         <p className="mx-auto mt-1 max-w-2xl text-xs text-text-muted dark:text-text-muted-dark">
                             {t('empty.subtitle')}
                         </p>
+                        <HelpLink
+                            target="missions#creating-a-mission"
+                            variant="emptyState"
+                            className="mt-3"
+                        />
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
