@@ -1,168 +1,14 @@
 import { Injectable, Logger, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import { NotificationEventTypeRepository } from '@ever-works/agent/database';
+import { CORE_NOTIFICATION_EVENTS } from '@ever-works/agent/notifications';
 import type { PluginNotificationEvent } from '@ever-works/plugin';
 
 /**
- * Core event registry — kept in sync with the rows
- * `SeedNotificationEventTypes1780000010000` migration inserts on Postgres.
- * Bootstrapped here too so SQLite / CI environments that boot with
- * `synchronize: true` (migrationsRun is false in that mode) still end up
- * with the core registry populated. Idempotent via TypeORM `repo.upsert`.
- */
-interface CoreEventRow {
-    readonly key: string;
-    readonly category: string;
-    readonly title: string;
-    readonly description: string;
-    readonly urgent: boolean;
-    readonly defaultChannels: readonly string[];
-}
-
-const CORE_EVENTS: readonly CoreEventRow[] = [
-    {
-        key: 'ai_credits_depleted',
-        category: 'ai_credits',
-        title: 'AI credits depleted',
-        description:
-            'Your configured AI provider has run out of credits. Top up to resume generation.',
-        urgent: true,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'ai_provider_error',
-        category: 'ai_credits',
-        title: 'AI provider error',
-        description: 'Recurring error from one of your enabled AI providers.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'generation_error',
-        category: 'generation',
-        title: 'Generation failed',
-        description: 'A scheduled or manual content generation run failed for one of your works.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'schedule_paused',
-        category: 'generation',
-        title: 'Schedule paused',
-        description:
-            'Scheduled updates for a work have been paused — likely due to repeated errors or an exhausted credit pool.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'git_auth_expired',
-        category: 'integrations',
-        title: 'Git authentication expired',
-        description: 'Your Git provider authentication has expired and needs to be refreshed.',
-        urgent: true,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'work_generation_finished',
-        category: 'generation',
-        title: 'Work generation finished',
-        description: 'A scheduled or manual content generation run for a work finished.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'agent_run_finished',
-        category: 'agents',
-        title: 'Agent run finished',
-        description: 'An autonomous agent run completed.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'mission_blocked',
-        category: 'system',
-        title: 'Mission blocked',
-        description: 'A mission can no longer progress — review its blocking task to unblock.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    // Attention surface (Wave 4 M6 + judgment layer G3). Seeded on
-    // Postgres by `1784600000000-CreateEscalationsAndReviewRejections`
-    // too; this list is what makes them exist on SQLite / CI, where
-    // migrations do not run.
-    {
-        key: 'agent_run_queued_too_long',
-        category: 'agent',
-        title: 'Agent run queued too long',
-        description:
-            'An agent run has been waiting for capacity longer than the configured bound. Nothing was cancelled.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'agent_run_escalated',
-        category: 'agent',
-        title: 'Agent needs a decision',
-        description:
-            'An agent stopped without finishing (checks exhausted, guardrail refusal, budget stop or refused merge) and a human decision is required.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    // Inbox (operator message center). Seeded on Postgres by
-    // `1786870000000-CreateInboxItems` too; this list is what makes
-    // them exist on SQLite / CI, where migrations do not run.
-    {
-        key: 'inbox_question',
-        category: 'agent',
-        title: 'Agent asked a question',
-        description:
-            'An agent paused its run on a blocking question and is waiting for your reply in the Inbox.',
-        urgent: true,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'inbox_approval_requested',
-        category: 'agent',
-        title: 'Approval requested',
-        description:
-            'An agent proposed a side-effectful action and is waiting for your approval in the Inbox.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'inbox_escalation',
-        category: 'agent',
-        title: 'Agent escalation in your Inbox',
-        description:
-            'An agent stopped without finishing and the escalation is waiting in your Inbox.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    {
-        key: 'inbox_notice',
-        category: 'system',
-        title: 'Inbox notice',
-        description: 'The platform filed a notice in your Inbox.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-    // Fleet local-runner routing. Seeded on Postgres by
-    // `1786920000000-FleetRunnerTelemetryAndRouting` too; this entry is
-    // what makes it exist on SQLite / CI, where migrations do not run.
-    {
-        key: 'fleet_runner_fallback',
-        category: 'agent',
-        title: 'Local runner fallback',
-        description:
-            'A run that preferred your local runner was executed in the cloud instead, because no runner could take it.',
-        urgent: false,
-        defaultChannels: ['in-app'],
-    },
-];
-
-/**
  * EW-664 / EW-676 / T21 — at app bootstrap:
- *  1. Seed CORE_EVENTS into `notification_event_types`. The same rows are
+ *  1. Seed the core event catalogue (`CORE_NOTIFICATION_EVENTS`, owned by
+ *     `@ever-works/agent/notifications` since AW-13) into
+ *     `notification_event_types`. The same rows are
  *     also inserted by `SeedNotificationEventTypes1780000010000`, but that
  *     migration only runs when `migrationsRun=true` (prod). In CI / E2E
  *     environments that boot with `synchronize: true`, migrations are
@@ -195,7 +41,7 @@ export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
         // 1. Seed core events (idempotent — safe to run alongside the
         //    Postgres migration that inserts the same rows).
         let coreUpserts = 0;
-        for (const event of CORE_EVENTS) {
+        for (const event of CORE_NOTIFICATION_EVENTS) {
             try {
                 await this.eventTypes.upsert({
                     key: event.key,

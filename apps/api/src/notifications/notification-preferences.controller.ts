@@ -12,7 +12,7 @@ import {
     ParseEnumPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsOptional, IsString, Matches } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsOptional, IsString, Matches } from 'class-validator';
 import { CurrentUser, AuthSessionGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { NotificationPreferencesService } from './notification-preferences.service';
@@ -40,7 +40,7 @@ const VALID_TIMEZONES = new Set<string>([
 const HH_MM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 const NOTIFICATION_CATEGORY_VALUES = Object.values(NotificationCategory);
 
-class QuietHoursBody {
+export class QuietHoursBody {
     // Security: must match HH:mm to prevent arbitrary strings in DB
     @IsOptional()
     @IsString()
@@ -58,6 +58,12 @@ class QuietHoursBody {
     @IsString()
     @IsIn([...VALID_TIMEZONES], { message: 'timezone must be a valid IANA timezone identifier' })
     timezone?: string | null;
+
+    // AW-13: the person's opt-in to let every urgent event through quiet
+    // hours. Optional; when omitted the stored value is kept.
+    @IsOptional()
+    @IsBoolean()
+    urgentBypassesQuietHours?: boolean;
 }
 
 class MuteBody {
@@ -121,12 +127,19 @@ export class NotificationPreferencesController {
     @Put('preferences/quiet-hours')
     @ApiOperation({ summary: 'Set quiet hours window + timezone' })
     async setQuietHours(@CurrentUser() auth: AuthenticatedUser, @Body() body: QuietHoursBody) {
-        const preference = await this.service.setQuietHours(
-            auth.userId,
-            body.quietHoursStart ?? null,
-            body.quietHoursEnd ?? null,
-            body.timezone ?? null,
-        );
+        const start = body.quietHoursStart ?? null;
+        const end = body.quietHoursEnd ?? null;
+        const timezone = body.timezone ?? null;
+        const preference =
+            typeof body.urgentBypassesQuietHours === 'boolean'
+                ? await this.service.setQuietHours(
+                      auth.userId,
+                      start,
+                      end,
+                      timezone,
+                      body.urgentBypassesQuietHours,
+                  )
+                : await this.service.setQuietHours(auth.userId, start, end, timezone);
         return { preference };
     }
 
