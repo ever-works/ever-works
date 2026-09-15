@@ -37,6 +37,7 @@ import {
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
+import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../database/insertion-order';
 import {
     dodProgressSignature,
     hasDefinitionOfDone,
@@ -95,6 +96,22 @@ const MAX_GOAL_TASKS = 500;
 const MAX_SCOPE_CANDIDATES = 50;
 
 const ACTIVE_RUN_STATUSES = ['queued', 'running'];
+
+/** Epoch millis of a timestamp, or `fallback` when it is missing or unparseable. */
+function timeOf(value: Date | string | null | undefined, fallback: number): number {
+    if (value === null || value === undefined) return fallback;
+    const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+    return Number.isNaN(ms) ? fallback : ms;
+}
+
+/** A sorted copy, ascending by `key`; rows with equal keys keep their input order. */
+function sortedByTime<T>(rows: readonly T[], key: (row: T) => number): T[] {
+    return [...rows].sort((a, b) => {
+        const left = key(a);
+        const right = key(b);
+        return left < right ? -1 : left > right ? 1 : 0;
+    });
+}
 
 /**
  * Autonomy layer — the per-Goal EXECUTION LOOP.
@@ -1105,15 +1122,61 @@ export class GoalOrchestratorService {
         if (tasks.length === 0) {
             return { tasks, runsByTask: new Map(), runs: [] };
         }
-        const runs = await this.runs.find({
-            where: { taskId: In(tasks.map((task) => task.id)) },
-            order: { startedAt: 'ASC' },
-        });
+        const { startedFirst, createdFirst } = await this.findRunsForTasks(
+            tasks.map((task) => task.id),
+        );
         const runsByTask = new Map<string, AgentRun>();
-        for (const run of runs) {
+        for (const run of createdFirst) {
             if (run.taskId) runsByTask.set(run.taskId, run);
         }
-        return { tasks, runsByTask, runs };
+        return { tasks, runsByTask, runs: startedFirst };
+    }
+
+    /**
+     * The iteration runs in two orders, from one query.
+     *
+     * - `startedFirst`: oldest-started first, never-started runs last. The
+     *   FIRST in-flight row is the active head read by `nudge`, `advance` and
+     *   `cancelActiveRun`; the spend roll-up sums the whole list.
+     * - `createdFirst`: oldest-created first. The LAST row per Task is its
+     *   latest run in `listSessions`, the same run `findLatestForTask` names.
+     *   The latest is NOT taken from `startedFirst`: a run that went terminal
+     *   without starting (cancelled while queued, dispatch failed, queued too
+     *   long) has a NULL `startedAt`, sorts last there and would mask a newer
+     *   run that did start.
+     *
+     * Every driver but SQLite keeps the original `find` ordered by
+     * `startedAt` (Postgres sorts NULLs last), and `createdFirst` is a stable
+     * in-memory sort of it by `createdAt`. SQLite sorts NULLs first, stores
+     * `createdAt` with whole-second resolution and returns ties in index
+     * order, so there the query reads the rows in insertion order
+     * (`createdAt`, then `rowid`) and `startedFirst` is the stable in-memory
+     * sort, with never-started runs last and ties kept in insertion order.
+     */
+    private async findRunsForTasks(
+        taskIds: string[],
+    ): Promise<{ startedFirst: AgentRun[]; createdFirst: AgentRun[] }> {
+        if (isSqliteFamilyDriver(this.runs.manager?.connection?.options?.type)) {
+            const createdFirst = await addInsertionOrderTieBreak(
+                this.runs.createQueryBuilder('run').setFindOptions({
+                    where: { taskId: In(taskIds) },
+                    order: { createdAt: 'ASC' },
+                }),
+                'ASC',
+            ).getMany();
+            const startedFirst = sortedByTime(createdFirst, (run) =>
+                timeOf(run.startedAt, Number.POSITIVE_INFINITY),
+            );
+            return { startedFirst, createdFirst };
+        }
+        const startedFirst = await this.runs.find({
+            where: { taskId: In(taskIds) },
+            order: { startedAt: 'ASC' },
+        });
+        const createdFirst = sortedByTime(startedFirst, (run) =>
+            timeOf(run.createdAt, Number.NEGATIVE_INFINITY),
+        );
+        return { startedFirst, createdFirst };
     }
 
     private async computeSpend(goalId: string): Promise<number> {
