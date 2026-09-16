@@ -10,9 +10,9 @@ import { prefillFromSearchParams } from './register-prefill';
  */
 describe('register prefill from the checkout query', () => {
     it('passes a name and email through', () => {
-        expect(
-            prefillFromSearchParams({ email: 'buyer@example.com', name: 'Jane Buyer' }),
-        ).toEqual({ email: 'buyer@example.com', name: 'Jane Buyer' });
+        expect(prefillFromSearchParams({ email: 'buyer@example.com', name: 'Jane Buyer' })).toEqual(
+            { email: 'buyer@example.com', name: 'Jane Buyer' },
+        );
     });
 
     it('control: an absent query yields no prefill at all', () => {
@@ -35,7 +35,10 @@ describe('register prefill from the checkout query', () => {
 
     it('ignores a repeated parameter rather than guessing which one was meant', () => {
         expect(
-            prefillFromSearchParams({ email: ['a@example.com', 'b@example.com'], name: ['A', 'B'] }),
+            prefillFromSearchParams({
+                email: ['a@example.com', 'b@example.com'],
+                name: ['A', 'B'],
+            }),
         ).toEqual({ email: undefined, name: undefined });
     });
 });
