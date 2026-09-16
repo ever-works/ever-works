@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -18,6 +19,7 @@ import {
     type McpConnectionView,
 } from '@ever-works/agent/mcp';
 import { CurrentUser } from '../auth/decorators/user.decorator';
+import { ScopeContextService } from '../scope/scope-context.service';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { CreateMcpConnectionDto, UpdateMcpConnectionDto } from './dto/mcp-connection.dto';
 
@@ -32,7 +34,16 @@ import { CreateMcpConnectionDto, UpdateMcpConnectionDto } from './dto/mcp-connec
 @ApiTags('mcp-connections')
 @Controller('api/mcp-connections')
 export class McpConnectionsController {
-    constructor(private readonly service: McpConnectionsService) {}
+    constructor(
+        private readonly service: McpConnectionsService,
+        /**
+         * AW-15 — the active request scope. A new row is stamped with this
+         * organization, so the create-time check of "Require https for
+         * connection credentials" reads the same organization the
+         * connect-time check will. Absent ⇒ the row is tenant-wide.
+         */
+        @Optional() private readonly scope?: ScopeContextService,
+    ) {}
 
     @Get()
     @ApiOperation({ summary: 'List my MCP connections (masked — header names only).' })
@@ -59,12 +70,16 @@ export class McpConnectionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateMcpConnectionDto,
     ): Promise<McpConnectionView> {
-        return this.service.create(auth.userId, {
+        const input = {
             name: body.name,
             url: body.url,
             transport: body.transport,
             authHeaders: body.authHeaders,
-        });
+        };
+        const organizationId = this.scope?.getOrganizationId() ?? null;
+        return organizationId
+            ? this.service.create(auth.userId, input, { organizationId })
+            : this.service.create(auth.userId, input);
     }
 
     @Patch(':id')

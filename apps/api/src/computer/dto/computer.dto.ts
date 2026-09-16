@@ -4,6 +4,7 @@ import {
     ArrayMinSize,
     ArrayUnique,
     IsArray,
+    IsBoolean,
     IsIn,
     IsInt,
     IsOptional,
@@ -17,9 +18,11 @@ import {
 import {
     COMPUTER_CHANNELS,
     COMPUTER_CLOSE_REASONS,
+    COMPUTER_CONTROL_DECISIONS,
     COMPUTER_QUALITIES,
     type ComputerChannel,
     type ComputerCloseReason,
+    type ComputerControlDecision,
     type ComputerQuality,
 } from '@ever-works/contracts';
 import { FleetJobNodeCredentialDto } from '../../fleet/dto/fleet-job.dto';
@@ -61,6 +64,28 @@ export class UpdateComputerSessionDto {
     @IsOptional()
     @IsIn(COMPUTER_CHANNELS)
     activeChannel?: ComputerChannel;
+}
+
+/** `POST /api/agents/:id/computer/sessions/:sessionId/control` — take control, or ask for it. */
+export class ComputerControlDto {
+    @ApiProperty({
+        required: false,
+        description: 'Ask whoever holds control to hand it over, instead of taking a free machine.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    request?: boolean;
+}
+
+/** `POST /api/agents/:id/computer/sessions/:sessionId/control/handover` — the holder answers. */
+export class AnswerComputerControlRequestDto {
+    @ApiProperty({ format: 'uuid', description: 'The request being answered.' })
+    @IsUUID()
+    requestId: string;
+
+    @ApiProperty({ enum: COMPUTER_CONTROL_DECISIONS })
+    @IsIn(COMPUTER_CONTROL_DECISIONS)
+    decision: ComputerControlDecision;
 }
 
 /** `POST /api/agents/:id/computer/profile/reset`. */

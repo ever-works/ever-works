@@ -8,6 +8,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { ConnectionHealth, ConnectionHealthErrorCode } from '@ever-works/contracts';
 import { User } from './user.entity';
 import { EncryptedJsonColumn } from './_secret-json-column';
 import { PortableDateColumn } from './_types';
@@ -93,6 +94,31 @@ export class McpServerConnection {
     /** Classified message of the last failed connect/list/call — never carries header values. */
     @Column({ type: 'text', nullable: true })
     lastError?: string | null;
+
+    /**
+     * AW-15 — connection health, derived from every real connection attempt
+     * (a run listing tools, a tool call, a Settings test) by the pure
+     * `classifyProbeResult`: `unknown` until the first attempt, then
+     * `healthy` / `degraded` / `expired` / `unreachable`, or the
+     * `insecure_transport` WARNING (a working connection that sent literal
+     * credentials over plain http). Additive: nothing that reads
+     * `lastConnectedAt` / `lastError` changes. Widened from 16 to 32 by
+     * `1791150200000-AddConnectionCredentialTransportPolicy`.
+     */
+    @Column({ type: 'varchar', length: 32, default: 'unknown' })
+    health: ConnectionHealth;
+
+    /** When `health` was last written. Portable for the same reason as `lastConnectedAt`. */
+    @PortableDateColumn({ nullable: true })
+    healthCheckedAt?: Date | null;
+
+    /** Consecutive failed attempts; reset to 0 by a success. */
+    @Column({ type: 'int', default: 0 })
+    healthFailureCount: number;
+
+    /** Classified code for `lastError` (e.g. `credential_missing`) — a code, never a value. */
+    @Column({ type: 'varchar', length: 48, nullable: true })
+    lastErrorCode?: ConnectionHealthErrorCode | null;
 
     // Tenant + Organization scope FKs (EW-651 Tier A denormalization).
     // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.

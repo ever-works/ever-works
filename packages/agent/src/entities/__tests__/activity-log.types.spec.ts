@@ -91,6 +91,8 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Agent computers — one row per stretch of control of an Agent's machine.
+            ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -158,16 +160,19 @@ describe('activity-log.types', () => {
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
             //    on develop, which did not yet carry schedule_paused /
             //    schedule_resumed.
-            // Merge of develop's Live Feed members with this branch's Schedules
-            // workspace pause/resume members: 157 base + 2 + 3 -> 162.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop, on the same Live-Feed-only base.
+            // Merge of develop's Live Feed + Agent computers members with this
+            // branch's Schedules workspace pause/resume members:
+            // 157 base + 2 + 3 + 1 -> 163.
             //
-            // 🛑 162 is COUNTED from the merged enum, never added up from the
+            // 🛑 163 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 159, develop was at 160), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(162);
+            expect(literals).toHaveLength(163);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

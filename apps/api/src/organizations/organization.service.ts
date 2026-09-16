@@ -19,7 +19,12 @@ import { UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS } from '@ever-works/contracts
 // `@ever-works/agent/policy`: the sanitizer is pure and the contracts
 // package is dependency-free, so this file does not drag the agent
 // package's entity graph into every consumer of the org service.
-import { sanitizeMergePolicyOverride, type MergePolicyOverride } from '@ever-works/contracts';
+import {
+    sanitizeMergePolicyOverride,
+    sanitizeOrganizationConnectionPolicy,
+    type MergePolicyOverride,
+    type OrganizationConnectionPolicy,
+} from '@ever-works/contracts';
 import { UsernameAllocatorService } from '../users/services/username-allocator.service';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
 
@@ -1065,6 +1070,11 @@ export class OrganizationService {
              * `null` clears the override (inherit Tenant / platform default).
              */
             mergePolicy?: MergePolicyOverride | null;
+            /**
+             * AW-15 — connection safety settings. `null` resets to defaults
+             * (every setting off).
+             */
+            connectionPolicy?: OrganizationConnectionPolicy | null;
         },
     ): Promise<Organization> {
         const user = await this.userRepository.findById(userId);
@@ -1075,7 +1085,7 @@ export class OrganizationService {
         if (!org || org.tenantId !== user.tenantId) {
             throw new NotFoundException(`Organization ${organizationId} not found`);
         }
-        const { vision, mergePolicy, ...rest } = patch;
+        const { vision, mergePolicy, connectionPolicy, ...rest } = patch;
         let updatePayload: Partial<Organization> = { ...rest };
         if (vision !== undefined) {
             updatePayload.vision = this.normalizeVision(vision);
@@ -1092,6 +1102,15 @@ export class OrganizationService {
                 const sanitized = sanitizeMergePolicyOverride(mergePolicy);
                 updatePayload.mergePolicy = Object.keys(sanitized).length > 0 ? sanitized : null;
             }
+        }
+        // AW-15 — connection safety settings. Sanitized behind the DTO the
+        // same way (only real booleans survive); nothing left is stored as
+        // NULL so "every default" has one representation at rest.
+        if (connectionPolicy !== undefined) {
+            updatePayload.connectionPolicy =
+                connectionPolicy === null
+                    ? null
+                    : sanitizeOrganizationConnectionPolicy(connectionPolicy);
         }
         await this.organizationRepository.update(organizationId, updatePayload);
         const updated = await this.organizationRepository.findById(organizationId);

@@ -136,6 +136,9 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_COLLABORATOR_ENABLED,
     ActivityActionType.AGENT_COLLABORATOR_DISABLED,
     ActivityActionType.AGENT_COLLABORATOR_REMOVED,
+    // Agent computers — a stretch of someone's control of this Agent's machine,
+    // written by the activity-log listener with `details.resourceId` = the Agent.
+    ActivityActionType.AGENT_COMPUTER_CONTROLLED,
 ];
 
 /**

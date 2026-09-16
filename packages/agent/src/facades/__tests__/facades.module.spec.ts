@@ -25,6 +25,8 @@ import { NotificationChannelFacadeService } from '../notification-channel.facade
 import { VectorStoreFacadeService } from '../vector-store.facade';
 // Goals feature PR-7 — metrics-provider capability facade.
 import { MetricsFacadeService } from '../metrics.facade';
+// AW-15 — connection-scopes capability facade.
+import { ConnectionScopesFacadeService } from '../connection-scopes.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -64,6 +66,8 @@ describe('FacadesModule + barrel re-exports', () => {
         VectorStoreFacadeService,
         // Goals feature PR-7 — metrics-provider capability (custom-http, Stripe).
         MetricsFacadeService,
+        // AW-15 — connection-scopes capability (provider access levels).
+        ConnectionScopesFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -139,6 +143,7 @@ describe('FacadesModule + barrel re-exports', () => {
                 NotificationChannelFacadeService,
             );
             expect(facadesBarrel.MetricsFacadeService).toBe(MetricsFacadeService);
+            expect(facadesBarrel.ConnectionScopesFacadeService).toBe(ConnectionScopesFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -258,6 +263,8 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Goals feature PR-7 — metrics-provider capability facade.
                     'MetricsFacadeError',
                     'MetricsFacadeService',
+                    // AW-15 — connection-scopes capability facade.
+                    'ConnectionScopesFacadeService',
                     // Merge-policy matrix (Wave 3, D4). `AgentMergeActor` is
                     // type-only and correctly absent from this runtime list.
                     'MergePolicyRefusedError',
