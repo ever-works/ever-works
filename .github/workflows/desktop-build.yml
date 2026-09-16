@@ -19,14 +19,23 @@ name: Desktop App Build
 # pull-request cells build the shell alone to keep PR feedback fast, and the
 # resulting app then reports that local-stack mode is unavailable.
 
+# TRIGGER POLICY (owner, 2026-09-14): the heavy suites no longer run on pull
+# requests. Developers run them locally, merge into `develop`, and the real
+# verification happens when a batch is cascaded `develop -> stage -> main`.
+# See the long note at the top of ci.yml for the numbers behind that decision.
+# Nothing was deleted here — the same jobs run on the same files, just on
+# `stage` and `main` instead of on every PR, and `workflow_dispatch` below
+# still runs the whole thing on demand against any branch:
+#   gh workflow run <this-file> --ref <your-branch>
+#
+# Note for whoever reads the queue: this matrix runs on ubuntu-latest,
+# windows-latest and macos-latest — GitHub-hosted, NOT the self-hosted ARC
+# pool — so it was never part of the homelab starvation. It is narrowed here
+# to keep one consistent rule across the repo, and because macOS minutes bill
+# at 10x.
 on:
   push:
-    branches: [main, develop, stage]
-    paths:
-      - 'apps/desktop/**'
-      - '.github/workflows/desktop-build.yml'
-  pull_request:
-    branches: [main, develop, stage]
+    branches: [main, stage]
     paths:
       - 'apps/desktop/**'
       - '.github/workflows/desktop-build.yml'
