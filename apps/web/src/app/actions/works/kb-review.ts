@@ -109,6 +109,29 @@ export async function archiveKbDocumentAction(args: {
 }
 
 /**
+ * Restore — the inverse of archive, from the workbench header or the tree
+ * context menu. Back to the shelf and into the folder the document was
+ * archived from; `restoredToUnfiled` says when that folder is gone. Idempotent.
+ */
+export async function unarchiveKbDocumentAction(args: {
+    workId: string;
+    docId: string;
+    path?: string;
+}): Promise<ActionResult<{ document: KbDocumentBodyDto; restoredToUnfiled: boolean }>> {
+    try {
+        const result = await kbAPI.unarchiveDocument(args.workId, args.docId);
+        revalidateKb(args.workId, args.path);
+        return {
+            success: true,
+            data: { document: result.document, restoredToUnfiled: result.restoredToUnfiled },
+        };
+    } catch (error) {
+        console.error('[kb-review] failed to restore KB document:', error);
+        return { success: false, error: toMessage(error, 'Failed to restore the document') };
+    }
+}
+
+/**
  * Supersede — pick the survivor. Reuses the M4 decision status machine:
  * `superseded` with `supersededByDocId` writes the chain link on BOTH
  * documents, so the demoted decision keeps rendering as
