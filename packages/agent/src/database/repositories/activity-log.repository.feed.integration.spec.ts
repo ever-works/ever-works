@@ -82,6 +82,29 @@ describe('Live Feed over seeded activity (integration)', () => {
         );
     }
 
+    /**
+     * A row the COLUMN DEFAULT timestamps, exactly as every real write path
+     * does. `seed()` above always passes an explicit `createdAt`, which TypeORM
+     * stores with `.SSS` — that accidental padding is what hid the keyset
+     * defect from this suite: the product's own rows take `datetime('now')`,
+     * which writes second precision and no fraction at all.
+     */
+    function seedAtNow(): Promise<ActivityLog> {
+        sequence += 1;
+        const repository = dataSource.getRepository(ActivityLog);
+        return repository.save(
+            repository.create({
+                userId: USER,
+                actionType: ActivityActionType.TASK_CREATED,
+                action: 'task_created',
+                status: ActivityStatus.COMPLETED,
+                summary: `now row ${sequence}`,
+                tenantId: TENANT,
+                organizationId: null,
+            } as Partial<ActivityLog>),
+        );
+    }
+
     async function seedAgent(
         id: string,
         name: string,
@@ -153,6 +176,27 @@ describe('Live Feed over seeded activity (integration)', () => {
             (item) => item.createdAt,
         );
         expect([...times].sort().reverse()).toEqual(times);
+    });
+
+    it('advances past rows the column default timestamped, which carry no fractional second', async () => {
+        // `datetime('now')` writes 'YYYY-MM-DD HH:MM:SS'. The whole burst lands
+        // inside one second, so the id tiebreak is the only thing separating
+        // these rows — and a cursor key padded out to '.000' would sort after
+        // every one of them and re-read the same page until the caller's own
+        // guard loop gave up (stage run 34970057817: 60 ids, 3 distinct).
+        for (let i = 0; i < 7; i++) await seedAtNow();
+
+        const seen: string[] = [];
+        let cursor: string | null = null;
+        for (let page = 0; page < 10; page++) {
+            const result = await feed.getPage(USER, PERSONAL, { limit: 3, cursor }, new Date());
+            seen.push(...result.items.map((item) => item.id));
+            cursor = result.nextCursor;
+            if (!cursor) break;
+        }
+
+        expect(seen).toHaveLength(7);
+        expect(new Set(seen).size).toBe(7);
     });
 
     it('stops at the 90-day history floor', async () => {
@@ -304,10 +348,13 @@ describe('Live Feed over seeded activity (integration)', () => {
         await seed({ minutesAgo: 7 });
 
         const page = await feed.getPage(USER, PERSONAL, { limit: 2 }, NOW);
-        expect(decodeFeedCursor(page.nextCursor as string)).toEqual({
-            createdAt: new Date(last.createdAt).toISOString(),
-            id: last.id,
-        });
+        // The key is the store's own text for the row, so assert the INSTANT it
+        // names rather than how this engine happens to render it.
+        const decoded = decodeFeedCursor(page.nextCursor as string);
+        expect(decoded.id).toBe(last.id);
+        expect(new Date(`${decoded.createdAt}Z`).getTime()).toBe(
+            new Date(last.createdAt).getTime(),
+        );
     });
 
     it('builds the actor roster from scoped agents and counts attributed activity in the window', async () => {

@@ -18,9 +18,15 @@ export interface ActivityFeedPageRows {
     /** Newest first; at most `limit` rows. */
     rows: ActivityLog[];
     /**
-     * The exact ordering timestamp of each row, keyed by row id, for building
-     * the next keyset cursor. On Postgres this keeps the column's microsecond
-     * precision, which a JS `Date` would silently round away.
+     * The row's ordering timestamp exactly as the store holds it, keyed by row
+     * id, for building the next keyset cursor: Postgres' microsecond text, or
+     * sqlite's stored text. A JS `Date` round-trip would round one and pad the
+     * other — and a padded key sorts after the row it came from, so the cursor
+     * would match its own row and the page would never advance.
+     *
+     * Only ever the store's own key: a row the store gave none for is ABSENT
+     * rather than carrying a re-derived one, so the caller mints no cursor and
+     * the feed ends instead of repeating its head.
      */
     sortKeys: Map<string, string>;
     hasMore: boolean;
@@ -58,6 +64,26 @@ type ActivityQueryBuilder = SelectQueryBuilder<ActivityLog>;
 
 /** Placeholder for an empty `IN (...)` list, which is not valid SQL. */
 const NO_MATCH = ['__none__'];
+
+/**
+ * A feed cursor key (`YYYY-MM-DDTHH:MM:SS[.fff…]`) rewritten into the text form
+ * the sqlite family stores a `datetime` column as: a space separator, no zone
+ * marker, and the fractional part exactly as the row carries it.
+ *
+ * `@CreateDateColumn()` takes the driver's `datetime('now')` default, which
+ * writes SECOND precision (`'2026-09-16 13:45:34'`). Binding a JS `Date` back
+ * renders it through `DateUtils.mixedDateToUtcDatetimeString`, which always
+ * appends `.SSS` — and the column holds non-numeric TEXT, so SQLite compares
+ * lexicographically: `'…:34'` sorts BEFORE `'…:34.000'`, which makes
+ * `createdAt < :cursor` true for the cursor row itself. The page then never
+ * advances and the feed re-reads its own head forever.
+ */
+function toSqliteStoredTimestamp(key: string): string {
+    return key.replace('T', ' ').replace(/Z$/, '');
+}
+
+/** The shape `encodeFeedCursor` mints and `decodeFeedCursor` accepts. */
+const FEED_SORT_KEY = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?$/;
 
 @Injectable()
 export class ActivityLogRepository {
@@ -375,23 +401,31 @@ export class ActivityLogRepository {
         }
 
         if (options.cursor) {
-            // Postgres compares the microsecond-precise text key against the
-            // column; better-sqlite3 stores milliseconds, so a Date is exact.
+            // Both engines compare the store's OWN key for the last row of the
+            // previous page, so the predicate compares exactly what
+            // `ORDER BY activity.createdAt` orders by. Postgres: a
+            // microsecond-precise text key the timestamp column parses back to
+            // the same instant. better-sqlite3: the stored text verbatim — the
+            // column holds what `datetime('now')` wrote, which has no
+            // fractional second, and a JS `Date` binds as '…:12.000', which
+            // sorts AFTER '…:12' and brings the cursor row back on every page.
             const cursorCreatedAt = postgres
                 ? options.cursor.createdAt
-                : new Date(options.cursor.createdAt);
+                : toSqliteStoredTimestamp(options.cursor.createdAt);
             qb.andWhere(
                 '(activity.createdAt < :feedCursorCreatedAt OR (activity.createdAt = :feedCursorCreatedAt AND activity.id < :feedCursorId))',
                 { feedCursorCreatedAt: cursorCreatedAt, feedCursorId: options.cursor.id },
             );
         }
 
-        if (postgres) {
-            qb.addSelect(
-                `to_char(activity."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.US')`,
-                'feed_sort_key',
-            );
-        }
+        // The key a cursor carries is always the store's own text for the row,
+        // never a re-rendering of it through a JS `Date`.
+        qb.addSelect(
+            postgres
+                ? `to_char(activity."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.US')`
+                : `replace(CAST(activity."createdAt" AS TEXT), ' ', 'T')`,
+            'feed_sort_key',
+        );
 
         qb.orderBy('activity.createdAt', 'DESC')
             .addOrderBy('activity.id', 'DESC')
@@ -399,19 +433,23 @@ export class ActivityLogRepository {
 
         const { entities, raw } = await qb.getRawAndEntities();
         const sortKeys = new Map<string, string>();
-        if (postgres) {
-            for (const record of raw as Array<Record<string, unknown>>) {
-                const id = record.activity_id;
-                const key = record.feed_sort_key;
-                if (typeof id === 'string' && typeof key === 'string') sortKeys.set(id, key);
+        for (const record of raw as Array<Record<string, unknown>>) {
+            const id = record.activity_id;
+            const key = record.feed_sort_key;
+            if (typeof id === 'string' && typeof key === 'string' && FEED_SORT_KEY.test(key)) {
+                sortKeys.set(id, key);
             }
         }
+        // Deliberately NO fallback key. Re-deriving one from the hydrated
+        // `createdAt` would re-introduce the defect this method exists to fix:
+        // `new Date(row.createdAt).toISOString()` always carries a fractional
+        // part, and on sqlite '…:34.000' sorts AFTER the stored '…:34', so the
+        // cursor would match its own row and the feed would re-read its own head
+        // forever. A row the store gave no key for simply has none, and
+        // `FeedService` then mints no `nextCursor` — the feed ENDS instead of
+        // repeating itself. Unreachable while both engines select
+        // `feed_sort_key`, and it stays honest if that ever changes shape.
         const rows = entities.slice(0, options.limit);
-        for (const row of rows) {
-            if (!sortKeys.has(row.id)) {
-                sortKeys.set(row.id, new Date(row.createdAt).toISOString());
-            }
-        }
         return { rows, sortKeys, hasMore: entities.length > options.limit };
     }
 
