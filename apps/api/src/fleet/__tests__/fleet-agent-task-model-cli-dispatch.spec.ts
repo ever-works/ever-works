@@ -59,7 +59,10 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
     let store: { enqueue: jest.Mock; findById: jest.Mock };
     let delegate: AgentTaskExecuteDispatcher & { enqueue: jest.Mock };
 
-    const buildDispatcher = (planner?: { plan: jest.Mock }): AgentTaskExecuteDispatcher => {
+    const buildDispatcher = (planner?: {
+        plan: jest.Mock;
+        refuseAgentReviewRun?: jest.Mock;
+    }): AgentTaskExecuteDispatcher => {
         const factory = new NodeDispatcherFactory({ store });
         const plugin = new NodeJobRuntimePlugin().useDispatcherFactory(factory);
         const router = new FleetRunRouterService(factory, plugin, undefined);
@@ -218,6 +221,69 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         expect(planner.plan).not.toHaveBeenCalled();
         expect(delegate.enqueue).toHaveBeenCalledTimes(1);
         expect(store.enqueue).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — the dispatcher
+     * half of "an agent REVIEW run never becomes a fleet job".
+     *
+     * The planner's own spec proves `refuseAgentReviewRun` recognises a
+     * review run. This proves the WIRING: the dispatcher asks it for every
+     * fleet-bound run, BEFORE a plan is built (so the review brief is never
+     * rendered as an `# OWNER ANSWER`) and before a job row exists (so no
+     * node can lease a run whose verdict it has no channel to record), and
+     * lets its refusal propagate — `dispatchAgentRun` then marks the run
+     * `dispatch-failed` and the review ledger settles the claim `failed`.
+     */
+    describe('agent review runs (slice AD)', () => {
+        it('refuses a review run before planning or enqueuing anything', async () => {
+            const planner = {
+                plan: jest.fn().mockResolvedValue(plan),
+                refuseAgentReviewRun: jest
+                    .fn()
+                    .mockRejectedValue(new Error('Run run-1 is an agent code-review run')),
+            };
+            await expect(buildDispatcher(planner).enqueue(payload())).rejects.toThrow(
+                /agent code-review run/,
+            );
+            expect(planner.refuseAgentReviewRun).toHaveBeenCalledWith(payload());
+            expect(planner.plan).not.toHaveBeenCalled();
+            expect(store.enqueue).not.toHaveBeenCalled();
+            // Not a cloud fallback either: a refusal is not a routing hiccup.
+            expect(delegate.enqueue).not.toHaveBeenCalled();
+        });
+
+        it('asks in the legacy command mode too — a null plan is still a fleet job', async () => {
+            const planner = {
+                plan: jest.fn().mockResolvedValue(null),
+                refuseAgentReviewRun: jest.fn().mockRejectedValue(new Error('review run')),
+            };
+            await expect(buildDispatcher(planner).enqueue(payload())).rejects.toThrow(/review run/);
+            expect(store.enqueue).not.toHaveBeenCalled();
+        });
+
+        it('lets an ordinary run through to the plan and the job', async () => {
+            const planner = {
+                plan: jest.fn().mockResolvedValue(plan),
+                refuseAgentReviewRun: jest.fn().mockResolvedValue(undefined),
+            };
+            await buildDispatcher(planner).enqueue(payload());
+            expect(planner.refuseAgentReviewRun.mock.invocationCallOrder[0]).toBeLessThan(
+                planner.plan.mock.invocationCallOrder[0],
+            );
+            expect(store.enqueue).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not ask for a run routed to the platform runtime, where a review run belongs', async () => {
+            process.env.EVER_WORKS_JOB_RUNTIME = 'trigger';
+            const planner = {
+                plan: jest.fn().mockResolvedValue(plan),
+                refuseAgentReviewRun: jest.fn().mockRejectedValue(new Error('review run')),
+            };
+            await buildDispatcher(planner).enqueue(payload());
+            expect(planner.refuseAgentReviewRun).not.toHaveBeenCalled();
+            expect(delegate.enqueue).toHaveBeenCalledTimes(1);
+        });
     });
 
     /**

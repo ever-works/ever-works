@@ -11,6 +11,7 @@ import type { Agent, Task } from '@ever-works/agent/entities';
 import { SkillsService } from '@ever-works/agent/skills';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import {
+    isAgentReviewRunScope,
     resolveAcceptanceChecks,
     resolveChecksPolicy,
     resolveSetupSteps,
@@ -350,6 +351,78 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         };
     }
 
+    /**
+     * Reviewer agent stage (self-build slice AD, EW-811) — refuse an agent
+     * REVIEW run before any fleet job is built for it, in either mode.
+     *
+     * Why a review run can never run here: its only output is a verdict,
+     * recorded through `submitTaskReview`, and that tool exists only in
+     * the platform's in-process tool loop. A node runs a CLI on a prompt;
+     * its MCP bridge is off by default and exposes no verdict route. So a
+     * fleet review would spend a model run on one of the owner's PCs and
+     * could not possibly record anything, leaving its ledger row open and
+     * its budget slot spent. Worse, its brief travels on `pendingInput`,
+     * which {@link resolveOwnerMessages} renders as `# OWNER ANSWER` —
+     * the pull request author's diff, presented to the model as the owner's
+     * own words — cut to 16 KiB with no marker, and the model would be told
+     * to "make your changes here" in a worktree the node then pushes.
+     *
+     * Identified from the run ROW's admission scope (platform state written
+     * at dispatch), never from the queue payload, so a parked review run
+     * promoted later by the dispatch-gate drain is refused too.
+     *
+     * NOT the first refusal a review run meets on the fleet. The dispatcher
+     * asks the G9 delegation-scope guard
+     * ({@link refuseUnenforceableDelegationScope}) first, and the review-only
+     * scope always narrows, so with production wiring (the planner is the
+     * guard) a review run is refused there, as
+     * `fleet-delegation-scope-unenforceable`, and this method is never
+     * reached. It is reachable only behind an explicit
+     * `delegationScopeGuard` that admits the run. It stays the rule that
+     * matters if G9 is ever relaxed for nodes that can enforce a scope,
+     * because a verdict still cannot be recorded on a node.
+     *
+     * Fails closed: an unbound run repository, an unreadable row, or a run
+     * id whose row does not exist refuses the dispatch rather than guessing
+     * that it is not a review. A missing row is not evidence of an ordinary
+     * run: it is a run scope that cannot be verified at all, and behind a
+     * guard that admitted the payload nothing else would stop it reaching
+     * {@link plan}. No run id means no pre-created run row, which a review
+     * dispatch never produces (`TaskTransitionService.dispatchAgentRun`
+     * refuses to bind a review without one), so that payload is not a
+     * review and passes. The reasons here deliberately never carry the G9
+     * `fleet-delegation-scope-` prefix: they are this rule's refusals, not
+     * the delegation-scope guard's.
+     */
+    async refuseAgentReviewRun(payload: AgentTaskExecuteDispatchPayload): Promise<void> {
+        if (!payload.runId) return;
+        if (!this.runs) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} could not be checked before routing to the fleet (no run repository) — refusing rather than risk dispatching an agent review run a fleet node cannot complete`,
+            );
+        }
+        let run: Awaited<ReturnType<AgentRunRepository['findById']>>;
+        try {
+            run = await this.runs.findById(payload.runId);
+        } catch (err) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} could not be read before routing to the fleet — refusing rather than risk dispatching an agent review run a fleet node cannot complete: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+        if (!run) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} was not found before routing to the fleet — refusing rather than risk dispatching an agent review run a fleet node cannot complete`,
+            );
+        }
+        if (isAgentReviewRunScope(run.delegationScope)) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} is an agent code-review run, and review runs cannot execute on the fleet: a fleet node has no channel to record the reviewer's verdict. Route this Work's agent runs to the platform runtime to use agent reviewers.`,
+            );
+        }
+    }
+
     async plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null> {
         const settings = await this.resolveSettings(payload.userId);
         if (settings.mode !== 'model-cli') {
@@ -654,6 +727,22 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
 
         const narrowing = describeDelegationScopeNarrowing(run.delegationScope);
         if (narrowing.length === 0) return;
+
+        // An agent REVIEW run (slice AD) is admitted under the review-only
+        // scope, which always narrows, so it is refused HERE — before
+        // `refuseAgentReviewRun` is ever asked. Same code (the review ledger's
+        // `refusalCode` and the specs key on it); only the wording differs, so
+        // the owner is not told a review run was a delegated sub-agent run.
+        if (isAgentReviewRunScope(run.delegationScope)) {
+            throw new FleetDelegationScopeRefusedError(
+                FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+                `run ${payload.runId} is an agent review run, and review runs cannot run on the fleet: ` +
+                    `its scope narrows what it may do (${narrowing.join('; ')}), which no fleet node can ` +
+                    `enforce, and a node has no channel to record the reviewer's verdict. Refused rather ` +
+                    `than run with more than the review admitted. Route this Work's agent runs to the ` +
+                    `platform runtime to use agent reviewers.`,
+            );
+        }
 
         throw new FleetDelegationScopeRefusedError(
             FLEET_DELEGATION_SCOPE_UNENFORCEABLE,

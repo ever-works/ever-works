@@ -60,6 +60,13 @@ import {
     type RunCaptureState,
 } from './run-capture';
 import { filterToolNamesBySubAgentScope, type SubAgentScope } from '@ever-works/contracts';
+// Pure leaf (type-only imports of its own) — no runtime graph, no cycle.
+import {
+    AGENT_REVIEW_BRIEF_MISSING,
+    isAgentReviewBriefMessage,
+    isAgentReviewRunScope,
+    SUBMIT_TASK_REVIEW_TOOL,
+} from '../tasks-domain/task-agent-review';
 
 export interface AgentRunContext {
     runId: string;
@@ -804,16 +811,40 @@ export class AgentRunService {
         // state-machine + force semantics).
         let capturedFinishStatus: AgentRunOutcome['taskFinishStatus'] = null;
         let capturedForce = false;
-        const toolDescriptors: AgentToolDescriptor[] =
-            context.kind === 'task'
-                ? [
-                      ...baseDescriptors,
-                      this.buildTransitionTaskTool((status, force) => {
-                          capturedFinishStatus = status;
-                          capturedForce = force;
-                      }),
-                  ]
-                : baseDescriptors;
+        // Reviewer agent stage (slice AD, EW-811) — a review run gets NO
+        // virtual transitionTask. This descriptor is appended AFTER the
+        // delegation-scope filter above, so without this a run admitted
+        // with the review-only scope could still move its own Task (and,
+        // through `finalize`, re-enter review or unblock a merge path) —
+        // the one tool the scope was written to withhold.
+        const reviewRun = isAgentReviewRunScope(context.delegationScope);
+        // …and the verdict tool is offered ONLY to an execution that is
+        // running UNDER the review scope. `submitTaskReview` authorizes on
+        // the run ROW (bound to a review, review-scoped), while everything
+        // this loop restricts — the tool surface, the virtual
+        // `transitionTask`, the brief-in-hand gate below — is decided from
+        // the CONTEXT the worker built. Those two must never disagree: a
+        // worker that claims a review row without carrying its scope (the
+        // heartbeat and chat-reply workers' legacy "any in-flight run for
+        // this agent" fallbacks) would otherwise execute it with the full
+        // tool surface and no brief gate, and its verdict would still be
+        // accepted. Without the scope in hand, no verdict tool — so the
+        // only execution that can answer a review is one that is also
+        // narrowed and gated. Withheld silently: an ordinary run has no
+        // review to answer, and the tool would refuse it anyway.
+        const scopedBaseDescriptors = reviewRun
+            ? baseDescriptors
+            : baseDescriptors.filter((descriptor) => descriptor.name !== SUBMIT_TASK_REVIEW_TOOL);
+        const offerVirtualTransition = context.kind === 'task' && !reviewRun;
+        const toolDescriptors: AgentToolDescriptor[] = offerVirtualTransition
+            ? [
+                  ...scopedBaseDescriptors,
+                  this.buildTransitionTaskTool((status, force) => {
+                      capturedFinishStatus = status;
+                      capturedForce = force;
+                  }),
+              ]
+            : scopedBaseDescriptors;
         const toolDefs = toolDescriptors.map((d) => ({
             name: d.name,
             description: d.description,
@@ -840,6 +871,9 @@ export class AgentRunService {
         // Run steering (Wave 4 M5) — set when a cooperative interrupt landed
         // between iterations; the caller finalizes the run `completed`.
         let interrupted = false;
+        // Reviewer agent stage (slice AD, EW-811) — has THIS execution read
+        // its steering queue yet? See the brief-in-hand gate in the loop.
+        let firstSteeringDrain = true;
 
         // Session detail (Feature K) — per-loop capture window. Message
         // and tool-preview rows count toward CAPTURE_MAX_ENTRIES; every
@@ -883,6 +917,58 @@ export class AgentRunService {
                     // reached the model.
                     iterations -= 1;
                     break;
+                }
+                // Reviewer agent stage (slice AD, EW-811) — a review run may
+                // reach the model ONLY with its brief in hand.
+                //
+                // The brief (the diff + the CI verdict) travels as the first
+                // `pendingInput` entry, and draining the queue CLEARS it. A
+                // job-runtime retry re-executes the same `running` row, so
+                // the retry's first drain comes back without the brief —
+                // while the one-tool verdict surface and the open review
+                // row are both still there. Without this gate that retry
+                // could record an `approve` for a diff it never received.
+                //
+                // So: this execution's FIRST drain must start with a brief
+                // the platform composed, or the model is never called — no
+                // round-trip, therefore no tool call, therefore no verdict
+                // from this execution. The review bound to the run is
+                // settled `failed` too, so the verdict service itself
+                // refuses the run from here on. Independent of any
+                // deployment's retry setting. Fails closed on every
+                // ambiguity: an unreadable queue reads as empty, and any
+                // first message that is not a brief is not a brief. The
+                // brief cannot be forged into the queue: nothing may steer
+                // a review run (`RunSteeringService.steer` and
+                // `AgentRunRepository.appendPendingInput` both refuse one,
+                // and Task chat does not route to one), so the only writer
+                // of a review run's queue is the dispatch's seed.
+                if (firstSteeringDrain) {
+                    firstSteeringDrain = false;
+                    if (reviewRun && !isAgentReviewBriefMessage(steering.pendingInput[0])) {
+                        await this.runLogs
+                            .append({
+                                runId: context.runId,
+                                level: 'ERROR',
+                                step: 'agent-review',
+                                message:
+                                    'Review run started without its brief (already consumed by an earlier execution) — stopped before the first model round-trip; no verdict can be recorded.',
+                                metadata: {
+                                    reason: AGENT_REVIEW_BRIEF_MISSING,
+                                    queuedMessages: steering.pendingInput.length,
+                                },
+                            })
+                            .catch(() => undefined);
+                        await this.abandonAgentReviewRun(context.runId);
+                        // This round-trip never reached the model.
+                        iterations -= 1;
+                        return {
+                            errored: true,
+                            errorMessage: AGENT_REVIEW_BRIEF_MISSING,
+                            outcome: { errored: true, errorMessage: AGENT_REVIEW_BRIEF_MISSING },
+                            iterations,
+                        };
+                    }
                 }
                 for (const injected of steering.pendingInput) {
                     // Security (prompt-injection): a steering message is
@@ -1116,6 +1202,32 @@ export class AgentRunService {
             capturedForce,
         );
         return { errored: false, outcome, iterations };
+    }
+
+    /**
+     * Reviewer agent stage (slice AD, EW-811) — close the review bound to a
+     * review run that started without its brief.
+     *
+     * Feature-detected like {@link takeSteeringSignals}: `this.toolService`
+     * is a partial double in many specs and an older RPC proxy in a rolling
+     * worker. Best-effort by construction — the caller has ALREADY refused
+     * to call the model for this execution, which on its own means no
+     * verdict can come from it; settling the ledger row is the second,
+     * independent closure, not the first.
+     */
+    private async abandonAgentReviewRun(runId: string): Promise<void> {
+        const abandon = (this.toolService as Partial<AgentToolService> | undefined)
+            ?.abandonAgentReviewRun;
+        if (typeof abandon !== 'function') return;
+        try {
+            await abandon.call(this.toolService, runId);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: closing the brief-less review failed (the model was not called): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
     }
 
     /**

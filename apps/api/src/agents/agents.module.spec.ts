@@ -79,6 +79,8 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskAssigneeRepository: class TaskAssigneeRepository {},
     TaskReviewerRepository: class TaskReviewerRepository {},
     TaskApproverRepository: class TaskApproverRepository {},
+    // Reviewer agent stage (slice AD, EW-811).
+    TaskAgentReviewService: class TaskAgentReviewService {},
     TaskStatus: {},
     RUN_STEERING_PORT: 'RUN_STEERING_PORT',
 }));
@@ -164,6 +166,7 @@ import {
     TaskAssigneeRepository,
     TaskReviewerRepository,
     TaskApproverRepository,
+    TaskAgentReviewService,
 } from '@ever-works/agent/tasks-domain';
 import {
     AgentRepository,
@@ -236,6 +239,13 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             WorkflowGraphExecutorService,
             // Inbox (operator message center) — the `ask_human` tool.
             InboxService,
+            // Reviewer agent stage (slice AD, EW-811) — backs
+            // `submitTaskReview`, the ONE way a review run records a
+            // verdict. Appended LAST: this array is positional and the
+            // container passes it positionally to `useFactory`, so this
+            // assertion is what stops a future slice inserting in the
+            // middle and silently rebinding every service after it.
+            TaskAgentReviewService,
         ]);
     });
 
@@ -344,6 +354,24 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(bundle?.tasks?.assignees).toBeDefined();
         expect(bundle?.tasks?.reviewers).toBeDefined();
         expect(bundle?.tasks?.approvers).toBeDefined();
+    });
+
+    it('binds the reviewer-agent verdict service (unbound, submitTaskReview is not offered)', () => {
+        // Reviewer agent stage (slice AD, EW-811). Without this binding
+        // `buildAgentTaskTools` omits `submitTaskReview` entirely, every
+        // dispatched review run has no way to record a verdict, and the
+        // approver rows this slice exists to write stay `pending`
+        // forever — a dead seam that costs a model run per review.
+        const factory = findProvider(AGENT_DOMAIN_TOOL_SOURCES);
+        const bundle = factory?.useFactory?.(
+            ...(factory.inject ?? []).map((_, index) => ({ stub: index })),
+        ) as { tasks?: Record<string, unknown> };
+        expect(bundle?.tasks?.agentReviews).toBeDefined();
+        // Positional proof: the LAST injected service is the one that
+        // lands here, so an insertion anywhere earlier is caught.
+        expect(bundle?.tasks?.agentReviews).toEqual({
+            stub: (factory?.inject ?? []).length - 1,
+        });
     });
 
     it('carries every domain in the assembled bundle', () => {

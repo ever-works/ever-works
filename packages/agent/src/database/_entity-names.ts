@@ -170,6 +170,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'SubscriptionPlan',
     // Tasks family (PR #1019) ──
     'Task',
+    // Reviewer agent stage (slice AD, EW-811) - the review ledger.
+    'TaskAgentReview',
     'TaskApprover',
     'TaskAssignee',
     'TaskAttachment',

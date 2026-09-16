@@ -69,6 +69,7 @@ import {
     TaskAssigneeRepository,
     TaskReviewerRepository,
     TaskApproverRepository,
+    TaskAgentReviewService,
     RUN_STEERING_PORT,
     TERMINAL_SESSION_STARTER,
 } from '@ever-works/agent/tasks-domain';
@@ -877,6 +878,13 @@ const HELD_FOR_APPROVAL_NOTE =
                 ToolGrantService,
                 WorkflowGraphExecutorService,
                 InboxService,
+                // Reviewer agent stage (slice AD, EW-811) — backs
+                // `submitTaskReview`. APPENDED LAST, and matched by the
+                // last parameter of `useFactory` below: this list is
+                // positional and the container passes it positionally, so
+                // inserting anywhere else silently rebinds every service
+                // after the insertion point.
+                TaskAgentReviewService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -897,11 +905,24 @@ const HELD_FOR_APPROVAL_NOTE =
                 toolGrants: ToolGrantService,
                 workflowExecutor: WorkflowGraphExecutorService,
                 inboxService: InboxService,
+                agentReviews: TaskAgentReviewService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
                 // when any of them is missing.
-                tasks: { tasksService, chatService, assignees, reviewers, approvers },
+                tasks: {
+                    tasksService,
+                    chatService,
+                    assignees,
+                    reviewers,
+                    approvers,
+                    // Reviewer agent stage (slice AD, EW-811). Unbound,
+                    // `submitTaskReview` is not offered at all and no
+                    // agent approval can be recorded — the same
+                    // fail-closed posture as the membership repositories
+                    // above.
+                    agentReviews,
+                },
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },

@@ -75,6 +75,7 @@ export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
 export * from './task-review-rejection.entity';
 export * from './task-ci-auto-resume-attempt.entity';
+export * from './task-agent-review.entity';
 export * from './task-approver.entity';
 export * from './task-block.entity';
 export * from './task-relation.entity';
