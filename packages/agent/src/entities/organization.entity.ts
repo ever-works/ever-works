@@ -10,6 +10,7 @@ import type {
     EmailSendPolicyOverride,
     KbMemoryConsolidationSettings,
     MergePolicyOverride,
+    OrganizationConnectionPolicy,
     OrganizationDigestSettings,
 } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
@@ -216,6 +217,23 @@ export class Organization {
      */
     @Column('simple-json', { nullable: true, name: 'digest_settings' })
     digestSettings?: OrganizationDigestSettings | null;
+
+    /**
+     * AW-15 — connection safety settings for this organization.
+     *
+     * NULL / `{}` means every default, which is the value for every existing
+     * row: a connection's literal auth headers keep working over plain http
+     * (flagged `insecure_transport`), exactly as before. Setting
+     * `{ requireHttpsForCredentials: true }` ("Require https for connection
+     * credentials") opts the organization into refusing credentials of any
+     * kind over plain http. `{{cred.key}}` references are refused over plain
+     * http regardless of this setting.
+     *
+     * Read through `McpCredentialTransportPolicyService` — never inspect this
+     * column directly to decide whether a credential may be sent.
+     */
+    @Column('simple-json', { nullable: true, name: 'connection_policy' })
+    connectionPolicy?: OrganizationConnectionPolicy | null;
 
     /**
      * Agent email (AW-05) — the organization's email sending policy: the

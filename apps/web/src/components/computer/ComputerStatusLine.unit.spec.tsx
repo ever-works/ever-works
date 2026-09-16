@@ -68,3 +68,23 @@ describe('ComputerStatusLine', () => {
         );
     });
 });
+
+describe('ComputerStatusLine — in control', () => {
+    it('says the mode in prose even with colour gone, and adds how long control lasts', () => {
+        render(
+            <ComputerStatusLine
+                agentName="Ops"
+                nodeName="studio-imac"
+                channel="screen"
+                stall="ok"
+                lowered={null}
+                controlling
+                controlNote="Control ends in 57:04."
+            />,
+        );
+        const line = screen.getByRole('status');
+        expect(screen.getByTestId('computer-mode-sentence')).toHaveTextContent('modeControlling');
+        expect(line).toHaveTextContent('Control ends in 57:04.');
+        expect(line).not.toHaveTextContent('Watching');
+    });
+});

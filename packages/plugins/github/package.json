@@ -53,7 +53,8 @@
 			"category": "git-provider",
 			"capabilities": [
 				"git-provider",
-				"oauth"
+				"oauth",
+				"connection-scopes"
 			],
 			"description": "GitHub integration for repository management, git operations, and GitHub Actions",
 			"author": {

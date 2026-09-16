@@ -22,6 +22,7 @@ import {
 	COMPUTER_MAX_ERROR_MESSAGE_LENGTH,
 	COMPUTER_MAX_FRAME_BYTES,
 	COMPUTER_MAX_KEY_NAME_LENGTH,
+	COMPUTER_MAX_POINTER_BUTTONS,
 	COMPUTER_MAX_SCROLL_DELTA,
 	COMPUTER_MAX_TEXT_LENGTH,
 	COMPUTER_MAX_WIRE_FRAME_BYTES,
@@ -211,15 +212,22 @@ function normalizeUnsafe(value: unknown): ComputerFrame | null {
 			const x = own(value, 'x');
 			const y = own(value, 'y');
 			const button = own(value, 'button');
+			const buttons = own(value, 'buttons');
 			if (
 				!isOneOf(COMPUTER_POINTER_ACTIONS, action) ||
 				!isBoundedInt(x, 0, COMPUTER_MAX_DIMENSION) ||
 				!isBoundedInt(y, 0, COMPUTER_MAX_DIMENSION) ||
-				!(button === null || isOneOf(COMPUTER_POINTER_BUTTONS, button))
+				!(button === null || isOneOf(COMPUTER_POINTER_BUTTONS, button)) ||
+				!(buttons === undefined || isBoundedInt(buttons, 0, COMPUTER_MAX_POINTER_BUTTONS))
 			) {
 				return null;
 			}
-			return { kind: 'pointer', action, x, y, button: button as ComputerPointerButton | null };
+			const pointer = { kind: 'pointer', action, x, y, button: button as ComputerPointerButton | null } as const;
+			// The guard above already proved `buttons` is a bounded integer, but that
+			// narrowing does not survive the negated union under every consumer's
+			// compiler settings (packages/agent compiles this source with its own
+			// tsconfig), so state the proven type explicitly, like `button` above.
+			return buttons === undefined ? pointer : { ...pointer, buttons: buttons as number };
 		}
 		case 'key': {
 			const action = own(value, 'action');

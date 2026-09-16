@@ -35,6 +35,9 @@ export * from './release/index.js';
 // Conversations — kinds, participants, send status and delivery outcomes for
 // named conversations with Agents.
 export * from './conversations/index.js';
+// Connections (AW-15) — plain-English scope presets expressed on the
+// tool-grant lattice, and the shared connection-health vocabulary.
+export * from './connections/index.js';
 // Live Feed — the narrated, filterable view of the activity log. Structure
 // only (narration keys + typed destinations); renderers own the words.
 export * from './feed/index.js';
