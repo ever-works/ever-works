@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, type FindOptionsWhere } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import type {
     ConversationAttachmentRef,
     ConversationAuthorType,
@@ -20,6 +21,7 @@ import {
     conversationAuthorTypeForRole,
 } from '../../entities/conversation-message.entity';
 import { ConversationParticipant } from '../../entities/conversation-participant.entity';
+import { readPositionMovesForward } from './conversation-participant.repository';
 import { ownershipWhere, type OwnershipScope } from '../ownership-scope';
 
 export interface CreateConversationInput {
@@ -247,22 +249,30 @@ export class ConversationRepository {
     ): Promise<void> {
         if (!newest?.id) return;
         try {
+            // Built through TypeORM rather than spelled out, so the table and
+            // the column are escaped for the driver in use: raw `"createdAt"`
+            // quoting is Postgres/SQLite-only and MySQL rejects it without
+            // ANSI_QUOTES.
+            const readAtExpression = `(${this.messageRepo
+                .createQueryBuilder('rtm')
+                .select('rtm.createdAt')
+                .where('rtm.id = :readThroughMessageId')
+                .getQuery()})`;
             await this.messageRepo.manager
                 .createQueryBuilder()
                 .update(ConversationParticipant)
                 .set({
                     lastReadMessageId: newest.id,
-                    lastReadAt: () =>
-                        '(SELECT m."createdAt" FROM conversation_messages m WHERE m.id = :readThroughMessageId)',
+                    lastReadAt: () => readAtExpression,
                 })
-                .where('"conversationId" = :conversationId', { conversationId })
-                .andWhere('"participantType" = :participantType', { participantType: 'user' })
-                .andWhere('"role" = :role', { role: 'owner' })
-                // Forward only, like `markRead`: a slower append that
-                // finishes after a newer one must not pull the position back.
-                .andWhere(
-                    '("lastReadAt" IS NULL OR "lastReadAt" <= (SELECT m."createdAt" FROM conversation_messages m WHERE m.id = :readThroughMessageId))',
-                )
+                .where('conversationId = :conversationId', { conversationId })
+                .andWhere('participantType = :participantType', { participantType: 'user' })
+                .andWhere('role = :role', { role: 'owner' })
+                // Forward only, and on the same `(createdAt, id)` pair
+                // `markRead` compares: a slower append that finishes after a
+                // newer one must not pull the position back, not even when
+                // both messages share a stored timestamp.
+                .andWhere(readPositionMovesForward(readAtExpression, 'readThroughMessageId'))
                 .setParameter('readThroughMessageId', newest.id)
                 .execute();
         } catch {
@@ -270,16 +280,38 @@ export class ConversationRepository {
         }
     }
 
+    /**
+     * Write a title for a Conversation the caller owns.
+     *
+     * `onlyWhenNotUserTitled` makes the write a compare-and-set on
+     * `titleSource`: an automatic title is generated from a read taken before
+     * a slow model call, and by the time it comes back the person may have
+     * renamed the Conversation themselves. Without the condition that stale
+     * write would land on top of their name and FR-6 ("a name a person chose
+     * is never overwritten by a model") would hold only until the next race.
+     * Returns whether a row was written, so a caller can tell a refused stale
+     * write from a successful one instead of assuming success.
+     */
     async updateTitle(
         id: string,
         userId: string,
         title: string,
         metadata?: Record<string, unknown>,
-    ): Promise<void> {
-        await this.conversationRepo.update(
-            { id, userId },
-            { title, ...(metadata && { metadata }) },
-        );
+        options: { onlyWhenNotUserTitled?: boolean } = {},
+    ): Promise<boolean> {
+        const query = this.conversationRepo
+            .createQueryBuilder()
+            .update(Conversation)
+            .set({ title, ...(metadata && { metadata }) } as QueryDeepPartialEntity<Conversation>)
+            .where('id = :id', { id })
+            .andWhere('userId = :userId', { userId });
+        if (options.onlyWhenNotUserTitled) {
+            query.andWhere('(titleSource IS NULL OR titleSource != :userTitleSource)', {
+                userTitleSource: 'user' satisfies ConversationTitleSource,
+            });
+        }
+        const result = await query.execute();
+        return (result.affected ?? 0) > 0;
     }
 
     /**
@@ -411,8 +443,12 @@ export class ConversationRepository {
             )
             .where('m.conversationId IN (:...conversationIds)', { conversationIds })
             .andWhere('m.authorType IN (:...authorTypes)', { authorTypes: ['agent', 'system'] })
+            // The read boundary is the pair `(createdAt, id)`, exactly as
+            // `markRead` stores it: several messages can share one stored
+            // timestamp, and a plain `createdAt > lastReadAt` would silently
+            // count every one of those later ids as already read.
             .andWhere(
-                '((p.lastReadAt IS NOT NULL AND m.createdAt > p.lastReadAt) OR (p.lastReadAt IS NULL AND m.createdAt >= p.joinedAt))',
+                '((p.lastReadAt IS NOT NULL AND (m.createdAt > p.lastReadAt OR (m.createdAt = p.lastReadAt AND p.lastReadMessageId IS NOT NULL AND m.id > p.lastReadMessageId))) OR (p.lastReadAt IS NULL AND m.createdAt >= p.joinedAt))',
             )
             .groupBy('m.conversationId')
             .getRawMany<{ conversationId: string; count: string | number }>();
@@ -445,11 +481,17 @@ export class ConversationRepository {
         if (before) {
             // Compared inside the database, column to column: a JS Date bound
             // as a parameter is formatted differently from the stored value
-            // on some drivers, which silently disables the bound.
-            query.andWhere(
-                'm.createdAt < (SELECT anchor."createdAt" FROM conversation_messages anchor WHERE anchor.id = :before)',
-                { before },
-            );
+            // on some drivers, which silently disables the bound. The
+            // sub-select is built through TypeORM so its table and column are
+            // escaped for the driver in use (raw `"createdAt"` quoting is
+            // Postgres/SQLite-only; MySQL rejects it without ANSI_QUOTES).
+            const anchorCreatedAt = query
+                .subQuery()
+                .select('anchor.createdAt')
+                .from(ConversationMessage, 'anchor')
+                .where('anchor.id = :before')
+                .getQuery();
+            query.andWhere(`m.createdAt < ${anchorCreatedAt}`, { before });
         }
         const rows = await query.orderBy('m.createdAt', 'DESC').take(limit).getMany();
         return rows.reverse();
@@ -476,6 +518,46 @@ export class ConversationRepository {
         clientMessageId: string,
     ): Promise<ConversationMessage | null> {
         return this.messageRepo.findOne({ where: { conversationId, clientMessageId } });
+    }
+
+    /**
+     * Messages whose send status may still move, plus any extra ids the
+     * caller is still watching — newest first, capped at `limit`.
+     *
+     * A person's message is not finished when it is written: the reply job can
+     * refuse it (`sent` → `failed`) long afterwards, and a Retry sends it
+     * again (`failed` → `sent`). The live stream re-reads the newest window
+     * for status changes, but in a busy Conversation a message waiting for its
+     * outcome drops out of that window while it is still moving. Keyed on
+     * status and on the ids a connection is watching rather than on recency,
+     * this read keeps delivering those changes.
+     */
+    async findUnsettledMessages(
+        conversationId: string,
+        statuses: ConversationMessageStatus[],
+        watchedIds: string[],
+        limit = 50,
+    ): Promise<ConversationMessage[]> {
+        const branches: string[] = [];
+        const query = this.messageRepo
+            .createQueryBuilder('m')
+            .where('m.conversationId = :conversationId', { conversationId });
+        if (statuses.length > 0) {
+            branches.push('m.status IN (:...statuses)');
+            query.setParameter('statuses', statuses);
+        }
+        if (watchedIds.length > 0) {
+            branches.push('m.id IN (:...watchedIds)');
+            query.setParameter('watchedIds', watchedIds);
+        }
+        if (branches.length === 0) return [];
+        const rows = await query
+            .andWhere(`(${branches.join(' OR ')})`)
+            .orderBy('m.createdAt', 'DESC')
+            .addOrderBy('m.id', 'DESC')
+            .take(limit)
+            .getMany();
+        return rows.reverse();
     }
 
     /** Messages newer than `since`, oldest-first — the live stream diffs these. */

@@ -27,6 +27,7 @@ import {
     conversationBodyBytes,
     type ConversationAttachmentRef,
     type ConversationFailureCode,
+    type ConversationMessageStatus,
     type ConversationReach,
 } from './conversation.types';
 
@@ -295,6 +296,39 @@ export class ConversationMessageService {
         return this.conversations.findMessagesAfter(
             conversation.id,
             options.after ?? null,
+            options.limit,
+        );
+    }
+
+    /**
+     * Messages whose send status may still move, plus the ids the caller is
+     * still watching — the live stream's third read.
+     *
+     * The newest-window read only refreshes the tail of the Conversation. A
+     * message still waiting for its outcome can be pushed out of that window
+     * by newer traffic, and its `failed`/`sent` change would then never reach
+     * the open connection. This read is keyed on status and on watched ids
+     * instead, so the change lands on the same connection.
+     */
+    async listUnsettledMessages(
+        userId: string,
+        conversationId: string,
+        options: {
+            statuses: ConversationMessageStatus[];
+            watchedIds?: string[];
+            limit: number;
+        },
+        scope?: OwnershipScope,
+    ): Promise<ConversationMessage[]> {
+        const conversation = await this.conversationService.assertParticipant(
+            conversationId,
+            userId,
+            scope,
+        );
+        return this.conversations.findUnsettledMessages(
+            conversation.id,
+            options.statuses,
+            options.watchedIds ?? [],
             options.limit,
         );
     }

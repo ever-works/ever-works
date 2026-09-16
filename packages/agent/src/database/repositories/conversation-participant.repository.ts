@@ -18,6 +18,24 @@ export interface AddConversationParticipantInput {
 }
 
 /**
+ * Forward-only guard for the read position, compared as `(createdAt, id)` —
+ * the same lexicographic order the forward message pages walk.
+ *
+ * `readAtExpression` is whatever yields the new read instant: a bound
+ * parameter here, a scalar sub-select in the read-through write of
+ * `ConversationRepository`. Exported so both state the identical condition
+ * rather than two subtly different ones. Column names are entity property
+ * names, which TypeORM escapes per driver.
+ */
+export const readPositionMovesForward = (
+    readAtExpression: string,
+    messageIdParameter: string,
+): string =>
+    `(lastReadAt IS NULL OR lastReadAt < ${readAtExpression}` +
+    ` OR (lastReadAt = ${readAtExpression}` +
+    ` AND (lastReadMessageId IS NULL OR lastReadMessageId < :${messageIdParameter})))`;
+
+/**
  * Persistence for who takes part in a Conversation.
  *
  * Membership is read in both directions — "who is in this Conversation" for
@@ -123,12 +141,22 @@ export class ConversationParticipantRepository {
     /**
      * Move the read position forward to `messageId`, and never backward.
      *
-     * The write is conditional in the database: it only lands while the stored
-     * position is unset or not later than `readAt`. A delayed request for an
-     * older message that arrives after a newer one was read therefore changes
-     * nothing, instead of turning messages the person already read unread
-     * again. Returns whether the position moved (`false` also when there is no
-     * participant row).
+     * The write is conditional in the database, and the comparison is the same
+     * `(createdAt, id)` order the forward message pages use
+     * (`ConversationRepository.findMessagesAfter`): it lands only while the
+     * stored position is unset, strictly older than `readAt`, or at the very
+     * same instant with a smaller message id. A timestamp-only guard was not
+     * enough — several messages can share one stored timestamp, and a delayed
+     * request for an earlier one of them would then move
+     * `lastReadMessageId` BACK while `lastReadAt` stayed put, hiding the
+     * later ids of that instant behind a read marker that had moved
+     * backwards. Returns whether the position moved (`false` also when there
+     * is no participant row, and when the position already was at or past
+     * this message).
+     *
+     * Column names are written as entity property names rather than as quoted
+     * SQL identifiers: TypeORM escapes them for the driver in use, so the
+     * statement is correct on Postgres, MySQL and SQLite alike.
      */
     async markRead(
         conversationId: string,
@@ -141,10 +169,13 @@ export class ConversationParticipantRepository {
             .createQueryBuilder()
             .update(ConversationParticipant)
             .set({ lastReadMessageId: messageId, lastReadAt: readAt })
-            .where('"conversationId" = :conversationId', { conversationId })
-            .andWhere('"participantType" = :participantType', { participantType })
-            .andWhere('"participantId" = :participantId', { participantId })
-            .andWhere('("lastReadAt" IS NULL OR "lastReadAt" <= :readAt)', { readAt })
+            .where('conversationId = :conversationId', { conversationId })
+            .andWhere('participantType = :participantType', { participantType })
+            .andWhere('participantId = :participantId', { participantId })
+            .andWhere(readPositionMovesForward(':readAt', 'readMessageId'), {
+                readAt,
+                readMessageId: messageId,
+            })
             .execute();
         return (result.affected ?? 0) > 0;
     }
