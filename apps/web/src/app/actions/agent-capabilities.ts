@@ -2,8 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { AgentCapabilitiesPayload } from '@ever-works/contracts';
+import type {
+    AgentCapabilitiesPayload,
+    ConnectionScopePresetId,
+    ConnectionScopePresetStateDto,
+} from '@ever-works/contracts';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
+import { ApiResponseError } from '@/lib/api/server-api';
 import { toolGrantsAPI } from '@/lib/api/tool-grants';
 import { skillsAPI, type Skill, type SkillBinding } from '@/lib/api/skills';
 import { getAuthFromCookie } from '@/lib/auth';
@@ -169,4 +174,51 @@ export async function unbindSkillFromAgentAction(
     revalidatePath(`/agents/${agentId}/capabilities`);
     revalidatePath(`/agents/${agentId}/skills`);
     return res;
+}
+
+/**
+ * AW-15 — choose a plain-English access level ("Read only" / "Read and
+ * write") for one provider at THIS agent's scope.
+ *
+ * Rides `PUT /api/tool-grants/presets`, which writes the level as deny
+ * patterns on this agent's tool-grant row — the same row the per-tool
+ * switches above edit — so the fresh capabilities payload is returned too
+ * and the tool list can never show a stale state.
+ *
+ * Expected refusals come back as DATA (Next.js redacts Server Action error
+ * messages in production). `reapproval` is the one the section explains in
+ * its own words: widening needs the owner to reconnect the provider first.
+ */
+export type AgentAccessLevelResult =
+    | {
+          success: true;
+          state: ConnectionScopePresetStateDto;
+          capabilities: AgentCapabilitiesPayload;
+      }
+    | { success: false; reason: 'reapproval' | 'failed'; error: string };
+
+export async function setAgentAccessLevelAction(
+    agentId: string,
+    providerId: string,
+    preset: ConnectionScopePresetId,
+): Promise<AgentAccessLevelResult> {
+    await ensureAuth();
+    try {
+        const state = await toolGrantsAPI.applyPreset({
+            providerId,
+            scopeType: 'agent',
+            scopeId: agentId,
+            preset,
+        });
+        revalidatePath(`/agents/${agentId}/capabilities`);
+        const capabilities = await agentsAPI.getCapabilities(agentId);
+        return { success: true, state, capabilities };
+    } catch (err) {
+        const code = err instanceof ApiResponseError ? err.code : undefined;
+        return {
+            success: false,
+            reason: code === 'preset_requires_reapproval' ? 'reapproval' : 'failed',
+            error: err instanceof Error ? err.message : String(err),
+        };
+    }
 }

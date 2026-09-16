@@ -27,6 +27,7 @@ import { TerminalStreamFacadeService } from './terminal-stream.facade';
 import { WorkspaceFacadeService } from './workspace.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
+import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -58,6 +59,9 @@ const FACADES = [
     // BudgetsModule already imported by this module. Goal evaluation
     // (PR-8) consumes it through FacadesModule.
     MetricsFacadeService,
+    // AW-15 — `connection-scopes` capability lookup (which access levels a
+    // provider declares). Depends only on the global PluginRegistryService.
+    ConnectionScopesFacadeService,
 ];
 
 /**

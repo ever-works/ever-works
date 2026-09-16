@@ -3,11 +3,13 @@ import {
     ConflictException,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
     HttpCode,
     HttpException,
     HttpStatus,
     NotFoundException,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -20,15 +22,18 @@ import {
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type {
+    ComputerControlStateView,
     ComputerNodeOption,
     ComputerSessionView,
     NodeAgentProfileView,
 } from '@ever-works/contracts';
 import { AgentsService } from '@ever-works/agent/agents';
 import {
+    ComputerControlArbiter,
     ComputerSessionService,
     NodeAgentProfileService,
     type ComputerAgentRef,
+    type ComputerControlOutcome,
     type OpenComputerSessionRefusal,
     type ResetNodeAgentProfileOutcome,
 } from '@ever-works/agent/computer';
@@ -38,11 +43,14 @@ import { FleetEnabledGuard } from '../fleet/guards/fleet-enabled.guard';
 import {
     ComputerAttachService,
     resolveRequestedComputerRole,
-    type ComputerRequestedRole,
+    wantsComputerControlRole,
+    type ComputerMintedRole,
 } from './computer-attach.service';
 import { ComputerRelayRegistry, type ComputerSessionRelayStatus } from './computer-relay.registry';
 import { COMPUTER_WS_PATH_PREFIX } from './computer-ws.service';
 import {
+    AnswerComputerControlRequestDto,
+    ComputerControlDto,
     OpenComputerSessionDto,
     ResetNodeAgentProfileDto,
     UpdateComputerSessionDto,
@@ -68,6 +76,12 @@ export type ComputerSessionResponse = ComputerSessionView & { live: ComputerSess
  *   429  the per-machine or per-Organization live-view cap (names the views)
  *   503  no fleet runtime wired on this install
  *
+ * Taking control (`…/sessions/:sessionId/control`) answers the same way: 403
+ * when the machine's control policy leaves the person out (naming the
+ * policy), 409 when someone else holds control (naming the holder) or the
+ * act does not fit the moment (naming why), and the control state in the
+ * body of every answer so the surface never has to guess.
+ *
  * The whole surface disappears with `FLEET_ENABLED=false`, like the fleet's.
  */
 @ApiTags('agent-computer')
@@ -80,6 +94,10 @@ export class ComputerController {
         private readonly profiles: NodeAgentProfileService,
         private readonly attach: ComputerAttachService,
         private readonly relay: ComputerRelayRegistry,
+        // Appended LAST + @Optional(): without the arbiter a live view is
+        // watch-only — every control route answers 503 and no driving token
+        // is ever minted.
+        @Optional() private readonly control?: ComputerControlArbiter,
     ) {}
 
     @Get('nodes')
@@ -185,16 +203,17 @@ export class ComputerController {
 
     /**
      * Mint a short-lived token for the live-view socket. Present it in the
-     * FIRST WebSocket message, never in the URL. While taking control has
-     * not shipped the only browser role is `viewer`: a request can downgrade
-     * itself, never upgrade.
+     * FIRST WebSocket message, never in the URL. A browser is minted `viewer`
+     * unless it asks for `controller` AND its view holds control of the
+     * machine right now, in which case it is minted `driver`: a request can
+     * downgrade itself, never upgrade past what the arbiter says it holds.
      */
     @Post('sessions/:sessionId/attach-token')
     @ApiOperation({
         summary:
             'Mint a short-lived attach token for this live view’s socket (first frame, never the URL).',
     })
-    @ApiQuery({ name: 'role', required: false, enum: ['viewer'] })
+    @ApiQuery({ name: 'role', required: false, enum: ['viewer', 'controller'] })
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async mintAttachToken(
@@ -205,13 +224,16 @@ export class ComputerController {
     ): Promise<{
         token: string;
         wsPath: string;
-        role: ComputerRequestedRole;
+        role: ComputerMintedRole;
         expiresInSec: number;
     }> {
         await this.resolveAgent(auth.userId, agentId);
         const view = await this.sessions.getForOwner(auth.userId, agentId, sessionId);
         if (!view) throw sessionNotFound(sessionId);
-        const role = resolveRequestedComputerRole(requestedRole);
+        let role: ComputerMintedRole = resolveRequestedComputerRole(requestedRole);
+        if (wantsComputerControlRole(requestedRole) && this.control && view.status !== 'ended') {
+            if ((await this.control.holdOf(sessionId)).held) role = 'driver';
+        }
         const { token, expiresInSec } = this.attach.mint({ userId: auth.userId, sessionId, role });
         return { token, wsPath: `${COMPUTER_WS_PATH_PREFIX}${sessionId}`, role, expiresInSec };
     }
@@ -235,6 +257,129 @@ export class ComputerController {
             });
         }
         return { requested: this.relay.deliverToNode(sessionId, { kind: 'refresh' }) };
+    }
+
+    @Get('sessions/:sessionId/control')
+    @ApiOperation({
+        summary:
+            'Control of the machine as this live view sees it: who holds it, until when, and any pending request.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async getControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) agentId: string,
+        @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    ): Promise<ComputerControlStateView> {
+        await this.resolveAgent(auth.userId, agentId);
+        const state = await this.requireControl().getState({
+            userId: auth.userId,
+            agentId,
+            sessionId,
+        });
+        if (!state) throw sessionNotFound(sessionId);
+        return state;
+    }
+
+    @Post('sessions/:sessionId/control')
+    @ApiOperation({
+        summary:
+            'Take control of the machine from this live view (the Agent’s own input pauses), or — with `request: true` — ask whoever holds it to hand it over.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async takeControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) agentId: string,
+        @Param('sessionId', ParseUUIDPipe) sessionId: string,
+        @Body() body: ComputerControlDto,
+    ): Promise<ComputerControlStateView> {
+        await this.resolveAgent(auth.userId, agentId);
+        const actor = { userId: auth.userId, agentId, sessionId };
+        const control = this.requireControl();
+        const outcome = body?.request ? await control.request(actor) : await control.take(actor);
+        return controlStateOrThrow(outcome, sessionId);
+    }
+
+    @Delete('sessions/:sessionId/control')
+    @ApiOperation({
+        summary:
+            'Give control back from this live view; the Agent’s own input resumes. Idempotent.',
+    })
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async giveBackControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) agentId: string,
+        @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    ): Promise<void> {
+        await this.resolveAgent(auth.userId, agentId);
+        const outcome = await this.requireControl().giveBack({
+            userId: auth.userId,
+            agentId,
+            sessionId,
+        });
+        controlStateOrThrow(outcome, sessionId);
+    }
+
+    @Post('sessions/:sessionId/control/handover')
+    @ApiOperation({
+        summary:
+            'The view holding control answers a request: hand control over to it, or keep control.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async answerControlRequest(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) agentId: string,
+        @Param('sessionId', ParseUUIDPipe) sessionId: string,
+        @Body() body: AnswerComputerControlRequestDto,
+    ): Promise<ComputerControlStateView> {
+        await this.resolveAgent(auth.userId, agentId);
+        const outcome = await this.requireControl().answer(
+            { userId: auth.userId, agentId, sessionId },
+            body.requestId,
+            body.decision,
+        );
+        return controlStateOrThrow(outcome, sessionId);
+    }
+
+    @Post('sessions/:sessionId/control/keep')
+    @ApiOperation({
+        summary: 'Keep control: push back the automatic give-back after inactivity.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async keepControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) agentId: string,
+        @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    ): Promise<ComputerControlStateView> {
+        await this.resolveAgent(auth.userId, agentId);
+        const outcome = await this.requireControl().keep({
+            userId: auth.userId,
+            agentId,
+            sessionId,
+        });
+        return controlStateOrThrow(outcome, sessionId);
+    }
+
+    @Post('sessions/:sessionId/control/extend')
+    @ApiOperation({
+        summary: 'Extend the current stretch of control by one more stretch. Once per stretch.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async extendControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) agentId: string,
+        @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    ): Promise<ComputerControlStateView> {
+        await this.resolveAgent(auth.userId, agentId);
+        const outcome = await this.requireControl().extend({
+            userId: auth.userId,
+            agentId,
+            sessionId,
+        });
+        return controlStateOrThrow(outcome, sessionId);
     }
 
     @Get('profile')
@@ -280,6 +425,16 @@ export class ComputerController {
         });
         if ('reset' in outcome) return outcome.reset;
         throw toResetRefusalException(outcome);
+    }
+
+    private requireControl(): ComputerControlArbiter {
+        if (!this.control) {
+            throw new ServiceUnavailableException({
+                message: 'Taking control is not available on this install.',
+                reason: 'control-unavailable',
+            });
+        }
+        return this.control;
     }
 
     /** Agent ownership first — a foreign or unknown Agent 404s through the service. */
@@ -352,6 +507,67 @@ export function toRefusalException(refusal: OpenComputerSessionRefusal): HttpExc
                 reason: 'dispatcher-unavailable',
             });
     }
+}
+
+/**
+ * The control state of an outcome, or its refusal as an exception that names
+ * the reason and carries the state (so a 409 for `held` says who holds it).
+ */
+export function controlStateOrThrow(
+    outcome: ComputerControlOutcome | null,
+    sessionId: string,
+): ComputerControlStateView {
+    if (!outcome) throw sessionNotFound(sessionId);
+    if (!('refused' in outcome)) return outcome.state;
+    const { refused, state } = outcome;
+    switch (refused) {
+        case 'policy':
+            return throwIt(
+                new ForbiddenException({
+                    message:
+                        state.policy === 'owner'
+                            ? 'Only the owner of this computer can take control.'
+                            : `This computer’s control policy (${state.policy}) does not include you.`,
+                    reason: 'policy',
+                    policy: state.policy,
+                    state,
+                }),
+            );
+        case 'held':
+            return throwIt(
+                new ConflictException({
+                    message: 'Someone else has control of this computer.',
+                    reason: 'held',
+                    holder: state.holder,
+                    state,
+                }),
+            );
+        default:
+            return throwIt(
+                new ConflictException({
+                    message: CONTROL_REFUSAL_MESSAGES[refused],
+                    reason: refused,
+                    state,
+                }),
+            );
+    }
+}
+
+const CONTROL_REFUSAL_MESSAGES: Record<
+    Exclude<Extract<ComputerControlOutcome, { refused: unknown }>['refused'], 'policy' | 'held'>,
+    string
+> = {
+    'not-live': 'This live view is not showing the computer yet.',
+    'session-ended': 'This live view has ended.',
+    'not-holder': 'This live view does not have control of the computer.',
+    'not-held': 'Nobody has control of this computer — take it instead.',
+    'already-requested': 'Someone has already asked for control. Try again in a minute.',
+    'no-request': 'That request for control is no longer waiting for an answer.',
+    'already-extended': 'This stretch of control has already been extended once.',
+};
+
+function throwIt(error: HttpException): never {
+    throw error;
 }
 
 /** Map a typed reset refusal to its status, always naming the reason. */

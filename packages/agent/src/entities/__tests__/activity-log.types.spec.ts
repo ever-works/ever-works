@@ -101,6 +101,8 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Agent computers — one row per stretch of control of an Agent's machine.
+            ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -162,7 +164,7 @@ describe('activity-log.types', () => {
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
             //
-            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // 🛑 161 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -174,12 +176,16 @@ describe('activity-log.types', () => {
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161.
             //
-            // 171 after the AW-07 memory facts + context files branch merged
-            // develop's Live Feed run-lifecycle members — COUNTED from the
-            // merged enum (the AW-07 branch said 168, develop said 160; the
-            // two sets are disjoint).
-            expect(literals).toHaveLength(171);
+            // 172 after the AW-07 memory facts + context files branch merged
+            // develop again — COUNTED from the merged enum. The AW-07 branch
+            // stood at 171 (it had already absorbed develop's Live Feed
+            // run-lifecycle members) and develop stood at 161; the only member
+            // develop contributed that AW-07 did not already carry is
+            // agent_computer_controlled, so 171 + 1 = 172. Do NOT re-derive
+            // this by adding the deltas above — count the merged enum.
+            expect(literals).toHaveLength(172);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
