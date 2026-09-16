@@ -116,6 +116,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'IngestedEvent',
     // Memory eval loop (memory upgrades M10) — append-only retrieval log
     'KbRetrievalLog',
+    // Knowledge library — per-person read state + pins on KB documents
+    'KnowledgeDocumentReaderState',
     // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
     // written only by the signature-verified webhook
     'Invoice',
@@ -149,6 +151,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Plan entitlements (pricing Wave 9 M1)
     'PlanEntitlement',
     'PluginUsageEvent',
+    // AW-14 What's new — per-person read state for product changelog entries.
+    'ProductChangelogRead',
     'RefreshToken',
     // Release promotion lane (self-build slice AI, EW-808).
     'ReleasePromotion',

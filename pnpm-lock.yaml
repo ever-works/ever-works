@@ -752,6 +752,9 @@ importers:
       '@ever-works/plugin':
         specifier: workspace:*
         version: link:../../packages/plugin
+      '@ever-works/pty-local-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/pty-local
       commander:
         specifier: ^14.0.2
         version: 14.0.3

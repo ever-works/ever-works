@@ -39,7 +39,7 @@ Approvals and escalations are **mirrors**: the proposal row and the escalation r
 **Sidebar → Inbox** — the first item after Dashboard, and the only navigation entry that carries an unread badge. That placement is deliberate: a message here can be blocking work right now, so it stays one click away.
 
 - The badge shows your unread count, refreshed every 30 seconds (the notification bell's cadence), and renders `99+` above ninety-nine. No badge at all means nothing is unread — never a grey `0`.
-- Two views: **Active** (`/inbox`, everything not archived) and **Archived** (`/inbox?view=archived`).
+- Three views: **Active** (`/inbox`, everything not archived), **My Decisions** (`/inbox?view=decisions`, the same messages read as a ranked decision queue — see [My Decisions](#my-decisions)) and **Archived** (`/inbox?view=archived`).
 - The bell's **Open inbox** action carries a deep link, `/inbox?id=<itemId>`, so you land on the exact message the notification was about rather than on whatever is newest.
 
 ## Reading a message
@@ -108,6 +108,52 @@ Every row has a **⋮ Message actions** menu:
 
 The list also polls every 30 seconds so messages that arrive while the tab sits open show up on their own. The poll pauses while a reply is in flight, so a refresh can never yank the text out from under you.
 
+## My Decisions
+
+**My Decisions** (`/inbox?view=decisions`) is the Inbox read as a decision queue: only the messages that ask you to decide something — questions, approvals and escalations, never notices — ranked so the one that is holding work back is on top. It is a view of the Inbox, not a second list: answering here is the same reply as answering in **Active**, and a message answered in either place is answered in both.
+
+### How the queue is ordered
+
+The **Open** tab ranks decisions by, in order:
+
+1. **Blocking first.** A decision is _blocking_ when the run that asked is parked waiting for you, or the Task it belongs to is `blocked`. The chip says which: _Run paused_ or _Task blocked_.
+2. **Confidence, highest first.** Escalations carry a confidence score. A decision nobody scored ranks as if it were 50% and is labelled _not scored_ rather than shown a percentage.
+3. **Oldest first** among equals — the decision that has waited longest goes to the top.
+
+The header shows how many decisions are open and how many of them are blocking. The counts refresh every 30 seconds while the tab is visible and not at all while it is hidden. They are absent until they are known — never a `0` that would read as "nothing needs you".
+
+The **Answered** and **Archived** tabs list the rest, newest first. A decision open for more than 30 days with no live work behind it is flagged _Open 30+ days_; nothing is ever archived for you.
+
+### Filtering and linking
+
+Filter by kind, search the title and message, or narrow to one **Agent**, **Task** or **Mission** (the Mission the Task was raised under). The tab, every filter and the selected decision live in the URL, so any state of the queue can be bookmarked or shared:
+
+```text
+/inbox?view=decisions&tab=open&kind=approval&taskId=<task-id>&id=<item-id>
+```
+
+The queue loads 25 decisions at a time; **Load more** fetches the next page only when you ask, and continues right after the last decision on screen, so a decision answered elsewhere or raised meanwhile never makes it skip or repeat one. Whichever decision is on screen counts as opened, including the first one and a deep-linked one. Press **j** / **k** to move between decisions. Other surfaces link in rather than re-implementing it: every question, approval and escalation in **Active** has **Open in My Decisions**, the approvals block on Home has **See all decisions**, and a Task whose run is waiting on a question links to its own filtered queue.
+
+### Answering, with a reason
+
+Selecting a decision shows what happened, what the agent already tried, its risks, and links to its Task, Mission and Agent. Opening an unread decision marks it read and records the first time you looked at it, so the time between a decision being raised, being seen and being answered is measurable.
+
+Two answers need **one sentence saying why** before they can be sent: **rejecting** an approval, and choosing an option **other than the recommended one**. Those are the answers the agent learns the most from and can least interpret from a bare click. The reason travels with the answer. The same rule is enforced by the API when a reply opts in with `requireReason`, so it does not depend on the page.
+
+### What happens to the work
+
+After you answer, the decision says in words what happened to the work behind it:
+
+| Line                                                            | Meaning                                                                                                   |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| _Sent to the Run that is already going._                        | The run was still live; your answer was injected into it.                                                 |
+| _Researcher is picking the work back up._                       | The parked run was continued as a new run carrying the same conversation, seeded with your answer.        |
+| _Queued — waiting for a free slot._                             | That new run was admitted but is waiting on a concurrency slot.                                           |
+| _Answered, but the agent could not be restarted automatically._ | The decision stands; restarting failed. Open the Task to run it by hand. The answer is never rolled back. |
+| _Answered. There was no paused work left to restart._           | Nothing was waiting behind the decision.                                                                  |
+
+It does not matter which door a decision is closed through. Approving on Home, resolving an escalation from its endpoint, the Task page or the agent chat tool, and replying in the Inbox all close the Inbox message and hand the answer to the waiting run the same way, so the queue never shows a decision somebody already made.
+
 ## How to answer a blocking question
 
 1. The badge appears on **Sidebar → Inbox** (or the bell rings, or your Slack/Discord/Telegram channel does — see [Notifications](./notifications.md)).
@@ -150,18 +196,20 @@ Each write also files an activity row (`INBOX_ITEM_CREATED`, and `INBOX_ITEM_ANS
 
 Everything the page does is available over the REST API. All routes are owner-scoped: a message belonging to someone else and a message that does not exist return the same `404`.
 
-| Method   | Route                      | Purpose                                                                                                                                                     |
-| -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/inbox`               | List your messages, newest first. `?status=open\|answered\|archived`, `?limit=` (1–100, default 50), `?offset=`. Omitting `status` returns the Active view. |
-| `GET`    | `/api/inbox/unread-count`  | `{ count }` — what the sidebar badge polls.                                                                                                                 |
-| `GET`    | `/api/inbox/:id`           | One message.                                                                                                                                                |
-| `POST`   | `/api/inbox/:id/reply`     | `{ text?, optionId? }` — answer it. Throttled to 30 replies per minute.                                                                                     |
-| `PATCH`  | `/api/inbox/:id/read`      | Mark read. `{ "unread": true }` flips it back.                                                                                                              |
-| `POST`   | `/api/inbox/:id/archive`   | Archive.                                                                                                                                                    |
-| `POST`   | `/api/inbox/:id/unarchive` | Restore to Active.                                                                                                                                          |
-| `DELETE` | `/api/inbox/:id`           | Delete the message. The mirrored records survive.                                                                                                           |
+| Method   | Route                         | Purpose                                                                                                                                                                                  |
+| -------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/inbox`                  | List your messages, newest first. `?status=open\|answered\|archived`, `?limit=` (1–100, default 50), `?offset=`. Omitting `status` returns the Active view.                              |
+| `GET`    | `/api/inbox/unread-count`     | `{ count }` — what the sidebar badge polls.                                                                                                                                              |
+| `GET`    | `/api/inbox/decisions`        | My Decisions. `?status=` (default `open`), `?kind=question\|approval\|escalation`, `?agentId=`, `?taskId=`, `?missionId=`, `?q=`, `?limit=` (1–100, default 25), `?offset=`, `?cursor=`. |
+| `GET`    | `/api/inbox/decisions/counts` | `{ open, blocking, lastRaisedAt }` — the My Decisions header.                                                                                                                            |
+| `GET`    | `/api/inbox/:id`              | One message.                                                                                                                                                                             |
+| `POST`   | `/api/inbox/:id/reply`        | `{ text?, optionId?, requireReason? }` — answer it. Throttled to 30 replies per minute.                                                                                                  |
+| `PATCH`  | `/api/inbox/:id/read`         | Mark read. `{ "unread": true }` flips it back.                                                                                                                                           |
+| `POST`   | `/api/inbox/:id/archive`      | Archive.                                                                                                                                                                                 |
+| `POST`   | `/api/inbox/:id/unarchive`    | Restore to Active.                                                                                                                                                                       |
+| `DELETE` | `/api/inbox/:id`              | Delete the message. The mirrored records survive.                                                                                                                                        |
 
-The list response is `{ data, meta: { total, limit, offset, unreadCount } }`. A reply responds `{ item, routed, runId? }`, where `routed` is one of the outcomes in the table above and `runId` names the run that was steered or newly dispatched.
+The list response is `{ data, meta: { total, limit, offset, unreadCount } }`. A reply responds `{ item, routed, runId?, restart? }`, where `routed` is one of the outcomes in the table above, `runId` names the run that was steered or newly dispatched, and `restart` (`injected`, `resumed`, `queued`, `failed` or `none`) says what happened to the work behind it. The decision list responds `{ data, meta: { total, limit, offset, openCount, blockingCount, lastRaisedAt, nextCursor } }`. Pass `nextCursor` back as `?cursor=` for the next page: it names the position of the last row, so the page does not drift when the live queue changes between reads; it is `null` when nothing follows. Each row is an Inbox message plus a `decision` object carrying the blocking reason, confidence, what was tried, risk flags, the Agent, Task and Mission, and the dormant flag.
 
 ```bash
 # What is waiting on me right now?

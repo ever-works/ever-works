@@ -101,7 +101,12 @@ export const PLUGIN_CAPABILITIES = {
 	// capabilities, artefacts, escalation points). Consumed only through
 	// PlaybookCatalogFacadeService. See
 	// capabilities/playbook-provider.interface.ts.
-	PLAYBOOK_PROVIDER: 'playbook-provider'
+	PLAYBOOK_PROVIDER: 'playbook-provider',
+	// AW-15 — optional access-level declaration ("Read only" / "Read and
+	// write") mapped onto the tool-grant lattice. Declared alongside a
+	// provider's main capability; see
+	// capabilities/connection-scopes.interface.ts.
+	CONNECTION_SCOPES: 'connection-scopes'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

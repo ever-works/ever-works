@@ -840,7 +840,8 @@
                 "bulkApprovedSkipped": "Approved {approved} actions, {skipped} already decided",
                 "bulkApprovedExcluded": "Approved {approved} actions, {excluded} still need a decision one at a time",
                 "error": "Something went wrong. Please try again."
-            }
+            },
+            "seeAll": "See all decisions"
         },
         "inbox": {
             "title": "Inbox",
@@ -849,7 +850,8 @@
             "unreadDot": "Unread",
             "tabs": {
                 "active": "Active",
-                "archived": "Archived"
+                "archived": "Archived",
+                "decisions": "My Decisions"
             },
             "kind": {
                 "question": "Question",
@@ -880,7 +882,8 @@
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
                 "yourReply": "Your reply",
-                "noReplyText": "No reply text was recorded."
+                "noReplyText": "No reply text was recorded.",
+                "openInDecisions": "Open in My Decisions"
             },
             "reply": {
                 "chooseOption": "Choose an answer",
@@ -889,7 +892,11 @@
                 "placeholder": "Write your reply…",
                 "send": "Send Reply",
                 "hint": "Your reply goes straight back to the agent.",
-                "needsAnswer": "Pick an option or write a reply first."
+                "needsAnswer": "Pick an option or write a reply first.",
+                "reasonRequired": "Why? (required)",
+                "reasonOptional": "Why? (optional)",
+                "reasonHelper": "One sentence is enough. This is what the agent learns from.",
+                "reasonMissing": "Add one sentence explaining why."
             },
             "routed": {
                 "steered": "Reply delivered — the running agent picked it up.",
@@ -905,6 +912,85 @@
                 "unarchived": "Message moved back to Active.",
                 "deleted": "Message deleted.",
                 "error": "Something went wrong. Please try again."
+            },
+            "decisions": {
+                "title": "My Decisions",
+                "subtitle": "Everything waiting on you, and nothing else.",
+                "counts": {
+                    "open": "{count} open",
+                    "blocking": "{count} blocking"
+                },
+                "tabs": {
+                    "open": "Open",
+                    "answered": "Answered",
+                    "archived": "Archived"
+                },
+                "filters": {
+                    "label": "Filter decisions",
+                    "kind": "Kind",
+                    "allKinds": "All kinds",
+                    "search": "Search decisions",
+                    "clear": "Clear filters",
+                    "remove": "remove filter",
+                    "agentId": "Agent",
+                    "taskId": "Task",
+                    "missionId": "Mission"
+                },
+                "card": {
+                    "blocking": "Blocking",
+                    "blockingRunParked": "Run paused",
+                    "blockingTaskBlocked": "Task blocked",
+                    "dormant": "Open 30+ days",
+                    "confidence": "{percent}% sure",
+                    "notScored": "not scored"
+                },
+                "detail": {
+                    "none": "Select a decision to answer it.",
+                    "whatHappened": "What happened",
+                    "whatItTried": "What it tried",
+                    "risks": "Risks",
+                    "positionWalker": "{index} / {total}",
+                    "nextDecision": "Next decision",
+                    "previousDecision": "Previous decision",
+                    "openTask": "Open Task",
+                    "openMission": "Open Mission",
+                    "openAgent": "Open Agent",
+                    "pendingOne": "Answer this and {agent} picks this up where it stopped.",
+                    "pendingOneUnnamed": "Answer this and the agent picks this up where it stopped.",
+                    "archivedNote": "This decision was archived. Move it back to Active from the Archived tab to answer it.",
+                    "keyboardHint": "Press j or k to move between decisions."
+                },
+                "resolution": {
+                    "resumed": "{agent} is picking the work back up.",
+                    "resumedUnnamed": "The agent is picking the work back up.",
+                    "injected": "Sent to the Run that is already going.",
+                    "none": "Answered. There was no paused work left to restart.",
+                    "queued": "Queued — waiting for a free slot.",
+                    "failed": "Answered, but the agent could not be restarted automatically.",
+                    "alreadyDecided": "This was already decided elsewhere.",
+                    "runNow": "Open the Task to run it now"
+                },
+                "empty": {
+                    "quietTitle": "Nothing needs you right now.",
+                    "quietBody": "That is either very good news, or your agents are deciding things they should be asking you about.",
+                    "quietFootnote": "Nothing has needed you in {days} days.",
+                    "firstRunTitle": "No decisions yet.",
+                    "firstRunBody": "When an agent hits something it should not decide alone — spending money, reaching a customer, choosing between two real directions — it stops and asks you here.",
+                    "firstRunHint": "Tell an agent when to ask by writing it into its instructions.",
+                    "openAgents": "Open Agents",
+                    "reviewActivity": "Review recent activity",
+                    "filteredTitle": "No decisions match these filters.",
+                    "answeredTitle": "Nothing answered yet.",
+                    "archivedTitle": "Nothing archived."
+                },
+                "error": {
+                    "title": "Could not load your decisions.",
+                    "body": "We did not show an empty queue, because we cannot tell whether it is empty.",
+                    "retry": "Try again",
+                    "lastKnown": "Last known: {count} open."
+                },
+                "loadMore": "Load {count} more",
+                "loadMoreError": "Could not load more decisions."
             }
         },
         "connectGithub": {
@@ -1317,6 +1403,7 @@
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
                 "capabilities": "Capabilities",
+                "computer": "Computer",
                 "inbox": "Inbox"
             },
             "email": {
@@ -1705,6 +1792,34 @@
                     "routingUnavailable": "Execution routing could not be loaded right now.",
                     "routingChange": "Change in Settings → Fleet"
                 },
+                "accessLevels": {
+                    "title": "Access levels",
+                    "description": "Choose what this agent may do through each provider that offers access levels. Start narrow — you can widen it later without reconnecting.",
+                    "pickerLabel": "Access level for {provider}",
+                    "levels": {
+                        "read": "Read only",
+                        "write": "Read and write"
+                    },
+                    "levelHints": {
+                        "read": "Look things up. Never changes anything.",
+                        "write": "Look things up and make changes."
+                    },
+                    "narrowed": "In effect: {level} — narrowed by the {scope} setting.",
+                    "none": "No access",
+                    "scopes": {
+                        "default": "platform",
+                        "tenant": "tenant",
+                        "organization": "organization",
+                        "work": "Work",
+                        "agent": "agent"
+                    },
+                    "unavailable": "The current access level couldn't be loaded.",
+                    "reapproval": "{provider} needs one more approval before agents can make changes with it.",
+                    "reapprovalLink": "Reconnect it in Plugins",
+                    "saved": "Access level for {provider} saved",
+                    "appliesNext": "Changes apply on this agent's next tool call. Nothing restarts.",
+                    "blockedByExistingRule": "Blocked by an existing rule: {rules}. Access levels never remove a rule added on this agent. Turn the tool back on to use this level."
+                },
                 "initScript": {
                     "title": "Init Script",
                     "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
@@ -2061,7 +2176,8 @@
                     "interruptRequested": "Interrupt requested — the agent will stop after its current step.",
                     "resumeDispatched": "Resumed — a new run is picking up the same session.",
                     "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
-                    "genericError": "That run control could not be applied."
+                    "genericError": "That run control could not be applied.",
+                    "allDecisions": "See every decision for this Task"
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
@@ -3128,6 +3244,49 @@
                 }
             }
         },
+        "whatsNew": {
+            "title": "What's new",
+            "controlLabel": "What's new",
+            "controlLabelUnread": "What's new — {count} unread",
+            "close": "Close what's new",
+            "subtitleUnread": "{count} updates you haven't read",
+            "subtitleUnreadOne": "1 update you haven't read",
+            "subtitleCaughtUp": "All caught up",
+            "markAllRead": "Mark all as read",
+            "markedAllRead": "All caught up",
+            "unread": "Unread",
+            "pinned": "Pinned",
+            "filters": {
+                "label": "Filter updates by area",
+                "all": "All",
+                "agents": "Agents & Missions",
+                "decisions": "Decisions & Safety",
+                "knowledge": "Knowledge & Memory",
+                "connections": "Connections & Computers",
+                "costs": "Runs & Costs",
+                "platform": "Platform",
+                "emptyTooltip": "No updates in this area yet"
+            },
+            "kinds": {
+                "new": "New",
+                "improved": "Improved",
+                "fixed": "Fixed",
+                "security": "Security"
+            },
+            "empty": {
+                "title": "No updates yet",
+                "description": "New releases will show up here."
+            },
+            "emptyFiltered": {
+                "title": "Nothing here yet",
+                "description": "No updates in {category}.",
+                "action": "Show all updates"
+            },
+            "error": {
+                "title": "Couldn't load updates.",
+                "retry": "Try again"
+            }
+        },
         "commandPalette": {
             "trigger": "Search…",
             "triggerHintMac": "⌘K",
@@ -3276,7 +3435,8 @@
             "subtitle": "Track all operations across your works",
             "viewToggle": {
                 "log": "Log",
-                "schedules": "Schedules"
+                "schedules": "Schedules",
+                "feed": "Live Feed"
             },
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
@@ -3374,6 +3534,137 @@
                     "failed": "Failed",
                     "cancelled": "Cancelled"
                 }
+            }
+        },
+        "feed": {
+            "title": "Live Feed",
+            "subtitle": "Everything your agents are doing, as it happens.",
+            "refreshNote": "Refreshes every 10 seconds",
+            "listLabel": "Live Feed entries",
+            "loadOlder": "Load older",
+            "loadingOlder": "Loading older activity…",
+            "loadOlderFailed": "Couldn't load older activity.",
+            "retryOlder": "Try again",
+            "filters": {
+                "agentsLabel": "Agents:",
+                "kindsLabel": "Kinds:",
+                "allAgents": "All",
+                "moreAgents": "+{count} more",
+                "onlyFailed": "Only failed",
+                "failedInView": "{count, plural, one {# failure} other {# failures}} loaded",
+                "clearFilters": "Clear filters",
+                "agentLimit": "You can watch up to 20 agents at once. Deselect one to add another.",
+                "agentsGroup": "Filter by agent",
+                "kindsGroup": "Filter by kind"
+            },
+            "agentPicker": {
+                "title": "Watch agents",
+                "search": "Search agents",
+                "selectedCount": "{selected} of 20 selected",
+                "clearAll": "Clear all",
+                "done": "Done",
+                "noMatches": "No agents match your search.",
+                "entryCount": "{count, plural, one {# entry} other {# entries}}"
+            },
+            "kinds": {
+                "work": "work",
+                "decision": "decision",
+                "delivery": "delivery",
+                "problem": "problem",
+                "system": "system"
+            },
+            "actors": {
+                "you": "You",
+                "unknownAgent": "A deleted agent",
+                "external": "An external source",
+                "system": "Ever Works"
+            },
+            "empty": {
+                "title": "Nothing has happened yet",
+                "body": "When your agents pick up work, finish a run, publish a document or need a decision from you, it shows up here — live.",
+                "createAgent": "Create an agent",
+                "startMission": "Start a mission"
+            },
+            "emptyFiltered": {
+                "title": "No activity from the agents you picked",
+                "titleGeneric": "Nothing matches these filters",
+                "body": "Nothing matched in the last 90 days. New activity will still appear here as it happens."
+            },
+            "error": {
+                "title": "We couldn't load the feed",
+                "body": "Nothing was lost — every entry is still in your Activity log.",
+                "retry": "Try again",
+                "openActivityLog": "Open the Activity log"
+            },
+            "end": {
+                "title": "That's the last 90 days",
+                "pageCapTitle": "That's as far back as this visit goes",
+                "body": "Older records live in your Activity log.",
+                "openActivityLog": "Open the Activity log"
+            },
+            "time": {
+                "justNow": "just now",
+                "minutesAgo": "{count}m ago",
+                "hoursAgo": "{count}h ago",
+                "yesterdayAt": "Yesterday {time}",
+                "withinWeek": "{weekday} {time}",
+                "absolute": "{date}"
+            },
+            "narration": {
+                "fallback": "<b>{actor}</b> · {action}",
+                "agentRunStarted": "<b>{actor}</b> started a run",
+                "agentRunCompleted": "<b>{actor}</b> finished a run",
+                "agentRunFailed": "<b>{actor}</b> had a run fail",
+                "agentRunCancelled": "<b>{actor}</b> had a run cancelled",
+                "agentRunTriggered": "<b>{actor}</b> was asked to run now",
+                "agentHeartbeatStarted": "<b>{actor}</b> started a heartbeat run",
+                "agentHeartbeatCompleted": "<b>{actor}</b> finished a heartbeat run",
+                "agentHeartbeatFailed": "<b>{actor}</b> had a heartbeat run fail",
+                "agentCreated": "<b>{actor}</b> was created",
+                "agentPaused": "<b>{actor}</b> was paused",
+                "agentResumed": "<b>{actor}</b> was resumed",
+                "agentBudgetExceeded": "<b>{actor}</b> reached its budget limit",
+                "agentFileEdited": "<b>{actor}</b> edited {hasSubject, select, yes {the agent file “{subject}”} other {an agent file}}",
+                "agentFileEditRejected": "<b>{actor}</b> could not save {hasSubject, select, yes {the agent file “{subject}”} other {an agent file}} because it changed elsewhere",
+                "agentTaskAssigned": "<b>{actor}</b> was assigned a task",
+                "missionCreated": "<b>{actor}</b> created {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionCompleted": "<b>{actor}</b> completed {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionFailed": "<b>{actor}</b> could not run a mission",
+                "missionPaused": "<b>{actor}</b> paused {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionResumed": "<b>{actor}</b> resumed {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
+                "missionTick": "<b>{actor}</b> ran a mission tick{hasCount, select, yes { and created {count, plural, =0 {no ideas} one {# idea} other {# ideas}}} other {}}",
+                "missionTickCapped": "<b>{actor}</b> held a mission tick back at its limit",
+                "taskCreated": "<b>{actor}</b> created {hasSubject, select, yes {the task “{subject}”} other {a task}}",
+                "taskAssigned": "<b>{actor}</b> assigned a task",
+                "taskTransitioned": "<b>{actor}</b> moved a task to {to, select, backlog {Backlog} todo {To do} in_progress {In progress} in_review {In review} blocked {Blocked} done {Done} cancelled {Cancelled} other {a new status}}",
+                "taskCommented": "<b>{actor}</b> commented on a task",
+                "taskCompleted": "<b>{actor}</b> completed a task",
+                "taskMerged": "<b>{actor}</b> merged {hasPrNumber, select, yes {pull request #{prNumber}} other {a pull request}} for a task",
+                "taskMergeRefused": "<b>{actor}</b> was not allowed to merge {hasPrNumber, select, yes {pull request #{prNumber}} other {a pull request}}",
+                "taskRecurrenceFired": "<b>{actor}</b> created the next instance of a recurring task",
+                "goalLoopStarted": "<b>{actor}</b> started working toward a goal",
+                "goalLoopCompleted": "<b>{actor}</b> reached a goal",
+                "goalIterationDispatched": "<b>{actor}</b> picked up {hasIteration, select, yes {iteration {iteration}} other {the next iteration}} of a goal",
+                "goalLimitTripped": "<b>{actor}</b> stopped a goal at its limit",
+                "ideaGenerated": "<b>{actor}</b> generated {hasCount, select, yes {{count, plural, =0 {no ideas} one {# idea} other {# ideas}}} other {new ideas}}",
+                "ideaAccepted": "<b>{actor}</b> accepted an idea",
+                "ideaFailed": "<b>{actor}</b> could not build an idea",
+                "skillInvoked": "<b>{actor}</b> used {hasSubject, select, yes {the skill “{subject}”} other {a skill}}",
+                "skillInstalled": "<b>{actor}</b> installed a skill",
+                "skillAttachedToAgent": "<b>{actor}</b> gave an agent a skill",
+                "inboxItemCreated": "<b>{actor}</b> needs a decision from you",
+                "inboxItemAnswered": "<b>{actor}</b> answered a decision",
+                "kbDocumentCreated": "<b>{actor}</b> added {hasSubject, select, yes {“{subject}”} other {a document}} to the knowledge base",
+                "kbDocumentUpdated": "<b>{actor}</b> updated {hasSubject, select, yes {“{subject}”} other {a document}} in the knowledge base",
+                "kbReembedCompleted": "<b>{actor}</b> refreshed the knowledge base search index",
+                "gitPushed": "<b>{actor}</b> pushed to {hasSubject, select, yes {{subject}} other {a repository}}",
+                "gitCommitted": "<b>{actor}</b> committed to {hasSubject, select, yes {{subject}} other {a repository}}",
+                "gitMerged": "<b>{actor}</b> merged a pull request in {hasSubject, select, yes {{subject}} other {a repository}}",
+                "externalEventIngested": "<b>{actor}</b> sent {hasSubject, select, yes {a “{subject}” event} other {an event}}",
+                "scheduleExecuted": "<b>{actor}</b> ran a scheduled update{hasWork, select, yes { for “{work}”} other {}}",
+                "deploymentCompleted": "<b>{actor}</b> {status, select, pending {queued a deployment of} in_progress {started deploying} failed {could not deploy} cancelled {stopped deploying} other {deployed}} {hasWork, select, yes {“{work}”} other {a Work}}",
+                "generationCompleted": "<b>{actor}</b> {status, select, pending {queued generation for} in_progress {started generating} failed {could not generate} cancelled {stopped generating} other {finished generating}} {hasWork, select, yes {“{work}”} other {a Work}}",
+                "memoryFolderSynced": "<b>{actor}</b> synced {hasSubject, select, yes {the memory folder “{subject}”} other {a memory folder}}"
             }
         },
         "works": {
@@ -4604,7 +4895,25 @@
                     "headerValue": "Auth header value",
                     "headerValueHelp": "Stored encrypted. Never shown again.",
                     "cancel": "Cancel",
-                    "save": "Save"
+                    "save": "Save",
+                    "urlHelp": "Use an https:// address so auth headers are encrypted. Credential references only work with https://."
+                },
+                "banner": {
+                    "needsAttention": "{count, plural, one {# connection needs attention.} other {# connections need attention.}}",
+                    "insecureTransport": "{count, plural, one {# connection sends credentials unencrypted.} other {# connections send credentials unencrypted.}}"
+                },
+                "health": {
+                    "unknown": "Not checked yet",
+                    "healthy": "Healthy",
+                    "degraded": "Having trouble",
+                    "expired": "Expired",
+                    "unreachable": "Unreachable",
+                    "credentialMissingHint": "This connection refers to a credential that isn't available. Make the credential available or replace the auth header, then test again.",
+                    "insecureTransportHint": "Change the server URL to https:// to encrypt them.",
+                    "credentialRejectedHint": "The server rejected this credential. Replace the auth header, then test again.",
+                    "insecureTransport": "Unencrypted",
+                    "insecureTransportWarning": "Credentials are sent unencrypted over http://.",
+                    "httpsRequiredHint": "These credentials are only sent to an https:// address (always for credential references, and for any credential when your organization requires https). Change the server URL to https://."
                 }
             },
             "repositories": {
@@ -9137,6 +9446,245 @@
                 "minute": "{value}m ago",
                 "hour": "{value}h ago",
                 "day": "{value}d ago"
+            }
+        },
+        "computer": {
+            "title": "{agent}'s computer",
+            "tabLabel": "Computer",
+            "heroAction": "Watch computer",
+            "backToAgent": "Back to {agent}",
+            "modeWatching": "Watching — {agent} keeps working.",
+            "modeControlling": "You have control — {agent}'s input is paused.",
+            "terminalOnNode": "Watching — this shell is on {node}.",
+            "terminalReadOnly": "read-only",
+            "watermark": "EVER WORKS · LIVE VIEW · {agent} @ {node}",
+            "liveBadge": "LIVE",
+            "liveBadgeTitle": "Pictures are arriving from {node}",
+            "connectingBadge": "CONNECTING",
+            "endedBadge": "ENDED",
+            "capturingBrowser": "{agent}'s own browser",
+            "localTime": "{time} local",
+            "localTimeStale": "{time} local — not updated for a while",
+            "briefLabel": "BRIEF · {task}",
+            "briefMission": "Mission: {mission}",
+            "briefIdle": "Idle — no task in flight",
+            "bandwidthUsed": "Bandwidth used: {value}",
+            "noCost": "Watching spends no model tokens and no credits.",
+            "copyLink": "Copy link to this view",
+            "linkCopied": "Link copied",
+            "endSession": "End session",
+            "moreActions": "More actions",
+            "channelLabel": "Channel",
+            "channelScreen": "Screen",
+            "channelTerminal": "Terminal",
+            "qualityLabel": "Quality",
+            "quality": {
+                "sharp": "Sharp",
+                "smooth": "Smooth",
+                "steady": "Steady",
+                "autoLowered": "Lowered to {tier} — the connection is slow. It will go back to {chosen} on its own."
+            },
+            "refresh": "Refresh",
+            "banner": "{node}: {message}",
+            "connecting": {
+                "title": "Waking up the view…",
+                "subtitle": "Asking {node} for a picture.",
+                "slow": "{node} has not answered yet. It may be busy.",
+                "cancel": "Cancel"
+            },
+            "stall": {
+                "banner": "Stream stalled — last frame {seconds}s ago",
+                "refreshNow": "Refresh now",
+                "staleNote": "The picture is stale; the work is not.",
+                "stopped": "The stream stopped.",
+                "stoppedDetail": "The computer may be busy or asleep.",
+                "reconnect": "Reconnect"
+            },
+            "empty": {
+                "title": "{agent} does not have a computer yet",
+                "body": "Agents work on machines you own. Add one and you can watch what {agent} is doing on it, live.",
+                "addComputer": "Add a computer",
+                "howItWorks": "How this works"
+            },
+            "offline": {
+                "title": "{node} is offline",
+                "lastSeen": "Last heard from {relative}.",
+                "lastSeenNever": "It has never checked in.",
+                "hint": "Start the Ever Works node app on that machine to bring it back.",
+                "tryAgain": "Try again",
+                "pickAnother": "Pick another computer"
+            },
+            "cannotShow": {
+                "noBrowserTitle": "No browser found on {node}",
+                "noBrowserBody": "{agent} needs its own browser on a machine before you can watch it work. Install Chrome, Edge or Chromium there, or point the node at one you already have.",
+                "noDisplayTitle": "{node} has no display session",
+                "noDisplayBody": "{node} cannot take a picture of {agent}'s browser right now.",
+                "noTerminalTitle": "{node} cannot serve a terminal right now",
+                "noTerminalBody": "The node on that machine is not offering a shell.",
+                "watchTerminalInstead": "Watch the terminal instead",
+                "watchScreenInstead": "Watch the screen instead"
+            },
+            "notAttended": {
+                "title": "Live view is switched off on {node}",
+                "body": "Run this on that machine to turn it on:",
+                "command": "ever-works-node start --attend",
+                "copy": "copy",
+                "copied": "copied",
+                "abandonedTitle": "{node} did not pick up the view"
+            },
+            "unwatchable": {
+                "title": "{node} cannot be watched right now",
+                "paused": "{node} is paused. Resume it to watch it.",
+                "disabled": "{node} is disabled in Fleet settings.",
+                "draining": "{node} is winding down and is not taking new views.",
+                "cluster": "{node} is a cluster node. Its work can be read in Runs, but it has no screen to show."
+            },
+            "nodePicker": {
+                "label": "Choose a computer",
+                "heading": "Watching a computer does not change where {agent}'s work runs.",
+                "pinnedNote": "{agent} is pinned to {node}. Change that on {agent}'s Capabilities tab.",
+                "unpinnedNote": "{agent} is not pinned to a computer. Change that on {agent}'s Capabilities tab.",
+                "capabilitiesLink": "Open Capabilities",
+                "pinnedBadge": "Pinned to {agent}",
+                "selected": "Selected",
+                "lastHeartbeatNever": "never",
+                "reasonOffline": "Offline",
+                "reasonPaused": "Paused",
+                "reasonDisabled": "Disabled",
+                "reasonDraining": "Draining — not available",
+                "reasonNoDisplay": "No display session",
+                "reasonNoBrowser": "No browser found",
+                "reasonNoTerminal": "No terminal",
+                "reasonNotAttended": "Live view is switched off",
+                "reasonCluster": "Cluster node — read only",
+                "capabilitiesScreenTerminal": "Screen, Terminal",
+                "capabilitiesScreen": "Screen",
+                "capabilitiesTerminal": "Terminal"
+            },
+            "overLimit": {
+                "title": "{node} already has {count} live views",
+                "titleOrganization": "This workspace already has {count} live views",
+                "body": "Close one to open another.",
+                "rowWatching": "Watching since {time}",
+                "pickAnother": "Pick another computer"
+            },
+            "stopped": {
+                "banner": "All computers are stopped — \"{reason}\" · since {time}",
+                "bannerNoReason": "All computers are stopped · since {time}",
+                "body": "Live views are closed while the stop is in force."
+            },
+            "ended": {
+                "title": "This live view has ended",
+                "openAgain": "Open a new view",
+                "reasons": {
+                    "closedByUser": "You ended it.",
+                    "noViewer": "Nobody was watching.",
+                    "sessionCeiling": "It reached the longest a live view can stay open.",
+                    "stalled": "No picture arrived for too long.",
+                    "nodeRestarted": "{node} restarted. Open a new view to reconnect.",
+                    "nodeUnavailable": "{node} stopped serving the view.",
+                    "stopped": "All computers were stopped.",
+                    "accessRevoked": "You no longer have access to this computer.",
+                    "abandoned": "{node} did not pick up the view in time.",
+                    "error": "Something went wrong on {node}."
+                }
+            },
+            "errors": {
+                "cannotConnect": "The live view could not connect. Try again in a moment.",
+                "refused": "You no longer have access to this computer.",
+                "unavailable": "Live views are not available on this install.",
+                "nodesUnavailable": "The list of computers could not be loaded."
+            },
+            "profile": {
+                "action": "Own logins and files",
+                "title": "Own logins and files",
+                "body": "{agent} has its own browser profile on {node}. No other agent can read its cookies, sessions or files.",
+                "notYet": "{agent} has not used {node} yet. Its profile is created the first time you watch it there.",
+                "loading": "Checking {agent}'s profile on {node}…",
+                "unknown": "Could not check {agent}'s profile on {node} right now.",
+                "tryAgain": "Try again",
+                "created": "Created",
+                "lastUsed": "Last used",
+                "signedInTo": "Signed in to",
+                "signedInCount": "{count, plural, one {# site} other {# sites}}",
+                "diskUsed": "Disk used",
+                "lastReset": "Last reset",
+                "never": "never",
+                "resetAction": "Reset this agent's logins and files",
+                "resetTitle": "Reset {agent}'s logins and files on {node}?",
+                "resetBody": "{agent} will be signed out of {count, plural, one {# site} other {# sites}} and its files there are deleted the next time it opens on {node}. No other agent on this computer is touched. This cannot be undone.",
+                "resetConfirmLabel": "Type the agent's name to confirm:",
+                "resetConfirm": "Reset",
+                "cancel": "Cancel",
+                "close": "Close",
+                "resetBlocked": "{agent} is working on this computer right now. Pause it or wait for the run to finish.",
+                "resetMismatch": "Type the agent's name exactly to confirm.",
+                "resetDone": "{agent}'s logins and files on {node} were reset.",
+                "resetFailed": "The reset did not go through. Try again."
+            },
+            "shortcuts": {
+                "title": "Keyboard",
+                "open": "Keyboard shortcuts",
+                "refresh": "Refresh the picture",
+                "quality": "Cycle quality: Sharp → Smooth → Steady",
+                "channel": "Switch channel: screen ↔ terminal",
+                "node": "Choose a computer",
+                "sheet": "This sheet",
+                "close": "Close",
+                "takeOver": "Take over",
+                "giveBack": "Give back control",
+                "footnote": "While you have control every other key goes to the computer. Esc Esc always comes back to you.",
+                "notForwarded": "Never sent to the computer: {keys}"
+            },
+            "a11y": {
+                "stageLabelWatching": "Live view of {agent}'s computer {node}. Watching.",
+                "modeChanged": "Mode changed to {mode}.",
+                "modeWatchingName": "watching",
+                "stageLabelControlling": "Live view of {agent}'s computer {node}. You have control.",
+                "modeControllingName": "in control"
+            },
+            "control": {
+                "takeOver": "Take over",
+                "giveBack": "Give back control",
+                "youBadge": "YOU",
+                "deniedTooltip": "Only the owner of this computer can take control.",
+                "deniedByPolicy": "This computer's control policy does not let you take control.",
+                "terminalReadOnly": "The terminal stays read-only. Switch to the screen to take over.",
+                "notLive": "Take over once the picture is showing.",
+                "endsIn": "Control ends in {countdown}.",
+                "ceilingNote": "A single stretch of control lasts at most an hour. You can extend it once.",
+                "extend": "Extend",
+                "extended": "Extended once — it cannot be extended again.",
+                "releasedAutomatically": "Control was released automatically.",
+                "heldByYou": "You have had control in another view of this computer since {time}.",
+                "heldBySomeone": "Someone else has had control since {time}.",
+                "heldByBody": "You can watch. Ask for control and whoever has it will be prompted.",
+                "requestControl": "Request control",
+                "keepWatching": "Keep watching",
+                "requestWaiting": "Waiting for an answer — declines on its own in {countdown}.",
+                "requestDeclined": "Your request was not answered. You still have watching access.",
+                "incomingRequest": "Someone is asking for control of {node}.",
+                "incomingRequestYou": "Another view of yours is asking for control of {node}.",
+                "autoDeclines": "Declines on its own in {countdown}.",
+                "handOver": "Hand over",
+                "keepControl": "Keep control",
+                "idleWarning": "Giving control back in {countdown}",
+                "idleWarningBody": "{agent} has been waiting since {time}.",
+                "giveBackNow": "Give back",
+                "promptLabel": "Control of {node}",
+                "refusals": {
+                    "policy": "Only the owner of this computer can take control.",
+                    "held": "Someone else has control of this computer.",
+                    "notLive": "This live view is not showing the computer yet.",
+                    "sessionEnded": "This live view has ended.",
+                    "notHolder": "This view does not have control of the computer.",
+                    "notHeld": "Nobody has control of this computer — take it instead.",
+                    "alreadyRequested": "Someone has already asked for control. Try again in a minute.",
+                    "noRequest": "That request is no longer waiting for an answer.",
+                    "alreadyExtended": "This stretch of control has already been extended once.",
+                    "unavailable": "Taking control is not available on this install.",
+                    "failed": "That did not go through. Try again."
+                }
             }
         }
     },

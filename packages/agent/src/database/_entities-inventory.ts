@@ -158,12 +158,14 @@ import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
 import { MemoryFolder } from '../entities/memory-folder.entity';
+import { KnowledgeDocumentReaderState } from '../entities/knowledge-document-reader-state.entity';
 // Repository registry (Feature G)
 import { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
 import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-allowlist.entity';
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
+import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 
 import {
     PluginEntity,
@@ -404,6 +406,9 @@ export const ENTITIES = [
     Environment,
     // Memory Files — user-defined folders organizing uploads on /memory.
     MemoryFolder,
+    // Knowledge library — one row per (person, KB document): last read
+    // revision + pin. Written lazily on first open or pin.
+    KnowledgeDocumentReaderState,
     // Repository registry (Feature G) — account-level repo records plus
     // the Agent → repo grant edge rows.
     AgentPluginPackage,
@@ -415,4 +420,8 @@ export const ENTITIES = [
     // UNIQUE (workId, rung, laneKey) index on it is what stops two merges
     // to develop opening two competing promotion pull requests.
     ReleasePromotion,
+    // AW-14 What's new — one row per (person, product changelog entry) they
+    // have read. Deliberately not workspace-scoped: read state follows the
+    // person, never the active Organization.
+    ProductChangelogRead,
 ];

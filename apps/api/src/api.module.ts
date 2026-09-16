@@ -25,6 +25,7 @@ import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { BillingApiModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ChangelogModule } from './changelog/changelog.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { SearchModule } from './plugins-capabilities/search/search.module';
@@ -86,6 +87,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
+import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -139,6 +141,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,
+        // AW-14 What's new — in-product product changelog: entries from the
+        // build's content source, per-person read state, /api/changelog.
+        ChangelogModule,
         BudgetsModule,
         ScreenshotModule,
         SearchModule,
@@ -316,6 +321,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
         MemoryFilesApiModule,
+        // Knowledge library — /api/knowledge: the organization shelf over
+        // the Knowledge Base (shared folders, filing, archive / restore,
+        // Markdown export).
+        KnowledgeLibraryApiModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,

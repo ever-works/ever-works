@@ -191,6 +191,7 @@ export * from './workflow-run.entity';
 export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+export * from './knowledge-document-reader-state.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './agent-plugin-package.entity';
 export * from './agent-plugin-package-allowlist.entity';
@@ -199,3 +200,5 @@ export * from './agent-repo-attachment.entity';
 // Release promotion lane (self-build slice AI, EW-808) — one row per
 // attempt to move a Work one rung along develop -> stage -> main.
 export * from './release-promotion.entity';
+// AW-14 What's new — per-person read state for product changelog entries.
+export * from './product-changelog-read.entity';

@@ -17,6 +17,21 @@ import {
 export const MEMORY_FILE_SOURCES = ['upload', 'kb-upload'] as const;
 export type MemoryFileSourceParam = (typeof MEMORY_FILE_SOURCES)[number];
 
+/**
+ * Folder scopes accepted by the folder routes. `user` (the default when
+ * omitted) is the personal Files tree, byte-identical to before scopes
+ * existed; `organization` is a shared Knowledge library folder.
+ */
+export const MEMORY_FOLDER_SCOPES = ['user', 'organization'] as const;
+export type MemoryFolderScopeParam = (typeof MEMORY_FOLDER_SCOPES)[number];
+
+/** Query for `GET /api/memory/files/tree`. */
+export class MemoryFolderTreeQueryDto {
+    @IsOptional()
+    @IsIn(MEMORY_FOLDER_SCOPES as unknown as readonly string[])
+    scope?: MemoryFolderScopeParam;
+}
+
 /** Query for `GET /api/memory/files` (the unified list). */
 export class ListMemoryFilesQueryDto {
     /** Folder to list; omitted = the root (unfiled files). */
@@ -77,6 +92,11 @@ export class CreateMemoryFolderDto {
     @IsOptional()
     @IsUUID()
     ownerAgentId?: string;
+
+    /** Omit (or `user`) for a personal folder; `organization` for a shared library folder. */
+    @IsOptional()
+    @IsIn(MEMORY_FOLDER_SCOPES as unknown as readonly string[])
+    scope?: MemoryFolderScopeParam;
 }
 
 /**

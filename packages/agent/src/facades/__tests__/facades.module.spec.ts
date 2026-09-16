@@ -27,6 +27,8 @@ import { VectorStoreFacadeService } from '../vector-store.facade';
 import { MetricsFacadeService } from '../metrics.facade';
 // AW-21 — playbook-provider capability facade.
 import { PlaybookCatalogFacadeService } from '../playbook-catalog.facade';
+// AW-15 — connection-scopes capability facade.
+import { ConnectionScopesFacadeService } from '../connection-scopes.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -68,6 +70,8 @@ describe('FacadesModule + barrel re-exports', () => {
         MetricsFacadeService,
         // AW-21 — playbook-provider capability (capability & playbook catalogue).
         PlaybookCatalogFacadeService,
+        // AW-15 — connection-scopes capability (provider access levels).
+        ConnectionScopesFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -144,6 +148,7 @@ describe('FacadesModule + barrel re-exports', () => {
             );
             expect(facadesBarrel.MetricsFacadeService).toBe(MetricsFacadeService);
             expect(facadesBarrel.PlaybookCatalogFacadeService).toBe(PlaybookCatalogFacadeService);
+            expect(facadesBarrel.ConnectionScopesFacadeService).toBe(ConnectionScopesFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -268,6 +273,8 @@ describe('FacadesModule + barrel re-exports', () => {
                     'PLAYBOOK_PROVIDER_PAGE_SIZE',
                     'PlaybookCatalogFacadeError',
                     'PlaybookCatalogFacadeService',
+                    // AW-15 — connection-scopes capability facade.
+                    'ConnectionScopesFacadeService',
                     // Merge-policy matrix (Wave 3, D4). `AgentMergeActor` is
                     // type-only and correctly absent from this runtime list.
                     'MergePolicyRefusedError',
