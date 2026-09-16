@@ -142,6 +142,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'NotificationChannel',
     'NotificationChannelDeliveryLog',
     'NotificationEventType',
+    'OnboardingChecklist',
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',

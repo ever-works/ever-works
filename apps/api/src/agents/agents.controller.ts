@@ -340,6 +340,8 @@ export class AgentsController {
                 name: body.name,
                 title: body.title ?? null,
                 capabilities: body.capabilities ?? null,
+                // AW-20 — the area of work this Agent owns. Label only.
+                lane: body.lane ?? null,
                 aiProviderId: body.aiProviderId ?? null,
                 modelId: body.modelId ?? null,
                 // Environments — service validates same-user + published
@@ -682,6 +684,8 @@ export class AgentsController {
                 name: body.name,
                 title: body.title,
                 capabilities: body.capabilities,
+                // AW-20 — `undefined` leaves the lane alone, `null` clears it.
+                lane: body.lane,
                 aiProviderId: body.aiProviderId,
                 modelId: body.modelId,
                 // Environments — `undefined` leaves the assignment alone,

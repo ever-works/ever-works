@@ -13,6 +13,7 @@ import { GoalEvaluationService, GoalOrchestratorService } from '@ever-works/agen
 import {
     AgentEscalationService,
     AgentRunService,
+    RosterProvisioningService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
     RunDispatchGateService,
@@ -141,6 +142,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: AgentRunService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'AgentRunService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // AW-20 P1 - `roster-provision` drives the whole provisioning
+        // state machine here. Proxied rather than provided directly: the
+        // service writes Agents, collaborator rows and the checklist row,
+        // all of which live behind the API process's DataSource.
+        {
+            provide: RosterProvisioningService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'RosterProvisioningService'),
             inject: [TriggerInternalApiClient],
         },
         // Judgment layer G3 - `agent-task-execute` files an escalation
@@ -410,6 +421,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
         AgentRunService,
+        RosterProvisioningService,
         AgentEscalationService,
         TaskReviewRejectionService,
         AgentRepository,

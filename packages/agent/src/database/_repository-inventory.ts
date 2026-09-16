@@ -52,6 +52,7 @@ import { NotificationChannelDeliveryLogRepository } from './repositories/notific
 import { NotificationChannelRepository } from './repositories/notification-channel.repository';
 import { NotificationEventTypeRepository } from './repositories/notification-event-type.repository';
 import { NotificationRepository } from './repositories/notification.repository';
+import { OnboardingChecklistRepository } from './repositories/onboarding-checklist.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
 import { OrganizationNotificationDefaultRepository } from './repositories/organization-notification-default.repository';
 import { OrganizationOnboardingProfileRepository } from './repositories/organization-onboarding-profile.repository';
@@ -112,6 +113,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     NotificationChannelRepository,
     NotificationEventTypeRepository,
     NotificationRepository,
+    OnboardingChecklistRepository,
     OnboardingRequestRepository,
     OrganizationNotificationDefaultRepository,
     OrganizationOnboardingProfileRepository,

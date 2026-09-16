@@ -33,6 +33,11 @@ export interface AgentDto {
     slug: string;
     title: string | null;
     capabilities: string | null;
+    /**
+     * AW-20 — the area of work this Agent owns. A label, never a
+     * permission; `null` on every Agent that has not been given one.
+     */
+    lane: string | null;
     aiProviderId: string | null;
     modelId: string | null;
     /**
@@ -95,6 +100,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         slug: agent.slug,
         title: agent.title ?? null,
         capabilities: agent.capabilities ?? null,
+        lane: agent.lane ?? null,
         aiProviderId: agent.aiProviderId ?? null,
         modelId: agent.modelId ?? null,
         environmentId: agent.environmentId ?? null,

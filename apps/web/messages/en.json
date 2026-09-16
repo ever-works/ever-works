@@ -605,6 +605,90 @@
                     "successDefault": "SIM AI connection verified."
                 }
             }
+        },
+        "rosterStep": {
+            "title": "Your agents",
+            "subtitle": "Based on what you told us, here's a team to start with. Rename anything, drop what you don't need, add what's missing.",
+            "loading": "Working out who you need…",
+            "loadFailed": "We couldn't load a starting roster. You can set your agents up later from Agents.",
+            "coordinatorChip": "coordinator",
+            "addLane": "Add a lane",
+            "addLaneFull": "8 agents is the most we'll set up at once — you can add more any time from Agents.",
+            "remove": "Remove",
+            "guardrailNotice": "Every one of these asks you before it sends, spends, or publishes anything. You can loosen that later, per agent.",
+            "primary": "Create my agents",
+            "skip": "Skip for now",
+            "nameRequired": "Give this one a name",
+            "nameTooLong": "Names can be up to 60 characters",
+            "noRolesNotice": "We picked a starting point — change anything you like.",
+            "noRolesAction": "Tell us what you do",
+            "readOnlyNotice": "Someone with permission to add agents needs to do this.",
+            "copyNote": "Copy note",
+            "provisionFailed": "We couldn't start setting up your agents. Try again.",
+            "lanes": {
+                "coordination": "Coordination",
+                "research": "Research",
+                "content": "Content",
+                "outreach": "Outreach",
+                "visibility": "Search visibility",
+                "social": "Social",
+                "marketWatch": "Market watch"
+            },
+            "blurbs": {
+                "coordination": "Takes whatever you hand over, works out who should do it, and asks you when it isn't obvious.",
+                "research": "Digs into questions and writes up what it found.",
+                "content": "Drafts copy and long-form pieces. Always a draft, never published.",
+                "outreach": "Writes the first message and the follow-ups, for you to send.",
+                "visibility": "Checks how findable your pages are and proposes fixes.",
+                "social": "Plans and drafts posts on a calendar you approve.",
+                "marketWatch": "Keeps an eye on the field and flags what changed."
+            }
+        },
+        "provisioning": {
+            "working": "Setting up your agents…",
+            "readyTitle": "Your agents are ready",
+            "progress": "{done} of {total}",
+            "hint": "This takes about a minute. You can keep going — we'll finish in the background.",
+            "continue": "Continue setup",
+            "meetThem": "Meet your agents",
+            "renamed": "Named {finalName} — you already had a {requestedName}",
+            "partialTitle": "Set up {done} of {total} agents",
+            "partialBody": "Your plan has room for {remaining} more agents. The ones we made are ready to work.",
+            "seePlans": "See plans",
+            "finishLater": "Finish this later",
+            "finishNow": "Finish setting up",
+            "failedTitle": "We couldn't set up your agents",
+            "failedBody": "Nothing was created, so nothing is half-made. Try again, or carry on and set them up later from Agents.",
+            "retry": "Try again",
+            "stalledTitle": "This is taking longer than usual",
+            "stalledBody": "We've set up {done} of {total} so far. Nothing is lost — trying again picks up where this left off.",
+            "keepWaiting": "Keep waiting",
+            "inFlight": "Already setting up your agents",
+            "skillWarning": "Couldn't attach {count} skills — you can add them from the agent.",
+            "outcomes": {
+                "created": "Created",
+                "reused": "Reused — you already had this one",
+                "skippedNoSeat": "Not enough seats on your plan",
+                "pending": "Not attempted",
+                "working": "Setting up…",
+                "binding": "Attaching skills…"
+            },
+            "failures": {
+                "nameUnavailable": "Couldn't find a free name",
+                "noSeat": "Not enough seats on your plan",
+                "permissionDenied": "You don't have permission to add agents",
+                "timedOut": "Took too long — try again",
+                "unknown": "Something went wrong on our side"
+            }
+        },
+        "introduction": {
+            "title": "Meet your agents",
+            "reportsTo": "reports to {name}",
+            "everyoneReportsTo": "Everyone below reports to {name}.",
+            "skills": "Skills: {list}",
+            "guardrailNotice": "None of them acts on its own. They propose; you approve.",
+            "openAgents": "Open Agents",
+            "gotIt": "Got it"
         }
     },
     "dashboard": {

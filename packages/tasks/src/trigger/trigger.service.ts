@@ -9,6 +9,8 @@ import {
     WorkImportDispatcher,
     TemplateCustomizationPayload,
     TemplateCustomizationDispatcher,
+    RosterProvisionPayload,
+    RosterProvisionDispatcher,
     WebhookDeliveryPayload,
     WebhookDeliveryDispatcher,
     KbMirrorDocumentPayload,
@@ -37,6 +39,7 @@ import type {
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
 import { templateCustomizationTask } from '../tasks/trigger/template-customization.task';
+import { rosterProvisionTask } from '../tasks/trigger/roster-provision.task';
 import { webhookDeliveryTask } from '../tasks/trigger/webhook-delivery.task';
 import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
 import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
@@ -94,6 +97,7 @@ export class TriggerService
         WorkGenerationDispatcher,
         WorkImportDispatcher,
         TemplateCustomizationDispatcher,
+        RosterProvisionDispatcher,
         WebhookDeliveryDispatcher,
         KbMirrorDocumentDispatcher,
         KbBackfillSkeletonDispatcher,
@@ -462,6 +466,35 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch work-import task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * AW-20 P1 — enqueue one roster provisioning run.
+     *
+     * `idempotencyKey` is the run id, so a double-fired enqueue collapses
+     * to a single execution instead of two workers racing to create the
+     * same four agents.
+     */
+    async dispatchRosterProvision(payload: RosterProvisionPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await rosterProvisionTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: ['roster-provision', payload.runId],
+                    idempotencyKey: payload.runId,
+                    machine: this.machine() as any,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch roster-provision task', error as Error);
             return null;
         }
     }

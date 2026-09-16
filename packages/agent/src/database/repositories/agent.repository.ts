@@ -158,6 +158,35 @@ export class AgentRepository {
         return this.repository.findOne({ where: { userId, ...common } });
     }
 
+    /**
+     * AW-20 — the Agents of this user that already hold a lane.
+     *
+     * Roster provisioning asks this before it creates anything: a lane
+     * that is already filled is REUSED, never duplicated, which is what
+     * makes running provisioning twice safe. Archived Agents are excluded
+     * — an archived Agent does not hold its lane any more, and treating
+     * it as the occupant would leave the lane permanently unfillable.
+     *
+     * `lanes` empty returns nothing rather than everything: "no lanes
+     * requested" must never read as "every lane".
+     */
+    async findByUserAndLanes(
+        userId: string,
+        lanes: readonly string[],
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent[]> {
+        if (lanes.length === 0) return [];
+        const branches = ownershipWhere<Agent>(userId, ownershipScope);
+        return this.repository.find({
+            where: branches.map((branch) => ({
+                ...branch,
+                lane: In([...lanes]),
+                status: Not(AgentStatus.ARCHIVED),
+            })),
+            order: { createdAt: 'ASC' },
+        });
+    }
+
     async findByUserIdScoped(
         userId: string,
         filter: ListAgentsFilter = {},

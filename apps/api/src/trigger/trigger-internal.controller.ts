@@ -47,6 +47,7 @@ import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService, GoalOrchestratorService } from '@ever-works/agent/goals';
 import {
     AgentEscalationService,
+    RosterProvisioningService,
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
@@ -387,6 +388,13 @@ export class TriggerInternalController implements OnModuleInit {
         // channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly paygService?: PaygService,
+        // AW-20 P1 — backs the `roster-provision` one-shot task: the
+        // worker proxy drives `execute()` over the internal RPC channel,
+        // landing here where the Agents, collaborator and checklist
+        // repositories are wired. Appended LAST + @Optional() per the
+        // arity rule above.
+        @Optional()
+        private readonly rosterProvisioningService?: RosterProvisioningService,
     ) {}
 
     onModuleInit() {
@@ -426,6 +434,8 @@ export class TriggerInternalController implements OnModuleInit {
             // Judgment layer G3 — agent-task-execute files escalations here
             // when the gate is exhausted / the budget stopped the loop.
             AgentEscalationService: this.agentEscalationService,
+            // AW-20 P1 — exposed for the `roster-provision` one-shot task.
+            RosterProvisioningService: this.rosterProvisioningService,
             // Orchestration M9 — agent-task-execute persists the machine
             // gate feedback here so a later resume replays it.
             TaskReviewRejectionService: this.taskReviewRejectionService,

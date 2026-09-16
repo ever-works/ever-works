@@ -49,6 +49,7 @@ import { TermsAcceptance } from '../entities/terms-acceptance.entity';
 import { GitHubAppInstallation } from '../entities/github-app-installation.entity';
 import { GitHubAppInstallationRepository } from '../entities/github-app-installation-repository.entity';
 import { GitHubAppUserLink } from '../entities/github-app-user-link.entity';
+import { OnboardingChecklist } from '../entities/onboarding-checklist.entity';
 import { OnboardingRequest } from '../entities/onboarding-request.entity';
 import { Template } from '../entities/template.entity';
 import { TemplateCustomization } from '../entities/template-customization.entity';
@@ -207,6 +208,7 @@ export const ENTITIES = [
     GitHubAppInstallation,
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
+    OnboardingChecklist,
     OnboardingRequest,
     Template,
     TemplateCustomization,
