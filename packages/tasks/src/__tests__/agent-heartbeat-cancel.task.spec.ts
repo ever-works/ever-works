@@ -193,3 +193,107 @@ describe('agentHeartbeatTask — cancelled run accounting', () => {
         expect(agents.incrementErrorCount).not.toHaveBeenCalled();
     });
 });
+
+describe('agentHeartbeatTask — a claimed row runs under its OWN admission scope', () => {
+    /**
+     * Reviewer agent stage (slice AD), review finding "scope from the context,
+     * verdict from the row". The legacy payload with no `runId` claims ANY
+     * in-flight run of the agent (`findInFlightForAgent`), and a payload
+     * `runId` is only checked against the agent — so the row executed here
+     * can be a REVIEW run. The tool loop narrows tools and gates on the brief
+     * from the scope on the context, and the worker used to leave it off.
+     */
+    let registeredConfig: TaskConfig;
+    let runs: any;
+    let runner: any;
+    const REVIEW_SCOPE = { allowedTools: ['submitTaskReview'] };
+
+    beforeAll(async () => {
+        vi.resetModules();
+        await import('../tasks/trigger/agent-heartbeat.task');
+        registeredConfig = taskMock.mock.calls[taskMock.mock.calls.length - 1][0] as TaskConfig;
+    });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        const agents = {
+            findById: vi.fn().mockResolvedValue({
+                id: AGENT_ID,
+                userId: OWNER,
+                heartbeatCadence: '*/5 * * * *',
+            }),
+            releaseAfterRun: vi.fn().mockResolvedValue(undefined),
+            incrementErrorCount: vi.fn().mockResolvedValue(undefined),
+        };
+        runs = {
+            findById: vi.fn().mockResolvedValue(null),
+            findInFlightForAgent: vi.fn().mockResolvedValue(null),
+            createQueued: vi.fn().mockResolvedValue({ id: 'run-1', status: 'queued' }),
+            markStarted: vi.fn().mockResolvedValue(true),
+            markCompleted: vi.fn().mockResolvedValue(undefined),
+            markFailed: vi.fn().mockResolvedValue(undefined),
+        };
+        runner = { execute: vi.fn().mockResolvedValue({ status: 'dispatched' }) };
+        createApplicationContextMock.mockResolvedValue({
+            useLogger: vi.fn(),
+            get: vi.fn().mockImplementation((token: unknown) => {
+                if (token === AgentRepositoryToken) return agents;
+                if (token === AgentRunRepositoryToken) return runs;
+                if (token === AgentRunServiceToken) return runner;
+                throw new Error(`Unexpected DI token: ${String(token)}`);
+            }),
+            close: vi.fn().mockResolvedValue(undefined),
+        });
+    });
+
+    const legacyPayload = {
+        agentId: AGENT_ID,
+        userId: OWNER,
+        scheduledFor: '2026-01-01T00:00:00Z',
+    };
+
+    it('carries a REVIEW row’s scope found through the legacy "any in-flight run" fallback', async () => {
+        runs.findInFlightForAgent.mockResolvedValueOnce({
+            id: 'run-review-1',
+            agentId: AGENT_ID,
+            status: 'running',
+            delegationScope: REVIEW_SCOPE,
+        });
+
+        await registeredConfig.run(legacyPayload, { ctx: { run: { id: 'run_abc' } } });
+
+        expect(runner.execute).toHaveBeenCalledTimes(1);
+        expect(runner.execute.mock.calls[0][0]).toMatchObject({
+            runId: 'run-review-1',
+            kind: 'heartbeat',
+            delegationScope: REVIEW_SCOPE,
+        });
+    });
+
+    it('carries the scope of a row named by the payload runId too', async () => {
+        runs.findById.mockResolvedValueOnce({
+            id: 'run-review-1',
+            agentId: AGENT_ID,
+            status: 'queued',
+            delegationScope: REVIEW_SCOPE,
+        });
+
+        await registeredConfig.run(
+            { ...legacyPayload, runId: 'run-review-1' },
+            { ctx: { run: { id: 'run_abc' } } },
+        );
+
+        expect(runner.execute.mock.calls[0][0].delegationScope).toEqual(REVIEW_SCOPE);
+    });
+
+    it('leaves an ordinary heartbeat call exactly as it was — no scope key at all', async () => {
+        await registeredConfig.run(legacyPayload, { ctx: { run: { id: 'run_abc' } } });
+
+        expect(runner.execute.mock.calls[0][0]).toEqual({
+            runId: 'run-1',
+            agentId: AGENT_ID,
+            userId: OWNER,
+            kind: 'heartbeat',
+        });
+    });
+});

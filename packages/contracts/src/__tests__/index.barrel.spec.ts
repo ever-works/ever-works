@@ -5,6 +5,7 @@ import * as root from '../index.js';
 import * as agents from '../agents/index.js';
 import * as computer from '../computer/index.js';
 import * as connections from '../connections/index.js';
+import * as conversations from '../conversations/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
@@ -49,6 +50,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
 	['computer', computer],
 	['connections', connections],
+	['conversations', conversations],
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
@@ -78,7 +80,11 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(25);
+		// 26 is COUNTED from the AREAS array above after merging develop, not
+		// added up from either side's number: this branch stood at 25 (its own
+		// `memory` area) and develop at 24 (its `conversations` area), and the
+		// merged barrel carries both.
+		expect(exportLines).toBe(26);
 	});
 
 	it('has no name exported by two different areas', () => {

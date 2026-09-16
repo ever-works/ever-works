@@ -35,6 +35,9 @@ export * from './release/index.js';
 // Memory facts + context-file vocabulary (AW-07) — the atomic tier of Memory
 // and the shared limits every surface validates against.
 export * from './memory/index.js';
+// Conversations — kinds, participants, send status and delivery outcomes for
+// named conversations with Agents.
+export * from './conversations/index.js';
 // Connections (AW-15) — plain-English scope presets expressed on the
 // tool-grant lattice, and the shared connection-health vocabulary.
 export * from './connections/index.js';

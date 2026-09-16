@@ -77,6 +77,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ComputerSession',
     'Conversation',
     'ConversationMessage',
+    // Named Conversations — a person or an Agent taking part in one
+    'ConversationParticipant',
     // Credits ledger (pricing Wave 9 M1)
     'CreditLedgerEntry',
     // Pay-as-you-go meter events (billing spec §3.5) — the platform-side
@@ -160,6 +162,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ReleasePromotion',
     // Repository registry (Feature G) — account-level repo records.
     'RepoConnection',
+    // AW-18 Shared view — one Workspace's read-only published face.
+    'SharedView',
     // Skills family (PR #1019) ──
     'Skill',
     'SkillBinding',
@@ -168,6 +172,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'SubscriptionPlan',
     // Tasks family (PR #1019) ──
     'Task',
+    // Reviewer agent stage (slice AD, EW-811) - the review ledger.
+    'TaskAgentReview',
     'TaskApprover',
     'TaskAssignee',
     'TaskAttachment',

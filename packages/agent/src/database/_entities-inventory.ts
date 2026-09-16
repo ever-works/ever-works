@@ -42,6 +42,7 @@ import { Notification } from '../entities/notification.entity';
 import { ActivityLog } from '../entities/activity-log.entity';
 import { Conversation } from '../entities/conversation.entity';
 import { ConversationMessage } from '../entities/conversation-message.entity';
+import { ConversationParticipant } from '../entities/conversation-participant.entity';
 import { AuthAccount } from '../entities/auth-account.entity';
 import { AuthSession } from '../entities/auth-session.entity';
 import { AuthVerification } from '../entities/auth-verification.entity';
@@ -94,6 +95,7 @@ import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
 import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
 import { TaskCiAutoResumeAttempt } from '../entities/task-ci-auto-resume-attempt.entity';
+import { TaskAgentReview } from '../entities/task-agent-review.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
 import { TaskRelation } from '../entities/task-relation.entity';
@@ -168,6 +170,7 @@ import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
 import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
+import { SharedView } from '../entities/shared-view.entity';
 
 import {
     PluginEntity,
@@ -203,6 +206,7 @@ export const ENTITIES = [
     ActivityLog,
     Conversation,
     ConversationMessage,
+    ConversationParticipant,
     AuthAccount,
     AuthSession,
     AuthVerification,
@@ -265,6 +269,9 @@ export const ENTITIES = [
     // CI feedback + autonomous fix loop (slice AC, EW-806) - the durable
     // auto-resume attempt ledger, which IS the retry budget.
     TaskCiAutoResumeAttempt,
+    // Reviewer agent stage (slice AD, EW-811) - the review ledger, which
+    // IS the review budget and the run -> approver-row binding.
+    TaskAgentReview,
     TaskApprover,
     TaskBlock,
     TaskRelation,
@@ -432,4 +439,7 @@ export const ENTITIES = [
     // have read. Deliberately not workspace-scoped: read state follows the
     // person, never the active Organization.
     ProductChangelogRead,
+    // AW-18 Shared view — one row per Workspace holding what its share link
+    // publishes and the hashed + encrypted token. Never a copy of content.
+    SharedView,
 ];

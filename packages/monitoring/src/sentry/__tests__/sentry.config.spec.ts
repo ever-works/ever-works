@@ -136,6 +136,27 @@ describe('sentry.config', () => {
             expect(cfg.beforeSend(ev)).toBe(ev);
             expect(cfg.beforeSendTransaction(ev)).toBe(ev);
         });
+        it('redacts share tokens from the request URL, transaction name and breadcrumbs', () => {
+            const cfg = createSentryConfig();
+            const token = 'Zb3kQ9x_T1-vYwP0aLmN8cR4sD6fG2hJ5kL7qW9eR1t';
+            const event = {
+                request: { url: `https://app.example/en/share/${token}` },
+                transaction: `GET /share/${token}`,
+                breadcrumbs: [
+                    { data: { url: `https://app.example/share/${token}` } },
+                    { message: `navigated to /share/${token}` },
+                ],
+            };
+            const sent = cfg.beforeSend(event);
+            expect(JSON.stringify(sent)).not.toContain(token);
+            expect(sent.request.url).toBe('https://app.example/en/share/[redacted]');
+
+            const transaction = cfg.beforeSendTransaction({
+                request: { url: `https://app.example/share/${token}` },
+                transaction: `GET /share/${token}`,
+            });
+            expect(JSON.stringify(transaction)).not.toContain(token);
+        });
     });
 
     describe('initSentry', () => {

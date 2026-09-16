@@ -6,6 +6,7 @@ import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialE
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
 import { Agent, AgentStatus } from '../../entities/agent.entity';
+import { ConversationMessage } from '../../entities/conversation-message.entity';
 import { Mission } from '../../entities/mission.entity';
 import { Task } from '../../entities/task.entity';
 import { Work } from '../../entities/work.entity';
@@ -13,6 +14,8 @@ import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../insertion-order';
 import type { SubAgentScope } from '@ever-works/contracts';
+// Pure leaf (type-only imports of its own) — no runtime graph, no cycle.
+import { isAgentReviewRunScope } from '../../tasks-domain/task-agent-review';
 
 /**
  * Statuses a run may be transitioned OUT OF by a normal terminal write.
@@ -657,6 +660,12 @@ export class AgentRunRepository {
         triggerKind: AgentRunTriggerKind;
         taskId?: string | null;
         chatMessageId?: string | null;
+        /**
+         * Named Conversations — the Conversation message a `conversation`
+         * run replies to. Omitted by every other caller, which leaves the
+         * column NULL exactly as before.
+         */
+        conversationMessageId?: string | null;
         /** Wave 4 M1 — denormalized from `task.workId` at creation when present. */
         workId?: string | null;
         /** Wave 4 M2 — set to `concurrency-limit` when the dispatch gate parks the run. */
@@ -704,6 +713,9 @@ export class AgentRunRepository {
             queuedReason: args.queuedReason ?? null,
             runnerKind: args.runnerKind ?? null,
             ...(args.persistent === true ? { persistent: true } : {}),
+            ...(args.conversationMessageId
+                ? { conversationMessageId: args.conversationMessageId }
+                : {}),
             // Only stamp when explicitly provided — the ambient scope
             // subscriber (EW-657) remains the default writer.
             ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),
@@ -1138,6 +1150,49 @@ export class AgentRunRepository {
     }
 
     /**
+     * Named Conversations — an in-flight run this Agent is already executing
+     * in reply to a message of this Conversation. A new message for the same
+     * Agent is steered into that run instead of starting a second one.
+     */
+    async findInFlightForConversationAgent(
+        conversationId: string,
+        agentId: string,
+        userId?: string,
+        scope?: OwnershipScope,
+    ): Promise<AgentRun | null> {
+        const query = this.repository
+            .createQueryBuilder('run')
+            .where('run.agentId = :agentId', { agentId })
+            .andWhere('run.triggerKind = :triggerKind', {
+                triggerKind: 'conversation' satisfies AgentRun['triggerKind'],
+            })
+            .andWhere('run.status IN (:...statuses)', {
+                statuses: ['queued', 'running'] satisfies AgentRunStatus[],
+            })
+            .orderBy('run.createdAt', 'DESC');
+        // Built through TypeORM rather than spelled out as SQL: raw
+        // `cm."conversationId"` quoting is Postgres/SQLite-only, and MySQL —
+        // a supported driver — rejects it without ANSI_QUOTES, which would
+        // make this lookup fail outright there. The sub-select lets each
+        // driver escape the table and the column its own way.
+        const conversationMessageIds = query
+            .subQuery()
+            .select('cm.id')
+            .from(ConversationMessage, 'cm')
+            .where('cm.conversationId = :conversationId')
+            .getQuery();
+        query.andWhere(`run.conversationMessageId IN ${conversationMessageIds}`, {
+            conversationId,
+        });
+        if (userId) query.andWhere('run.userId = :userId', { userId });
+        const scopePredicate = ownershipSqlPredicate('run', scope, 'inFlightConversationRun');
+        if (scopePredicate) {
+            query.andWhere(scopePredicate.clause, scopePredicate.parameters);
+        }
+        return query.getOne();
+    }
+
+    /**
      * Most-recent run dispatched for a Task, any agent, any status —
      * the "latest run" the quality-gate transition rule (Wave 3 M8)
      * reads `gateStatus` from. Authoritative (queries the runs table
@@ -1157,6 +1212,69 @@ export class AgentRunRepository {
                 .orderBy('run.createdAt', 'DESC'),
             'DESC',
         ).getOne();
+    }
+
+    /**
+     * One page of this Task's runs, newest first — any agent, any status.
+     *
+     * The paged sibling of {@link findLatestForTask}, for a caller that has
+     * to look PAST the newest run: slice AC's CI auto-resume skips review
+     * runs (reviewer agent stage, slice AD) to find the latest run that
+     * could have authored the commit CI judged. The caller decides what to
+     * skip; this only reads. `id` breaks `createdAt` ties so consecutive
+     * pages neither repeat nor drop a row.
+     *
+     * @internal Security: unscoped, like `findLatestForTask` — callers
+     * have already resolved an owner-scoped Task row.
+     */
+    async findRecentForTask(taskId: string, limit: number, offset = 0): Promise<AgentRun[]> {
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.taskId = :taskId', { taskId })
+            .orderBy('run.createdAt', 'DESC')
+            .addOrderBy('run.id', 'DESC')
+            .skip(Math.max(0, Math.trunc(offset)))
+            .take(Math.max(1, Math.trunc(limit)))
+            .getMany();
+    }
+
+    /**
+     * EVERY distinct agent that has had a run on this Task, over the
+     * Task's whole life, except the runs named in `excludeRunIds`.
+     *
+     * Reviewer agent stage (self-build slice AD, EW-811): this is the
+     * evidence for "which agents wrote this Task's code?", which is the
+     * question the self-review refusal turns on. The caller excludes only
+     * review runs it has PROVEN could not author anything (bound in the
+     * review ledger AND admitted with the review-only tool scope), or a
+     * reviewer would disqualify itself the moment its review run started.
+     *
+     * Complete by construction — `DISTINCT agentId`, no row limit. It used
+     * to be the 50 NEWEST runs as a plain array, which a caller could not
+     * tell apart from a complete history: an implementer whose runs had
+     * aged out behind 50 newer ones (chat mentions, resumes, review runs)
+     * silently stopped counting as an author, and the refusal failed OPEN.
+     * The answer is bounded by the number of distinct agents on a Task,
+     * not by its run count, so there is nothing to cap.
+     *
+     * @internal Security: unscoped, like `findLatestForTask` — callers
+     * have already resolved an owner-scoped Task row.
+     */
+    async findAuthorAgentIdsForTask(
+        taskId: string,
+        excludeRunIds: readonly string[] = [],
+    ): Promise<string[]> {
+        const query = this.repository
+            .createQueryBuilder('run')
+            .select('DISTINCT run.agentId', 'agentId')
+            .where('run.taskId = :taskId', { taskId });
+        if (excludeRunIds.length > 0) {
+            query.andWhere('run.id NOT IN (:...excludeRunIds)', {
+                excludeRunIds: [...excludeRunIds],
+            });
+        }
+        const rows = await query.getRawMany<{ agentId: string }>();
+        return rows.map((row) => row.agentId).filter((id): id is string => Boolean(id));
     }
 
     /**
@@ -1383,10 +1501,20 @@ export class AgentRunRepository {
     async appendPendingInput(runId: string, message: string): Promise<boolean> {
         const run = await this.repository.findOne({
             where: { id: runId },
-            select: ['id', 'status', 'pendingInput'],
+            select: ['id', 'status', 'pendingInput', 'delegationScope'],
         });
         if (!run) return false;
         if (!NON_TERMINAL.includes(run.status)) return false;
+        // Reviewer agent stage (slice AD, EW-811) — a REVIEW run's queue
+        // takes no steering, at the storage choke point as well as in
+        // `RunSteeringService.steer`. The only thing that may ever sit in a
+        // review run's `pendingInput` is the brief the platform seeds at
+        // dispatch (`seedResumeContext`, before the enqueue), and the tool
+        // loop's brief-in-hand gate relies on exactly that: with this
+        // method refusing, the gate's "first queued message is the brief"
+        // cannot be satisfied by anyone but the platform. `false` is the
+        // same answer as a terminal run — nothing was queued.
+        if (isAgentReviewRunScope(run.delegationScope)) return false;
         const queue = Array.isArray(run.pendingInput) ? [...run.pendingInput] : [];
         queue.push(message);
         const result = await this.repository

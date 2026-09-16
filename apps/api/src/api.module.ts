@@ -83,6 +83,7 @@ import { ScopeModule } from './scope/scope.module';
 import { ScopeOwnershipGuard } from './scope/scope-ownership.guard';
 import { SessionScopeGuard } from './scope/session-scope.guard';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { SharedViewsApiModule } from './shared-views/shared-views.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
@@ -348,6 +349,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // EW-658 (Tenants & Organizations Phase 6) — Organization
         // CRUD + lazy Tenant bootstrap + upgrade-from-account flow.
         OrganizationsModule,
+        // AW-18 Shared view — Settings → Sharing (owner) and the public
+        // share-link exchange + published board read (no account).
+        SharedViewsApiModule,
     ],
     providers: [
         {

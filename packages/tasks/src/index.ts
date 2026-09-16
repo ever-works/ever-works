@@ -9,6 +9,9 @@ export { TriggerService } from './trigger/trigger.service';
 // fan out platform Task events to the Trigger.dev runtime. API-side
 // TasksModule binds these to the dispatcher tokens.
 export * from './dispatchers/agent-task-dispatchers';
+// Named Conversations — the reply dispatch adapter. API-side TasksModule
+// binds it to the AGENT_CONVERSATION_REPLY_DISPATCHER token.
+export * from './dispatchers/conversation-dispatchers';
 // PR-4 — Idea → Work build executor dispatch adapter. API-side
 // IdeaBuildExecutorDispatchModule binds this to the
 // IDEA_BUILD_EXECUTE_DISPATCHER token.

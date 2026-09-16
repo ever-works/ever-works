@@ -1950,7 +1950,8 @@
                 "manual": "Manual",
                 "task": "Task",
                 "chat": "Chat reply",
-                "event": "Event"
+                "event": "Event",
+                "conversation": "Conversation reply"
             },
             "outcome": {
                 "queued": "Waiting",

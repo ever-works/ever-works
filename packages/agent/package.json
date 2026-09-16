@@ -181,6 +181,10 @@
             "types": "./dist/tasks-domain/index.d.ts",
             "default": "./dist/tasks-domain/index.js"
         },
+        "./conversations": {
+            "types": "./dist/conversations/index.d.ts",
+            "default": "./dist/conversations/index.js"
+        },
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"
@@ -228,6 +232,10 @@
         "./computer": {
             "types": "./dist/computer/index.d.ts",
             "default": "./dist/computer/index.js"
+        },
+        "./shared-views": {
+            "types": "./dist/shared-views/index.d.ts",
+            "default": "./dist/shared-views/index.js"
         },
         "./pr-review": {
             "types": "./dist/pr-review/index.d.ts",

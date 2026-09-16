@@ -36,3 +36,7 @@ export * from './changelog/index.js';
 
 // AW-01 workspace-wide search behind the dashboard command palette.
 export * from './workspace-search/index.js';
+
+// AW-18 Shared view — owner sharing settings, the share-link exchange, and
+// the closed published board and document shapes.
+export * from './shared-view/index.js';

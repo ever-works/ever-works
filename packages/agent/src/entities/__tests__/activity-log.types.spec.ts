@@ -108,6 +108,12 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Shared view (AW-18)
+            ['SHARED_VIEW_ENABLED', 'shared_view_enabled'],
+            ['SHARED_VIEW_DISABLED', 'shared_view_disabled'],
+            ['SHARED_VIEW_REGENERATED', 'shared_view_regenerated'],
+            ['SHARED_VIEW_SECTIONS_CHANGED', 'shared_view_sections_changed'],
+            ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
             // Agent computers — one row per stretch of control of an Agent's machine.
             ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
@@ -173,7 +179,7 @@ describe('activity-log.types', () => {
             // +5 kb_document_archived / _unarchived / _filed / _exported and
             //    memory_folder_renamed (Knowledge library shelf) -> 162.
             //
-            // 🛑 166 is COUNTED from the merged enum, never added up from the
+            // 🛑 171 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -202,7 +208,20 @@ describe('activity-log.types', () => {
             // stood at 172 and develop at 166, and the overlap between the two
             // is everything except those 5 shelf literals. Recount the enum
             // after every merge instead of trusting either side's number.
-            expect(literals).toHaveLength(177);
+            //
+            // +5 shared_view_enabled / _disabled / _regenerated /
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) —
+            //    develop grew these while this branch sat, and they are the only
+            //    members develop carried that AW-07 did not already have.
+            //
+            // 182 after this branch merged develop again. COUNTED from the
+            // merged enum, never added up: this branch stood at 177 and develop
+            // at 171, the five shared-view literals are everything develop had
+            // that this branch lacked, and the eleven memory-fact / context-file
+            // literals are everything this branch had that develop lacked.
+            // Recount the enum after every merge instead of trusting either
+            // side's number.
+            expect(literals).toHaveLength(182);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
