@@ -23,11 +23,21 @@ interface RegisterFormProps {
      * is blocked — see `termsUnavailable` below.
      */
     termsDocuments: TermsAcceptanceDocument[];
+    /**
+     * Identity carried over from Stripe Checkout, via ever.co/checkout/complete.
+     *
+     * The email is the address the subscription was created against, so it is
+     * rendered read-only: letting someone register under a different address than
+     * the one that is paying produces an account the billing side cannot match.
+     * The name is only a convenience and stays editable.
+     */
+    prefill?: { email?: string; name?: string };
 }
 
 export default function RegisterForm({
     availableSocialProviders,
     termsDocuments,
+    prefill,
 }: RegisterFormProps) {
     const t = useTranslations('auth.register');
     // The rules this form has to state are already written, and already
@@ -40,8 +50,8 @@ export default function RegisterForm({
     const router = useRouter();
 
     const [formData, setFormData] = useState({
-        name: '',
-        email: '',
+        name: prefill?.name ?? '',
+        email: prefill?.email ?? '',
         password: '',
         confirmPassword: '',
         // The terms checkbox used to be uncontrolled — rendered with a bare
@@ -259,6 +269,9 @@ export default function RegisterForm({
                         value={formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         required
+                        // Read-only rather than disabled: a disabled input is excluded from form
+                        // submission, which would drop the very address this is meant to carry.
+                        readOnly={Boolean(prefill?.email)}
                         disabled={isPending}
                         className="text-sm shadow-sm"
                     />
