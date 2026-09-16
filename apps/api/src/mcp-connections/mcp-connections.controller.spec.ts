@@ -74,6 +74,25 @@ describe('McpConnectionsController', () => {
         expect(service.test).toHaveBeenCalledWith('u1', 'c1');
     });
 
+    it('AW-15: hands create the active organization so its https setting is checked up front', async () => {
+        const service = makeService();
+        const scope = { getOrganizationId: jest.fn().mockReturnValue('org-1') };
+        const controller = new McpConnectionsController(service as never, scope as never);
+        const body = {
+            name: 'github',
+            url: 'http://mcp.example.com',
+            transport: 'streamable-http' as const,
+            authHeaders: { Authorization: 'Bearer x' },
+        };
+
+        await controller.create(auth, body);
+        expect(service.create).toHaveBeenCalledWith('u1', body, { organizationId: 'org-1' });
+
+        scope.getOrganizationId.mockReturnValue(null);
+        await controller.create(auth, body);
+        expect(service.create).toHaveBeenLastCalledWith('u1', body);
+    });
+
     it('wraps list results in { data }', async () => {
         const controller = new McpConnectionsController(makeService() as never);
         await expect(controller.list(auth)).resolves.toEqual({ data: [{ id: 'c1' }] });

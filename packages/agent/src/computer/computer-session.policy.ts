@@ -257,6 +257,13 @@ export function resolveComputerSessionLimits(
     };
 }
 
+/**
+ * The operator-limit parser behind {@link resolveComputerSessionLimits}, for
+ * the other live-view limits (control) so every one of them clamps the same
+ * way: unset or nonsense is the default, out of range is clamped.
+ */
+export { clampInt as clampComputerLimit };
+
 export type ComputerSessionExpiry = 'abandoned' | 'stalled' | 'session-ceiling' | null;
 
 /**

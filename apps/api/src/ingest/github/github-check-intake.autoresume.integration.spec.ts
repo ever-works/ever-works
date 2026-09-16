@@ -109,22 +109,18 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
      * Give a run row a `createdAt` strictly after every run written before it.
      *
      * `agent_runs.createdAt` is a `CreateDateColumn`, which better-sqlite3
-     * fills with `datetime('now')` — SECOND resolution. The evaluator picks
-     * the run to resume with `AgentRunRepository.findLatestForTask`, which
-     * orders by `createdAt` alone, so two runs inserted inside the same
-     * wall-clock second TIE, and sqlite then hands back the one it scanned
-     * first: the OLDER row.
+     * fills with `datetime('now')` — SECOND resolution, so two runs inserted
+     * inside the same wall-clock second carry the same `createdAt`. The
+     * evaluator picks the run to resume with
+     * `AgentRunRepository.findLatestForTask`, which on sqlite breaks such a
+     * tie by insertion order (`rowid`), so the newer row wins either way —
+     * the unpinned tie cases further down this suite cover exactly that.
      *
-     * Left to the database clock that made this suite's answer depend on
-     * how fast it ran. A fast run put the seeded run and the resumed run in
-     * the same second, `findLatestForTask` returned the seeded COMPLETED run,
-     * and a second resume went out while the first resumed run was still
-     * queued. A loaded CI runner crossed a second boundary in between, the
-     * resumed QUEUED run was correctly the latest, the evaluator refused
-     * with `run-in-flight`, and "exactly two resumes" received one. On
-     * Postgres (`timestamptz`, microseconds) a resumed run is always
-     * strictly newer than the run it resumes; this pins the fixture to that
-     * same ordering instead of to the wall clock.
+     * The pin is kept because it models what Postgres (`timestamptz`,
+     * microseconds) does for real: a resumed run is always STRICTLY newer
+     * than the run it resumes. Pinning keeps the scenarios below about the
+     * evaluator's decisions rather than about the tie-break, and keeps the
+     * suite's answer independent of how fast the runner is.
      */
     async function pinRunCreatedAt(id: string): Promise<void> {
         runClock += 1000;
@@ -295,6 +291,8 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             awaitingInput?: boolean;
             ciHeadSha?: string | null;
             ciHeadSeenAt?: Date | null;
+            /** A fixed id for the seeded run; generated when omitted. */
+            runId?: string;
         } = {},
     ) {
         const work = await workRows.save(
@@ -339,6 +337,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         );
         const run = await runRows.save(
             runRows.create({
+                ...(overrides.runId === undefined ? {} : { id: overrides.runId }),
                 agentId: AGENT_ID,
                 userId: OWNER_USER,
                 triggerKind: 'task',
@@ -792,6 +791,164 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         expect(resumes).toHaveLength(2);
         expect(resumes[1].runId).toBe(resumedRunIds[0]);
         expect(await attempts.countForTask(task.id)).toBe(2);
+    });
+
+    // ── same-second runs, NOT pinned ────────────────────────────────
+
+    /**
+     * Two runs of one Task that share a `createdAt` — what better-sqlite3's
+     * whole-second `datetime('now')` produces for a burst (several agents
+     * dispatched for one Task, or a resume inside the same second). The
+     * evaluator must read the run inserted LAST.
+     *
+     * Both run ids are fixed, at opposite ends of the id space, and every
+     * scenario runs once with the newer run holding the SMALLER id (the
+     * default) and once with it holding the LARGER one. An id tie-break in
+     * either direction therefore fails at least one of each pair, as does no
+     * tie-break at all — only insertion order passes both.
+     */
+    const SMALLEST_RUN_ID = '00000000-0000-4000-8000-000000000001';
+    const LARGEST_RUN_ID = 'ffffffff-ffff-4fff-bfff-ffffffffffff';
+    const NEWER_ID_SMALLER = { older: LARGEST_RUN_ID, newer: SMALLEST_RUN_ID };
+    const NEWER_ID_LARGER = { older: SMALLEST_RUN_ID, newer: LARGEST_RUN_ID };
+
+    async function seedSameSecondSuccessor(overrides: {
+        olderStatus: string;
+        newerStatus: string;
+        newerAwaitingInput?: boolean;
+        ids?: { older: string; newer: string };
+    }) {
+        const ids = overrides.ids ?? NEWER_ID_SMALLER;
+        const { task, run: older } = await seedWorkTaskAndRun({
+            runStatus: overrides.olderStatus,
+            runId: ids.older,
+        });
+        expect(older.id).toBe(ids.older);
+        const newer = await runRows.save(
+            runRows.create({
+                id: ids.newer,
+                agentId: AGENT_ID,
+                userId: OWNER_USER,
+                triggerKind: 'task',
+                taskId: task.id,
+                status: overrides.newerStatus,
+                awaitingInput: overrides.newerAwaitingInput ?? false,
+            } as Partial<AgentRun>),
+        );
+        const sameSecond = new Date(Math.floor(runClock / 1000) * 1000);
+        await runRows.update({ id: In([older.id, newer.id]) }, {
+            createdAt: sameSecond,
+        } as never);
+        const tied = await runRows.find({ where: { id: In([older.id, newer.id]) } });
+        expect(new Set(tied.map((row) => row.createdAt.getTime())).size).toBe(1);
+        return { task, older, newer };
+    }
+
+    it('refuses with run-in-flight when a same-second newer run is still running', async () => {
+        const { task } = await seedSameSecondSuccessor({
+            olderStatus: 'completed',
+            newerStatus: 'running',
+        });
+        const service = buildService();
+
+        const result = await service.handle(BINDING, 'check_run', checkRun({ id: 90 }) as never);
+
+        expect(result.autoResume).toMatchObject({ reason: 'run-in-flight' });
+        expect(resumes).toHaveLength(0);
+        expect(await attempts.countForTask(task.id)).toBe(0);
+    });
+
+    it('refuses with awaiting-human when a same-second newer run is parked on a question', async () => {
+        const { task } = await seedSameSecondSuccessor({
+            olderStatus: 'completed',
+            newerStatus: 'completed',
+            newerAwaitingInput: true,
+        });
+        const service = buildService();
+
+        const result = await service.handle(BINDING, 'check_run', checkRun({ id: 91 }) as never);
+
+        expect(result.autoResume).toMatchObject({ reason: 'awaiting-human' });
+        expect(resumes).toHaveLength(0);
+        expect(await attempts.countForTask(task.id)).toBe(0);
+    });
+
+    it('resumes the same-second newer completed run, not the older failed one', async () => {
+        const { task, newer } = await seedSameSecondSuccessor({
+            olderStatus: 'failed',
+            newerStatus: 'completed',
+        });
+        const service = buildService();
+
+        const result = await service.handle(BINDING, 'check_run', checkRun({ id: 92 }) as never);
+
+        expect(result.autoResume).toMatchObject({ reason: 'resumed' });
+        expect(resumes).toHaveLength(1);
+        expect(resumes[0].runId).toBe(newer.id);
+        expect(await attempts.countForTask(task.id)).toBe(1);
+    });
+
+    describe('when the same-second newer run holds the lexically LARGER id', () => {
+        it('refuses with run-in-flight while that newer run is still running', async () => {
+            const { task, newer } = await seedSameSecondSuccessor({
+                olderStatus: 'completed',
+                newerStatus: 'running',
+                ids: NEWER_ID_LARGER,
+            });
+            expect(newer.id).toBe(LARGEST_RUN_ID);
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'check_run',
+                checkRun({ id: 93 }) as never,
+            );
+
+            expect(result.autoResume).toMatchObject({ reason: 'run-in-flight' });
+            expect(resumes).toHaveLength(0);
+            expect(await attempts.countForTask(task.id)).toBe(0);
+        });
+
+        it('refuses with awaiting-human while that newer run is parked on a question', async () => {
+            const { task } = await seedSameSecondSuccessor({
+                olderStatus: 'completed',
+                newerStatus: 'completed',
+                newerAwaitingInput: true,
+                ids: NEWER_ID_LARGER,
+            });
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'check_run',
+                checkRun({ id: 94 }) as never,
+            );
+
+            expect(result.autoResume).toMatchObject({ reason: 'awaiting-human' });
+            expect(resumes).toHaveLength(0);
+            expect(await attempts.countForTask(task.id)).toBe(0);
+        });
+
+        it('resumes that newer completed run, not the older failed one', async () => {
+            const { task, older, newer } = await seedSameSecondSuccessor({
+                olderStatus: 'failed',
+                newerStatus: 'completed',
+                ids: NEWER_ID_LARGER,
+            });
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'check_run',
+                checkRun({ id: 95 }) as never,
+            );
+
+            expect(result.autoResume).toMatchObject({ reason: 'resumed' });
+            expect(resumes).toHaveLength(1);
+            expect(resumes[0].runId).toBe(newer.id);
+            expect(resumes[0].runId).not.toBe(older.id);
+            expect(await attempts.countForTask(task.id)).toBe(1);
+        });
     });
 
     it('refuses a cancelled run', async () => {

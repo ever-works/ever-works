@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { promises as fsp } from 'fs';
 import { join } from 'path';
+import type { ComputerInputFrame } from '@ever-works/contracts';
 import { buildNodeCheckEnv } from '../executors/acceptance-checks';
 import { BROWSER_NO_SANDBOX_ENV } from '../executors/browser-check';
 import {
@@ -26,9 +27,13 @@ import { CdpConnection, defaultWebSocketFactory, type WebSocketFactory } from '.
  * binary the `browser` and `screen` tags stand on — headless, in that same
  * profile directory, so sign-ins persist for that Agent and no other.
  *
- * It only ever TAKES PICTURES: it never navigates, types or clicks, and a
- * browser it attached to is left running when the view ends (it belongs to
- * the Agent). A browser it launched is stopped with the view.
+ * On its own it only TAKES PICTURES: it never navigates, types or clicks, and
+ * a browser it attached to is left running when the view ends (it belongs to
+ * the Agent). A browser it launched is stopped with the view. The one
+ * exception is a person who holds control of the view: their input reaches
+ * the page on screen through `dispatchInput`, and only after
+ * `input-injector.ts` has checked that control is held and the input is
+ * something a person may send.
  *
  * Every picture is a full keyframe scaled DOWN to the preset width (never up)
  * from the page's visible viewport, so the Agent's own window size is never
@@ -196,6 +201,108 @@ export function countSessionCookieSites(cookies: unknown): number {
 	return sites.size;
 }
 
+/** Windows virtual key codes for the non-character keys a page needs one for. */
+const VIRTUAL_KEY_CODES: Readonly<Record<string, number>> = Object.freeze({
+	Backspace: 8,
+	Tab: 9,
+	Enter: 13,
+	Escape: 27,
+	' ': 32,
+	PageUp: 33,
+	PageDown: 34,
+	End: 35,
+	Home: 36,
+	ArrowLeft: 37,
+	ArrowUp: 38,
+	ArrowRight: 39,
+	ArrowDown: 40,
+	Delete: 46
+});
+
+/** The protocol's mouse button name for a pointer frame's button. */
+function mouseButton(button: 'left' | 'middle' | 'right' | null): 'left' | 'middle' | 'right' | 'none' {
+	return button ?? 'none';
+}
+
+/**
+ * The button a move is dragging with, from the pressed-buttons bitmask
+ * (1 left, 2 right, 4 middle): a move carries no `button` of its own, and a
+ * move reported with none pressed is a hover, not a drag.
+ */
+function draggingButton(buttons: number | undefined): 'left' | 'middle' | 'right' | null {
+	if (buttons === undefined) return null;
+	if (buttons & 1) return 'left';
+	if (buttons & 2) return 'right';
+	if (buttons & 4) return 'middle';
+	return null;
+}
+
+/**
+ * One input frame as the browser debugging protocol call that performs it,
+ * with picture pixels mapped back to the page's CSS pixels by the scale the
+ * last picture was taken at. Pure, so the mapping is testable without a
+ * browser. The modifier bitmask is the protocol's own (1 alt, 2 ctrl, 4 meta,
+ * 8 shift), so it passes through unchanged.
+ */
+export function inputToProtocolCall(
+	input: ComputerInputFrame,
+	scale: number
+): { method: string; params: Record<string, unknown> } {
+	const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+	const toPage = (value: number) => Math.round((value / safeScale) * 100) / 100;
+	switch (input.kind) {
+		case 'pointer': {
+			const params: Record<string, unknown> = {
+				type:
+					input.action === 'move' ? 'mouseMoved' : input.action === 'down' ? 'mousePressed' : 'mouseReleased',
+				x: toPage(input.x),
+				y: toPage(input.y),
+				button: mouseButton(
+					input.action === 'move' && input.button === null ? draggingButton(input.buttons) : input.button
+				),
+				clickCount: input.action === 'move' ? 0 : 1
+			};
+			// Which buttons are held once this event has happened: what keeps a
+			// move a drag (the protocol reads a move with none as a hover), and
+			// 0 after the last release.
+			if (input.buttons !== undefined) params.buttons = input.buttons;
+			return { method: 'Input.dispatchMouseEvent', params };
+		}
+		case 'scroll':
+			return {
+				method: 'Input.dispatchMouseEvent',
+				params: {
+					type: 'mouseWheel',
+					x: toPage(input.x),
+					y: toPage(input.y),
+					deltaX: input.dx,
+					deltaY: input.dy
+				}
+			};
+		case 'text':
+			return { method: 'Input.insertText', params: { text: input.text } };
+		case 'key': {
+			// A printable key with no Ctrl/⌘ carries its character; everything
+			// else is a raw key the page handles itself (Enter, arrows, Ctrl+A).
+			const printable = input.key.length === 1 && (input.modifiers & 6) === 0;
+			const params: Record<string, unknown> = {
+				type: input.action === 'up' ? 'keyUp' : printable ? 'keyDown' : 'rawKeyDown',
+				key: input.key,
+				code: input.code,
+				modifiers: input.modifiers
+			};
+			if (input.action === 'down' && printable) params.text = input.key;
+			if (input.action === 'down' && input.key === 'Enter') params.text = '\r';
+			const virtualKey = VIRTUAL_KEY_CODES[input.key];
+			if (virtualKey !== undefined) {
+				params.windowsVirtualKeyCode = virtualKey;
+				params.nativeVirtualKeyCode = virtualKey;
+			}
+			return { method: 'Input.dispatchKeyEvent', params };
+		}
+	}
+}
+
 /** A page target this connection is attached to. */
 interface AttachedPage {
 	targetId: string;
@@ -295,6 +402,8 @@ async function attachForegroundPage(cdp: CdpConnection, current: AttachedPage | 
 
 class BrowserPageSource implements CaptureSource {
 	private stopped = false;
+	/** The scale the last picture was taken at — how picture pixels map back to the page. */
+	private lastScale = 1;
 
 	private constructor(
 		private readonly cdp: CdpConnection,
@@ -349,7 +458,15 @@ class BrowserPageSource implements CaptureSource {
 		if (typeof shot.data !== 'string' || shot.data.length === 0) {
 			throw new Error('The browser returned an empty picture');
 		}
+		this.lastScale = size.scale;
 		return { mime: 'image/jpeg', width: size.width, height: size.height, data: shot.data };
+	}
+
+	async dispatchInput(input: ComputerInputFrame): Promise<void> {
+		if (this.stopped) throw new Error('Capture source is stopped');
+		const call = inputToProtocolCall(input, this.lastScale);
+		// Into the page on screen NOW — the same page the person is looking at.
+		await this.cdp.send(call.method, call.params, await this.foregroundSession());
 	}
 
 	async countSignedInSites(): Promise<number | null> {

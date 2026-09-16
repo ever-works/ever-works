@@ -1,4 +1,11 @@
-import { decodeComputerFrame, encodeComputerFrame, type ComputerFrame } from '@ever-works/contracts';
+import {
+	decodeComputerFrame,
+	encodeComputerFrame,
+	isComputerInputFrame,
+	type ComputerFrame,
+	type ComputerInputFrame,
+	type ComputerMode
+} from '@ever-works/contracts';
 import type { Logger } from '../logger';
 import type { WebSocketFactory, WebSocketLike } from './cdp-connection';
 
@@ -10,8 +17,12 @@ import type { WebSocketFactory, WebSocketLike } from './cdp-connection';
  * machine's leg, and this module is that leg: an OUTBOUND WebSocket from the
  * node to the platform's live-view gateway, authenticated in its first frame
  * with a short-lived `worker` token minted through the node credential
- * (never put in a URL). It only ever listens for `quality` and `refresh`;
- * any other kind is ignored.
+ * (never put in a URL). It listens for `quality` and `refresh` requests,
+ * and — for a view someone can take control of — for the `mode` the view is
+ * in and the input the person holding control sends. The relay routes input
+ * to this leg only from the socket that holds control; the input injector on
+ * this machine checks again before anything reaches a page. Any other kind is
+ * ignored.
  *
  * A dropped socket reconnects with backoff and a fresh token, until closed.
  * The backoff resets only once the relay has ACCEPTED the leg — a socket
@@ -40,6 +51,10 @@ export interface NodeLegOptions {
 	mintToken: () => Promise<{ token: string; wsPath: string }>;
 	factory: WebSocketFactory;
 	onRequest: (frame: Extract<ComputerFrame, { kind: 'quality' | 'refresh' }>) => void;
+	/** The view's mode changed (a person took control, or gave it back). Optional: a watch-only leg ignores it. */
+	onMode?: (mode: ComputerMode) => void;
+	/** Input from the person holding control. Optional: a leg without an injector ignores it. */
+	onInput?: (frame: ComputerInputFrame) => void;
 	logger?: Logger;
 	/** Monotonic-enough clock for the acceptance window; defaults to `Date.now`. */
 	now?: () => number;
@@ -134,14 +149,22 @@ export function openNodeLeg(options: NodeLegOptions): NodeLeg {
 		current.onmessage = (event) => {
 			if (typeof event?.data !== 'string') return;
 			const frame = decodeComputerFrame(event.data);
-			if (frame && (frame.kind === 'quality' || frame.kind === 'refresh')) {
-				// The relay routes requests only to an authenticated leg.
+			if (!frame) return;
+			const deliver = (listener: (() => void) | undefined): void => {
+				// The relay routes frames only to an authenticated leg.
 				attempt = 0;
 				try {
-					options.onRequest(frame);
+					listener?.();
 				} catch {
 					// the listener's failure is its own
 				}
+			};
+			if (frame.kind === 'quality' || frame.kind === 'refresh') {
+				deliver(() => options.onRequest(frame));
+			} else if (frame.kind === 'mode') {
+				deliver(options.onMode ? () => options.onMode?.(frame.mode) : undefined);
+			} else if (isComputerInputFrame(frame)) {
+				deliver(options.onInput ? () => options.onInput?.(frame) : undefined);
 			}
 		};
 		current.onerror = () => undefined;

@@ -154,6 +154,34 @@ function isPlainObject(node: object): boolean {
 const MIN_REDACTABLE_SECRET_LENGTH = 8;
 
 /**
+ * How far `'credential'` mode rebuilds a structure level by level. Content
+ * nested deeper is still checked (iteratively, so no input depth can
+ * exhaust the stack), and a subtree that carries a value is replaced whole.
+ */
+const CREDENTIAL_MODE_WALK_DEPTH = 64;
+
+/**
+ * How thoroughly `redactCredentialValues` scrubs.
+ *
+ *  - `'text'` (the default): values of at least 8 characters are replaced
+ *    wherever they occur inside string VALUES, down to the walk depth
+ *    limit. Object keys are kept as they are, shorter values are ignored so
+ *    ordinary text is not corrupted, and content nested past the limit is
+ *    returned untouched.
+ *  - `'credential'`: for content that must never carry a resolved value at
+ *    all (a connection's tool list, a tool result). On top of the above it
+ *    scrubs object KEYS, replaces a string or key that is EXACTLY a shorter
+ *    value (a substring of ordinary text is still left alone), and never
+ *    lets content past a depth limit through unchecked.
+ */
+export type CredentialRedactionMode = 'text' | 'credential';
+
+export interface CredentialRedactionOptions {
+    /** Defaults to `'text'`. See `CredentialRedactionMode`. */
+    mode?: CredentialRedactionMode;
+}
+
+/**
  * Scrub resolved credential VALUES out of anything about to travel back
  * to the model (or into a log, or into a stored transcript).
  *
@@ -167,17 +195,36 @@ const MIN_REDACTABLE_SECRET_LENGTH = 8;
 export function redactCredentialValues<T>(
     value: T,
     credentials: ReadonlyMap<string, string> | Iterable<[string, string]>,
+    options: CredentialRedactionOptions = {},
 ): T {
-    const entries = Array.from(
+    const strict = options.mode === 'credential';
+    const resolved = Array.from(
         credentials instanceof Map ? credentials.entries() : credentials,
-    ).filter(
-        ([, secret]) => typeof secret === 'string' && secret.length >= MIN_REDACTABLE_SECRET_LENGTH,
-    );
+    ).filter(([, secret]) => typeof secret === 'string' && secret.length > 0);
+    const entries = resolved.filter(([, secret]) => secret.length >= MIN_REDACTABLE_SECRET_LENGTH);
     // Longest first, so a secret that contains another is scrubbed whole.
     entries.sort((a, b) => b[1].length - a[1].length);
-    if (entries.length === 0) return value;
+    // Shorter values: only a string that IS the value, and only in strict mode.
+    const exact = strict
+        ? resolved.filter(([, secret]) => secret.length < MIN_REDACTABLE_SECRET_LENGTH)
+        : [];
+    if (entries.length === 0 && exact.length === 0) return value;
+
+    /** The key of the first value `input` carries, if any. */
+    const leakedKeyIn = (input: string): string | undefined => {
+        for (const [key, secret] of exact) {
+            if (input === secret) return key;
+        }
+        for (const [key, secret] of entries) {
+            if (input.includes(secret)) return key;
+        }
+        return undefined;
+    };
 
     const scrubString = (input: string): string => {
+        for (const [key, secret] of exact) {
+            if (input === secret) return credentialRedactionToken(key);
+        }
         let out = input;
         for (const [key, secret] of entries) {
             if (!out.includes(secret)) continue;
@@ -186,15 +233,55 @@ export function redactCredentialValues<T>(
         return out;
     };
 
+    /**
+     * Strict mode, past the rebuild depth: an iterative search (no recursion,
+     * cycle-safe) for any value in strings, keys and nested containers.
+     */
+    const findLeakedKey = (root: object): string | undefined => {
+        const stack: unknown[] = [root];
+        const seen = new Set<object>();
+        while (stack.length > 0) {
+            const node = stack.pop();
+            if (typeof node === 'string') {
+                const key = leakedKeyIn(node);
+                if (key !== undefined) return key;
+                continue;
+            }
+            if (!node || typeof node !== 'object' || seen.has(node)) continue;
+            seen.add(node);
+            if (Array.isArray(node)) {
+                for (const item of node) stack.push(item);
+                continue;
+            }
+            if (!isPlainObject(node)) continue;
+            for (const [name, item] of Object.entries(node as Record<string, unknown>)) {
+                const key = leakedKeyIn(name);
+                if (key !== undefined) return key;
+                stack.push(item);
+            }
+        }
+        return undefined;
+    };
+
     const walk = (node: unknown, level: number): unknown => {
-        if (level > MAX_WALK_DEPTH) return node;
+        if (strict) {
+            if (typeof node === 'string') return scrubString(node);
+            if (level > CREDENTIAL_MODE_WALK_DEPTH && node && typeof node === 'object') {
+                // Fail closed: a subtree too deep to rebuild that still
+                // carries a value is replaced whole, never passed through.
+                const leaked = findLeakedKey(node);
+                return leaked === undefined ? node : credentialRedactionToken(leaked);
+            }
+        } else if (level > MAX_WALK_DEPTH) {
+            return node;
+        }
         if (typeof node === 'string') return scrubString(node);
         if (Array.isArray(node)) return node.map((item) => walk(item, level + 1));
         if (node && typeof node === 'object') {
             if (!isPlainObject(node)) return node;
             const out: Record<string, unknown> = {};
             for (const [key, item] of Object.entries(node as Record<string, unknown>)) {
-                out[key] = walk(item, level + 1);
+                out[strict ? scrubString(key) : key] = walk(item, level + 1);
             }
             return out;
         }

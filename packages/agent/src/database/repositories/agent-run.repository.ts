@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -10,6 +11,7 @@ import { Task } from '../../entities/task.entity';
 import { Work } from '../../entities/work.entity';
 import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
+import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../insertion-order';
 import type { SubAgentScope } from '@ever-works/contracts';
 
 /**
@@ -42,6 +44,44 @@ export const ATTENTION_REASON_STALE_PARKED = 'stale-parked' as const;
 
 /** Prefix on the summary of a parked run — the user-facing cell text. */
 export const STALE_PARK_SUMMARY_PREFIX = 'stuck-parked' as const;
+
+/**
+ * A won {@link AgentRunRepository.claimResume}: the single-flight hold one
+ * `resume` call has on its SOURCE run.
+ *
+ * `token` fences every later write to the claim, so a holder whose claim
+ * expired and was taken over can neither release nor consume the newer
+ * holder's claim. `previousToken` is the value the claim replaced — what a
+ * release puts back so the row reads exactly as it did before the attempt.
+ */
+export interface RunResumeClaim {
+    runId: string;
+    token: string;
+    previousToken: string | null;
+}
+
+/**
+ * The successor an earlier, unconsumed resume claim left linked on its
+ * source run — what {@link AgentRunRepository.findResumeSuccessor} returns
+ * for the next claimant to reconcile.
+ */
+export type ResumeSuccessorSnapshot = Pick<AgentRun, 'id' | 'status' | 'startedAt'>;
+
+/**
+ * Thrown by {@link AgentRunRepository.createQueued} when it was asked to
+ * create a resume successor under a claim that is no longer held (it
+ * expired and another resume took it over). The insert is rolled back:
+ * nothing was created.
+ */
+export class ResumeClaimLostError extends Error {
+    constructor(readonly sourceRunId: string) {
+        super(
+            `AgentRun ${sourceRunId}: the resume claim was taken over before a successor was created.`,
+        );
+        this.name = 'ResumeClaimLostError';
+    }
+}
+
 /**
  * Namespace (`classid`) for every run-admission advisory lock, so this
  * subsystem can never collide with another feature's advisory locks in
@@ -105,6 +145,15 @@ export class AgentRunRepository {
                 }`,
             );
         }
+    }
+
+    /**
+     * SQLite stores `createdAt` with whole-second resolution, so time-ordered
+     * reads need an insertion-order tie-break there (see `insertion-order.ts`).
+     * Missing manager (unit-test mocks) reads as "not SQLite".
+     */
+    private isSqliteFamily(): boolean {
+        return isSqliteFamilyDriver(this.repository.manager?.connection?.options?.type);
     }
 
     async findById(id: string): Promise<AgentRun | null> {
@@ -193,6 +242,17 @@ export class AgentRunRepository {
      * belongs to the acting user before calling this method.
      */
     async findByAgent(agentId: string, limit = 25, offset = 0): Promise<AgentRun[]> {
+        if (this.isSqliteFamily()) {
+            return addInsertionOrderTieBreak(
+                this.repository.createQueryBuilder('run').setFindOptions({
+                    where: { agentId },
+                    order: { createdAt: 'DESC' },
+                    take: limit,
+                    skip: offset,
+                }),
+                'DESC',
+            ).getMany();
+        }
         return this.repository.find({
             where: { agentId },
             order: { createdAt: 'DESC' },
@@ -223,6 +283,17 @@ export class AgentRunRepository {
         offset = 0,
         scope?: OwnershipScope,
     ): Promise<AgentRun[]> {
+        if (this.isSqliteFamily()) {
+            return addInsertionOrderTieBreak(
+                this.repository.createQueryBuilder('run').setFindOptions({
+                    where: ownershipWhereWith<AgentRun>(userId, scope, { agentId }),
+                    order: { createdAt: 'DESC' },
+                    take: limit,
+                    skip: offset,
+                }),
+                'DESC',
+            ).getMany();
+        }
         return this.repository.find({
             where: ownershipWhereWith<AgentRun>(userId, scope, { agentId }),
             order: { createdAt: 'DESC' },
@@ -426,9 +497,12 @@ export class AgentRunRepository {
                 { exemptQueuedReasons: [...exemptQueuedReasons] },
             );
         }
-        return query
-            .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
-            .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
+        return addInsertionOrderTieBreak(
+            query
+                .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
+                .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC'),
+            'ASC',
+        )
             .limit(limit)
             .getMany();
     }
@@ -532,21 +606,24 @@ export class AgentRunRepository {
             'id' | 'agentId' | 'userId' | 'taskId' | 'workId' | 'queuedReason' | 'createdAt'
         >[]
     > {
-        return this.repository
-            .createQueryBuilder('run')
-            .select([
-                'run.id',
-                'run.agentId',
-                'run.userId',
-                'run.taskId',
-                'run.workId',
-                'run.queuedReason',
-                'run.createdAt',
-            ])
-            .where('run.status = :queued', { queued: 'queued' })
-            .andWhere('run.attentionReason IS NULL')
-            .andWhere('run.createdAt <= :cutoff', { cutoff })
-            .orderBy('run.createdAt', 'ASC')
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .select([
+                    'run.id',
+                    'run.agentId',
+                    'run.userId',
+                    'run.taskId',
+                    'run.workId',
+                    'run.queuedReason',
+                    'run.createdAt',
+                ])
+                .where('run.status = :queued', { queued: 'queued' })
+                .andWhere('run.attentionReason IS NULL')
+                .andWhere('run.createdAt <= :cutoff', { cutoff })
+                .orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        )
             .limit(limit)
             .getMany();
     }
@@ -603,6 +680,17 @@ export class AgentRunRepository {
          * the tool filter reads as "no additional restriction".
          */
         delegationScope?: SubAgentScope | null;
+        /**
+         * Resume single-flight — create this run as the SUCCESSOR of the
+         * resume that holds this claim. The insert and the link on the
+         * source run ({@link AgentRun.resumeSuccessorRunId}, guarded on the
+         * claim's token) commit in ONE transaction, so a successor can never
+         * exist without its source knowing about it, and a holder whose
+         * claim was taken over creates nothing at all
+         * ({@link ResumeClaimLostError}). Omitted by every other caller:
+         * a plain insert, exactly as before.
+         */
+        resumeClaim?: RunResumeClaim;
     }): Promise<AgentRun> {
         const run = this.repository.create({
             agentId: args.agentId,
@@ -621,7 +709,21 @@ export class AgentRunRepository {
             ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),
             ...(args.organizationId !== undefined ? { organizationId: args.organizationId } : {}),
         });
-        return this.repository.save(run);
+        const claim = args.resumeClaim;
+        if (!claim) return this.repository.save(run);
+        return this.repository.manager.transaction(async (manager) => {
+            const saved = await manager.getRepository(AgentRun).save(run);
+            const linked = await manager
+                .createQueryBuilder()
+                .update(AgentRun)
+                .set({ resumeSuccessorRunId: saved.id })
+                .where('id = :id', { id: claim.runId })
+                .andWhere('resumeClaimToken = :token', { token: claim.token })
+                .execute();
+            // Throwing rolls the insert back with the transaction.
+            if ((linked.affected ?? 0) === 0) throw new ResumeClaimLostError(claim.runId);
+            return saved;
+        });
     }
 
     /**
@@ -918,13 +1020,16 @@ export class AgentRunRepository {
      * pinned exit frame so no viewer ever stares at a frozen pane.
      */
     async findStaleTerminalRuns(cutoff: Date, limit = 50): Promise<AgentRun[]> {
-        return this.repository
-            .createQueryBuilder('run')
-            .where('run.terminalState IN (:...states)', { states: ['starting', 'attached'] })
-            .andWhere('(run.lastHeartbeatAt IS NULL OR run.lastHeartbeatAt < :cutoff)', {
-                cutoff,
-            })
-            .orderBy('run.createdAt', 'ASC')
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.terminalState IN (:...states)', { states: ['starting', 'attached'] })
+                .andWhere('(run.lastHeartbeatAt IS NULL OR run.lastHeartbeatAt < :cutoff)', {
+                    cutoff,
+                })
+                .orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        )
             .take(limit)
             .getMany();
     }
@@ -1029,7 +1134,7 @@ export class AgentRunRepository {
         if (scopePredicate) {
             query.andWhere(scopePredicate.clause, scopePredicate.parameters);
         }
-        return query.getOne();
+        return addInsertionOrderTieBreak(query, 'DESC').getOne();
     }
 
     /**
@@ -1045,11 +1150,13 @@ export class AgentRunRepository {
      * owner-scoped Task row).
      */
     async findLatestForTask(taskId: string): Promise<AgentRun | null> {
-        return this.repository
-            .createQueryBuilder('run')
-            .where('run.taskId = :taskId', { taskId })
-            .orderBy('run.createdAt', 'DESC')
-            .getOne();
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.taskId = :taskId', { taskId })
+                .orderBy('run.createdAt', 'DESC'),
+            'DESC',
+        ).getOne();
     }
 
     /**
@@ -1058,14 +1165,16 @@ export class AgentRunRepository {
      * workers started carrying explicit AgentRun ids.
      */
     async findInFlightForAgent(agentId: string): Promise<AgentRun | null> {
-        return this.repository
-            .createQueryBuilder('run')
-            .where('run.agentId = :agentId', { agentId })
-            .andWhere('run.status IN (:...statuses)', {
-                statuses: ['queued', 'running'] satisfies AgentRunStatus[],
-            })
-            .orderBy('run.createdAt', 'DESC')
-            .getOne();
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.agentId = :agentId', { agentId })
+                .andWhere('run.status IN (:...statuses)', {
+                    statuses: ['queued', 'running'] satisfies AgentRunStatus[],
+                })
+                .orderBy('run.createdAt', 'DESC'),
+            'DESC',
+        ).getOne();
     }
 
     // ── Run orchestration (Wave 4 M2/M3) ───────────────────────────
@@ -1192,13 +1301,15 @@ export class AgentRunRepository {
         workId: string,
         queuedReason: string,
     ): Promise<AgentRun | null> {
-        return this.repository
-            .createQueryBuilder('run')
-            .where('run.workId = :workId', { workId })
-            .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
-            .andWhere('run.queuedReason = :queuedReason', { queuedReason })
-            .orderBy('run.createdAt', 'ASC')
-            .getOne();
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.workId = :workId', { workId })
+                .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+                .andWhere('run.queuedReason = :queuedReason', { queuedReason })
+                .orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        ).getOne();
     }
 
     /**
@@ -1382,6 +1493,147 @@ export class AgentRunRepository {
     }
 
     /**
+     * Resume single-flight — CAS claim of a SOURCE run for one `resume`.
+     *
+     * The point is the DUPLICATE-SUCCESSOR refusal: two requests that both
+     * loaded the same parked run (two Inbox items decided at once, a double
+     * submit, an auto-resume racing a human) must produce exactly ONE
+     * successor. A read-then-write check cannot promise that, so the claim
+     * is one conditional UPDATE, the same shape as
+     * {@link casClaimTerminalSession}: it lands only while the claim reads
+     * exactly as the caller READ it —
+     *
+     *  - the token is still `observedToken`, and
+     *  - the in-flight stamp is still in the state the caller saw: NULL if
+     *    it saw no resume in flight, or — if it saw one — still set and
+     *    older than `staleBefore` (that resume's process died, or its
+     *    bookkeeping failed, between claim and consume).
+     *
+     * Both conditions are what close the whole race rather than just its
+     * middle. A caller that read the run before another resume claimed it
+     * loses even after that resume has finished, because a successful resume
+     * keeps its token (see {@link consumeResumeClaim}). A caller that read
+     * the run WHILE another resume held it loses too once that resume has
+     * finished: the token is the same, but the stamp it saw set is now NULL.
+     * "Unclaimed" alone would let either late caller through on a run that
+     * stays resumable after its first resume — a parked run, or a completed
+     * one under auto-resume.
+     *
+     * Deliberately NOT a resumability check: which runs may be resumed is
+     * `RunSteeringService`'s policy and stays there. The claim only decides
+     * which of several callers that already passed it goes ahead — and a
+     * winner must still reconcile any successor an earlier attempt left
+     * linked ({@link findResumeSuccessor}) before creating one.
+     *
+     * Returns the claim, or `null` when another caller holds or has taken
+     * it (affected=0).
+     */
+    async claimResume(
+        runId: string,
+        opts: { observedToken: string | null; observedClaimedAt: Date | null; staleBefore: Date },
+    ): Promise<RunResumeClaim | null> {
+        const token = randomUUID();
+        const query = this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ resumeClaimToken: token, resumeClaimedAt: new Date() })
+            .where('id = :id', { id: runId });
+        if (opts.observedToken === null) {
+            query.andWhere('resumeClaimToken IS NULL');
+        } else {
+            query.andWhere('resumeClaimToken = :observedToken', {
+                observedToken: opts.observedToken,
+            });
+        }
+        if (opts.observedClaimedAt === null) {
+            query.andWhere('resumeClaimedAt IS NULL');
+        } else {
+            query.andWhere('resumeClaimedAt IS NOT NULL AND resumeClaimedAt < :staleBefore', {
+                staleBefore: opts.staleBefore,
+            });
+        }
+        const result = await query.execute();
+        if ((result.affected ?? 0) === 0) return null;
+        return { runId, token, previousToken: opts.observedToken };
+    }
+
+    /**
+     * Resume single-flight — the successor an earlier resume on this SOURCE
+     * run created but never consumed its claim for, or `null` when there is
+     * none (never linked, consumed, or the linked row no longer exists).
+     *
+     * Read by the winner of {@link claimResume} before it creates anything.
+     * Once a claim is won nobody else can link a successor (the link is
+     * guarded on the claim token — see {@link createQueued}), so this read
+     * cannot race a writer.
+     */
+    async findResumeSuccessor(sourceRunId: string): Promise<ResumeSuccessorSnapshot | null> {
+        const source = await this.repository.findOne({
+            where: { id: sourceRunId },
+            select: ['id', 'resumeSuccessorRunId'],
+        });
+        if (!source?.resumeSuccessorRunId) return null;
+        return this.repository.findOne({
+            where: { id: source.resumeSuccessorRunId },
+            select: ['id', 'status', 'startedAt'],
+        });
+    }
+
+    /**
+     * Give back a claim whose resume is not going ahead (the create, the
+     * seed or the enqueue threw, or reconciling an earlier successor refused
+     * it). Restores the token the claim replaced and clears the in-flight
+     * stamp, so the owner can retry at once.
+     *
+     * The successor link is deliberately LEFT as it is: a successor that
+     * was linked may still run (a rollback that lost to a worker which had
+     * already picked the job up is a no-op), so the next claimant must
+     * reconcile it rather than assume it is gone.
+     *
+     * Guarded on the claim's own token so a stale releaser — one whose
+     * claim expired and was taken over — can never evict the newer holder.
+     * Returns whether this call released anything.
+     */
+    async releaseResumeClaim(claim: RunResumeClaim): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ resumeClaimToken: claim.previousToken, resumeClaimedAt: null })
+            .where('id = :id', { id: claim.runId })
+            .andWhere('resumeClaimToken = :token', { token: claim.token })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Consume a claim whose resume DID produce a successor: clear the
+     * in-flight stamp and the successor link, but KEEP the token. The kept
+     * token is what makes a request that read the run before this resume
+     * lose its claim (see {@link claimResume}); a request that loads the run
+     * afterwards reads the new token and is judged on the run's state
+     * exactly as before.
+     *
+     * The stamp and the link clear in ONE statement, so there is no state
+     * in which the run reads "no resume in flight" while a successor it has
+     * not accounted for is still linked. If this write never lands, the
+     * claim stays in flight with its link, and whoever takes it over after
+     * expiry reconciles that successor instead of creating a second one.
+     *
+     * Token-guarded for the same stale-holder reason as
+     * {@link releaseResumeClaim}. Returns whether this call consumed it.
+     */
+    async consumeResumeClaim(claim: RunResumeClaim): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ resumeClaimedAt: null, resumeSuccessorRunId: null })
+            .where('id = :id', { id: claim.runId })
+            .andWhere('resumeClaimToken = :token', { token: claim.token })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * Sessions list (Wave 4 M3) — owner-scoped, filterable, paginated.
      * `userId` is mandatory and always applied at the repository layer:
      * this is the HTTP-facing method, so cross-user rows must be
@@ -1456,15 +1708,21 @@ export class AgentRunRepository {
         }
         if (filters.order === 'longest-running') {
             // `startedAt` is null only before a run is picked up; those sort
-            // after every started run, oldest created first.
-            return qb
-                .orderBy('run.startedAt', 'ASC', 'NULLS LAST')
-                .addOrderBy('run.createdAt', 'ASC')
+            // after every started run, oldest created first. The insertion-order
+            // tie-break keeps the page stable on SQLite, where whole-second
+            // timestamps make ties routine.
+            return addInsertionOrderTieBreak(
+                qb.orderBy('run.startedAt', 'ASC', 'NULLS LAST').addOrderBy('run.createdAt', 'ASC'),
+                'ASC',
+            )
                 .take(limit)
                 .skip(offset)
                 .getManyAndCount();
         }
-        return qb.orderBy('run.createdAt', 'DESC').take(limit).skip(offset).getManyAndCount();
+        return addInsertionOrderTieBreak(qb.orderBy('run.createdAt', 'DESC'), 'DESC')
+            .take(limit)
+            .skip(offset)
+            .getManyAndCount();
     }
 
     /**
@@ -1481,10 +1739,13 @@ export class AgentRunRepository {
      */
     async listRecentForOrganization(organizationId: string, limit = 100): Promise<AgentRun[]> {
         const take = Math.min(Math.max(limit, 1), 500);
-        return this.repository
-            .createQueryBuilder('run')
-            .where('run.organizationId = :organizationId', { organizationId })
-            .orderBy('run.createdAt', 'DESC')
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.organizationId = :organizationId', { organizationId })
+                .orderBy('run.createdAt', 'DESC'),
+            'DESC',
+        )
             .take(take)
             .getMany();
     }
@@ -1696,11 +1957,14 @@ export class AgentRunRepository {
             );
         }
         const take = Math.min(Math.max(Math.trunc(limit), 1), 201);
-        return qb
-            .orderBy(LEDGER_INSTANT, 'DESC')
-            .addOrderBy('run.id', 'DESC')
-            .limit(take)
-            .getMany();
+        return (
+            qb
+                .orderBy(LEDGER_INSTANT, 'DESC')
+                // No rowid tie-break: run.id is already unique here and is part of the cursor.
+                .addOrderBy('run.id', 'DESC')
+                .limit(take)
+                .getMany()
+        );
     }
 
     /**
@@ -1803,9 +2067,12 @@ export class AgentRunRepository {
         cap: number,
         ownershipScope?: OwnershipScope,
     ): Promise<Array<{ at: Date; status: AgentRunStatus }>> {
-        const rows = await this.ledgerQuery(userId, window, filters, ownershipScope)
-            .select(['run.id', 'run.status', 'run.startedAt', 'run.createdAt'])
-            .orderBy('run.createdAt', 'ASC')
+        const rows = await addInsertionOrderTieBreak(
+            this.ledgerQuery(userId, window, filters, ownershipScope)
+                .select(['run.id', 'run.status', 'run.startedAt', 'run.createdAt'])
+                .orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        )
             .limit(Math.max(1, Math.trunc(cap)))
             .getMany();
         return rows.map((row) => ({ at: row.startedAt ?? row.createdAt, status: row.status }));

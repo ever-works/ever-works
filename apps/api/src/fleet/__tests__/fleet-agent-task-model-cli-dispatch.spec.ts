@@ -63,11 +63,17 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         const factory = new NodeDispatcherFactory({ store });
         const plugin = new NodeJobRuntimePlugin().useDispatcherFactory(factory);
         const router = new FleetRunRouterService(factory, plugin, undefined);
-        return createFleetAwareAgentTaskExecuteDispatcher(
-            delegate,
-            router,
-            planner ? { planner } : {},
-        );
+        return createFleetAwareAgentTaskExecuteDispatcher(delegate, router, {
+            ...(planner ? { planner } : {}),
+            // Judgment layer G9 — a fleet-bound run is refused when no
+            // delegation-scope guard is wired (fail closed). This suite is
+            // about the plan wiring, not delegation, so it wires the answer
+            // the production guard gives a non-delegated run: admit. The
+            // planner (or its absence) is unchanged.
+            delegationScopeGuard: {
+                refuseUnenforceableDelegationScope: jest.fn(async () => undefined),
+            },
+        });
     };
 
     beforeEach(() => {
