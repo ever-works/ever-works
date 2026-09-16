@@ -13,7 +13,9 @@ import { DatabaseModule } from '../database/database.module';
 import { McpClientService } from './mcp-client.service';
 import { McpConnectionsService } from './mcp-connections.service';
 import { McpToolSource } from './mcp-tool-source';
+import { McpCredentialTransportPolicyService } from './mcp-credential-transport-policy.service';
 import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
+import { PolicyModule } from '../policy/policy.module';
 
 /**
  * Agent Plugins MCP slice (docs/specs/features/agent-plugins plan §2.4)
@@ -51,6 +53,14 @@ import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
         // failure this repo has already shipped once, where a seam looked
         // wired because the provider existed SOMEWHERE in the app.
         AgentPluginsModule,
+        // `{{cred.key}}` references in a connection's auth headers are
+        // resolved through CREDENTIAL_RESOLVER immediately before each
+        // connection attempt. McpClientService injects it @Optional(), so
+        // without this import the token would be absent from its injector
+        // and every referenced key would fail closed as missing — the same
+        // silent-seam trap documented above. PolicyModule is a leaf (four
+        // scope entities + tool_grants), so this import cannot cycle.
+        PolicyModule,
     ],
     providers: [
         McpServerConnectionRepository,
@@ -60,6 +70,11 @@ import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
         McpClientService,
         McpConnectionsService,
         McpToolSource,
+        // AW-15 — reads "Require https for connection credentials" for the
+        // client and the CRUD service. Both inject it @Optional(); it must be
+        // provided HERE so neither silently runs without it. Its two
+        // repositories come from DatabaseModule, imported above.
+        McpCredentialTransportPolicyService,
     ],
     exports: [
         McpServerConnectionRepository,
@@ -67,6 +82,7 @@ import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
         McpClientService,
         McpConnectionsService,
         McpToolSource,
+        McpCredentialTransportPolicyService,
     ],
 })
 export class McpModule {}

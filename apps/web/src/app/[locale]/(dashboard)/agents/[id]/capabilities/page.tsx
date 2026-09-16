@@ -6,6 +6,7 @@ import { repoConnectionsAPI } from '@/lib/api/repo-connections';
 import { environmentsAPI } from '@/lib/api/environments';
 import { AgentCapabilitiesClient } from '@/components/agents/AgentCapabilitiesClient';
 import { loadAgentFleet } from './agent-fleet-data';
+import { loadAgentAccessLevels } from './agent-access-levels-data';
 
 type Params = Promise<{ id: string; locale: string }>;
 
@@ -15,6 +16,8 @@ type Params = Promise<{ id: string; locale: string }>;
  *  - Agent tools (the tool-grant matrix's first web UI) — per-tool
  *    toggles writing the AGENT-scope grant row; parent-scope denials
  *    shown read-only (narrowing-only semantics);
+ *  - Access levels (AW-15) — "Read only" / "Read and write" per provider
+ *    whose plugin declares them, written onto that same grant row;
  *  - Skills — agent-scope bindings (attach / detach) + inherited
  *    bindings read-only;
  *  - MCP connections — effective per-agent state over the user's MCP
@@ -53,6 +56,7 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
         repos,
         environments,
         fleet,
+        accessLevels,
     ] = await Promise.all([
         agentsAPI.getCapabilities(id),
         agentsAPI.listSkills(id).catch(() => ({ data: [] })),
@@ -70,6 +74,8 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
         // with a 422, so the picker offers exactly what it will accept.
         environmentsAPI.list('published').catch(() => []),
         loadAgentFleet(id).catch(() => null),
+        // AW-15 — providers that declare access levels + this agent's level.
+        loadAgentAccessLevels(id).catch(() => []),
     ]);
 
     return (
@@ -95,6 +101,7 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
                 name: environment.name,
             }))}
             fleet={fleet}
+            accessLevels={accessLevels}
         />
     );
 }

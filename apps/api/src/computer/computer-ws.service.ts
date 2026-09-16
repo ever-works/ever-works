@@ -14,9 +14,10 @@ import {
     decodeComputerFrame,
     encodeComputerFrame,
     isComputerClientToServerFrame,
+    isComputerInputFrame,
     makeComputerErrorFrame,
 } from '@ever-works/contracts';
-import { ComputerSessionService } from '@ever-works/agent/computer';
+import { ComputerControlArbiter, ComputerSessionService } from '@ever-works/agent/computer';
 import { config } from '@ever-works/agent/config';
 import { ComputerAttachService } from './computer-attach.service';
 import { ComputerRelayRegistry } from './computer-relay.registry';
@@ -45,7 +46,21 @@ import type { TerminalClientRole } from '../terminal/terminal-relay.registry';
  * When the last browser leaves a view, the view ends after a short grace
  * (`lastViewerGraceMs`, 15 s by default) unless someone comes back — a live
  * view nobody is watching must not keep a machine publishing pictures.
+ *
+ * Taking control (with the control arbiter wired):
+ *
+ *  - a `driver` socket's input reaches the relay, which forwards it only while
+ *    the view holds control; accepted input pushes the idle deadline (written
+ *    at most every {@link INPUT_WRITE_INTERVAL_MS}), and refused input makes
+ *    the gateway re-read the hold (at most every
+ *    {@link HOLD_REFRESH_INTERVAL_MS}) so a hold granted on another replica
+ *    starts working without a reconnect;
+ *  - a `driver` socket answering its heartbeat acknowledges the hold;
+ *  - when the last `driver` socket of the holding view goes away, control is
+ *    given back after the disconnect grace (30 s) unless one returns.
  */
+const INPUT_WRITE_INTERVAL_MS = 5_000;
+const HOLD_REFRESH_INTERVAL_MS = 1_000;
 const AUTH_TIMEOUT_MS = 5_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const MAX_MISSED_PONGS = 2;
@@ -68,6 +83,9 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
     private heartbeat: NodeJS.Timeout | null = null;
     private readonly states = new Map<WebSocket, SocketState>();
     private readonly viewerGraceTimers = new Map<string, NodeJS.Timeout>();
+    private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+    /** Per view: when input was last written, and when the hold was last re-read. */
+    private readonly controlWrites = new Map<string, { inputAt: number; refreshAt: number }>();
     private upgradeHandler: ((req: IncomingMessage, socket: Duplex, head: Buffer) => void) | null =
         null;
 
@@ -78,6 +96,9 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
         // Appended LAST + @Optional(): without the session service the
         // gateway still relays; it just cannot end a view nobody watches.
         @Optional() private readonly sessions?: ComputerSessionService,
+        // Appended LAST + @Optional(): without the arbiter nobody can hold
+        // control, so there is no hold to renew, refresh or release here.
+        @Optional() private readonly control?: ComputerControlArbiter,
     ) {}
 
     onApplicationBootstrap(): void {
@@ -98,6 +119,8 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
         if (this.heartbeat) clearInterval(this.heartbeat);
         for (const timer of this.viewerGraceTimers.values()) clearTimeout(timer);
         this.viewerGraceTimers.clear();
+        for (const timer of this.disconnectTimers.values()) clearTimeout(timer);
+        this.disconnectTimers.clear();
         const httpServer = this.adapterHost.httpAdapter?.getHttpServer?.();
         if (httpServer && this.upgradeHandler) {
             httpServer.off?.('upgrade', this.upgradeHandler);
@@ -160,6 +183,11 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
 
         ws.on('pong', () => {
             state.missedPongs = 0;
+            if (state.authenticated && state.role === 'driver') {
+                this.runControl(state.sessionId, 'acknowledge', (control) =>
+                    control.acknowledge(state.sessionId),
+                );
+            }
         });
 
         ws.on('message', (data: Buffer | ArrayBuffer | Buffer[] | string) => {
@@ -193,6 +221,10 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
                 state.authenticated = true;
                 state.role = claims.role;
                 if (claims.role !== 'worker') this.cancelViewerGrace(state.sessionId);
+                if (claims.role === 'driver') {
+                    this.cancelDisconnect(state.sessionId);
+                    this.refreshHold(state.sessionId, true);
+                }
                 this.registry.attach(state.sessionId, {
                     id: state.clientId,
                     role: claims.role,
@@ -201,6 +233,13 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
                         ws.send(wire);
                     },
                 });
+                if (claims.role === 'worker' && this.registry.getControl(state.sessionId)?.held) {
+                    // The machine's leg rejoined a view this replica believes is
+                    // held: its replay told it what this replica last heard, so
+                    // confirm the hold with the arbiter (renewed elsewhere →
+                    // `controlling` again; ran out → released and `watching`).
+                    this.refreshHold(state.sessionId, true, false);
+                }
                 return;
             }
 
@@ -209,7 +248,11 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
                 this.answer(ws, 'protocol: frame kind not accepted on this leg');
                 return;
             }
-            this.registry.deliverInbound(state.sessionId, state.clientId, frame);
+            const delivered = this.registry.deliverInbound(state.sessionId, state.clientId, frame);
+            if (state.role === 'driver' && isComputerInputFrame(frame)) {
+                if (delivered) this.recordInput(state.sessionId);
+                else this.refreshHold(state.sessionId);
+            }
         });
 
         ws.on('close', () => {
@@ -228,6 +271,102 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
         if (!state?.authenticated) return;
         this.registry.detach(state.sessionId, state.clientId);
         if (state.role !== 'worker') this.scheduleViewerGrace(state.sessionId);
+        if (state.role === 'driver') this.scheduleDisconnect(state.sessionId);
+    }
+
+    /** The holding view's last driving socket left: give control back after the grace unless one returns. */
+    private scheduleDisconnect(sessionId: string): void {
+        if (!this.control || this.hasDriver(sessionId) || this.disconnectTimers.has(sessionId)) {
+            return;
+        }
+        if (!this.registry.getControl(sessionId)?.held) return;
+        const timer = setTimeout(() => {
+            this.disconnectTimers.delete(sessionId);
+            if (this.hasDriver(sessionId)) return;
+            this.runControl(sessionId, 'disconnect release', (control) =>
+                control.releaseForSession(sessionId, 'disconnected'),
+            );
+        }, this.control.limits().disconnectMs);
+        timer.unref?.();
+        this.disconnectTimers.set(sessionId, timer);
+    }
+
+    private cancelDisconnect(sessionId: string): void {
+        const timer = this.disconnectTimers.get(sessionId);
+        if (timer) {
+            clearTimeout(timer);
+            this.disconnectTimers.delete(sessionId);
+        }
+    }
+
+    private hasDriver(sessionId: string): boolean {
+        for (const state of this.states.values()) {
+            if (state.authenticated && state.role === 'driver' && state.sessionId === sessionId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Accepted input: push the idle deadline, at most every few seconds per view. */
+    private recordInput(sessionId: string): void {
+        if (!this.control) return;
+        const writes = this.writesFor(sessionId);
+        const now = Date.now();
+        if (now - writes.inputAt < INPUT_WRITE_INTERVAL_MS) return;
+        writes.inputAt = now;
+        this.runControl(sessionId, 'input', async (control) => {
+            this.registry.applyControl(sessionId, await control.recordInput(sessionId));
+            this.scheduleDisconnect(sessionId);
+        });
+    }
+
+    /**
+     * Re-read this view's hold from the arbiter into the relay (throttled
+     * unless `force`). `fromDriver`: a driving socket on this replica asked
+     * for it — if that socket left while the read was in flight, its close
+     * found no hold here to give back, so the disconnect grace starts now.
+     */
+    private refreshHold(sessionId: string, force = false, fromDriver = true): void {
+        if (!this.control) return;
+        const writes = this.writesFor(sessionId);
+        const now = Date.now();
+        if (!force && now - writes.refreshAt < HOLD_REFRESH_INTERVAL_MS) return;
+        writes.refreshAt = now;
+        this.runControl(sessionId, 'hold refresh', async (control) => {
+            this.registry.applyControl(sessionId, await control.holdOf(sessionId));
+            if (fromDriver) this.scheduleDisconnect(sessionId);
+        });
+    }
+
+    private writesFor(sessionId: string): { inputAt: number; refreshAt: number } {
+        let writes = this.controlWrites.get(sessionId);
+        if (!writes) {
+            writes = { inputAt: 0, refreshAt: 0 };
+            this.controlWrites.set(sessionId, writes);
+            if (this.controlWrites.size > 10_000) {
+                const oldest = this.controlWrites.keys().next().value;
+                if (oldest !== undefined) this.controlWrites.delete(oldest);
+            }
+        }
+        return writes;
+    }
+
+    /** Fire-and-log: a control write from a socket event must never throw into the socket. */
+    private runControl(
+        sessionId: string,
+        what: string,
+        work: (control: ComputerControlArbiter) => Promise<unknown>,
+    ): void {
+        const control = this.control;
+        if (!control) return;
+        void work(control).catch((error: unknown) =>
+            this.logger.warn(
+                `computer session ${sessionId}: control ${what} failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            ),
+        );
     }
 
     /** The last browser left: end the view after the grace unless one returns. */

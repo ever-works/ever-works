@@ -1792,6 +1792,34 @@
                     "routingUnavailable": "Execution routing could not be loaded right now.",
                     "routingChange": "Change in Settings → Fleet"
                 },
+                "accessLevels": {
+                    "title": "Access levels",
+                    "description": "Choose what this agent may do through each provider that offers access levels. Start narrow — you can widen it later without reconnecting.",
+                    "pickerLabel": "Access level for {provider}",
+                    "levels": {
+                        "read": "Read only",
+                        "write": "Read and write"
+                    },
+                    "levelHints": {
+                        "read": "Look things up. Never changes anything.",
+                        "write": "Look things up and make changes."
+                    },
+                    "narrowed": "In effect: {level} — narrowed by the {scope} setting.",
+                    "none": "No access",
+                    "scopes": {
+                        "default": "platform",
+                        "tenant": "tenant",
+                        "organization": "organization",
+                        "work": "Work",
+                        "agent": "agent"
+                    },
+                    "unavailable": "The current access level couldn't be loaded.",
+                    "reapproval": "{provider} needs one more approval before agents can make changes with it.",
+                    "reapprovalLink": "Reconnect it in Plugins",
+                    "saved": "Access level for {provider} saved",
+                    "appliesNext": "Changes apply on this agent's next tool call. Nothing restarts.",
+                    "blockedByExistingRule": "Blocked by an existing rule: {rules}. Access levels never remove a rule added on this agent. Turn the tool back on to use this level."
+                },
                 "initScript": {
                     "title": "Init Script",
                     "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
@@ -4777,7 +4805,25 @@
                     "headerValue": "Auth header value",
                     "headerValueHelp": "Stored encrypted. Never shown again.",
                     "cancel": "Cancel",
-                    "save": "Save"
+                    "save": "Save",
+                    "urlHelp": "Use an https:// address so auth headers are encrypted. Credential references only work with https://."
+                },
+                "banner": {
+                    "needsAttention": "{count, plural, one {# connection needs attention.} other {# connections need attention.}}",
+                    "insecureTransport": "{count, plural, one {# connection sends credentials unencrypted.} other {# connections send credentials unencrypted.}}"
+                },
+                "health": {
+                    "unknown": "Not checked yet",
+                    "healthy": "Healthy",
+                    "degraded": "Having trouble",
+                    "expired": "Expired",
+                    "unreachable": "Unreachable",
+                    "credentialMissingHint": "This connection refers to a credential that isn't available. Make the credential available or replace the auth header, then test again.",
+                    "insecureTransportHint": "Change the server URL to https:// to encrypt them.",
+                    "credentialRejectedHint": "The server rejected this credential. Replace the auth header, then test again.",
+                    "insecureTransport": "Unencrypted",
+                    "insecureTransportWarning": "Credentials are sent unencrypted over http://.",
+                    "httpsRequiredHint": "These credentials are only sent to an https:// address (always for credential references, and for any credential when your organization requires https). Change the server URL to https://."
                 }
             },
             "repositories": {
@@ -9317,6 +9363,7 @@
             "heroAction": "Watch computer",
             "backToAgent": "Back to {agent}",
             "modeWatching": "Watching — {agent} keeps working.",
+            "modeControlling": "You have control — {agent}'s input is paused.",
             "terminalOnNode": "Watching — this shell is on {node}.",
             "terminalReadOnly": "read-only",
             "watermark": "EVER WORKS · LIVE VIEW · {agent} @ {node}",
@@ -9492,12 +9539,61 @@
                 "channel": "Switch channel: screen ↔ terminal",
                 "node": "Choose a computer",
                 "sheet": "This sheet",
-                "close": "Close"
+                "close": "Close",
+                "takeOver": "Take over",
+                "giveBack": "Give back control",
+                "footnote": "While you have control every other key goes to the computer. Esc Esc always comes back to you.",
+                "notForwarded": "Never sent to the computer: {keys}"
             },
             "a11y": {
                 "stageLabelWatching": "Live view of {agent}'s computer {node}. Watching.",
                 "modeChanged": "Mode changed to {mode}.",
-                "modeWatchingName": "watching"
+                "modeWatchingName": "watching",
+                "stageLabelControlling": "Live view of {agent}'s computer {node}. You have control.",
+                "modeControllingName": "in control"
+            },
+            "control": {
+                "takeOver": "Take over",
+                "giveBack": "Give back control",
+                "youBadge": "YOU",
+                "deniedTooltip": "Only the owner of this computer can take control.",
+                "deniedByPolicy": "This computer's control policy does not let you take control.",
+                "terminalReadOnly": "The terminal stays read-only. Switch to the screen to take over.",
+                "notLive": "Take over once the picture is showing.",
+                "endsIn": "Control ends in {countdown}.",
+                "ceilingNote": "A single stretch of control lasts at most an hour. You can extend it once.",
+                "extend": "Extend",
+                "extended": "Extended once — it cannot be extended again.",
+                "releasedAutomatically": "Control was released automatically.",
+                "heldByYou": "You have had control in another view of this computer since {time}.",
+                "heldBySomeone": "Someone else has had control since {time}.",
+                "heldByBody": "You can watch. Ask for control and whoever has it will be prompted.",
+                "requestControl": "Request control",
+                "keepWatching": "Keep watching",
+                "requestWaiting": "Waiting for an answer — declines on its own in {countdown}.",
+                "requestDeclined": "Your request was not answered. You still have watching access.",
+                "incomingRequest": "Someone is asking for control of {node}.",
+                "incomingRequestYou": "Another view of yours is asking for control of {node}.",
+                "autoDeclines": "Declines on its own in {countdown}.",
+                "handOver": "Hand over",
+                "keepControl": "Keep control",
+                "idleWarning": "Giving control back in {countdown}",
+                "idleWarningBody": "{agent} has been waiting since {time}.",
+                "giveBackNow": "Give back",
+                "promptLabel": "Control of {node}",
+                "refusals": {
+                    "policy": "Only the owner of this computer can take control.",
+                    "held": "Someone else has control of this computer.",
+                    "notLive": "This live view is not showing the computer yet.",
+                    "sessionEnded": "This live view has ended.",
+                    "notHolder": "This view does not have control of the computer.",
+                    "notHeld": "Nobody has control of this computer — take it instead.",
+                    "alreadyRequested": "Someone has already asked for control. Try again in a minute.",
+                    "noRequest": "That request is no longer waiting for an answer.",
+                    "alreadyExtended": "This stretch of control has already been extended once.",
+                    "unavailable": "Taking control is not available on this install.",
+                    "failed": "That did not go through. Try again."
+                }
             }
         }
     },

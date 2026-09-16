@@ -92,6 +92,8 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Agent computers — one row per stretch of control of an Agent's machine.
+            ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -154,7 +156,7 @@ describe('activity-log.types', () => {
             //    develop and this branch — so it is shared, not additive.
             // +2 skill_enabled / skill_disabled (Skills shelf on/off switch) -> 159.
             //
-            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // 🛑 161 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -167,7 +169,11 @@ describe('activity-log.types', () => {
             // Merging develop's Live Feed run lifecycle (+3, develop said 160)
             // into the Skills shelf branch (+2 skill_enabled / skill_disabled,
             // this branch said 159) -> 162, COUNTED from the merged enum.
-            expect(literals).toHaveLength(162);
+            // +1 agent_computer_controlled (Agent computers, take-over) —
+            //    develop said 161 on its own base; merged with the Skills
+            //    shelf branch's 162 this COUNTS to 163 from the merged enum,
+            //    not from adding either side's number.
+            expect(literals).toHaveLength(163);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
