@@ -102,6 +102,24 @@ export class NotificationService {
      * Without a `deduplicationKey`, every call writes a new row.
      */
     async create(dto: CreateNotificationDto): Promise<Notification> {
+        return (await this.createOnce(dto)).notification;
+    }
+
+    /**
+     * {@link create} plus the one fact its return value hides: whether THIS
+     * call inserted the row, or handed back one an earlier call had already
+     * written under the same deduplication key.
+     *
+     * A producer that also fans the notification out to email/push needs the
+     * difference. `create()` is retry-safe by design — the second call is a
+     * no-op that returns the first row — but an unconditional fanout after it
+     * is not: the retry would ring the owner a second time for a single
+     * event. Producers whose fanout must happen exactly once per
+     * deduplication key branch on `created`.
+     */
+    private async createOnce(
+        dto: CreateNotificationDto,
+    ): Promise<{ notification: Notification; created: boolean }> {
         // Check deduplication - if a notification with this key already exists and isn't dismissed, return it
         if (dto.deduplicationKey) {
             const existing = await this.repository.findByDeduplicationKey(
@@ -112,7 +130,7 @@ export class NotificationService {
                 this.logger.debug(
                     `Notification with deduplication key ${dto.deduplicationKey} already exists`,
                 );
-                return existing;
+                return { notification: existing, created: false };
             }
         }
 
@@ -123,7 +141,7 @@ export class NotificationService {
                 `Created notification ${notification.id} for user ${dto.userId}: ${dto.title}`,
             );
 
-            return notification;
+            return { notification, created: true };
         } catch (error) {
             // Handle race condition: another request created the notification between our check and insert
             if (dto.deduplicationKey && this.isUniqueConstraintError(error)) {
@@ -135,7 +153,7 @@ export class NotificationService {
                     dto.deduplicationKey,
                 );
                 if (existing) {
-                    return existing;
+                    return { notification: existing, created: false };
                 }
             }
             throw error;
@@ -916,7 +934,9 @@ export class NotificationService {
      * opened, tell the Workspace owner once. The caller has already claimed
      * the first view atomically, and the deduplication key carries the link's
      * rotation count, so a retried producer cannot ring twice for one link
-     * while a regenerated link still notifies once more.
+     * while a regenerated link still notifies once more. "Once" covers the
+     * fanout too: a retry that finds the row already filed emits no second
+     * event, so the owner cannot be mailed twice for one opening.
      *
      * Registered as `shared_view_first_view` (in-app by default) so the
      * owner can route it to a channel from the preference matrix. The share
@@ -930,7 +950,7 @@ export class NotificationService {
         const title = 'Shared view opened';
         const message = 'Your shared view was opened for the first time.';
         const actionUrl = '/settings/sharing';
-        await this.create({
+        const { created } = await this.createOnce({
             userId: args.userId,
             type: NotificationType.INFO,
             category: NotificationCategory.SYSTEM,
@@ -941,6 +961,9 @@ export class NotificationService {
             metadata: { sharedViewId: args.sharedViewId },
             deduplicationKey: `shared_view_first_view_${args.sharedViewId}_${args.rotationCount}`,
         });
+        // The row was already filed by an earlier call for this link and
+        // rotation: this is a retry, and the fanout has already gone out.
+        if (!created) return;
         await this.dispatchFanout({
             userId: args.userId,
             eventKey: 'shared_view_first_view',

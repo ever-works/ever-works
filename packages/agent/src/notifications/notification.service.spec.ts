@@ -668,8 +668,11 @@ describe('NotificationService', () => {
             expect(payload.urgent).toBe(false);
         });
 
-        it('does not file a second row for the same link when the producer is retried', async () => {
-            const { service, repository } = makeSharedViewService();
+        it('files neither a second row NOR a second fanout when the producer is retried', async () => {
+            // The bell row is de-duplicated by key, but the fanout is what
+            // reaches email and push: a retry that rings it again mails the
+            // owner twice for one opening.
+            const { service, repository, emitter } = makeSharedViewService();
             (repository.findByDeduplicationKey as jest.Mock).mockResolvedValueOnce(null);
             await service.notifySharedViewFirstView({
                 userId: 'owner-1',
@@ -686,6 +689,65 @@ describe('NotificationService', () => {
                 rotationCount: 0,
             });
             expect(repository.create).toHaveBeenCalledTimes(1);
+            expect(emitter.emit).toHaveBeenCalledTimes(1);
+        });
+
+        it('still fans out once more after the link is regenerated', async () => {
+            // A new rotation is a new deduplication key: the owner is told
+            // again the first time the NEW link is opened.
+            const { service, repository, emitter } = makeSharedViewService();
+            await service.notifySharedViewFirstView({
+                userId: 'owner-1',
+                sharedViewId: 'view-1',
+                rotationCount: 0,
+            });
+            await service.notifySharedViewFirstView({
+                userId: 'owner-1',
+                sharedViewId: 'view-1',
+                rotationCount: 1,
+            });
+            expect(repository.create).toHaveBeenCalledTimes(2);
+            expect(emitter.emit).toHaveBeenCalledTimes(2);
+        });
+
+        it('suppresses the fanout when a concurrent producer won the insert race', async () => {
+            // Both callers miss the pre-check; the loser's INSERT hits the
+            // UNIQUE (userId, deduplicationKey) constraint and re-fetches the
+            // winner's row. Only the winner may ring.
+            const { service, repository, emitter } = makeSharedViewService();
+            (repository.findByDeduplicationKey as jest.Mock)
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce({ id: 'n1', isDismissed: false });
+            (repository.create as jest.Mock).mockRejectedValueOnce(
+                Object.assign(new Error('duplicate key'), { code: '23505' }),
+            );
+
+            await service.notifySharedViewFirstView({
+                userId: 'owner-1',
+                sharedViewId: 'view-1',
+                rotationCount: 0,
+            });
+
+            expect(emitter.emit).not.toHaveBeenCalled();
+        });
+
+        it('fans out when a dismissed row re-arms the deduplication slot', async () => {
+            // `create()` writes a fresh row once the earlier one was
+            // dismissed; that IS a new insert, so the fanout must follow it.
+            const { service, repository, emitter } = makeSharedViewService();
+            (repository.findByDeduplicationKey as jest.Mock).mockResolvedValue({
+                id: 'n1',
+                isDismissed: true,
+            });
+
+            await service.notifySharedViewFirstView({
+                userId: 'owner-1',
+                sharedViewId: 'view-1',
+                rotationCount: 0,
+            });
+
+            expect(repository.create).toHaveBeenCalledTimes(1);
+            expect(emitter.emit).toHaveBeenCalledTimes(1);
         });
     });
 
