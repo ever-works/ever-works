@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import {
     Boxes,
     FolderGit2,
@@ -42,6 +42,8 @@ import {
 } from './agent-capabilities.shared';
 import { AgentFleetSection } from './AgentFleetSection';
 import type { AgentFleetData } from './agent-fleet.shared';
+import { AgentAccessLevelsSection } from './AgentAccessLevelsSection';
+import type { AgentAccessLevelRow } from './agent-access-levels.shared';
 import {
     bindSkillToAgentAction,
     installAndBindSkillAction,
@@ -56,7 +58,10 @@ import {
  * use. The sibling features that shipped on parallel branches now each
  * own a section here:
  *
- *   1. Agent tools   — the tool-grant matrix's first web UI.
+ *   1. Agent tools   — the tool-grant matrix's first web UI, followed by
+ *                      Access levels (`AgentAccessLevelsSection`, AW-15):
+ *                      "Read only" / "Read and write" per provider that
+ *                      declares them, written onto the same grant row.
  *   2. Permissions   — read-only summary; edited in Settings.
  *   3. Skills        — agent-scope bindings + inherited, read-only.
  *   4. MCP           — per-agent MCP connection state + inherited badge.
@@ -132,6 +137,11 @@ interface Props {
      * there anything true to show.
      */
     fleet?: AgentFleetData | null;
+    /**
+     * AW-15 — providers whose plugins declare access levels, with this
+     * agent's current level each. Absent or empty hides the section.
+     */
+    accessLevels?: AgentAccessLevelRow[] | null;
 }
 
 /** Same labels the Settings tab uses for the 8 flags. */
@@ -165,8 +175,10 @@ export function AgentCapabilitiesClient({
     initialRepos = [],
     environments = [],
     fleet = null,
+    accessLevels = null,
 }: Props) {
     const t = useTranslations('dashboard.agentsPage.capabilities');
+    const router = useRouter();
     const [caps, setCaps] = useState(initialCapabilities);
     const [boundSkills, setBoundSkills] = useState(initialBoundSkills);
     // `useTransition`'s `pending` is deliberately NOT the busy signal: the
@@ -200,6 +212,17 @@ export function AgentCapabilitiesClient({
             .filter((group) => group.tools.length > 0);
     }, [caps.tools, t]);
 
+    /**
+     * The Access levels section reads the SAME agent grant row the switches
+     * below rewrite, but its per-provider state (`requested`, `effective`,
+     * `blockedByExistingDeny`) is loaded by the page. After any write to that
+     * row the page is refreshed so the section re-reads it instead of showing
+     * the level from before the write.
+     */
+    const refreshAccessLevels = () => {
+        if (accessLevels && accessLevels.length > 0) router.refresh();
+    };
+
     const toggleTool = (tool: AgentCapabilityToolRow, next: boolean) => {
         // Second line of defence behind the disabled switches: every grant
         // is composed from the CURRENT `agentGrantRow`, so overlapping
@@ -212,6 +235,7 @@ export function AgentCapabilitiesClient({
             void (async () => {
                 try {
                     setCaps(await setAgentToolGrantAction(agent.id, grant));
+                    refreshAccessLevels();
                 } catch (err) {
                     toast.error(err instanceof Error ? err.message : String(err));
                 } finally {
@@ -229,6 +253,7 @@ export function AgentCapabilitiesClient({
             void (async () => {
                 try {
                     setCaps(await resetAgentToolGrantAction(agent.id, row.id));
+                    refreshAccessLevels();
                 } catch (err) {
                     toast.error(err instanceof Error ? err.message : String(err));
                 } finally {
@@ -543,6 +568,27 @@ export function AgentCapabilitiesClient({
                     </div>
                 )}
             </section>
+
+            {/* ── Section: Access levels (AW-15) ──
+                Plain-English "Read only" / "Read and write" per provider
+                that declares the levels. Writes the SAME agent grant row as
+                the tool switches above, so it hands the refreshed payload
+                back. Rendered only when at least one provider declares
+                levels. */}
+            {accessLevels && accessLevels.length > 0 && (
+                <AgentAccessLevelsSection
+                    agentId={agent.id}
+                    rows={accessLevels}
+                    onCapabilitiesChange={(next) => {
+                        setCaps(next);
+                        // Also re-read after a level change, so a refresh
+                        // started by an earlier switch can never land last
+                        // with the level from before this choice.
+                        refreshAccessLevels();
+                    }}
+                    className={sectionClass}
+                />
+            )}
 
             {/* ── Section: Permissions summary (read-only) ── */}
             <section className={sectionClass} data-testid="capabilities-permissions-section">

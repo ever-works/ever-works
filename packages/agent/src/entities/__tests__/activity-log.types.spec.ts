@@ -96,6 +96,8 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Agent computers — one row per stretch of control of an Agent's machine.
+            ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -159,7 +161,7 @@ describe('activity-log.types', () => {
             // +5 kb_document_archived / _unarchived / _filed / _exported and
             //    memory_folder_renamed (Knowledge library shelf) -> 162.
             //
-            // 🛑 162 is COUNTED from the merged enum, never added up from the
+            // 🛑 166 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -167,12 +169,16 @@ describe('activity-log.types', () => {
             // ActivityStatus, and including it inflates the total by 5.
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
-            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) and +5 knowledge
+            //    library literals -> 165.
             //
             // Both land together when the Knowledge library shelf merges
             // develop's Live Feed work: 162 (shelf side) and 160 (develop side)
             // each counted from their own base, and the merged enum COUNTS 165.
-            expect(literals).toHaveLength(165);
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 166
+            //    after the knowledge library branch merged develop's Agent
+            //    computers take-over work.
+            expect(literals).toHaveLength(166);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import type { ToolGrantOverride, ToolGrantScope } from '@ever-works/contracts';
+import {
+    pruneConnectionScopePresetOwnership,
+    type ConnectionScopePresetOwnership,
+    type ToolGrantOverride,
+    type ToolGrantScope,
+} from '@ever-works/contracts';
 import { ToolGrant } from '../entities/tool-grant.entity';
 
 /** One (scope, id) pair to load a grant row for. */
@@ -14,6 +19,14 @@ export interface UpsertToolGrantInput extends ToolGrantScopeRef {
     userId: string;
     grant: ToolGrantOverride;
     note?: string | null;
+    /**
+     * AW-15 — the access-level control's ownership record for this row.
+     * Only that control passes it. Omitted (every other writer: the raw
+     * `PUT /api/tool-grants`, the per-tool switches) ⇒ the stored record is
+     * PRUNED to patterns still in the new `deny`, so a pattern the operator
+     * removed by hand stops being the control's to manage.
+     */
+    presetOwnership?: ConnectionScopePresetOwnership | null;
 }
 
 /**
@@ -83,10 +96,14 @@ export class ToolGrantRepository {
         const existing = await this.findOne(input.userId, input);
         const allow = input.grant.allow ?? null;
         const deny = input.grant.deny ?? null;
+        const presetOwnership =
+            input.presetOwnership !== undefined
+                ? input.presetOwnership
+                : pruneConnectionScopePresetOwnership(existing?.presetOwnership ?? null, deny);
         if (existing) {
             await this.grants.update(
                 { id: existing.id, userId: input.userId },
-                { allow, deny, note: input.note ?? null },
+                { allow, deny, note: input.note ?? null, presetOwnership },
             );
             const refreshed = await this.findByIdAndUser(existing.id, input.userId);
             return refreshed ?? existing;
@@ -98,6 +115,7 @@ export class ToolGrantRepository {
             allow,
             deny,
             note: input.note ?? null,
+            presetOwnership,
         });
         return this.grants.save(created);
     }

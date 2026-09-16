@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Keyboard, MoreHorizontal, RefreshCw } from 'lucide-react';
+import { Hand, Keyboard, MoreHorizontal, RefreshCw } from 'lucide-react';
 import {
     COMPUTER_QUALITIES,
     type ComputerChannel,
@@ -11,6 +11,17 @@ import {
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils/cn';
+import type { ComputerTakeOverAvailability } from './computer-session.shared';
+
+/** Take over / give back, when this surface offers control at all. */
+export interface ComputerControlsControl {
+    availability: ComputerTakeOverAvailability;
+    busy: boolean;
+    onTakeOver: () => void;
+    onGiveBack: () => void;
+    /** Offered while controlling and the stretch was not extended yet. */
+    onExtend?: (() => void) | null;
+}
 
 interface Props {
     channel: ComputerChannel;
@@ -26,12 +37,15 @@ interface Props {
     onEndSession: () => void;
     onOpenShortcuts: () => void;
     linkCopied: boolean;
+    /** Take over and give back. Absent: a watch-only surface, exactly as before. */
+    control?: ComputerControlsControl;
 }
 
 /**
- * Channel switch, quality, refresh and the `⋯` menu (own logins and files,
- * copy link, bandwidth used, end session). Watching only: there is no take
- * over control on this surface yet, and none is rendered.
+ * Channel switch, quality, refresh, take over / give back, and the `⋯` menu
+ * (own logins and files, copy link, bandwidth used, end session). Taking over
+ * is an explicit button (never a click on the picture); when it is not
+ * available the button stays visible but disabled, and says why.
  */
 export function ComputerControls({
     channel,
@@ -47,6 +61,7 @@ export function ComputerControls({
     onEndSession,
     onOpenShortcuts,
     linkCopied,
+    control,
 }: Props) {
     const t = useTranslations('dashboard.computer');
     const [menuOpen, setMenuOpen] = useState(false);
@@ -121,6 +136,8 @@ export function ComputerControls({
                 {t('refresh')}
             </Button>
 
+            {control ? <ControlButtons control={control} /> : null}
+
             <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('noCost')}</span>
 
             <div ref={menuRef} className="relative ml-auto">
@@ -191,5 +208,65 @@ export function ComputerControls({
                 ) : null}
             </div>
         </div>
+    );
+}
+
+function ControlButtons({ control }: { control: ComputerControlsControl }) {
+    const t = useTranslations('dashboard.computer.control');
+    if (control.availability === 'controlling') {
+        return (
+            <>
+                <Button
+                    size="sm"
+                    data-testid="computer-give-back"
+                    className="bg-amber-600 text-white hover:bg-amber-700"
+                    onClick={control.onGiveBack}
+                    disabled={control.busy}
+                >
+                    <Hand className="mr-1 h-3.5 w-3.5" aria-hidden />
+                    {t('giveBack')}
+                </Button>
+                {control.onExtend ? (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        title={t('ceilingNote')}
+                        onClick={control.onExtend}
+                        disabled={control.busy}
+                    >
+                        {t('extend')}
+                    </Button>
+                ) : null}
+            </>
+        );
+    }
+    const why =
+        control.availability === 'denied'
+            ? t('deniedTooltip')
+            : control.availability === 'terminal'
+              ? t('terminalReadOnly')
+              : control.availability === 'unavailable'
+                ? t('notLive')
+                : null;
+    const disabled = why !== null || control.busy;
+    return (
+        <span title={why ?? undefined} className="inline-flex items-center gap-1">
+            <Button
+                size="sm"
+                variant="secondary"
+                data-testid="computer-take-over"
+                onClick={control.onTakeOver}
+                disabled={disabled}
+                aria-describedby={why ? 'computer-take-over-why' : undefined}
+            >
+                <Hand className="mr-1 h-3.5 w-3.5" aria-hidden />
+                {t('takeOver')}
+            </Button>
+            {why ? (
+                <span id="computer-take-over-why" className="sr-only">
+                    {why}
+                </span>
+            ) : null}
+        </span>
     );
 }

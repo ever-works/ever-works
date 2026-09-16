@@ -53,6 +53,16 @@ describe('RunSteeringService — auto-resume widening (slice AC)', () => {
             setAwaitingInput: jest.fn().mockResolvedValue(undefined),
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            // Resume single-flight — an uncontended claim always wins.
+            claimResume: jest.fn().mockImplementation(async (id: string) => ({
+                runId: id,
+                token: 'claim-1',
+                previousToken: null,
+            })),
+            releaseResumeClaim: jest.fn().mockResolvedValue(true),
+            consumeResumeClaim: jest.fn().mockResolvedValue(true),
+            // No successor left behind by an earlier, unfinished resume.
+            findResumeSuccessor: jest.fn().mockResolvedValue(null),
         };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trigger-1' }) };
     });

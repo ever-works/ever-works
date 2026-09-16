@@ -228,6 +228,12 @@ export enum ActivityActionType {
     AGENT_COLLABORATOR_ENABLED = 'agent_collaborator_enabled',
     AGENT_COLLABORATOR_DISABLED = 'agent_collaborator_disabled',
     AGENT_COLLABORATOR_REMOVED = 'agent_collaborator_removed',
+    // Agent computers — a person took control of the machine an Agent works
+    // on and gave it back (or it was released automatically). Written once
+    // per stretch of control, when it ends, with how long it lasted and why
+    // it ended; `details.resourceId` is the Agent so it lands in that
+    // Agent's feed. Additive — `activity_log.actionType` is a plain varchar.
+    AGENT_COMPUTER_CONTROLLED = 'agent_computer_controlled',
     // Environments (Settings → Environments) — named, reusable runtime
     // recipes assigned per-Agent. Emitted by the api-side controller.
     ENVIRONMENT_CREATED = 'environment_created',

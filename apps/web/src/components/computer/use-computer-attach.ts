@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     decodeComputerFrame,
+    encodeComputerFrame,
     type ComputerChannel,
     type ComputerCloseReason,
+    type ComputerInputFrame,
+    type ComputerMode,
     type ComputerQuality,
     type ComputerScreenFrame,
     type ComputerStatsFrame,
@@ -29,6 +32,14 @@ import { describeOpenRefusal, type ComputerOpenRefusal } from './computer-sessio
  * States are visibly distinct: `opening` (asking for a view), `connecting`
  * (socket up, no picture yet), `live`, `ended` (with the platform's reason),
  * `refused` (a named refusal from the platform), `cannot-connect`.
+ *
+ * Taking control rides the SAME view and socket model: once the page holds
+ * control it asks for a driving token (`?role=controller`, which the platform
+ * mints only to the view holding control) and swaps the watching socket for a
+ * driving one — the new socket takes over only once it is open, so a swap
+ * that fails leaves the watching view exactly as it was. `mode` follows the
+ * relay's `mode` frames; `sendInput` sends the person's input on the current
+ * socket (the relay forwards it only while this view holds control).
  *
  * Every seam (fetch, WebSocket, clock) is injectable for jsdom tests.
  */
@@ -82,6 +93,14 @@ export interface ComputerAttachApi {
     endSession: () => void;
     /** Open a fresh view (Reconnect / Try again). */
     reconnect: () => void;
+    /** The view's mode as the relay last said: `controlling` while this view holds control. */
+    mode: ComputerMode;
+    /** Whether the socket in use is a driving one (swapped in after control was taken). */
+    driving: boolean;
+    /** Ask for a driving socket now that this view holds control. A no-op when already driving. */
+    upgradeToController: () => void;
+    /** Send one input frame on the current socket. False when there is no open socket to send it on. */
+    sendInput: (frame: ComputerInputFrame) => boolean;
 }
 
 const MAX_BANNERS = 5;
@@ -101,6 +120,12 @@ export function useComputerAttach(
     const [openedAt, setOpenedAt] = useState<number | null>(null);
     const [banners, setBanners] = useState<string[]>([]);
     const [nonce, setNonce] = useState(0);
+    const [mode, setMode] = useState<ComputerMode>('watching');
+    const [driving, setDriving] = useState(false);
+    /** The socket frames are sent on now; replaced when a driving socket takes over. */
+    const socketRef = useRef<WebSocket | null>(null);
+    /** Set by the running view: swaps in a driving socket. */
+    const upgradeRef = useRef<(() => void) | null>(null);
     const callbacksRef = useRef(callbacks);
     const sessionRef = useRef<string | null>(null);
     /** Sessions already ended from here (the owner's End session, or a release below). */
@@ -154,12 +179,16 @@ export function useComputerAttach(
 
         setSessionId(null);
         sessionRef.current = null;
+        socketRef.current = null;
+        upgradeRef.current = null;
         setRefusal(null);
         setEndReason(null);
         setStats(null);
         setLastStatsAt(null);
         setLastFrameAt(null);
         setBanners([]);
+        setMode('watching');
+        setDriving(false);
         if (!enabled || !nodeId || !channel) {
             setState('idle');
             setOpenedAt(null);
@@ -240,6 +269,68 @@ export function useComputerAttach(
                 return;
             }
 
+            const wire = (ws: WebSocket, wsToken: string, onAccepted?: () => void) => {
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({ kind: 'auth', token: wsToken }));
+                    if (onAccepted) {
+                        // A driving socket takes over only once it is open.
+                        onAccepted();
+                        return;
+                    }
+                    if (!cancelled) setState((prev) => (prev === 'opening' ? 'connecting' : prev));
+                };
+                ws.onmessage = (event) => {
+                    // A socket that was swapped out (or is not yet swapped in) says nothing.
+                    if (cancelled || ws !== socket || typeof event.data !== 'string') return;
+                    const frame = decodeComputerFrame(event.data);
+                    if (!frame) return;
+                    attached = true;
+                    switch (frame.kind) {
+                        case 'frame':
+                            setLastFrameAt(now());
+                            setState((prev) => (prev === 'ended' ? prev : 'live'));
+                            callbacksRef.current.onPicture(frame);
+                            break;
+                        case 'terminal':
+                            setLastFrameAt(now());
+                            setState((prev) => (prev === 'ended' ? prev : 'live'));
+                            callbacksRef.current.onTerminal?.(frame.frame);
+                            break;
+                        case 'stats':
+                            setStats(frame);
+                            setLastStatsAt(now());
+                            break;
+                        case 'error':
+                            setBanners((prev) => [...prev, frame.message].slice(-MAX_BANNERS));
+                            break;
+                        case 'mode':
+                            setMode(frame.mode);
+                            break;
+                        case 'end':
+                            setEndReason(frame.reason);
+                            setState('ended');
+                            break;
+                        default:
+                            break;
+                    }
+                };
+                ws.onclose = (event) => {
+                    if (cancelled || ws !== socket) return;
+                    setState((prev) => {
+                        if (prev === 'ended' || prev === 'refused') return prev;
+                        return event.code === 4001 ? 'refused' : 'cannot-connect';
+                    });
+                    // Closed before the relay accepted this viewer (a refused token,
+                    // a dropped connection): Reconnect opens a fresh session.
+                    release();
+                };
+                ws.onerror = () => {
+                    if (!cancelled && ws === socket) {
+                        setState((prev) => (prev === 'ended' ? prev : 'cannot-connect'));
+                    }
+                };
+            };
+
             try {
                 socket = new WS(wsUrl);
             } catch {
@@ -247,58 +338,61 @@ export function useComputerAttach(
                 release();
                 return;
             }
-            socket.onopen = () => {
-                socket?.send(JSON.stringify({ kind: 'auth', token }));
-                if (!cancelled) setState((prev) => (prev === 'opening' ? 'connecting' : prev));
-            };
-            socket.onmessage = (event) => {
-                if (cancelled || typeof event.data !== 'string') return;
-                const frame = decodeComputerFrame(event.data);
-                if (!frame) return;
-                attached = true;
-                switch (frame.kind) {
-                    case 'frame':
-                        setLastFrameAt(now());
-                        setState((prev) => (prev === 'ended' ? prev : 'live'));
-                        callbacksRef.current.onPicture(frame);
-                        break;
-                    case 'terminal':
-                        setLastFrameAt(now());
-                        setState((prev) => (prev === 'ended' ? prev : 'live'));
-                        callbacksRef.current.onTerminal?.(frame.frame);
-                        break;
-                    case 'stats':
-                        setStats(frame);
-                        setLastStatsAt(now());
-                        break;
-                    case 'error':
-                        setBanners((prev) => [...prev, frame.message].slice(-MAX_BANNERS));
-                        break;
-                    case 'end':
-                        setEndReason(frame.reason);
-                        setState('ended');
-                        break;
-                    default:
-                        break;
-                }
-            };
-            socket.onclose = (event) => {
-                if (cancelled) return;
-                setState((prev) => {
-                    if (prev === 'ended' || prev === 'refused') return prev;
-                    return event.code === 4001 ? 'refused' : 'cannot-connect';
-                });
-                // Closed before the relay accepted this viewer (a refused token,
-                // a dropped connection): Reconnect opens a fresh session.
-                release();
-            };
-            socket.onerror = () => {
-                if (!cancelled) setState((prev) => (prev === 'ended' ? prev : 'cannot-connect'));
+            socketRef.current = socket;
+            wire(socket, token);
+
+            const viewId = sessionIdOpened;
+            const SocketImpl = WS;
+            let upgrading = false;
+            let upgraded = false;
+            upgradeRef.current = () => {
+                if (cancelled || upgrading || upgraded) return;
+                upgrading = true;
+                void (async () => {
+                    try {
+                        const res = await doFetch(
+                            `/api/agents/${agentId}/computer/sessions/${viewId}/attach-token?role=controller`,
+                            { method: 'POST' },
+                        );
+                        if (cancelled || !res.ok) return;
+                        const body = (await res.json()) as {
+                            token?: string;
+                            wsUrl?: string;
+                            role?: string;
+                        };
+                        // The platform decides: without control it mints a watching token, and
+                        // the watching socket already in use stays.
+                        if (cancelled || body.role !== 'driver' || !body.token || !body.wsUrl)
+                            return;
+                        const next = new SocketImpl(body.wsUrl);
+                        wire(next, body.token, () => {
+                            if (cancelled) {
+                                next.close();
+                                return;
+                            }
+                            const previous = socket;
+                            socket = next;
+                            socketRef.current = next;
+                            upgraded = true;
+                            setDriving(true);
+                            try {
+                                previous?.close();
+                            } catch {
+                                // already gone
+                            }
+                        });
+                    } catch {
+                        // The watching socket keeps working; the next attempt tries again.
+                    } finally {
+                        upgrading = false;
+                    }
+                })();
             };
         })();
 
         return () => {
             cancelled = true;
+            upgradeRef.current = null;
             try {
                 socket?.close();
             } catch {
@@ -339,6 +433,19 @@ export function useComputerAttach(
         setState('ended');
     }, [call]);
     const reconnect = useCallback(() => setNonce((n) => n + 1), []);
+    const upgradeToController = useCallback(() => upgradeRef.current?.(), []);
+    const sendInput = useCallback((frame: ComputerInputFrame): boolean => {
+        const ws = socketRef.current;
+        if (!ws || ws.readyState !== 1) return false;
+        const wire = encodeComputerFrame(frame);
+        if (wire === null) return false;
+        try {
+            ws.send(wire);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
     return {
         state,
@@ -354,5 +461,9 @@ export function useComputerAttach(
         setQuality,
         endSession,
         reconnect,
+        mode,
+        driving,
+        upgradeToController,
+        sendInput,
     };
 }

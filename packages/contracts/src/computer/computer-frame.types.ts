@@ -180,13 +180,28 @@ export type ComputerPointerAction = (typeof COMPUTER_POINTER_ACTIONS)[number];
 export const COMPUTER_POINTER_BUTTONS = ['left', 'middle', 'right'] as const;
 export type ComputerPointerButton = (typeof COMPUTER_POINTER_BUTTONS)[number];
 
+/**
+ * Largest pressed-buttons bitmask accepted: 1 left, 2 right, 4 middle,
+ * 8 back, 16 forward — the pointer-event and browser debugging protocol
+ * encoding alike.
+ */
+export const COMPUTER_MAX_POINTER_BUTTONS = 31;
+
 /** Pointer input, in picture pixels. */
 export interface ComputerPointerFrame {
 	readonly kind: 'pointer';
 	readonly action: ComputerPointerAction;
 	readonly x: number;
 	readonly y: number;
+	/** The button this event is about (`down` / `up`); null on a `move`. */
 	readonly button: ComputerPointerButton | null;
+	/**
+	 * The buttons held down once this event has happened (a bitmask, see
+	 * {@link COMPUTER_MAX_POINTER_BUTTONS}): what makes a `move` a drag, and
+	 * 0 after the last release. Optional — a sender that omits it sends a
+	 * plain pointer as before.
+	 */
+	readonly buttons?: number;
 }
 
 export const COMPUTER_KEY_ACTIONS = ['down', 'up'] as const;

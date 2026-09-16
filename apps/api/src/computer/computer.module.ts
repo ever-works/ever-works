@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { AgentsModule } from '@ever-works/agent/agents';
 import {
     COMPUTER_PENDING_SESSIONS,
@@ -11,9 +12,10 @@ import { FleetEnabledGuard } from '../fleet/guards/fleet-enabled.guard';
 import { FleetNodeAuthGuard } from '../fleet/guards/fleet-node-auth.guard';
 import { TerminalModule } from '../terminal/terminal.module';
 import { ComputerAttachService } from './computer-attach.service';
+import { ComputerControlListener } from './computer-control.listener';
 import { ComputerController } from './computer.controller';
 import { ComputerInternalController } from './computer-internal.controller';
-import { ComputerRelayRegistry } from './computer-relay.registry';
+import { COMPUTER_RELAY_REQUIRES_CONTROL, ComputerRelayRegistry } from './computer-relay.registry';
 import { computerSessionDispatcherProvider } from './computer-session.dispatcher.provider';
 import { ComputerSessionListener } from './computer-session.listener';
 import { ComputerWsService } from './computer-ws.service';
@@ -32,6 +34,9 @@ import { ComputerWsService } from './computer-ws.service';
  *   - machine authentication is the fleet's own `FleetNodeAuthGuard`, and
  *     the `computer-session` job is enqueued through the fleet's node job
  *     runtime factory (`FleetApiModule` exports it);
+ *   - taking control is the agent-side control arbiter (a compare-and-set on
+ *     the machine's row) behind the same routes, relay and gateway — no
+ *     second session store and no second relay;
  *   - the whole surface goes dark with `FLEET_ENABLED=false`.
  *
  * `@Global()` for one reason, the same one the api-side `AgentsModule`
@@ -43,7 +48,14 @@ import { ComputerWsService } from './computer-ws.service';
  */
 @Global()
 @Module({
-    imports: [AgentComputerModule, AgentsModule, TerminalModule, FleetApiModule],
+    imports: [
+        AgentComputerModule,
+        AgentsModule,
+        TerminalModule,
+        FleetApiModule,
+        // The control listener's Activity Log rows.
+        ActivityLogModule,
+    ],
     controllers: [ComputerController, ComputerInternalController],
     providers: [
         computerSessionDispatcherProvider,
@@ -52,6 +64,11 @@ import { ComputerWsService } from './computer-ws.service';
         ComputerRelayRegistry,
         ComputerWsService,
         ComputerSessionListener,
+        // Taking control: input is forwarded only from the view holding control
+        // (the arbiter lives in the agent-side module), and the relay follows
+        // every change of control whichever path made it.
+        { provide: COMPUTER_RELAY_REQUIRES_CONTROL, useValue: true },
+        ComputerControlListener,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetNodeAuthGuard,

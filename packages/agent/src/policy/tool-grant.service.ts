@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
     PLATFORM_DEFAULT_TOOL_GRANT,
+    normalizeConnectionScopePresetOwnership,
     sanitizeToolGrantOverride,
     type ResolvedToolGrants,
     type ToolGrantDecision,
@@ -126,7 +127,17 @@ export class ToolGrantService implements ToolGrantEnforcer {
      */
     async upsert(input: Omit<UpsertToolGrantInput, 'grant'> & { grant: ToolGrantOverride }) {
         const grant = sanitizeToolGrantOverride(input.grant);
-        return this.grants.upsert({ ...input, grant });
+        if (input.presetOwnership === undefined) {
+            return this.grants.upsert({ ...input, grant });
+        }
+        // AW-15 — the access-level control's record is shape-checked too. A
+        // malformed entry is dropped, which only ever makes the control own
+        // LESS: the pattern is then kept as operator-owned, never removed.
+        return this.grants.upsert({
+            ...input,
+            grant,
+            presetOwnership: normalizeConnectionScopePresetOwnership(input.presetOwnership),
+        });
     }
 
     async remove(userId: string, id: string): Promise<boolean> {

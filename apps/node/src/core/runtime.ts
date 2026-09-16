@@ -826,9 +826,10 @@ function createAttendedLane(
 	// owner-only through an ACL or it is not opened at all (fail closed).
 	const restrictToOwner =
 		options.restrictProfileDir ?? (environment.platform === 'win32' ? restrictDirectoryToOwnerWindows : undefined);
+	const profileFs = createAgentProfileFs();
 	const profiles = createAgentProfileManager({
 		root: options.agentProfileRoot ?? defaultAgentProfileRoot(options.env ?? process.env),
-		fs: createAgentProfileFs(),
+		fs: profileFs,
 		platform: environment.platform,
 		...(restrictToOwner ? { restrictToOwner } : {})
 	});
@@ -859,7 +860,8 @@ function createAttendedLane(
 				terminalHost,
 				webSocketFactory,
 				logger: io.logger,
-				platform: environment.platform
+				platform: environment.platform,
+				profileFs
 			},
 			signal
 		)

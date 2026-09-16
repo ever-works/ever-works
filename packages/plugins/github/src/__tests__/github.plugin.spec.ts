@@ -52,7 +52,9 @@ describe('GitHubPlugin', () => {
 		});
 
 		it('declares git-provider and oauth capabilities', () => {
-			expect(plugin.capabilities).toEqual(['git-provider', 'oauth']);
+			// `connection-scopes` (AW-15) is additive: the two original
+			// capabilities stay first and unchanged.
+			expect(plugin.capabilities).toEqual(['git-provider', 'oauth', 'connection-scopes']);
 		});
 
 		it('uses admin-only configuration mode', () => {
@@ -245,7 +247,7 @@ describe('GitHubPlugin', () => {
 			const m = plugin.getManifest();
 			expect(m.id).toBe('github');
 			expect(m.category).toBe('git-provider');
-			expect(m.capabilities).toEqual(['git-provider', 'oauth']);
+			expect(m.capabilities).toEqual(['git-provider', 'oauth', 'connection-scopes']);
 			expect(m.builtIn).toBe(true);
 			expect(m.systemPlugin).toBe(true);
 			expect(m.autoEnable).toBe(true);
