@@ -39,10 +39,15 @@ function fakeResponse() {
 
 function fakeRequest() {
     const listeners: Array<() => void> = [];
+    const socketListeners: Array<() => void> = [];
     return {
         on: jest.fn((_event: 'close', listener: () => void) => listeners.push(listener)),
-        socket: { on: jest.fn() },
+        socket: {
+            destroyed: false,
+            on: jest.fn((_event: 'close', listener: () => void) => socketListeners.push(listener)),
+        },
         close: () => listeners.forEach((listener) => listener()),
+        closeSocket: () => socketListeners.forEach((listener) => listener()),
     };
 }
 
@@ -53,7 +58,11 @@ const flush = async () => {
 
 describe('ConversationStreamController', () => {
     let conversations: { assertParticipant: jest.Mock };
-    let messages: { listMessages: jest.Mock; listMessagesAfter: jest.Mock };
+    let messages: {
+        listMessages: jest.Mock;
+        listMessagesAfter: jest.Mock;
+        listUnsettledMessages: jest.Mock;
+    };
     let controller: ConversationStreamController;
 
     beforeEach(() => {
@@ -62,6 +71,7 @@ describe('ConversationStreamController', () => {
         messages = {
             listMessages: jest.fn().mockResolvedValue([]),
             listMessagesAfter: jest.fn().mockResolvedValue([]),
+            listUnsettledMessages: jest.fn().mockResolvedValue([]),
         };
         controller = new ConversationStreamController(
             conversations as any,
@@ -218,6 +228,117 @@ describe('ConversationStreamController', () => {
         jest.advanceTimersByTime(CONVERSATION_STREAM_POLL_MS * 3);
         await flush();
         expect(messages.listMessages.mock.calls.length).toBe(calls);
+    });
+
+    it('delivers a status change on a message pushed out of the newest window', async () => {
+        // `m-old` is the person's message waiting for a reply. 50 newer
+        // messages land, so the newest window no longer holds it — and only
+        // then does the reply job refuse it.
+        const older = { id: 'm-old', status: 'sending', createdAt: new Date(1_000) };
+        const newest = Array.from({ length: 50 }, (_, i) => ({
+            id: `n${i}`,
+            status: 'sent',
+            createdAt: new Date(2_000 + i),
+        }));
+        messages.listMessages.mockResolvedValue(newest);
+        messages.listUnsettledMessages.mockResolvedValue([older]);
+
+        const res = fakeResponse();
+        await controller.stream(auth, CONVERSATION_ID, res as any, fakeRequest() as any);
+        // The backlog, `m-old` included, is primed and never announced.
+        expect(res.chunks).toEqual([]);
+        expect(messages.listUnsettledMessages).toHaveBeenCalledWith(
+            'user-1',
+            CONVERSATION_ID,
+            { statuses: ['sending', 'failed'], watchedIds: [], limit: 50 },
+            SCOPE,
+        );
+
+        messages.listUnsettledMessages.mockResolvedValue([
+            { ...older, status: 'failed', failureCode: 'budget_exceeded' },
+        ]);
+        jest.advanceTimersByTime(CONVERSATION_STREAM_POLL_MS);
+        await flush();
+
+        const events = res.chunks.filter((chunk) => chunk.startsWith('event: message'));
+        expect(events).toHaveLength(1);
+        expect(events[0]).toContain('"id":"m-old"');
+        expect(events[0]).toContain('"status":"failed"');
+        // The id it is still watching is carried into the next refresh, so a
+        // Retry that moves it back to `sent` is delivered as well.
+        expect(messages.listUnsettledMessages).toHaveBeenLastCalledWith(
+            'user-1',
+            CONVERSATION_ID,
+            expect.objectContaining({ watchedIds: ['m-old'] }),
+            SCOPE,
+        );
+
+        messages.listUnsettledMessages.mockResolvedValue([{ ...older, status: 'sent' }]);
+        jest.advanceTimersByTime(CONVERSATION_STREAM_POLL_MS);
+        await flush();
+        const afterRetry = res.chunks.filter((chunk) => chunk.startsWith('event: message'));
+        expect(afterRetry).toHaveLength(2);
+        expect(afterRetry[1]).toContain('"status":"sent"');
+        res.close();
+    });
+
+    it('a failing status refresh still primes the stream', async () => {
+        messages.listMessages.mockResolvedValue([{ id: 'm1', status: 'sent' }]);
+        messages.listUnsettledMessages.mockRejectedValue(new Error('db down'));
+        const res = fakeResponse();
+
+        await controller.stream(auth, CONVERSATION_ID, res as any, fakeRequest() as any);
+        expect(res.chunks).toEqual([]);
+
+        messages.listMessages.mockResolvedValue([
+            { id: 'm1', status: 'sent' },
+            { id: 'm2', status: 'sent' },
+        ]);
+        jest.advanceTimersByTime(CONVERSATION_STREAM_POLL_MS);
+        await flush();
+
+        // Primed despite the failure: only the new message is announced, not
+        // the whole backlog.
+        const events = res.chunks.filter((chunk) => chunk.startsWith('event: message'));
+        expect(events).toHaveLength(1);
+        expect(events[0]).toContain('"id":"m2"');
+        res.close();
+    });
+
+    it('starts no timer when the client leaves during the first read', async () => {
+        const res = fakeResponse();
+        const req = fakeRequest();
+        // The close event arrives while the initial read is still in flight —
+        // before this fix the listeners were registered only afterwards, so it
+        // was missed and three timers were left running against a dead socket.
+        messages.listMessages.mockImplementation(async () => {
+            req.close();
+            return [];
+        });
+
+        await controller.stream(auth, CONVERSATION_ID, res as any, req as any);
+
+        expect(jest.getTimerCount()).toBe(0);
+        expect(res.end).toHaveBeenCalledTimes(1);
+        const calls = messages.listMessages.mock.calls.length;
+        jest.advanceTimersByTime(CONVERSATION_STREAM_POLL_MS * 3);
+        await flush();
+        expect(messages.listMessages.mock.calls.length).toBe(calls);
+        expect(res.chunks).toEqual([]);
+    });
+
+    it('starts no timer when the socket was torn down without a close event', async () => {
+        const res = fakeResponse();
+        const req = fakeRequest();
+        messages.listMessages.mockImplementation(async () => {
+            req.socket.destroyed = true;
+            return [];
+        });
+
+        await controller.stream(auth, CONVERSATION_ID, res as any, req as any);
+
+        expect(jest.getTimerCount()).toBe(0);
+        expect(res.end).toHaveBeenCalledTimes(1);
     });
 
     it('forces the stream closed after ten minutes', async () => {

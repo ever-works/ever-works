@@ -1,5 +1,8 @@
 import { IsNull, QueryFailedError } from 'typeorm';
-import { ConversationParticipantRepository } from './conversation-participant.repository';
+import {
+    ConversationParticipantRepository,
+    readPositionMovesForward,
+} from './conversation-participant.repository';
 
 /**
  * Conversation participants — the behaviours the rest of the feature leans
@@ -136,19 +139,28 @@ describe('ConversationParticipantRepository', () => {
         await expect(participants.markRead('c1', 'user', 'u1', 'm9', at)).resolves.toBe(true);
 
         expect(builder.set).toHaveBeenCalledWith({ lastReadMessageId: 'm9', lastReadAt: at });
-        expect(builder.where).toHaveBeenCalledWith('"conversationId" = :conversationId', {
+        // Property names, not hand-quoted identifiers: TypeORM escapes them
+        // for the driver in use, and `"col"` quoting is not MySQL-portable.
+        expect(builder.where).toHaveBeenCalledWith('conversationId = :conversationId', {
             conversationId: 'c1',
         });
-        expect(builder.andWhere).toHaveBeenCalledWith('"participantType" = :participantType', {
+        expect(builder.andWhere).toHaveBeenCalledWith('participantType = :participantType', {
             participantType: 'user',
         });
-        expect(builder.andWhere).toHaveBeenCalledWith('"participantId" = :participantId', {
+        expect(builder.andWhere).toHaveBeenCalledWith('participantId = :participantId', {
             participantId: 'u1',
         });
-        // The guard that keeps a delayed, older read from moving it back.
+        // The guard that keeps a delayed, older read from moving it back —
+        // compared as the `(createdAt, id)` pair, so messages sharing one
+        // stored timestamp are ordered by id rather than treated as equal.
         expect(builder.andWhere).toHaveBeenCalledWith(
-            '("lastReadAt" IS NULL OR "lastReadAt" <= :readAt)',
-            { readAt: at },
+            readPositionMovesForward(':readAt', 'readMessageId'),
+            { readAt: at, readMessageId: 'm9' },
+        );
+        expect(readPositionMovesForward(':readAt', 'readMessageId')).toBe(
+            '(lastReadAt IS NULL OR lastReadAt < :readAt' +
+                ' OR (lastReadAt = :readAt' +
+                ' AND (lastReadMessageId IS NULL OR lastReadMessageId < :readMessageId)))',
         );
         // Read-then-write would reopen the race; nothing is read first.
         expect(repository.update).not.toHaveBeenCalled();

@@ -259,36 +259,69 @@ describe('ConversationRepository', () => {
     });
 
     describe('updateTitle', () => {
-        it('updates by composite (id, userId) key with title only when metadata omitted', async () => {
-            convRepo.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
-
-            await expect(service.updateTitle('c1', 'u1', 'New title')).resolves.toBeUndefined();
-
-            expect(convRepo.update).toHaveBeenCalledWith(
-                { id: 'c1', userId: 'u1' },
-                { title: 'New title' },
+        /**
+         * A conditional write, so the same statement can carry the
+         * `titleSource` compare-and-set. The scoping the object form used to
+         * express — id AND userId, metadata only when given — is asserted on
+         * the builder instead.
+         */
+        const titleBuilder = () => {
+            const builder = {
+                update: jest.fn().mockReturnThis(),
+                set: jest.fn().mockReturnThis(),
+                where: jest.fn().mockReturnThis(),
+                andWhere: jest.fn().mockReturnThis(),
+                execute: jest.fn().mockResolvedValue({ affected: 1 }),
+            };
+            (convRepo as unknown as { createQueryBuilder: jest.Mock }).createQueryBuilder = jest.fn(
+                () => builder,
             );
+            return builder;
+        };
+
+        it('updates by composite (id, userId) key with title only when metadata omitted', async () => {
+            const builder = titleBuilder();
+
+            await expect(service.updateTitle('c1', 'u1', 'New title')).resolves.toBe(true);
+
+            expect(builder.set).toHaveBeenCalledWith({ title: 'New title' });
+            expect(builder.where).toHaveBeenCalledWith('id = :id', { id: 'c1' });
+            expect(builder.andWhere).toHaveBeenCalledWith('userId = :userId', { userId: 'u1' });
+            expect(builder.andWhere).toHaveBeenCalledTimes(1);
         });
 
         it('includes metadata when provided', async () => {
-            convRepo.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
+            const builder = titleBuilder();
 
             await service.updateTitle('c1', 'u1', 'Title', { aiTitle: true });
 
-            expect(convRepo.update).toHaveBeenCalledWith(
-                { id: 'c1', userId: 'u1' },
-                { title: 'Title', metadata: { aiTitle: true } },
-            );
+            expect(builder.set).toHaveBeenCalledWith({
+                title: 'Title',
+                metadata: { aiTitle: true },
+            });
         });
 
         it('does NOT include metadata when explicitly undefined', async () => {
-            convRepo.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
+            const builder = titleBuilder();
 
             await service.updateTitle('c1', 'u1', 'Title', undefined);
 
-            expect(convRepo.update).toHaveBeenCalledWith(
-                { id: 'c1', userId: 'u1' },
-                { title: 'Title' },
+            expect(builder.set).toHaveBeenCalledWith({ title: 'Title' });
+        });
+
+        it('compare-and-sets on titleSource when asked, and reports a refused write', async () => {
+            const builder = titleBuilder();
+            builder.execute.mockResolvedValue({ affected: 0 });
+
+            await expect(
+                service.updateTitle('c1', 'u1', 'Title', undefined, {
+                    onlyWhenNotUserTitled: true,
+                }),
+            ).resolves.toBe(false);
+
+            expect(builder.andWhere).toHaveBeenCalledWith(
+                '(titleSource IS NULL OR titleSource != :userTitleSource)',
+                { userTitleSource: 'user' },
             );
         });
     });

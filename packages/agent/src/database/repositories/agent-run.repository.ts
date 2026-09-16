@@ -6,6 +6,7 @@ import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialE
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
 import { Agent, AgentStatus } from '../../entities/agent.entity';
+import { ConversationMessage } from '../../entities/conversation-message.entity';
 import { Mission } from '../../entities/mission.entity';
 import { Task } from '../../entities/task.entity';
 import { Work } from '../../entities/work.entity';
@@ -1125,11 +1126,21 @@ export class AgentRunRepository {
             .andWhere('run.status IN (:...statuses)', {
                 statuses: ['queued', 'running'] satisfies AgentRunStatus[],
             })
-            .andWhere(
-                'run.conversationMessageId IN (SELECT cm.id FROM conversation_messages cm WHERE cm."conversationId" = :conversationId)',
-                { conversationId },
-            )
             .orderBy('run.createdAt', 'DESC');
+        // Built through TypeORM rather than spelled out as SQL: raw
+        // `cm."conversationId"` quoting is Postgres/SQLite-only, and MySQL —
+        // a supported driver — rejects it without ANSI_QUOTES, which would
+        // make this lookup fail outright there. The sub-select lets each
+        // driver escape the table and the column its own way.
+        const conversationMessageIds = query
+            .subQuery()
+            .select('cm.id')
+            .from(ConversationMessage, 'cm')
+            .where('cm.conversationId = :conversationId')
+            .getQuery();
+        query.andWhere(`run.conversationMessageId IN ${conversationMessageIds}`, {
+            conversationId,
+        });
         if (userId) query.andWhere('run.userId = :userId', { userId });
         const scopePredicate = ownershipSqlPredicate('run', scope, 'inFlightConversationRun');
         if (scopePredicate) {
