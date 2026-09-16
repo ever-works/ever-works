@@ -261,6 +261,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.INBOX_ITEM_CREATED]: 'decision',
     [ActivityActionType.INBOX_ITEM_ANSWERED]: 'decision',
 
+    // Shared view (AW-18) — the owner's own sharing configuration changes.
+    [ActivityActionType.SHARED_VIEW_ENABLED]: 'system',
+    [ActivityActionType.SHARED_VIEW_DISABLED]: 'system',
+    [ActivityActionType.SHARED_VIEW_REGENERATED]: 'system',
+    [ActivityActionType.SHARED_VIEW_SECTIONS_CHANGED]: 'system',
+    [ActivityActionType.SHARED_VIEW_INDEXING_CHANGED]: 'system',
+
     // Knowledge library — shelf curation (filing, archive, export) and shared-folder rename.
     [ActivityActionType.KB_DOCUMENT_ARCHIVED]: 'work',
     [ActivityActionType.KB_DOCUMENT_UNARCHIVED]: 'work',

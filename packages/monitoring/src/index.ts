@@ -13,3 +13,6 @@ export * from './interceptors';
 
 // Types
 export * from './types';
+
+// Request-recorder redaction (share tokens, view sessions)
+export * from './redaction';

@@ -160,6 +160,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ReleasePromotion',
     // Repository registry (Feature G) — account-level repo records.
     'RepoConnection',
+    // AW-18 Shared view — one Workspace's read-only published face.
+    'SharedView',
     // Skills family (PR #1019) ──
     'Skill',
     'SkillBinding',
