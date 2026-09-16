@@ -352,6 +352,59 @@ export class Task {
     @PortableDateColumn({ nullable: true })
     ciAutoResumeNoticedAt?: Date | null;
 
+    // ── Agent review planning memory (slice AD, CodeRabbit CR-2) ─────
+    // Review planning runs AFTER the change it belongs to is persisted
+    // (entry into `in_review`, a head change the poll recorded), so a
+    // failure or a killed process in between used to leave nothing that
+    // said a review was still owed. The PR-status poll now reconciles every
+    // `in_review` Task, and these columns are what keep that from being a
+    // cost loop: a deterministic refusal is remembered for its key, a
+    // transient one is retried with capped backoff, and every write is a
+    // compare-and-set on `agentReviewPlanLease` so two replicas plan once.
+    // Written only by `TaskRepository.claimAgentReviewPlan` /
+    // `recordAgentReviewPlanProgress` / `settleAgentReviewPlan`, and cleared
+    // by the status write of an entry into `in_review`
+    // (`agentReviewPlanEntryReset`); the rules live in `task-agent-review.ts`
+    // (`decideAgentReviewPlanAttempt`, `classifyAgentReviewPlanOutcome`).
+    // All nullable: a NULL key is "never planned", which plans.
+
+    /** `<head sha>:<agent approver set fingerprint>` the memory is about. */
+    @Column({ type: 'varchar', length: 96, nullable: true })
+    agentReviewPlanKey?: string | null;
+
+    /** `in-flight` | `settled` | `refused` | `retry` | `exhausted`. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    agentReviewPlanState?: string | null;
+
+    /** Planning reason code of the last settled attempt (operator-readable). */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    agentReviewPlanReason?: string | null;
+
+    /** Attempts taken for this key, the current one included. */
+    @Column({ type: 'int', nullable: true })
+    agentReviewPlanAttempts?: number | null;
+
+    /** Lease expiry while `in-flight`; earliest retry while `retry`. */
+    @PortableDateColumn({ nullable: true })
+    agentReviewPlanNextAt?: Date | null;
+
+    /**
+     * Compare-and-set token. Rotated by EVERY memory write that ends or
+     * resets an attempt (the lease, its settle, an entry into `in_review`),
+     * so a copy of the row read before any of them can never win a later
+     * compare-and-set.
+     */
+    @Column({ type: 'varchar', length: 36, nullable: true })
+    agentReviewPlanLease?: string | null;
+
+    /**
+     * Reviews dispatched under `agentReviewPlanKey` during the current entry
+     * into `in_review`, across attempts — carried into the next attempt's
+     * per-entry approver cap so a retry cannot buy another cap's worth.
+     */
+    @Column({ type: 'int', nullable: true })
+    agentReviewPlanStarted?: number | null;
+
     // ── Latest-run denorm (kanban run cockpit, Wave 2) ───────────────
     // Maintained by `TaskRunDenormService` on queued creation, claim and
     // terminal transition of task-kind AgentRuns. Denormalized so the

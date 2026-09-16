@@ -1048,6 +1048,47 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
             );
 
             /**
+             * CodeRabbit CR-1 (CWE-863), through the REAL dispatcher and
+             * planner: behind an explicit guard that ADMITS the payload, a
+             * run id whose row does not exist used to pass
+             * `refuseAgentReviewRun` (only a found review row refused), so
+             * a run whose scope nothing could verify reached `plan()` and
+             * the job writer. It now stops at `refuseAgentReviewRun`, with
+             * that rule's reason rather than a G9 code.
+             */
+            it.each(['command', 'model-cli'])(
+                'refuses a run whose row is missing behind an explicit guard that admits it (%s mode): no plan, no job',
+                async (mode) => {
+                    process.env.FLEET_NODE_AGENT_EXECUTION_MODE = mode;
+                    const delegationScopeGuard = {
+                        refuseUnenforceableDelegationScope: jest.fn().mockResolvedValue(undefined),
+                    };
+                    const dispatcher = buildDispatcher({ delegationScopeGuard });
+                    const planSpy = jest.spyOn(planner, 'plan');
+
+                    const refusal = await dispatcher
+                        .enqueue(payload({ runId: 'run-gone', agentId: REVIEWER }))
+                        .then(
+                            () => null,
+                            (err: unknown) => err,
+                        );
+
+                    expect(
+                        delegationScopeGuard.refuseUnenforceableDelegationScope,
+                    ).toHaveBeenCalledTimes(1);
+                    expect(runs.findById).toHaveBeenCalledWith('run-gone');
+                    expect(refusal).toBeInstanceOf(FleetAgentTaskPlanError);
+                    expect(refusal).not.toBeInstanceOf(FleetDelegationScopeRefusedError);
+                    expect((refusal as Error).message).toContain('Run run-gone was not found');
+                    expect((refusal as Error).message).not.toContain('fleet-delegation-scope-');
+                    expect(planSpy).not.toHaveBeenCalled();
+                    expect(plannerTasks.findById).not.toHaveBeenCalled();
+                    expect(store.enqueue).not.toHaveBeenCalled();
+                    expect(delegate.enqueue).not.toHaveBeenCalled();
+                },
+            );
+
+            /**
              * CURRENT, DOCUMENTED BEHAVIOUR — pinned so a change to it is a
              * decision, not an accident.
              *

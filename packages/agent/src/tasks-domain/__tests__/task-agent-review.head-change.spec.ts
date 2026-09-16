@@ -72,7 +72,7 @@ function harness(task: Task, providerHead: string | null) {
         requestAgentReviews: jest.fn(async () => undefined),
     };
     const svc = new TaskPrStatusService(tasks as any, works as any, git as any, transitions as any);
-    return { svc, tasks, transitions };
+    return { svc, tasks, transitions, git };
 }
 
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -113,6 +113,98 @@ describe('the PR-status poll requests a review when an in_review head moves', ()
     it('a review hiccup never fails the status refresh', async () => {
         const h = harness(makeTask(), NEW_HEAD);
         h.transitions.requestAgentReviews.mockRejectedValue(new Error('boom'));
+        const summary = await h.svc.syncDuePrStatuses();
+        await settle();
+        expect(summary.failed).toBe(0);
+        expect(summary.refreshed).toBe(1);
+    });
+});
+
+/**
+ * CodeRabbit CR-2 on PR #2419 — the poll also RECONCILES an `in_review` Task
+ * whose head did not move, because planning that never happened (a process
+ * killed after `in_review` was persisted, a transient failure) has no other
+ * recovery. The routine poll above still requests nothing: the reconcile is a
+ * separate, memory-bounded call (see `task-agent-review.reconcile.spec.ts`
+ * for what it does and does not buy).
+ */
+describe('the PR-status poll reconciles an in_review Task whose head did not move', () => {
+    function reconcilingHarness(task: Task, providerHead: string | null) {
+        const h = harness(task, providerHead);
+        const transitions = Object.assign(h.transitions, {
+            reconcileAgentReviews: jest.fn(async () => undefined),
+        });
+        return { ...h, transitions };
+    }
+
+    it('reconciles, and does not re-request, when the head is unchanged', async () => {
+        const h = reconcilingHarness(makeTask(), OLD_HEAD);
+        await h.svc.syncDuePrStatuses();
+        await settle();
+        expect(h.transitions.requestAgentReviews).not.toHaveBeenCalled();
+        expect(h.transitions.reconcileAgentReviews).toHaveBeenCalledTimes(1);
+        const [task] = h.transitions.reconcileAgentReviews.mock.calls[0] as unknown as [Task];
+        expect(task).toMatchObject({
+            id: 'task-1',
+            status: TaskStatus.IN_REVIEW,
+            prHeadSha: OLD_HEAD,
+        });
+    });
+
+    it('does not reconcile when the head moved — that is a request, handled once', async () => {
+        const h = reconcilingHarness(makeTask(), NEW_HEAD);
+        await h.svc.syncDuePrStatuses();
+        await settle();
+        expect(h.transitions.requestAgentReviews).toHaveBeenCalledTimes(1);
+        expect(h.transitions.reconcileAgentReviews).not.toHaveBeenCalled();
+    });
+
+    it('does not reconcile a Task outside review, or one without a parseable head', async () => {
+        const out = reconcilingHarness(makeTask({ status: TaskStatus.IN_PROGRESS }), OLD_HEAD);
+        await out.svc.syncDuePrStatuses();
+        const headless = reconcilingHarness(makeTask(), 'not-a-sha');
+        await headless.svc.syncDuePrStatuses();
+        await settle();
+        expect(out.transitions.reconcileAgentReviews).not.toHaveBeenCalled();
+        expect(headless.transitions.reconcileAgentReviews).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Adversarial review of CR-2, finding 4 — the refresh that first sees a
+     * merged or closed pull request used to reconcile too. Planning refuses
+     * that (`pr-closed`) only after a Work read and a provider read of its
+     * own, so the reconcile bought exactly one wasted provider call per
+     * merged Task, racing the merge completion.
+     */
+    it('does not reconcile when this read reports the pull request merged or closed — a draft still is', async () => {
+        const reported = (state: string) => ({
+            number: 41,
+            state,
+            merged: state === 'merged',
+            headSha: OLD_HEAD,
+            ciState: 'passing',
+            checks: [],
+        });
+        for (const state of ['merged', 'closed']) {
+            const h = reconcilingHarness(makeTask(), OLD_HEAD);
+            h.git.getPullRequestStatus.mockResolvedValue(reported(state));
+            await h.svc.syncDuePrStatuses();
+            await settle();
+            expect({
+                state,
+                reconciles: h.transitions.reconcileAgentReviews.mock.calls.length,
+            }).toEqual({ state, reconciles: 0 });
+        }
+        const draft = reconcilingHarness(makeTask(), OLD_HEAD);
+        draft.git.getPullRequestStatus.mockResolvedValue(reported('draft'));
+        await draft.svc.syncDuePrStatuses();
+        await settle();
+        expect(draft.transitions.reconcileAgentReviews).toHaveBeenCalledTimes(1);
+    });
+
+    it('a reconcile hiccup never fails the status refresh', async () => {
+        const h = reconcilingHarness(makeTask(), OLD_HEAD);
+        h.transitions.reconcileAgentReviews.mockRejectedValue(new Error('boom'));
         const summary = await h.svc.syncDuePrStatuses();
         await settle();
         expect(summary.failed).toBe(0);

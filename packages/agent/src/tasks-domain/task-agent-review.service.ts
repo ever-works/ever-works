@@ -26,7 +26,9 @@ import {
     AGENT_REVIEW_DIFF_MAX_BYTES,
     AGENT_REVIEW_DIFF_MAX_FILES,
     agentApproverNeedsReview,
+    agentReviewApproverFingerprint,
     agentReviewClaimKey,
+    agentReviewPlanKey,
     assessReviewDiff,
     composeAgentReviewBrief,
     isAgentReviewRunScope,
@@ -57,6 +59,23 @@ export interface PlannedAgentReview {
 
 export interface AgentReviewPlan extends AgentReviewDispatchOutcome {
     dispatches: PlannedAgentReview[];
+}
+
+/**
+ * What the platform's OWN state says about a Task's agent reviews, read
+ * without any provider call — see {@link TaskAgentReviewService.probeAgentReviewPlan}.
+ */
+export interface AgentReviewPlanProbe {
+    /** `false` when configuration switches the stage off; nothing else is read. */
+    enabled: boolean;
+    /** The head this Task last recorded (`prHeadSha`, else `ciHeadSha`), normalized. */
+    headSha: string | null;
+    /** {@link agentReviewPlanKey} for that head and the agent approver set; `null` without a head. */
+    planKey: string | null;
+    /** Agent approvers that need a review of `headSha`. */
+    needsReview: number;
+    /** Of those, how many hold no review claim for `(reviewer, headSha)`. */
+    unclaimed: number;
 }
 
 /** What `TaskTransitionService.dispatchAgentRun` reported back. */
@@ -193,16 +212,95 @@ export class TaskAgentReviewService {
     // ── the dispatch half ─────────────────────────────────────────────
 
     /**
+     * Does this Task still owe agent reviews for the head it last recorded?
+     * Two ledger-side reads, never a provider call (CodeRabbit CR-2).
+     *
+     * The PR-status poll's reconcile asks this for every `in_review` Task it
+     * refreshes, so it has to be cheap: the approver rows and the claim keys,
+     * nothing else. It deliberately does NOT run the self-review check (more
+     * reads per approver) — a reviewer refused for that is remembered by the
+     * plan memory instead, under the key this returns.
+     *
+     * `null` when a read threw: the caller cannot tell, so the reconcile does
+     * nothing this time (no spend) and asks again on the next poll.
+     */
+    async probeAgentReviewPlan(task: Task): Promise<AgentReviewPlanProbe | null> {
+        try {
+            if (
+                config.agents.getAgentReviewMaxRunsPerTask() <= 0 ||
+                config.agents.getAgentReviewMaxApproversPerEntry() <= 0
+            ) {
+                return {
+                    enabled: false,
+                    headSha: null,
+                    planKey: null,
+                    needsReview: 0,
+                    unclaimed: 0,
+                };
+            }
+            const headSha = normalizeCommitSha(resolveReviewHead(task));
+            const agentRows = (await this.approvers.findByTaskId(task.id)).filter(
+                (row) => row.approverType === 'agent',
+            );
+            const needing = agentRows.filter((row) => agentApproverNeedsReview(row, headSha));
+            if (!headSha) {
+                return {
+                    enabled: true,
+                    headSha: null,
+                    planKey: null,
+                    needsReview: needing.length,
+                    unclaimed: needing.length,
+                };
+            }
+            const planKey = agentReviewPlanKey(
+                headSha,
+                agentReviewApproverFingerprint(agentRows.map((row) => row.id)),
+            );
+            const probe: AgentReviewPlanProbe = {
+                enabled: true,
+                headSha,
+                planKey,
+                needsReview: needing.length,
+                unclaimed: 0,
+            };
+            if (needing.length === 0) return probe;
+            const claimed = new Set(await this.reviews.listClaimKeysForTask(task.id));
+            probe.unclaimed = needing.filter(
+                (row) => !claimed.has(agentReviewClaimKey(row.approverId, headSha)),
+            ).length;
+            return probe;
+        } catch (error) {
+            this.logger.warn(
+                `Agent review for task ${task.id}: could not read whether reviews are owed — ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
      * Decide which agent approvers get a review run for this Task, and
      * claim a ledger row for each.
      *
      * Never throws: the caller is a transition side effect and a review
      * hiccup must not roll back a status change. Every failure is a named
      * reason in the returned plan.
+     *
+     * `options.alreadyStarted` — reviews earlier planning attempts already
+     * dispatched in this same entry for this same key (the plan memory's
+     * `agentReviewPlanStarted`, see `agentReviewPlanCarriedStarts`). They
+     * count against the per-entry approver cap, so a retry after a transient
+     * failure buys only what the cap has left; when nothing is left the plan
+     * is refused `approver-cap` before a single read. Omitted = 0, the
+     * behaviour of every caller outside the plan memory.
      */
-    async planReviews(task: Task): Promise<AgentReviewPlan> {
+    async planReviews(
+        task: Task,
+        options: { alreadyStarted?: number } = {},
+    ): Promise<AgentReviewPlan> {
         try {
-            return await this.planReviewsInner(task);
+            return await this.planReviewsInner(task, options);
         } catch (error) {
             this.logger.warn(
                 `Agent review planning failed for task ${task.id}: ${
@@ -213,7 +311,10 @@ export class TaskAgentReviewService {
         }
     }
 
-    private async planReviewsInner(task: Task): Promise<AgentReviewPlan> {
+    private async planReviewsInner(
+        task: Task,
+        options: { alreadyStarted?: number },
+    ): Promise<AgentReviewPlan> {
         const empty = (reason: AgentReviewDispatchReason): AgentReviewPlan => ({
             taskId: task.id,
             reason,
@@ -227,6 +328,12 @@ export class TaskAgentReviewService {
         if (maxRuns <= 0) return empty('disabled');
         const maxApprovers = config.agents.getAgentReviewMaxApproversPerEntry();
         if (maxApprovers <= 0) return empty('approver-cap');
+        // The per-entry cap is per ENTRY, not per planning attempt: starts an
+        // earlier attempt of this entry already made count here (adversarial
+        // review of CR-2). A spent cap costs no read at all.
+        const carried = Number(options.alreadyStarted ?? 0);
+        const alreadyStarted = Number.isFinite(carried) ? Math.max(0, Math.trunc(carried)) : 0;
+        if (alreadyStarted >= maxApprovers) return empty('approver-cap');
 
         // Approvers come from platform state, keyed by the Task — never
         // from a request body, and never filtered by anything a caller
@@ -518,7 +625,7 @@ export class TaskAgentReviewService {
         // was read before the provider calls, and another planner may have
         // spent the same slot since.
         let remainingBudget = maxRuns - spent;
-        let started = 0;
+        let started = alreadyStarted;
         // Set when a claim THROWS. Everything claimed before it is still
         // returned for dispatch — see the catch below.
         let claimFailed = false;

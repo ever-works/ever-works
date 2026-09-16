@@ -319,6 +319,107 @@ describe('requestAgentReviews — a push while the Task sits in in_review', () =
     });
 });
 
+/**
+ * CodeRabbit CR-2 — `reconcileAgentReviews` is the poll's recovery for
+ * planning that never happened. Unlike the two event paths above, it never
+ * plans without its plan memory: the memory is its cost control.
+ */
+describe('reconcileAgentReviews — the poll recovery fails closed', () => {
+    const probe = {
+        enabled: true,
+        headSha: 'a'.repeat(40),
+        planKey: `${'a'.repeat(40)}:0123456789abcdef`,
+        needsReview: 1,
+        unclaimed: 1,
+    };
+
+    it('plans nothing when the Task repository cannot hold the plan memory', async () => {
+        const h = harness();
+        h.agentReviews.probeAgentReviewPlan = jest.fn(async () => probe);
+        await h.svc.reconcileAgentReviews(makeTask({ status: TaskStatus.IN_REVIEW }));
+        expect(h.agentReviews.planReviews).not.toHaveBeenCalled();
+        expect(h.dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('plans nothing when the probe cannot read, or the lease write throws — and never throws', async () => {
+        const h = harness();
+        h.tasks.claimAgentReviewPlan = jest.fn().mockRejectedValue(new Error('db down'));
+        h.agentReviews.probeAgentReviewPlan = jest.fn(async () => null);
+        await h.svc.reconcileAgentReviews(makeTask({ status: TaskStatus.IN_REVIEW }));
+        expect(h.tasks.claimAgentReviewPlan).not.toHaveBeenCalled();
+
+        h.agentReviews.probeAgentReviewPlan = jest.fn(async () => probe);
+        await expect(
+            h.svc.reconcileAgentReviews(makeTask({ status: TaskStatus.IN_REVIEW })),
+        ).resolves.toBeUndefined();
+        expect(h.tasks.claimAgentReviewPlan).toHaveBeenCalledTimes(1);
+        expect(h.agentReviews.planReviews).not.toHaveBeenCalled();
+    });
+
+    it('plans nothing when every reviewer already holds a claim, or the lease is lost', async () => {
+        const h = harness();
+        h.tasks.claimAgentReviewPlan = jest.fn().mockResolvedValue(false);
+        h.agentReviews.probeAgentReviewPlan = jest.fn(async () => ({ ...probe, unclaimed: 0 }));
+        await h.svc.reconcileAgentReviews(makeTask({ status: TaskStatus.IN_REVIEW }));
+        expect(h.tasks.claimAgentReviewPlan).not.toHaveBeenCalled();
+
+        h.agentReviews.probeAgentReviewPlan = jest.fn(async () => probe);
+        await h.svc.reconcileAgentReviews(makeTask({ status: TaskStatus.IN_REVIEW }));
+        expect(h.tasks.claimAgentReviewPlan).toHaveBeenCalledTimes(1);
+        expect(h.agentReviews.planReviews).not.toHaveBeenCalled();
+    });
+
+    it('with the memory, plans through the same bound, scoped path and records the outcome under its lease', async () => {
+        const h = harness();
+        h.tasks.claimAgentReviewPlan = jest.fn().mockResolvedValue(true);
+        h.tasks.settleAgentReviewPlan = jest.fn().mockResolvedValue(true);
+        h.agentReviews.probeAgentReviewPlan = jest.fn(async () => probe);
+        await h.svc.reconcileAgentReviews(makeTask({ status: TaskStatus.IN_REVIEW }));
+
+        expect(h.agentReviews.planReviews).toHaveBeenCalledTimes(1);
+        expect(h.runs.createQueued.mock.calls[0][0].delegationScope).toEqual(agentReviewRunScope());
+        expect(h.dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        const claim = h.tasks.claimAgentReviewPlan.mock.calls[0][0];
+        expect(claim).toMatchObject({
+            taskId: 't1',
+            expectedLease: null,
+            when: 'always',
+            patch: {
+                agentReviewPlanKey: probe.planKey,
+                agentReviewPlanState: 'in-flight',
+                agentReviewPlanAttempts: 1,
+            },
+        });
+        expect(h.tasks.settleAgentReviewPlan).toHaveBeenCalledWith({
+            taskId: 't1',
+            lease: claim.patch.agentReviewPlanLease,
+            patch: {
+                // Remembered under the key the lease was taken for.
+                agentReviewPlanKey: probe.planKey,
+                agentReviewPlanState: 'settled',
+                agentReviewPlanReason: 'dispatched',
+                agentReviewPlanNextAt: null,
+                // Adversarial review of CR-2: the settle ROTATES the token…
+                agentReviewPlanLease: expect.any(String),
+                // …and records the starts this entry has made for the key.
+                agentReviewPlanStarted: 1,
+            },
+        });
+        const settled = h.tasks.settleAgentReviewPlan.mock.calls[0][0];
+        expect(settled.patch.agentReviewPlanLease).not.toBe(claim.patch.agentReviewPlanLease);
+        // A first attempt carries no earlier starts.
+        expect(claim.patch.agentReviewPlanStarted).toBe(0);
+    });
+
+    it('does nothing for a Task that is not in review', async () => {
+        const h = harness();
+        h.agentReviews.probeAgentReviewPlan = jest.fn(async () => probe);
+        await h.svc.reconcileAgentReviews(makeTask({ status: TaskStatus.IN_PROGRESS }));
+        expect(h.agentReviews.probeAgentReviewPlan).not.toHaveBeenCalled();
+        expect(h.agentReviews.planReviews).not.toHaveBeenCalled();
+    });
+});
+
 describe('the pre-existing paths are untouched', () => {
     it('does not plan reviews on any other transition', async () => {
         const h = harness();

@@ -36,10 +36,39 @@ import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
 // Value import for the same @Optional() class-injection reason as the
 // gate above. No cycle: task-agent-review.service imports repositories,
 // the git facade and two leaf modules — never this file.
-import { TaskAgentReviewService } from './task-agent-review.service';
-import { agentReviewRunScope, resolveCompletionGateHead } from './task-agent-review';
+import { TaskAgentReviewService, type AgentReviewPlan } from './task-agent-review.service';
+import {
+    AGENT_REVIEW_PLAN_LEASE_MS,
+    AGENT_REVIEW_PLAN_MAX_ATTEMPTS,
+    agentReviewPlanCarriedStarts,
+    agentReviewPlanEntryReset,
+    agentReviewPlanRetryDelayMs,
+    agentReviewRunScope,
+    classifyAgentReviewPlanOutcome,
+    decideAgentReviewPlanAttempt,
+    resolveCompletionGateHead,
+    type AgentReviewPlanMode,
+} from './task-agent-review';
 import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
+import { randomUUID } from 'node:crypto';
+
+/**
+ * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
+ * the plan memory cannot be used, so an event path plans without it.
+ * `skip`: plan nothing now.
+ */
+type AgentReviewPlanLease =
+    | { kind: 'skip' }
+    | { kind: 'unavailable' }
+    | {
+          kind: 'taken';
+          lease: string;
+          attempt: number;
+          key: string;
+          /** Reviews dispatched under `key` in this entry so far, this attempt's included. */
+          started: number;
+      };
 
 /**
  * Tasks feature — Phase 12.1.
@@ -267,6 +296,18 @@ export class TaskTransitionService {
         if (from === TaskStatus.BLOCKED) {
             patch.previousStatus = null;
         }
+        // Reviewer agent stage (adversarial review of CodeRabbit CR-2) — an
+        // entry into `in_review` clears the review planning memory in THIS
+        // compare-and-set, atomically with the status. A new entry plans
+        // whatever the memory remembered for its key; written only by the
+        // fire-and-forget hook below, that intent died with a process killed
+        // in between, and every later reconcile then skipped the key on its
+        // old `settled` / `refused` / `exhausted` outcome. Cleared here, the
+        // next poll sees a never-planned key and recovers it. The fresh lease
+        // token also makes any pre-entry attempt or snapshot stale.
+        if (to === TaskStatus.IN_REVIEW) {
+            Object.assign(patch, agentReviewPlanEntryReset(randomUUID()));
+        }
 
         // Atomic CAS on the source state: the UPDATE only lands while the row
         // is still at `from`, so a concurrent identical-transition burst
@@ -305,8 +346,15 @@ export class TaskTransitionService {
         // status change a human or an agent just made. Bounded by the
         // ledger claim inside `planReviews` — this hook firing twice for
         // one commit buys zero extra runs.
+        //
+        // Not durable on its own (CodeRabbit CR-2): the status is already
+        // persisted, so a process killed before this runs used to leave the
+        // review owed and nothing that knew it. The PR-status poll's
+        // reconcile (`reconcileAgentReviews`) is the recovery, and the plan
+        // memory this writes is what tells that reconcile what already
+        // happened.
         if (to === TaskStatus.IN_REVIEW && this.agentReviews && this.dispatcher) {
-            void this.fanOutAgentReviews(refreshed).catch((err) =>
+            void this.planAgentReviewsDurably(refreshed, 'entry').catch((err) =>
                 this.logger.warn(`Agent review fan-out failed for task ${refreshed.id}: ${err}`),
             );
         }
@@ -425,16 +473,31 @@ export class TaskTransitionService {
      * started before its diff arrived would be a reviewer with nothing to
      * read, which is the exact failure this slice must not have.
      */
-    private async fanOutAgentReviews(task: Task): Promise<void> {
-        if (!this.agentReviews) return;
-        const plan = await this.agentReviews.planReviews(task);
+    private async fanOutAgentReviews(
+        task: Task,
+        attempt: {
+            /** Starts earlier attempts of this entry made for this key. */
+            alreadyStarted?: number;
+            /** Called with the plan BEFORE any of its runs is dispatched. */
+            onPlanned?: (plan: AgentReviewPlan) => Promise<void>;
+        } = {},
+    ): Promise<AgentReviewPlan | null> {
+        if (!this.agentReviews) return null;
+        const alreadyStarted = attempt.alreadyStarted ?? 0;
+        // The one-argument call is kept for every plan with nothing carried,
+        // so the planning call a first attempt makes is unchanged.
+        const plan =
+            alreadyStarted > 0
+                ? await this.agentReviews.planReviews(task, { alreadyStarted })
+                : await this.agentReviews.planReviews(task);
+        if (attempt.onPlanned) await attempt.onPlanned(plan);
         if (plan.dispatches.length === 0) {
             if (plan.reason && plan.reason !== 'no-agent-approvers' && plan.reason !== 'disabled') {
                 this.logger.log(
                     `Agent review for task ${task.id}: nothing dispatched (${plan.reason}).`,
                 );
             }
-            return;
+            return plan;
         }
         for (const planned of plan.dispatches) {
             const result = await this.dispatchAgentRun(task, planned.reviewerAgentId, {
@@ -449,6 +512,212 @@ export class TaskTransitionService {
                 reviewId: planned.reviewId,
             });
             await this.agentReviews.recordDispatchResult(planned.reviewId, result);
+        }
+        return plan;
+    }
+
+    /**
+     * Reviewer agent stage (CodeRabbit CR-2 on PR #2419) — plan (and
+     * dispatch) the agent reviews a Task is owed, under the plan memory on
+     * its row.
+     *
+     * One attempt at a time per Task: the attempt takes a lease with a
+     * compare-and-set (`TaskRepository.claimAgentReviewPlan`), plans through
+     * {@link fanOutAgentReviews} exactly as before, and records the outcome
+     * under the lease (`settleAgentReviewPlan`) — `settled`, `refused` for a
+     * deterministic refusal, `retry` with capped exponential backoff for a
+     * transient one, `exhausted` once the attempts for that key are spent
+     * (`task-agent-review.ts` holds the rules and the classification).
+     *
+     * FAILS CLOSED for the reconcile: when the memory cannot be read or
+     * written (no probe, no repository method, a store error, a lost
+     * compare-and-set) the reconcile plans nothing and asks again on the next
+     * poll. The memory is the reconcile's cost control, so a reconcile never
+     * runs without it.
+     *
+     * The two EVENT paths — entry into `in_review` and a head change the poll
+     * recorded — keep their behaviour when the memory is unavailable: they
+     * plan anyway, exactly as before the memory existed. Their cost was, and
+     * still is, bounded by the review ledger (one claim per reviewer per
+     * head, the lifetime budget slots, the per-entry cap), and each fires
+     * once per event rather than once per poll. When the memory IS available
+     * they take the lease too, so a reconcile or a second replica does not
+     * plan the same Task beside them. A lost compare-and-set means another
+     * planner holds the Task right now, and it is left to that planner.
+     */
+    private async planAgentReviewsDurably(task: Task, mode: AgentReviewPlanMode): Promise<void> {
+        if (!this.agentReviews) return;
+        const lease = await this.takeAgentReviewPlanLease(task, mode);
+        if (lease.kind === 'skip') return;
+        let plan: AgentReviewPlan | null = null;
+        try {
+            plan =
+                lease.kind === 'taken'
+                    ? await this.fanOutAgentReviews(task, {
+                          alreadyStarted: lease.started,
+                          // Count this attempt's starts durably BEFORE its runs
+                          // are dispatched, so a takeover of an attempt killed
+                          // mid-dispatch still sees them against the cap.
+                          onPlanned: (planned) =>
+                              this.recordAgentReviewPlanStarts(task, lease, planned),
+                      })
+                    : await this.fanOutAgentReviews(task);
+        } finally {
+            if (lease.kind === 'taken') {
+                await this.settleAgentReviewPlanLease(task, lease, plan);
+            }
+        }
+    }
+
+    private async takeAgentReviewPlanLease(
+        task: Task,
+        mode: AgentReviewPlanMode,
+    ): Promise<AgentReviewPlanLease> {
+        // Event paths plan without the memory when it is unavailable; the
+        // reconcile does not plan at all. See `planAgentReviewsDurably`.
+        const unavailable: AgentReviewPlanLease =
+            mode === 'reconcile' ? { kind: 'skip' } : { kind: 'unavailable' };
+        const reviews = this.agentReviews;
+        if (
+            !reviews ||
+            typeof reviews.probeAgentReviewPlan !== 'function' ||
+            typeof this.tasks.claimAgentReviewPlan !== 'function'
+        ) {
+            return unavailable;
+        }
+        const probe = await reviews.probeAgentReviewPlan(task);
+        if (!probe || !probe.enabled || !probe.planKey) return unavailable;
+        // THE reconcile predicate: at least one agent approver that needs a
+        // review of the recorded head and holds no claim for it. Anything
+        // else is the steady state — a claim exists for every reviewer, or
+        // there is nobody to review — and costs nothing further.
+        if (mode === 'reconcile' && probe.unclaimed === 0) return { kind: 'skip' };
+
+        const decision = decideAgentReviewPlanAttempt(task, probe.planKey, mode);
+        if (decision === null) return { kind: 'skip' };
+        const attempt = decision.attempt;
+        // Starts earlier attempts of THIS entry made for this key: they count
+        // against the per-entry approver cap (see `agentReviewPlanCarriedStarts`).
+        const started = agentReviewPlanCarriedStarts(task, probe.planKey);
+
+        const now = new Date();
+        const lease = randomUUID();
+        const patch = {
+            agentReviewPlanKey: probe.planKey,
+            agentReviewPlanState: 'in-flight' as const,
+            agentReviewPlanAttempts: attempt,
+            agentReviewPlanNextAt: new Date(now.getTime() + AGENT_REVIEW_PLAN_LEASE_MS),
+            agentReviewPlanLease: lease,
+            agentReviewPlanStarted: started,
+            // A new key starts a new story; a retry keeps the last reason
+            // readable until this attempt settles.
+            ...(task.agentReviewPlanKey === probe.planKey ? {} : { agentReviewPlanReason: null }),
+        };
+        let won: boolean;
+        try {
+            won = await this.tasks.claimAgentReviewPlan({
+                taskId: task.id,
+                expectedLease: task.agentReviewPlanLease ?? null,
+                now,
+                when: decision.when,
+                patch,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Agent review for task ${task.id}: planning lease unavailable (${mode}): ${err}`,
+            );
+            return unavailable;
+        }
+        if (!won) return { kind: 'skip' };
+        Object.assign(task, patch);
+        return { kind: 'taken', lease, attempt, key: probe.planKey, started };
+    }
+
+    /**
+     * Record the starts a plan claimed, under the attempt's lease, before its
+     * runs are dispatched. Best-effort: a lost write leaves the settle to
+     * record the same count, and only an attempt killed between here and its
+     * settle can undercount.
+     */
+    private async recordAgentReviewPlanStarts(
+        task: Task,
+        lease: Extract<AgentReviewPlanLease, { kind: 'taken' }>,
+        plan: AgentReviewPlan,
+    ): Promise<void> {
+        if (plan.dispatches.length === 0) return;
+        lease.started += plan.dispatches.length;
+        if (typeof this.tasks.recordAgentReviewPlanProgress !== 'function') return;
+        try {
+            const landed = await this.tasks.recordAgentReviewPlanProgress({
+                taskId: task.id,
+                lease: lease.lease,
+                started: lease.started,
+            });
+            if (landed) task.agentReviewPlanStarted = lease.started;
+        } catch (err) {
+            this.logger.warn(
+                `Agent review for task ${task.id}: could not record the reviews this plan started: ${err}`,
+            );
+        }
+    }
+
+    private async settleAgentReviewPlanLease(
+        task: Task,
+        lease: Extract<AgentReviewPlanLease, { kind: 'taken' }>,
+        plan: AgentReviewPlan | null,
+    ): Promise<void> {
+        const outcome = plan
+            ? classifyAgentReviewPlanOutcome(plan)
+            : { state: 'retry' as const, reason: 'error' as const };
+        let state: 'settled' | 'refused' | 'retry' | 'exhausted' = outcome.state;
+        let nextAt: Date | null = null;
+        if (state === 'retry') {
+            if (lease.attempt >= AGENT_REVIEW_PLAN_MAX_ATTEMPTS) {
+                state = 'exhausted';
+            } else {
+                nextAt = new Date(Date.now() + agentReviewPlanRetryDelayMs(lease.attempt));
+            }
+        }
+        // Remembered under the key the lease was taken for — the RECORDED
+        // head — even when planning read a newer live head. Re-keying on the
+        // live head would let a recorded head that keeps disagreeing with the
+        // live read re-plan on every poll; this way a key is planned once, and
+        // the newer head gets its own key (and its own plan, which costs no
+        // provider call when its claims already exist) when the poll records
+        // it.
+        //
+        // The lease token ROTATES here (adversarial review of CR-2): a copy of
+        // the row read while this attempt was in flight carries this attempt's
+        // token, and a settled / refused / exhausted row's NULL
+        // `agentReviewPlanNextAt` satisfies the `due` condition — so without a
+        // new token that copy could plan the key again right after it was
+        // remembered.
+        const patch = {
+            agentReviewPlanKey: lease.key,
+            agentReviewPlanState: state,
+            agentReviewPlanReason: outcome.reason,
+            agentReviewPlanNextAt: nextAt,
+            agentReviewPlanLease: randomUUID(),
+            agentReviewPlanStarted: lease.started,
+        };
+        try {
+            const landed = await this.tasks.settleAgentReviewPlan({
+                taskId: task.id,
+                lease: lease.lease,
+                patch,
+            });
+            if (landed) Object.assign(task, patch);
+            if (landed && (state === 'refused' || state === 'exhausted')) {
+                this.logger.log(
+                    `Agent review for task ${task.id}: ${state} (${outcome.reason}) — not planned again ` +
+                        `until the head, the agent approvers or the review entry change.`,
+                );
+            }
+        } catch (err) {
+            // The lease simply expires; the attempt counts as a failed one.
+            this.logger.warn(
+                `Agent review for task ${task.id}: could not record the planning outcome: ${err}`,
+            );
         }
     }
 
@@ -510,15 +779,53 @@ export class TaskTransitionService {
      *
      * Bounded exactly like the entry hook: one claim per (reviewer, head),
      * the lifetime budget, the per-entry cap. Fire-and-forget and never
-     * throws — the caller is a status poll.
+     * throws — the caller is a status poll. Under the plan memory (see
+     * {@link planAgentReviewsDurably}): a head the memory already settled or
+     * refused is not planned twice, and two replicas that both see the same
+     * head change plan it once.
      */
     async requestAgentReviews(task: Task): Promise<void> {
         if (!this.agentReviews || !this.dispatcher) return;
         if (task.status !== TaskStatus.IN_REVIEW) return;
         try {
-            await this.fanOutAgentReviews(task);
+            await this.planAgentReviewsDurably(task, 'head-change');
         } catch (err) {
             this.logger.warn(`Agent review re-plan failed for task ${task.id}: ${err}`);
+        }
+    }
+
+    /**
+     * Reviewer agent stage (CodeRabbit CR-2 on PR #2419) — the RECOVERY for
+     * review planning that never happened.
+     *
+     * The entry hook and {@link requestAgentReviews} run after the change
+     * they belong to is persisted, so a transient failure or a killed process
+     * in between used to suppress every agent review for that Task and head
+     * until the next head change. `TaskPrStatusService` calls this for every
+     * `in_review` Task whose head did NOT move when it refreshes it (the
+     * `task-pr-status-sync` sweep every two minutes, and the owner-scoped
+     * on-demand refresh), so the review owed is planned on a later poll.
+     *
+     * Plans only when ALL hold, cheapest first:
+     *  - the Task is `in_review` (in memory, and again in the lease's
+     *    compare-and-set, so a Task that left review is not planned);
+     *  - the stage is enabled and the Task has a recorded head;
+     *  - some agent approver needs a review of that head and holds no claim
+     *    for it (ledger reads only — no provider call);
+     *  - the plan memory allows an attempt for this key: never after a
+     *    deterministic refusal or a settled plan, and after a transient
+     *    failure only once the backoff has elapsed and attempts remain;
+     *  - this caller wins the lease.
+     *
+     * Never throws — the caller is a status poll.
+     */
+    async reconcileAgentReviews(task: Task): Promise<void> {
+        if (!this.agentReviews || !this.dispatcher) return;
+        if (task.status !== TaskStatus.IN_REVIEW) return;
+        try {
+            await this.planAgentReviewsDurably(task, 'reconcile');
+        } catch (err) {
+            this.logger.warn(`Agent review reconcile failed for task ${task.id}: ${err}`);
         }
     }
 

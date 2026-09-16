@@ -1,6 +1,6 @@
 import { DataSource, Table } from 'typeorm';
 import { ENTITIES } from '@ever-works/agent/database';
-import { TaskAgentReview, TaskApprover } from '@ever-works/agent/entities';
+import { Task, TaskAgentReview, TaskApprover } from '@ever-works/agent/entities';
 import { AddTaskAgentReviews1790300000000 } from '../1790300000000-AddTaskAgentReviews';
 
 /**
@@ -429,6 +429,123 @@ describe('AddTaskAgentReviews1790300000000', () => {
         // A second run changes nothing.
         await expect(runUp()).resolves.toBeUndefined();
         expect(Object.keys(await columns('task_agent_reviews'))).toHaveLength(18);
+    });
+
+    /**
+     * CodeRabbit CR-2 on PR #2419 — the review planning memory on `tasks`.
+     * A minimal pre-existing `tasks` table with a row in it, like the
+     * `task_approvers` one above.
+     */
+    describe('the review planning memory on tasks', () => {
+        const PLAN_COLUMNS = [
+            'agentReviewPlanAttempts',
+            'agentReviewPlanKey',
+            'agentReviewPlanLease',
+            'agentReviewPlanNextAt',
+            'agentReviewPlanReason',
+            'agentReviewPlanStarted',
+            'agentReviewPlanState',
+        ];
+        const ORIGINAL_TASK_COLUMNS = ['id', 'status', 'title', 'userId'];
+
+        beforeEach(async () => {
+            const runner = dataSource.createQueryRunner();
+            await runner.createTable(
+                new Table({
+                    name: 'tasks',
+                    columns: [
+                        { name: 'id', type: 'uuid', isPrimary: true },
+                        { name: 'userId', type: 'uuid' },
+                        { name: 'title', type: 'varchar', length: '200' },
+                        {
+                            name: 'status',
+                            type: 'varchar',
+                            length: '16',
+                            default: "'backlog'",
+                        },
+                    ],
+                }),
+            );
+            await runner.query(
+                `INSERT INTO tasks (id, "userId", title, status) VALUES (?, ?, ?, ?)`,
+                ['task-1', 'user-1', 'Ship it', 'in_review'],
+            );
+            await runner.release();
+        });
+
+        it('adds EXACTLY the seven plan columns the Task entity declares — all nullable, matching lengths — and keeps existing rows', async () => {
+            await runUp();
+            const after = await physical('tasks');
+            const added = Object.keys(after)
+                .filter((name) => !ORIGINAL_TASK_COLUMNS.includes(name))
+                .sort();
+            expect(added).toEqual(PLAN_COLUMNS);
+
+            const declared = new Map(
+                (await entityColumns(Task)).map((column) => [column.name, column]),
+            );
+            for (const name of added) {
+                const column = declared.get(name);
+                expect({ name, declared: Boolean(column) }).toEqual({ name, declared: true });
+                expect({ name, notnull: after[name].notnull }).toEqual({ name, notnull: 0 });
+                expect({ name, nullable: column!.nullable }).toEqual({ name, nullable: true });
+                if (column!.length) {
+                    expect({ name, type: after[name].type }).toEqual({
+                        name,
+                        type: expect.stringContaining(`(${column!.length})`),
+                    });
+                }
+            }
+            // …and every plan column the entity declares was added.
+            expect(
+                [...declared.keys()].filter((name) => name.startsWith('agentReviewPlan')).sort(),
+            ).toEqual(PLAN_COLUMNS);
+
+            // The existing row reads "never planned".
+            const rows = await dataSource.query(
+                `SELECT status, "agentReviewPlanKey", "agentReviewPlanState", "agentReviewPlanAttempts", "agentReviewPlanNextAt", "agentReviewPlanLease", "agentReviewPlanStarted" FROM tasks WHERE id = ?`,
+                ['task-1'],
+            );
+            expect(rows[0]).toEqual({
+                status: 'in_review',
+                agentReviewPlanKey: null,
+                agentReviewPlanState: null,
+                agentReviewPlanAttempts: null,
+                agentReviewPlanNextAt: null,
+                agentReviewPlanLease: null,
+                agentReviewPlanStarted: null,
+            });
+        });
+
+        it('is idempotent on tasks too', async () => {
+            await runUp();
+            await expect(runUp()).resolves.toBeUndefined();
+            expect(Object.keys(await columns('tasks'))).toHaveLength(
+                ORIGINAL_TASK_COLUMNS.length + PLAN_COLUMNS.length,
+            );
+        });
+
+        it('adds the tasks columns even when task_approvers does not exist', async () => {
+            // The approver half returns early without its table; the tasks
+            // half must not be skipped by that.
+            await dataSource.query('DROP TABLE task_approvers');
+            await runUp();
+            expect(Object.keys(await columns('tasks')).sort()).toEqual(
+                [...ORIGINAL_TASK_COLUMNS, ...PLAN_COLUMNS].sort(),
+            );
+        });
+
+        it('down() removes the plan columns and leaves the original tasks columns and row', async () => {
+            await runUp();
+            const runner = dataSource.createQueryRunner();
+            await migration.down(runner);
+            await runner.release();
+            expect(Object.keys(await columns('tasks')).sort()).toEqual(
+                [...ORIGINAL_TASK_COLUMNS].sort(),
+            );
+            const rows = await dataSource.query(`SELECT id, status FROM tasks`);
+            expect(rows).toEqual([{ id: 'task-1', status: 'in_review' }]);
+        });
     });
 
     it('down() removes both halves through the query-runner primitives', async () => {

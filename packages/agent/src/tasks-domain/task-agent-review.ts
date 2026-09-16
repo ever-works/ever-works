@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
 import type { GitDiffResult } from '@ever-works/plugin';
 
@@ -681,6 +682,319 @@ export interface AgentReviewVerdictResult {
     verdict?: AgentReviewVerdict;
     approverId?: string;
     headSha?: string | null;
+}
+
+// ── durable review planning (CodeRabbit CR-2 on PR #2419) ───────────
+
+/**
+ * Review planning is a side effect that runs AFTER the state change it
+ * belongs to is persisted — the entry into `in_review` (`TaskTransitionService`)
+ * or a head change the PR-status poll recorded (`TaskPrStatusService`). A
+ * transient failure, or a process kill in between, used to leave nothing
+ * durable saying a review was owed: the approvers stayed `pending` (safe), and
+ * the autonomy chain silently stalled until the next head change.
+ *
+ * The PR-status poll now also RECONCILES every `in_review` Task it refreshes.
+ * What keeps that from becoming a cost loop is the plan memory on the Task
+ * row (`tasks.agentReviewPlan*`), keyed on {@link agentReviewPlanKey}:
+ *
+ *  - a DETERMINISTIC refusal is remembered for that key, and later polls make
+ *    no provider call and no diff download for it;
+ *  - a TRANSIENT failure is retried with capped exponential backoff, at most
+ *    {@link AGENT_REVIEW_PLAN_MAX_ATTEMPTS} attempts per key;
+ *  - a new head (or a changed agent approver set) is a new key, which resets
+ *    both.
+ *
+ * Every write is a compare-and-set on the row's lease token, so two API
+ * replicas polling the same Task plan it once; the review ledger's unique
+ * claim still collapses any duplicate dispatch.
+ */
+
+/**
+ * How long a planning attempt holds the Task before another replica may take
+ * it over. An attempt that outlives it (a killed process) is counted as a
+ * failed attempt. A real plan is two provider calls and a dispatch — seconds.
+ */
+export const AGENT_REVIEW_PLAN_LEASE_MS = 10 * 60 * 1000;
+
+/** First retry delay after a transient planning failure. */
+export const AGENT_REVIEW_PLAN_RETRY_BASE_MS = 5 * 60 * 1000;
+
+/** Ceiling on the retry delay. */
+export const AGENT_REVIEW_PLAN_RETRY_MAX_MS = 60 * 60 * 1000;
+
+/**
+ * Planning attempts per key, the first included. With the delays above the
+ * attempts land at roughly 0, +5, +15, +35 and +75 minutes (each no earlier
+ * than the next poll that visits the Task); after the fifth transient failure
+ * the key is `exhausted` and only a new head, a changed approver set or a new
+ * entry into `in_review` plans it again. At two provider calls per attempt
+ * that is at most ten provider calls per key.
+ */
+export const AGENT_REVIEW_PLAN_MAX_ATTEMPTS = 5;
+
+/** `tasks.agentReviewPlanKey` is `varchar(96)`. */
+export const AGENT_REVIEW_PLAN_KEY_MAX_CHARS = 96;
+
+/**
+ * What the plan memory says about its key.
+ *
+ *  - `in-flight` — an attempt holds the lease until `agentReviewPlanNextAt`.
+ *  - `settled`   — the plan ran to the end: reviews dispatched, or every
+ *                  reviewer already holds a claim. Nothing more to buy.
+ *  - `refused`   — a deterministic refusal. Not planned again for this key.
+ *  - `retry`     — a transient failure; planned again after `agentReviewPlanNextAt`.
+ *  - `exhausted` — transient failures used every attempt for this key.
+ */
+export type AgentReviewPlanState = 'in-flight' | 'settled' | 'refused' | 'retry' | 'exhausted';
+
+/**
+ * How a planning outcome is remembered. Exhaustive over
+ * {@link AgentReviewDispatchReason} on purpose (a `Record`), so a new reason
+ * cannot ship unclassified.
+ *
+ *  - `deterministic` — planning the same key again gives the same answer, so
+ *    it is remembered and never re-planned for that key.
+ *  - `transient`     — a read or store failure that may clear by itself;
+ *    retried with backoff, capped.
+ *  - `settled`       — not a refusal: nothing is left to buy.
+ */
+export const AGENT_REVIEW_PLAN_REASON_CLASS: Readonly<
+    Record<AgentReviewDispatchReason, 'deterministic' | 'transient' | 'settled'>
+> = {
+    dispatched: 'settled',
+    'already-claimed': 'settled',
+    // Configuration read from the environment: it changes only with a
+    // restart, and a new entry into `in_review` plans again regardless.
+    disabled: 'deterministic',
+    // The per-entry fan-out cap. The approvers past it wait for a new head,
+    // a changed approver set or a new entry — exactly as before the reconcile
+    // existed; otherwise every poll would turn a per-ENTRY cap into a
+    // per-POLL one.
+    'approver-cap': 'deterministic',
+    // The key carries the agent approver set, so adding one is a new key.
+    'no-agent-approvers': 'deterministic',
+    // The Task left review; a new entry resets the memory.
+    'not-in-review': 'deterministic',
+    // The poll never selects a Task without a pull request.
+    'no-pull-request': 'deterministic',
+    'pr-closed': 'deterministic',
+    // The diff of an immutable head commit against its base does not change
+    // by asking again.
+    'diff-too-large': 'deterministic',
+    'diff-incomplete': 'deterministic',
+    'diff-empty': 'deterministic',
+    // The set of agents that worked on the Task only grows.
+    'self-review': 'deterministic',
+    // Ledger rows are never deleted, so a spent lifetime budget stays spent.
+    'budget-spent': 'deterministic',
+    // Never returned by planning (the claim is spent at dispatch, by design);
+    // classified so an outcome carrying it is never retried.
+    'dispatch-failed': 'deterministic',
+    // `works.findById` failures read as a missing Work, so a store hiccup and
+    // a deleted Work are indistinguishable here: retried, capped.
+    'no-work': 'transient',
+    // The provider threw or answered nothing, or the facade is unbound.
+    'pr-unreadable': 'transient',
+    // A provider answer with no parseable head.
+    'head-unknown': 'transient',
+    // The compare threw, or the provider reported no base branch.
+    'diff-unavailable': 'transient',
+    'reviewer-unreadable': 'transient',
+    'budget-unreadable': 'transient',
+    error: 'transient',
+};
+
+/**
+ * Classify one planning outcome for the plan memory.
+ *
+ * Any transient signal anywhere — the batch reason or one approver's
+ * decision — makes the whole outcome a retry, even when other approvers were
+ * dispatched: the approver that hit it still has no claim. Otherwise reviews
+ * dispatched (or nothing left to buy) settle the key, and a deterministic
+ * refusal refuses it.
+ */
+export function classifyAgentReviewPlanOutcome(plan: {
+    reason?: AgentReviewDispatchReason;
+    decisions: readonly { reason: AgentReviewDispatchReason }[];
+    dispatches: readonly unknown[];
+}): { state: 'settled' | 'refused' | 'retry'; reason: AgentReviewDispatchReason } {
+    const reasons: AgentReviewDispatchReason[] = [];
+    if (plan.reason) reasons.push(plan.reason);
+    for (const decision of plan.decisions) reasons.push(decision.reason);
+    // An unknown value (not in the table) is treated as transient: capped
+    // retries, never "remembered as fine".
+    const classOf = (reason: AgentReviewDispatchReason) =>
+        AGENT_REVIEW_PLAN_REASON_CLASS[reason] ?? 'transient';
+
+    const transient = reasons.find((reason) => classOf(reason) === 'transient');
+    if (transient) return { state: 'retry', reason: transient };
+    if (plan.dispatches.length > 0) return { state: 'settled', reason: 'dispatched' };
+    const deterministic = reasons.find((reason) => classOf(reason) === 'deterministic');
+    if (deterministic) return { state: 'refused', reason: deterministic };
+    return { state: 'settled', reason: 'already-claimed' };
+}
+
+/**
+ * The key the plan memory is about: the head commit, plus a fingerprint of
+ * the Task's AGENT approver rows (row ids, order-free).
+ *
+ * The head alone is not enough. A Task whose only agent approver is its own
+ * author is refused `self-review` for that head; when a human then attaches a
+ * second agent approver, a head-only key would keep that head refused and the
+ * new approver would never be reviewed. Row ids, not agent ids, so removing
+ * and re-adding an approver is a change too. A verdict does not change the
+ * key — decisions are not part of it — so a per-entry cap is not re-opened by
+ * one reviewer answering.
+ */
+export function agentReviewPlanKey(headSha: string, approverFingerprint: string): string {
+    return `${headSha}:${approverFingerprint}`.slice(0, AGENT_REVIEW_PLAN_KEY_MAX_CHARS);
+}
+
+/** The approver half of {@link agentReviewPlanKey}: 16 hex chars, order-free. */
+export function agentReviewApproverFingerprint(agentApproverRowIds: readonly string[]): string {
+    return createHash('sha256')
+        .update([...agentApproverRowIds].sort().join('\n'))
+        .digest('hex')
+        .slice(0, 16);
+}
+
+/** Delay before retry `attempt + 1`, after transient failure number `attempt` (1-based). */
+export function agentReviewPlanRetryDelayMs(attempt: number): number {
+    const exponent = Math.max(0, Math.trunc(attempt) - 1);
+    return Math.min(
+        AGENT_REVIEW_PLAN_RETRY_MAX_MS,
+        AGENT_REVIEW_PLAN_RETRY_BASE_MS * 2 ** exponent,
+    );
+}
+
+/** The plan-memory columns a decision reads (times are left to the database). */
+export interface AgentReviewPlanMemory {
+    agentReviewPlanKey?: string | null;
+    agentReviewPlanState?: string | null;
+    agentReviewPlanAttempts?: number | null;
+    /** Reviews dispatched under this key in the current entry, across attempts. */
+    agentReviewPlanStarted?: number | null;
+}
+
+/**
+ * Who is asking to plan.
+ *
+ *  - `entry`       — the Task just ENTERED `in_review`. A new entry plans
+ *                    whatever the memory says for its key (the behaviour
+ *                    before the memory existed), except while another
+ *                    attempt holds a live lease on that very key. The entry
+ *                    itself cleared the memory in its status write
+ *                    ({@link agentReviewPlanEntryReset}), so a same-key
+ *                    memory here was written by an attempt of THIS entry.
+ *  - `head-change` — the poll recorded a new head.
+ *  - `reconcile`   — the poll refreshed a Task whose head did not move.
+ *
+ * The two poll modes obey the memory: a new key always plans; the same key
+ * plans only from `retry` (or an expired `in-flight`) with attempts left and
+ * the backoff elapsed.
+ */
+export type AgentReviewPlanMode = 'entry' | 'head-change' | 'reconcile';
+
+/**
+ * The time condition an attempt still needs, checked by the DATABASE in the
+ * lease compare-and-set against the caller's clock — never against a
+ * timestamp read back into JavaScript, which better-sqlite3 hydrates in the
+ * process's local time zone and would shift by the zone offset.
+ *
+ *  - `always`        — no time condition (a new key).
+ *  - `due`           — `agentReviewPlanNextAt` is NULL or not in the future:
+ *                      the backoff elapsed, or an `in-flight` lease expired.
+ *  - `no-live-lease` — the row is not `in-flight` with an unexpired lease.
+ */
+export type AgentReviewPlanAttemptCondition = 'always' | 'due' | 'no-live-lease';
+
+export interface AgentReviewPlanAttemptDecision {
+    /** 1-based attempt number this attempt will be for its key. */
+    attempt: number;
+    when: AgentReviewPlanAttemptCondition;
+}
+
+/**
+ * May this caller take a planning attempt for `key`? `null` when the memory
+ * rules it out whatever the time; otherwise the attempt number and the time
+ * condition the lease compare-and-set enforces. Pure: the compare-and-set on
+ * the lease token the memory was read with is what makes the decision hold
+ * across replicas.
+ */
+export function decideAgentReviewPlanAttempt(
+    memory: AgentReviewPlanMemory,
+    key: string,
+    mode: AgentReviewPlanMode,
+): AgentReviewPlanAttemptDecision | null {
+    const sameKey = (memory.agentReviewPlanKey ?? null) === key;
+    const state = memory.agentReviewPlanState ?? null;
+    if (mode === 'entry') return { attempt: 1, when: sameKey ? 'no-live-lease' : 'always' };
+    if (!sameKey) return { attempt: 1, when: 'always' };
+    if (state !== null && state !== 'retry' && state !== 'in-flight') return null;
+    const attempts = Math.max(0, Math.trunc(memory.agentReviewPlanAttempts ?? 0));
+    if (attempts >= AGENT_REVIEW_PLAN_MAX_ATTEMPTS) return null;
+    return { attempt: attempts + 1, when: 'due' };
+}
+
+/**
+ * How many reviews earlier attempts already dispatched for `key` in the
+ * CURRENT review entry — what the next attempt carries into the per-entry
+ * approver cap (`TASK_AGENT_REVIEW_MAX_APPROVERS`).
+ *
+ * Adversarial review of CR-2: a `retry` is taken whenever ANY approver hit a
+ * transient failure, even when the same plan dispatched others and capped the
+ * rest. `planReviews` used to start its cap count at zero on every attempt,
+ * so each of up to {@link AGENT_REVIEW_PLAN_MAX_ATTEMPTS} retries could buy
+ * another cap's worth of runs for one entry and one head — the very
+ * per-entry-cap-becomes-per-poll-cap the `approver-cap: 'deterministic'`
+ * classification exists to prevent. A different key starts at zero (a new
+ * head or a changed approver set gets a fresh cap, exactly as before the
+ * memory existed), and so does a new entry: the entry into `in_review`
+ * clears the memory ({@link agentReviewPlanEntryReset}), so the same key can
+ * only be in the memory because an attempt planned it during THIS entry.
+ */
+export function agentReviewPlanCarriedStarts(memory: AgentReviewPlanMemory, key: string): number {
+    if ((memory.agentReviewPlanKey ?? null) !== key) return 0;
+    const started = Number(memory.agentReviewPlanStarted ?? 0);
+    return Number.isFinite(started) ? Math.max(0, Math.trunc(started)) : 0;
+}
+
+/**
+ * The plan-memory columns an ENTRY into `in_review` writes, in the SAME
+ * compare-and-set UPDATE that moves the status (`TaskTransitionService.transition`).
+ *
+ * Adversarial review of CR-2: an entry used to plan past whatever the memory
+ * remembered for its key, but nothing durable recorded that the entry had
+ * happened — so a process killed between the status write and the entry's
+ * lease left the OLD `settled` / `refused` / `exhausted` outcome in place,
+ * and every later reconcile skipped the key: the CR-2 stall, on the one path
+ * meant to re-plan a key. Clearing the memory atomically with the status makes
+ * "a new entry plans" durable: the next poll sees a never-planned key.
+ *
+ * `lease` is a FRESH compare-and-set token (never NULL): any attempt still in
+ * flight from before the entry, and any snapshot read before it, no longer
+ * matches, so neither can record an outcome over the new entry's memory nor
+ * plan from a pre-entry view of it.
+ */
+export function agentReviewPlanEntryReset(lease: string): {
+    agentReviewPlanKey: null;
+    agentReviewPlanState: null;
+    agentReviewPlanReason: null;
+    agentReviewPlanAttempts: null;
+    agentReviewPlanNextAt: null;
+    agentReviewPlanStarted: null;
+    agentReviewPlanLease: string;
+} {
+    return {
+        agentReviewPlanKey: null,
+        agentReviewPlanState: null,
+        agentReviewPlanReason: null,
+        agentReviewPlanAttempts: null,
+        agentReviewPlanNextAt: null,
+        agentReviewPlanStarted: null,
+        agentReviewPlanLease: lease,
+    };
 }
 
 // ── the message the review run reads ────────────────────────────────

@@ -283,6 +283,31 @@ describe('FleetAgentTaskPlannerService', () => {
                 FleetAgentTaskPlanError,
             );
         });
+
+        /**
+         * CodeRabbit CR-1 (CWE-863): a run id whose row is GONE used to fall
+         * through and admit the dispatch, so behind a delegation-scope guard
+         * that admitted the payload an unverifiable run reached `plan()`.
+         * A missing row is a scope that cannot be checked, not an ordinary
+         * run: it refuses, with this rule's own reason (never the G9
+         * `fleet-delegation-scope-` code, which is the guard's).
+         */
+        it('FAILS CLOSED when the run id names a row that does not exist', async () => {
+            runs.findById.mockResolvedValue(null);
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            const refusal = await build()
+                .refuseAgentReviewRun(payload)
+                .then(
+                    () => null,
+                    (err: unknown) => err,
+                );
+            expect(refusal).toBeInstanceOf(FleetAgentTaskPlanError);
+            expect((refusal as Error).message).toMatch(/Run run-1 was not found/);
+            expect((refusal as Error).message).not.toContain('fleet-delegation-scope-');
+            expect(runs.findById).toHaveBeenCalledWith('run-1');
+            // Nothing past the refusal was consulted.
+            expect(tasks.findById).not.toHaveBeenCalled();
+        });
     });
 
     /**

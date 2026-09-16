@@ -1,5 +1,21 @@
 import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex } from 'typeorm';
 
+/** The `tasks` review planning memory columns, in the order `up()` adds them. */
+const AGENT_REVIEW_PLAN_TASK_COLUMNS: ReadonlyArray<{
+    name: string;
+    type: string;
+    length?: string;
+    isNullable: true;
+}> = [
+    { name: 'agentReviewPlanKey', type: 'varchar', length: '96', isNullable: true },
+    { name: 'agentReviewPlanState', type: 'varchar', length: '16', isNullable: true },
+    { name: 'agentReviewPlanReason', type: 'varchar', length: '64', isNullable: true },
+    { name: 'agentReviewPlanAttempts', type: 'int', isNullable: true },
+    { name: 'agentReviewPlanNextAt', type: 'timestamp', isNullable: true },
+    { name: 'agentReviewPlanLease', type: 'varchar', length: '36', isNullable: true },
+    { name: 'agentReviewPlanStarted', type: 'int', isNullable: true },
+];
+
 /**
  * Reviewer agent stage (self-build slice AD, EW-811, closes finding R18).
  *
@@ -56,6 +72,23 @@ import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex } from 
  * `decidedVia` is not the literal `'user'` with a non-null human decider.
  * `'agent-review'` is not a value in that column's vocabulary and this
  * migration does not touch that table.
+ *
+ * ## Seven additive, nullable columns on `tasks` — the review planning memory
+ *
+ * Review planning runs after the change it belongs to is persisted (entry
+ * into `in_review`, a head change the PR-status poll recorded), so a failure
+ * or a killed process in between left nothing saying a review was owed
+ * (CodeRabbit CR-2 on PR #2419). The poll now reconciles every `in_review`
+ * Task, and these columns keep that bounded: `agentReviewPlanKey` (head +
+ * agent approver set), `agentReviewPlanState`, `agentReviewPlanReason`,
+ * `agentReviewPlanAttempts`, `agentReviewPlanNextAt` (lease expiry or retry
+ * time), `agentReviewPlanLease` (the compare-and-set token, rotated on every
+ * settle and entry) and `agentReviewPlanStarted` (reviews dispatched under
+ * the key in the current entry, so a retry cannot re-open the per-entry
+ * approver cap). All NULL on
+ * every existing row, which reads as "never planned". Columns on `tasks`,
+ * not rows in `task_agent_reviews`: every ledger row holds a budget slot, so
+ * the ledger cannot remember a refusal without spending budget on it.
  *
  * Forward-only with existence guards so a partially applied database
  * converges; portable `Table` / `TableColumn` DDL because CI and the e2e
@@ -217,6 +250,17 @@ export class AddTaskAgentReviews1790300000000 implements MigrationInterface {
             );
         }
 
+        // The review planning memory on `tasks` (CodeRabbit CR-2). Placed
+        // BEFORE the `task_approvers` early return below, and guarded on its
+        // own table, so neither half can skip the other.
+        for (const column of AGENT_REVIEW_PLAN_TASK_COLUMNS) {
+            // Re-read every time: on sqlite an addColumn rebuilds the table.
+            const tasks = await queryRunner.getTable('tasks');
+            if (tasks && !tasks.findColumnByName(column.name)) {
+                await queryRunner.addColumn('tasks', new TableColumn({ ...column }));
+            }
+        }
+
         const approvers = await queryRunner.getTable('task_approvers');
         if (!approvers) return;
         if (!approvers.findColumnByName('decidedVia')) {
@@ -256,6 +300,12 @@ export class AddTaskAgentReviews1790300000000 implements MigrationInterface {
     public async down(queryRunner: QueryRunner): Promise<void> {
         // Columns first, newest-added first, re-reading between drops for
         // the same sqlite table-rebuild reason as `up()`.
+        for (const column of [...AGENT_REVIEW_PLAN_TASK_COLUMNS].reverse()) {
+            const tasks = await queryRunner.getTable('tasks');
+            if (tasks?.findColumnByName(column.name)) {
+                await queryRunner.dropColumn('tasks', column.name);
+            }
+        }
         for (const column of ['decidedHeadSha', 'decidedByRunId', 'decidedVia']) {
             const approvers = await queryRunner.getTable('task_approvers');
             if (approvers?.findColumnByName(column)) {

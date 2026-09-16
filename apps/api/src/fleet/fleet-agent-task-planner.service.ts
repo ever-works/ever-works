@@ -382,11 +382,17 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
      * matters if G9 is ever relaxed for nodes that can enforce a scope,
      * because a verdict still cannot be recorded on a node.
      *
-     * Fails closed: an unbound run repository or an unreadable row refuses
-     * the dispatch rather than guessing that it is not a review. No run id
-     * means no pre-created run row, which a review dispatch never produces
-     * (`TaskTransitionService.dispatchAgentRun` refuses to bind a review
-     * without one).
+     * Fails closed: an unbound run repository, an unreadable row, or a run
+     * id whose row does not exist refuses the dispatch rather than guessing
+     * that it is not a review. A missing row is not evidence of an ordinary
+     * run: it is a run scope that cannot be verified at all, and behind a
+     * guard that admitted the payload nothing else would stop it reaching
+     * {@link plan}. No run id means no pre-created run row, which a review
+     * dispatch never produces (`TaskTransitionService.dispatchAgentRun`
+     * refuses to bind a review without one), so that payload is not a
+     * review and passes. The reasons here deliberately never carry the G9
+     * `fleet-delegation-scope-` prefix: they are this rule's refusals, not
+     * the delegation-scope guard's.
      */
     async refuseAgentReviewRun(payload: AgentTaskExecuteDispatchPayload): Promise<void> {
         if (!payload.runId) return;
@@ -405,7 +411,12 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 }`,
             );
         }
-        if (run && isAgentReviewRunScope(run.delegationScope)) {
+        if (!run) {
+            throw new FleetAgentTaskPlanError(
+                `Run ${payload.runId} was not found before routing to the fleet — refusing rather than risk dispatching an agent review run a fleet node cannot complete`,
+            );
+        }
+        if (isAgentReviewRunScope(run.delegationScope)) {
             throw new FleetAgentTaskPlanError(
                 `Run ${payload.runId} is an agent code-review run, and review runs cannot execute on the fleet: a fleet node has no channel to record the reviewer's verdict. Route this Work's agent runs to the platform runtime to use agent reviewers.`,
             );

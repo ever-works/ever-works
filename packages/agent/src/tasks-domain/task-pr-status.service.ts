@@ -454,6 +454,37 @@ export class TaskPrStatusService {
                         }`,
                     );
                 });
+            } else if (
+                // CodeRabbit CR-2 — the head did NOT move, and this is still
+                // the one place that visits every open-PR Task on a schedule
+                // (the two-minute sweep; the on-demand refresh too). Planning
+                // that never happened — a process killed between persisting
+                // `in_review` (or a head change) and planning, a transient
+                // provider failure — is recovered here instead of stalling
+                // until the next push. `reconcileAgentReviews` is bounded by
+                // the plan memory on the Task row: a steady-state Task costs
+                // two ledger reads, a deterministically refused head costs no
+                // provider call ever again, and a transient failure is retried
+                // with capped backoff. Fire-and-forget, never a refresh failure.
+                //
+                // Only while the pull request THIS read reports is still open
+                // (or draft): planning refuses a merged or closed one
+                // (`pr-closed`) only after a Work read and a provider read of
+                // its own, so reconciling the refresh that first sees the
+                // merge would buy exactly that — and nothing else.
+                task.status === TaskStatus.IN_REVIEW &&
+                (patch.prState === 'open' || patch.prState === 'draft') &&
+                patch.prHeadSha &&
+                patch.prHeadSha === previousPrHead &&
+                typeof this.transitions?.reconcileAgentReviews === 'function'
+            ) {
+                void this.transitions.reconcileAgentReviews(task).catch((error: unknown) => {
+                    this.logger.warn(
+                        `Task ${task.id}: agent review reconcile threw after a PR status refresh: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                });
             }
 
             // Release promotion lane (slice AI) — runs BEFORE the merge
