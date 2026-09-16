@@ -267,6 +267,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.SHARED_VIEW_REGENERATED]: 'system',
     [ActivityActionType.SHARED_VIEW_SECTIONS_CHANGED]: 'system',
     [ActivityActionType.SHARED_VIEW_INDEXING_CHANGED]: 'system',
+
+    // Knowledge library — shelf curation (filing, archive, export) and shared-folder rename.
+    [ActivityActionType.KB_DOCUMENT_ARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_UNARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_FILED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_EXPORTED]: 'work',
+    [ActivityActionType.MEMORY_FOLDER_RENAMED]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */
