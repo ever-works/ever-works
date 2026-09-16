@@ -9,7 +9,12 @@ import {
     MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { TOOL_GRANT_PATTERN, type ToolGrantScope } from '@ever-works/contracts';
+import {
+    CONNECTION_SCOPE_PRESET_ORDER,
+    TOOL_GRANT_PATTERN,
+    type ConnectionScopePresetId,
+    type ToolGrantScope,
+} from '@ever-works/contracts';
 
 /** Upper bound on patterns per field — a grant list is a policy, not a database. */
 const MAX_PATTERNS = 200;
@@ -107,4 +112,45 @@ export class UpsertToolGrantDto {
     @IsString()
     @MaxLength(500)
     note?: string;
+}
+
+/** Plugin ids are slug-shaped; bound the path segment before it reaches the registry. */
+const PROVIDER_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
+
+/**
+ * Query for `GET /api/tool-grants/presets/state` (AW-15) — the access level
+ * one scope selects for one provider, and the level in effect there.
+ */
+export class ToolGrantPresetStateQueryDto {
+    @ApiProperty({
+        description: 'Plugin id of a provider that declares access levels, e.g. "github".',
+    })
+    @IsString()
+    @Matches(PROVIDER_ID_PATTERN)
+    providerId: string;
+
+    @ApiProperty({
+        enum: ['tenant', 'organization', 'work', 'agent'],
+        description: 'Which tool-grant scope to read.',
+    })
+    @IsIn(['tenant', 'organization', 'work', 'agent'])
+    scopeType: ToolGrantScope;
+
+    @ApiProperty({ description: 'Id of the scope entity. Must be owned/accessible by the caller.' })
+    @IsUUID()
+    scopeId: string;
+}
+
+/**
+ * Body for `PUT /api/tool-grants/presets` (AW-15) — choose a plain-English
+ * access level for one provider at one scope. Written as ordinary deny
+ * patterns on that scope's tool-grant row, so it can only ever narrow.
+ */
+export class ApplyToolGrantPresetDto extends ToolGrantPresetStateQueryDto {
+    @ApiProperty({
+        enum: [...CONNECTION_SCOPE_PRESET_ORDER],
+        description: '"read" (Read only) or "write" (Read and write).',
+    })
+    @IsIn([...CONNECTION_SCOPE_PRESET_ORDER])
+    preset: ConnectionScopePresetId;
 }

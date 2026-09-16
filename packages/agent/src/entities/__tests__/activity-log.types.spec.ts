@@ -98,6 +98,8 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Agent computers — one row per stretch of control of an Agent's machine.
+            ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -159,7 +161,7 @@ describe('activity-log.types', () => {
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
             //
-            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // 🛑 161 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -172,10 +174,14 @@ describe('activity-log.types', () => {
             // +3 agent_run_started / agent_run_completed / agent_run_failed
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
             //    on develop's base.
-            // 168 after the model-accounts branch merged develop's Live Feed
-            //    work — COUNTED from the merged enum (157 + 8 + 3), not taken
-            //    from either side's total.
-            expect(literals).toHaveLength(168);
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop's base.
+            // 169 after the model-accounts branch merged develop's Live Feed
+            //    and Agent-computers work — COUNTED from the merged enum
+            //    (160 shared base + 8 model_* from this branch + 3
+            //    agent_run_* + 1 agent_computer_controlled from develop), not
+            //    taken from either side's total.
+            expect(literals).toHaveLength(169);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

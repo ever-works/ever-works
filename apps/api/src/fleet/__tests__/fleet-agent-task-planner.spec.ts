@@ -13,7 +13,12 @@ import {
 import {
     FleetAgentTaskPlanError,
     FleetAgentTaskPlannerService,
+    FleetDelegationScopeRefusedError,
 } from '../fleet-agent-task-planner.service';
+import {
+    FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+    FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
+} from '../fleet-delegation-scope';
 
 /**
  * Both shipped providers CAN be granted an additional writable root
@@ -1485,5 +1490,207 @@ describe('FleetAgentTaskPlannerService — Nest wiring (review follow-up)', () =
         const service = moduleRef.get(FleetAgentTaskPlannerService);
         expect((await service.resolveSettings(USER)).maxBudgetUsd).toBe(500);
         expect(pluginSettings.getResolvedSettings).toHaveBeenCalled();
+    });
+});
+
+/**
+ * Judgment layer G9 on the fleet — a delegated run whose admission scope
+ * narrows the tool surface is refused before any fleet job is built for it,
+ * because no node can enforce the scope; and a run whose row cannot be read
+ * is refused too, because an unknown scope is never assumed unrestricted.
+ *
+ * What these pin:
+ *
+ *   - the refusal is a PLAN error (so every caller records it the same way),
+ *     carries its own name and `fleet-delegation-scope-…` code, and names the
+ *     narrowed dimensions and the reason the fleet cannot honour them;
+ *   - it reads the run ROW by `runId` and nothing about the execution mode,
+ *     so `command` and `model-cli` tenants are refused alike;
+ *   - a readable row whose scope is `null` or restricts nothing passes, with
+ *     no other read;
+ *   - every way the row can be unreadable fails CLOSED.
+ */
+describe('FleetAgentTaskPlannerService.refuseUnenforceableDelegationScope (G9)', () => {
+    const originalEnv = process.env;
+    let runs: { findById: jest.Mock };
+    let tasks: { findById: jest.Mock };
+    let pluginSettings: { getResolvedSettings: jest.Mock };
+
+    const row = (over: Record<string, unknown> = {}) => ({
+        id: 'run-1',
+        userId: USER,
+        delegationScope: null,
+        ...over,
+    });
+
+    const build = (opts: { runs?: boolean } = {}) =>
+        new FleetAgentTaskPlannerService(
+            tasks as never,
+            { findByIdAndUser: jest.fn() } as never,
+            { findById: jest.fn() } as never,
+            {
+                describeFleetWorkspace: jest.fn(),
+                resolveFleetRunEnvGrants: jest.fn(),
+                readFleetRepoDeclaredCommands: jest.fn(),
+            } as never,
+            undefined,
+            undefined,
+            pluginSettings as never,
+            opts.runs === false ? undefined : (runs as never),
+        );
+
+    beforeEach(() => {
+        process.env = { ...originalEnv };
+        for (const key of Object.keys(process.env)) {
+            if (key.startsWith('FLEET_NODE_AGENT_EXECUTION_')) delete process.env[key];
+        }
+        runs = { findById: jest.fn().mockResolvedValue(row()) };
+        tasks = { findById: jest.fn().mockResolvedValue(task()) };
+        pluginSettings = { getResolvedSettings: jest.fn().mockResolvedValue({}) };
+    });
+
+    afterAll(() => {
+        process.env = originalEnv;
+    });
+
+    it('is implemented by the production planner the TasksModule wires into the dispatcher', () => {
+        // The port method is optional for planner doubles; the real planner
+        // must never be the one that silently lacks it.
+        expect(
+            typeof FleetAgentTaskPlannerService.prototype.refuseUnenforceableDelegationScope,
+        ).toBe('function');
+    });
+
+    it('refuses a delegated run whose scope narrows the tool surface, naming the scope and the rule', async () => {
+        runs.findById.mockResolvedValue(
+            row({ delegationScope: { allowedTools: ['readFile'], networkAccess: false } }),
+        );
+
+        const refusal = await build()
+            .refuseUnenforceableDelegationScope(payload)
+            .then(
+                () => null,
+                (err: unknown) => err,
+            );
+
+        expect(runs.findById).toHaveBeenCalledWith('run-1');
+        expect(refusal).toBeInstanceOf(FleetDelegationScopeRefusedError);
+        // A plan error by inheritance: the dispatcher, the transition service,
+        // the drain and resume all already record one on the run row.
+        expect(refusal).toBeInstanceOf(FleetAgentTaskPlanError);
+        const error = refusal as FleetDelegationScopeRefusedError;
+        expect(error.name).toBe('FleetDelegationScopeRefusedError');
+        expect(error.code).toBe(FLEET_DELEGATION_SCOPE_UNENFORCEABLE);
+        expect(
+            error.message.startsWith(`${FLEET_DELEGATION_SCOPE_UNENFORCEABLE}: run run-1 `),
+        ).toBe(true);
+        expect(error.message).toContain('allowedTools [readFile]; networkAccess off');
+        expect(error.message).toContain('no fleet node can enforce a delegation scope');
+        expect(error.message).toContain('platform runtime');
+    });
+
+    it.each(['command', 'model-cli'])(
+        'refuses in %s mode alike, reading neither settings nor the Task',
+        async (mode) => {
+            // The mode is the instance default `resolveSettings` would read
+            // (no plugin-settings override is stubbed), so a refusal that
+            // consulted the mode and stood down outside `model-cli` turns the
+            // `command` case red. Whether the DISPATCHER asks in both modes
+            // is pinned separately, through the real dispatcher, in
+            // fleet-agent-task-delegation-scope-dispatch.spec.ts.
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = mode;
+            runs.findById.mockResolvedValue(
+                row({ delegationScope: { allowedTools: ['readFile'] } }),
+            );
+
+            await expect(build().refuseUnenforceableDelegationScope(payload)).rejects.toThrow(
+                FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+            );
+            expect(pluginSettings.getResolvedSettings).not.toHaveBeenCalled();
+            expect(tasks.findById).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each<[string, unknown]>([
+        ['an empty tool list', { allowedTools: [] }],
+        ['allowedPaths on a wildcard scope', { allowedTools: ['*'], allowedPaths: ['src'] }],
+        ['an empty allowedPaths on a wildcard scope', { allowedTools: ['*'], allowedPaths: [] }],
+        ['networkAccess off on a wildcard scope', { allowedTools: ['*'], networkAccess: false }],
+        ['the future reviewer scope (slice AD)', { allowedTools: ['submitTaskReview'] }],
+        ['an unparseable scope string', '{"allowedTools":["*"'],
+    ])('refuses %s', async (_label, delegationScope) => {
+        runs.findById.mockResolvedValue(row({ delegationScope }));
+
+        await expect(build().refuseUnenforceableDelegationScope(payload)).rejects.toMatchObject({
+            code: FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
+        });
+    });
+
+    it.each<[string, Record<string, unknown>]>([
+        ['a non-delegated run (null scope)', { delegationScope: null }],
+        ['a row with no scope key at all', { delegationScope: undefined }],
+        ["the wildcard ['*']", { delegationScope: { allowedTools: ['*'] } }],
+        [
+            'a wildcard among names with network on',
+            { delegationScope: { allowedTools: ['*', 'readFile'], networkAccess: true } },
+        ],
+        [
+            'an unrestricted scope stored as a JSON string',
+            { delegationScope: '{"allowedTools":["*"]}' },
+        ],
+    ])('lets %s through, with no other read', async (_label, over) => {
+        runs.findById.mockResolvedValue(row(over));
+
+        await expect(build().refuseUnenforceableDelegationScope(payload)).resolves.toBeUndefined();
+        expect(runs.findById).toHaveBeenCalledTimes(1);
+        expect(pluginSettings.getResolvedSettings).not.toHaveBeenCalled();
+        expect(tasks.findById).not.toHaveBeenCalled();
+    });
+
+    describe('fails closed when the run row cannot be read', () => {
+        const expectUnverifiable = async (
+            planner: FleetAgentTaskPlannerService,
+            input: Omit<typeof payload, 'runId'> & { runId?: string },
+            reason: string,
+        ) => {
+            const refusal = await planner.refuseUnenforceableDelegationScope(input as never).then(
+                () => null,
+                (err: unknown) => err,
+            );
+            expect(refusal).toBeInstanceOf(FleetDelegationScopeRefusedError);
+            const error = refusal as FleetDelegationScopeRefusedError;
+            expect(error.code).toBe(FLEET_DELEGATION_SCOPE_UNVERIFIABLE);
+            expect(error.message.startsWith(`${FLEET_DELEGATION_SCOPE_UNVERIFIABLE}: `)).toBe(true);
+            expect(error.message).toContain(reason);
+            expect(error.message).toContain('never assumed to be unrestricted');
+        };
+
+        it('refuses a dispatch that carries no run id, without reading anything', async () => {
+            await expectUnverifiable(
+                build(),
+                { ...payload, runId: undefined },
+                'carries no run id',
+            );
+            expect(runs.findById).not.toHaveBeenCalled();
+        });
+
+        it('refuses when no run repository is bound', async () => {
+            await expectUnverifiable(build({ runs: false }), payload, 'no run repository');
+        });
+
+        it('refuses when the read throws, carrying the cause', async () => {
+            runs.findById.mockRejectedValue(new SyntaxError('Unexpected token } in JSON'));
+            await expectUnverifiable(build(), payload, 'Unexpected token } in JSON');
+        });
+
+        it('refuses when the run row does not exist', async () => {
+            runs.findById.mockResolvedValue(null);
+            await expectUnverifiable(build(), payload, 'does not exist');
+        });
+
+        it("refuses when the row belongs to someone other than the dispatch's owner", async () => {
+            runs.findById.mockResolvedValue(row({ userId: 'someone-else' }));
+            await expectUnverifiable(build(), payload, 'different owner');
+        });
     });
 });

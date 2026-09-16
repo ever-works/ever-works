@@ -65,6 +65,17 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
     let router: FleetRunRouterService;
     let dispatcher: AgentTaskExecuteDispatcher;
 
+    // Judgment layer G9 — the fleet-aware dispatcher now REFUSES every
+    // fleet-bound run when no delegation-scope guard is wired (fail closed;
+    // before G9 there was no guard to wire). This suite is about the producer
+    // wiring, not delegation, so it wires the answer the production guard
+    // gives these non-delegated runs (a `null` scope on the row): admit. No
+    // planner is wired, so every fleet run here is still the legacy command
+    // job, exactly as the assertions below pin.
+    const delegationScopeGuard = {
+        refuseUnenforceableDelegationScope: jest.fn(async () => undefined),
+    };
+
     const buildRouter = (overlay?: {
         findOne: jest.Mock;
     }): { router: FleetRunRouterService; factory: NodeDispatcherFactory } => {
@@ -138,7 +149,9 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
         };
         delegate = { enqueue: jest.fn().mockResolvedValue({ runId: 'trigger-run-1' }) };
         router = buildRouter().router;
-        dispatcher = createFleetAwareAgentTaskExecuteDispatcher(delegate, router);
+        dispatcher = createFleetAwareAgentTaskExecuteDispatcher(delegate, router, {
+            delegationScopeGuard,
+        });
     });
 
     afterAll(() => {
@@ -261,7 +274,9 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
             }),
         };
         router = buildRouter(overlay).router;
-        dispatcher = createFleetAwareAgentTaskExecuteDispatcher(delegate, router);
+        dispatcher = createFleetAwareAgentTaskExecuteDispatcher(delegate, router, {
+            delegationScopeGuard,
+        });
 
         await buildTransition().dispatchAgentRun(buildTask({ tenantId: 'tenant-1' }), 'agent-1');
 

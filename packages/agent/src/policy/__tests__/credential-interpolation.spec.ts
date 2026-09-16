@@ -112,6 +112,107 @@ describe('redactCredentialValues', () => {
         const value = { a: 'b' };
         expect(redactCredentialValues(value, new Map())).toBe(value);
     });
+
+    /** `{ a: { a: … { leaf } } }`, `levels` objects deep. */
+    function nest(levels: number, leaf: Record<string, unknown>): Record<string, unknown> {
+        let node: Record<string, unknown> = leaf;
+        for (let i = 0; i < levels; i++) node = { a: node };
+        return node;
+    }
+
+    describe("the default 'text' mode keeps its behavior", () => {
+        it('keeps object keys and a string that is exactly a short value', () => {
+            const credentials = new Map([
+                ['long', 'abcdefgh12345'],
+                ['short', 'pin42'],
+            ]);
+            const result = redactCredentialValues(
+                { abcdefgh12345: 'x', code: 'pin42' },
+                credentials,
+            ) as Record<string, unknown>;
+            expect(Object.keys(result)).toEqual(['abcdefgh12345', 'code']);
+            expect(result.code).toBe('pin42');
+        });
+    });
+
+    describe("'credential' mode", () => {
+        const SECRET = 'resolved-vault-value-9f8e7d6c';
+        const credentials = new Map([['docs_token', SECRET]]);
+        const token = credentialRedactionToken('docs_token');
+
+        it('scrubs a value reflected in an object key', () => {
+            const result = redactCredentialValues(
+                { properties: { [SECRET]: { type: 'string' }, [`x-${SECRET}`]: 1 } },
+                credentials,
+                { mode: 'credential' },
+            );
+            expect(JSON.stringify(result)).not.toContain(SECRET);
+            expect(Object.keys(result.properties as object)).toEqual([token, `x-${token}`]);
+        });
+
+        it('redacts a string or key that is exactly a short value, but not ordinary text around it', () => {
+            const short = new Map([['pin', 'cat']]);
+            const result = redactCredentialValues(
+                { value: 'cat', cat: true, text: 'about the cat' },
+                short,
+                { mode: 'credential' },
+            ) as Record<string, unknown>;
+            expect(result.value).toBe(credentialRedactionToken('pin'));
+            expect(result[credentialRedactionToken('pin')]).toBe(true);
+            expect(result.cat).toBeUndefined();
+            expect(result.text).toBe('about the cat');
+        });
+
+        it('scrubs content nested deeper than the text-mode walk limit', () => {
+            const input = nest(20, { description: `Bearer ${SECRET}`, [SECRET]: 'k' });
+            const result = redactCredentialValues(input, credentials, { mode: 'credential' });
+            expect(JSON.stringify(result)).not.toContain(SECRET);
+            expect(JSON.stringify(result)).toContain(`Bearer ${token}`);
+        });
+
+        it('fails closed past the rebuild depth: a subtree carrying a value is replaced whole', () => {
+            const input = nest(500, { description: `Bearer ${SECRET}` });
+            const result = redactCredentialValues(input, credentials, { mode: 'credential' });
+
+            let node: unknown = result;
+            let depth = 0;
+            while (node && typeof node === 'object') {
+                node = (node as Record<string, unknown>).a;
+                depth++;
+            }
+            expect(node).toBe(token);
+            expect(depth).toBeGreaterThan(8);
+            expect(depth).toBeLessThan(500);
+        });
+
+        it('passes a deep subtree through untouched when it carries no value', () => {
+            const deep = nest(500, { description: 'nothing to hide' });
+            const result = redactCredentialValues(deep, credentials, { mode: 'credential' });
+
+            // The top levels are rebuilt; below the rebuild depth the very
+            // same objects are handed back.
+            let original: unknown = deep;
+            let copy: unknown = result;
+            let depth = 0;
+            while (copy !== original && copy && typeof copy === 'object') {
+                copy = (copy as Record<string, unknown>).a;
+                original = (original as Record<string, unknown>).a;
+                depth++;
+            }
+            expect(copy).toBe(original);
+            expect(copy && typeof copy === 'object').toBe(true);
+            expect(depth).toBeGreaterThan(8);
+            expect(JSON.stringify(result)).toBe(JSON.stringify(deep));
+        });
+
+        it('terminates on a cyclic structure', () => {
+            const cyclic: Record<string, unknown> = { note: 'loop' };
+            cyclic.self = cyclic;
+            expect(() =>
+                redactCredentialValues(cyclic, credentials, { mode: 'credential' }),
+            ).not.toThrow();
+        });
+    });
 });
 
 describe('invalidCredentialKeys', () => {

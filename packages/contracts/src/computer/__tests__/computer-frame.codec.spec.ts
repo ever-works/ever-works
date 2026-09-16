@@ -61,6 +61,22 @@ describe('computer frame codec — round trip', () => {
 	});
 });
 
+describe('computer frame codec — pointer pressed buttons', () => {
+	it('carries the pressed-buttons bitmask of a drag, and 0 after the release', () => {
+		const drag = { kind: 'pointer', action: 'move', x: 40, y: 50, button: null, buttons: 1 } as const;
+		const release = { kind: 'pointer', action: 'up', x: 41, y: 50, button: 'left', buttons: 0 } as const;
+		for (const frame of [drag, release]) {
+			expect(decodeComputerFrame(encodeComputerFrame(frame) as string)).toEqual(frame);
+		}
+	});
+
+	it('leaves a pointer without pressed buttons exactly as it was', () => {
+		const decoded = decodeComputerFrame(JSON.stringify(VALID.pointer));
+		expect(decoded).toEqual(VALID.pointer);
+		expect(decoded && Object.prototype.hasOwnProperty.call(decoded, 'buttons')).toBe(false);
+	});
+});
+
 describe('computer frame codec — refusals (null, never throw)', () => {
 	it.each([
 		['invalid JSON', '{not json'],
@@ -76,6 +92,10 @@ describe('computer frame codec — refusals (null, never throw)', () => {
 		['an unknown close reason', JSON.stringify({ kind: 'end', reason: 'bored' })],
 		['a token with whitespace', JSON.stringify({ kind: 'auth', token: 'a b' })],
 		['a pointer off the picture', JSON.stringify({ ...VALID.pointer, x: 99_999 })],
+		['pressed buttons outside the bitmask', JSON.stringify({ ...VALID.pointer, buttons: 32 })],
+		['negative pressed buttons', JSON.stringify({ ...VALID.pointer, buttons: -1 })],
+		['fractional pressed buttons', JSON.stringify({ ...VALID.pointer, buttons: 1.5 })],
+		['pressed buttons as a string', JSON.stringify({ ...VALID.pointer, buttons: '1' })],
 		['modifiers outside the bitmask', JSON.stringify({ ...VALID.key, modifiers: 16 })],
 		['a control character in a key name', JSON.stringify({ ...VALID.key, key: String.fromCharCode(97, 0) })],
 		['empty text', JSON.stringify({ kind: 'text', text: '' })],

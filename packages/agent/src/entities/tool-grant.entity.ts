@@ -6,7 +6,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import type { ToolGrantScope } from '@ever-works/contracts';
+import type { ConnectionScopePresetOwnership, ToolGrantScope } from '@ever-works/contracts';
 
 /**
  * Tool-grant matrix (audit item G4) — one stored grant row for ONE scope.
@@ -87,6 +87,21 @@ export class ToolGrant {
     /** Optional operator note — why this grant exists. Never a secret. */
     @Column({ type: 'text', nullable: true })
     note?: string | null;
+
+    /**
+     * AW-15 — which `deny` patterns the access-level control ("Read only" /
+     * "Read and write") itself added on this row, per provider, and the level
+     * chosen there. NULL = the control never touched this row.
+     *
+     * Recorded, never inferred: a pattern that was already in `deny` when the
+     * control first touched the row belongs to the operator, and no level
+     * change ever removes it. Every write that does not come from the control
+     * prunes this record to patterns still in `deny`
+     * (`ToolGrantRepository.upsert`). `decideToolGrant` never reads it —
+     * `allow` / `deny` stay the only inputs to a decision.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    presetOwnership?: ConnectionScopePresetOwnership | null;
 
     // Tier A/C scope columns — auto-stamped by ScopeStampingSubscriber.
     // No @ManyToOne: known entities import cycle (user.entity.ts, EW-654).

@@ -191,7 +191,7 @@ export class OrganizationsController {
     @ApiOperation({
         summary: 'Update Organization fields',
         description:
-            'Partial update of `displayName`, `legalName`, `countryCode`, `vision`. `vision` omitted = unchanged; explicit null clears it; any present vision value bumps `visionUpdatedAt`.',
+            'Partial update of `displayName`, `legalName`, `countryCode`, `vision`, `mergePolicy` and `connectionPolicy`. `vision` omitted = unchanged; explicit null clears it; any present vision value bumps `visionUpdatedAt`. `connectionPolicy: { requireHttpsForCredentials: true }` opts the organization into refusing connection credentials over plain http.',
     })
     async update(
         @Req() req: { user: { userId: string } },
@@ -244,6 +244,8 @@ export class OrganizationsController {
             // reset-to-inherit. The EFFECTIVE policy comes from
             // `GET /api/merge-policy/resolve`, never from this field.
             mergePolicy: org.mergePolicy ?? null,
+            // AW-15 — stored connection safety settings (null = defaults).
+            connectionPolicy: org.connectionPolicy ?? null,
             createdAt: org.createdAt.toISOString(),
             updatedAt: org.updatedAt.toISOString(),
         };

@@ -141,6 +141,13 @@ describe('dispatchAgentRun under the global stop flag (EW-778)', () => {
     it('dispatches onto the fleet as before while the flag is clear', async () => {
         const dispatcher = createFleetAwareAgentTaskExecuteDispatcher(delegate, buildRouter(), {
             killSwitch,
+            // Judgment layer G9 — a fleet-bound run is refused when no
+            // delegation-scope guard is wired (fail closed). This case is
+            // about the stop flag, so it wires the answer the production
+            // guard gives a non-delegated run: admit.
+            delegationScopeGuard: {
+                refuseUnenforceableDelegationScope: jest.fn(async () => undefined),
+            },
         });
 
         const result = await buildTransition(dispatcher).dispatchAgentRun(buildTask(), 'agent-1');
