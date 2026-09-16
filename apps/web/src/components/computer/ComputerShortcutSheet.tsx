@@ -9,12 +9,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { blockedShortcutLabels } from './computer-session.shared';
 
-/** The keys a watching owner has. Take-over and teach keys arrive with those features. */
+/** The keys an owner has on a live view. Teach keys arrive with that feature. */
 const SHORTCUTS: ReadonlyArray<{
     keys: string;
-    label: 'refresh' | 'quality' | 'channel' | 'node' | 'sheet';
+    label: 'takeOver' | 'giveBack' | 'refresh' | 'quality' | 'channel' | 'node' | 'sheet';
 }> = [
+    { keys: 'T', label: 'takeOver' },
+    { keys: 'Esc Esc', label: 'giveBack' },
     { keys: 'R', label: 'refresh' },
     { keys: 'Q', label: 'quality' },
     { keys: 'C', label: 'channel' },
@@ -53,6 +56,15 @@ export function ComputerShortcutSheet({
                         </div>
                     ))}
                 </dl>
+                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                    {t('footnote')}
+                </p>
+                <p
+                    data-testid="computer-shortcuts-not-forwarded"
+                    className="text-xs text-text-secondary dark:text-text-secondary-dark"
+                >
+                    {t('notForwarded', { keys: blockedShortcutLabels().join(', ') })}
+                </p>
                 <DialogFooter>
                     <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
                         {t('close')}

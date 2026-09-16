@@ -6,7 +6,13 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
-import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { config } from '../config';
+import {
+    AgentRunRepository,
+    ResumeClaimLostError,
+    type ResumeSuccessorSnapshot,
+    type RunResumeClaim,
+} from '../database/repositories/agent-run.repository';
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 import type { AgentRun } from '../entities/agent-run.entity';
 import {
@@ -363,11 +369,7 @@ export class RunSteeringService implements RunSteeringPort {
                 ? RunSteeringService.isAutoResumable(run)
                 : RunSteeringService.isResumable(run);
         if (!resumable) {
-            throw new ConflictException(
-                `AgentRun ${runId} is not resumable — resume applies to runs awaiting input or ` +
-                    `ended with reason '${RESUMABLE_ENDED_REASONS.join("' / '")}' ` +
-                    `(status=${run.status}, endedReason=${run.terminalEndedReason ?? 'none'}).`,
-            );
+            throw this.notResumable(run);
         }
         if (!run.taskId) {
             // The only dispatch path a resumed run can take today is
@@ -378,118 +380,212 @@ export class RunSteeringService implements RunSteeringPort {
             );
         }
 
-        // Same concurrency choke point as every other dispatch path — and
-        // the row that consumes the admitted slot is created INSIDE it, so
-        // count + insert are one critical section (advisory-locked on
-        // Postgres, documented no-op elsewhere).
-        let created: AgentRun | undefined;
-        const reserve = async (verdict: {
-            admitted: boolean;
-            queuedReason?: string;
-        }): Promise<void> => {
-            created = await this.runs.createQueued({
-                agentId: run.agentId,
-                userId,
-                triggerKind: 'task',
-                taskId: run.taskId!,
-                workId: run.workId ?? null,
-                tenantId: run.tenantId ?? null,
-                organizationId: run.organizationId ?? null,
-                runnerKind: run.runnerKind ?? null,
-                queuedReason: verdict.admitted ? null : (verdict.queuedReason ?? null),
-                // Streaming terminal — the conversation lifetime survives
-                // the process lifetime, and so does the SHAPE of the
-                // session. A resumed persistent run still wants an
-                // interactive terminal, which is what the fan-out's
-                // `requirePersistent` gate reads.
-                persistent: run.persistent === true,
-            });
-        };
-        const admission: { admitted: boolean; queuedReason?: string } = this.dispatchGate
-            ? await this.dispatchGate.admit(
-                  {
-                      userId,
-                      workId: run.workId ?? null,
-                      organizationId: run.organizationId ?? null,
-                  },
-                  reserve,
-              )
-            : { admitted: true, queuedReason: undefined };
-        // Gate absent, or a gate stub that ignored the callback.
-        if (!created) await reserve(admission);
-        // Non-null from here: `reserve` either ran above or threw.
-        const next = created!;
-
-        // Orchestration M9 — rejection-feedback prepend. A run is most
-        // often resumed BECAUSE a human rejected its work, and until now
-        // the reason was lost: the reviewer's words lived on a PR or in a
-        // review row, and the resumed run started from nothing. Any
-        // durable rejections recorded for this Task since the last resume
-        // become the FIRST thing the new run reads, ahead of the caller's
-        // own message.
+        // Single-flight claim on the SOURCE run, taken after every cheap
+        // refusal above (a run that cannot be resumed is never claimed) and
+        // BEFORE anything is created. The check above is a read: two
+        // requests deciding different Inbox items on the same parked run —
+        // or a double submit, or an auto-resume racing a human — both pass
+        // it, and without this both went on to create a successor. The
+        // claim is one conditional UPDATE only one of them can win; it is
+        // compare-and-set against the claim token THIS request read, so a
+        // request that loaded the run before another resume claimed it
+        // loses even when that resume has already finished (the repository
+        // method explains why "unclaimed" alone is not enough).
         //
-        // Best-effort by contract: a resume must never fail because the
-        // feedback lookup hiccuped — the run still resumes, just without
-        // the prepend, which is exactly today's behavior.
-        const replayed = await this.claimRejectionFeedback(run.taskId, next.id);
-
-        // The conversation lifetime survives the process lifetime: hand the
-        // pipeline plugin its own resume id, and seed the first message so
-        // the resumed loop starts from the human's answer.
+        // The in-flight stamp is compared the same way: a request that
+        // loaded the run WHILE another resume held it loses once that
+        // resume has finished, instead of slipping in behind it.
         //
-        // Order matters: the rejection block goes FIRST so the agent reads
-        // "here is what was wrong" before "here is what to do about it".
-        const seeded = [
-            ...(replayed.message ? [replayed.message] : []),
-            ...(trimmed ? [trimmed] : []),
-        ];
-        await this.runs.seedResumeContext(next.id, {
-            cliSessionId: run.cliSessionId ?? null,
-            pendingInput: seeded.length > 0 ? seeded : null,
+        // The loser gets exactly the refusal a non-resumable run gets — to
+        // that request the run is no longer resumable, it just learned so
+        // after its read — so a double submit is a clean 409, not a second
+        // run. This covers `allowCompleted` too: a completed run has no
+        // `awaitingInput` to clear, so the claim is its only guard.
+        const claim = await this.runs.claimResume(run.id, {
+            observedToken: run.resumeClaimToken ?? null,
+            observedClaimedAt: run.resumeClaimedAt ?? null,
+            staleBefore: this.resumeClaimStaleBefore(),
         });
+        if (!claim) {
+            this.logger.log(
+                `Run ${run.id}: resume by user ${userId} refused — another resume claimed it first.`,
+            );
+            throw this.notResumable(run);
+        }
 
-        if (admission.admitted && this.dispatcher) {
-            try {
-                const handle = await this.dispatcher.enqueue({
+        // Winning the claim is not yet licence to create: an EARLIER resume
+        // may have left a successor behind without finishing — its process
+        // died after the enqueue, or its consume write failed — and then
+        // its claim expired (which is how this request could win) or was
+        // released. Reconcile that successor first; this throws when it
+        // means this resume must not go ahead.
+        await this.reconcileEarlierSuccessor(run, claim, userId);
+
+        // From the claim to a successful enqueue, ANY throw gives the claim
+        // back (see the catch below) so the owner can retry. A successor
+        // created on the way stays LINKED to the source through a release,
+        // so a retry reconciles it (see `reconcileEarlierSuccessor`) rather
+        // than trusting that the rollback beat any worker to it.
+        let created: AgentRun | undefined;
+        let rolledBack = false;
+        let admission: { admitted: boolean; queuedReason?: string };
+        let replayed: { message: string | null; count: number };
+        try {
+            // Same concurrency choke point as every other dispatch path — and
+            // the row that consumes the admitted slot is created INSIDE it, so
+            // count + insert are one critical section (advisory-locked on
+            // Postgres, documented no-op elsewhere).
+            const reserve = async (verdict: {
+                admitted: boolean;
+                queuedReason?: string;
+            }): Promise<void> => {
+                created = await this.runs.createQueued({
                     agentId: run.agentId,
                     userId,
-                    taskId: run.taskId,
-                    // Run-scoped so a double resume dedups at the runner and
-                    // cannot collide with the original run's fan-out key.
-                    dedupKey: `${run.taskId}:${run.agentId}:resume:${next.id}`,
-                    runId: next.id,
-                    // Scope carriers, mirroring
-                    // `TaskTransitionService.dispatchAgentRun` (self-build
-                    // slice Q): the fleet router resolves the TENANT's job
-                    // runtime from `tenantId` and falls back to the INSTANCE
-                    // default when it is absent — without these, a tenant
-                    // whose fleet selection lives in the tenant job-runtime
-                    // overlay would resume a parked fleet run onto the cloud.
-                    // Ignored by adapters that don't route per tenant.
+                    triggerKind: 'task',
+                    taskId: run.taskId!,
+                    workId: run.workId ?? null,
                     tenantId: run.tenantId ?? null,
                     organizationId: run.organizationId ?? null,
+                    runnerKind: run.runnerKind ?? null,
+                    queuedReason: verdict.admitted ? null : (verdict.queuedReason ?? null),
+                    // Streaming terminal — the conversation lifetime survives
+                    // the process lifetime, and so does the SHAPE of the
+                    // session. A resumed persistent run still wants an
+                    // interactive terminal, which is what the fan-out's
+                    // `requirePersistent` gate reads.
+                    persistent: run.persistent === true,
+                    // Inserted together with its link on the source, and
+                    // only while this claim is still held — a request whose
+                    // claim was taken over creates nothing.
+                    resumeClaim: claim,
                 });
-                if (handle?.runId) {
-                    await this.runs
-                        .setTriggerRunId(next.id, handle.runId)
-                        .catch((err) =>
-                            this.logger.warn(
-                                `Run ${next.id}: failed to stamp triggerRunId on resume: ${err}`,
-                            ),
-                        );
+            };
+            admission = this.dispatchGate
+                ? await this.dispatchGate.admit(
+                      {
+                          userId,
+                          workId: run.workId ?? null,
+                          organizationId: run.organizationId ?? null,
+                      },
+                      reserve,
+                  )
+                : { admitted: true, queuedReason: undefined };
+            // Gate absent, or a gate stub that ignored the callback.
+            if (!created) await reserve(admission);
+            // Non-null from here: `reserve` either ran above or threw.
+            const next = created!;
+
+            // Orchestration M9 — rejection-feedback prepend. A run is most
+            // often resumed BECAUSE a human rejected its work, and until now
+            // the reason was lost: the reviewer's words lived on a PR or in a
+            // review row, and the resumed run started from nothing. Any
+            // durable rejections recorded for this Task since the last resume
+            // become the FIRST thing the new run reads, ahead of the caller's
+            // own message.
+            //
+            // Best-effort by contract: a resume must never fail because the
+            // feedback lookup hiccuped — the run still resumes, just without
+            // the prepend, which is exactly today's behavior.
+            replayed = await this.claimRejectionFeedback(run.taskId, next.id);
+
+            // The conversation lifetime survives the process lifetime: hand the
+            // pipeline plugin its own resume id, and seed the first message so
+            // the resumed loop starts from the human's answer.
+            //
+            // Order matters: the rejection block goes FIRST so the agent reads
+            // "here is what was wrong" before "here is what to do about it".
+            const seeded = [
+                ...(replayed.message ? [replayed.message] : []),
+                ...(trimmed ? [trimmed] : []),
+            ];
+            await this.runs.seedResumeContext(next.id, {
+                cliSessionId: run.cliSessionId ?? null,
+                pendingInput: seeded.length > 0 ? seeded : null,
+            });
+
+            if (admission.admitted && this.dispatcher) {
+                try {
+                    const handle = await this.dispatcher.enqueue({
+                        agentId: run.agentId,
+                        userId,
+                        taskId: run.taskId,
+                        // Run-scoped so a double resume dedups at the runner and
+                        // cannot collide with the original run's fan-out key.
+                        dedupKey: `${run.taskId}:${run.agentId}:resume:${next.id}`,
+                        runId: next.id,
+                        // Scope carriers, mirroring
+                        // `TaskTransitionService.dispatchAgentRun` (self-build
+                        // slice Q): the fleet router resolves the TENANT's job
+                        // runtime from `tenantId` and falls back to the INSTANCE
+                        // default when it is absent — without these, a tenant
+                        // whose fleet selection lives in the tenant job-runtime
+                        // overlay would resume a parked fleet run onto the cloud.
+                        // Ignored by adapters that don't route per tenant.
+                        tenantId: run.tenantId ?? null,
+                        organizationId: run.organizationId ?? null,
+                    });
+                    if (handle?.runId) {
+                        await this.runs
+                            .setTriggerRunId(next.id, handle.runId)
+                            .catch((err) =>
+                                this.logger.warn(
+                                    `Run ${next.id}: failed to stamp triggerRunId on resume: ${err}`,
+                                ),
+                            );
+                    }
+                } catch (err) {
+                    const detail = err instanceof Error ? err.message : String(err);
+                    const notConfigured =
+                        err instanceof Error && err.name === 'JobRuntimeNotConfiguredError';
+                    const reason = notConfigured
+                        ? `${JOB_RUNTIME_NOT_CONFIGURED_REASON}: ${detail}`
+                        : `dispatch-failed: ${detail}`;
+                    this.logger.warn(`Run ${next.id}: resume enqueue failed: ${reason}`);
+                    await this.runs.markDispatchFailed(next.id, reason).catch(() => undefined);
+                    rolledBack = true;
+                    throw new ConflictException(`Resume could not be dispatched — ${reason}`);
                 }
-            } catch (err) {
-                const detail = err instanceof Error ? err.message : String(err);
-                const notConfigured =
-                    err instanceof Error && err.name === 'JobRuntimeNotConfiguredError';
-                const reason = notConfigured
-                    ? `${JOB_RUNTIME_NOT_CONFIGURED_REASON}: ${detail}`
-                    : `dispatch-failed: ${detail}`;
-                this.logger.warn(`Run ${next.id}: resume enqueue failed: ${reason}`);
-                await this.runs.markDispatchFailed(next.id, reason).catch(() => undefined);
-                throw new ConflictException(`Resume could not be dispatched — ${reason}`);
             }
+        } catch (err) {
+            // No successor will run, so the source goes back exactly as it
+            // was and the owner can retry. Two halves:
+            //
+            //  1. A successor row created before the throw (the seed failed)
+            //     is rolled back to `failed` like a failed enqueue already
+            //     is. Left `queued`, a row the gate had parked would later be
+            //     drained into a second, unseeded successor the moment the
+            //     owner's retry succeeds. QUEUED_ONLY-guarded, so it can
+            //     never stomp a run a worker already picked up.
+            //  2. The claim is released — token-guarded, so a claim that
+            //     expired and was taken over in the meantime is left alone.
+            //
+            // The enqueue catch above has already done (1) for its own
+            // failure; neither half may mask the original error.
+            //
+            // A lost claim is the exception: the successor's insert was
+            // rolled back with its link, and the claim belongs to whoever
+            // took it over — there is nothing to roll back or release, and
+            // to this request the run is simply no longer resumable.
+            if (err instanceof ResumeClaimLostError) {
+                this.logger.log(
+                    `Run ${run.id}: resume by user ${userId} refused — its claim was taken over before a successor was created.`,
+                );
+                throw this.notResumable(run);
+            }
+            if (created && !rolledBack) {
+                const detail = err instanceof Error ? err.message : String(err);
+                await this.runs
+                    .markDispatchFailed(
+                        created.id,
+                        `dispatch-failed: resume aborted before enqueue: ${detail}`,
+                    )
+                    .catch(() => undefined);
+            }
+            await this.releaseResumeClaim(claim);
+            throw err;
         }
+        const next = created!;
 
         // The source run is answered — it must stop showing up in the
         // needs-attention filter. Cleared ONLY here, once the successor is
@@ -503,8 +599,23 @@ export class RunSteeringService implements RunSteeringPort {
         // reopened would route 'none' on the next attempt and the owner's
         // answer could never reach a node. The catch above rethrows before
         // this line, so a failed enqueue keeps the source run parked.
-        if (run.awaitingInput) {
-            await this.runs.setAwaitingInput(run.id, false).catch(() => undefined);
+        //
+        // Then the claim is consumed — in THAT order. Consuming first would
+        // open a window in which a request loading the run fresh sees it
+        // unclaimed AND still awaiting input, and wins a second successor.
+        // Clearing `awaitingInput` first means such a request finds the run
+        // either still claimed or no longer awaiting; the kept token refuses
+        // every request that read the run earlier.
+        //
+        // If the clear itself failed, consuming would open exactly that
+        // window for good, so the claim is RELEASED instead: the successor
+        // stays linked, and the next resume reconciles it — refusing while
+        // it is live, finishing this bookkeeping once it has run — rather
+        // than creating a second one.
+        if (await this.clearAwaitingInput(run)) {
+            await this.consumeResumeClaim(claim);
+        } else {
+            await this.releaseResumeClaim(claim);
         }
 
         await this.stamp(next.id, userId, 'resume', {
@@ -559,6 +670,163 @@ export class RunSteeringService implements RunSteeringPort {
     }
 
     // ── internals ──────────────────────────────────────────────────
+
+    /**
+     * The refusal for a run that cannot be resumed — including one another
+     * request claimed first, which to the losing request is exactly that.
+     */
+    private notResumable(run: AgentRun): ConflictException {
+        return new ConflictException(
+            `AgentRun ${run.id} is not resumable — resume applies to runs awaiting input or ` +
+                `ended with reason '${RESUMABLE_ENDED_REASONS.join("' / '")}' ` +
+                `(status=${run.status}, endedReason=${run.terminalEndedReason ?? 'none'}).`,
+        );
+    }
+
+    /**
+     * Resume single-flight — a claim taken before this instant is treated as
+     * abandoned and may be taken over.
+     *
+     * Reuses the stuck-run sweeper's cutoff rather than inventing a second
+     * window, because the two describe the same failure. A process that died
+     * between claim and consume left either nothing, a `queued` successor
+     * that never dispatched (the sweeper reaps exactly that row at this same
+     * cutoff), or a successor that was dispatched and ran. Expiry alone
+     * cannot tell those apart, which is why the successor is linked on the
+     * source and the taker reconciles it before creating anything.
+     *
+     * The same two mechanisms fence a slow-but-alive holder whose claim
+     * expires under it: its insert is refused once the claim is taken (the
+     * link is token-guarded, inside the insert's transaction), and a
+     * successor it had already created is reconciled by the taker. Expiring
+     * too early therefore costs that slow resume a 409, not a duplicate;
+     * expiring too late only delays a retry after a crash that is already
+     * rare.
+     */
+    private resumeClaimStaleBefore(): Date {
+        return new Date(Date.now() - config.agents.getRunStuckSweepMinutes() * 60_000);
+    }
+
+    /**
+     * Resume single-flight — reconcile the successor an earlier, unfinished
+     * resume left linked on the source run, before this resume creates its
+     * own. Returns when this resume may go ahead; otherwise settles the claim
+     * it holds and throws the not-resumable refusal.
+     *
+     * Only a successor whose claim was never CONSUMED is linked, so whatever
+     * is found here is an attempt that did not finish its bookkeeping — a
+     * process that died after the create or the enqueue, or a consume (or
+     * `awaitingInput` clear) that failed after the successor was dispatched:
+     *
+     *  - **never ran** (`failed` without ever starting — the enqueue was
+     *    rolled back, or the sweeper reaped an orphan that was never
+     *    dispatched): nothing answered the source, so this resume goes ahead.
+     *  - **still live** (`queued` / `running`): it may yet run — a gate-parked
+     *    row is drained later, an enqueued one is picked up by a worker — so
+     *    creating another would be the duplicate. Refuse, and release the
+     *    claim so the next attempt reconciles again as soon as that row
+     *    settles. `awaitingInput` is left alone: if the row turns out to be
+     *    an orphan the sweeper reaps, the question must still be answerable.
+     *  - **ran** (anything else): the earlier resume took effect. Finish its
+     *    bookkeeping on its behalf — clear `awaitingInput`, consume the claim
+     *    — and refuse this one, exactly as it would have been refused had
+     *    that resume finished normally while this request was loading.
+     *
+     * A lookup that fails is treated as "cannot tell": the claim is released
+     * and the error propagates, so a retry decides again — never a guess
+     * that could create a second successor.
+     */
+    private async reconcileEarlierSuccessor(
+        run: AgentRun,
+        claim: RunResumeClaim,
+        userId: string,
+    ): Promise<void> {
+        let earlier: ResumeSuccessorSnapshot | null;
+        try {
+            earlier = await this.runs.findResumeSuccessor(run.id);
+        } catch (err) {
+            await this.releaseResumeClaim(claim);
+            throw err;
+        }
+        if (!earlier) return;
+        if (earlier.status === 'failed' && !earlier.startedAt) return;
+
+        if (RunSteeringService.isLive(earlier)) {
+            this.logger.log(
+                `Run ${run.id}: resume by user ${userId} refused — earlier successor ${earlier.id} is still ${earlier.status}.`,
+            );
+            await this.releaseResumeClaim(claim);
+            throw this.notResumable(run);
+        }
+
+        this.logger.warn(
+            `Run ${run.id}: earlier successor ${earlier.id} already ran (${earlier.status}) without its resume finishing — completing that resume and refusing the one by user ${userId}.`,
+        );
+        if (await this.clearAwaitingInput(run)) {
+            await this.consumeResumeClaim(claim);
+        } else {
+            await this.releaseResumeClaim(claim);
+        }
+        throw this.notResumable(run);
+    }
+
+    /**
+     * Mark the source run answered. Best-effort — a failure is logged and
+     * reported, never thrown — and a no-op when the run was not awaiting
+     * input. The caller decides what a failure means for its claim.
+     */
+    private async clearAwaitingInput(run: AgentRun): Promise<boolean> {
+        if (!run.awaitingInput) return true;
+        try {
+            await this.runs.setAwaitingInput(run.id, false);
+            return true;
+        } catch (err) {
+            this.logger.warn(`Run ${run.id}: failed to clear awaitingInput on resume: ${err}`);
+            return false;
+        }
+    }
+
+    /**
+     * Give a resume claim back after a failure. Best-effort by contract: the
+     * caller is already rethrowing the error that matters, and a claim that
+     * could not be released still expires on its own.
+     */
+    private async releaseResumeClaim(claim: RunResumeClaim): Promise<void> {
+        try {
+            const released = await this.runs.releaseResumeClaim(claim);
+            if (!released) {
+                this.logger.warn(
+                    `Run ${claim.runId}: resume claim was not released — it expired and was taken over.`,
+                );
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Run ${claim.runId}: failed to release resume claim (it expires on its own): ${err}`,
+            );
+        }
+    }
+
+    /**
+     * Mark a resume claim as spent once its successor exists. Best-effort for
+     * the same reason the `awaitingInput` clear beside it is: the resume has
+     * already dispatched. A claim this fails to consume stays in flight with
+     * its successor linked, so whoever takes it over after expiry reconciles
+     * that successor instead of creating a second one.
+     */
+    private async consumeResumeClaim(claim: RunResumeClaim): Promise<void> {
+        try {
+            const consumed = await this.runs.consumeResumeClaim(claim);
+            if (!consumed) {
+                this.logger.warn(
+                    `Run ${claim.runId}: resume claim expired and was taken over before this resume consumed it.`,
+                );
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Run ${claim.runId}: failed to consume resume claim (it expires on its own): ${err}`,
+            );
+        }
+    }
 
     /**
      * Orchestration M9 — read the Task's pending reviewer rejections,

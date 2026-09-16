@@ -245,6 +245,83 @@ describe('signup — the name field names itself (EW-074)', () => {
     });
 });
 
+describe('signup — arriving from checkout carries what Stripe collected', () => {
+    // ever.co/checkout/complete forwards the name and email the buyer typed into
+    // Stripe. The email is the address the subscription was created against, so
+    // it is locked; the name is a convenience and stays editable.
+    const PREFILL = { email: 'buyer@example.com', name: 'Jane Buyer' };
+
+    const nameInput = () =>
+        screen.getByLabelText(en.auth.register.form.name.label) as HTMLInputElement;
+    const emailInput = () =>
+        screen.getByLabelText(en.auth.register.form.email.label) as HTMLInputElement;
+
+    function renderPrefilled(prefill: { email?: string; name?: string } = PREFILL) {
+        return render(
+            <RegisterForm availableSocialProviders={[]} termsDocuments={TERMS} prefill={prefill} />,
+        );
+    }
+
+    it('control: with no prefill both fields start empty and the email is editable', () => {
+        renderForm();
+
+        expect(nameInput().value).toBe('');
+        expect(emailInput().value).toBe('');
+        expect(emailInput().readOnly).toBe(false);
+    });
+
+    it('fills in the name and email the buyer already gave Stripe', () => {
+        renderPrefilled();
+
+        expect(nameInput().value).toBe(PREFILL.name);
+        expect(emailInput().value).toBe(PREFILL.email);
+    });
+
+    it('locks the prefilled email — read-only, not disabled, so it is still submitted', () => {
+        renderPrefilled();
+
+        expect(emailInput().readOnly).toBe(true);
+        expect(emailInput().disabled).toBe(false);
+    });
+
+    it('keeps the prefilled name editable', () => {
+        renderPrefilled();
+
+        expect(nameInput().readOnly).toBe(false);
+        fireEvent.change(nameInput(), { target: { value: 'Jane Q. Buyer' } });
+        expect(nameInput().value).toBe('Jane Q. Buyer');
+    });
+
+    it('a name-only prefill leaves the email empty and editable', () => {
+        renderPrefilled({ name: PREFILL.name });
+
+        expect(nameInput().value).toBe(PREFILL.name);
+        expect(emailInput().value).toBe('');
+        expect(emailInput().readOnly).toBe(false);
+    });
+
+    it('the prefilled identity reaches the register action without being retyped', async () => {
+        renderPrefilled();
+
+        fireEvent.change(screen.getByLabelText(en.auth.register.form.password.label), {
+            target: { value: 'lowercase1' },
+        });
+        fireEvent.change(screen.getByLabelText(en.auth.register.form.confirmPassword.label), {
+            target: { value: 'lowercase1' },
+        });
+        fireEvent.click(screen.getByRole('checkbox'));
+        fireEvent.submit(
+            screen
+                .getByRole('button', { name: en.auth.register.form.submit })
+                .closest('form') as HTMLFormElement,
+        );
+
+        await waitFor(() => expect(registerActionMock).toHaveBeenCalledTimes(1));
+        expect(registerActionMock.mock.calls[0][0]).toBe(PREFILL.name);
+        expect(registerActionMock.mock.calls[0][1]).toBe(PREFILL.email);
+    });
+});
+
 describe('signup — an unloadable legal corpus explains itself (EW-075)', () => {
     it('control: with the documents loaded, no failure notice is shown', () => {
         renderForm();

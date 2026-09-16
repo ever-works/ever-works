@@ -245,3 +245,62 @@ describe('resolveNodeShell', () => {
 		expect(resolveNodeShell('linux', {}).command).toEqual(['/bin/sh']);
 	});
 });
+
+describe('openNodeLeg — a view someone can take control of', () => {
+	it('hands the view’s mode and the controller’s input to their own listeners, and nothing else', async () => {
+		let socket: WebSocketLike | null = null;
+		const factory = vi.fn(() => {
+			socket = {
+				readyState: 1,
+				onopen: null,
+				onmessage: null,
+				onerror: null,
+				onclose: null,
+				send: () => undefined,
+				close: vi.fn()
+			};
+			return socket;
+		});
+		const modes: string[] = [];
+		const inputs: string[] = [];
+		const requests: string[] = [];
+		const leg = openNodeLeg({
+			apiUrl: 'https://api.ever.works',
+			mintToken: async () => ({ token: 'worker-token', wsPath: `/ws/computer/${SESSION}` }),
+			factory,
+			onRequest: (frame) => requests.push(frame.kind),
+			onMode: (mode) => modes.push(mode),
+			onInput: (frame) => inputs.push(frame.kind)
+		});
+		await vi.waitFor(() => expect(socket).not.toBeNull());
+		const open = socket as unknown as WebSocketLike;
+		open.onopen?.({});
+
+		open.onmessage?.({ data: JSON.stringify({ kind: 'mode', mode: 'controlling' }) });
+		open.onmessage?.({ data: JSON.stringify({ kind: 'pointer', action: 'down', x: 1, y: 1, button: 'left' }) });
+		open.onmessage?.({
+			data: JSON.stringify({ kind: 'key', action: 'down', key: 'a', code: 'KeyA', modifiers: 0 })
+		});
+		open.onmessage?.({ data: JSON.stringify({ kind: 'text', text: 'hi' }) });
+		open.onmessage?.({ data: JSON.stringify({ kind: 'scroll', x: 1, y: 1, dx: 0, dy: 3 }) });
+		open.onmessage?.({ data: JSON.stringify({ kind: 'control', action: 'release' }) });
+		open.onmessage?.({
+			data: JSON.stringify({
+				kind: 'frame',
+				seq: 1,
+				keyframe: true,
+				width: 1,
+				height: 1,
+				mime: 'image/png',
+				data: 'QUJD'
+			})
+		});
+		open.onmessage?.({ data: JSON.stringify({ kind: 'mode', mode: 'watching' }) });
+		open.onmessage?.({ data: JSON.stringify({ kind: 'pointer', action: 'wiggle', x: 1, y: 1, button: 'left' }) });
+
+		expect(modes).toEqual(['controlling', 'watching']);
+		expect(inputs).toEqual(['pointer', 'key', 'text', 'scroll']);
+		expect(requests).toEqual([]);
+		leg.close();
+	});
+});

@@ -95,6 +95,8 @@ describe('activity-log.types', () => {
             ['SHARED_VIEW_REGENERATED', 'shared_view_regenerated'],
             ['SHARED_VIEW_SECTIONS_CHANGED', 'shared_view_sections_changed'],
             ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
+            // Agent computers — one row per stretch of control of an Agent's machine.
+            ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -156,7 +158,7 @@ describe('activity-log.types', () => {
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
             //
-            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // 🛑 161 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -167,7 +169,11 @@ describe('activity-log.types', () => {
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
             // +5 shared_view_enabled / _disabled / _regenerated /
             //    _sections_changed / _indexing_changed (Shared view, AW-18) -> 165.
-            expect(literals).toHaveLength(165);
+            // +1 agent_computer_controlled (Agent computers, take-over) — arrived
+            //    on develop while this branch was open -> 166 COUNTED from the
+            //    merged enum (this branch budgeted 165, develop was at 161; the
+            //    two additions are disjoint, so the merged total is 166).
+            expect(literals).toHaveLength(166);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
