@@ -159,6 +159,7 @@ import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
 import { MemoryFolder } from '../entities/memory-folder.entity';
+import { KnowledgeDocumentReaderState } from '../entities/knowledge-document-reader-state.entity';
 // Repository registry (Feature G)
 import { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
 import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-allowlist.entity';
@@ -407,6 +408,9 @@ export const ENTITIES = [
     Environment,
     // Memory Files — user-defined folders organizing uploads on /memory.
     MemoryFolder,
+    // Knowledge library — one row per (person, KB document): last read
+    // revision + pin. Written lazily on first open or pin.
+    KnowledgeDocumentReaderState,
     // Repository registry (Feature G) — account-level repo records plus
     // the Agent → repo grant edge rows.
     AgentPluginPackage,

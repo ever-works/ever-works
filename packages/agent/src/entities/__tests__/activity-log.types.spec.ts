@@ -87,6 +87,13 @@ describe('activity-log.types', () => {
             // Skills shelf — the workspace-level on/off switch.
             ['SKILL_ENABLED', 'skill_enabled'],
             ['SKILL_DISABLED', 'skill_disabled'],
+            // Knowledge library — shelf curation (filing, archive, export)
+            // and shared-folder rename.
+            ['KB_DOCUMENT_ARCHIVED', 'kb_document_archived'],
+            ['KB_DOCUMENT_UNARCHIVED', 'kb_document_unarchived'],
+            ['KB_DOCUMENT_FILED', 'kb_document_filed'],
+            ['KB_DOCUMENT_EXPORTED', 'kb_document_exported'],
+            ['MEMORY_FOLDER_RENAMED', 'memory_folder_renamed'],
             // Live Feed — a run starting / finishing / failing for every
             // trigger kind other than heartbeat.
             ['AGENT_RUN_STARTED', 'agent_run_started'],
@@ -155,8 +162,11 @@ describe('activity-log.types', () => {
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
             // +2 skill_enabled / skill_disabled (Skills shelf on/off switch) -> 159.
+            // +5 kb_document_archived / _unarchived / _filed / _exported and
+            //    memory_folder_renamed (Knowledge library shelf) -> 162 on
+            //    develop's own base.
             //
-            // 🛑 161 is COUNTED from the merged enum, never added up from the
+            // 🛑 168 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -173,7 +183,13 @@ describe('activity-log.types', () => {
             //    develop said 161 on its own base; merged with the Skills
             //    shelf branch's 162 this COUNTS to 163 from the merged enum,
             //    not from adding either side's number.
-            expect(literals).toHaveLength(163);
+            // Merging develop again (it had reached 166 by landing the
+            // Knowledge library shelf's +5 kb_document_archived /
+            // _unarchived / _filed / _exported / memory_folder_renamed)
+            // into this branch's 163 COUNTS to 168 from the merged enum —
+            // the two skill_* literals are this branch's only additions that
+            // develop does not already carry.
+            expect(literals).toHaveLength(168);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

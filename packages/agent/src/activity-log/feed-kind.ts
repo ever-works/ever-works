@@ -264,6 +264,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // Skills shelf — a person switching a Skill on or off.
     [ActivityActionType.SKILL_ENABLED]: 'system',
     [ActivityActionType.SKILL_DISABLED]: 'system',
+
+    // Knowledge library — shelf curation (filing, archive, export) and shared-folder rename.
+    [ActivityActionType.KB_DOCUMENT_ARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_UNARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_FILED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_EXPORTED]: 'work',
+    [ActivityActionType.MEMORY_FOLDER_RENAMED]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

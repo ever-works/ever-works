@@ -86,6 +86,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
+import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -316,6 +317,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
         MemoryFilesApiModule,
+        // Knowledge library — /api/knowledge: the organization shelf over
+        // the Knowledge Base (shared folders, filing, archive / restore,
+        // Markdown export).
+        KnowledgeLibraryApiModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,
