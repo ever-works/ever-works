@@ -454,6 +454,50 @@ export class FleetNode {
     @PortableDateColumn({ nullable: true })
     controlExpiresAt?: Date | null;
 
+    /**
+     * Agent computers, take-over — the rest of the control lock. Written only
+     * by `ComputerControlArbiterService` through `ComputerControlRepository`,
+     * always as a conditional UPDATE scoped by the holding (or requesting)
+     * view, never read-modify-write:
+     *
+     *  - `controlIdleAt` — when control is given back if no input arrives
+     *    first. Pushed forward by input and by "Keep control".
+     *  - `controlAckAt` — when the controlling browser last acknowledged
+     *    (input, a keep-alive, its socket's pong). The floor under the live
+     *    gateway's disconnect release, for a replica that went away.
+     *  - `controlExtendedAt` — set when this stretch of control was extended;
+     *    a stretch may be extended once.
+     *  - `controlRequest*` — ONE pending request for control from another
+     *    view, answered by the holder or declined on its own. A hand-over is a
+     *    single UPDATE that moves the lock to the requester only while that
+     *    exact request is still pending, so it can never race an automatic
+     *    release into two holders.
+     *
+     * Migration: `1791141100000-AddComputerControlHandover`.
+     */
+    @PortableDateColumn({ nullable: true })
+    controlIdleAt?: Date | null;
+
+    /** See {@link controlIdleAt}. */
+    @PortableDateColumn({ nullable: true })
+    controlAckAt?: Date | null;
+
+    /** See {@link controlIdleAt}. */
+    @PortableDateColumn({ nullable: true })
+    controlExtendedAt?: Date | null;
+
+    /** The person asking for control. See {@link controlIdleAt}. */
+    @Column({ type: 'uuid', nullable: true })
+    controlRequestUserId?: string | null;
+
+    /** The live view asking for control. See {@link controlIdleAt}. */
+    @Column({ type: 'uuid', nullable: true })
+    controlRequestSessionId?: string | null;
+
+    /** When the pending request was made. See {@link controlIdleAt}. */
+    @PortableDateColumn({ nullable: true })
+    controlRequestedAt?: Date | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

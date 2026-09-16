@@ -5,6 +5,7 @@ import type { AgentCapabilitiesPayload, AgentCapabilityToolRow } from '@ever-wor
 import type { Agent } from '@/lib/api/agents';
 import { AgentCapabilitiesClient } from './AgentCapabilitiesClient';
 import type { AgentFleetData } from './agent-fleet.shared';
+import type { AgentAccessLevelRow } from './agent-access-levels.shared';
 
 /**
  * Capabilities tab — the wiring assertions.
@@ -30,6 +31,8 @@ const setAgentMcpBindingAction = vi.fn();
 const clearAgentMcpBindingAction = vi.fn();
 const setAgentRepoAttachment = vi.fn();
 const removeAgentRepoAttachment = vi.fn();
+const setAgentAccessLevelAction = vi.fn();
+const routerRefresh = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -41,6 +44,7 @@ vi.mock('@/i18n/navigation', () => ({
     Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
         <a href={href}>{children}</a>
     ),
+    useRouter: () => ({ refresh: routerRefresh }),
 }));
 vi.mock('sonner', () => ({
     toast: {
@@ -55,6 +59,7 @@ vi.mock('@/app/actions/agent-capabilities', () => ({
     bindSkillToAgentAction: (...args: unknown[]) => bindSkillToAgentAction(...args),
     installAndBindSkillAction: (...args: unknown[]) => installAndBindSkillAction(...args),
     unbindSkillFromAgentAction: (...args: unknown[]) => unbindSkillFromAgentAction(...args),
+    setAgentAccessLevelAction: (...args: unknown[]) => setAgentAccessLevelAction(...args),
 }));
 vi.mock('@/app/actions/agents', () => ({
     listAgentSkillsAction: (...args: unknown[]) => listAgentSkillsAction(...args),
@@ -207,6 +212,7 @@ interface ExtraProps {
     environments?: Array<{ id: string; name: string }>;
     environmentId?: string | null;
     fleet?: AgentFleetData | null;
+    accessLevels?: AgentAccessLevelRow[] | null;
 }
 
 function renderTab(
@@ -226,6 +232,7 @@ function renderTab(
             initialRepos={(extra.initialRepos ?? []) as never}
             environments={extra.environments ?? []}
             fleet={extra.fleet ?? null}
+            accessLevels={extra.accessLevels ?? null}
         />,
     );
     return caps;
@@ -863,5 +870,96 @@ describe('AgentCapabilitiesClient — execution section', () => {
         expect(screen.getByTestId('capabilities-fleet-routing-mode')).toHaveTextContent(
             'routing.modes.local-fallback.label',
         );
+    });
+});
+
+/**
+ * The Access levels section's own wiring is pinned by
+ * `AgentAccessLevelsSection.unit.spec.tsx`. What matters here: its state is
+ * loaded by the page, and the per-tool switches rewrite the same grant row,
+ * so every successful write to that row re-reads the page.
+ */
+describe('AgentCapabilitiesClient — access levels stay in step with the tool switches', () => {
+    function accessLevels(): AgentAccessLevelRow[] {
+        return [
+            {
+                providerId: 'github',
+                providerName: 'GitHub',
+                presets: ['read', 'write'],
+                state: {
+                    providerId: 'github',
+                    scopeType: 'agent',
+                    scopeId: AGENT_ID,
+                    presets: ['read', 'write'],
+                    requested: 'write',
+                    effective: 'write',
+                    clampedBy: null,
+                },
+            },
+        ];
+    }
+
+    it('re-reads the page after a tool switch rewrites the grant row', async () => {
+        const user = userEvent.setup();
+        setAgentToolGrantAction.mockResolvedValue(payload());
+        renderTab({}, [], { accessLevels: accessLevels() });
+
+        await user.click(screen.getByTestId('capabilities-tool-switch-searchWeb'));
+
+        await waitFor(() => expect(routerRefresh).toHaveBeenCalledTimes(1));
+    });
+
+    it('re-reads the page after Reset to inherited', async () => {
+        const user = userEvent.setup();
+        resetAgentToolGrantAction.mockResolvedValue(payload());
+        renderTab(
+            { agentGrantRow: { id: 'row-9', allow: null, deny: ['searchWeb'], note: null } },
+            [],
+            { accessLevels: accessLevels() },
+        );
+
+        await user.click(screen.getByTestId('capabilities-reset-grants'));
+
+        await waitFor(() => expect(routerRefresh).toHaveBeenCalledTimes(1));
+    });
+
+    it('re-reads the page after an access level is chosen', async () => {
+        const user = userEvent.setup();
+        const next = accessLevels()[0].state!;
+        setAgentAccessLevelAction.mockResolvedValue({
+            success: true,
+            state: { ...next, requested: 'read', effective: 'read' },
+            capabilities: payload(),
+        });
+        renderTab({}, [], { accessLevels: accessLevels() });
+
+        await user.click(screen.getByTestId('capabilities-access-level-github-read'));
+
+        await waitFor(() => expect(routerRefresh).toHaveBeenCalledTimes(1));
+    });
+
+    it('does not re-read when the write failed', async () => {
+        const user = userEvent.setup();
+        setAgentToolGrantAction.mockRejectedValue(new Error('nope'));
+        renderTab({}, [], { accessLevels: accessLevels() });
+
+        await user.click(screen.getByTestId('capabilities-tool-switch-searchWeb'));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('nope'));
+        expect(routerRefresh).not.toHaveBeenCalled();
+    });
+
+    it('does not re-read a page that shows no access levels', async () => {
+        const user = userEvent.setup();
+        setAgentToolGrantAction.mockResolvedValue(payload());
+        renderTab();
+
+        await user.click(screen.getByTestId('capabilities-tool-switch-searchWeb'));
+
+        await waitFor(() => expect(setAgentToolGrantAction).toHaveBeenCalled());
+        await waitFor(() =>
+            expect(screen.getByTestId('capabilities-tool-switch-searchWeb')).not.toBeDisabled(),
+        );
+        expect(routerRefresh).not.toHaveBeenCalled();
     });
 });
