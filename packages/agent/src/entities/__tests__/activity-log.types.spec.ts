@@ -191,7 +191,13 @@ describe('activity-log.types', () => {
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
-            // +1 agent_computer_controlled (Agent computers, take-over) -> 161.
+            //    On the Knowledge library shelf side the same three literals
+            //    land together with its +5 shelf literals: 162 (shelf side) and
+            //    160 (develop side) each counted from their own base, and that
+            //    merged enum COUNTED 165.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop, and -> 166 once the knowledge library branch had
+            //    merged develop's Agent computers take-over work.
             //
             // 172 after the AW-07 memory facts + context files branch merged
             // develop again — COUNTED from the merged enum. The AW-07 branch

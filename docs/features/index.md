@@ -51,6 +51,7 @@ A few features share a sidebar entry rather than owning one. **Teams** is the hu
 | [Agent Terminals](./agent-terminals)                   | Attach a real terminal to a live agent run — take the keyboard, watch read-only, replay the transcript             |
 | [Knowledge Base & Memory](./knowledge-base)            | Per-Work, typed, Git-backed institutional context and long-term memory every run reads from                        |
 | [Memory (Org-Wide)](./memory)                          | Every Work's KB plus org-level documents in one place — files, agent memory, review queue, consolidation           |
+| [Knowledge Library](./knowledge-library)               | The Library view of Memory — every KB document on one shelf, in shared folders, with archive, restore and export   |
 | [Meetings](./meetings)                                 | Meeting records with transcripts — entered by hand or synced from Zoom and Google Meet, then summarized            |
 | [Notifications](./notifications)                       | The in-app bell, the Slack / Discord / Telegram / WhatsApp / Novu channels, and event subscriptions                |
 | [Digests](./digests)                                   | Daily and weekly briefings composed from real runs, tasks, pull requests, escalations and goal progress            |
