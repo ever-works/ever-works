@@ -506,6 +506,17 @@ export class RunSteeringService implements RunSteeringPort {
             // the row that consumes the admitted slot is created INSIDE it, so
             // count + insert are one critical section (advisory-locked on
             // Postgres, documented no-op elsewhere).
+            // `delegationScope` below: a resume never WIDENS what the source
+            // run was admitted with. A delegated (G9) run's narrowed tool scope
+            // is snapshotted on its row and read back by the tool loop; omitting
+            // it made the resumed run an ordinary, unrestricted one. Carried
+            // verbatim, so the new run is exactly as narrow as the old one —
+            // never narrower by accident, never wider. (Review-scoped sources
+            // are refused above and never reach this line.) It is stated HERE
+            // rather than beside the property because `dispatch-paths-gated`
+            // reads a fixed window of lines after a `createQueued` to prove the
+            // call is gated, and prose inside the object literal pushes the
+            // `dispatchGate.admit` below it out of that window.
             const reserve = async (verdict: {
                 admitted: boolean;
                 queuedReason?: string;
@@ -526,14 +537,6 @@ export class RunSteeringService implements RunSteeringPort {
                     // interactive terminal, which is what the fan-out's
                     // `requirePersistent` gate reads.
                     persistent: run.persistent === true,
-                    // A resume never WIDENS what the source run was admitted
-                    // with. A delegated (G9) run's narrowed tool scope is
-                    // snapshotted on its row and read back by the tool loop;
-                    // omitting it here made the resumed run an ordinary,
-                    // unrestricted one. Carried verbatim, so the new run is
-                    // exactly as narrow as the old one — never narrower by
-                    // accident, never wider. (Review-scoped sources were
-                    // refused above and never reach this line.)
                     delegationScope: run.delegationScope ?? null,
                     // Inserted together with its link on the source, and
                     // only while this claim is still held — a request whose
