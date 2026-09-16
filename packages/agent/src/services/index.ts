@@ -96,7 +96,7 @@ export * from './memory-facts.module';
 export { decodeCursor, encodeCursor } from './knowledge-library.service';
 export {
     decodeCursor as decodeMemoryFactCursor,
-    encodeCursor as encodeMemoryFactCursor
+    encodeCursor as encodeMemoryFactCursor,
 } from './memory-fact.service';
 // AW-07 — publishes the platform vector chunk tables (Work KB chunks + non-Work
 // namespaces) to row-filter vector stores through the plugin host.
