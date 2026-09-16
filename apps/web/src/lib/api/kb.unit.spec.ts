@@ -139,4 +139,19 @@ describe('kbAPI', () => {
             );
         });
     });
+    describe('unarchiveDocument', () => {
+        it('POSTs /works/:id/kb/documents/:docId/unarchive with an encoded id and no envelope', async () => {
+            const result = { document: { id: 'doc/1' }, restoredToUnfiled: true, changed: true };
+            serverMutationMock.mockResolvedValueOnce(result);
+
+            await expect(kbAPI.unarchiveDocument('work-1', 'doc/1')).resolves.toEqual(result);
+
+            expect(serverMutationMock).toHaveBeenCalledWith({
+                endpoint: '/works/work-1/kb/documents/doc%2F1/unarchive',
+                data: {},
+                method: 'POST',
+                wrapInData: false,
+            });
+        });
+    });
 });
