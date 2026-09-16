@@ -42,9 +42,17 @@ jest.mock('../organizations/guards/organization-ownership.guard', () => ({
     OrganizationOwnershipGuard: class OrganizationOwnershipGuard {},
 }));
 
-import { MODULE_METADATA } from '@nestjs/common/constants';
+import {
+    EXCEPTION_FILTERS_METADATA,
+    INTERCEPTORS_METADATA,
+    MODULE_METADATA,
+} from '@nestjs/common/constants';
 import { SharedViewOwnerGuard, SharedViewOwnerResolver } from './shared-view-owner.guard';
 import { SharedViewPublicController } from './shared-view-public.controller';
+import {
+    SharedViewPublicExceptionFilter,
+    SharedViewPublicHeadersInterceptor,
+} from './shared-view-public.http';
 import { SharedViewSessionGuard } from './shared-view-session.guard';
 import { SharedViewSessionService } from './shared-view-session.service';
 import { SharedViewViewDedupe } from './shared-view-view-dedupe';
@@ -85,6 +93,25 @@ describe('SharedViewsApiModule wiring', () => {
         );
     });
 
+    it('provides the public posture enhancers the public controller declares', () => {
+        // The filter makes every refusal identical bytes and the interceptor
+        // sets the no-store/no-referrer/crawler-block headers. Declaring them
+        // on the controller is what applies them; listing them here is what
+        // keeps them resolvable from this module.
+        expect(Reflect.getMetadata(EXCEPTION_FILTERS_METADATA, SharedViewPublicController)).toEqual(
+            [SharedViewPublicExceptionFilter],
+        );
+        expect(Reflect.getMetadata(INTERCEPTORS_METADATA, SharedViewPublicController)).toEqual([
+            SharedViewPublicHeadersInterceptor,
+        ]);
+        expect(providers).toEqual(
+            expect.arrayContaining([
+                SharedViewPublicExceptionFilter,
+                SharedViewPublicHeadersInterceptor,
+            ]),
+        );
+    });
+
     it.each([
         SharedViewsController,
         SharedViewPublicController,
@@ -93,6 +120,8 @@ describe('SharedViewsApiModule wiring', () => {
         SharedViewSessionGuard,
         SharedViewSessionService,
         SharedViewViewDedupe,
+        SharedViewPublicExceptionFilter,
+        SharedViewPublicHeadersInterceptor,
     ])('every constructor dependency of %p resolves inside the module', (target) => {
         const params: Array<{ name?: string } | undefined> =
             Reflect.getMetadata('design:paramtypes', target) ?? [];

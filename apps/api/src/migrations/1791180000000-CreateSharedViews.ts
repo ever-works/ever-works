@@ -1,4 +1,11 @@
-import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } from 'typeorm';
+import {
+    MigrationInterface,
+    QueryRunner,
+    Table,
+    TableForeignKey,
+    TableIndex,
+    type TableColumnOptions,
+} from 'typeorm';
 
 /**
  * Shared view (AW-18, phase 1) — the `shared_views` table.
@@ -27,7 +34,27 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  *
  * Forward-only + idempotent (`hasTable` / index-name / FK-name guards), and
  * portable `Table` DDL because production runs Postgres while CI runs
- * better-sqlite3. `down()` drops only the table `up()` created.
+ * better-sqlite3.
+ *
+ * ## Ownership — which `shared_views` this migration may touch
+ *
+ * A `shared_views` table can already exist when `up()` runs: `synchronize()`
+ * builds the schema from the entities on the CLI app type, so the idempotent
+ * adopt path has to keep working (refusing every pre-existing table would
+ * crash-loop that database on boot). What must NOT happen is the mirror image
+ * on the way back: `migration:revert` dropping a table this migration never
+ * created.
+ *
+ * So both directions are gated on the DECLARED SHAPE — the column set below,
+ * which is the entity's:
+ *
+ *   - `up()` adopts a pre-existing table only when it carries every declared
+ *     column; anything else is somebody else's table and the migration
+ *     refuses it loudly rather than bolting this feature's indexes and
+ *     cascading foreign keys onto it;
+ *   - `down()` drops `shared_views` only when it carries that same shape, so
+ *     a rollback can never delete an unrelated table that happens to share
+ *     the name.
  */
 export class CreateSharedViews1791180000000 implements MigrationInterface {
     name = 'CreateSharedViews1791180000000';
@@ -70,39 +97,76 @@ export class CreateSharedViews1791180000000 implements MigrationInterface {
         }),
     ];
 
+    /**
+     * The declared columns. `isPostgres` only picks the id default
+     * (`uuid_generate_v4()` is a Postgres function); the NAMES are the table's
+     * identity for the ownership gate, so they are read from here rather than
+     * kept in a second list that could drift.
+     */
+    private static columns(isPostgres: boolean): TableColumnOptions[] {
+        return [
+            {
+                name: 'id',
+                type: 'uuid',
+                isPrimary: true,
+                generationStrategy: 'uuid',
+                default: isPostgres ? 'uuid_generate_v4()' : undefined,
+            },
+            { name: 'organizationId', type: 'uuid' },
+            { name: 'tenantId', type: 'uuid' },
+            { name: 'ownerUserId', type: 'uuid' },
+            { name: 'tokenHash', type: 'varchar', length: '64' },
+            { name: 'tokenEncrypted', type: 'text' },
+            { name: 'status', type: 'varchar', length: '16', default: "'active'" },
+            { name: 'sections', type: 'text' },
+            { name: 'knowledgeClasses', type: 'text' },
+            { name: 'searchIndexable', type: 'boolean', default: false },
+            { name: 'viewCount', type: 'int', default: 0 },
+            { name: 'lastViewedAt', type: 'timestamp', isNullable: true },
+            { name: 'firstViewNotifiedAt', type: 'timestamp', isNullable: true },
+            { name: 'tokenRotatedAt', type: 'timestamp', isNullable: true },
+            { name: 'rotationCount', type: 'int', default: 0 },
+            { name: 'createdById', type: 'uuid' },
+            { name: 'createdAt', type: 'timestamp', default: 'CURRENT_TIMESTAMP' },
+            { name: 'updatedAt', type: 'timestamp', default: 'CURRENT_TIMESTAMP' },
+        ];
+    }
+
+    /**
+     * Is this the `shared_views` this migration owns? True when the table
+     * carries every declared column. Extra columns are tolerated (a later
+     * migration may have added one); a missing one means the table is not
+     * this feature's, and neither `up()` nor `down()` may touch it.
+     */
+    private static ownsTable(table: Table | undefined): boolean {
+        if (!table) return false;
+        const present = new Set(table.columns.map((column) => column.name));
+        return CreateSharedViews1791180000000.columns(false).every((column) =>
+            present.has(column.name),
+        );
+    }
+
     public async up(queryRunner: QueryRunner): Promise<void> {
         const isPostgres = queryRunner.connection.options.type === 'postgres';
 
-        if (!(await queryRunner.hasTable('shared_views'))) {
+        const tableExists = await queryRunner.hasTable('shared_views');
+
+        if (
+            tableExists &&
+            !CreateSharedViews1791180000000.ownsTable(await queryRunner.getTable('shared_views'))
+        ) {
+            throw new Error(
+                'CreateSharedViews1791180000000: a table named "shared_views" already exists without the ' +
+                    'columns this migration declares. Refusing to adopt it — rename or drop that table, then ' +
+                    'run the migration again.',
+            );
+        }
+
+        if (!tableExists) {
             await queryRunner.createTable(
                 new Table({
                     name: 'shared_views',
-                    columns: [
-                        {
-                            name: 'id',
-                            type: 'uuid',
-                            isPrimary: true,
-                            generationStrategy: 'uuid',
-                            default: isPostgres ? 'uuid_generate_v4()' : undefined,
-                        },
-                        { name: 'organizationId', type: 'uuid' },
-                        { name: 'tenantId', type: 'uuid' },
-                        { name: 'ownerUserId', type: 'uuid' },
-                        { name: 'tokenHash', type: 'varchar', length: '64' },
-                        { name: 'tokenEncrypted', type: 'text' },
-                        { name: 'status', type: 'varchar', length: '16', default: "'active'" },
-                        { name: 'sections', type: 'text' },
-                        { name: 'knowledgeClasses', type: 'text' },
-                        { name: 'searchIndexable', type: 'boolean', default: false },
-                        { name: 'viewCount', type: 'int', default: 0 },
-                        { name: 'lastViewedAt', type: 'timestamp', isNullable: true },
-                        { name: 'firstViewNotifiedAt', type: 'timestamp', isNullable: true },
-                        { name: 'tokenRotatedAt', type: 'timestamp', isNullable: true },
-                        { name: 'rotationCount', type: 'int', default: 0 },
-                        { name: 'createdById', type: 'uuid' },
-                        { name: 'createdAt', type: 'timestamp', default: 'CURRENT_TIMESTAMP' },
-                        { name: 'updatedAt', type: 'timestamp', default: 'CURRENT_TIMESTAMP' },
-                    ],
+                    columns: CreateSharedViews1791180000000.columns(isPostgres),
                 }),
                 true,
             );
@@ -124,8 +188,12 @@ export class CreateSharedViews1791180000000 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        if (await queryRunner.hasTable('shared_views')) {
-            await queryRunner.dropTable('shared_views', true, true, true);
+        if (!(await queryRunner.hasTable('shared_views'))) return;
+        // A table that does not carry the declared shape was never this
+        // migration's to create, so it is never this migration's to drop.
+        if (!CreateSharedViews1791180000000.ownsTable(await queryRunner.getTable('shared_views'))) {
+            return;
         }
+        await queryRunner.dropTable('shared_views', true, true, true);
     }
 }

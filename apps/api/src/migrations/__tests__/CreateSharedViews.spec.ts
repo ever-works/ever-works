@@ -153,4 +153,55 @@ describe('CreateSharedViews1791180000000', () => {
     it('down() is safe on a database where up() never ran', async () => {
         await expect(run('down')).resolves.toBeUndefined();
     });
+
+    describe('ownership — a table this migration did not create', () => {
+        /** A stranger that happens to be called `shared_views`, carrying a row. */
+        const createForeignTable = async () => {
+            await dataSource.query(
+                `CREATE TABLE "shared_views" ("id" varchar PRIMARY KEY NOT NULL, "note" varchar)`,
+            );
+            await dataSource.query(
+                `INSERT INTO "shared_views" ("id", "note") VALUES ('x1', 'keep')`,
+            );
+        };
+
+        it('up() refuses to adopt it instead of bolting the indexes and cascades on', async () => {
+            await createForeignTable();
+
+            await expect(run('up')).rejects.toThrow(/shared_views/);
+
+            const indexes: Array<{ name: string }> = await dataSource.query(
+                `PRAGMA index_list("shared_views")`,
+            );
+            expect(indexes.map((index) => index.name)).not.toContain('uq_shared_views_token_hash');
+            expect(await dataSource.query(`SELECT * FROM "shared_views"`)).toHaveLength(1);
+        });
+
+        it('down() leaves it — and its rows — alone', async () => {
+            await createForeignTable();
+
+            await expect(run('down')).resolves.toBeUndefined();
+
+            const rows: Array<{ id: string; note: string }> = await dataSource.query(
+                `SELECT * FROM "shared_views"`,
+            );
+            expect(rows).toEqual([{ id: 'x1', note: 'keep' }]);
+        });
+
+        it('up() still adopts a table that carries the declared shape', async () => {
+            // The `synchronize()` path builds `shared_views` from the entity
+            // before this migration ever runs; adopting it must keep working.
+            await run('up');
+            await dataSource.query(`DROP INDEX "uq_shared_views_token_hash"`);
+            await insert('v1', 'o1', 'a'.repeat(64));
+
+            await expect(run('up')).resolves.toBeUndefined();
+
+            const indexes: Array<{ name: string }> = await dataSource.query(
+                `PRAGMA index_list("shared_views")`,
+            );
+            expect(indexes.map((index) => index.name)).toContain('uq_shared_views_token_hash');
+            expect(await rows()).toHaveLength(1);
+        });
+    });
 });
