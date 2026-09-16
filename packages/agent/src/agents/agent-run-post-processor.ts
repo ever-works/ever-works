@@ -37,8 +37,34 @@ export interface AgentRunTaskFinisher {
     finishTask(input: AgentTaskFinishInput): Promise<{ status: string }>;
 }
 
+/**
+ * Named Conversations — the reply a `chat`-kind run started from a
+ * Conversation message produced.
+ */
+export interface AgentConversationReplyPostInput {
+    /** The run that produced the reply — the key that makes the post idempotent. */
+    runId: string;
+    userId: string;
+    /** Agent posting the reply — used as the message author. */
+    agentId: string;
+    /** The Conversation message the reply answers. */
+    conversationMessageId: string;
+    body: string;
+}
+
+/**
+ * Records a Conversation reply BEFORE `finalize()` marks its run completed, so
+ * a run can never report success for a reply that was not stored. Must be
+ * idempotent per `runId`: a run finalized again (a redelivered job) gets the
+ * message the first post stored, never a second one.
+ */
+export interface AgentRunConversationReplyPoster {
+    postReply(input: AgentConversationReplyPostInput): Promise<{ messageId: string }>;
+}
+
 export const AGENT_RUN_CHAT_BACK_POSTER = 'AGENT_RUN_CHAT_BACK_POSTER' as const;
 export const AGENT_RUN_TASK_FINISHER = 'AGENT_RUN_TASK_FINISHER' as const;
+export const AGENT_RUN_CONVERSATION_REPLY_POSTER = 'AGENT_RUN_CONVERSATION_REPLY_POSTER' as const;
 
 /**
  * Outcome supplied by the LLM dispatch path to `AgentRunService.finalize()`.

@@ -133,6 +133,19 @@ describe('GitHubApiService — getPullRequestStatus', () => {
 		expect(status!.checks[0].detailsUrl).toBe('https://ci.invalid/build');
 	});
 
+	it('reports the base branch the pull request merges into (reviewer agent stage, slice AD)', async () => {
+		// The review stage pins its diff to `baseRef...headSha`, and refuses
+		// to review when the base is unknown.
+		const status = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		expect(status!.baseRef).toBe('main');
+
+		pullsGetMock.mockResolvedValueOnce({
+			data: { number: 41, state: 'open', html_url: 'u', head: { sha: 'abc' } }
+		});
+		const noBase = await new GitHubApiService().getPullRequestStatus(OWNER, REPO, 41, TOKEN);
+		expect(noBase!.baseRef).toBeNull();
+	});
+
 	it('reports `merged` when the PR landed', async () => {
 		pullsGetMock.mockResolvedValueOnce({
 			data: {
@@ -373,6 +386,34 @@ describe('GitHubApiService — diffs', () => {
 		);
 		expect(compareMock).toHaveBeenCalledWith(expect.objectContaining({ basehead: 'main...task/t-1' }));
 		expect(diff.files).toHaveLength(3);
+	});
+
+	it('carries the OLD path of a renamed file, for pull requests and compares alike (slice AD)', async () => {
+		// A rename touches two paths. Without `previous_filename` a reviewer
+		// saw a small edit to the new path and nothing about the old one.
+		const renamed = {
+			filename: 'docs/examples/ci.yml',
+			status: 'renamed',
+			previous_filename: '.github/workflows/ci.yml',
+			additions: 1,
+			deletions: 1,
+			patch: '@@ -1 +1 @@'
+		};
+		pullsListFilesMock.mockResolvedValueOnce({ data: [renamed, FILES[0]] });
+		compareMock.mockResolvedValueOnce({ data: { files: [renamed, FILES[0]] } });
+		const svc = new GitHubApiService();
+		for (const diff of [
+			await svc.getPullRequestDiff(OWNER, REPO, 41, {}, TOKEN),
+			await svc.getCompareDiff(OWNER, REPO, 'main', 'abc', {}, TOKEN)
+		]) {
+			expect(diff.files[0]).toMatchObject({
+				path: 'docs/examples/ci.yml',
+				status: 'renamed',
+				previousPath: '.github/workflows/ci.yml'
+			});
+			// Nothing invented for a file that was not renamed.
+			expect(diff.files[1]).not.toHaveProperty('previousPath');
+		}
 	});
 
 	it('tolerates a compare response with no files array', async () => {

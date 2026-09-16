@@ -140,6 +140,10 @@ function stubDomainSources(): AgentDomainToolSources {
             assignees: stub(),
             reviewers: stub(),
             approvers: stub(),
+            // Reviewer agent stage (slice AD, EW-811) — without it the
+            // Capabilities tab never listed `submitTaskReview`, while the
+            // production bundle offers it.
+            agentReviews: stub(),
         },
         ingest: { repository: stub() },
         digest: { digestService: stub() },

@@ -5,6 +5,10 @@ import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
+import {
+    TaskApproverRepository,
+    TaskAssigneeRepository,
+} from '../database/repositories/task-side.repositories';
 import { RUN_KILL_SWITCH, type RunKillSwitch } from '../agents/run-kill-switch';
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import {
@@ -26,6 +30,9 @@ import {
     type CiHeadDecision,
 } from './task-ci-auto-resume';
 import type { TaskAutoResumeTrigger } from '../entities/task-ci-auto-resume-attempt.entity';
+import type { AgentRun } from '../entities/agent-run.entity';
+import { isAgentReviewRunScope } from './task-agent-review';
+import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 
 /** One completed (or in-flight) check result, already normalized. */
 export interface CiCheckResultInput {
@@ -92,6 +99,13 @@ export const REVIEW_PENDING_SCAN = 20;
  */
 export const REVIEW_PENDING_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * Page size for the scan past review runs to the latest AUTHORING run
+ * (see `findLatestAuthoringRun`). Larger than the maximum lifetime review
+ * budget, so one read answers in every configuration the clamps allow.
+ */
+export const AUTHORING_RUN_SCAN_PAGE = 25;
+
 /** A provider-side review that slice AB has ALREADY recorded a row for. */
 export interface ReviewRejectionSignalInput {
     userId: string;
@@ -140,9 +154,13 @@ export interface ReviewRejectionSignalInput {
  *    because it is not a failure;
  *  * a **stale head** — CI catching up on a revision that has already been
  *    replaced would fix code nobody has;
- *  * a **superseded run** — the target is always the Task's LATEST run, so
- *    an older one is never resumed, and a run that is queued or running
- *    means the fix may already be in flight;
+ *  * a **superseded run** — the target is always the Task's LATEST
+ *    AUTHORING run (review runs and reviewer agents' runs are skipped —
+ *    slice AD), so an older one is never resumed, and a run that is queued
+ *    or running means the fix may already be in flight;
+ *  * a Task whose only runs are **review runs or reviewer agents' runs**
+ *    (`no-authoring-run`) — CI feedback is the implementer's, never a
+ *    reviewer's;
  *  * a run **parked on a question** — that is the owner's to answer, and
  *    resuming would consume their Inbox item with CI feedback;
  *  * a **done or cancelled** Task, checked here because the cloud dispatch
@@ -190,6 +208,17 @@ export class TaskCiAutoResumeService {
         @Optional()
         @Inject(RUN_KILL_SWITCH)
         private readonly killSwitch?: RunKillSwitch,
+        // Reviewer agent stage (slice AD, EW-811) — who REVIEWS this Task,
+        // so a reviewer agent's own runs (a chat reply to a question about
+        // its review, say) are never picked as the run CI feedback goes
+        // to. Appended last. Both are provided by `TasksDomainModule`, the
+        // module this service lives in; unbound (hand-rolled test
+        // constructions) the only runs skipped are review-scoped ones, as
+        // before. A read that THROWS is not swallowed: it fails the
+        // evaluation, which `onCheckResult` reports as `error` and resumes
+        // nothing.
+        @Optional() private readonly approvers?: TaskApproverRepository,
+        @Optional() private readonly assignees?: TaskAssigneeRepository,
     ) {}
 
     /**
@@ -479,8 +508,26 @@ export class TaskCiAutoResumeService {
         }
 
         // ── which run, and is it ours to touch? ─────────────────────
-        const run = await this.runs.findLatestForTask(task.id);
-        if (!run) return { reason: 'no-run', taskId: task.id };
+        // The latest AUTHORING run, not simply the latest run. Reviewer
+        // agent stage (slice AD, EW-811): the ordinary order of events is
+        // "PR opened → Task enters in_review → review run finishes → CI goes
+        // red", which leaves a REVIEW run as the Task's newest row. Resuming
+        // that sent the CI failure to the reviewer instead of the agent that
+        // wrote the code (and, before the resume path refused review runs,
+        // brought the reviewer back with full tools and a workspace). A run
+        // of a REVIEWER agent is skipped the same way — see
+        // `findLatestAuthoringRun`.
+        const { run, skippedNonAuthoringRuns } = await this.findLatestAuthoringRun(task);
+        if (!run) {
+            // Only review runs (or reviewer agents' runs) on this Task:
+            // nobody who could have written the failing commit to hand the
+            // failure to. Its own reason, so the refusal is never mistaken
+            // for "no runs at all" — and never a reviewer resumed in the
+            // implementer's place.
+            return skippedNonAuthoringRuns > 0
+                ? { reason: 'no-authoring-run', taskId: task.id }
+                : { reason: 'no-run', taskId: task.id };
+        }
         // Status literals rather than `RunSteeringService.isLive`: this
         // package's import direction is agents → tasks-domain, never back.
         if (run.status === 'queued' || run.status === 'running') {
@@ -654,6 +701,95 @@ export class TaskCiAutoResumeService {
     }
 
     // ── internals ──────────────────────────────────────────────────
+
+    /**
+     * The newest run on this Task that the IMPLEMENTER owns, whatever its
+     * status — the status checks stay in {@link evaluate}, unchanged.
+     *
+     * Two kinds of run are skipped, both identified from platform state:
+     *
+     *  - a REVIEW run — its own row's `delegationScope` is exactly the
+     *    review-only scope (`isAgentReviewRunScope`, the same predicate the
+     *    tool loop, the worker and the fleet dispatcher read). It holds a
+     *    single tool, gets no workspace and is refused by the fleet, so it
+     *    provably authored nothing;
+     *  - any run of a REVIEWER agent — an agent that is an agent approver
+     *    on this Task and NOT one of the agents the Task is dispatched to
+     *    (`resolveTaskDispatchAgentIds`, the ladder the transition service
+     *    implements with). Found by review of slice AD: a human asking the
+     *    reviewer about its verdict leaves a completed CHAT run of the
+     *    reviewer as the Task's newest row, and resuming that turned the
+     *    reviewer into a fully tooled task run with a workspace and the CI
+     *    failure — so the implementer was never told, and the reviewer,
+     *    now an author, was refused `self-review` on every later round.
+     *    An agent that is BOTH assigned and an approver is the
+     *    implementer, and is not skipped.
+     *
+     * Every other run is treated as authoring, including chat replies and
+     * delegated runs of the implementer — those can hold `commitToRepo` /
+     * `openPullRequest`, so skipping them could hand the failure to an
+     * older run while the commit CI judged came from a newer one.
+     *
+     * Consequences, deliberately: a skipped run that is still queued or
+     * running does not block the resume (a review is not a fix in flight),
+     * and a skipped run parked or failed does not stand in for the
+     * implementer's state either.
+     *
+     * The reviewer set is empty for a Task with no agent approvers, and the
+     * newest row is read exactly as before (`findLatestForTask`), so a Task
+     * whose newest run is the implementer's is decided byte-for-byte as it
+     * always was. Only when that row is skipped does the scan look further
+     * back — paged rather than capped, so the answer is complete however
+     * many skipped runs sit on top.
+     */
+    private async findLatestAuthoringRun(
+        task: Task,
+    ): Promise<{ run: AgentRun | null; skippedNonAuthoringRuns: number }> {
+        const reviewerAgentIds = await this.reviewerOnlyAgentIds(task);
+        const nonAuthoring = (candidate: AgentRun): boolean =>
+            isAgentReviewRunScope(candidate.delegationScope) ||
+            reviewerAgentIds.has(candidate.agentId);
+
+        const latest = await this.runs.findLatestForTask(task.id);
+        if (!latest) return { run: null, skippedNonAuthoringRuns: 0 };
+        if (!nonAuthoring(latest)) return { run: latest, skippedNonAuthoringRuns: 0 };
+        let skippedNonAuthoringRuns = 0;
+        let offset = 0;
+        for (;;) {
+            const page = await this.runs.findRecentForTask(
+                task.id,
+                AUTHORING_RUN_SCAN_PAGE,
+                offset,
+            );
+            for (const candidate of page) {
+                if (nonAuthoring(candidate)) {
+                    skippedNonAuthoringRuns += 1;
+                    continue;
+                }
+                return { run: candidate, skippedNonAuthoringRuns };
+            }
+            if (page.length < AUTHORING_RUN_SCAN_PAGE) {
+                return { run: null, skippedNonAuthoringRuns };
+            }
+            offset += page.length;
+        }
+    }
+
+    /**
+     * Agents that REVIEW this Task and do not implement it: agent approvers
+     * minus the dispatch ladder. Empty when no approver repository is bound
+     * or the Task has no agent approvers — and then the ladder is not read
+     * at all. Errors propagate (see the constructor note).
+     */
+    private async reviewerOnlyAgentIds(task: Task): Promise<Set<string>> {
+        if (!this.approvers) return new Set();
+        const agentApproverIds = (await this.approvers.findByTaskId(task.id))
+            .filter((row) => row.approverType === 'agent')
+            .map((row) => row.approverId);
+        if (agentApproverIds.length === 0) return new Set();
+        const implementers = new Set(await resolveTaskDispatchAgentIds(task, this.assignees));
+        return new Set(agentApproverIds.filter((agentId) => !implementers.has(agentId)));
+    }
 
     /**
      * Repo + PR number (or branch) → the Task, through platform state only.

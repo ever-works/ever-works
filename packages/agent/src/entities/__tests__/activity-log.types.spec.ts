@@ -99,6 +99,12 @@ describe('activity-log.types', () => {
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Shared view (AW-18)
+            ['SHARED_VIEW_ENABLED', 'shared_view_enabled'],
+            ['SHARED_VIEW_DISABLED', 'shared_view_disabled'],
+            ['SHARED_VIEW_REGENERATED', 'shared_view_regenerated'],
+            ['SHARED_VIEW_SECTIONS_CHANGED', 'shared_view_sections_changed'],
+            ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
             // Agent computers — one row per stretch of control of an Agent's machine.
             ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
@@ -166,7 +172,7 @@ describe('activity-log.types', () => {
             //    memory_folder_renamed (Knowledge library shelf) -> 162 on
             //    develop's own base.
             //
-            // 🛑 168 is COUNTED from the merged enum, never added up from the
+            // 🛑 173 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -174,7 +180,10 @@ describe('activity-log.types', () => {
             // ActivityStatus, and including it inflates the total by 5.
             //
             // +3 agent_run_started / agent_run_completed / agent_run_failed
-            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on this branch's own base; the same +3 reached develop together
+            //    with the +5 knowledge library literals, which develop counted
+            //    as -> 165 there.
             //
             // Merging develop's Live Feed run lifecycle (+3, develop said 160)
             // into the Skills shelf branch (+2 skill_enabled / skill_disabled,
@@ -189,7 +198,13 @@ describe('activity-log.types', () => {
             // into this branch's 163 COUNTS to 168 from the merged enum —
             // the two skill_* literals are this branch's only additions that
             // develop does not already carry.
-            expect(literals).toHaveLength(168);
+            // +5 shared_view_enabled / _disabled / _regenerated /
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) —
+            //    develop landed those while this branch was open and counted
+            //    171 there; merging that develop into this branch's 168 COUNTS
+            //    to 173 from the merged enum, the two skill_* literals still
+            //    being this branch's only additions develop does not carry.
+            expect(literals).toHaveLength(173);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

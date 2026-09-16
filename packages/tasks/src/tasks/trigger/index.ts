@@ -34,6 +34,8 @@ export * from './agent-heartbeat-dispatcher.task';
 export * from './agent-heartbeat.task';
 export * from './agent-task-execute.task';
 export * from './agent-chat-reply.task';
+// Named Conversations — an Agent answers a message in a Conversation.
+export * from './agent-conversation-reply.task';
 export * from './task-recurrence-dispatcher.task';
 export * from './template-customization.task';
 export * from './work-generation.task';

@@ -10,6 +10,7 @@ import { WorkAgentModule } from '@ever-works/agent/work-agent';
 import { GoalsModule } from '@ever-works/agent/goals';
 import { AgentsModule, TerminalTranscriptModule } from '@ever-works/agent/agents';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import { ConversationsModule } from '@ever-works/agent/conversations';
 import { EventIngestModule } from '@ever-works/agent/ingest';
 import { DigestModule } from '@ever-works/agent/digest';
 import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
@@ -109,6 +110,11 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // packages/tasks) can drive `sweepStale()` over the internal RPC
         // channel every hour.
         AgentSkillsModule,
+        // Named Conversations — exposes ConversationMessageService through
+        // the remote-proxy controller so the agent-conversation-reply task
+        // (in packages/tasks) can load the Conversation it answers and
+        // record the Agent's reply over the internal RPC channel.
+        ConversationsModule,
     ],
     controllers: [TriggerInternalController],
 })

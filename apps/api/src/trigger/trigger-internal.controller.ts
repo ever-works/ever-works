@@ -67,6 +67,7 @@ import {
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { FleetJobService } from '@ever-works/agent/fleet';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
 import { GitFacadeService, NotificationChannelFacadeService } from '@ever-works/agent/facades';
@@ -388,6 +389,12 @@ export class TriggerInternalController implements OnModuleInit {
         // channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly paygService?: PaygService,
+        // Named Conversations — backs the `agent-conversation-reply` task:
+        // the worker proxy calls `loadReplyContext`, `agentVisibleBody` and
+        // `appendAgentMessage` over the internal RPC channel. Appended LAST +
+        // @Optional() per the arity rule above.
+        @Optional()
+        private readonly conversationMessageService?: ConversationMessageService,
         // Skills shelf — backs the `skill-readiness-sweep` cron: the worker
         // proxy calls `sweepStale()` over the internal RPC channel, landing
         // here where the Skill repositories, the tool-grant matrix and the
@@ -447,6 +454,10 @@ export class TriggerInternalController implements OnModuleInit {
             TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
             TasksService: this.tasksService,
             TaskChatService: this.taskChatService,
+            // Named Conversations — agent-conversation-reply calls
+            // `loadReplyContext` / `agentVisibleBody` / `appendAgentMessage`
+            // here (allow-list auto-derived).
+            ConversationMessageService: this.conversationMessageService,
             TaskWorkspaceService: this.taskWorkspaceService,
             // Wave 3 M2 — agent-task-execute calls `runChecks` here after the
             // agent loop (quality gates; allow-list auto-derived).

@@ -146,10 +146,15 @@ function toDiffFile(file: {
 	additions?: number;
 	deletions?: number;
 	patch?: string;
+	previous_filename?: string;
 }): GitDiffFile {
 	return {
 		path: file.filename,
 		status: file.status ?? 'modified',
+		// Renames and copies only — GitHub sends it for nothing else. A
+		// reviewer shown only the new path cannot see that the old one is
+		// gone (reviewer agent stage, slice AD).
+		...(file.previous_filename ? { previousPath: file.previous_filename } : {}),
 		additions: file.additions ?? 0,
 		deletions: file.deletions ?? 0,
 		...(file.patch ? { patch: file.patch } : {})
@@ -862,6 +867,7 @@ export class GitHubApiService {
 			merged,
 			mergeable: typeof pr.mergeable === 'boolean' ? pr.mergeable : null,
 			headSha,
+			baseRef: pr.base?.ref ?? null,
 			reviewDecision,
 			ciState: deriveCiState(checks),
 			checks: capped,

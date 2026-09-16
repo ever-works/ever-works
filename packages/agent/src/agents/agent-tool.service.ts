@@ -485,6 +485,11 @@ export class AgentToolService {
                     assignees: tasks.assignees,
                     reviewers: tasks.reviewers,
                     approvers: tasks.approvers,
+                    // Reviewer agent stage (slice AD, EW-811). The run id
+                    // is what `submitTaskReview` authorizes on — only the
+                    // run a review was bound to may answer it.
+                    agentReviews: tasks.agentReviews,
+                    runId: runContext?.runId ?? null,
                 }),
             );
         }
@@ -736,6 +741,31 @@ export class AgentToolService {
                 }`,
             );
             return { tools, refused: [] };
+        }
+    }
+
+    /**
+     * Reviewer agent stage (slice AD, EW-811) — settle the review bound to
+     * a review run whose execution started without its brief, through the
+     * same tasks bundle that backs `submitTaskReview`.
+     *
+     * Best-effort and never throws: the tool loop has already refused to
+     * call the model for that execution, which on its own means no verdict
+     * can come from it. `false` when no review service is bound or nothing
+     * open was bound to the run.
+     */
+    async abandonAgentReviewRun(runId: string): Promise<boolean> {
+        const reviews = this.domainToolSources?.tasks?.agentReviews;
+        if (typeof reviews?.abandonRunWithoutBrief !== 'function') return false;
+        try {
+            return await reviews.abandonRunWithoutBrief(runId);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: settling a brief-less review failed: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return false;
         }
     }
 

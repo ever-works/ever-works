@@ -25,6 +25,7 @@ export * from './activity-log.types';
 export * from './cache.entity';
 export * from './conversation.entity';
 export * from './conversation-message.entity';
+export * from './conversation-participant.entity';
 export * from './auth-account.entity';
 export * from './auth-session.entity';
 export * from './auth-verification.entity';
@@ -75,6 +76,7 @@ export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
 export * from './task-review-rejection.entity';
 export * from './task-ci-auto-resume-attempt.entity';
+export * from './task-agent-review.entity';
 export * from './task-approver.entity';
 export * from './task-block.entity';
 export * from './task-relation.entity';
@@ -203,3 +205,5 @@ export * from './agent-repo-attachment.entity';
 export * from './release-promotion.entity';
 // AW-14 What's new — per-person read state for product changelog entries.
 export * from './product-changelog-read.entity';
+// AW-18 Shared view — a Workspace's read-only published projection.
+export * from './shared-view.entity';
