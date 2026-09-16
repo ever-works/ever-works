@@ -32,6 +32,9 @@ export * from './email/index.js';
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Conversations — kinds, participants, send status and delivery outcomes for
+// named conversations with Agents.
+export * from './conversations/index.js';
 // Connections (AW-15) — plain-English scope presets expressed on the
 // tool-grant lattice, and the shared connection-health vocabulary.
 export * from './connections/index.js';

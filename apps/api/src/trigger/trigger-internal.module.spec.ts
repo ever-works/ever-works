@@ -108,6 +108,11 @@ jest.mock('../account/tenant-job-runtime/tenant-job-runtime.module', () => ({
 jest.mock('../organizations/organizations.module', () => ({
     OrganizationsModule: class OrganizationsModule {},
 }));
+// Named Conversations — the module imports ConversationsModule from the
+// conversations barrel; stub it so the entity chain is never loaded.
+jest.mock('@ever-works/agent/conversations', () => ({
+    ConversationsModule: class ConversationsModule {},
+}));
 jest.mock('./trigger-internal.controller', () => ({
     TriggerInternalController: class TriggerInternalController {},
 }));

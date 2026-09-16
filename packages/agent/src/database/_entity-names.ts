@@ -77,6 +77,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ComputerSession',
     'Conversation',
     'ConversationMessage',
+    // Named Conversations — a person or an Agent taking part in one
+    'ConversationParticipant',
     // Credits ledger (pricing Wave 9 M1)
     'CreditLedgerEntry',
     // Pay-as-you-go meter events (billing spec §3.5) — the platform-side
