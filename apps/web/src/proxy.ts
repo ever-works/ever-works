@@ -86,6 +86,14 @@ function buildCsp(): string {
     } catch {
         apiHost = 'https://api.ever.works';
     }
+    // The live-view and streaming-terminal sockets hang off the SAME origin
+    // over ws:/wss: (`lib/api/computer-bff.ts` toComputerSocketUrl, and the
+    // terminal attach-token route). CSP3 scheme-part matching does NOT let an
+    // http(s) source authorise a ws(s) URL, so the socket origin must be listed
+    // too — without it every live view is refused with "violates … connect-src".
+    // Derived from `apiHost`, never from the raw env, so a malformed
+    // NEXT_PUBLIC_API_URL cannot smuggle a directive separator into the policy.
+    const apiWsHost = apiHost.replace(/^http/, 'ws');
     return [
         "default-src 'self'",
         "base-uri 'self'",
@@ -100,7 +108,7 @@ function buildCsp(): string {
         // EW-617 — Cloudflare Turnstile widget script + challenge iframe. Keep
         // in lock-step with next.config.ts's CSP array (its byte-twin).
         "frame-src 'self' https://challenges.cloudflare.com",
-        `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
+        `connect-src 'self' ${apiHost} ${apiWsHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
         "worker-src 'self' blob:",
     ].join('; ');
 }

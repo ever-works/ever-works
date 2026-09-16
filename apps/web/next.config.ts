@@ -45,6 +45,15 @@ const apiHost = (() => {
         return 'https://api.ever.works';
     }
 })();
+// The live-view and streaming-terminal sockets hang off the SAME origin over
+// ws:/wss: (`lib/api/computer-bff.ts` toComputerSocketUrl, and the terminal
+// attach-token route). CSP3 scheme-part matching does NOT let an http(s)
+// source authorise a ws(s) URL, so the socket origin must be listed too —
+// without it every live view is refused with "violates … connect-src".
+// Derived from `apiHost`, never from the raw env: a malformed
+// NEXT_PUBLIC_API_URL still falls back to the hard-coded default and cannot
+// smuggle a directive separator into the policy.
+const apiWsHost = apiHost.replace(/^http/, 'ws');
 const CSP = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -63,7 +72,7 @@ const CSP = [
     // (backup). Both are essential for the on-page Lottie animations that
     // boot on /login and /register; without them the E2E suite trips on
     // console errors. Keep them tightly listed (not wildcard).
-    `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
+    `connect-src 'self' ${apiHost} ${apiWsHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
     "worker-src 'self' blob:",
 ].join('; ');
 

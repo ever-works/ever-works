@@ -96,4 +96,44 @@ test.describe('CSP — web surface', () => {
         }
         expect(csp!.length).toBeGreaterThan(0);
     });
+
+    test('web connect-src authorises the live-view socket, not just the API origin', async ({
+        page,
+        baseURL,
+    }) => {
+        // The Agent computer surface and the streaming terminal open a socket on
+        // the API ORIGIN over ws(s) (`lib/api/computer-bff.ts`
+        // `toComputerSocketUrl`). CSP3 scheme-part matching does NOT let an
+        // http(s) source authorise a ws(s) URL, so a policy that lists only
+        // `http://host:port` blocks every live view with "violates … connect-src".
+        const res = await page.goto(`${baseURL || 'http://localhost:3000'}/en/login`, {
+            waitUntil: 'domcontentloaded',
+        });
+        if (!res) test.skip(true, 'no response');
+        const csp =
+            res!.headers()['content-security-policy'] ||
+            res!.headers()['content-security-policy-report-only'];
+        if (!csp) {
+            test.skip(true, 'web does not set CSP');
+        }
+        const connectSrc = parseCsp(csp!).get('connect-src') ?? [];
+
+        // Every socket source pairs with the http(s) origin it belongs to, and
+        // at least one exists — that pair IS the live-view lane.
+        const socketSources = connectSrc.filter((source) => /^wss?:\/\//.test(source));
+        expect(
+            socketSources.length,
+            `connect-src has no ws(s) source: "${connectSrc.join(' ')}"`,
+        ).toBeGreaterThan(0);
+        for (const socket of socketSources) {
+            expect(connectSrc).toContain(socket.replace(/^ws/, 'http'));
+        }
+
+        // When the web app was built against the API this suite talks to, name
+        // that origin's socket twin exactly.
+        const apiOrigin = new URL(API_BASE).origin;
+        if (connectSrc.includes(apiOrigin)) {
+            expect(connectSrc).toContain(apiOrigin.replace(/^http/, 'ws'));
+        }
+    });
 });
