@@ -103,7 +103,7 @@ See the [plugin documentation][uri_docs] for how to build and publish your own.
      - Trendshift: submit the repo at https://trendshift.io to get the numeric repository ID
      - Repobeats: generate an embed at https://repobeats.axiom.co to get the SVG hash -->
 
-<a href="https://trendshift.io/repositories/00000" target="_blank"><img src="https://trendshift.io/api/badge/repositories/00000" alt="ever-works%2Fever-works | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/235659" target="_blank"><img src="https://trendshift.io/api/badge/repositories/235659" alt="ever-works%2Fever-works | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 ![Alt](https://repobeats.axiom.co/api/embed/0000000000000000000000000000000000000000.svg 'Repobeats analytics image')
 
