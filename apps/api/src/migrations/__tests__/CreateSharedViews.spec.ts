@@ -188,6 +188,96 @@ describe('CreateSharedViews1791180000000', () => {
             expect(rows).toEqual([{ id: 'x1', note: 'keep' }]);
         });
 
+        /**
+         * A stranger called `shared_views` that carries every column name this
+         * migration declares — the case a shape check alone cannot tell from
+         * the `synchronize()`-built table, and the one where a naive `down()`
+         * would drop somebody else's rows.
+         */
+        const createShapeMatchingForeignTable = async () => {
+            await dataSource.query(
+                `CREATE TABLE "shared_views" (
+                    "id" varchar PRIMARY KEY NOT NULL,
+                    "organizationId" varchar NOT NULL,
+                    "tenantId" varchar NOT NULL,
+                    "ownerUserId" varchar NOT NULL,
+                    "tokenHash" varchar NOT NULL,
+                    "tokenEncrypted" text NOT NULL,
+                    "status" varchar NOT NULL DEFAULT ('active'),
+                    "sections" text NOT NULL,
+                    "knowledgeClasses" text NOT NULL,
+                    "searchIndexable" boolean NOT NULL DEFAULT (0),
+                    "viewCount" integer NOT NULL DEFAULT (0),
+                    "lastViewedAt" datetime,
+                    "firstViewNotifiedAt" datetime,
+                    "tokenRotatedAt" datetime,
+                    "rotationCount" integer NOT NULL DEFAULT (0),
+                    "createdById" varchar NOT NULL,
+                    "createdAt" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+                    "updatedAt" datetime NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+                    "note" varchar
+                )`,
+            );
+            await insert('x1', 'o1', 'c'.repeat(64));
+            await dataSource.query(`UPDATE "shared_views" SET "note" = 'keep' WHERE "id" = 'x1'`);
+        };
+
+        const indexNames = async (): Promise<string[]> => {
+            const indexes: Array<{ name: string }> = await dataSource.query(
+                `PRAGMA index_list("shared_views")`,
+            );
+            return indexes.map((index) => index.name);
+        };
+
+        it('up() stamps the table it creates, so down() can prove it owns it', async () => {
+            await run('up');
+
+            expect(await indexNames()).toContain('idx_shared_views_owned_1791180000000');
+        });
+
+        it('up() adopts a shape-matching stranger without stamping it', async () => {
+            await createShapeMatchingForeignTable();
+
+            await expect(run('up')).resolves.toBeUndefined();
+
+            const names = await indexNames();
+            expect(names).toEqual(
+                expect.arrayContaining([
+                    'uq_shared_views_organization',
+                    'uq_shared_views_token_hash',
+                    'idx_shared_views_tenant',
+                ]),
+            );
+            expect(names).not.toContain('idx_shared_views_owned_1791180000000');
+        });
+
+        it('down() keeps a shape-matching stranger and its rows, reverting only what up() added', async () => {
+            await createShapeMatchingForeignTable();
+            await run('up');
+
+            await expect(run('down')).resolves.toBeUndefined();
+
+            const tables: Array<{ name: string }> = await dataSource.query(
+                `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'shared_views'`,
+            );
+            expect(tables.map((table) => table.name)).toEqual(['shared_views']);
+
+            const surviving: Array<{ id: string; note: string }> = await dataSource.query(
+                `SELECT "id", "note" FROM "shared_views"`,
+            );
+            expect(surviving).toEqual([{ id: 'x1', note: 'keep' }]);
+
+            const names = await indexNames();
+            for (const dropped of [
+                'uq_shared_views_organization',
+                'uq_shared_views_token_hash',
+                'idx_shared_views_tenant',
+            ]) {
+                expect(names).not.toContain(dropped);
+            }
+            expect(await dataSource.query(`PRAGMA foreign_key_list("shared_views")`)).toEqual([]);
+        });
+
         it('up() still adopts a table that carries the declared shape', async () => {
             // The `synchronize()` path builds `shared_views` from the entity
             // before this migration ever runs; adopting it must keep working.

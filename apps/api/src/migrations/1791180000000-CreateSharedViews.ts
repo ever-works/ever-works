@@ -45,16 +45,25 @@ import {
  * on the way back: `migration:revert` dropping a table this migration never
  * created.
  *
- * So both directions are gated on the DECLARED SHAPE — the column set below,
- * which is the entity's:
+ * Two gates, because a shape check alone cannot prove provenance — a foreign
+ * table that happens to carry all the declared column names would pass it:
  *
- *   - `up()` adopts a pre-existing table only when it carries every declared
- *     column; anything else is somebody else's table and the migration
- *     refuses it loudly rather than bolting this feature's indexes and
- *     cascading foreign keys onto it;
- *   - `down()` drops `shared_views` only when it carries that same shape, so
- *     a rollback can never delete an unrelated table that happens to share
- *     the name.
+ *   - SHAPE gates what `up()` will adopt. A pre-existing table is adopted only
+ *     when it carries every declared column; anything else is somebody else's
+ *     table and the migration refuses it loudly rather than bolting this
+ *     feature's indexes and cascading foreign keys onto it.
+ *   - PROVENANCE gates what `down()` will drop. `up()` stamps
+ *     `idx_shared_views_owned_1791180000000` onto the table on the — and only
+ *     the — path where it creates it, so the marker survives in the schema
+ *     catalogue between the two processes. `down()` drops the table only when
+ *     that stamp is there. A table `up()` merely adopted is instead reverted
+ *     precisely: this migration's own indexes and foreign keys come off by
+ *     name, and the table and every row in it stay.
+ *
+ * The stamp is not in the entity's metadata, so a later `synchronize()` may
+ * drop it. That failure is the safe one: `down()` then treats a table it did
+ * create as adopted and keeps it, which costs a manual `DROP TABLE` on a
+ * rollback and never costs anybody's rows.
  */
 export class CreateSharedViews1791180000000 implements MigrationInterface {
     name = 'CreateSharedViews1791180000000';
@@ -72,6 +81,23 @@ export class CreateSharedViews1791180000000 implements MigrationInterface {
         }),
         new TableIndex({ name: 'idx_shared_views_tenant', columnNames: ['tenantId'] }),
     ];
+
+    /**
+     * The provenance stamp. `up()` creates it on the one path where it also
+     * creates the table, so its presence in the schema catalogue is proof —
+     * persisted, and readable by the later `migration:revert` process — that
+     * this migration created this `shared_views`. It is deliberately NOT part
+     * of {@link INDEXES}: those are created on the adopt path too, and an
+     * index that can appear on an adopted table proves nothing.
+     *
+     * It indexes the primary key, which is the cheapest column to stamp: the
+     * table holds one row per Workspace, so the duplicate index costs
+     * essentially nothing, and `down()` takes the whole table with it.
+     */
+    private static readonly OWNERSHIP_MARKER_INDEX = new TableIndex({
+        name: 'idx_shared_views_owned_1791180000000',
+        columnNames: ['id'],
+    });
 
     private static readonly FOREIGN_KEYS = [
         new TableForeignKey({
@@ -133,16 +159,35 @@ export class CreateSharedViews1791180000000 implements MigrationInterface {
     }
 
     /**
-     * Is this the `shared_views` this migration owns? True when the table
-     * carries every declared column. Extra columns are tolerated (a later
-     * migration may have added one); a missing one means the table is not
-     * this feature's, and neither `up()` nor `down()` may touch it.
+     * Does this table carry the declared shape? True when it has every
+     * declared column. Extra columns are tolerated (a later migration may have
+     * added one); a missing one means the table is not this feature's, and
+     * neither `up()` nor `down()` may touch it.
+     *
+     * This is a SHAPE test, not an ownership proof — see
+     * {@link createdTable} for the latter.
      */
-    private static ownsTable(table: Table | undefined): boolean {
+    private static hasDeclaredShape(table: Table | undefined): boolean {
         if (!table) return false;
         const present = new Set(table.columns.map((column) => column.name));
         return CreateSharedViews1791180000000.columns(false).every((column) =>
             present.has(column.name),
+        );
+    }
+
+    /**
+     * Did THIS migration create this table? True only when the table carries
+     * the provenance stamp `up()` writes on its create path. A table that
+     * `up()` adopted — `synchronize()`-built, or any other pre-existing
+     * `shared_views` that happens to match the declared column names — never
+     * carries it, so `down()` never drops it.
+     */
+    private static createdTable(table: Table | undefined): boolean {
+        return (
+            table?.indices.some(
+                (index) =>
+                    index.name === CreateSharedViews1791180000000.OWNERSHIP_MARKER_INDEX.name,
+            ) ?? false
         );
     }
 
@@ -153,7 +198,9 @@ export class CreateSharedViews1791180000000 implements MigrationInterface {
 
         if (
             tableExists &&
-            !CreateSharedViews1791180000000.ownsTable(await queryRunner.getTable('shared_views'))
+            !CreateSharedViews1791180000000.hasDeclaredShape(
+                await queryRunner.getTable('shared_views'),
+            )
         ) {
             throw new Error(
                 'CreateSharedViews1791180000000: a table named "shared_views" already exists without the ' +
@@ -169,6 +216,12 @@ export class CreateSharedViews1791180000000 implements MigrationInterface {
                     columns: CreateSharedViews1791180000000.columns(isPostgres),
                 }),
                 true,
+            );
+            // Stamp provenance on the create path only: this is what lets
+            // down() tell the table it created from one it merely adopted.
+            await queryRunner.createIndex(
+                'shared_views',
+                CreateSharedViews1791180000000.OWNERSHIP_MARKER_INDEX,
             );
         }
 
@@ -189,11 +242,32 @@ export class CreateSharedViews1791180000000 implements MigrationInterface {
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         if (!(await queryRunner.hasTable('shared_views'))) return;
+
+        const table = await queryRunner.getTable('shared_views');
         // A table that does not carry the declared shape was never this
-        // migration's to create, so it is never this migration's to drop.
-        if (!CreateSharedViews1791180000000.ownsTable(await queryRunner.getTable('shared_views'))) {
+        // migration's to touch, so it is never this migration's to revert.
+        if (!CreateSharedViews1791180000000.hasDeclaredShape(table)) return;
+
+        if (CreateSharedViews1791180000000.createdTable(table)) {
+            // Ours: `up()` created it, so the whole table goes.
+            await queryRunner.dropTable('shared_views', true, true, true);
             return;
         }
-        await queryRunner.dropTable('shared_views', true, true, true);
+
+        // Adopted: the table and its rows are somebody else's. Revert exactly
+        // what `up()` added to it — its own named foreign keys first (they
+        // depend on the indexes), then its own named indexes — and leave the
+        // table standing.
+        for (const foreignKey of CreateSharedViews1791180000000.FOREIGN_KEYS) {
+            const current = await queryRunner.getTable('shared_views');
+            const existing = current?.foreignKeys.find((fk) => fk.name === foreignKey.name);
+            if (existing) await queryRunner.dropForeignKey('shared_views', existing);
+        }
+
+        for (const index of CreateSharedViews1791180000000.INDEXES) {
+            const current = await queryRunner.getTable('shared_views');
+            const existing = current?.indices.find((idx) => idx.name === index.name);
+            if (existing) await queryRunner.dropIndex('shared_views', existing);
+        }
     }
 }
