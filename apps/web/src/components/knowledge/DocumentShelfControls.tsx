@@ -90,6 +90,11 @@ export function DocumentShelfControls({ workId, document }: DocumentShelfControl
             }
             await refresh();
             router.refresh();
+        } catch {
+            // The server action itself rejected (a dropped connection, a
+            // redeploy): report the same failure the refused result does,
+            // so the control never goes quiet.
+            toast.error(archived ? t('restoreFailed') : t('archiveFailed'));
         } finally {
             setPending(false);
         }

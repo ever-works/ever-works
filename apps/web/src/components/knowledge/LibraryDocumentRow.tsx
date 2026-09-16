@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
     Archive,
     Building2,
@@ -33,11 +33,16 @@ export function libraryDocumentHref(document: KbLibraryDocumentDto): string | nu
     return document.workId ? `${ROUTES.DASHBOARD_WORK_KB(document.workId)}/${document.path}` : null;
 }
 
-export function formatLibraryDate(iso: string | null | undefined): string {
+/**
+ * A shelf date in the application's active locale. `locale` comes from
+ * `useLocale()` at the call site — the runtime default (`undefined`) would
+ * show a person reading the app in one language dates in another.
+ */
+export function formatLibraryDate(iso: string | null | undefined, locale?: string): string {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 /**
@@ -61,11 +66,12 @@ export function LibraryDocumentRow({
     busy = false,
 }: LibraryDocumentRowProps) {
     const t = useTranslations('dashboard.memoryPage.library');
+    const locale = useLocale();
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
     const href = libraryDocumentHref(document);
     const folder = formatFolderPath(document.folderPath) ?? t('unfiled');
-    const changed = formatLibraryDate(document.revisionAt ?? document.updatedAt);
+    const changed = formatLibraryDate(document.revisionAt ?? document.updatedAt, locale);
     const fileBlocked = !document.canEdit;
     const archiveBlocked = !document.canEdit;
 

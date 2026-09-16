@@ -19,6 +19,11 @@ export type ShelfBlockKey =
  * File and Export need the Organization's library row; Archive and Restore
  * use the Work's own endpoints and are only blocked when the row says the
  * person cannot edit — the API still enforces access either way.
+ *
+ * Archive and Restore also wait while an Organization's row is still being
+ * read, so a view-only member cannot start the mutation in the window before
+ * `canEdit` arrives. Outside an Organization (`unavailable`) and while the
+ * read is deferred (`idle`) there is no row to wait for, so they stay usable.
  */
 export function shelfBlockReason(
     control: ShelfControl,
@@ -28,6 +33,9 @@ export function shelfBlockReason(
     if (control === 'file' || control === 'export') {
         if (state === 'unavailable') return 'needsOrganization';
         if (state !== 'ready' || !row) return 'loading';
+    }
+    if ((control === 'archive' || control === 'restore') && state === 'loading') {
+        return 'loading';
     }
     if (state === 'ready' && row && !row.canEdit) {
         if (control === 'file') return 'noEditAccessFile';

@@ -72,6 +72,13 @@ function renderMenu(document: KbDocumentDto = activeDoc) {
     });
 }
 
+/** Restore holds until the library row says whether this member may edit. */
+async function findEnabledRestore() {
+    const item = await screen.findByTestId('kb-workbench-context-restore');
+    await waitFor(() => expect(item.getAttribute('data-disabled')).toBe('false'));
+    return item;
+}
+
 beforeEach(() => {
     for (const fn of [...Object.values(client), unarchiveMock, routerRefresh]) fn.mockReset();
     scopeMock.mockReturnValue({ kind: 'organization', slug: 'ever' });
@@ -131,6 +138,13 @@ describe('KbDocumentContextMenu — knowledge library entries', () => {
         );
     });
 
+    it('offers Restore in place of Archive for an archived document', async () => {
+        renderMenu({ ...activeDoc, status: 'archived' });
+
+        expect(await screen.findByTestId('kb-workbench-context-restore')).toBeTruthy();
+        expect(screen.queryByTestId('kb-workbench-context-archive')).toBeNull();
+    });
+
     it('restores an archived document through the Work and refreshes the tree', async () => {
         unarchiveMock.mockResolvedValue({
             success: true,
@@ -138,7 +152,7 @@ describe('KbDocumentContextMenu — knowledge library entries', () => {
         });
         renderMenu({ ...activeDoc, status: 'archived' });
 
-        fireEvent.click(await screen.findByTestId('kb-workbench-context-restore'));
+        fireEvent.click(await findEnabledRestore());
 
         await waitFor(() =>
             expect(unarchiveMock).toHaveBeenCalledWith({
@@ -154,10 +168,27 @@ describe('KbDocumentContextMenu — knowledge library entries', () => {
         unarchiveMock.mockResolvedValue({ success: false, error: undefined });
         renderMenu({ ...activeDoc, status: 'archived' });
 
-        fireEvent.click(await screen.findByTestId('kb-workbench-context-restore'));
+        fireEvent.click(await findEnabledRestore());
 
         expect((await screen.findByTestId('kb-workbench-context-menu-error')).textContent).toBe(
             'restoreFailed',
+        );
+    });
+
+    it('reports a restore whose server action rejects, and leaves the menu usable', async () => {
+        unarchiveMock.mockRejectedValue(new Error('connection lost'));
+        renderMenu({ ...activeDoc, status: 'archived' });
+
+        fireEvent.click(await findEnabledRestore());
+
+        expect((await screen.findByTestId('kb-workbench-context-menu-error')).textContent).toBe(
+            'restoreFailed',
+        );
+        // `pending` cleared, so the entries are not stuck disabled.
+        await waitFor(() =>
+            expect(
+                screen.getByTestId('kb-workbench-context-restore').getAttribute('data-disabled'),
+            ).toBe('false'),
         );
     });
 

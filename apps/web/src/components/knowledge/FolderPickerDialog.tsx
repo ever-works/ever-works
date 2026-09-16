@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { CornerUpLeft, FolderClosed, FolderPlus, Loader2, Search } from 'lucide-react';
 import { KB_LIBRARY_FILE_BATCH_MAX } from '@ever-works/contracts';
@@ -40,6 +40,9 @@ export interface FolderPickerDialogProps {
  * creates that folder and files into it in one step.
  *
  * Keyboard: ↑/↓ move, Enter files into the highlighted option, Esc cancels.
+ * Focus stays in the search box, which is the combobox owning the list, so
+ * `aria-activedescendant` names the highlighted option — a screen reader
+ * announces the folder Enter would file into instead of leaving it silent.
  * More than `KB_LIBRARY_FILE_BATCH_MAX` documents cannot be filed at once;
  * the dialog says so and disables File rather than sending a doomed request.
  */
@@ -54,6 +57,10 @@ export function FolderPickerDialog({
     error,
 }: FolderPickerDialogProps) {
     const t = useTranslations('dashboard.memoryPage.library');
+    const baseId = useId();
+    const listboxId = `${baseId}-list`;
+    const optionId = (option: PickerOption) =>
+        `${baseId}-opt-${option.kind === 'folder' ? option.id : option.kind}`;
     const [query, setQuery] = useState('');
     const [active, setActive] = useState(0);
     const [chosen, setChosen] = useState<PickerOption | null>(null);
@@ -165,6 +172,13 @@ export function FolderPickerDialog({
                             <input
                                 data-testid="library-folder-picker-search"
                                 type="text"
+                                role="combobox"
+                                aria-expanded="true"
+                                aria-autocomplete="list"
+                                aria-controls={listboxId}
+                                aria-activedescendant={
+                                    highlighted ? optionId(highlighted) : undefined
+                                }
                                 autoFocus
                                 value={query}
                                 onChange={(e) => {
@@ -182,6 +196,7 @@ export function FolderPickerDialog({
                         </div>
                     </div>
                     <ul
+                        id={listboxId}
                         role="listbox"
                         aria-label={t('fileIntoTitle', { count: documentCount })}
                         className="max-h-72 overflow-y-auto px-2 py-2"
@@ -206,6 +221,7 @@ export function FolderPickerDialog({
                                     <button
                                         type="button"
                                         role="option"
+                                        id={optionId(option)}
                                         aria-selected={selected}
                                         data-testid={
                                             option.kind === 'folder'

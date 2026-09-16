@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { KB_LIBRARY_FILE_BATCH_MAX } from '@ever-works/contracts';
@@ -35,6 +35,10 @@ export function DocumentFilePicker({
     const t = useTranslations('dashboard.memoryPage.library');
     const [tree, setTree] = useState<KbLibraryTreeDto | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Folders created from this picker, by id. Create-and-file files in the
+    // same tick, before the `tree` this render captured carries the folder,
+    // so the confirmation reads its path from here — as `LibraryPanel` does.
+    const createdPaths = useRef(new Map<string, string>());
 
     useEffect(() => {
         if (!open) return;
@@ -67,7 +71,7 @@ export function DocumentFilePicker({
             );
             throw err;
         }
-        const path = target ? findPath(tree, target) : null;
+        const path = target ? (createdPaths.current.get(target) ?? findPath(tree, target)) : null;
         toast.success(
             target
                 ? t('filedToast', { count: 1, folder: formatFolderPath(path) ?? t('unfiled') })
@@ -80,6 +84,7 @@ export function DocumentFilePicker({
     const onCreateFolder = async (name: string) => {
         try {
             const folder = await knowledgeLibraryClient.createFolder(name, null);
+            createdPaths.current.set(folder.id, folder.path);
             setTree((prev) =>
                 prev
                     ? {

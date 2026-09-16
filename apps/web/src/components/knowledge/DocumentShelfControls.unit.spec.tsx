@@ -174,6 +174,47 @@ describe('DocumentShelfControls', () => {
         expect(screen.getByTestId('kb-workbench-archive-button')).toBeTruthy();
     });
 
+    it('reports an archive whose server action rejects and re-enables the control', async () => {
+        actions.archive.mockRejectedValue(new Error('connection lost'));
+        render(<DocumentShelfControls workId="work-1" document={doc} />);
+        await screen.findByTestId('kb-workbench-folder-breadcrumb');
+
+        fireEvent.click(screen.getByTestId('kb-workbench-archive-button'));
+
+        await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith('archiveFailed'));
+        await waitFor(() =>
+            expect(
+                screen.getByTestId('kb-workbench-archive-button').getAttribute('aria-disabled'),
+            ).toBe('false'),
+        );
+    });
+
+    it('reports a restore whose server action rejects and re-enables the control', async () => {
+        actions.unarchive.mockRejectedValue(new Error('connection lost'));
+        const archived = { ...doc, status: 'archived' } as KbDocumentDto;
+        render(<DocumentShelfControls workId="work-1" document={archived} />);
+        await screen.findByTestId('kb-workbench-folder-breadcrumb');
+
+        fireEvent.click(screen.getByTestId('kb-workbench-restore-button'));
+
+        await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith('restoreFailed'));
+        await waitFor(() =>
+            expect(
+                screen.getByTestId('kb-workbench-restore-button').getAttribute('aria-disabled'),
+            ).toBe('false'),
+        );
+    });
+
+    it('holds Archive until the library row says whether this member may edit', () => {
+        render(<DocumentShelfControls workId="work-1" document={doc} />);
+
+        const archive = screen.getByTestId('kb-workbench-archive-button');
+        expect(archive.getAttribute('aria-disabled')).toBe('true');
+        expect(archive.getAttribute('data-disabled-reason')).toBe('loading');
+        fireEvent.click(archive);
+        expect(actions.archive).not.toHaveBeenCalled();
+    });
+
     it('files from the header through the folder picker', async () => {
         client.file.mockResolvedValue({ filed: 1, folderId: null });
         render(<DocumentShelfControls workId="work-1" document={doc} />);
@@ -185,6 +226,30 @@ describe('DocumentShelfControls', () => {
 
         await waitFor(() => expect(client.file).toHaveBeenCalledWith(['doc-1'], null));
         expect(toastMock.success).toHaveBeenCalledWith('unfiledToast:{"count":1}');
+    });
+
+    it('names the folder it just created in the filed confirmation', async () => {
+        client.createFolder.mockResolvedValue({
+            id: 'refunds',
+            name: 'Refunds',
+            path: '/Refunds',
+            parentId: null,
+        });
+        client.file.mockResolvedValue({ filed: 1, folderId: 'refunds' });
+        render(<DocumentShelfControls workId="work-1" document={doc} />);
+        await screen.findByTestId('kb-workbench-folder-breadcrumb');
+
+        fireEvent.click(screen.getByTestId('kb-workbench-file-button'));
+        fireEvent.change(await screen.findByTestId('library-folder-picker-search'), {
+            target: { value: 'Refunds' },
+        });
+        fireEvent.click(screen.getByTestId('library-folder-picker-create'));
+        fireEvent.click(screen.getByTestId('library-folder-picker-confirm'));
+
+        await waitFor(() => expect(client.file).toHaveBeenCalledWith(['doc-1'], 'refunds'));
+        // The tree this render captured has no such folder yet — the toast
+        // still names it rather than falling back to Unfiled.
+        expect(toastMock.success).toHaveBeenCalledWith('filedToast:{"count":1,"folder":"Refunds"}');
     });
 
     it('exports Markdown, reporting a failure', async () => {

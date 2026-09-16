@@ -4,9 +4,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { KbLibraryDocumentDto } from '@ever-works/contracts';
 import { libraryDoc } from './__tests__/library-fixtures';
 
+const { localeMock } = vi.hoisted(() => ({ localeMock: vi.fn(() => 'en-US') }));
+
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
         vars ? `${key}:${JSON.stringify(vars)}` : key,
+    useLocale: () => localeMock(),
 }));
 
 vi.mock('@/i18n/navigation', () => ({
@@ -27,9 +30,35 @@ function renderRow(doc: KbLibraryDocumentDto, selected = false) {
     return handlers;
 }
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    localeMock.mockReturnValue('en-US');
+});
 
 describe('LibraryDocumentRow', () => {
+    it('writes the changed date in the active application locale', () => {
+        const opts = { year: 'numeric', month: 'short', day: 'numeric' } as const;
+        const changed = new Date(libraryDoc().revisionAt!);
+
+        localeMock.mockReturnValue('de-DE');
+        renderRow(libraryDoc());
+        const german = screen.getByText(/changedAt/).textContent;
+        cleanup();
+
+        localeMock.mockReturnValue('en-US');
+        renderRow(libraryDoc());
+        const english = screen.getByText(/changedAt/).textContent;
+
+        expect(german).toBe(
+            `changedAt:${JSON.stringify({ date: changed.toLocaleDateString('de-DE', opts) })}`,
+        );
+        expect(english).toBe(
+            `changedAt:${JSON.stringify({ date: changed.toLocaleDateString('en-US', opts) })}`,
+        );
+        // The row follows the locale rather than the runtime default.
+        expect(german).not.toBe(english);
+    });
+
     it('links the title to the workbench and shows the folder breadcrumb and Work', () => {
         renderRow(libraryDoc());
 

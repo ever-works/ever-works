@@ -6,6 +6,7 @@ import { libraryDoc } from './__tests__/library-fixtures';
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string, vars?: Record<string, unknown>) =>
         vars ? `${key}:${JSON.stringify(vars)}` : key,
+    useLocale: () => 'en-US',
 }));
 
 vi.mock('@/i18n/navigation', () => ({

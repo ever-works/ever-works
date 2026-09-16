@@ -15,7 +15,14 @@ describe('shelfBlockReason', () => {
     it('holds File and Export while the library row loads', () => {
         expect(shelfBlockReason('file', 'loading', null)).toBe('loading');
         expect(shelfBlockReason('export', 'idle', null)).toBe('loading');
-        expect(shelfBlockReason('archive', 'loading', null)).toBeNull();
+    });
+
+    it('holds Archive and Restore while an organization row loads, so a viewer cannot start one', () => {
+        expect(shelfBlockReason('archive', 'loading', null)).toBe('loading');
+        expect(shelfBlockReason('restore', 'loading', null)).toBe('loading');
+        // A deferred read (a closed context menu) has no row to wait for.
+        expect(shelfBlockReason('archive', 'idle', null)).toBeNull();
+        expect(shelfBlockReason('restore', 'idle', null)).toBeNull();
     });
 
     it('explains every edit control to a view-only member, and lets them export', () => {

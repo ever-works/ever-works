@@ -161,6 +161,29 @@ describe('FolderPickerDialog', () => {
         await waitFor(() => expect(onFile).toHaveBeenCalledWith('support'));
     });
 
+    it('names the highlighted option to assistive technology as the arrows move', async () => {
+        renderPicker();
+        const search = await screen.findByTestId('library-folder-picker-search');
+        const listbox = screen.getByRole('listbox');
+
+        expect(search.getAttribute('role')).toBe('combobox');
+        expect(search.getAttribute('aria-controls')).toBe(listbox.id);
+        expect(listbox.id).toBeTruthy();
+
+        const activeId = () => search.getAttribute('aria-activedescendant');
+        expect(activeId()).toBe(screen.getByTestId('library-folder-picker-option-playbooks').id);
+
+        fireEvent.keyDown(search, { key: 'ArrowDown' });
+        expect(activeId()).toBe(screen.getByTestId('library-folder-picker-option-support').id);
+
+        fireEvent.keyDown(search, { key: 'ArrowDown' });
+        fireEvent.keyDown(search, { key: 'ArrowDown' });
+        expect(activeId()).toBe(screen.getByTestId('library-folder-picker-unfiled').id);
+
+        fireEvent.keyDown(search, { key: 'ArrowUp' });
+        expect(activeId()).toBe(screen.getByTestId('library-folder-picker-option-reports').id);
+    });
+
     it('refuses more than 100 documents with the over-limit copy', async () => {
         const { onFile } = renderPicker({ documentCount: 143 });
 

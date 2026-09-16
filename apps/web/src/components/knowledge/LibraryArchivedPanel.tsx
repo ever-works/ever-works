@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Archive, Download, FolderClosed, Loader2, RotateCcw } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { formatFolderPath, type KbLibraryDocumentDto } from '@/lib/api/knowledge-library-types';
@@ -40,6 +40,7 @@ export function LibraryArchivedPanel({
     busyDocId,
 }: LibraryArchivedPanelProps) {
     const t = useTranslations('dashboard.memoryPage.library');
+    const locale = useLocale();
 
     return (
         <section data-testid="library-archived-panel" className="flex flex-col gap-3">
@@ -128,7 +129,7 @@ export function LibraryArchivedPanel({
                                         {doc.archivedAt ? (
                                             <span>
                                                 {t('archivedAt', {
-                                                    date: formatLibraryDate(doc.archivedAt),
+                                                    date: formatLibraryDate(doc.archivedAt, locale),
                                                 })}
                                             </span>
                                         ) : null}

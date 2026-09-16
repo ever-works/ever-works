@@ -321,18 +321,26 @@ export function KbDocumentContextMenu({
     const onRestore = useCallback(async () => {
         setPending(true);
         setError(null);
-        const result = await unarchiveKbDocumentAction({
-            workId,
-            docId: document.id,
-            path: document.path,
-        });
-        setPending(false);
-        if (result.success && result.data) {
-            onPatched?.(result.data.document);
-            router.refresh();
-            closeMenu();
-        } else {
-            setError(result.error ?? tLibrary('restoreFailed'));
+        try {
+            const result = await unarchiveKbDocumentAction({
+                workId,
+                docId: document.id,
+                path: document.path,
+            });
+            if (result.success && result.data) {
+                onPatched?.(result.data.document);
+                router.refresh();
+                closeMenu();
+            } else {
+                setError(result.error ?? tLibrary('restoreFailed'));
+            }
+        } catch {
+            // A rejected server-action invocation (a dropped connection, a
+            // redeploy) never returns a result — say so rather than leaving
+            // the item pending with no explanation.
+            setError(tLibrary('restoreFailed'));
+        } finally {
+            setPending(false);
         }
     }, [workId, document.id, document.path, onPatched, router, closeMenu, tLibrary]);
 
@@ -554,6 +562,9 @@ const ContextMenuPanel = function ContextMenuPanel({
 }: ContextMenuPanelProps & { ref: React.Ref<HTMLDivElement> }) {
     const [lockSubmenuOpen, setLockSubmenuOpen] = useState(false);
     const menuId = useId();
+    // Restore replaces Archive only where it exists: without the library
+    // entries an archived document keeps the Archive item it has today.
+    const restorable = document.status === 'archived' && Boolean(library);
 
     return (
         <div
@@ -648,17 +659,21 @@ const ContextMenuPanel = function ContextMenuPanel({
                 </div>
             )}
 
-            <MenuItem
-                testId="kb-workbench-context-archive"
-                icon={Archive}
-                label={labels.archive}
-                disabled={pending}
-                onClick={onArchive}
-            />
+            {/* Archive and Restore are the two ends of one action: an
+                archived document offers Restore in its place, never both. */}
+            {restorable ? null : (
+                <MenuItem
+                    testId="kb-workbench-context-archive"
+                    icon={Archive}
+                    label={labels.archive}
+                    disabled={pending}
+                    onClick={onArchive}
+                />
+            )}
 
             {library ? (
                 <>
-                    {document.status === 'archived' ? (
+                    {restorable ? (
                         <MenuItem
                             testId="kb-workbench-context-restore"
                             icon={RotateCcw}

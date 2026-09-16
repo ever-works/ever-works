@@ -152,6 +152,15 @@ describe('filenameFromDisposition', () => {
         );
     });
 
+    it('drops the optional RFC 5987 language tag instead of keeping it in the name', () => {
+        expect(filenameFromDisposition("attachment; filename*=UTF-8'en'caf%C3%A9.md", 'x.md')).toBe(
+            'café.md',
+        );
+        expect(
+            filenameFromDisposition("attachment; filename*=ISO-8859-1'de'gru%DFe.md", 'x.md'),
+        ).toBe('gru%DFe.md');
+    });
+
     it('strips path separators and falls back when the header is missing', () => {
         expect(filenameFromDisposition('attachment; filename="../../etc.md"', 'x.md')).toBe(
             '.._.._etc.md',

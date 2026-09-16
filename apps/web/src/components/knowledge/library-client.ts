@@ -60,10 +60,16 @@ async function requestJson<T>(url: string, init: RequestInit = {}): Promise<T> {
     return (await res.json()) as T;
 }
 
-/** `attachment; filename="voice.md"` → `voice.md`, stripped of path characters. */
+/**
+ * `attachment; filename="voice.md"` → `voice.md`, stripped of path characters.
+ *
+ * An RFC 5987 `filename*` carries `<charset>'<language>'<percent-encoded>`,
+ * and the language half is optional — `UTF-8''caf%C3%A9.md` and
+ * `UTF-8'en'caf%C3%A9.md` both have to yield `café.md`.
+ */
 export function filenameFromDisposition(disposition: string | null, fallback: string): string {
     const match = disposition
-        ? /filename\*?=(?:UTF-8'')?(?:"([^"]+)"|([^;\s]+))/i.exec(disposition)
+        ? /filename\*?=(?:[A-Za-z0-9._-]+'[^']*')?(?:"([^"]+)"|([^;\s]+))/i.exec(disposition)
         : null;
     const raw = match?.[1] ?? match?.[2];
     let name = fallback;
