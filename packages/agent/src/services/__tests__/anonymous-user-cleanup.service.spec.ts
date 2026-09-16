@@ -133,4 +133,154 @@ describe('AnonymousUserCleanupService (EW-617 G2)', () => {
             expect(summary.deleted).toBe(1);
         });
     });
+
+    // Knowledge library — an Organization's shared folders record their
+    // creator in `memory_folders.userId` (FK `ON DELETE CASCADE`), so they
+    // must change hands before the creator's row is deleted.
+    describe('shared folder hand-over', () => {
+        const ORG = 'org-1';
+        const TENANT = 'tenant-1';
+
+        const buildWithFolders = () => {
+            const userRepository = {
+                findExpiredAnonymous: jest.fn(),
+                deleteAnonymous: jest.fn().mockResolvedValue(undefined),
+                findById: jest.fn(async (id: string) => ({ id, tenantId: TENANT })),
+                findOtherTenantMember: jest.fn(async () => ({ id: 'u-member', tenantId: TENANT })),
+            } as any;
+            const memoryFolders = {
+                listOrganizationIdsWithFoldersCreatedBy: jest.fn(async () => [ORG]),
+                reassignOrganizationFolders: jest.fn(async () => 2),
+            } as any;
+            const organizations = {
+                findById: jest.fn(async () => ({ id: ORG, tenantId: TENANT })),
+            } as any;
+            const tenants = {
+                findById: jest.fn(async () => ({ id: TENANT, ownerUserId: 'u-owner' })),
+            } as any;
+            const storage = { deleteAllByOwner: jest.fn(async () => ({ deleted: 0 })) };
+            const service = new AnonymousUserCleanupService(
+                userRepository,
+                storage,
+                memoryFolders,
+                organizations,
+                tenants,
+            );
+            return { service, userRepository, memoryFolders, organizations, tenants, storage };
+        };
+
+        it('hands the shared folders to the Tenant owner before the row is deleted', async () => {
+            const { service, userRepository, memoryFolders } = buildWithFolders();
+            userRepository.findExpiredAnonymous.mockResolvedValue([{ id: 'u-anon' }]);
+
+            const summary = await service.purgeExpired();
+
+            expect(memoryFolders.listOrganizationIdsWithFoldersCreatedBy).toHaveBeenCalledWith(
+                'u-anon',
+            );
+            expect(memoryFolders.reassignOrganizationFolders).toHaveBeenCalledWith(
+                ORG,
+                'u-anon',
+                'u-owner',
+            );
+            expect(userRepository.findOtherTenantMember).not.toHaveBeenCalled();
+            expect(
+                memoryFolders.reassignOrganizationFolders.mock.invocationCallOrder[0],
+            ).toBeLessThan(userRepository.deleteAnonymous.mock.invocationCallOrder[0]);
+            expect(summary).toMatchObject({ deleted: 1, failed: 0 });
+        });
+
+        it('hands them to another member when the deleted user owns the Tenant', async () => {
+            const { service, userRepository, memoryFolders, tenants } = buildWithFolders();
+            tenants.findById.mockResolvedValue({ id: TENANT, ownerUserId: 'u-anon' });
+            userRepository.findExpiredAnonymous.mockResolvedValue([{ id: 'u-anon' }]);
+
+            await service.purgeExpired();
+
+            expect(userRepository.findOtherTenantMember).toHaveBeenCalledWith(TENANT, 'u-anon');
+            expect(memoryFolders.reassignOrganizationFolders).toHaveBeenCalledWith(
+                ORG,
+                'u-anon',
+                'u-member',
+            );
+            expect(userRepository.deleteAnonymous).toHaveBeenCalledWith('u-anon');
+        });
+
+        it('passes over a Tenant owner who has left the Tenant', async () => {
+            const { service, userRepository, memoryFolders } = buildWithFolders();
+            userRepository.findById.mockResolvedValue({ id: 'u-owner', tenantId: 'elsewhere' });
+            userRepository.findExpiredAnonymous.mockResolvedValue([{ id: 'u-anon' }]);
+
+            await service.purgeExpired();
+
+            expect(memoryFolders.reassignOrganizationFolders).toHaveBeenCalledWith(
+                ORG,
+                'u-anon',
+                'u-member',
+            );
+        });
+
+        it('leaves the folders to the cascade when the user was the last member', async () => {
+            const { service, userRepository, memoryFolders, tenants } = buildWithFolders();
+            tenants.findById.mockResolvedValue({ id: TENANT, ownerUserId: 'u-anon' });
+            userRepository.findOtherTenantMember.mockResolvedValue(null);
+            userRepository.findExpiredAnonymous.mockResolvedValue([{ id: 'u-anon' }]);
+
+            const summary = await service.purgeExpired();
+
+            expect(memoryFolders.reassignOrganizationFolders).not.toHaveBeenCalled();
+            expect(userRepository.deleteAnonymous).toHaveBeenCalledWith('u-anon');
+            expect(summary.deleted).toBe(1);
+        });
+
+        it('does nothing for a user who created no shared folders', async () => {
+            const { service, userRepository, memoryFolders, organizations } = buildWithFolders();
+            memoryFolders.listOrganizationIdsWithFoldersCreatedBy.mockResolvedValue([]);
+            userRepository.findExpiredAnonymous.mockResolvedValue([{ id: 'u-anon' }]);
+
+            await service.purgeExpired();
+
+            expect(organizations.findById).not.toHaveBeenCalled();
+            expect(memoryFolders.reassignOrganizationFolders).not.toHaveBeenCalled();
+            expect(userRepository.deleteAnonymous).toHaveBeenCalledWith('u-anon');
+        });
+
+        it('keeps a user whose hand-over failed for the next run, and carries on with the batch', async () => {
+            const { service, userRepository, memoryFolders, storage } = buildWithFolders();
+            memoryFolders.reassignOrganizationFolders
+                .mockRejectedValueOnce(new Error('db down'))
+                .mockResolvedValueOnce(1);
+            userRepository.findExpiredAnonymous.mockResolvedValue([
+                { id: 'u-stuck' },
+                { id: 'u-next' },
+            ]);
+
+            const summary = await service.purgeExpired();
+
+            expect(userRepository.deleteAnonymous).not.toHaveBeenCalledWith('u-stuck');
+            expect(storage.deleteAllByOwner).not.toHaveBeenCalledWith('u-stuck');
+            expect(userRepository.deleteAnonymous).toHaveBeenCalledWith('u-next');
+            expect(summary).toMatchObject({
+                scanned: 2,
+                deleted: 1,
+                failed: 1,
+                failures: [{ userId: 'u-stuck', error: 'db down' }],
+            });
+        });
+    });
+
+    describe('shared folder hand-over without the folder repositories wired', () => {
+        it('deletes exactly as before', async () => {
+            // `buildService` wires no folder repositories and its user
+            // repository has no `findOtherTenantMember`: the hand-over must
+            // not touch either.
+            const { service, userRepository } = buildService(undefined);
+            userRepository.findExpiredAnonymous.mockResolvedValue([{ id: 'u-1' }]);
+
+            const summary = await service.purgeExpired();
+
+            expect(userRepository.deleteAnonymous).toHaveBeenCalledWith('u-1');
+            expect(summary).toMatchObject({ scanned: 1, deleted: 1, failed: 0, failures: [] });
+        });
+    });
 });
