@@ -33,6 +33,7 @@ export * from './repositories/work-budget.repository';
 export * from './repositories/work-budget-alert-state.repository';
 export * from './repositories/notification.repository';
 export * from './repositories/conversation.repository';
+export * from './repositories/conversation-participant.repository';
 export * from './repositories/github-app-installation.repository';
 export * from './repositories/github-app-installation-repository.repository';
 export * from './repositories/github-app-user-link.repository';
@@ -95,6 +96,7 @@ export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './repositories/memory-folder.repository';
+export * from './repositories/knowledge-document-reader-state.repository';
 // AW-14 What's new — per-person product changelog read state.
 export * from './repositories/product-changelog-read.repository';
 // Repository registry (Feature G) — repo connections + agent grants.

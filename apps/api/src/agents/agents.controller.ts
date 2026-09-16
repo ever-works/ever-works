@@ -1305,6 +1305,11 @@ export class AgentsController {
      * were typing" is a normal race, not a client error, and the caller has a
      * defined next step.
      *
+     * A REVIEW run (reviewer agent stage, slice AD) IS a 409, live or not:
+     * nothing is steered into a reviewer's conversation, because this route
+     * is reachable with a fleet run token — i.e. by the code's author — and a
+     * new conversation with the reviewer is not something a review supports.
+     *
      * Ownership is enforced twice — `getOne` 404s a cross-user Agent, and
      * `RunSteeringService` loads the run through `findByIdAndUser`, so a run
      * id belonging to someone else is indistinguishable from a missing one.

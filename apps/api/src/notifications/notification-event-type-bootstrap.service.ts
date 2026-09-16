@@ -158,6 +158,17 @@ const CORE_EVENTS: readonly CoreEventRow[] = [
         urgent: false,
         defaultChannels: ['in-app'],
     },
+    // Shared view (AW-18). Registered here so the first-view notice can be
+    // routed to a channel from the preference matrix; an unregistered key
+    // would stay in-app forever.
+    {
+        key: 'shared_view_first_view',
+        category: 'system',
+        title: 'Shared view opened',
+        description: 'A share link you published was opened for the first time.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
 ];
 
 /**

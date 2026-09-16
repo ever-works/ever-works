@@ -83,9 +83,11 @@ import { ScopeModule } from './scope/scope.module';
 import { ScopeOwnershipGuard } from './scope/scope-ownership.guard';
 import { SessionScopeGuard } from './scope/session-scope.guard';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { SharedViewsApiModule } from './shared-views/shared-views.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
+import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -316,6 +318,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Memory Files — /api/memory/files: the unified Files area of
         // /memory (folder tree + both upload spines + manual git sync).
         MemoryFilesApiModule,
+        // Knowledge library — /api/knowledge: the organization shelf over
+        // the Knowledge Base (shared folders, filing, archive / restore,
+        // Markdown export).
+        KnowledgeLibraryApiModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,
@@ -331,6 +337,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // EW-658 (Tenants & Organizations Phase 6) — Organization
         // CRUD + lazy Tenant bootstrap + upgrade-from-account flow.
         OrganizationsModule,
+        // AW-18 Shared view — Settings → Sharing (owner) and the public
+        // share-link exchange + published board read (no account).
+        SharedViewsApiModule,
     ],
     providers: [
         {

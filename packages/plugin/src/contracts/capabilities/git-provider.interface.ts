@@ -318,6 +318,18 @@ export interface GitPullRequestStatus {
 	/** Provider's mergeability verdict; `null` when still being computed. */
 	readonly mergeable?: boolean | null;
 	readonly headSha?: string | null;
+	/**
+	 * The branch the pull request merges INTO (`main`, `develop`, …), as
+	 * the provider reports it. Optional and additive.
+	 *
+	 * Reviewer agent stage (slice AD, EW-811): with `headSha` it pins a
+	 * review diff to one commit — `getCompareDiff(baseRef, headSha)` — so
+	 * the diff a reviewer reads is the content of the commit its verdict
+	 * is bound to, not whatever the pull request's head happens to be a
+	 * moment later. A caller that needs that guarantee refuses when this
+	 * is absent.
+	 */
+	readonly baseRef?: string | null;
 	readonly reviewDecision?: GitReviewDecision | null;
 	/**
 	 * Roll-up over EVERY check the provider reports for the head commit —
@@ -419,6 +431,17 @@ export interface GitDiffFile {
 	readonly path: string;
 	/** Provider status verbatim (`added`/`modified`/`removed`/…). */
 	readonly status: string;
+	/**
+	 * The path this file had BEFORE the change, for a rename or a copy
+	 * (GitHub `previous_filename`). Optional and additive: absent for every
+	 * other status, and for providers that do not report it.
+	 *
+	 * Reviewer agent stage (slice AD, EW-811): a rename is a change to the
+	 * OLD path as well as the new one — moving a workflow file or a spec out
+	 * of its active location is invisible in the new path's hunks alone —
+	 * so the review brief prints it, and refuses a rename that lacks it.
+	 */
+	readonly previousPath?: string;
 	readonly additions: number;
 	readonly deletions: number;
 	/** Unified patch; omitted when the byte budget was already spent. */

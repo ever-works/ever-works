@@ -234,6 +234,12 @@ describe('RunsController', () => {
             expect(repeated.instance.kind).toEqual(['heartbeat', 'chat']);
         });
 
+        it('accepts the conversation trigger kind alongside the others', async () => {
+            const mixed = await validateDto(ListRunsQueryDto, { kind: 'conversation,chat' });
+            expect(mixed.properties).toEqual([]);
+            expect(mixed.instance.kind).toEqual(['conversation', 'chat']);
+        });
+
         it('rejects unknown statuses and trigger kinds inside a list', async () => {
             expect(
                 (await validateDto(ListRunsQueryDto, { status: ['failed', 'exploded'] }))

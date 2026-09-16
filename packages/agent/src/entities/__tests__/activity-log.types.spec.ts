@@ -86,11 +86,24 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Knowledge library — shelf curation (filing, archive, export)
+            // and shared-folder rename.
+            ['KB_DOCUMENT_ARCHIVED', 'kb_document_archived'],
+            ['KB_DOCUMENT_UNARCHIVED', 'kb_document_unarchived'],
+            ['KB_DOCUMENT_FILED', 'kb_document_filed'],
+            ['KB_DOCUMENT_EXPORTED', 'kb_document_exported'],
+            ['MEMORY_FOLDER_RENAMED', 'memory_folder_renamed'],
             // Live Feed — a run starting / finishing / failing for every
             // trigger kind other than heartbeat.
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Shared view (AW-18)
+            ['SHARED_VIEW_ENABLED', 'shared_view_enabled'],
+            ['SHARED_VIEW_DISABLED', 'shared_view_disabled'],
+            ['SHARED_VIEW_REGENERATED', 'shared_view_regenerated'],
+            ['SHARED_VIEW_SECTIONS_CHANGED', 'shared_view_sections_changed'],
+            ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
             // Agent computers — one row per stretch of control of an Agent's machine.
             ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
@@ -166,13 +179,34 @@ describe('activity-log.types', () => {
             // branch's Schedules workspace pause/resume members:
             // 157 base + 2 + 3 + 1 -> 163.
             //
-            // 🛑 163 is COUNTED from the merged enum, never added up from the
+            // +5 kb_document_archived / _unarchived / _filed / _exported and
+            //    memory_folder_renamed (Knowledge library shelf) -> 162 on
+            //    develop, on its own Live-Feed base.
+            //
+            // 🛑 173 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 159, develop was at 160), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(163);
+            //
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) and +5 knowledge
+            //    library literals -> 165.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 166
+            //    after the knowledge library branch merged develop's Agent
+            //    computers take-over work.
+            // +5 shared_view_enabled / _disabled / _regenerated /
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) — this
+            //    branch's own additions, disjoint from everything develop grew
+            //    while it was open -> 171 COUNTED from the merged enum (this
+            //    branch budgeted 166, develop was at 166, and the five shared-view
+            //    literals are the only ones develop does not already have).
+            // +2 schedule_paused / schedule_resumed (Schedules workspace pause
+            //    that keeps the cadence) — this branch's own additions, the only
+            //    two literals develop does not already have -> 173 COUNTED from
+            //    the merged enum (this branch budgeted 163, develop was at 171).
+            expect(literals).toHaveLength(173);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
