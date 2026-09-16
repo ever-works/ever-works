@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getLocale, getTranslations } from 'next-intl/server';
 import RegisterForm from './register-form';
+import { prefillFromSearchParams, type RegisterSearchParams } from './register-prefill';
 import { getConfiguredAuthProviders } from '@/lib/auth/providers';
 import { authAPI, type TermsAcceptanceDocument } from '@/lib/api';
 
@@ -9,8 +10,14 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t('createAccount') };
 }
 
-export default async function RegisterPage() {
+export default async function RegisterPage({
+    searchParams,
+}: {
+    searchParams: Promise<RegisterSearchParams>;
+}) {
     const availableSocialProviders = await getConfiguredAuthProviders();
+    // Identity carried over from Stripe Checkout — see `register-prefill.ts`.
+    const prefill = prefillFromSearchParams(await searchParams);
 
     // Resolve the documents this signup must accept on the server, in the user's
     // locale, and hand them to the form. The form posts them straight back on
@@ -32,6 +39,7 @@ export default async function RegisterPage() {
         <RegisterForm
             availableSocialProviders={availableSocialProviders}
             termsDocuments={termsDocuments}
+            prefill={prefill}
         />
     );
 }

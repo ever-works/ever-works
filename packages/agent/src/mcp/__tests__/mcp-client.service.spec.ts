@@ -7,6 +7,7 @@ import {
 import type { McpClientFactory, McpSdkClient } from '../mcp-sdk';
 import type { McpServerConnection } from '../../entities/mcp-server-connection.entity';
 import type { McpServerConnectionRepository } from '../../database/repositories/mcp-server-connection.repository';
+import { McpCredentialTransportPolicyService } from '../mcp-credential-transport-policy.service';
 
 function makeConnection(over: Partial<McpServerConnection> = {}): McpServerConnection {
     return {
@@ -253,6 +254,615 @@ describe('McpClientService', () => {
             expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
                 ok: false,
                 error: 'Server unreachable (connection failed).',
+            });
+        });
+    });
+
+    describe('header credentials resolved at connect time', () => {
+        const RESOLVED = 'resolved-vault-value-9f8e7d6c';
+
+        function makeResolver(values: Record<string, string> = { docs_token: RESOLVED }) {
+            return {
+                resolve: jest.fn(async (_ctx: unknown, keys: readonly string[]) => {
+                    const out = new Map<string, string>();
+                    for (const key of keys) {
+                        if (values[key] !== undefined) out.set(key, values[key]);
+                    }
+                    return out;
+                }),
+            };
+        }
+
+        function referencing(over: Partial<McpServerConnection> = {}): McpServerConnection {
+            return makeConnection({
+                authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+                tenantId: 't1',
+                organizationId: 'o1',
+                ...over,
+            });
+        }
+
+        it('hands the factory resolved headers while the entity keeps the reference', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const resolver = makeResolver();
+            const service = new McpClientService(repo as never, factory, resolver);
+            const connection = referencing();
+
+            await service.listTools(connection);
+
+            expect(factory.connect).toHaveBeenCalledWith({
+                url: 'https://mcp.example.com/mcp',
+                transport: 'streamable-http',
+                headers: { Authorization: `Bearer ${RESOLVED}` },
+            });
+            expect(connection.authHeaders).toEqual({
+                Authorization: 'Bearer {{cred.docs_token}}',
+            });
+            expect(resolver.resolve).toHaveBeenCalledWith(
+                { userId: 'u1', organizationId: 'o1', tenantId: 't1' },
+                ['docs_token'],
+            );
+        });
+
+        it('resolves on every attempt (list, call) — nothing is cached', async () => {
+            const client = makeClient();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const resolver = makeResolver();
+            const service = new McpClientService(makeRepo() as never, factory, resolver);
+
+            await service.listTools(referencing(), { bypassCache: true });
+            await service.callTool(referencing(), 'search_issues', {});
+
+            expect(resolver.resolve).toHaveBeenCalledTimes(2);
+        });
+
+        it('a missing key fails BEFORE the factory is called and names the key', async () => {
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const service = new McpClientService(repo as never, factory, makeResolver({}));
+
+            await expect(service.listTools(referencing())).rejects.toThrow(
+                'Missing credential `docs_token`',
+            );
+            expect(factory.connect).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                ok: false,
+                error: 'Missing credential `docs_token`',
+            });
+        });
+
+        it('callTool returns the missing-key refusal as { error } without dialing', async () => {
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const service = new McpClientService(makeRepo() as never, factory, makeResolver({}));
+
+            const result = (await service.callTool(referencing(), 'search_issues', {})) as {
+                error: string;
+            };
+
+            expect(result.error).toBe('MCP server "github": Missing credential `docs_token`');
+            expect(factory.connect).not.toHaveBeenCalled();
+        });
+
+        it('an unbound resolver fails closed — the reference is never sent verbatim', async () => {
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const service = new McpClientService(makeRepo() as never, factory);
+
+            await expect(service.listTools(referencing())).rejects.toThrow(
+                'Missing credential `docs_token`',
+            );
+            expect(factory.connect).not.toHaveBeenCalled();
+        });
+
+        it('a resolver that throws fails closed without logging its message', async () => {
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const resolver = {
+                resolve: jest.fn().mockRejectedValue(new Error(`store said ${RESOLVED}`)),
+            };
+            const service = new McpClientService(makeRepo() as never, factory, resolver);
+            const warn = jest
+                .spyOn((service as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                .mockImplementation(() => undefined);
+
+            await expect(service.listTools(referencing())).rejects.toThrow(/Missing credential/);
+            expect(factory.connect).not.toHaveBeenCalled();
+            for (const call of warn.mock.calls) {
+                expect(String(call[0])).not.toContain(RESOLVED);
+            }
+        });
+
+        it('a header with no reference is sent unchanged and never consults the resolver', async () => {
+            const client = makeClient();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const resolver = makeResolver();
+            const service = new McpClientService(makeRepo() as never, factory, resolver);
+
+            await service.listTools(makeConnection());
+
+            expect(factory.connect).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    headers: { Authorization: 'Bearer secret-token-value' },
+                }),
+            );
+            expect(resolver.resolve).not.toHaveBeenCalled();
+        });
+
+        it('redacts a resolved value an SDK error echoes back', async () => {
+            const repo = makeRepo();
+            const factory: McpClientFactory = {
+                connect: jest
+                    .fn()
+                    .mockRejectedValue(
+                        new Error(
+                            `Headers.append: "Bearer ${RESOLVED}" is an invalid header value.`,
+                        ),
+                    ),
+            };
+            const service = new McpClientService(repo as never, factory, makeResolver());
+
+            let thrown = '';
+            try {
+                await service.listTools(referencing());
+            } catch (err) {
+                thrown = err instanceof Error ? err.message : String(err);
+            }
+
+            expect(thrown).not.toContain(RESOLVED);
+            const stamped = repo.stampConnectionResult.mock.calls[0][1];
+            expect(String(stamped.error)).not.toContain(RESOLVED);
+            expect(String(stamped.error)).toContain('[redacted:cred.docs_token]');
+        });
+
+        it('redacts a resolved value a tool result or tool error reflects', async () => {
+            const reflecting = makeClient({
+                callTool: jest
+                    .fn()
+                    .mockResolvedValue({ content: [{ type: 'text', text: `echo ${RESOLVED}` }] }),
+            });
+            const failing = makeClient({
+                callTool: jest.fn().mockRejectedValue(new Error(`upstream said ${RESOLVED}`)),
+            });
+
+            const okService = new McpClientService(
+                makeRepo() as never,
+                { connect: jest.fn().mockResolvedValue(reflecting) },
+                makeResolver(),
+            );
+            const failService = new McpClientService(
+                makeRepo() as never,
+                { connect: jest.fn().mockResolvedValue(failing) },
+                makeResolver(),
+            );
+
+            const okResult = await okService.callTool(referencing(), 'echo', {});
+            const failResult = await failService.callTool(referencing(), 'echo', {});
+
+            expect(JSON.stringify(okResult)).not.toContain(RESOLVED);
+            expect(JSON.stringify(failResult)).not.toContain(RESOLVED);
+        });
+
+        it('redacts a resolved value reflected in tool metadata before it is returned or cached', async () => {
+            const reflecting = makeClient({
+                listTools: jest.fn().mockResolvedValue({
+                    tools: [
+                        {
+                            name: 'search_issues',
+                            description: `Authenticated as Bearer ${RESOLVED}`,
+                            inputSchema: {
+                                type: 'object',
+                                properties: {
+                                    token: { type: 'string', default: RESOLVED },
+                                },
+                            },
+                        },
+                    ],
+                }),
+            });
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(reflecting) };
+            const service = new McpClientService(makeRepo() as never, factory, makeResolver());
+
+            const live = await service.listTools(referencing());
+            const cached = await service.listTools(referencing());
+
+            expect(factory.connect).toHaveBeenCalledTimes(1);
+            for (const tools of [live, cached]) {
+                expect(JSON.stringify(tools)).not.toContain(RESOLVED);
+                expect(tools[0].name).toBe('search_issues');
+                expect(tools[0].description).toBe(
+                    'Authenticated as Bearer [redacted:cred.docs_token]',
+                );
+                expect(JSON.stringify(tools[0].inputSchema)).toContain(
+                    '[redacted:cred.docs_token]',
+                );
+            }
+        });
+
+        it('redacts a resolved value reflected in a schema key or deep inside a nested schema', async () => {
+            let nested: Record<string, unknown> = {
+                type: 'string',
+                description: `Sent as Bearer ${RESOLVED}`,
+            };
+            for (let i = 0; i < 6; i++) {
+                nested = { type: 'object', properties: { [`level${i}`]: nested } };
+            }
+            const reflecting = makeClient({
+                listTools: jest.fn().mockResolvedValue({
+                    tools: [
+                        {
+                            name: 'search_issues',
+                            description: 'Search issues',
+                            inputSchema: {
+                                type: 'object',
+                                properties: { [RESOLVED]: { type: 'string' }, deep: nested },
+                            },
+                        },
+                    ],
+                }),
+            });
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(reflecting) };
+            const service = new McpClientService(makeRepo() as never, factory, makeResolver());
+
+            const live = await service.listTools(referencing());
+            const cached = await service.listTools(referencing());
+
+            expect(factory.connect).toHaveBeenCalledTimes(1);
+            for (const tools of [live, cached]) {
+                const schema = JSON.stringify(tools[0].inputSchema);
+                expect(schema).not.toContain(RESOLVED);
+                expect(schema).toContain('"[redacted:cred.docs_token]":{"type":"string"}');
+                expect(schema).toContain('Sent as Bearer [redacted:cred.docs_token]');
+            }
+        });
+
+        it('redacts a tool result that is exactly a short resolved value', async () => {
+            const SHORT = 'pin4242';
+            const reflecting = makeClient({
+                callTool: jest.fn().mockResolvedValue({
+                    content: [{ type: 'text', text: SHORT }],
+                    structuredContent: { [SHORT]: 'yes', note: 'ok' },
+                }),
+            });
+            const service = new McpClientService(
+                makeRepo() as never,
+                { connect: jest.fn().mockResolvedValue(reflecting) },
+                makeResolver({ docs_token: SHORT }),
+            );
+
+            const result = await service.callTool(referencing(), 'echo', {});
+
+            expect(JSON.stringify(result)).not.toContain(SHORT);
+            expect(result).toEqual({
+                content: [{ type: 'text', text: '[redacted:cred.docs_token]' }],
+                structuredContent: { '[redacted:cred.docs_token]': 'yes', note: 'ok' },
+            });
+        });
+
+        it('never writes a resolved value to a log line or the stamped error', async () => {
+            const repo = makeRepo();
+            const factory: McpClientFactory = {
+                connect: jest.fn().mockRejectedValue(new Error(`HTTP 401 for ${RESOLVED}`)),
+            };
+            const service = new McpClientService(repo as never, factory, makeResolver());
+            const logger = (
+                service as unknown as {
+                    logger: Record<'log' | 'warn' | 'error' | 'debug' | 'verbose', () => void>;
+                }
+            ).logger;
+            const spies = (['log', 'warn', 'error', 'debug', 'verbose'] as const).map((level) =>
+                jest.spyOn(logger, level).mockImplementation(() => undefined),
+            );
+
+            await expect(service.listTools(referencing())).rejects.toThrow(
+                'Authentication failed (401). Check the auth header.',
+            );
+
+            for (const spy of spies) {
+                for (const call of spy.mock.calls) {
+                    expect(JSON.stringify(call)).not.toContain(RESOLVED);
+                }
+            }
+            for (const call of repo.stampConnectionResult.mock.calls) {
+                expect(JSON.stringify(call)).not.toContain(RESOLVED);
+            }
+        });
+    });
+
+    describe('credentials require an https endpoint (connect-time re-check)', () => {
+        it('a legacy http row with a credential reference never reaches the factory', async () => {
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const resolver = { resolve: jest.fn() };
+            const service = new McpClientService(repo as never, factory, resolver);
+
+            await expect(
+                service.listTools(
+                    makeConnection({
+                        url: 'http://mcp.example.com/mcp',
+                        authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+                    }),
+                ),
+            ).rejects.toThrow('Credentials require an https:// endpoint');
+            expect(factory.connect).not.toHaveBeenCalled();
+            // Refused before any credential was even looked up.
+            expect(resolver.resolve).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                ok: false,
+                error: 'Credentials require an https:// endpoint',
+            });
+        });
+
+        it('a legacy http row with a literal header keeps connecting, marked insecure_transport', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const service = new McpClientService(repo as never, factory);
+            const connection = makeConnection({ url: 'http://mcp.example.com/mcp' });
+
+            const result = await service.callTool(connection, 'search_issues', {});
+            const tools = await service.listTools(connection, { bypassCache: true });
+
+            expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+            expect(tools).toHaveLength(1);
+            // Sent exactly as before this change: the literal header, untouched.
+            expect(factory.connect).toHaveBeenCalledWith({
+                url: 'http://mcp.example.com/mcp',
+                transport: 'streamable-http',
+                headers: { Authorization: 'Bearer secret-token-value' },
+            });
+            for (const call of repo.stampConnectionResult.mock.calls) {
+                expect(call).toEqual(['c1', { ok: true, warning: 'insecure_transport' }]);
+            }
+            expect(repo.stampConnectionResult).toHaveBeenCalledTimes(2);
+        });
+
+        it('a legacy http row with a literal header keeps connecting when the organization setting is off', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(false) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            await service.listTools(
+                makeConnection({
+                    url: 'http://mcp.example.com/mcp',
+                    organizationId: 'o1',
+                    tenantId: 't1',
+                }),
+            );
+
+            expect(policy.requiresHttpsForCredentials).toHaveBeenCalledWith({
+                userId: 'u1',
+                organizationId: 'o1',
+                tenantId: 't1',
+            });
+            expect(factory.connect).toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                ok: true,
+                warning: 'insecure_transport',
+            });
+        });
+
+        it('with the organization setting on, a literal header over http is refused before dialing and names the setting', async () => {
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            const result = (await service.callTool(
+                makeConnection({ url: 'http://mcp.example.com/mcp' }),
+                'search_issues',
+                {},
+            )) as { error: string };
+
+            expect(result.error).toBe(
+                'MCP server "github": Credentials require an https:// endpoint (organization setting "Require https for connection credentials" is on)',
+            );
+            expect(factory.connect).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                ok: false,
+                error: 'Credentials require an https:// endpoint (organization setting "Require https for connection credentials" is on)',
+            });
+        });
+
+        describe('the organization setting cannot be read (it defaults to off)', () => {
+            /** The real policy service over an organization store whose every read throws. */
+            function unreadablePolicy() {
+                const organizations = {
+                    findById: jest.fn().mockRejectedValue(new Error('driver: db-host-7c1e down')),
+                    findByTenantId: jest
+                        .fn()
+                        .mockRejectedValue(new Error('driver: db-host-7c1e down')),
+                };
+                const policy = new McpCredentialTransportPolicyService(organizations as never);
+                const warn = jest
+                    .spyOn((policy as unknown as { logger: { warn: jest.Mock } }).logger, 'warn')
+                    .mockImplementation(() => undefined);
+                return { policy, organizations, warn };
+            }
+
+            it('a literal-header http connection still connects and is marked insecure_transport', async () => {
+                const client = makeClient();
+                const repo = makeRepo();
+                const factory: McpClientFactory = {
+                    connect: jest.fn().mockResolvedValue(client),
+                };
+                const { policy, organizations, warn } = unreadablePolicy();
+                const service = new McpClientService(repo as never, factory, undefined, policy);
+
+                const tools = await service.listTools(
+                    makeConnection({ url: 'http://mcp.example.com/mcp', organizationId: 'org-9' }),
+                );
+
+                expect(tools).toHaveLength(1);
+                expect(organizations.findById).toHaveBeenCalledWith('org-9');
+                expect(factory.connect).toHaveBeenCalledWith({
+                    url: 'http://mcp.example.com/mcp',
+                    transport: 'streamable-http',
+                    headers: { Authorization: 'Bearer secret-token-value' },
+                });
+                expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                    ok: true,
+                    warning: 'insecure_transport',
+                });
+                // Logged with the organization id; never a header value, a URL
+                // or the driver's own message.
+                expect(warn).toHaveBeenCalledTimes(1);
+                const line = String(warn.mock.calls[0][0]);
+                expect(line).toContain('org-9');
+                expect(line).not.toContain('secret-token-value');
+                expect(line).not.toContain('mcp.example.com');
+                expect(line).not.toContain('db-host-7c1e');
+            });
+
+            it('a vault-reference http connection is still refused', async () => {
+                const factory: McpClientFactory = { connect: jest.fn() };
+                const resolver = { resolve: jest.fn() };
+                const { policy } = unreadablePolicy();
+                const service = new McpClientService(
+                    makeRepo() as never,
+                    factory,
+                    resolver,
+                    policy,
+                );
+
+                await expect(
+                    service.listTools(
+                        makeConnection({
+                            url: 'http://mcp.example.com/mcp',
+                            organizationId: 'org-9',
+                            authHeaders: { Authorization: 'Bearer {{cred.docs_token}}' },
+                        }),
+                    ),
+                ).rejects.toThrow('Credentials require an https:// endpoint');
+                expect(factory.connect).not.toHaveBeenCalled();
+                expect(resolver.resolve).not.toHaveBeenCalled();
+            });
+
+            it('a policy binding that throws is also read as off, never as a refusal', async () => {
+                const client = makeClient();
+                const repo = makeRepo();
+                const factory: McpClientFactory = {
+                    connect: jest.fn().mockResolvedValue(client),
+                };
+                const policy = {
+                    requiresHttpsForCredentials: jest.fn().mockRejectedValue(new Error('db down')),
+                };
+                const service = new McpClientService(
+                    repo as never,
+                    factory,
+                    undefined,
+                    policy as never,
+                );
+                jest.spyOn(
+                    (service as unknown as { logger: { warn: jest.Mock } }).logger,
+                    'warn',
+                ).mockImplementation(() => undefined);
+
+                const result = await service.callTool(
+                    makeConnection({ url: 'http://mcp.example.com/mcp' }),
+                    'search_issues',
+                    {},
+                );
+
+                expect(result).toEqual({ content: [{ type: 'text', text: 'ok' }] });
+                expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
+                    ok: true,
+                    warning: 'insecure_transport',
+                });
+            });
+        });
+
+        it('https rows never consult the organization setting and stay plainly healthy', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            await service.listTools(makeConnection());
+
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', { ok: true });
+        });
+
+        it('a credential reference over http is refused even when the organization setting is off', async () => {
+            const factory: McpClientFactory = { connect: jest.fn() };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(false) };
+            const resolver = { resolve: jest.fn() };
+            const service = new McpClientService(
+                makeRepo() as never,
+                factory,
+                resolver,
+                policy as never,
+            );
+
+            await expect(
+                service.listTools(
+                    makeConnection({
+                        url: 'http://mcp.example.com/mcp',
+                        authHeaders: {
+                            'X-Api-Key': 'literal',
+                            Authorization: '{{cred.docs_token}}',
+                        },
+                    }),
+                ),
+            ).rejects.toThrow('Credentials require an https:// endpoint');
+            expect(factory.connect).not.toHaveBeenCalled();
+            expect(resolver.resolve).not.toHaveBeenCalled();
+            // References are refused without needing the setting.
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+        });
+
+        it('an unauthenticated plain-http connection never consults the organization setting', async () => {
+            const client = makeClient();
+            const repo = makeRepo();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const policy = { requiresHttpsForCredentials: jest.fn().mockResolvedValue(true) };
+            const service = new McpClientService(
+                repo as never,
+                factory,
+                undefined,
+                policy as never,
+            );
+
+            await service.listTools(
+                makeConnection({ url: 'http://mcp.example.com/mcp', authHeaders: null }),
+            );
+
+            expect(policy.requiresHttpsForCredentials).not.toHaveBeenCalled();
+            expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', { ok: true });
+        });
+
+        it('an unauthenticated plain-http connection keeps working exactly as before', async () => {
+            const client = makeClient();
+            const factory: McpClientFactory = { connect: jest.fn().mockResolvedValue(client) };
+            const service = new McpClientService(makeRepo() as never, factory);
+
+            const tools = await service.listTools(
+                makeConnection({ url: 'http://mcp.example.com/mcp', authHeaders: null }),
+            );
+
+            expect(tools).toHaveLength(1);
+            expect(factory.connect).toHaveBeenCalledWith({
+                url: 'http://mcp.example.com/mcp',
+                transport: 'streamable-http',
+                headers: {},
             });
         });
     });

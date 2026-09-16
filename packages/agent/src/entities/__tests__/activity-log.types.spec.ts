@@ -84,6 +84,13 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Live Feed — a run starting / finishing / failing for every
+            // trigger kind other than heartbeat.
+            ['AGENT_RUN_STARTED', 'agent_run_started'],
+            ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
+            ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Agent computers — one row per stretch of control of an Agent's machine.
+            ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -145,13 +152,17 @@ describe('activity-log.types', () => {
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
             //
-            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // 🛑 161 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(157);
+            //
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161.
+            expect(literals).toHaveLength(161);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

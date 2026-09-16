@@ -129,6 +129,32 @@ describe('FleetJobsController', () => {
                 capabilities: ['workspace'],
             });
         });
+
+        it('forwards a lane kind filter only when the node sent one', async () => {
+            const lease = jest.fn(async () => []);
+            const controller = makeController({ lease });
+            await controller.lease({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                kinds: ['computer-session'],
+            });
+            expect(lease).toHaveBeenLastCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                kinds: ['computer-session'],
+            });
+
+            await controller.lease({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                excludeKinds: ['computer-session'],
+            });
+            expect(lease).toHaveBeenLastCalledWith({
+                nodeId: NODE_ID,
+                secret: SECRET,
+                excludeKinds: ['computer-session'],
+            });
+        });
     });
 
     describe('POST /api/fleet/jobs/:id/heartbeat', () => {

@@ -1,11 +1,14 @@
 import {
+    COMPUTER_DEAD_AFTER_MS,
     COMPUTER_QUALITIES,
+    computerStallStateForAge,
     FLEET_ATTENDED_CAPABILITY,
     FLEET_BROWSER_CAPABILITY,
     FLEET_SCREEN_CAPABILITY,
     lowerComputerQuality,
     type ComputerChannel,
     type ComputerQuality,
+    type ComputerStallState,
     type ComputerUnwatchableReason,
     type FleetNodeView,
 } from '@ever-works/contracts';
@@ -155,59 +158,37 @@ function isQuality(value: unknown): value is ComputerQuality {
     return typeof value === 'string' && (COMPUTER_QUALITIES as readonly string[]).includes(value);
 }
 
-/** Degrade when the publish backlog stays above this many pictures… */
-export const COMPUTER_DEGRADE_BACKLOG_FRAMES = 3;
-/** …or the acknowledgement round trip stays above this… */
-export const COMPUTER_DEGRADE_ACK_MS = 1500;
-/** …for this long, continuously. */
-export const COMPUTER_DEGRADE_WINDOW_MS = 5000;
-/** Return to the chosen quality after this long within limits. */
-export const COMPUTER_RECOVER_WINDOW_MS = 30_000;
-
-export interface ComputerLinkSample {
-    backlog: number;
-    ackMs: number;
-}
-
-/** True when the link has been over a degrade threshold for the whole window. */
-export function isOverLinkLimits(sample: ComputerLinkSample): boolean {
-    return (
-        sample.backlog > COMPUTER_DEGRADE_BACKLOG_FRAMES || sample.ackMs > COMPUTER_DEGRADE_ACK_MS
-    );
-}
-
-/** Drop a tier? `overSinceMs` is how long the link has been continuously over a limit. */
-export function shouldDegrade(sample: ComputerLinkSample, overSinceMs: number): boolean {
-    return isOverLinkLimits(sample) && overSinceMs >= COMPUTER_DEGRADE_WINDOW_MS;
-}
-
-/** Return to the chosen tier? `withinSinceMs` is how long the link has been continuously within limits. */
-export function shouldRecover(sample: ComputerLinkSample, withinSinceMs: number): boolean {
-    return !isOverLinkLimits(sample) && withinSinceMs >= COMPUTER_RECOVER_WINDOW_MS;
-}
+/**
+ * The link thresholds (degrade / recover, stall / auto-refresh / dead) are
+ * declared ONCE in `@ever-works/contracts` so the machine's capture pump,
+ * the owner's browser and these rules can never disagree about a number.
+ * Re-exported here under their original names, so every importer of this
+ * module keeps compiling unchanged.
+ */
+export {
+    COMPUTER_AUTO_REFRESH_AFTER_MS,
+    COMPUTER_DEAD_AFTER_MS,
+    COMPUTER_DEGRADE_ACK_MS,
+    COMPUTER_DEGRADE_BACKLOG_FRAMES,
+    COMPUTER_DEGRADE_WINDOW_MS,
+    COMPUTER_RECOVER_WINDOW_MS,
+    COMPUTER_STALL_AFTER_MS,
+    isOverLinkLimits,
+    shouldDegrade,
+    shouldRecover,
+    type ComputerLinkSample,
+    type ComputerStallState,
+} from '@ever-works/contracts';
 
 /** The tier a degrade lands on — one step down, never a skip. */
 export function degradedQuality(current: ComputerQuality): ComputerQuality {
     return lowerComputerQuality(current);
 }
 
-/** A stream quieter than this is stalled (the strip says so over a dimmed picture). */
-export const COMPUTER_STALL_AFTER_MS = 6000;
-/** …one automatic refresh is attempted at this age… */
-export const COMPUTER_AUTO_REFRESH_AFTER_MS = 20_000;
-/** …and the session ends at this age. */
-export const COMPUTER_DEAD_AFTER_MS = 45_000;
-
-export type ComputerStallState = 'ok' | 'stalled' | 'auto-refresh' | 'dead';
-
 /** How stale the stream is, at the 6 s / 20 s / 45 s boundaries (inclusive). */
 export function stallState(lastFrameAt: Date | null | undefined, now: Date): ComputerStallState {
     if (!lastFrameAt) return 'ok';
-    const age = now.getTime() - lastFrameAt.getTime();
-    if (age >= COMPUTER_DEAD_AFTER_MS) return 'dead';
-    if (age >= COMPUTER_AUTO_REFRESH_AFTER_MS) return 'auto-refresh';
-    if (age >= COMPUTER_STALL_AFTER_MS) return 'stalled';
-    return 'ok';
+    return computerStallStateForAge(now.getTime() - lastFrameAt.getTime());
 }
 
 export interface ComputerSessionLimits {
@@ -275,6 +256,13 @@ export function resolveComputerSessionLimits(
             ) * 60_000,
     };
 }
+
+/**
+ * The operator-limit parser behind {@link resolveComputerSessionLimits}, for
+ * the other live-view limits (control) so every one of them clamps the same
+ * way: unset or nonsense is the default, out of range is clamped.
+ */
+export { clampInt as clampComputerLimit };
 
 export type ComputerSessionExpiry = 'abandoned' | 'stalled' | 'session-ceiling' | null;
 

@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { Bell, X } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
+import { HeaderCountBadge } from './HeaderCountBadge';
 
 interface NotificationDropdownProps {
     className?: string;
@@ -314,11 +315,7 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                 >
                     <Bell className="w-3.5 h-3.5" />
 
-                    {unreadCount > 0 && (
-                        <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-danger rounded-full">
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
-                    )}
+                    <HeaderCountBadge count={unreadCount} max={99} />
                 </button>
             </Tooltip>
 

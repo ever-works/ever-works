@@ -5,6 +5,7 @@ import {
     ArrayMinSize,
     IsArray,
     IsBoolean,
+    IsIn,
     IsInt,
     IsObject,
     IsOptional,
@@ -18,12 +19,14 @@ import {
     ValidateNested,
 } from 'class-validator';
 import {
+    FLEET_JOB_KINDS,
     FLEET_JOB_MAX_ERROR_LENGTH,
     FLEET_JOB_MAX_LEASE_BATCH,
     FLEET_JOB_MAX_LEASE_TTL_SEC,
     FLEET_JOB_MIN_LEASE_TTL_SEC,
     FLEET_RUN_ENV_FILE_MAX_COUNT,
     FLEET_RUN_ENV_FILE_REFS_MAX_COUNT,
+    type FleetJobKind,
 } from '@ever-works/contracts';
 
 /**
@@ -99,6 +102,32 @@ export class LeaseFleetJobsDto extends FleetJobNodeCredentialDto {
     @IsString({ each: true })
     @MaxLength(32, { each: true })
     capabilities?: string[];
+
+    @ApiProperty({
+        required: false,
+        enum: FLEET_JOB_KINDS,
+        isArray: true,
+        description:
+            'Claim only jobs of these kinds on this poll. Omitted means every kind (an attended node polls its live-view lane with ["computer-session"]).',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(FLEET_JOB_KINDS.length)
+    @IsIn(FLEET_JOB_KINDS, { each: true })
+    kinds?: FleetJobKind[];
+
+    @ApiProperty({
+        required: false,
+        enum: FLEET_JOB_KINDS,
+        isArray: true,
+        description:
+            'Never claim jobs of these kinds on this poll. Omitted excludes nothing (an attended node keeps live views out of its work lane).',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(FLEET_JOB_KINDS.length)
+    @IsIn(FLEET_JOB_KINDS, { each: true })
+    excludeKinds?: FleetJobKind[];
 }
 
 /** Request body for the PUBLIC `POST /api/fleet/jobs/:id/heartbeat`. */
