@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API_BASE, registerUserViaAPI, authedHeaders } from './helpers/api';
+import { clickAndExpectUrl } from './helpers/nav';
 
 /**
  * Runs ledger (AW-09) — `/runs` UI + `GET /api/runs*` contract.
@@ -21,7 +22,10 @@ test.describe('Runs ledger — UI', () => {
 
         await expect(page.getByRole('heading', { name: 'Runs', level: 1 })).toBeVisible();
         await expect(page.getByTestId('runs-timezone')).toContainText('Times shown in');
-        await expect(page.getByRole('button', { name: 'Day' })).toHaveAttribute(
+        // `exact: true`: Playwright's accessible-name match is a case-insensitive
+        // SUBSTRING by default, so a bare 'Day' also matches the "Today" button
+        // three elements away in the same calendar bar (strict-mode violation).
+        await expect(page.getByRole('button', { name: 'Day', exact: true })).toHaveAttribute(
             'aria-pressed',
             'true',
         );
@@ -58,7 +62,10 @@ test.describe('Runs ledger — UI', () => {
         await search.pressSequentially('dw');
 
         await expect(search).toHaveValue('dw');
-        await expect(page.getByRole('button', { name: 'Day' })).toHaveAttribute(
+        // `exact: true`: Playwright's accessible-name match is a case-insensitive
+        // SUBSTRING by default, so a bare 'Day' also matches the "Today" button
+        // three elements away in the same calendar bar (strict-mode violation).
+        await expect(page.getByRole('button', { name: 'Day', exact: true })).toHaveAttribute(
             'aria-pressed',
             'true',
         );
@@ -66,7 +73,7 @@ test.describe('Runs ledger — UI', () => {
 
     test('a filtered view survives a reload', async ({ page }) => {
         await page.goto('/en/runs?g=month&status=failed', { waitUntil: 'domcontentloaded' });
-        await expect(page.getByRole('button', { name: 'Month' })).toHaveAttribute(
+        await expect(page.getByRole('button', { name: 'Month', exact: true })).toHaveAttribute(
             'aria-pressed',
             'true',
         );
@@ -74,19 +81,32 @@ test.describe('Runs ledger — UI', () => {
 
         await page.reload({ waitUntil: 'domcontentloaded' });
 
-        await expect(page.getByRole('button', { name: 'Month' })).toHaveAttribute(
+        await expect(page.getByRole('button', { name: 'Month', exact: true })).toHaveAttribute(
             'aria-pressed',
             'true',
         );
         await expect(page.getByTestId('runs-filter-count')).toContainText('1 active');
-        await page.getByRole('button', { name: 'Clear filters' }).click();
+        // Scoped to the filter bar's own control: when the window has no
+        // matching runs the empty state renders a SECOND "Clear filters" CTA
+        // (RunsEmptyState.tsx), and an unscoped role+name matched both. The
+        // role+name assertion is kept — it still proves a button named
+        // "Clear filters" lives in the filters bar.
+        await page
+            .getByTestId('runs-filters')
+            .getByRole('button', { name: 'Clear filters' })
+            .click();
         await expect(page).not.toHaveURL(/status=failed/);
     });
 
     test('the Sessions tab links to Runs', async ({ page }) => {
         await page.goto('/en/agents/sessions', { waitUntil: 'domcontentloaded' });
-        await page.getByTestId('agent-sessions-open-in-runs').click();
-        await expect(page).toHaveURL(/\/runs/);
+        // A click that lands before React wires the `<Link>` is silently
+        // dropped: the trace shows "click action done" and "navigations have
+        // finished" 20ms later with no request for /runs at all, while the
+        // shell was still firing its hydration server actions. The helper
+        // re-clicks ONLY while the URL has not changed, so the claim is
+        // unchanged — it ends on the same `toHaveURL`.
+        await clickAndExpectUrl(page, page.getByTestId('agent-sessions-open-in-runs'), /\/runs/);
         await expect(page.getByRole('heading', { name: 'Runs', level: 1 })).toBeVisible();
     });
 });
