@@ -96,6 +96,13 @@ describe('activity-log.types', () => {
             ['CONTEXT_FILE_RESTORED', 'context_file_restored'],
             ['CONTEXT_FILE_MODE_CHANGED', 'context_file_mode_changed'],
             ['CONTEXT_BUDGET_EXCEEDED', 'context_budget_exceeded'],
+            // Knowledge library — shelf curation (filing, archive, export)
+            // and shared-folder rename.
+            ['KB_DOCUMENT_ARCHIVED', 'kb_document_archived'],
+            ['KB_DOCUMENT_UNARCHIVED', 'kb_document_unarchived'],
+            ['KB_DOCUMENT_FILED', 'kb_document_filed'],
+            ['KB_DOCUMENT_EXPORTED', 'kb_document_exported'],
+            ['MEMORY_FOLDER_RENAMED', 'memory_folder_renamed'],
             // Live Feed — a run starting / finishing / failing for every
             // trigger kind other than heartbeat.
             ['AGENT_RUN_STARTED', 'agent_run_started'],
@@ -163,8 +170,10 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
+            // +5 kb_document_archived / _unarchived / _filed / _exported and
+            //    memory_folder_renamed (Knowledge library shelf) -> 162.
             //
-            // 🛑 161 is COUNTED from the merged enum, never added up from the
+            // 🛑 166 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
             // (this one said 157, develop was at 153), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
@@ -185,7 +194,15 @@ describe('activity-log.types', () => {
             // develop contributed that AW-07 did not already carry is
             // agent_computer_controlled, so 171 + 1 = 172. Do NOT re-derive
             // this by adding the deltas above — count the merged enum.
-            expect(literals).toHaveLength(172);
+            //
+            // 177 after this branch merged develop's knowledge library shelf
+            // (kb_document_archived / _unarchived / _filed / _exported and
+            // memory_folder_renamed — the 5 members develop carried that AW-07
+            // did not). COUNTED from the merged enum, not added up: this branch
+            // stood at 172 and develop at 166, and the overlap between the two
+            // is everything except those 5 shelf literals. Recount the enum
+            // after every merge instead of trusting either side's number.
+            expect(literals).toHaveLength(177);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

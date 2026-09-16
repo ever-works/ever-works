@@ -197,6 +197,7 @@ export * from './memory-folder.entity';
 // context-file / fact vocabulary re-exported from contracts.
 export * from './memory-fact.entity';
 export * from './context-file-types';
+export * from './knowledge-document-reader-state.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './agent-plugin-package.entity';
 export * from './agent-plugin-package-allowlist.entity';

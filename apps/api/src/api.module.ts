@@ -88,6 +88,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
 import { MemoryFactsApiModule } from './memory-facts/memory-facts.module';
 import { VectorStoreHostChunkTablesModule } from '@ever-works/agent/services';
+import { KnowledgeLibraryApiModule } from './knowledge-library/knowledge-library.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -328,6 +329,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Base (work_knowledge_chunks) and memory facts
         // (vector_namespace_chunks) instead of failing "not wired".
         VectorStoreHostChunkTablesModule,
+        // Knowledge library — /api/knowledge: the organization shelf over
+        // the Knowledge Base (shared folders, filing, archive / restore,
+        // Markdown export).
+        KnowledgeLibraryApiModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,

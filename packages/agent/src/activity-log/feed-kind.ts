@@ -275,6 +275,13 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // Inbox — the decisions only a person can make
     [ActivityActionType.INBOX_ITEM_CREATED]: 'decision',
     [ActivityActionType.INBOX_ITEM_ANSWERED]: 'decision',
+
+    // Knowledge library — shelf curation (filing, archive, export) and shared-folder rename.
+    [ActivityActionType.KB_DOCUMENT_ARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_UNARCHIVED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_FILED]: 'work',
+    [ActivityActionType.KB_DOCUMENT_EXPORTED]: 'work',
+    [ActivityActionType.MEMORY_FOLDER_RENAMED]: 'work',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */
