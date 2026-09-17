@@ -147,22 +147,27 @@ export function readSavedChatPanelWidth(): number | null {
  * anyway; now the saved width is authoritative, so the guard has to live
  * where the value is actually known. FR-16: at most half the viewport.
  *
- * The floor is 240 and NOT {@link CHAT_PANEL_MIN_WIDTH} (350) on purpose —
- * that is the floor the effect this replaces used, and it only binds below
- * 480 px of viewport, where the layout has long since switched to the mobile
- * overlay and no docked panel is rendered at all. Raising it here would be a
- * silent behaviour change on a path nothing exercises.
+ * Both bounds, not just the upper one. A viewport narrow enough that half of
+ * it is under {@link CHAT_PANEL_MIN_WIDTH} has no valid width left to pick, so
+ * there the 240 floor of the effect this replaces is kept — and a 240 saved
+ * that way would otherwise be adopted verbatim on the next desktop visit,
+ * docking the panel 110 px below the minimum its own handle advertises as
+ * `aria-valuemin`. Anywhere else, `clampChatPanelWidth` applies the same
+ * [min, half-viewport] bounds the drag and keyboard paths already enforce.
  */
 export function adoptableChatPanelWidth(saved: number | null): number {
     const width = saved ?? DEFAULT_CHAT_PANEL_WIDTH;
     try {
         const max = Math.floor(window.innerWidth * CHAT_PANEL_MAX_VIEWPORT_SHARE);
-        if (width > max) return Math.max(240, max);
+        // Nothing in [CHAT_PANEL_MIN_WIDTH, max] to choose from: this is the
+        // mobile-overlay range, where no docked panel renders at all.
+        if (max < CHAT_PANEL_MIN_WIDTH) return Math.max(240, max);
+        return clampChatPanelWidth(width, window.innerWidth);
     } catch {
         // No window (or a hostile one): the unclamped width is still better
         // than losing the user's preference outright.
+        return width;
     }
-    return width;
 }
 
 /**

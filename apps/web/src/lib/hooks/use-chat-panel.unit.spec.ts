@@ -308,6 +308,17 @@ describe('adoptableChatPanelWidth', () => {
     });
 
     /**
+     * The narrow-viewport floor is reachable in the other direction, which is
+     * what makes clamping BOTH bounds necessary rather than tidy. A phone-width
+     * window adopts and persists 240; widen the same browser to a desktop size
+     * and, with only the upper bound clamped, 240 would be adopted verbatim and
+     * dock the panel 110px below the `aria-valuemin` its own handle publishes.
+     */
+    it('raises a width saved on a narrow viewport back to the minimum', () => {
+        expect(adoptableChatPanelWidth(240)).toBe(CHAT_PANEL_MIN_WIDTH);
+    });
+
+    /**
      * The floor is 240 rather than CHAT_PANEL_MIN_WIDTH (350) — the floor the
      * mount-time effect in layout-client.tsx used before this moved here.
      * It only binds below 480px of viewport, where the layout renders the
