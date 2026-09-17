@@ -257,6 +257,39 @@ describe('HelpCenterPanel — deep links', () => {
         expect(screen.getByTestId('help-article')).toHaveAttribute('data-article-id', 'tasks');
     });
 
+    it('leaves an open article alone when an earlier listener already claimed the Esc', () => {
+        // The claimer is a window CAPTURE listener registered before the panel
+        // mounts, so it runs before the panel's own window-capture listener
+        // (same target and phase run in registration order; the panel re-adds
+        // its listener on state changes, which only appends it later still).
+        // A document- or element-level listener would run after the panel's.
+        let claim = true;
+        const claimer = vi.fn((event: KeyboardEvent) => {
+            if (claim && event.key === 'Escape') event.preventDefault();
+        });
+        window.addEventListener('keydown', claimer, true);
+        drawerTeardown.push(() => window.removeEventListener('keydown', claimer, true));
+        const { closeButton, closeDrawer } = renderInDrawer(
+            <HelpCenterPanel onClose={vi.fn()} initialTarget="tasks#creating-a-task" />,
+        );
+        expect(screen.getByTestId('help-article')).toHaveAttribute('data-article-id', 'tasks');
+
+        const claimed = pressEscape(closeButton);
+        expect(claimer).toHaveBeenCalledTimes(1);
+        expect(claimed.defaultPrevented).toBe(true);
+        expect(closeDrawer).not.toHaveBeenCalled();
+        expect(screen.getByTestId('help-article')).toHaveAttribute('data-article-id', 'tasks');
+        expect(screen.queryByTestId('help-browse')).toBeNull();
+
+        // Control: the panel's listener is live — the same press, unclaimed,
+        // steps back — so the article stayed open because the Esc was claimed.
+        claim = false;
+        expect(pressEscape(closeButton).defaultPrevented).toBe(true);
+        expect(screen.queryByTestId('help-article')).toBeNull();
+        expect(screen.getByTestId('help-browse')).toBeInTheDocument();
+        expect(closeDrawer).not.toHaveBeenCalled();
+    });
+
     it('stops claiming Esc once the panel unmounts', () => {
         const { closeDrawer, unmount } = renderInDrawer(
             <HelpCenterPanel onClose={vi.fn()} initialTarget="tasks" />,
