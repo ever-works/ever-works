@@ -59,11 +59,25 @@ that revision**, or it will fail on drift rather than on a defect. Freeze revisi
 
 ### Known baseline conditions (recorded, deliberately NOT "fixed")
 
-- **Prettier drift is pre-existing.** `npx prettier --check` fails on ~57 app-works markdown files, including all
-  four programme-level files. Proven pre-existing: `git show HEAD:<file> | npx prettier --check --stdin-filepath
-<file>` fails on the HEAD revision too. Nobody ran `--write`, because reformatting aligned tables and prose in
-  files other agents are editing would be a large, unwanted diff. **`pnpm format:check` is therefore NOT clean on
-  this branch** and the programme's Definition of Done still lists it — this needs one deliberate pass.
+- **Prettier drift is now FIXED** for the programme's own tree. `npx prettier --check "docs/**/*.md"` passes
+  wholesale — the app-works specs, the internal app-works docs, and the two files a glob kept missing. It had been
+  pre-existing drift across 34+ files, including all four programme-level files. Reformatting prose can silently
+  drop emphasis, so before committing the pass I proved content survived: word counts identical (APW-06 `spec.md`
+  10 882 → 10 882), paragraph-style emphasis preserved (`*and*` → `_and_`, `*not*` → `_not_`, 1 → 1), and the
+  spec-tree checker still `CLEAN` afterwards.
+- **`read:packages` is deliberately NOT added to `GITHUB_FULL_SCOPES`.** `GITHUB-PERMISSIONS.md` rows 18/19 record
+  that APW-05 validates for `read:packages` while the platform's own scope set omits it, and it labels that a
+  **gap** whose fix APW-05 owns. Adding it is additive but **widens the OAuth consent screen every member sees** —
+  a real product decision — and APW-05's plan/tasks currently document the omission accurately as the present
+  state. **Owner call:** add the scope (updating APW-05 `plan.md:42`, `tasks.md:296-302` and `GITHUB-PERMISSIONS.md`
+  rows 18/19 together) or keep GHCR read on a separate user-supplied token.
+- **`apps/api` has no `lint` script and eslint is not installed in this worktree**, so
+  `pnpm --filter ever-works-api lint` can never pass here; the enforced gate is `prettier --check`. Worth a Wave-0
+  CI note.
+- **`packages/*/dist` staleness makes the documented test workflow unrunnable from a cold tree.** At the start of
+  this branch `packages/{contracts,plugin,agent}/dist` were stale, so _no_ `apps/api` suite could even start
+  (`Tests: 0 total`) until `contracts`+`plugin` were rebuilt. The pre-build step is missing from the documented
+  workflow and will bite the next agent.
 - **Five Blueprint ✗ spec findings are recorded, not fixed** (golden `README.md` §5): two of three Blueprints declare
   a cron that the managed tier refuses (`CRON_TOO_FREQUENT`); the fixture and Cal.diy declare `smtp`, which a
   _verification_ Build cannot start (`verificationDependencyUnsupported`) so only Umami is runner-verifiable as
@@ -71,8 +85,15 @@ that revision**, or it will fail on drift rather than on a defect. Freeze revisi
   `SPEC_LIMIT_EXCEEDED` can refuse a spec APW-03 accepted; Umami's image switches user by NAME and nothing renders
   `runAsUser`; and `EW_VERIFY_BUILD` has no derivable value.
 - **`_build-artifacts/expected-outputs/manifests/` is stale** relative to the Blueprints (the fixture worker still
-  renders 48Mi/96Mi where the Blueprint now says 64Mi/128Mi) and is not prettier-formatted. Recorded; the newer
-  `golden/` tree supersedes it and nothing was deleted.
+  renders 48Mi/96Mi where the Blueprint now says 64Mi/128Mi). Recorded; the newer `golden/` tree supersedes it and
+  nothing was deleted.
+- **`ever-works/platforms` is private while the launcher catalog reader fetches it over the public raw host**, so
+  the launcher's P1 read would fail until it is made public or read with a token. Recorded in CONTRACTS §8,
+  README §8 Q7, TRACKER and APW-11 T18. **Owner call.**
+- **Ten owner decisions stay open by design**, surfaced with recorded defaults and never silently decided:
+  APW12-G15, APW08-G25, APW09-G24, APW11-G20, EXT-30, EXT-15, EXT-19, GAP-19, GAP-29 — plus the APW-09 FR-41
+  operator deny-list route, which has no owning epic and needs one assigned.
+- **`Actions: write` vs `administration`** in APW-02 `plan.md` §4.5 is still an open discrepancy.
 
 ---
 
