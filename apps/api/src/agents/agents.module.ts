@@ -95,6 +95,7 @@ import {
     PullRequestGateService,
     ToolGrantService,
 } from '@ever-works/agent/policy';
+import { SAFETY_GATE, SafetyGateService, SafetyModule } from '@ever-works/agent/safety';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     FacadesModule,
@@ -212,6 +213,12 @@ const HELD_FOR_APPROVAL_NOTE =
         FleetModule,
         PrReviewModule,
         PolicyModule,
+        // Safety rails (AW-24) — supplies `SafetyGateService`, which THIS
+        // module re-binds to the `SAFETY_GATE` token below and exports, so
+        // the @Optional() @Inject in the agent-side `AgentRunService`
+        // actually resolves. SafetyModule imports only its own tables, so
+        // no cycle.
+        SafetyModule,
         // Agent Plugins MCP slice — provides McpToolSource for the
         // AGENT_MCP_TOOL_SOURCE binding below. Imports nothing api-side,
         // so no cycle is introduced.
@@ -321,6 +328,15 @@ const HELD_FOR_APPROVAL_NOTE =
         // binding were not global AND exported. `FleetModule` (imported
         // above) exports FleetKillSwitchService.
         { provide: RUN_KILL_SWITCH, useExisting: FleetKillSwitchService },
+        // Safety rails (AW-24) — bind the ONE gate every side-effectful
+        // action passes through. Exactly the RUN_KILL_SWITCH posture above,
+        // and for exactly the same reason: `AgentRunService.invokeTool` is
+        // the one place every tool call converges, it reads this token
+        // through an @Optional() @Inject(), and that injection resolves to
+        // `undefined` — leaving every rail dark while the product still
+        // claims them — unless this binding is BOTH global AND exported.
+        // `SafetyModule` (imported above) exports SafetyGateService.
+        { provide: SAFETY_GATE, useExisting: SafetyGateService },
         // Streaming terminal — the two halves of the session dispatch.
         //
         // TERMINAL_SESSION_DISPATCHER is the job-runtime producer for the
@@ -1047,6 +1063,7 @@ const HELD_FOR_APPROVAL_NOTE =
         TERMINAL_SESSION_DISPATCHER,
         TERMINAL_SESSION_STARTER,
         RUN_KILL_SWITCH,
+        SAFETY_GATE,
     ],
 })
 export class AgentsModule {}

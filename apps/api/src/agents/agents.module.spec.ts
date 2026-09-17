@@ -115,6 +115,14 @@ jest.mock('@ever-works/agent/policy', () => ({
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class WorkOwnershipService {},
 }));
+// Safety rails (AW-24) — the one gate every side-effectful action passes
+// through. Stubbed at module scope like every sibling barrel so the
+// decorator-metadata assertions never drag the entity graph in.
+jest.mock('@ever-works/agent/safety', () => ({
+    SafetyModule: class SafetyModule {},
+    SafetyGateService: class SafetyGateService {},
+    SAFETY_GATE: 'SAFETY_GATE',
+}));
 jest.mock('@ever-works/agent/skills', () => ({
     SkillsModule: class SkillsModule {},
 }));
@@ -183,6 +191,7 @@ import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/ag
 import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
+import { SafetyGateService, SafetyModule } from '@ever-works/agent/safety';
 
 type FactoryProvider = {
     provide?: unknown;
@@ -344,6 +353,25 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(provider).toBeDefined();
         expect((provider?.useExisting as { name?: string })?.name).toBe('FleetKillSwitchService');
         expect(meta('exports')).toContain('RUN_KILL_SWITCH');
+    });
+
+    /**
+     * Safety rails (AW-24) — `AgentRunService.invokeTool` is the one place
+     * every tool call converges, and it reads the gate through
+     * `@Optional() @Inject(SAFETY_GATE)`. `@Global()` publishes only
+     * EXPORTED providers, so a binding left out of `exports` resolves to
+     * `undefined` and every rail goes dark: the trust ladder would be
+     * stored, rendered and audited, and would stop nothing. This is the
+     * same failure RUN_KILL_SWITCH's pin above exists to catch.
+     */
+    it('binds + exports SAFETY_GATE to the safety gate service', () => {
+        expect(meta('imports')).toContain(SafetyModule);
+        const provider = (
+            meta('providers') as Array<{ provide?: unknown; useExisting?: unknown }>
+        ).find((p) => p && typeof p === 'object' && p.provide === 'SAFETY_GATE');
+        expect(provider).toBeDefined();
+        expect(provider?.useExisting).toBe(SafetyGateService);
+        expect(meta('exports')).toContain('SAFETY_GATE');
     });
 
     it('binds all three Task membership repositories (the commentOnTask gate is fail-closed)', () => {

@@ -47,6 +47,21 @@ export interface AuthenticatedUser {
     // against the user's real Tenant. `undefined` until that guard runs;
     // `null` for users not yet upgraded to a Tenant.
     tenantId?: string | null;
+    /**
+     * Safety rails (AW-24) — WHICH credential path authenticated this
+     * request, stamped by `AuthSessionGuard` in both of its branches.
+     *
+     * Some controls may only ever be operated by a person in an interactive
+     * session: a rung, a workspace pause, a resume (FR-31, FR-47). Nothing in
+     * `AuthenticatedUser` could tell a person from a machine credential, even
+     * though the guard knows exactly which branch ran — so `HumanActorGuard`
+     * had nothing to read.
+     *
+     * OPTIONAL, so every existing reader is unaffected. A MISSING value is
+     * treated as NOT human by `HumanActorGuard`: an older token path that
+     * predates the stamp must fail closed, not sneak through.
+     */
+    authMethod?: 'session' | 'api-key';
 }
 
 export interface TokenResponse {

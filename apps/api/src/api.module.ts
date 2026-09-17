@@ -84,6 +84,7 @@ import { ScopeOwnershipGuard } from './scope/scope-ownership.guard';
 import { SessionScopeGuard } from './scope/session-scope.guard';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { SharedViewsApiModule } from './shared-views/shared-views.module';
+import { SafetyApiModule } from './safety/safety.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MemoryFilesApiModule } from './memory-files/memory-files.module';
@@ -340,6 +341,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // AW-18 Shared view — Settings → Sharing (owner) and the public
         // share-link exchange + published board read (no account).
         SharedViewsApiModule,
+        // AW-24 Safety rails — the trust ladder, the refusal log and the one
+        // enforcement point every side-effectful action passes through.
+        SafetyApiModule,
     ],
     providers: [
         {
