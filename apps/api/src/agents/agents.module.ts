@@ -15,6 +15,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
     SKILL_FILE_CONTENT_READER,
+    ROSTER_SKILL_BINDER,
     RUN_KILL_SWITCH,
     AgentEscalationService,
     RunSteeringService,
@@ -146,6 +147,9 @@ import { AuthModule } from '../auth/auth.module';
 // this module is @Global(), so the agent-side AgentToolService's
 // @Optional() @Inject(SKILL_FILE_CONTENT_READER) resolves in production.
 import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
+// AW-20 P1 — backs the ROSTER_SKILL_BINDER binding below so a provisioned
+// roster agent arrives with its lane's suggested Skills already attached.
+import { RosterSkillBinderAdapter } from './roster-skill-binder.adapter';
 import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
 import { AgentIdentityService } from './agent-identity.service';
@@ -390,6 +394,7 @@ const HELD_FOR_APPROVAL_NOTE =
                     agentId,
                     taskId,
                     runId,
+                    missionId,
                     query,
                     maxResults,
                     includeDomains,
@@ -398,8 +403,9 @@ const HELD_FOR_APPROVAL_NOTE =
                     const results = await search.search(
                         query,
                         { maxResults, includeDomains, excludeDomains },
-                        // Wave 9 M2 — runId feeds per-run cost attribution.
-                        { userId, workId, agentId, taskId, runId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution;
+                        // AW-17 — missionId rolls the usage up to the Task's Mission.
+                        { userId, workId, agentId, taskId, runId, missionId },
                     );
                     return {
                         results: results.map((r) => ({
@@ -417,6 +423,7 @@ const HELD_FOR_APPROVAL_NOTE =
                     agentId,
                     taskId,
                     runId,
+                    missionId,
                     url,
                     viewportWidth,
                     viewportHeight,
@@ -424,8 +431,9 @@ const HELD_FOR_APPROVAL_NOTE =
                 }) {
                     const result = await screenshot.capture(
                         { url, viewportWidth, viewportHeight, fullPage } as any,
-                        // Wave 9 M2 — runId feeds per-run cost attribution.
-                        { userId, workId, agentId, taskId, runId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution;
+                        // AW-17 — missionId rolls the usage up to the Task's Mission.
+                        { userId, workId, agentId, taskId, runId, missionId },
                     );
                     return {
                         success: result.success,
@@ -433,7 +441,16 @@ const HELD_FOR_APPROVAL_NOTE =
                         cacheUrl: result.cacheUrl ?? null,
                     };
                 },
-                async extractContent({ userId, workId, agentId, taskId, runId, url, maxChars }) {
+                async extractContent({
+                    userId,
+                    workId,
+                    agentId,
+                    taskId,
+                    runId,
+                    missionId,
+                    url,
+                    maxChars,
+                }) {
                     const result = await extractor.extractContent(url, undefined, {
                         userId,
                         workId,
@@ -441,6 +458,8 @@ const HELD_FOR_APPROVAL_NOTE =
                         taskId,
                         // Wave 9 M2 — runId feeds per-run cost attribution.
                         runId,
+                        // AW-17 — the Task's Mission.
+                        missionId,
                     });
                     const raw = result?.rawContent ?? '';
                     const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
@@ -512,6 +531,8 @@ const HELD_FOR_APPROVAL_NOTE =
                             taskId: input.facadeOptions.taskId,
                             // Wave 9 M2 — per-run cost attribution.
                             runId: input.facadeOptions.runId,
+                            // AW-17 — the Mission of the run's Task.
+                            missionId: input.facadeOptions.missionId,
                             providerOverride: input.facadeOptions.providerOverride,
                         },
                     );
@@ -1033,9 +1054,17 @@ const HELD_FOR_APPROVAL_NOTE =
         // AgentToolService (@Optional() @Inject(SKILL_FILE_CONTENT_READER)).
         // Unbound, `getSkillFile` would list files but refuse every read.
         { provide: SKILL_FILE_CONTENT_READER, useExisting: SkillFileContentReaderService },
+        // AW-20 P1 — the seam roster provisioning attaches Skills through.
+        // `@Optional()` at the consumer, so WITHOUT this binding a roster
+        // is still provisioned and wired, just without its suggested
+        // Skills — the same dead-seam trap every other binding here
+        // documents.
+        RosterSkillBinderAdapter,
+        { provide: ROSTER_SKILL_BINDER, useExisting: RosterSkillBinderAdapter },
     ],
     exports: [
         SKILL_FILE_CONTENT_READER,
+        ROSTER_SKILL_BINDER,
         AGENT_HEARTBEAT_TRIGGER,
         // Goals autonomy layer — GoalOrchestratorService cancels the Goal's
         // in-flight iteration run and needs the SAME remote cancel this

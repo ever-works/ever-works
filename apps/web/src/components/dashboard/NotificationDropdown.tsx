@@ -18,6 +18,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Bell, X } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
 import { HeaderCountBadge } from './HeaderCountBadge';
+import { ROUTES } from '@/lib/constants';
 
 interface NotificationDropdownProps {
     className?: string;
@@ -375,6 +376,20 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
                                 ))}
                             </div>
                         )}
+                    </div>
+
+                    {/* AW-13 — the way from the bell to choosing what reaches you. */}
+                    <div className="border-t border-border p-2 text-right dark:border-border-dark">
+                        <a
+                            href={ROUTES.DASHBOARD_SETTINGS_NOTIFICATIONS}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleNavigate(ROUTES.DASHBOARD_SETTINGS_NOTIFICATIONS);
+                            }}
+                            className="text-xs text-primary dark:text-primary-light hover:underline"
+                        >
+                            {t('notifications.settingsLink')}
+                        </a>
                     </div>
                 </div>
             )}

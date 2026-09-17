@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, type ComponentType } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import {
     Loader2,
@@ -24,7 +25,7 @@ type IconType = ComponentType<LucideProps>;
 
 // Literal union (not `string`) so next-intl can type-check the
 // `sourceTypes.${labelKey}` message key at the call sites below.
-type SourceLabelKey =
+export type SourceLabelKey =
     | 'recurringTask'
     | 'agentHeartbeat'
     | 'workSchedule'
@@ -33,17 +34,18 @@ type SourceLabelKey =
     | 'dataSync'
     | 'inboundTrigger';
 
-const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey: SourceLabelKey }> = {
-    recurring_task: { icon: Repeat, labelKey: 'recurringTask' },
-    agent_heartbeat: { icon: Bot, labelKey: 'agentHeartbeat' },
-    work_schedule: { icon: CalendarClock, labelKey: 'workSchedule' },
-    mission_tick: { icon: Target, labelKey: 'missionTick' },
-    source_validation: { icon: ShieldCheck, labelKey: 'sourceValidation' },
-    data_sync: { icon: RefreshCw, labelKey: 'dataSync' },
-    inbound_trigger: { icon: Webhook, labelKey: 'inboundTrigger' },
-};
+export const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey: SourceLabelKey }> =
+    {
+        recurring_task: { icon: Repeat, labelKey: 'recurringTask' },
+        agent_heartbeat: { icon: Bot, labelKey: 'agentHeartbeat' },
+        work_schedule: { icon: CalendarClock, labelKey: 'workSchedule' },
+        mission_tick: { icon: Target, labelKey: 'missionTick' },
+        source_validation: { icon: ShieldCheck, labelKey: 'sourceValidation' },
+        data_sync: { icon: RefreshCw, labelKey: 'dataSync' },
+        inbound_trigger: { icon: Webhook, labelKey: 'inboundTrigger' },
+    };
 
-const SOURCE_ORDER: ScheduleSourceType[] = [
+export const SOURCE_ORDER: ScheduleSourceType[] = [
     'recurring_task',
     'agent_heartbeat',
     'work_schedule',
@@ -53,7 +55,7 @@ const SOURCE_ORDER: ScheduleSourceType[] = [
     'inbound_trigger',
 ];
 
-const STATUS_STYLES: Record<ScheduleStatus, string> = {
+export const STATUS_STYLES: Record<ScheduleStatus, string> = {
     active: 'bg-success/10 text-success dark:bg-success/15',
     paused: 'bg-warning/10 text-warning dark:bg-warning/15',
     disabled:
@@ -154,6 +156,11 @@ export function SchedulesList() {
                 <p className="text-sm text-text-muted dark:text-text-muted-dark max-w-sm">
                     {t('empty.description')}
                 </p>
+                <HelpLink
+                    target="activity#the-schedules-view"
+                    variant="emptyState"
+                    className="mt-3"
+                />
             </div>
         );
     }

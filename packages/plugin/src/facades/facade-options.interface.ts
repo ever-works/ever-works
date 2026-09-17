@@ -35,4 +35,23 @@ export interface FacadeOptions {
 	 * agentId/taskId attribution is unaffected).
 	 */
 	readonly runId?: string;
+
+	/**
+	 * AW-17 — the Mission of the run's Task (`tasks.missionId`), resolved
+	 * once when the run is dispatched and carried beside `taskId` / `runId`
+	 * so every usage row the call records rolls up to the Mission that
+	 * raised the work. NEVER the Agent's own `missionId` — an Agent scoped to
+	 * one Mission can work a Task filed against another. Undefined for runs
+	 * with no Task (heartbeat, chat without a Task) and outside a run.
+	 */
+	readonly missionId?: string;
+
+	/**
+	 * Model accounts (AW-16) — the schedule this call runs for, keyed the way
+	 * the unified schedule list keys a row (`${source}:${ownerId}`, e.g.
+	 * `agent_heartbeat:<agentId>`), so the schedule's own model choice wins
+	 * over the Agent's. Optional: a heartbeat Run is recognised from the Run
+	 * itself, so only a caller outside a Run needs to set it.
+	 */
+	readonly scheduleId?: string;
 }

@@ -628,4 +628,94 @@ describe('ContentExtractorFacadeService', () => {
             });
         });
     });
+
+    /**
+     * AW-17 — an attempt that reached a provider and produced nothing usable
+     * is recorded as a failed, zero-rated call; the fallback that succeeds is
+     * recorded as usual. Both carry the Mission of the run's Task.
+     */
+    describe('usage outcome per attempt (AW-17)', () => {
+        it('records the failed attempt and the successful fallback, both attributed to the Mission', async () => {
+            const jinaExtractor = createMockExtractorPlugin('jina', 'Jina');
+            const firecrawlExtractor = createMockExtractorPlugin('firecrawl', 'Firecrawl');
+            (jinaExtractor.extract as jest.Mock).mockResolvedValue({
+                success: false,
+                url: 'https://example.com',
+                error: 'blocked token=abc',
+            } as ContentExtractionResult);
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(jinaExtractor, {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: false,
+                }),
+                createRegisteredPlugin(firecrawlExtractor, {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: false,
+                }),
+            ]);
+            const usage = { record: jest.fn().mockResolvedValue(null) };
+            const facade = new ContentExtractorFacadeService(
+                registry,
+                settingsService,
+                undefined,
+                usage as never,
+            );
+
+            const result = await facade.extractContent('https://example.com', undefined, {
+                userId: 'test-user',
+                runId: 'run-1',
+                missionId: 'mission-1',
+            });
+
+            expect(result?.extraction?.providerId).toBe('firecrawl');
+            expect(usage.record).toHaveBeenCalledTimes(2);
+            expect(usage.record.mock.calls[0][0]).toMatchObject({
+                pluginId: 'jina',
+                outcome: 'failed',
+                costCents: 0,
+                missionId: 'mission-1',
+                runId: 'run-1',
+            });
+            expect(JSON.stringify(usage.record.mock.calls[0][0])).not.toContain('token=abc');
+            expect(usage.record.mock.calls[1][0]).toMatchObject({
+                pluginId: 'firecrawl',
+                missionId: 'mission-1',
+            });
+            expect(usage.record.mock.calls[1][0].outcome).toBeUndefined();
+        });
+
+        it('does not record a failed call when the budget guard refuses before the provider is invoked', async () => {
+            const jinaExtractor = createMockExtractorPlugin('jina', 'Jina');
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(jinaExtractor, {
+                    capabilities: ['content-extractor'],
+                    systemPlugin: false,
+                }),
+            ]);
+            const usage = { record: jest.fn().mockResolvedValue(null) };
+            const budgetGuard = {
+                checkBudget: jest.fn().mockRejectedValue(new Error('over budget')),
+            };
+            const facade = new ContentExtractorFacadeService(
+                registry,
+                settingsService,
+                undefined,
+                usage as never,
+                budgetGuard as never,
+            );
+
+            const result = await facade.extractContentWithDiagnostics(
+                'https://example.com',
+                undefined,
+                {
+                    userId: 'test-user',
+                    workId: 'work-1',
+                },
+            );
+
+            expect(result.content).toBeNull();
+            expect(jinaExtractor.extract).not.toHaveBeenCalled();
+            expect(usage.record).not.toHaveBeenCalled();
+        });
+    });
 });

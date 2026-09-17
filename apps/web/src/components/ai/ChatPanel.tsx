@@ -1,8 +1,9 @@
 'use client';
 
+import { ChatPanelVisibleProvider } from '@/lib/hooks/use-chat-panel';
 import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
-import { ChatInterface } from './ChatInterface';
+import { ConversationPanelRouter } from './conversations/ConversationPanelRouter';
 import { Bot } from 'lucide-react';
 
 const borderToggleClass = cn(
@@ -48,7 +49,13 @@ export function ChatPanel({
                 )}
             >
                 <div className="flex-1 flex flex-col min-h-0 w-full max-w-[60rem] mx-auto">
-                    <ChatInterface />
+                    {/* The view stack: the assistant's ChatInterface as before,
+                        plus one Agent's Conversations and the switcher. It stays
+                        mounted while the panel is closed; the visibility flag
+                        lets live delivery inside it stand down meanwhile. */}
+                    <ChatPanelVisibleProvider visible={open}>
+                        <ConversationPanelRouter onClose={onClose} />
+                    </ChatPanelVisibleProvider>
                 </div>
             </div>
         </div>

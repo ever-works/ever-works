@@ -6,6 +6,7 @@ import type {
 	EmbeddingOptions,
 	EmbeddingResponse
 } from '../contracts/capabilities/ai-provider.interface.js';
+import type { ReasoningEffort } from '@ever-works/contracts';
 import type { IBaseFacade } from './base-facade.interface.js';
 import type { FacadeOptions } from './facade-options.interface.js';
 import type { TemplateVariables } from '../helpers/template.utils.js';
@@ -29,6 +30,19 @@ export interface AiRoutingOptions {
 	readonly providerOverride?: string;
 	/** Bypasses complexity-based routing */
 	readonly modelOverride?: string;
+	/**
+	 * Model accounts (AW-16) — a reasoning effort this one call asks for,
+	 * narrower than any policy. Optional; absent means the effort the model
+	 * ladder resolves. Recorded on the Run's routing record; the provider's
+	 * own reasoning rules are unchanged by it.
+	 */
+	readonly reasoningEffort?: ReasoningEffort;
+	/**
+	 * Model accounts (AW-16) — the schedule this call runs for, as the unified
+	 * schedule list keys it (`${source}:${ownerId}`), so a schedule's own model
+	 * choice applies. Optional.
+	 */
+	readonly scheduleId?: string;
 }
 
 /**

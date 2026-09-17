@@ -341,6 +341,44 @@ export enum ActivityActionType {
     // varchar, so no migration is needed.
     INBOX_ITEM_CREATED = 'inbox_item_created',
     INBOX_ITEM_ANSWERED = 'inbox_item_answered',
+    // Memory facts + context files (AW-07). One row per create / edit /
+    // forget / restore / accept / discard of a fact, one when every fact is
+    // forgotten at once, one per context-file save / restore / load-mode
+    // change, and one when a run's instructions exceed a segment budget.
+    // `details` carries ids, counts and hashes — NEVER a fact or file body,
+    // which can hold business-sensitive prose. Additive members — storage is
+    // a plain varchar(50), so no migration is needed.
+    MEMORY_FACT_CREATED = 'memory_fact_created',
+    MEMORY_FACT_UPDATED = 'memory_fact_updated',
+    MEMORY_FACT_FORGOTTEN = 'memory_fact_forgotten',
+    MEMORY_FACT_RESTORED = 'memory_fact_restored',
+    MEMORY_FACT_ACCEPTED = 'memory_fact_accepted',
+    MEMORY_FACT_DISCARDED = 'memory_fact_discarded',
+    MEMORY_FACTS_CLEARED = 'memory_facts_cleared',
+    CONTEXT_FILE_UPDATED = 'context_file_updated',
+    CONTEXT_FILE_RESTORED = 'context_file_restored',
+    CONTEXT_FILE_MODE_CHANGED = 'context_file_mode_changed',
+    CONTEXT_BUDGET_EXCEEDED = 'context_budget_exceeded',
+    // Model accounts (AW-16) — one row per change to a workspace's provider
+    // accounts or model defaults. `details` names the account and the field
+    // that changed ({ accountId, label, providerPluginId, field } or
+    // { fromPosition, toPosition }); a credential VALUE is never included.
+    // Additive members — storage is a plain varchar, so no migration is needed.
+    MODEL_ACCOUNT_ADDED = 'model_account_added',
+    MODEL_ACCOUNT_UPDATED = 'model_account_updated',
+    MODEL_ACCOUNT_REORDERED = 'model_account_reordered',
+    MODEL_ACCOUNT_PAUSED = 'model_account_paused',
+    MODEL_ACCOUNT_RESUMED = 'model_account_resumed',
+    MODEL_ACCOUNT_RECONNECTED = 'model_account_reconnected',
+    MODEL_ACCOUNT_REMOVED = 'model_account_removed',
+    MODEL_POLICY_UPDATED = 'model_policy_updated',
+    // Schedules workspace — one row each time an owner pauses or resumes a
+    // cadence from any source (recurring Task, heartbeat, Mission tick,
+    // inbound Trigger). `details` carries `{ scheduleId, sourceType,
+    // control, before, after }`. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    SCHEDULE_PAUSED = 'schedule_paused',
+    SCHEDULE_RESUMED = 'schedule_resumed',
     // Live Feed — a run starting and a run reaching a terminal state, for
     // every trigger kind other than `heartbeat` (heartbeat runs keep the
     // three `agent_heartbeat_*` members above, unchanged). Declared here so

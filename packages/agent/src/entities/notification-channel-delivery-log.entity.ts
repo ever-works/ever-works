@@ -37,16 +37,28 @@ export type NotificationChannelDeliveryStatus =
 @Entity({ name: 'notification_channel_delivery_log' })
 @Index('idx_ncdl_channel_created', ['channelId', 'createdAt'])
 @Index('idx_ncdl_message_ref', ['messageRef'])
+@Index('idx_ncdl_user_created', ['userId', 'createdAt'])
 export class NotificationChannelDeliveryLog {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ type: 'uuid' })
-    channelId: string;
+    /**
+     * The `notification_channels` row delivered to. NULL for a built-in
+     * target (see `builtInChannel`), which has no channel row.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    channelId: string | null;
 
     @ManyToOne(() => NotificationChannel, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'channelId' })
     channel?: NotificationChannel;
+
+    /**
+     * Attention controls (AW-13) — the built-in target delivered to, e.g.
+     * `email`. Exactly one of `channelId` / `builtInChannel` is set.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    builtInChannel?: string | null;
 
     @Column({ type: 'varchar', length: 120 })
     messageRef: string;
@@ -77,6 +89,15 @@ export class NotificationChannelDeliveryLog {
 
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
+
+    /**
+     * Attention controls (AW-13) — the user the delivery was for, so every
+     * interrupting delivery (built-in or channel) can be counted per user
+     * from one place. Tier C denormalization like the two scope columns
+     * above: no FK, no relation.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    userId?: string | null;
 
     @CreateDateColumn()
     createdAt: Date;

@@ -638,6 +638,79 @@ describe('ConversationMessageService', () => {
         });
     });
 
+    describe('attachments as a person reads them', () => {
+        const SCOPE = { tenantId: 't1', organizationId: 'o1' };
+        const stored = {
+            id: 'm1',
+            authorType: 'user',
+            authorId: 'u1',
+            attachments: [{ uploadId: 'a'.repeat(64) }],
+        };
+        let resolver: { describe: jest.Mock };
+
+        beforeEach(() => {
+            resolver = {
+                describe: jest.fn(async (rows: Array<Record<string, unknown>>) =>
+                    rows.map((row) => ({ ...row, described: true })),
+                ),
+            };
+            service = new ConversationMessageService(
+                conversations as any,
+                conversationService as any,
+                mentions,
+                dispatch as any,
+                resolver as any,
+            );
+        });
+
+        it('describes the page of messages it lists, in the caller’s scope', async () => {
+            conversations.findMessagesPaged.mockResolvedValue([stored]);
+            const rows = await service.listMessages('u1', 'c1', { limit: 20 }, SCOPE);
+            expect(resolver.describe).toHaveBeenCalledWith([stored], SCOPE);
+            expect(rows).toEqual([{ ...stored, described: true }]);
+        });
+
+        it('describes what the live stream pages through', async () => {
+            conversations.findMessagesAfter = jest.fn().mockResolvedValue([stored]);
+            const rows = await service.listMessagesAfter('u1', 'c1', { limit: 50 }, SCOPE);
+            expect(resolver.describe).toHaveBeenCalledWith([stored], SCOPE);
+            expect(rows[0]).toMatchObject({ described: true });
+        });
+
+        it('describes the message a send returns, after storing the bare references', async () => {
+            const result = await service.send(
+                'u1',
+                'c1',
+                { body: 'the deck', attachments: [{ uploadId: 'a'.repeat(64) }] },
+                SCOPE,
+            );
+            expect(conversations.insertMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ attachments: [{ uploadId: 'a'.repeat(64) }] }),
+            );
+            expect(result.message).toMatchObject({ described: true });
+        });
+
+        it('describes the first copy a repeated client id returns, and a retried message', async () => {
+            conversations.findByClientMessageId.mockResolvedValue(stored);
+            const duplicate = await service.send(
+                'u1',
+                'c1',
+                { body: 'the deck', clientMessageId: 'client-1' },
+                SCOPE,
+            );
+            expect(duplicate).toMatchObject({ duplicate: true, message: { described: true } });
+
+            conversations.findMessageById.mockResolvedValue({
+                ...stored,
+                conversationId: 'c1',
+                content: 'the deck',
+                status: 'failed',
+            });
+            const retried = await service.retry('u1', 'c1', 'm1', SCOPE);
+            expect(retried.message).toMatchObject({ status: 'sent', described: true });
+        });
+    });
+
     describe('loadReplyContext', () => {
         it('loads the Conversation for the dispatching user, the triggering message and recent history', async () => {
             conversations.findMessageById.mockResolvedValue({ id: 'm1', content: 'hi' });

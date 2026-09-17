@@ -28,10 +28,17 @@ export * from './inbox/index.js';
 // Agent email (AW-05) — approve-before-send statuses and modes, plus the
 // per-inbox / per-workspace send ceilings and their pure resolution.
 export * from './email/index.js';
+// Model accounts (AW-16) — several credentials per AI provider, in order, the
+// workspace / Agent / schedule model ladder, and the record a Run keeps of
+// what actually answered it.
+export * from './model-routing/index.js';
 // Release promotion lane (self-build slice AI, EW-808) — develop -> stage
 // -> main as platform state, plus the ONE rule that reads the promotion
 // gate's verdict. Deliberately carries no cascade.
 export * from './release/index.js';
+// Memory facts + context-file vocabulary (AW-07) — the atomic tier of Memory
+// and the shared limits every surface validates against.
+export * from './memory/index.js';
 // Conversations — kinds, participants, send status and delivery outcomes for
 // named conversations with Agents.
 export * from './conversations/index.js';
@@ -44,3 +51,16 @@ export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';
+// Capability & playbook catalogue (AW-21) — the playbook-provider entry
+// shape, its pure validator + version comparator, and the per-caller
+// readiness / preflight wire types.
+export * from './playbook/index.js';
+// Meters and the credit price list (AW-17) — which of three ways a unit of
+// spend was paid for, and what a kind of call costs before it is made.
+export * from './billing/index.js';
+// Attention controls (AW-13) — the notification matrix (one row per event,
+// one column per delivery target) and the attention budget meter shape.
+export * from './notifications/index.js';
+// Home (AW-19) — the composed morning read on the dashboard root: one status per
+// block, over the decision queue, the Runs ledger, schedules, costs and the feed.
+export * from './home/index.js';

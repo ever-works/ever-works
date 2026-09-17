@@ -85,6 +85,9 @@ export interface ListConversationSummariesFilter {
     contextId?: string;
 }
 
+/** Characters of a Conversation's first message a list row shows when it has no name. */
+export const CONVERSATION_PREVIEW_CHARS = 160;
+
 /**
  * Columns a named-Conversation list row carries. The legacy `findByUser`
  * projection is deliberately left exactly as it was — clients that read it
@@ -460,8 +463,51 @@ export class ConversationRepository {
     }
 
     /**
+     * The opening line of each Conversation — the first message a person
+     * wrote, cut to {@link CONVERSATION_PREVIEW_CHARS} characters. A list row
+     * with no name renders this instead, so no row ever reads "Untitled"
+     * (FR-4). A Conversation no person has written in yet is absent.
+     */
+    async firstMessagePreviews(conversationIds: string[]): Promise<Map<string, string>> {
+        const previews = new Map<string, string>();
+        if (conversationIds.length === 0) return previews;
+        const rows = await this.messageRepo
+            .createQueryBuilder('m')
+            .select('m.conversationId', 'conversationId')
+            .addSelect(`SUBSTR(m.content, 1, ${CONVERSATION_PREVIEW_CHARS})`, 'preview')
+            .where('m.conversationId IN (:...conversationIds)', { conversationIds })
+            .andWhere('m.authorType = :authorType', { authorType: 'user' })
+            // Compared inside the database, column to column — the same
+            // precision note as `findMessagesPaged`.
+            .andWhere(
+                'm.createdAt = (SELECT MIN(earliest."createdAt") FROM conversation_messages earliest WHERE earliest."conversationId" = m."conversationId" AND earliest."authorType" = :authorType)',
+            )
+            // Messages stored in the same millisecond keep no record of which
+            // landed first, so a tie is settled by the Conversation's one
+            // message order — `createdAt`, then `id` — the order the thread
+            // pages in (`findMessagesPaged`) and the live stream walks
+            // (`findMessagesAfter`). The preview is therefore always the
+            // first message the thread itself shows.
+            .orderBy('m.createdAt', 'ASC')
+            .addOrderBy('m.id', 'ASC')
+            .getRawMany<{ conversationId: string; preview: string | null }>();
+        for (const row of rows) {
+            const preview = (row.preview ?? '').replace(/\s+/g, ' ').trim();
+            if (preview && !previews.has(row.conversationId)) {
+                previews.set(row.conversationId, preview);
+            }
+        }
+        return previews;
+    }
+
+    /**
      * A page of messages, returned oldest-first. `before` is a message id: the
      * page holds the `limit` messages written just before it.
+     *
+     * Ordered by `createdAt`, then `id` — the same order as
+     * {@link findMessagesAfter} and {@link firstMessagePreviews} — so messages
+     * that share a timestamp read in one fixed order everywhere, and a page
+     * boundary that falls between them skips none.
      */
     async findMessagesPaged(
         conversationId: string,
@@ -481,19 +527,28 @@ export class ConversationRepository {
         if (before) {
             // Compared inside the database, column to column: a JS Date bound
             // as a parameter is formatted differently from the stored value
-            // on some drivers, which silently disables the bound. The
+            // on some drivers, which silently disables the bound. Each
             // sub-select is built through TypeORM so its table and column are
             // escaped for the driver in use (raw `"createdAt"` quoting is
             // Postgres/SQLite-only; MySQL rejects it without ANSI_QUOTES).
-            const anchorCreatedAt = query
-                .subQuery()
-                .select('anchor.createdAt')
-                .from(ConversationMessage, 'anchor')
-                .where('anchor.id = :before')
-                .getQuery();
-            query.andWhere(`m.createdAt < ${anchorCreatedAt}`, { before });
+            const createdAtOf = (alias: string) =>
+                query
+                    .subQuery()
+                    .select(`${alias}.createdAt`)
+                    .from(ConversationMessage, alias)
+                    .where(`${alias}.id = :before`)
+                    .getQuery();
+            query.andWhere(
+                `(m.createdAt < ${createdAtOf('anchor')}` +
+                    ` OR (m.createdAt = ${createdAtOf('tied')} AND m.id < :before))`,
+                { before },
+            );
         }
-        const rows = await query.orderBy('m.createdAt', 'DESC').take(limit).getMany();
+        const rows = await query
+            .orderBy('m.createdAt', 'DESC')
+            .addOrderBy('m.id', 'DESC')
+            .take(limit)
+            .getMany();
         return rows.reverse();
     }
 

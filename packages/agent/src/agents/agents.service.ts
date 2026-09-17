@@ -77,6 +77,12 @@ export interface CreateAgentInput {
     name: string;
     title?: string | null;
     capabilities?: string | null;
+    /**
+     * AW-20 — the area of work this Agent owns. Optional and additive:
+     * every existing call site compiles unchanged and creates a laneless
+     * Agent, exactly as before.
+     */
+    lane?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
     maxSkillContextTokens?: number;
@@ -124,6 +130,8 @@ export interface UpdateAgentInput {
     name?: string;
     title?: string | null;
     capabilities?: string | null;
+    /** AW-20 — the area of work this Agent owns; `null` clears it. */
+    lane?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
     maxSkillContextTokens?: number;
@@ -370,6 +378,11 @@ export class AgentsService {
                 slug,
                 title: input.title ?? null,
                 capabilities: input.capabilities ?? null,
+                // AW-20 — a label, never a permission. Uniqueness per user
+                // is enforced by the partial index `uq_agents_user_lane`,
+                // and provisioning treats that rejection as "this lane is
+                // already filled" rather than as an error.
+                lane: input.lane ?? null,
                 aiProviderId: input.aiProviderId ?? null,
                 modelId: input.modelId ?? null,
                 maxSkillContextTokens: input.maxSkillContextTokens ?? 4000,
@@ -468,6 +481,10 @@ export class AgentsService {
 
         if (input.title !== undefined) patch.title = input.title;
         if (input.capabilities !== undefined) patch.capabilities = input.capabilities;
+        // AW-20 — editable wherever the title is (FR-29). Empty string
+        // normalises to null so clearing the field in a form does not
+        // persist a lane nobody can match on.
+        if (input.lane !== undefined) patch.lane = input.lane?.trim() ? input.lane.trim() : null;
         if (input.aiProviderId !== undefined) patch.aiProviderId = input.aiProviderId;
         if (input.modelId !== undefined) patch.modelId = input.modelId;
 
@@ -958,6 +975,57 @@ export class AgentsService {
 
     async resume(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<AgentDto> {
         return this.transition(userId, id, AgentStatus.ACTIVE, ownershipScope);
+    }
+
+    /**
+     * Schedules — pause this Agent's heartbeat WITHOUT pausing the Agent.
+     *
+     * Writes only `heartbeatPausedAt`. `status`, `heartbeatCadence` and
+     * `nextHeartbeatAt` are untouched, so the Agent keeps answering assigned
+     * Tasks, chat and manual run-now while the heartbeat dispatcher skips
+     * it. Idempotent: pausing a paused heartbeat keeps the original instant.
+     * An Agent with no scheduled heartbeat (null or `manual`) has nothing to
+     * pause — a 400, not a silent success.
+     */
+    async pauseHeartbeat(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
+        if (!agent.heartbeatCadence || agent.heartbeatCadence === 'manual') {
+            throw new BadRequestException('This Agent has no scheduled heartbeat to pause.');
+        }
+        if (!agent.heartbeatPausedAt) {
+            await this.agents.updateById(id, { heartbeatPausedAt: new Date() });
+        }
+        const refreshed = await this.agents.findById(id);
+        return toAgentDto(refreshed ?? agent);
+    }
+
+    /**
+     * Schedules — resume a paused heartbeat. Clears `heartbeatPausedAt`; the
+     * cadence is whatever it was before the pause. A slot that fell due
+     * while paused is NOT replayed: when `nextHeartbeatAt` is already in the
+     * past it moves to the next slot after now, so resuming never produces a
+     * burst of catch-up wakes. Idempotent on an un-paused heartbeat.
+     */
+    async resumeHeartbeat(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
+        if (agent.heartbeatPausedAt) {
+            const now = new Date();
+            const patch: Partial<Agent> = { heartbeatPausedAt: null };
+            if (agent.nextHeartbeatAt && agent.nextHeartbeatAt.getTime() <= now.getTime()) {
+                patch.nextHeartbeatAt = computeNextHeartbeat(agent.heartbeatCadence ?? null, now);
+            }
+            await this.agents.updateById(id, patch);
+        }
+        const refreshed = await this.agents.findById(id);
+        return toAgentDto(refreshed ?? agent);
     }
 
     /**

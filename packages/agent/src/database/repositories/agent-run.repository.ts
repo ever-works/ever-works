@@ -1371,6 +1371,29 @@ export class AgentRunRepository {
             .andWhere(`${alias}.queuedReason IS NULL`);
     }
 
+    /**
+     * Runs a user created inside `[from, to)`, narrowed to one workspace
+     * scope when one is given — the scoped twin of the run count the Costs
+     * summary reads, so a scoped spend headline divides by scoped runs.
+     */
+    async countCreatedForUserInWindow(
+        userId: string,
+        from: Date,
+        to: Date,
+        ownershipScope?: OwnershipScope,
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('run')
+            .where('run.userId = :userId', { userId })
+            .andWhere('run.createdAt >= :createdFrom', { createdFrom: from })
+            .andWhere('run.createdAt < :createdTo', { createdTo: to });
+        const ownership = ownershipSqlPredicate('run', ownershipScope, 'createdWindow');
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
+        return qb.getCount();
+    }
+
     /** Per-Work in-flight count for the dispatch gate. */
     async countInFlightForWork(workId: string): Promise<number> {
         return this.inFlightQb().andWhere('run.workId = :workId', { workId }).getCount();
@@ -1870,6 +1893,19 @@ export class AgentRunRepository {
              * answer "what is waiting on me?".
              */
             attention?: boolean;
+            /**
+             * Narrow to runs that are (`true`) or are not (`false`) waiting
+             * on a human. Home's Working now reads `status: 'running'` with
+             * `awaitingInput: false`: a run parked on a question is not
+             * acting, and it already shows as a decision.
+             */
+            awaitingInput?: boolean;
+            /**
+             * `newest` (default) — most recently created first, the Sessions
+             * list order. `longest-running` — earliest start first, so the
+             * run that has been going longest leads.
+             */
+            order?: 'newest' | 'longest-running';
         },
         limit = 25,
         offset = 0,
@@ -1901,6 +1937,24 @@ export class AgentRunRepository {
         }
         if (filters.triggerKind) {
             qb.andWhere('run.triggerKind = :triggerKind', { triggerKind: filters.triggerKind });
+        }
+        if (typeof filters.awaitingInput === 'boolean') {
+            qb.andWhere('run.awaitingInput = :awaitingInputFilter', {
+                awaitingInputFilter: filters.awaitingInput,
+            });
+        }
+        if (filters.order === 'longest-running') {
+            // `startedAt` is null only before a run is picked up; those sort
+            // after every started run, oldest created first. The insertion-order
+            // tie-break keeps the page stable on SQLite, where whole-second
+            // timestamps make ties routine.
+            return addInsertionOrderTieBreak(
+                qb.orderBy('run.startedAt', 'ASC', 'NULLS LAST').addOrderBy('run.createdAt', 'ASC'),
+                'ASC',
+            )
+                .take(limit)
+                .skip(offset)
+                .getManyAndCount();
         }
         return addInsertionOrderTieBreak(qb.orderBy('run.createdAt', 'DESC'), 'DESC')
             .take(limit)

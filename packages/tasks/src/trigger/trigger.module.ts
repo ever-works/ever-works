@@ -13,6 +13,7 @@ import {
     KB_NORMALIZE_MEDIA_DISPATCHER,
     KB_TRANSCRIBE_DISPATCHER,
     KB_REEMBED_WORK_DISPATCHER,
+    MEMORY_FACT_EMBED_DISPATCHER,
     JOB_RUNTIME_PROVIDER_REGISTRY,
     InMemoryJobRuntimeProviderRegistry,
     buildJobRuntimeProviders,
@@ -81,7 +82,8 @@ import {
         // `dispatchKbTranscribe` / `dispatchKbReembedWork` impls on
         // `TriggerService`. From this PR forward, an
         // `EVER_WORKS_JOB_RUNTIME=bullmq` flip swaps all 11 the same
-        // way (no per-dispatcher special-casing).
+        // way (no per-dispatcher special-casing). AW-07 adds
+        // `MEMORY_FACT_EMBED_DISPATCHER` to the same list (12 tokens).
         ...buildJobRuntimeProviders(),
         // Notifications v2 (EW-663) — the facade's delivery dispatcher
         // contract is `enqueue(payload) → { runId }`, which differs
@@ -154,6 +156,12 @@ import {
         KB_NORMALIZE_MEDIA_DISPATCHER,
         KB_TRANSCRIBE_DISPATCHER,
         KB_REEMBED_WORK_DISPATCHER,
+        // AW-07 — the memory-fact embed dispatcher resolves through the same
+        // registry, so any active job-runtime provider (and the tenant
+        // overlay in front of it) runs `memory-fact-embed`. Exported from
+        // this @Global() module so `MemoryFactService`, declared in the
+        // agent-side `MemoryFactsModule`, can see it.
+        MEMORY_FACT_EMBED_DISPATCHER,
         NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
     ],
 })

@@ -18,8 +18,9 @@ import { RecentTasks } from '@/components/dashboard/RecentTasks';
 import { AgentsPreviewSection } from '@/components/dashboard/AgentsPreviewSection';
 import { ApprovalsQueue } from '@/components/approvals/ApprovalsQueue';
 import { buildDecisionsHref } from '@/lib/api/inbox.shared';
-import { AttentionSection } from '@/components/dashboard/AttentionSection';
-import { SoonSection } from '@/components/dashboard/SoonSection';
+import { HomeMorningStack } from '@/components/home/HomeMorningStack';
+import { WorkspaceSection } from '@/components/home/WorkspaceSection';
+import type { HomeSummaryDto } from '@ever-works/contracts';
 import type { Task } from '@/lib/api/tasks';
 import type { Agent } from '@/lib/api/agents';
 import type { AgentActionProposal } from '@/lib/api/agent-approvals';
@@ -93,6 +94,16 @@ interface DashboardClientProps {
     attentionItems?: AttentionItem[];
     soonItems?: SoonRunItem[];
     soonTotal?: number;
+    /**
+     * Home (AW-19) — the composed morning read. `null` when it could not be
+     * read (the stack then says so and the composer still works); omitted
+     * entirely by a caller that does not render the morning stack.
+     */
+    homeSummary?: HomeSummaryDto | null;
+    /** The instant the page rendered — the greeting's clock when there is no summary. */
+    renderedAt?: string;
+    /** From the dashboard layout's health read; `false` = nothing will be dispatched. */
+    jobRuntimeConfigured?: boolean | null;
 }
 
 export default function DashboardClient({
@@ -121,8 +132,9 @@ export default function DashboardClient({
     initialApprovals = [],
     teamsTotal,
     attentionItems = [],
-    soonItems = [],
-    soonTotal = 0,
+    homeSummary = null,
+    renderedAt,
+    jobRuntimeConfigured = null,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -130,143 +142,143 @@ export default function DashboardClient({
 
     return (
         <div className="w-full">
-            {/* Page header */}
-            <div className="mb-10">
-                <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                    {t('header.welcome', { username: user.username })}
-                </h1>
-                <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
-                    {t('header.subtitle')}
-                </p>
-            </div>
-
-            {/* Stats strip */}
-            <StatsOverview
-                totalMissions={totalMissions}
-                totalIdeas={totalIdeas}
-                totalWorks={totalWorks}
-                totalItems={totalItems}
-                activeWebsites={activeWebsites}
-                monthSpendCents={monthSpendCents}
-                monthSpendCurrency={monthSpendCurrency}
-                agentsTotal={agentsTotal}
-                agentsActive={agentsActive}
-                tasksInProgress={tasksInProgress}
-                tasksBlocked={tasksBlocked}
-                teamsTotal={teamsTotal}
+            {/* Home (AW-19) — the morning read: greeting, composer, Needs you
+                (with the Attention signals as `Also broken`), the glance
+                counters, Today (the Soon block, widened to the local day and
+                every schedule kind) beside This week, Working now and Recent
+                activity. The page header's greeting lives here now. */}
+            <HomeMorningStack
+                userName={user.username}
+                summary={homeSummary}
+                renderedAt={renderedAt ?? new Date(0).toISOString()}
+                attentionItems={attentionItems}
+                jobRuntimeConfigured={jobRuntimeConfigured}
+                subtitle={t('header.subtitle')}
             />
 
-            {/* Content sections — divided by a subtle rule for visual rhythm */}
-            <div className="mt-10 divide-y divide-border/30 dark:divide-white/6">
-                {/* Agent Action Approval Queue — attention block above
+            {/* Everything Home showed before the morning read, unchanged. */}
+            <WorkspaceSection>
+                {/* Stats strip */}
+                <StatsOverview
+                    totalMissions={totalMissions}
+                    totalIdeas={totalIdeas}
+                    totalWorks={totalWorks}
+                    totalItems={totalItems}
+                    activeWebsites={activeWebsites}
+                    monthSpendCents={monthSpendCents}
+                    monthSpendCurrency={monthSpendCurrency}
+                    agentsTotal={agentsTotal}
+                    agentsActive={agentsActive}
+                    tasksInProgress={tasksInProgress}
+                    tasksBlocked={tasksBlocked}
+                    teamsTotal={teamsTotal}
+                />
+
+                {/* Content sections — divided by a subtle rule for visual rhythm */}
+                <div className="mt-10 divide-y divide-border/30 dark:divide-white/6">
+                    {/* Agent Action Approval Queue — attention block above
                     Missions. Self-hides when the queue empties. */}
-                {initialApprovals.length > 0 && (
-                    <div className="py-8 lg:py-10">
-                        <ApprovalsQueue initialApprovals={initialApprovals} />
-                        {/* My Decisions — the same approvals, ranked with every
+                    {initialApprovals.length > 0 && (
+                        <div className="py-8 lg:py-10">
+                            <ApprovalsQueue initialApprovals={initialApprovals} />
+                            {/* My Decisions — the same approvals, ranked with every
                             other decision waiting on the owner (questions,
                             escalations) in the Inbox's decision view. */}
-                        <Link
-                            href={buildDecisionsHref({ tab: 'open' })}
-                            className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
-                            data-testid="approvals-see-all-decisions"
-                        >
-                            {t('approvals.seeAll')}
-                        </Link>
-                    </div>
-                )}
-                {/* Dashboard blocks (spec §4.5) — Attention then Soon lead
-                    the stack, ABOVE Missions. Each wrapper is conditional so
-                    an empty block contributes no divider/gap. */}
-                {attentionItems.length > 0 && (
-                    <div className="py-8 lg:py-10">
-                        <AttentionSection items={attentionItems} />
-                    </div>
-                )}
-                {soonItems.length > 0 && (
-                    <div className="py-8 lg:py-10">
-                        <SoonSection items={soonItems} total={soonTotal} />
-                    </div>
-                )}
-
-                <div className="py-8 lg:py-10">
-                    <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
-                </div>
-
-                <div className="py-8">
-                    <WorkProposalsSection
-                        // Home shows Ideas of every status (page.tsx feeds the
-                        // all-status list here) so a manually-created Idea is
-                        // visible regardless of its status — `showAllStatuses`
-                        // starts the accepted/dismissed toggles ON.
-                        initialProposals={initialProposals}
-                        initiallyResearching={initiallyResearching}
-                        initiallyCanRefresh={initiallyCanRefresh}
-                        username={user.username}
-                        autoStart={autoStartProposals}
-                        totalIdeas={totalIdeas}
-                        showAllStatuses
-                        matchedWorkIds={matchedWorkIds}
-                    />
-                </div>
-
-                <div className="py-8 lg:py-10">
-                    <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
-                        <div className="flex items-center gap-2 min-w-0">
-                            <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-white/6 border border-border/50 dark:border-white/10 flex items-center justify-center">
-                                <FolderKanban className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
-                            </div>
-                            <h2 className="text-xl font-semibold text-text dark:text-text-dark truncate">
-                                {t('works.recent')}
-                            </h2>
-                        </div>
-                        <div className="flex flex-nowrap items-center gap-2 shrink-0">
                             <Link
-                                href="/new?type=website"
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
-                                    'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
-                                    'text-text-secondary dark:text-text-secondary-dark',
-                                    'hover:border-border dark:hover:border-white/16',
-                                )}
+                                href={buildDecisionsHref({ tab: 'open' })}
+                                className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
+                                data-testid="approvals-see-all-decisions"
                             >
-                                <Plus className="w-3.5 h-3.5" />
-                                {t('works.add')}
+                                {t('approvals.seeAll')}
                             </Link>
-                            {totalWorks > 5 && (
-                                <Link
-                                    href={ROUTES.DASHBOARD_WORKS}
-                                    className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
-                                >
-                                    {t('works.viewAll', { count: totalWorks })}
-                                </Link>
-                            )}
                         </div>
-                    </div>
-                    {hasWorks ? (
-                        <WorkList initialWorks={initialWorks} showLimit={GET_WORK_LIST_LIMIT} />
-                    ) : (
-                        <EmptyState
-                            title={t('works.empty.title')}
-                            description={t('works.empty.description')}
-                            action={{
-                                label: t('works.empty.action'),
-                                onClick: () => {
-                                    router.push('/new?type=website');
-                                },
-                            }}
-                        />
                     )}
-                </div>
+                    {/* Dashboard blocks (spec §4.5) — Attention and Soon moved into
+                    the morning stack above: Attention as Needs you's `Also
+                    broken`, Soon as the Today panel. */}
 
-                <div className="py-8 lg:py-10">
-                    <RecentTasks tasks={initialRecentTasks} total={tasksInProgress} />
-                </div>
+                    <div className="py-8 lg:py-10">
+                        <MissionsPreviewSection
+                            missions={initialMissions}
+                            allIdeas={initialAllIdeas}
+                        />
+                    </div>
 
-                <div className="py-8 lg:py-10">
-                    <AgentsPreviewSection agents={initialAgents} totalAgents={agentsTotal} />
+                    <div className="py-8">
+                        <WorkProposalsSection
+                            // Home shows Ideas of every status (page.tsx feeds the
+                            // all-status list here) so a manually-created Idea is
+                            // visible regardless of its status — `showAllStatuses`
+                            // starts the accepted/dismissed toggles ON.
+                            initialProposals={initialProposals}
+                            initiallyResearching={initiallyResearching}
+                            initiallyCanRefresh={initiallyCanRefresh}
+                            username={user.username}
+                            autoStart={autoStartProposals}
+                            totalIdeas={totalIdeas}
+                            showAllStatuses
+                            matchedWorkIds={matchedWorkIds}
+                        />
+                    </div>
+
+                    <div className="py-8 lg:py-10">
+                        <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-white/6 border border-border/50 dark:border-white/10 flex items-center justify-center">
+                                    <FolderKanban className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
+                                </div>
+                                <h2 className="text-xl font-semibold text-text dark:text-text-dark truncate">
+                                    {t('works.recent')}
+                                </h2>
+                            </div>
+                            <div className="flex flex-nowrap items-center gap-2 shrink-0">
+                                <Link
+                                    href="/new?type=website"
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
+                                        'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                                        'text-text-secondary dark:text-text-secondary-dark',
+                                        'hover:border-border dark:hover:border-white/16',
+                                    )}
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    {t('works.add')}
+                                </Link>
+                                {totalWorks > 5 && (
+                                    <Link
+                                        href={ROUTES.DASHBOARD_WORKS}
+                                        className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
+                                    >
+                                        {t('works.viewAll', { count: totalWorks })}
+                                    </Link>
+                                )}
+                            </div>
+                        </div>
+                        {hasWorks ? (
+                            <WorkList initialWorks={initialWorks} showLimit={GET_WORK_LIST_LIMIT} />
+                        ) : (
+                            <EmptyState
+                                title={t('works.empty.title')}
+                                description={t('works.empty.description')}
+                                action={{
+                                    label: t('works.empty.action'),
+                                    onClick: () => {
+                                        router.push('/new?type=website');
+                                    },
+                                }}
+                            />
+                        )}
+                    </div>
+
+                    <div className="py-8 lg:py-10">
+                        <RecentTasks tasks={initialRecentTasks} total={tasksInProgress} />
+                    </div>
+
+                    <div className="py-8 lg:py-10">
+                        <AgentsPreviewSection agents={initialAgents} totalAgents={agentsTotal} />
+                    </div>
                 </div>
-            </div>
+            </WorkspaceSection>
         </div>
     );
 }

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { AgentsModule } from '../agents/agents.module';
+import { ConversationAttachmentResolver } from './conversation-attachment.resolver';
 import { ConversationContextResolver } from './conversation-context.resolver';
 import { ConversationDispatchService } from './conversation-dispatch.service';
 import { ConversationMentionService } from './conversation-mention.service';
@@ -23,6 +24,7 @@ import { ConversationService } from './conversation.service';
 @Module({
     imports: [DatabaseModule, AgentsModule],
     providers: [
+        ConversationAttachmentResolver,
         ConversationContextResolver,
         ConversationService,
         ConversationMentionService,
@@ -30,6 +32,7 @@ import { ConversationService } from './conversation.service';
         ConversationMessageService,
     ],
     exports: [
+        ConversationAttachmentResolver,
         ConversationContextResolver,
         ConversationService,
         ConversationMentionService,

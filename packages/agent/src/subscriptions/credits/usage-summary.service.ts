@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { USAGE_EXPORT_MAX_DAYS, USAGE_EXPORT_MAX_ROWS } from '@ever-works/contracts';
 import { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import {
     PluginUsageRepository,
@@ -31,6 +32,26 @@ export class InvalidUsagePeriodError extends Error {
     constructor(period: string) {
         super(`Invalid period (expected YYYY-MM, 7d, or 30d): ${period}`);
         this.name = 'InvalidUsagePeriodError';
+    }
+}
+
+/**
+ * AW-17 — the export was refused BEFORE a byte was written because it would
+ * be larger than the published limits. Stable-named so the API boundary maps
+ * it to a 400 carrying the limit, never a truncated file presented as whole.
+ */
+export class UsageExportTooLargeError extends Error {
+    constructor(
+        readonly reason: 'rows' | 'days',
+        readonly limit: number,
+        readonly actual: number,
+    ) {
+        super(
+            reason === 'rows'
+                ? `That is more than ${limit} rows. Narrow the period and try again.`
+                : `That period is longer than ${limit} days. Narrow the period and try again.`,
+        );
+        this.name = 'UsageExportTooLargeError';
     }
 }
 
@@ -134,6 +155,18 @@ export interface UsageExportRow {
     taskId: string | null;
     runId: string | null;
     requestId: string | null;
+    /** AW-17 — `model` / `credits` / `addon`; null for rows recorded before meters. */
+    meter: string | null;
+    /** AW-17 — `capability.operation` price-list key. */
+    priceKey: string | null;
+    /** AW-17 — `ok` / `cached` / `failed`. */
+    outcome: string | null;
+    /** AW-17 — credits the row accounts for. */
+    creditsCharged: number;
+    /** AW-17 — the price-list version of a fixed price, or null. */
+    priceVersion: number | null;
+    /** AW-17 — the Mission of the row's Task. */
+    missionId: string | null;
 }
 
 /**
@@ -155,6 +188,14 @@ export const USAGE_EXPORT_COLUMNS = [
     'taskId',
     'runId',
     'requestId',
+    // AW-17 — appended, never interleaved, so a reader keyed on the earlier
+    // column positions keeps working.
+    'meter',
+    'priceKey',
+    'outcome',
+    'creditsCharged',
+    'priceVersion',
+    'missionId',
 ] as const satisfies readonly (keyof UsageExportRow)[];
 
 export interface UsageExportOptions {
@@ -201,6 +242,12 @@ function toUsageExportRow(event: PluginUsageEvent): UsageExportRow {
         taskId: event.taskId ?? null,
         runId: event.runId ?? null,
         requestId: event.requestId ?? null,
+        meter: event.meter ?? null,
+        priceKey: event.priceKey ?? null,
+        outcome: event.outcome ?? null,
+        creditsCharged: Number(event.creditsCharged ?? 0),
+        priceVersion: event.priceVersion ?? null,
+        missionId: event.missionId ?? null,
     };
 }
 
@@ -278,6 +325,33 @@ export class UsageSummaryService {
      * never caller-supplied — see
      * `PluginUsageRepository.findPageForUserExport`.
      */
+    /**
+     * AW-17 — refuse an export that would be larger than the published limits
+     * BEFORE any byte is written: more than `USAGE_EXPORT_MAX_ROWS` rows, or a
+     * window longer than `USAGE_EXPORT_MAX_DAYS` days. Same (user, window,
+     * organization) scope as {@link createExport}; resolves the window the same
+     * way, so an invalid period still throws `InvalidUsagePeriodError`.
+     */
+    async assertExportWithinLimits(
+        userId: string,
+        options: Pick<UsageExportOptions, 'period' | 'organizationId'> = {},
+    ): Promise<void> {
+        const window = resolveUsageSummaryWindow(options.period);
+        const days = Math.ceil((window.to.getTime() - window.from.getTime()) / DAY_MS);
+        if (days > USAGE_EXPORT_MAX_DAYS) {
+            throw new UsageExportTooLargeError('days', USAGE_EXPORT_MAX_DAYS, days);
+        }
+        const rows = await this.pluginUsageRepository.countForUserExport(
+            userId,
+            window.from,
+            window.to,
+            { organizationId: options.organizationId ?? null },
+        );
+        if (rows > USAGE_EXPORT_MAX_ROWS) {
+            throw new UsageExportTooLargeError('rows', USAGE_EXPORT_MAX_ROWS, rows);
+        }
+    }
+
     createExport(userId: string, options: UsageExportOptions = {}): UsageExportStream {
         const window = resolveUsageSummaryWindow(options.period);
         const organizationId = options.organizationId ?? null;

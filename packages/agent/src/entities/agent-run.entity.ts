@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { PortableDateColumn } from './_types';
 import type {
+    AgentRunModelRouting,
     GateStatus,
     SubAgentScope,
     TaskAcceptanceCheck,
@@ -338,6 +339,20 @@ export class AgentRun {
      */
     @Column({ type: 'int', nullable: true })
     costCents?: number | null;
+
+    /**
+     * Model accounts (AW-16) — what actually answered this run: the provider
+     * plugin, the model id the provider reported, the Model Account (id and
+     * name) when one was used, the requested reasoning effort and the run
+     * timeout in force. Written by the AI facade from the provider's own
+     * response, never from configuration, and never carrying a credential
+     * value. NULL on every run that made no model call and on every run that
+     * predates the column — a routing record is never invented. Sibling of
+     * `totalTokens` / `costCents`; the per-call ledger stays
+     * `plugin_usage_events`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    modelRouting?: AgentRunModelRouting | null;
 
     // ── Run steering (Wave 4 M5). Both additive; NULL/false on every
     // pre-existing row. The steering service writes them, the executing

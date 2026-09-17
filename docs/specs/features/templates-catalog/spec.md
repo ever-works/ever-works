@@ -6,6 +6,11 @@
 **Last updated**: 2026-05-08
 **Owner**: Ever Works Team
 
+> **Indexed by**: the capability catalogue
+> ([AW-21](../agent-workspace/AW-21-capability-catalog/spec.md)) lists these
+> template kinds with a count each under **Starting points** and links back to
+> this catalog; browsing and forking stay here.
+
 ---
 
 ## 1. Overview

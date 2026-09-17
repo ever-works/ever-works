@@ -1,5 +1,7 @@
 import { PluginUsageService } from './plugin-usage.service';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
+import { UsageMeter, UsageOutcome, UsagePayer } from '@src/entities/_types';
+import { PublishedCreditPriceList } from './credit-price-list';
 
 /**
  * EW-602 — PluginUsageService is the best-effort write path for
@@ -249,6 +251,226 @@ describe('PluginUsageService.record', () => {
             expect(repository.record).toHaveBeenCalledWith(
                 expect.objectContaining({ runId: null }),
             );
+        });
+    });
+
+    /**
+     * AW-17 — the single write path classifies every row as it is written:
+     * meter, payer, outcome, price key, price version, credits, and the
+     * Mission of the run's Task passed straight through.
+     */
+    describe('meter classification at capture (AW-17)', () => {
+        function makeClassifyingService(
+            options: {
+                payer?: UsagePayer;
+                resolver?: { resolve: jest.Mock } | null;
+                record?: jest.Mock;
+            } = {},
+        ) {
+            const repository = makeRepo(options.record ? { record: options.record } : {});
+            const resolver =
+                options.resolver === null
+                    ? undefined
+                    : (options.resolver ?? {
+                          resolve: jest
+                              .fn()
+                              .mockResolvedValue(options.payer ?? UsagePayer.PLATFORM),
+                      });
+            const service = new PluginUsageService(
+                repository as any,
+                new PublishedCreditPriceList(),
+                resolver as any,
+            );
+            return { service, repository, resolver };
+        }
+
+        it('stamps meter, payer, outcome, price key, version and credits on a platform-paid search', async () => {
+            const { service, repository, resolver } = makeClassifyingService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                costCents: 1,
+                metadata: { operation: 'search' },
+            });
+            expect(resolver?.resolve).toHaveBeenCalledWith({
+                pluginId: 'search-a',
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    meter: UsageMeter.CREDITS,
+                    payer: UsagePayer.PLATFORM,
+                    outcome: UsageOutcome.OK,
+                    priceKey: 'search.query',
+                    priceVersion: 1,
+                    creditsCharged: 2,
+                }),
+            );
+        });
+
+        it('records a call on a Workspace-owned key as model usage with zero credits', async () => {
+            const { service, repository } = makeClassifyingService({ payer: UsagePayer.WORKSPACE });
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+                units: 900,
+                costCents: 250,
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    meter: UsageMeter.MODEL,
+                    payer: UsagePayer.WORKSPACE,
+                    creditsCharged: 0,
+                    priceVersion: null,
+                    costCents: 250,
+                }),
+            );
+        });
+
+        it('uses a payer the caller already knows without asking the resolver', async () => {
+            const { service, repository, resolver } = makeClassifyingService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+                payer: UsagePayer.WORKSPACE,
+            });
+            expect(resolver?.resolve).not.toHaveBeenCalled();
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({ meter: UsageMeter.MODEL }),
+            );
+        });
+
+        it('writes a failed call with outcome failed and zero credits', async () => {
+            const { service, repository } = makeClassifyingService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                outcome: UsageOutcome.FAILED,
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    meter: UsageMeter.CREDITS,
+                    outcome: UsageOutcome.FAILED,
+                    creditsCharged: 0,
+                }),
+            );
+        });
+
+        it('passes the Mission of the run Task straight through, and null when the run had no Task', async () => {
+            const { service, repository } = makeClassifyingService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                agentId: 'agent-1',
+                taskId: 'task-1',
+                runId: 'run-1',
+                missionId: 'mission-7',
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+            });
+            expect(repository.record).toHaveBeenLastCalledWith(
+                expect.objectContaining({ missionId: 'mission-7', taskId: 'task-1' }),
+            );
+
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                agentId: 'agent-1',
+                runId: 'heartbeat-run',
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+            });
+            expect(repository.record).toHaveBeenLastCalledWith(
+                expect.objectContaining({ missionId: null, taskId: null }),
+            );
+        });
+
+        it('with no resolver bound, an unknown payer is recorded as unconfirmed credits and counted', async () => {
+            const { service, repository } = makeClassifyingService({ resolver: null });
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    meter: UsageMeter.CREDITS,
+                    payer: UsagePayer.UNCONFIRMED,
+                }),
+            );
+            expect(service.getCounters()).toMatchObject({ recorded: 1, unconfirmedPayer: 1 });
+        });
+
+        it('still writes the row as credits/unconfirmed when classification throws', async () => {
+            const { service, repository } = makeClassifyingService({
+                resolver: {
+                    resolve: jest.fn().mockRejectedValue(new Error('settings graph down')),
+                },
+            });
+            const result = await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+                metadata: { operation: 'search' },
+            });
+            expect(result).toEqual({ id: 'event-1' });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    meter: UsageMeter.CREDITS,
+                    payer: UsagePayer.UNCONFIRMED,
+                    priceKey: 'search.query',
+                    creditsCharged: 0,
+                }),
+            );
+            expect(service.getCounters()).toMatchObject({
+                recorded: 1,
+                classifierFailures: 1,
+                unconfirmedPayer: 1,
+            });
+        });
+
+        it('counts a price-list miss per row and keeps every row', async () => {
+            const { service, repository } = makeClassifyingService();
+            const priceless = 'future' as unknown as PluginUsageCapability;
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'p',
+                capability: priceless,
+            });
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'p',
+                capability: priceless,
+            });
+            expect(repository.record).toHaveBeenCalledTimes(2);
+            expect(service.getCounters().pricebookMisses).toBe(2);
+        });
+
+        it('a repository throw still returns null and counts a write failure', async () => {
+            const { service } = makeClassifyingService({
+                record: jest.fn().mockRejectedValue(new Error('DB down')),
+            });
+            const result = await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'search-a',
+                capability: PluginUsageCapability.SEARCH,
+            });
+            expect(result).toBeNull();
+            expect(service.getCounters()).toMatchObject({ recorded: 0, writeFailures: 1 });
         });
     });
 });
