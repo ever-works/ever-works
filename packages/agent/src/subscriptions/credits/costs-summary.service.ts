@@ -1,9 +1,15 @@
 import { Injectable, Optional } from '@nestjs/common';
 import {
+    BREAKDOWN_EVERYTHING_ELSE_KEY,
     RUN_LEDGER_TERMINAL_STATUSES,
     RUN_USAGE_DETAIL_RETENTION_MONTHS,
+    type CreditSettlementMode,
     type RunCostBreakdown,
+    type RunCostMeters,
+    type UsageMeterTotals,
+    type UsagePreMeterResidual,
 } from '@ever-works/contracts';
+import { config } from '@src/config';
 import { AgentRunRepository } from '@src/database/repositories/agent-run.repository';
 import { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
@@ -12,6 +18,12 @@ import type { AgentRun } from '@src/entities/agent-run.entity';
 // RunReceiptService, implemented here, bound to RUN_COST_BREAKDOWN_READER by
 // the api-side @Global() SubscriptionsModule).
 import type { RunCostBreakdownReader } from '../../agents/run-cost-breakdown-reader';
+import {
+    foldBreakdown,
+    foldMeterTotals,
+    foldRunMeters,
+    type SpendBreakdownRow,
+} from './spend-breakdown';
 
 /**
  * Costs dashboard — the rolling windows the Costs view offers.
@@ -198,6 +210,47 @@ export interface CostsTopRuns extends CostsWindowEcho {
 }
 
 /**
+ * AW-17 — one row of the by-tool / by-Mission breakdowns. `key` is a price
+ * key or a Mission id; NULL is "Not in a Mission"; the folded tail carries
+ * `BREAKDOWN_EVERYTHING_ELSE_KEY`.
+ */
+export interface CostsBreakdownRow extends SpendBreakdownRow {
+    /** Mission title / the capability behind a price key; null when unresolved. */
+    label: string | null;
+}
+
+/**
+ * AW-17 — a ranked breakdown of classified spend for the window. Row `calls`
+ * include cached and failed calls (both zero-rated); the by-meter cards count
+ * those apart.
+ */
+export interface CostsBreakdown extends CostsWindowEcho {
+    dimension: 'tool' | 'mission';
+    /**
+     * Credits at the published price list. Debited as such only when
+     * `settlementMode` is `price_list`; in `provider_cost` mode runs are
+     * debited from provider cost and this is the list-price figure.
+     */
+    totalCredits: number;
+    totalCostCents: number;
+    /** Top 10 by credits, then "Everything else", then the NULL row. */
+    rows: CostsBreakdownRow[];
+    foldedCount: number;
+    /** How this deployment debits runs — what the `credits` figures mean. */
+    settlementMode: CreditSettlementMode;
+}
+
+/** AW-17 — the three meter cards for the window, plus the pre-meter residual. */
+export interface CostsByMeter extends CostsWindowEcho {
+    /** Always `model`, `credits`, `addon`, in that order. */
+    meters: UsageMeterTotals[];
+    /** Rows recorded before meters were separated; null when there are none. */
+    preMeterResidual: UsagePreMeterResidual | null;
+    /** How this deployment debits runs — what the meters' `credits` figures mean. */
+    settlementMode: CreditSettlementMode;
+}
+
+/**
  * Costs dashboard — owner-scoped AI-spend aggregations behind
  * `GET /api/usage/costs/*`.
  *
@@ -250,9 +303,10 @@ export class CostsSummaryService implements RunCostBreakdownReader {
         run: Pick<AgentRun, 'id' | 'userId' | 'status' | 'costCents' | 'totalTokens' | 'createdAt'>,
         now: Date = new Date(),
     ): Promise<RunCostBreakdown> {
-        const [lines, credits] = await Promise.all([
+        const [lines, credits, meters] = await Promise.all([
             this.pluginUsageRepository.getRunSpendLines(run.id),
             this.findRunCredits(run),
+            this.findRunMeters(run.id),
         ]);
 
         const retentionCutoff = new Date(now);
@@ -276,7 +330,25 @@ export class CostsSummaryService implements RunCostBreakdownReader {
                 total: run.totalTokens ?? null,
             },
             lines,
+            // AW-17 — the same rows split by meter. Omitted (never faked) when
+            // the classified read is unavailable.
+            ...(meters === undefined ? {} : { meters }),
         };
+    }
+
+    /**
+     * AW-17 — a run's rows split by meter. `undefined` when the read fails
+     * (the receipt keeps every other figure); `null` when no rows are retained.
+     */
+    private async findRunMeters(runId: string): Promise<RunCostMeters | null | undefined> {
+        try {
+            const lines = await this.pluginUsageRepository.getRunMeterLines(runId);
+            return Array.isArray(lines)
+                ? foldRunMeters(lines, config.billing.credits.getSettlementMode())
+                : undefined;
+        } catch {
+            return undefined;
+        }
     }
 
     /**
@@ -444,6 +516,90 @@ export class CostsSummaryService implements RunCostBreakdownReader {
         };
     }
 
+    /**
+     * AW-17 — where the credits went, by kind of call (price key). Classified
+     * rows only; pre-meter rows are reported by {@link getByMeter}.
+     */
+    async getByTool(
+        userId: string,
+        windowDays?: number,
+        options: { full?: boolean } = {},
+    ): Promise<CostsBreakdown> {
+        const window = resolveCostsWindow(windowDays);
+        const groups = await this.pluginUsageRepository.getSpendByPriceKeyForUser(
+            userId,
+            window.from,
+            window.to,
+        );
+        const capabilityByKey = new Map(groups.map((row) => [row.key, row.capability]));
+        const folded = foldBreakdown(groups, options);
+        return {
+            ...echo(window),
+            dimension: 'tool',
+            totalCredits: folded.totalCredits,
+            totalCostCents: folded.totalCostCents,
+            foldedCount: folded.foldedCount,
+            rows: folded.rows.map((row) => ({
+                ...row,
+                label: capabilityByKey.get(row.key) ?? null,
+            })),
+            settlementMode: config.billing.credits.getSettlementMode(),
+        };
+    }
+
+    /**
+     * AW-17 — where the credits went, by the Mission of each row's Task. The
+     * NULL row is "Not in a Mission": Runs with no Task and Tasks filed
+     * against no Mission. Nothing is attributed by inference.
+     */
+    async getByMission(
+        userId: string,
+        windowDays?: number,
+        options: { full?: boolean } = {},
+    ): Promise<CostsBreakdown> {
+        const window = resolveCostsWindow(windowDays);
+        const groups = await this.pluginUsageRepository.getSpendByMissionForUser(
+            userId,
+            window.from,
+            window.to,
+        );
+        const folded = foldBreakdown(groups, options);
+        const titles = await this.pluginUsageRepository.getMissionTitles(
+            unique(folded.rows.map((row) => row.key).filter(isMissionKey)),
+        );
+        return {
+            ...echo(window),
+            dimension: 'mission',
+            totalCredits: folded.totalCredits,
+            totalCostCents: folded.totalCostCents,
+            foldedCount: folded.foldedCount,
+            rows: folded.rows.map((row) => ({
+                ...row,
+                label: isMissionKey(row.key) ? (titles.get(row.key) ?? null) : null,
+            })),
+            settlementMode: config.billing.credits.getSettlementMode(),
+        };
+    }
+
+    /**
+     * AW-17 — the three meter cards for the window: Model usage (paid by the
+     * Workspace's own accounts, never charged), Credits, Add-ons — plus the
+     * residual recorded before meters were separated, kept apart.
+     */
+    async getByMeter(userId: string, windowDays?: number): Promise<CostsByMeter> {
+        const window = resolveCostsWindow(windowDays);
+        const rows = await this.pluginUsageRepository.getSpendByMeterForUser(
+            userId,
+            window.from,
+            window.to,
+        );
+        return {
+            ...echo(window),
+            ...foldMeterTotals(rows),
+            settlementMode: config.billing.credits.getSettlementMode(),
+        };
+    }
+
     /** The window's most expensive runs, with their Agent/Task/model. */
     async getTopRuns(
         userId: string,
@@ -524,6 +680,11 @@ function clampLimit(limit: number): number {
 
 function unique(values: string[]): string[] {
     return Array.from(new Set(values));
+}
+
+/** A real Mission id — neither the NULL row nor the folded tail. */
+function isMissionKey(key: string | null): key is string {
+    return key !== null && key !== BREAKDOWN_EVERYTHING_ELSE_KEY;
 }
 
 /** Every UTC `YYYY-MM-DD` the window touches, ascending. */

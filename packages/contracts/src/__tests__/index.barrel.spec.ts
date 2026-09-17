@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as root from '../index.js';
 
 import * as agents from '../agents/index.js';
+import * as billing from '../billing/index.js';
 import * as computer from '../computer/index.js';
 import * as connections from '../connections/index.js';
 import * as conversations from '../conversations/index.js';
@@ -50,6 +51,7 @@ import * as workflow from '../workflow/index.js';
 /** [area name, namespace] for every barrel `src/index.ts` re-exports. */
 const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
+	['billing', billing],
 	['computer', computer],
 	['connections', connections],
 	['conversations', conversations],
@@ -89,12 +91,15 @@ describe('src/index.ts — the package root barrel', () => {
 		// lacked `connections`, `conversations`, `feed` and `model-routing`), so
 		// the literal below is re-counted off the merged array instead.
 		const exportLines = AREAS.length;
-		// 28 is COUNTED from the AREAS array above after merging develop, not
-		// added up from either side's number: this branch stood at 26 (its own
-		// `memory` area) and develop at 27 (its `model-routing` and
-		// `notifications` areas), and the merged barrel carries all three.
+		// 29 is COUNTED from the AREAS array above after merging develop, not
+		// added up from either side's number: this branch stood at 24 (its own
+		// `billing` area) and develop at 28 (its `model-routing`,
+		// `notifications`, `connections`, `conversations` and `feed` areas), and
+		// the merged barrel carries all of them. Note `src/index.ts` has 30
+		// `export *` lines but only 29 AREAS: `./fleet/fleet-task-workspace.types.js`
+		// is a second sub-path of the existing `fleet` area, not a new area.
 		// Recount the array after every merge instead of trusting either side.
-		expect(exportLines).toBe(28);
+		expect(exportLines).toBe(29);
 	});
 
 	it('has no name exported by two different areas', () => {

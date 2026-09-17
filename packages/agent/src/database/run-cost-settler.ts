@@ -17,6 +17,8 @@
  * run's terminal write), and the repository additionally guards the call.
  */
 
+import type { CreditSettlementMode } from '@ever-works/contracts';
+
 /** Outcome of one settlement pass — returned for observability/tests. */
 export interface RunSettlementResult {
     runId: string;
@@ -45,6 +47,13 @@ export interface RunSettlementResult {
     writtenOffCredits?: number;
     /** Plugins excluded because their calls ran on user-supplied keys. */
     exemptPluginIds: string[];
+    /**
+     * AW-17 — the settlement mode the debit was computed in
+     * (`config.billing.credits.getSettlementMode()`): `provider_cost` (the
+     * default, every row from its provider cost) or `price_list` (fixed
+     * published prices debited). Absent when the run had nothing to settle.
+     */
+    settlementMode?: CreditSettlementMode;
     /**
      * Model accounts (AW-16) — the workspace's own Model Accounts whose served
      * spend was excluded from the debit. Set only when there was any; a plugin
