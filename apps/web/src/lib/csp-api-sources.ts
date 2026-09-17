@@ -59,8 +59,17 @@ const DEFAULT_SERVER_API_URL = 'http://localhost:3100';
  * `connect-src` directive. A scheme+host[:port] and nothing else — no
  * whitespace, quotes, `;` or `*` — so a poisoned env var can never smuggle a
  * directive separator or a wildcard into the policy.
+ *
+ * The bracketed alternative is for IPv6. `new URL('http://[::1]:3100').origin`
+ * keeps the brackets, and the attach-token routes mint `ws://[::1]:3100/…`
+ * from that same origin — so without this branch the source is dropped and CSP
+ * blocks the very socket this module exists to authorise. Failing closed here
+ * is not safe; it is a dead live view on an IPv6 deployment. The brackets are
+ * required, and the inner class admits only hex digits, `:` and `.` (the
+ * IPv4-mapped form) — narrower than the named-host class, so nothing that
+ * could separate a directive fits inside them.
  */
-const SAFE_CSP_ORIGIN = /^(?:https?|wss?):\/\/[a-zA-Z0-9.-]+(?::\d{1,5})?$/;
+const SAFE_CSP_ORIGIN = /^(?:https?|wss?):\/\/(?:[a-zA-Z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?$/;
 
 /**
  * The browser-facing API origin, for the `http(s)` half of `connect-src`.
