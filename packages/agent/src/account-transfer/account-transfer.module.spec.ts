@@ -5,6 +5,7 @@ import { AccountImportService } from './account-import.service';
 import { GitHubSyncService } from './github-sync.service';
 import { UserSyncConfig } from './entities/user-sync-config.entity';
 import { UserSyncConfigRepository } from './repositories/user-sync-config.repository';
+import { AccountExportWorkContentSource, BACKUP_WORK_CONTENT } from './backup/backup-work-content';
 
 /**
  * Pins the public `@ever-works/agent/account-transfer` barrel surface and
@@ -68,6 +69,55 @@ describe('AccountTransferModule + barrel re-exports', () => {
                     'maskSecretValue',
                     'maskSecretSettings',
                     'containsMaskedSecrets',
+                    // AW-22 Workspace backup — the complete, dated archive
+                    // that sits BESIDE the export/import/sync path above.
+                    // Everything before this comment is unchanged.
+                    'WorkspaceBackupService',
+                    'WorkspaceBackupRunner',
+                    'BackupArchiveWriter',
+                    'BackupArchiveAbortedError',
+                    'BackupArchiveTooLargeError',
+                    'BACKUP_CHECKSUMS_ENTRY',
+                    'stableStringify',
+                    'buildManifest',
+                    'summarizeManifest',
+                    'countCompleteDomains',
+                    'hasGaps',
+                    'buildReadme',
+                    'countReadmeWords',
+                    'TypeOrmBackupRowSource',
+                    'BACKUP_STORAGE',
+                    'BACKUP_ARCHIVE_MIME_TYPE',
+                    'PluginBackupStorage',
+                    'BACKUP_ACTIVITY_RECORDER',
+                    'BACKUP_NOTIFIER',
+                    // The Work content port. One implementation, delegating
+                    // to the account export's own data-repo walk, so the
+                    // archive and the JSON export read a Work's items the
+                    // same single way (Constitution III).
+                    'BACKUP_WORK_CONTENT',
+                    'EMPTY_BACKUP_WORK_CONTENT',
+                    'AccountExportWorkContentSource',
+                    // Redaction — the one place that decides what never
+                    // reaches an archive (spec FR-18).
+                    'BACKUP_EXCLUSIONS',
+                    'BACKUP_DROPPED_ENTITIES',
+                    'BACKUP_BENIGN_COLUMNS',
+                    'shouldDropEntirely',
+                    'isRedactedColumn',
+                    'isDroppedColumn',
+                    'isBenignColumn',
+                    'redactSecretBag',
+                    'redactRow',
+                    // Collectors — the fifteen domains and the one engine
+                    // that reads them.
+                    'BACKUP_COLLECTORS',
+                    'BACKUP_DOMAIN_SPECS',
+                    'EntityBackupCollector',
+                    'getBackupCollector',
+                    'missingCollectorKeys',
+                    'referencedEntities',
+                    'withRetries',
                 ].sort(),
             );
         });
@@ -108,6 +158,23 @@ describe('AccountTransferModule + barrel re-exports', () => {
             expect(exportedNames).not.toContain('PluginRepository');
             expect(exportedNames).not.toContain('UserPluginRepository');
             expect(exportedNames).not.toContain('WorkPluginRepository');
+        });
+
+        it('binds the AW-22 Work content port to the account export service walk', () => {
+            // The archive must carry each Work's items, categories, tags,
+            // collections and comparisons — content that lives in the Work's
+            // own data repo, not in our database. There must be exactly ONE
+            // reader of that repo, and it is the account export's. This pins
+            // that the port resolves to a delegation to that service rather
+            // than to a second walk (Constitution III).
+            const providers = getMeta('providers');
+            expect(providers).toContain(AccountExportWorkContentSource);
+
+            const bound = providers.find(
+                (p: any) => p && typeof p === 'object' && p.provide === BACKUP_WORK_CONTENT,
+            );
+            expect(bound).toBeDefined();
+            expect(bound.useExisting).toBe(AccountExportWorkContentSource);
         });
 
         it('imports DatabaseModule (where the canonical work/user/auth repos live)', () => {

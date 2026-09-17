@@ -121,3 +121,9 @@ export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver
 // EW-742 P3.2 — Doppler SecretStoreResolver now lives at
 // @ever-works/secret-store-doppler-plugin
 // (packages/plugins/secret-store-doppler/).
+
+// AW-22 Workspace backup — enqueues the archive build. It can run for
+// the best part of an hour and produce gigabytes, so it can never happen
+// inside the request that asked for it.
+export * from './workspace-backup.types';
+export * from './workspace-backup-dispatcher';

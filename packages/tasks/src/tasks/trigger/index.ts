@@ -65,3 +65,8 @@ export * from './memory-fact-gc.task';
 export * from './model-account-health.task';
 // Skills shelf — hourly readiness sweep.
 export * from './skill-readiness-sweep.task';
+// AW-22 Workspace backup — build one complete archive of one workspace,
+// and the hourly sweep that expires artefacts, fails stalls and prunes
+// records so the history list stays honest.
+export * from './workspace-backup.task';
+export * from './workspace-backup-sweeper.task';

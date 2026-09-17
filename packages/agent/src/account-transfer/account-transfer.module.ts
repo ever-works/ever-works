@@ -18,6 +18,9 @@ import { AgentsSkillsTasksImportService } from './agents-skills-tasks-import.ser
 import { AgentsModule } from '../agents/agents.module';
 import { SkillsModule } from '../skills/skills.module';
 import { TasksDomainModule } from '../tasks-domain/tasks.module';
+import { AccountExportWorkContentSource, BACKUP_WORK_CONTENT } from './backup/backup-work-content';
+import { WorkspaceBackupRunner } from './backup/workspace-backup-runner';
+import { WorkspaceBackupService } from './backup/workspace-backup.service';
 
 @Module({
     imports: [
@@ -44,6 +47,18 @@ import { TasksDomainModule } from '../tasks-domain/tasks.module';
         WorkPluginRepository,
         AgentsSkillsTasksExportService,
         AgentsSkillsTasksImportService,
+        // AW-22 Workspace backup — the complete, dated archive that sits
+        // ALONGSIDE the export/import/config-repo-sync path above, which is
+        // untouched. Both surfaces stay: the JSON export is a small,
+        // hand-editable file for moving a couple of Works between
+        // environments; the archive is a complete artefact for keeping.
+        WorkspaceBackupService,
+        WorkspaceBackupRunner,
+        // The Work content port. Bound HERE, where `AccountExportService`
+        // already lives, so the archive reads each Work's items through the
+        // very walk the JSON export uses and no second reader exists.
+        AccountExportWorkContentSource,
+        { provide: BACKUP_WORK_CONTENT, useExisting: AccountExportWorkContentSource },
     ],
     exports: [
         AccountExportService,
@@ -52,6 +67,8 @@ import { TasksDomainModule } from '../tasks-domain/tasks.module';
         UserSyncConfigRepository,
         AgentsSkillsTasksExportService,
         AgentsSkillsTasksImportService,
+        WorkspaceBackupService,
+        WorkspaceBackupRunner,
     ],
 })
 export class AccountTransferModule {}

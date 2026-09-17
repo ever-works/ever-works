@@ -260,6 +260,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkSchedule',
     'Workflow',
     'WorkflowRun',
+    'WorkspaceBackup',
     // Safety rails (AW-24) — present only while a workspace is paused.
     'WorkspacePause',
 ] as const;

@@ -225,7 +225,12 @@ const sidebars: SidebarsConfig = {
 				'features/storage-backends',
 				'features/mcp-server',
 				'features/agent-plugins',
-				'features/data-management'
+				'features/data-management',
+				// The complete dated archive, beside the JSON export rather
+				// than instead of it: it reads directly after Data
+				// Management because the two answer different questions
+				// about the same data and the pages cross-reference.
+				'features/workspace-backup'
 			]
 		},
 		{

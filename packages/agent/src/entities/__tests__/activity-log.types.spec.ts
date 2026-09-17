@@ -130,6 +130,11 @@ describe('activity-log.types', () => {
             ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
             // Agent computers — one row per stretch of control of an Agent's machine.
             ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
+            // AW-22 Workspace backup — starting one, taking a copy off the
+            // platform, and removing the bytes early.
+            ['WORKSPACE_BACKUP_CREATED', 'workspace_backup_created'],
+            ['WORKSPACE_BACKUP_DOWNLOADED', 'workspace_backup_downloaded'],
+            ['WORKSPACE_BACKUP_DELETED', 'workspace_backup_deleted'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -343,6 +348,16 @@ describe('activity-log.types', () => {
             // Neither 169 nor 175 is the answer, and 169 + 175 is nonsense —
             // the number below was COUNTED off the merged enum.
             //
+            // +3 workspace_backup_created / _downloaded / _deleted (AW-22
+            //    Workspace backup) — this branch's own additions, disjoint
+            //    from everything develop grew while it was open -> 186
+            //    COUNTED from the merged enum. This branch budgeted 164 from
+            //    its own base (161 + 3) and develop had reached 183; neither
+            //    number is the answer and the two must never be added.
+            //
+            // develop's own ledger for the same stretch, kept so neither
+            // side's bookkeeping is lost:
+            //
             // Merging that develop (183, model accounts included) into this
             // AW-07 memory-facts + context-files branch (182) COUNTS 194 from
             // the merged enum: the eleven memory_fact_* / memory_facts_cleared /
@@ -380,7 +395,19 @@ describe('activity-log.types', () => {
             // ones this branch lacked. Neither 176 nor 194 is the answer, and
             // 176 + 194 is nonsense — 197 was COUNTED off the merged enum, and
             // must be recounted after every merge.
-            expect(literals).toHaveLength(197);
+            //
+            // Merging that develop (197, AW-07 memory facts + context files and
+            // the AW-23 agent brake included) into this AW-22 Workspace-backup
+            // branch (186) COUNTS 200 from the merged enum: the three
+            // workspace_backup_created / _downloaded / _deleted literals are the
+            // only ones develop does not carry, and the fourteen literals
+            // develop grew while this branch was open (memory_fact_* x6,
+            // memory_facts_cleared, context_file_* x3, context_budget_exceeded,
+            // agent_blocked_on_credential, agent_run_held, agent_runs_released)
+            // the only ones this branch lacked. Neither 186 nor 197 is the
+            // answer, and 186 + 197 is nonsense — 200 was COUNTED off the merged
+            // enum, and must be recounted after every merge.
+            expect(literals).toHaveLength(200);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

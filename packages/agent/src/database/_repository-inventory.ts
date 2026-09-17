@@ -92,6 +92,7 @@ import { OrganizationMemberRepository } from './repositories/organization-member
 import { WorkMemberRepository } from './repositories/work-member.repository';
 import { WorkRepository } from './repositories/work.repository';
 import { WorkScheduleRepository } from './repositories/work-schedule.repository';
+import { WorkspaceBackupRepository } from './repositories/workspace-backup.repository';
 
 export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ActivityLogRepository,
@@ -156,4 +157,5 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     WorkMemberRepository,
     WorkRepository,
     WorkScheduleRepository,
+    WorkspaceBackupRepository,
 ] as const;

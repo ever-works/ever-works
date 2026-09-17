@@ -13,6 +13,7 @@ import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from './template-customization-disp
 import { WEBHOOK_DELIVERY_DISPATCHER } from './webhook-delivery-dispatcher';
 import { WORK_GENERATION_DISPATCHER } from './work-generation-dispatcher';
 import { WORK_IMPORT_DISPATCHER } from './work-import-dispatcher';
+import { WORKSPACE_BACKUP_DISPATCHER } from './workspace-backup-dispatcher';
 
 /**
  * EW-685 P0 T4 — binding factory for the `*_DISPATCHER` symbols.
@@ -32,7 +33,7 @@ import { WORK_IMPORT_DISPATCHER } from './work-import-dispatcher';
  *
  * Every `*_DISPATCHER` symbol in `@ever-works/agent/tasks` is now bound
  * through this factory in `packages/tasks/src/trigger/trigger.module.ts`
- * (no `symbols:` filter — all 13 dispatchers flow through the registry).
+ * (no `symbols:` filter — all 14 dispatchers flow through the registry).
  * The previous 8-vs-3 split (with `KB_NORMALIZE_MEDIA_DISPATCHER` /
  * `KB_TRANSCRIBE_DISPATCHER` / `KB_REEMBED_WORK_DISPATCHER` still bound
  * as custom adapters in `apps/api/src/works/works.module.ts`) was
@@ -151,6 +152,7 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
     WEBHOOK_DELIVERY_DISPATCHER,
     WORK_GENERATION_DISPATCHER,
     WORK_IMPORT_DISPATCHER,
+    WORKSPACE_BACKUP_DISPATCHER,
 ] as const;
 
 /**
@@ -168,17 +170,17 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  *     letting the API's existing in-process dev fallback continue to
  *     kick in unchanged.
  *
- * Provider arity is pinned at 13 — one per entry in {@link DISPATCHER_SYMBOLS}
- * (the original 11 plus AW-07's `MEMORY_FACT_EMBED_DISPATCHER` and develop's
- * `ROSTER_PROVISION_DISPATCHER`) — and verified by
- * `__tests__/job-runtime.providers.spec.ts`. COUNT the array after every
- * merge rather than adding two branches' numbers together.
+ * Provider arity is pinned at 14 — one per entry in {@link DISPATCHER_SYMBOLS}
+ * (the original 11 plus AW-07's `MEMORY_FACT_EMBED_DISPATCHER`, develop's
+ * `ROSTER_PROVISION_DISPATCHER` and AW-22's `WORKSPACE_BACKUP_DISPATCHER`)
+ * — and verified by `__tests__/job-runtime.providers.spec.ts`. COUNT the
+ * array after every merge rather than adding two branches' numbers together.
  *
  * @param opts Optional `symbols` filter — when supplied, only those
  *   tokens are bound (the rest stay wherever the operator's module
  *   tree binds them today). The EW-685 T4 full cutover in
  *   `packages/tasks/src/trigger/trigger.module.ts` now passes no
- *   filter (all 13 dispatchers flow through the registry) — the
+ *   filter (all 14 dispatchers flow through the registry) — the
  *   `symbols:` option is retained for tests and for future modules
  *   that want to bind a subset (e.g. a pull-model worker host that
  *   only owns a strict subset of the dispatcher surface).
@@ -190,7 +192,7 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  */
 export interface BuildJobRuntimeProvidersOptions {
     /**
-     * Subset of `DISPATCHER_SYMBOLS` to bind. When omitted, all 13
+     * Subset of `DISPATCHER_SYMBOLS` to bind. When omitted, all 14
      * are bound (the default `trigger.module.ts` path post-EW-685 T4
      * full cutover). Used by tests and by future modules that want
      * to bind a strict subset.

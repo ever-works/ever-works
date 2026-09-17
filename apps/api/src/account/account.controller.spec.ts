@@ -94,6 +94,42 @@ describe('AccountController', () => {
                 ...defaultV2Toggles,
             });
         });
+
+        /**
+         * AW-22 added a second, complete archive at `/api/account/backups`.
+         * This route is the one people use today, and it does a different
+         * job — a small, hand-editable, diffable file for moving a couple of
+         * Works between environments. It must keep behaving exactly as it
+         * did: same path, same response body, same attachment filename.
+         */
+        it('still returns the service payload unchanged, under the same attachment filename', async () => {
+            const payload = { version: '2', data: { profile: {}, works: [] } };
+            exportService.exportAccountData.mockResolvedValue(payload as any);
+
+            const result = await controller.exportData(auth, 'false');
+
+            expect(result).toBe(payload);
+            expect(Reflect.getMetadata('__headers__', controller.exportData)).toEqual([
+                {
+                    name: 'Content-Disposition',
+                    value: 'attachment; filename="account-export.json"',
+                },
+            ]);
+        });
+
+        it('still forwards all four v2-tail toggles, so no opt-in section stops being exported', async () => {
+            exportService.exportAccountData.mockResolvedValue({} as any);
+
+            await controller.exportData(auth, 'true', 'true', 'true', 'true', 'true');
+
+            expect(exportService.exportAccountData).toHaveBeenCalledWith('user-1', {
+                includeSecrets: true,
+                includeAgents: true,
+                includeSkills: true,
+                includeTasks: true,
+                includeTaskChat: true,
+            });
+        });
     });
 
     describe('previewImport', () => {

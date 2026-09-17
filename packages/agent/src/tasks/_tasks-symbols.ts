@@ -101,5 +101,9 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'WORK_GENERATION_DISPATCHER',
     'WORK_GENERATION_MODE',
     'WORK_IMPORT_DISPATCHER',
+    // AW-22 Workspace backup — enqueues one complete archive of one
+    // workspace. A `null` return is treated as a hard failure by the
+    // caller, not a deferral: nothing else would ever pick the row up.
+    'WORKSPACE_BACKUP_DISPATCHER',
     'WorkImportErrorCode',
 ] as const;

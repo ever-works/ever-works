@@ -832,20 +832,20 @@ Import data from external sources using Apify web scraping actors.
 
 ## Storage
 
-Storage plugins implement the `storage` capability plus the object verbs (`put-object`, `get-object`, and `presigned-put` where the backend supports pre-signed uploads). They back every file the dashboard accepts — Knowledge Base documents, item images, avatars. Pick one at **Settings → Plugins → Storage** (`/settings/plugins/storage`). Introduced in EW-637; the Git LFS and `data-repo` work landed in EW-644. See [Storage Backends](../features/storage-backends.md) for the user-facing guide.
+Storage plugins implement the `storage` capability plus the object verbs (`put-object`, `get-object`, `presigned-put` where the backend supports pre-signed uploads, and `put-object-stream` / `get-object-stream` where the backend can write and read an object as a stream rather than as one buffer). They back every file the dashboard accepts — Knowledge Base documents, item images, avatars. Pick one at **Settings → Plugins → Storage** (`/settings/plugins/storage`). Introduced in EW-637; the Git LFS and `data-repo` work landed in EW-644; the two streaming verbs were added by the workspace-backup archive (AW-22), which can run to gigabytes and so may never pass through memory. Both are **optional**: a consumer probes for the method rather than checking a backend id, and a backend without them simply carries a smaller size ceiling. See [Storage Backends](../features/storage-backends.md) for the user-facing guide.
 
 ### Local Filesystem
 
 Writes objects to a directory on the API server. This is the **default boot storage** (FR-4): the API can serve with no distributable storage plugin enabled at all.
 
-| Field         | Value                                 |
-| ------------- | ------------------------------------- |
-| Plugin ID     | `local-fs`                            |
-| Category      | `storage`                             |
-| Auto Enable   | Yes                                   |
-| System Plugin | Yes                                   |
-| Distribution  | `core`                                |
-| Capabilities  | `storage`, `put-object`, `get-object` |
+| Field         | Value                                                                           |
+| ------------- | ------------------------------------------------------------------------------- |
+| Plugin ID     | `local-fs`                                                                      |
+| Category      | `storage`                                                                       |
+| Auto Enable   | Yes                                                                             |
+| System Plugin | Yes                                                                             |
+| Distribution  | `core`                                                                          |
+| Capabilities  | `storage`, `put-object`, `get-object`, `put-object-stream`, `get-object-stream` |
 
 **Settings:**
 
@@ -853,6 +853,8 @@ Writes objects to a directory on the API server. This is the **default boot stor
 | ------------ | ------ | ----------------------------- | -------------------- | ------------------------------------------- |
 | `uploadsDir` | string | `<tmpdir>/ever-works-uploads` | `UPLOADS_DIR`        | Absolute path on the API server for objects |
 | `maxBytes`   | number | `5242880` (5 MiB)             | `UPLOADS_MAX_BYTES`  | Per-object size cap in bytes                |
+
+Streaming writes go to a temporary name inside the same owner directory and are renamed into place, so the on-disk layout (`<UPLOADS_DIR>/<ownerId>/<sha256>.<ext>`) is identical whichever verb wrote the object.
 
 Single-node only — the directory is local to the API pod, so a multi-replica deployment needs S3, MinIO, or GitHub storage instead.
 

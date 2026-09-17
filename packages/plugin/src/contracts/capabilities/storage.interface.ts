@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import type { IPlugin } from '../plugin.interface.js';
 
 /**
@@ -15,6 +16,18 @@ import type { IPlugin } from '../plugin.interface.js';
  *   - `presigned-put` (optional) — backend can mint a direct-to-cloud upload
  *     URL the browser uses to skip the API process. S3 / MinIO support
  *     this; local-fs and GitHub-blob do not (the API has to mediate).
+ *   - `put-object-stream` (optional, AW-22) — backend accepts a `Readable`
+ *     instead of a `Buffer`, so an object larger than memory can be written.
+ *     Added for the workspace-backup archive, which may run to gigabytes.
+ *   - `get-object-stream` (optional, AW-22) — backend hands back a
+ *     `Readable`, so the same object can be served without buffering it.
+ *
+ * Both streaming capabilities are OPTIONAL and additive: every existing
+ * plugin keeps working untouched, and no plugin major version is needed.
+ * A consumer that wants them PROBES for the method
+ * (`typeof plugin.putObjectStream === 'function'`) rather than checking a
+ * backend id — a backend without them is a smaller size ceiling, never a
+ * wrong result.
  */
 export interface StoragePutInput {
 	/** Bytes to write. */
@@ -70,6 +83,42 @@ export interface StorageGetResult {
 }
 
 /**
+ * Input for the optional `putObjectStream` (AW-22). Same metadata as
+ * {@link StoragePutInput}, with the buffer replaced by a stream so the
+ * caller never has to hold the object.
+ */
+export interface StoragePutStreamInput {
+	/** Bytes to write, consumed lazily. The plugin owns draining it. */
+	readonly stream: Readable;
+	/** Client-supplied filename. NOT used as the storage key — only for
+	 *  derived extension / Content-Disposition. The key is opaque. */
+	readonly filename: string;
+	/** Already-validated MIME type. */
+	readonly mimeType: string;
+	/**
+	 * Expected byte length when the caller knows it. Backends that need a
+	 * content length up front (some object stores) use it; the rest ignore
+	 * it. Absent means "unknown until the stream ends".
+	 */
+	readonly expectedSize?: number;
+	/** Optional owner identifier, used only to derive the key prefix. */
+	readonly ownerId?: string;
+	/** Optional Work ID, for backends that resolve their destination per-Work. */
+	readonly workId?: string;
+}
+
+/**
+ * Result of the optional `getObjectStream` (AW-22). `size` is present when
+ * the backend knows it without reading the object, so a caller can set
+ * `Content-Length` before the first byte.
+ */
+export interface StorageGetStreamResult {
+	readonly stream: Readable;
+	readonly mimeType: string;
+	readonly size?: number;
+}
+
+/**
  * Input for `presignPut`. The plugin returns a URL + (for backends that
  * need it — e.g. POST policies) extra fields the browser includes in the
  * multipart form. For pure presigned PUT (S3 v4 signed PUT), `fields` is
@@ -121,6 +170,27 @@ export interface IStoragePlugin extends IPlugin {
 	 * implement this; local-fs / GitHub do not.
 	 */
 	presignPut?(input: StoragePresignInput): Promise<StoragePresignResult>;
+
+	/**
+	 * Optional (AW-22, capability `put-object-stream`): write an object from
+	 * a stream instead of a buffer, so its size is bounded by the backend
+	 * rather than by the process's memory.
+	 *
+	 * Implementations MUST NOT collect the stream into a buffer — that would
+	 * satisfy the signature while defeating the reason it exists. local-fs
+	 * pipes to a temporary path and renames; object stores use a multipart
+	 * upload. Backends whose write API is not a streaming target (GitHub
+	 * blobs) leave this unset, and callers fall back to `putObject` under a
+	 * smaller size ceiling.
+	 */
+	putObjectStream?(input: StoragePutStreamInput): Promise<StoragePutResult>;
+
+	/**
+	 * Optional (AW-22, capability `get-object-stream`): read an object back
+	 * as a stream, so a large object can be served without buffering it.
+	 * Throws if the key is not found, exactly like `getObject`.
+	 */
+	getObjectStream?(key: string): Promise<StorageGetStreamResult>;
 
 	/**
 	 * Reconstruct the plugin's canonical storage key from the legacy

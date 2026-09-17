@@ -223,3 +223,7 @@ export * from './release-promotion.entity';
 export * from './product-changelog-read.entity';
 // AW-18 Shared view — a Workspace's read-only published projection.
 export * from './shared-view.entity';
+// AW-22 Workspace backup — one record of one attempt to produce a complete,
+// dated archive of one workspace, with the manifest summary that keeps the
+// history legible after the archive itself expires.
+export * from './workspace-backup.entity';

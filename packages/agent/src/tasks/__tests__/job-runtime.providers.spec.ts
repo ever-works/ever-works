@@ -12,6 +12,7 @@ import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from '../template-customization-dis
 import { WEBHOOK_DELIVERY_DISPATCHER } from '../webhook-delivery-dispatcher';
 import { WORK_GENERATION_DISPATCHER } from '../work-generation-dispatcher';
 import { WORK_IMPORT_DISPATCHER } from '../work-import-dispatcher';
+import { WORKSPACE_BACKUP_DISPATCHER } from '../workspace-backup-dispatcher';
 import {
     InMemoryJobRuntimeProviderRegistry,
     JOB_RUNTIME_PROVIDER_REGISTRY,
@@ -130,12 +131,16 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
     });
 
     describe('buildJobRuntimeProviders()', () => {
-        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 13)', () => {
+        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 14)', () => {
             const providers = buildJobRuntimeProviders();
             // 11 original dispatchers + AW-07's MEMORY_FACT_EMBED_DISPATCHER +
-            // develop's ROSTER_PROVISION_DISPATCHER. COUNTED off the merged
-            // DISPATCHER_SYMBOLS list, not added up from either branch.
-            expect(providers).toHaveLength(13);
+            // develop's ROSTER_PROVISION_DISPATCHER + AW-22's
+            // WORKSPACE_BACKUP_DISPATCHER. COUNTED off the merged
+            // DISPATCHER_SYMBOLS list, not added up from either branch:
+            // develop reached 13 with MEMORY_FACT_EMBED + ROSTER_PROVISION and
+            // this branch reached 12 with WORKSPACE_BACKUP from a base of 11.
+            // The merged list carries all of them -> 14.
+            expect(providers).toHaveLength(14);
         });
 
         it('binds every *_DISPATCHER symbol exported from @ever-works/agent/tasks', () => {
@@ -147,7 +152,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // Compare as a Set — Symbol values cannot be sorted (the default
             // sort comparator coerces to string and symbols throw on
             // String() coercion). Identity match against the canonical
-            // 13-symbol list is the actual invariant we care about.
+            // 14-symbol list is the actual invariant we care about.
             const expected = new Set<symbol>([
                 KB_BACKFILL_SKELETON_DISPATCHER,
                 KB_EMBED_DOCUMENT_DISPATCHER,
@@ -162,6 +167,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
                 WEBHOOK_DELIVERY_DISPATCHER,
                 WORK_GENERATION_DISPATCHER,
                 WORK_IMPORT_DISPATCHER,
+                WORKSPACE_BACKUP_DISPATCHER,
             ]);
             expect(provideTokens).toEqual(expected);
             // Belt-and-suspenders: no duplicate provide tokens (a duplicate

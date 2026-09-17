@@ -61,6 +61,11 @@ export * from './billing/index.js';
 // Attention controls (AW-13) — the notification matrix (one row per event,
 // one column per delivery target) and the attention budget meter shape.
 export * from './notifications/index.js';
+// Workspace backup (AW-22) — the published archive format: the fifteen
+// domains, their restorability classes, the trim windows, the exclusions
+// list and the manifest shape. One source for the writer, the API, the web
+// report and the field reference.
+export * from './backup/index.js';
 // Home (AW-19) — the composed morning read on the dashboard root: one status per
 // block, over the decision queue, the Runs ledger, schedules, costs and the feed.
 export * from './home/index.js';

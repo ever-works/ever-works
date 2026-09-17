@@ -13,6 +13,17 @@ Data Management lets you export your entire account configuration, import it int
 Use data management to migrate between Ever Works instances, create backups of your configuration, or share work setups across environments (staging, production).
 :::
 
+:::note Two surfaces, two jobs
+This page describes the **JSON export, import and GitHub sync** — a small, hand-editable,
+diffable file, and the right tool for moving a couple of Works between environments or keeping
+your configuration in your own repository.
+
+If you want a complete, dated archive of an entire workspace — every section, with a manifest
+that states what is inside, what was trimmed and what a restore could put back — see
+[Workspace Backup](./workspace-backup.md). Both surfaces are supported and neither replaces the
+other.
+:::
+
 ## Prerequisites
 
 - A registered Ever Works account

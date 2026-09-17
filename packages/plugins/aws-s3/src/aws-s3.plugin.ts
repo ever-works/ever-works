@@ -9,12 +9,15 @@ import {
 	ListObjectsV2Command,
 	HeadBucketCommand
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type {
 	IStoragePlugin,
 	StoragePutInput,
 	StoragePutResult,
+	StoragePutStreamInput,
 	StorageGetResult,
+	StorageGetStreamResult,
 	StoragePresignInput,
 	StoragePresignResult,
 	IPlugin,
@@ -55,7 +58,17 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 	readonly name: string = 'AWS S3';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'storage';
-	readonly capabilities: readonly string[] = ['storage', 'put-object', 'get-object', 'presigned-put'];
+	readonly capabilities: readonly string[] = [
+		'storage',
+		'put-object',
+		'get-object',
+		'presigned-put',
+		// AW-22 — multipart upload and streamed download, so an object whose
+		// size is not known up front (a workspace-backup archive) is bounded
+		// by the bucket rather than by the API process's memory.
+		'put-object-stream',
+		'get-object-stream'
+	];
 
 	readonly providerName: string = 'aws-s3';
 
@@ -128,6 +141,69 @@ export class AwsS3StoragePlugin implements IPlugin, IStoragePlugin {
 
 		const url = this.objectUrl(cfg, key);
 		return { key, url };
+	}
+
+	/**
+	 * AW-22 — upload from a stream via S3 multipart, using the SDK's own
+	 * `Upload` helper rather than a hand-rolled part loop.
+	 *
+	 * The key is random rather than content-addressed, exactly as
+	 * `presignPut` already is and for the same reason: the sha256 of the
+	 * bytes is not known until the last one arrives, and round-tripping a
+	 * multi-gigabyte archive through memory to learn it is the thing this
+	 * method exists to avoid. The caller computes and records the digest as
+	 * it writes, so the archive is still verifiable — see
+	 * `checksums.txt` and the `sha256` on the backup record.
+	 *
+	 * `Upload` aborts the multipart upload on failure, so a torn write does
+	 * not leave billable orphan parts in the bucket.
+	 */
+	async putObjectStream(input: StoragePutStreamInput): Promise<StoragePutResult> {
+		const cfg = this.config();
+		const client = this.client(cfg);
+		const key = this.buildRandomKey(input.filename, input.ownerId);
+
+		const upload = new Upload({
+			client,
+			params: {
+				Bucket: cfg.bucket,
+				Key: key,
+				Body: input.stream,
+				ContentType: input.mimeType
+			},
+			// 8 MiB parts: comfortably above S3's 5 MiB minimum, and small
+			// enough that the in-flight window below stays modest.
+			partSize: 8 * 1024 * 1024,
+			queueSize: 4,
+			leavePartsOnError: false
+		});
+
+		await upload.done();
+
+		const url = this.objectUrl(cfg, key);
+		return { key, url };
+	}
+
+	/**
+	 * AW-22 — hand the object's body back as a stream so a large archive is
+	 * piped to the client and never buffered. `size` comes from
+	 * `ContentLength`, which lets the caller set its own `Content-Length`
+	 * before the first byte leaves.
+	 */
+	async getObjectStream(key: string): Promise<StorageGetStreamResult> {
+		const cfg = this.config();
+		const client = this.client(cfg);
+		const out = await client.send(new GetObjectCommand({ Bucket: cfg.bucket, Key: key }));
+		const body = out.Body;
+		if (!body) {
+			throw new Error(`S3 GetObject returned no body for key ${key}`);
+		}
+
+		const result: StorageGetStreamResult = {
+			stream: body as unknown as StorageGetStreamResult['stream'],
+			mimeType: out.ContentType || guessMime(key)
+		};
+		return typeof out.ContentLength === 'number' ? { ...result, size: out.ContentLength } : result;
 	}
 
 	async getObject(key: string): Promise<StorageGetResult> {
