@@ -100,9 +100,16 @@ describe('ConversationTitleService', () => {
         expect(opts.messages[1].content).toContain('user: hi');
         expect(opts.messages[1].content).toContain('user: tell me about cats');
         expect(opts.messages[1].content).toContain('assistant: cats are great');
-        expect(conversationRepo.updateTitle).toHaveBeenCalledWith('c-1', 'user-1', 'My Cat Title', {
-            aiTitle: true,
-        });
+        expect(conversationRepo.updateTitle).toHaveBeenCalledWith(
+            'c-1',
+            'user-1',
+            'My Cat Title',
+            { aiTitle: true },
+            // The write is a compare-and-set: the `titleSource` read above
+            // happened before the model call, so only the database can rule
+            // out a rename that landed in between.
+            { onlyWhenNotUserTitled: true },
+        );
     });
 
     it('truncates long generated titles to 100 chars', async () => {
@@ -129,9 +136,47 @@ describe('ConversationTitleService', () => {
 
         await service.maybeGenerateTitle('c-1', 'user-1');
 
-        expect(conversationRepo.updateTitle).toHaveBeenCalledWith('c-1', 'user-1', 'Spaced Title', {
-            aiTitle: true,
-        });
+        expect(conversationRepo.updateTitle).toHaveBeenCalledWith(
+            'c-1',
+            'user-1',
+            'Spaced Title',
+            { aiTitle: true },
+            { onlyWhenNotUserTitled: true },
+        );
+    });
+
+    it('never overwrites a name the person gave while the title was generated', async () => {
+        // The Conversation was read as untitled, the model call took seconds,
+        // and a `setName` landed in between. The conditional write reports
+        // that it changed nothing, and nothing is retried on top of it.
+        conversationRepo.findById.mockResolvedValue(conversation() as any);
+        workRepository.findByUser.mockResolvedValue([] as any);
+        aiFacade.createChatCompletion.mockResolvedValue({
+            choices: [{ message: { content: 'Model summary' } }],
+        } as any);
+        conversationRepo.updateTitle.mockResolvedValue(false);
+
+        await expect(service.maybeGenerateTitle('c-1', 'user-1')).resolves.toBeUndefined();
+
+        expect(conversationRepo.updateTitle).toHaveBeenCalledTimes(1);
+        expect(conversationRepo.updateTitle).toHaveBeenCalledWith(
+            'c-1',
+            'user-1',
+            'Model summary',
+            { aiTitle: true },
+            { onlyWhenNotUserTitled: true },
+        );
+    });
+
+    it('skips the model call entirely when the title is already user-owned', async () => {
+        conversationRepo.findById.mockResolvedValue(
+            conversation({ title: 'Quarterly plan', titleSource: 'user' }) as any,
+        );
+
+        await service.maybeGenerateTitle('c-1', 'user-1');
+
+        expect(aiFacade.createChatCompletion).not.toHaveBeenCalled();
+        expect(conversationRepo.updateTitle).not.toHaveBeenCalled();
     });
 
     it('skips updateTitle when AI returns empty content', async () => {

@@ -13,6 +13,7 @@ import { TaskKbMention } from '../entities/task-kb-mention.entity';
 import { TaskTemplate } from '../entities/task-template.entity';
 import { TaskTemplateStep } from '../entities/task-template-step.entity';
 import { TaskCiAutoResumeAttempt } from '../entities/task-ci-auto-resume-attempt.entity';
+import { TaskAgentReview } from '../entities/task-agent-review.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
@@ -23,6 +24,7 @@ import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
+import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
 import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
 import { TaskTemplateRepository } from '../database/repositories/task-template.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
@@ -58,6 +60,7 @@ import { TaskGitLinkService } from './task-git-link.service';
 import { TaskWorkspaceService } from './task-workspace.service';
 import { TaskPrStatusService } from './task-pr-status.service';
 import { TaskCiAutoResumeService } from './task-ci-auto-resume.service';
+import { TaskAgentReviewService } from './task-agent-review.service';
 import { FacadesModule } from '../facades/facades.module';
 import { PolicyModule } from '../policy/policy.module';
 import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
@@ -65,6 +68,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { DatabaseModule } from '../database/database.module';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 
 /**
  * Tasks feature — Phases 11 + 12 + 13.
@@ -96,6 +100,11 @@ import { DatabaseModule } from '../database/database.module';
             // registered in `_entities-inventory.ts` (no autoLoadEntities
             // in this repo) and in `_entity-names.ts`.
             TaskCiAutoResumeAttempt,
+            // Reviewer agent stage (slice AD, EW-811) — the review ledger
+            // that IS the review budget and the run → approver-row
+            // binding. ALSO registered in `_entities-inventory.ts` (no
+            // autoLoadEntities in this repo) and in `_entity-names.ts`.
+            TaskAgentReview,
             UserTaskCounter,
             WorkKnowledgeUpload,
             Work,
@@ -138,6 +147,7 @@ import { DatabaseModule } from '../database/database.module';
     providers: [
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
+        TaskAgentReviewRepository,
         AgentRepoAttachmentRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
@@ -200,6 +210,15 @@ import { DatabaseModule } from '../database/database.module';
         // tokens is @Optional() at the injection site, so an install
         // without them files nothing and resumes nothing.
         TaskCiAutoResumeService,
+        // Reviewer agent stage (self-build slice AD, EW-811) — plans the
+        // review runs an entry into `in_review` buys, and records the
+        // verdict those runs submit. Reads the review ledger above,
+        // `TaskApproverRepository` (provided above), `AgentRunRepository`
+        // + `AgentRepository` (AgentsModule, imported above) and the git
+        // facade (FacadesModule). Every one of those is @Optional() at the
+        // injection site, and the service refuses to review rather than
+        // half-reviewing when one is missing.
+        TaskAgentReviewService,
         // Wave 3 M2 — acceptance-check runner (quality gates). Needs only
         // AgentRunRepository (exported by AgentsModule above) to persist
         // per-run gate results.
@@ -209,10 +228,16 @@ import { DatabaseModule } from '../database/database.module';
         // (FacadesModule, imported above) and treats it as @Optional(), so
         // a deployment with no AI provider degrades to "no judge".
         TaskGateJudgeService,
+        // Schedules — the per-template run-now claim `TasksService` holds
+        // across the in-flight check, the instance insert and the dispatch.
+        // Backed by `cache_entries` through DatabaseModule (imported above);
+        // local, not exported, like CommunityPrModule's copy.
+        DistributedTaskLockService,
     ],
     exports: [
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
+        TaskAgentReviewRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
         TaskApproverRepository,
@@ -243,6 +268,7 @@ import { DatabaseModule } from '../database/database.module';
         TaskGitLinkService,
         TaskPrStatusService,
         TaskCiAutoResumeService,
+        TaskAgentReviewService,
         TaskGateRunnerService,
         TaskGateJudgeService,
     ],

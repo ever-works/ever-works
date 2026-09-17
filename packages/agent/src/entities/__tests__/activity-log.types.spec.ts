@@ -50,6 +50,8 @@ describe('activity-log.types', () => {
             ['SCHEDULE_UPDATED', 'schedule_updated'],
             ['SCHEDULE_DELETED', 'schedule_deleted'],
             ['SCHEDULE_EXECUTED', 'schedule_executed'],
+            ['SCHEDULE_PAUSED', 'schedule_paused'],
+            ['SCHEDULE_RESUMED', 'schedule_resumed'],
             // Import / Export
             ['IMPORT', 'import'],
             ['EXPORT', 'export'],
@@ -84,11 +86,36 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Model accounts (AW-16) — provider account + model default changes.
+            ['MODEL_ACCOUNT_ADDED', 'model_account_added'],
+            ['MODEL_ACCOUNT_UPDATED', 'model_account_updated'],
+            ['MODEL_ACCOUNT_REORDERED', 'model_account_reordered'],
+            ['MODEL_ACCOUNT_PAUSED', 'model_account_paused'],
+            ['MODEL_ACCOUNT_RESUMED', 'model_account_resumed'],
+            ['MODEL_ACCOUNT_RECONNECTED', 'model_account_reconnected'],
+            ['MODEL_ACCOUNT_REMOVED', 'model_account_removed'],
+            ['MODEL_POLICY_UPDATED', 'model_policy_updated'],
+            // Skills shelf — the workspace-level on/off switch.
+            ['SKILL_ENABLED', 'skill_enabled'],
+            ['SKILL_DISABLED', 'skill_disabled'],
+            // Knowledge library — shelf curation (filing, archive, export)
+            // and shared-folder rename.
+            ['KB_DOCUMENT_ARCHIVED', 'kb_document_archived'],
+            ['KB_DOCUMENT_UNARCHIVED', 'kb_document_unarchived'],
+            ['KB_DOCUMENT_FILED', 'kb_document_filed'],
+            ['KB_DOCUMENT_EXPORTED', 'kb_document_exported'],
+            ['MEMORY_FOLDER_RENAMED', 'memory_folder_renamed'],
             // Live Feed — a run starting / finishing / failing for every
             // trigger kind other than heartbeat.
             ['AGENT_RUN_STARTED', 'agent_run_started'],
             ['AGENT_RUN_COMPLETED', 'agent_run_completed'],
             ['AGENT_RUN_FAILED', 'agent_run_failed'],
+            // Shared view (AW-18)
+            ['SHARED_VIEW_ENABLED', 'shared_view_enabled'],
+            ['SHARED_VIEW_DISABLED', 'shared_view_disabled'],
+            ['SHARED_VIEW_REGENERATED', 'shared_view_regenerated'],
+            ['SHARED_VIEW_SECTIONS_CHANGED', 'shared_view_sections_changed'],
+            ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
             // Agent computers — one row per stretch of control of an Agent's machine.
             ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
         ];
@@ -151,18 +178,125 @@ describe('activity-log.types', () => {
             //    (Settings → Environments, via the Agent Workbench branch) -> 157.
             //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
             //    develop and this branch — so it is shared, not additive.
+            // +2 schedule_paused / schedule_resumed (Schedules workspace
+            //    pause that keeps the cadence) -> 159.
             //
-            // 🛑 161 is COUNTED from the merged enum, never added up from the
+            // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop, which did not yet carry schedule_paused /
+            //    schedule_resumed.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop, on the same Live-Feed-only base.
+            // Merge of develop's Live Feed + Agent computers members with this
+            // branch's Schedules workspace pause/resume members:
+            // 157 base + 2 + 3 + 1 -> 163.
+            //
+            // +5 kb_document_archived / _unarchived / _filed / _exported and
+            //    memory_folder_renamed (Knowledge library shelf) -> 162 on
+            //    develop, on its own Live-Feed base.
+            //
+            // develop's own ledger for the Skills shelf stretch, kept so
+            // neither side's bookkeeping is lost:
+            //   +2 skill_enabled / skill_disabled (Skills shelf on/off
+            //   switch) -> 159 on develop's own base.
+            //   +5 kb_document_archived / _unarchived / _filed / _exported and
+            //   memory_folder_renamed (Knowledge library shelf) -> 162 on
+            //   develop's own base.
+            //
+            // 🛑 175 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
-            // (this one said 157, develop was at 153), so after a merge neither
+            // (this one said 159, develop was at 160), so after a merge neither
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
             //
+            // +8 model_account_added / _updated / _reordered / _paused /
+            //    _resumed / _reconnected / _removed and model_policy_updated
+            //    (model accounts, AW-16) -> 165 on this branch's base.
             // +3 agent_run_started / agent_run_completed / agent_run_failed
-            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
-            // +1 agent_computer_controlled (Agent computers, take-over) -> 161.
-            expect(literals).toHaveLength(161);
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop's base.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop's base.
+            // 169 after the model-accounts branch merged develop's Live Feed
+            //    and Agent-computers work — COUNTED from the merged enum
+            //    (160 shared base + 8 model_* from this branch + 3
+            //    agent_run_* + 1 agent_computer_controlled from develop), not
+            //    taken from either side's total.
+            //
+            // develop's own ledger for the same stretch, kept so neither side's
+            // bookkeeping is lost. Its "+3 agent_run_*" line above continues:
+            //    on this branch's own base; the same +3 reached develop together
+            //    with the +5 knowledge library literals, which develop counted
+            //    as -> 165 there.
+            //
+            // Merging develop's Live Feed run lifecycle (+3, develop said 160)
+            // into the Skills shelf branch (+2 skill_enabled / skill_disabled,
+            // this branch said 159) -> 162, COUNTED from the merged enum.
+            // +1 agent_computer_controlled (Agent computers, take-over) —
+            //    develop said 161 on its own base; merged with the Skills
+            //    shelf branch's 162 this COUNTS to 163 from the merged enum,
+            //    not from adding either side's number.
+            // Merging develop again (it had reached 166 by landing the
+            // Knowledge library shelf's +5 kb_document_archived /
+            // _unarchived / _filed / _exported / memory_folder_renamed)
+            // into this branch's 163 COUNTS to 168 from the merged enum —
+            // the two skill_* literals are this branch's only additions that
+            // develop does not already carry.
+            //
+            // develop's own ledger for the same stretch, kept so neither
+            // side's bookkeeping is lost:
+            //   +3 agent_run_* (Live Feed — run lifecycle for non-heartbeat
+            //   triggers) and +5 knowledge library literals -> 165. Both land
+            //   together when the Knowledge library shelf merges develop's
+            //   Live Feed work: 162 (shelf side) and 160 (develop side) each
+            //   counted from their own base, and the merged enum COUNTS 165.
+            //   +1 agent_computer_controlled (Agent computers, take-over)
+            //   -> 166 after the knowledge library branch merged develop's
+            //   Agent computers take-over work.
+            // +5 shared_view_enabled / _disabled / _regenerated /
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) — this
+            //    branch's own additions, disjoint from everything develop grew
+            //    while it was open -> 171 COUNTED from the merged enum (this
+            //    branch budgeted 166, develop was at 166, and the five shared-view
+            //    literals are the only ones develop does not already have).
+            // +2 schedule_paused / schedule_resumed (Schedules workspace pause
+            //    that keeps the cadence) — this branch's own additions, the only
+            //    two literals develop does not already have -> 173 COUNTED from
+            //    the merged enum (this branch budgeted 163, develop was at 171).
+            //
+            // develop's own ledger for the shared-view stretch, kept so neither
+            // side's bookkeeping is lost:
+            //   the five shared_view_* literals landed on develop while the
+            //   Skills shelf branch was open and counted 171 there; merging that
+            //   develop into the shelf branch's 168 COUNTED 173, the two skill_*
+            //   literals being that branch's only additions develop lacked.
+            //
+            // Merging that develop (173, Skills shelf included) into this
+            // branch (173, Schedules workspace pause included) COUNTS 175 from
+            // the merged enum: schedule_paused / schedule_resumed are the only
+            // two literals develop does not carry, and skill_enabled /
+            // skill_disabled the only two this branch did not. Neither side's
+            // 173 is the answer and the two must never be added together.
+            //
+            // Merging that develop (175) into this model-accounts branch (169)
+            // COUNTS 183 from the merged enum: the eight model_account_* /
+            // model_policy_updated literals are the only ones develop does not
+            // carry, and the fourteen literals develop grew while this branch
+            // was open (skill_*, kb_document_*, memory_folder_renamed,
+            // shared_view_*, schedule_*) the only ones this branch lacked.
+            // Neither 169 nor 175 is the answer, and 169 + 175 is nonsense —
+            // the number below was COUNTED off the merged enum.
+            expect(literals).toHaveLength(183);
+        });
+
+        it('every literal fits the varchar(50) action_type column', () => {
+            const literals = Object.values(ActivityActionType).filter(
+                (v) => typeof v === 'string',
+            ) as string[];
+            for (const v of literals) {
+                expect(v.length).toBeLessThanOrEqual(50);
+            }
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

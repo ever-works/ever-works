@@ -21,6 +21,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { assertNoSecrets } from '../utils/secret-scan';
 import { AGENT_CHAT_REPLY_DISPATCHER, type AgentChatReplyDispatcher } from './task-dispatcher';
 import { RUN_STEERING_PORT, type RunSteeringPort } from './run-steering-port';
+import { isAgentReviewRunScope } from './task-agent-review';
 import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
 
 /**
@@ -423,6 +424,9 @@ export class TaskChatService {
      * steering port bound, the run went terminal mid-flight, or the steer
      * itself failed — so the fan-out falls through to today's dispatch and a
      * steering hiccup can never swallow a user's message.
+     *
+     * One more `true`: the live run is a REVIEW run (slice AD). Nothing is
+     * injected and nothing is dispatched — see the branch below for why.
      */
     private async trySteerLiveRun(
         taskId: string,
@@ -440,6 +444,24 @@ export class TaskChatService {
                 ownershipScope,
             );
             if (!live) return false;
+            // Reviewer agent stage (slice AD, EW-811) — a live REVIEW run
+            // is neither steered nor doubled up on. Steering it would put
+            // the poster's words into the reviewer's conversation outside
+            // the brief's untrusted-content fence (and `steer` refuses it
+            // anyway); falling back to a second, ordinary chat run for the
+            // reviewer would make that agent an AUTHOR of this Task, which
+            // refuses the review in flight as `self-review` — so any
+            // `@reviewer` post, including one the implementer makes through
+            // MCP, would cancel the review. Handled here (`true`): the
+            // message is already stored in the Task chat, and the review
+            // finishes and reports on its own. Mention the agent again once
+            // the review run has ended to get a reply.
+            if (isAgentReviewRunScope(live.delegationScope)) {
+                this.logger.log(
+                    `Task ${taskId}: agent ${agentId} is running a review — the chat message is stored, but not injected into the review run and no second run is started.`,
+                );
+                return true;
+            }
             const outcome = await this.steering.steer({ runId: live.id, userId, message: body });
             if (outcome.dispatched !== 'injected') return false;
             this.logger.log(

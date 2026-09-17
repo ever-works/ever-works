@@ -8,7 +8,21 @@ const FETCH_TIMEOUT_MS = 10_000;
 // 16 MB is a generous ceiling that never trips for legitimate responses.
 const MAX_CATALOG_BYTES = 16 * 1024 * 1024;
 const QUANT_PATTERN = /[-_](?:q\d[_a-z0-9]*|fp16|fp32|bf16|f16|f32|gguf|iq\d[_a-z0-9]*)$/i;
-const PARAM_SIZE_PATTERN = /^(\d+\.?\d*[bm](?:-a\d+[bm])?)/i;
+// `\d+(?:\.\d*)?`, not `\d+\.?\d*`. The two accept exactly the same strings,
+// but the original has TWO adjacent variable-length digit runs with nothing
+// between them, so when the trailing `[bm]` fails the engine re-splits them
+// against each other: quadratic. Measured on a model id whose tag is a run of
+// digits — 4k 28ms, 8k 144ms, 16k 463ms, 32k 2.1s, against 0.1ms flat for the
+// spelling below. Requiring the literal `.` before the second run pins the
+// split, so there is only one way to divide the input and no re-splitting.
+const PARAM_SIZE_PATTERN = /^(\d+(?:\.\d*)?[bm](?:-a\d+[bm])?)/i;
+// Nothing on the path from a caller-supplied model id to the patterns above
+// bounds its length (`normalizeModelId` only trims and lowercases), and a tag
+// is matched character by character. Real tags are short — `70b`, `1.5b-a22b`,
+// `q4_k_m`, `instruct` — so a tag past this length is not a tag we could
+// recognise anyway, and treating it as absent costs nothing real while keeping
+// the work on this path constant.
+const MAX_MODEL_TAG_CHARS = 128;
 
 export interface ModelCatalogEntry {
     id: string;
@@ -263,7 +277,7 @@ function buildCandidates(modelId: string): string[] {
     }
 
     const [base, tag] = baseName.split(':', 2);
-    if (!tag || tag === 'latest') {
+    if (!tag || tag === 'latest' || tag.length > MAX_MODEL_TAG_CHARS) {
         return [base];
     }
 

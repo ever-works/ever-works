@@ -47,3 +47,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# In-product manual (AW-25) — article bodies built from docs/ by
+# `scripts/build-help-catalog.mjs --bodies` on every build and dev start.
+# Only the metadata catalog (src/lib/help/help-catalog.generated.ts) is committed.
+/public/help-content/

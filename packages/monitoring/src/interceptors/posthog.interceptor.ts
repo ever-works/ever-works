@@ -2,6 +2,7 @@ import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nes
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { trackEvent } from '../posthog/posthog.config';
+import { redactSecretUrl } from '../redaction/secret-url';
 
 /**
  * Route prefixes that are MACHINE traffic, never product usage. Every one of
@@ -124,7 +125,8 @@ export class PostHogInterceptor implements NestInterceptor {
     // that secrets embedded in query parameters never reach PostHog.
     private getEndpointPath(url: string): string {
         if (!url) return url;
-        return url.split('?')[0].split('#')[0];
+        // A share token in a path segment is dropped too, not just the query.
+        return redactSecretUrl(url.split('?')[0].split('#')[0]);
     }
 
     // Infrastructure endpoints we never want in analytics: health probes, synthetic

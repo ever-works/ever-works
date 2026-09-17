@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useId, useMemo, useState, useTransition } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { TASK_BOARD_TERMINAL_WINDOW_ALL, type TaskBoardSort } from '@ever-works/contracts';
@@ -443,6 +444,11 @@ export function TasksList({
                             ? t('empty.title')
                             : `${t('empty.title')} (${statusFilter.replace('_', ' ')})`}
                     </p>
+                    <HelpLink
+                        target="tasks#creating-a-task"
+                        variant="emptyState"
+                        className="mt-3"
+                    />
                 </div>
             ) : view === 'cards' ? (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">

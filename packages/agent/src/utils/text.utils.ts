@@ -43,3 +43,31 @@ export function unSlugifyText(slug: string): string {
         .replace(/-/g, ' ')
         .replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
 }
+
+/**
+ * Strip the given characters from both ends of `value`, in linear time.
+ *
+ * **Why this is not a regex.** The obvious spelling of an edge trim —
+ * `value.replace(/^-+|-+$/g, '')` — is polynomial on paper: a trailing-anchored
+ * `-+$` can be retried from every offset inside a long run. CodeQL flags it for
+ * that reason.
+ *
+ * Measured, that cost does not currently appear: V8 optimises the anchored trim
+ * and handles a 160k-character run of `-` in well under a millisecond, flat as
+ * the input grows. So this is not a fix for a live denial of service, and it
+ * should not be described as one. It is here because the guarantee should come
+ * from the code rather than from an engine optimisation the caller cannot see,
+ * and because it silences a standing alert on a hot path that takes user
+ * filenames and document titles. A two-pointer scan cannot backtrack at all.
+ *
+ * `leading` and `trailing` are sets of characters, not patterns; each is
+ * matched literally. Trimming meets in the middle, so an all-trimmable string
+ * returns `''`.
+ */
+export function trimEdgeChars(value: string, leading: string, trailing: string): string {
+    let start = 0;
+    let end = value.length;
+    while (start < end && leading.includes(value[start])) start++;
+    while (end > start && trailing.includes(value[end - 1])) end--;
+    return value.slice(start, end);
+}

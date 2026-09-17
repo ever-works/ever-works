@@ -1,0 +1,282 @@
+{
+    "articles": [
+        {
+            "source": "docs/overview.md",
+            "section": "start-here",
+            "order": 10,
+            "summary": "What Ever Works is, the mental model behind Missions, Ideas, Works and Agents, and the surfaces you use it from.",
+            "keywords": ["overview", "introduction", "platform", "mental model", "surfaces"],
+            "documents": [],
+            "related": ["getting-started", "dashboard", "new-page"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/getting-started.md",
+            "section": "start-here",
+            "order": 20,
+            "summary": "The hosted path and the self-hosted path, the plugin keys you need, and how to create your first Work.",
+            "keywords": ["getting started", "first work", "setup", "install", "self-host", "keys"],
+            "documents": ["DASHBOARD"],
+            "related": ["overview", "creating-a-work", "plugins"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/new-page.md",
+            "section": "start-here",
+            "order": 30,
+            "summary": "One page to start anything: a Mission, an Idea, an Agent, a Task, a Work, a repository or a company.",
+            "keywords": ["new", "create", "start", "chips", "prompt"],
+            "documents": ["DASHBOARD_NEW"],
+            "related": ["missions", "creating-a-work", "tasks"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/dashboard.md",
+            "section": "start-here",
+            "order": 40,
+            "summary": "The home page, the sidebar, the header, the Help drawer and the keyboard shortcuts.",
+            "keywords": [
+                "home",
+                "dashboard",
+                "sidebar",
+                "needs attention",
+                "shortcuts",
+                "help drawer"
+            ],
+            "documents": ["DASHBOARD"],
+            "related": ["overview", "inbox", "settings-map"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/missions.md",
+            "section": "running-the-loop",
+            "order": 10,
+            "summary": "A long-running goal that keeps finding Ideas and building Works until you mark it complete.",
+            "keywords": ["mission", "goal", "schedule", "auto-build", "delegate", "brief"],
+            "documents": ["DASHBOARD_MISSIONS", "DASHBOARD_MISSIONS_NEW", "DASHBOARD_MISSION"],
+            "related": ["ideas", "creating-a-work", "budgets-and-usage"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/ideas.md",
+            "section": "running-the-loop",
+            "order": 20,
+            "summary": "Candidate Works proposed by you or a Mission: accept, build, refresh or retry them.",
+            "keywords": ["idea", "build", "accept", "refresh", "failed idea"],
+            "documents": ["DASHBOARD_IDEAS", "DASHBOARD_IDEAS_NEW", "DASHBOARD_IDEA"],
+            "related": ["missions", "creating-a-work", "budgets-and-usage"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/creating-a-work.md",
+            "section": "running-the-loop",
+            "order": 30,
+            "summary": "Create a Work with AI, by hand, by import or from an Idea, and how its git and deploy providers are chosen.",
+            "keywords": ["work", "website", "create", "import", "deploy", "generation"],
+            "documents": ["DASHBOARD_WORKS", "DASHBOARD_WORKS_NEW", "DASHBOARD_WORK"],
+            "related": ["new-page", "ideas", "knowledge-base"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/tasks.md",
+            "section": "running-the-loop",
+            "order": 40,
+            "summary": "Units of work an Agent picks up: create, prioritise, run, gate and schedule them, and read the board.",
+            "keywords": ["task", "kanban", "board", "sub-task", "priority", "blocked", "recurring"],
+            "documents": [
+                "DASHBOARD_TASKS",
+                "DASHBOARD_TASK_NEW",
+                "DASHBOARD_TASK",
+                "DASHBOARD_TASK_TRIGGERS"
+            ],
+            "related": ["agents", "sessions-and-steering", "approvals-and-escalations"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/inbox.md",
+            "section": "running-the-loop",
+            "order": 50,
+            "summary": "Questions, approvals, escalations and notices addressed to you, and how to answer them.",
+            "keywords": ["inbox", "decisions", "questions", "approvals", "escalations", "answer"],
+            "documents": ["DASHBOARD_INBOX"],
+            "related": ["approvals-and-escalations", "notifications", "tasks"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/activity.md",
+            "section": "running-the-loop",
+            "order": 60,
+            "summary": "The record of everything the platform did for you, the Schedules view, filters and CSV export.",
+            "keywords": ["activity", "log", "schedules", "history", "export", "generation"],
+            "documents": ["DASHBOARD_ACTIVITY"],
+            "related": ["tasks", "notifications", "sessions-and-steering"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/goals.md",
+            "section": "running-the-loop",
+            "order": 70,
+            "summary": "A measurable target an Agent iterates towards, with a metric source and a lifecycle.",
+            "keywords": ["goal", "metric", "target", "iteration", "delivery"],
+            "documents": ["DASHBOARD_GOALS", "DASHBOARD_GOALS_NEW"],
+            "related": ["missions", "agents", "tasks"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/agents.md",
+            "section": "your-agents",
+            "order": 10,
+            "summary": "Who your Agents are, what each one has, what they do on an idle tick and how to create one.",
+            "keywords": [
+                "agent",
+                "employee",
+                "heartbeat",
+                "workbench",
+                "guardrails",
+                "create agent"
+            ],
+            "documents": ["DASHBOARD_AGENTS", "DASHBOARD_AGENT_NEW", "DASHBOARD_AGENT"],
+            "related": ["skills-catalog", "teams", "approvals-and-escalations"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/skills-catalog.md",
+            "section": "your-agents",
+            "order": 20,
+            "summary": "Reusable capabilities an Agent can use, the SKILL.md format and how to attach Skills to Agents.",
+            "keywords": ["skill", "skills", "catalog", "attach", "capability"],
+            "documents": ["DASHBOARD_SKILLS", "DASHBOARD_SKILL_NEW", "DASHBOARD_SKILL"],
+            "related": ["agents", "knowledge-base", "plugins"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/memory.md",
+            "section": "your-agents",
+            "order": 30,
+            "summary": "Everything your organization knows, gathered across every Work: search, review, consolidation and recall.",
+            "keywords": ["memory", "review queue", "consolidation", "recall", "meetings"],
+            "documents": ["DASHBOARD_MEMORY"],
+            "related": ["knowledge-base", "agents", "organizations"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/knowledge-base.md",
+            "section": "your-agents",
+            "order": 40,
+            "summary": "A Work's own store of context: what lives in it, how files are ingested and how Agents search it.",
+            "keywords": ["knowledge base", "kb", "documents", "ingest", "search", "upload"],
+            "documents": ["DASHBOARD_WORK_KB"],
+            "related": ["memory", "creating-a-work", "agents"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/teams.md",
+            "section": "your-agents",
+            "order": 50,
+            "summary": "Group Agents into teams with roles and resources, nest them and read the Org Chart.",
+            "keywords": ["team", "roster", "roles", "org chart", "nesting"],
+            "documents": [
+                "DASHBOARD_TEAMS",
+                "DASHBOARD_TEAM_NEW",
+                "DASHBOARD_TEAM",
+                "DASHBOARD_ORG_CHART"
+            ],
+            "related": ["agents", "organizations"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/organizations.md",
+            "section": "setup-and-connections",
+            "order": 10,
+            "summary": "Switch workspaces, create an Organization, invite members and register a company.",
+            "keywords": ["organization", "workspace", "invite", "members", "company"],
+            "documents": [],
+            "related": ["teams", "settings-map", "credits-and-billing"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/plugins.md",
+            "section": "setup-and-connections",
+            "order": 20,
+            "summary": "Enable, configure and disable plugins, at account level or for one Work.",
+            "keywords": ["plugin", "provider", "enable", "credentials", "integration"],
+            "documents": ["DASHBOARD_PLUGINS", "DASHBOARD_PLUGIN_DETAIL"],
+            "related": ["settings-map", "job-runtimes", "getting-started"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/notifications.md",
+            "section": "setup-and-connections",
+            "order": 30,
+            "summary": "The bell, delivery channels beyond the dashboard, and which events reach you where.",
+            "keywords": ["notification", "bell", "channel", "preferences", "alerts"],
+            "documents": ["DASHBOARD_SETTINGS_NOTIFICATIONS"],
+            "related": ["inbox", "activity", "settings-map"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/settings-map.md",
+            "section": "setup-and-connections",
+            "order": 40,
+            "summary": "Where every settings page lives, including the ones the settings sidebar does not list.",
+            "keywords": ["settings", "account", "preferences", "configuration"],
+            "documents": ["DASHBOARD_SETTINGS"],
+            "related": ["plugins", "notifications", "credits-and-billing"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/budgets-and-usage.md",
+            "section": "money-and-limits",
+            "order": 10,
+            "summary": "Cap AI spend per Work, Mission, Idea or account, and what happens when a cap is hit.",
+            "keywords": ["budget", "cap", "limit", "spend", "usage", "cost"],
+            "documents": [
+                "DASHBOARD_USAGE",
+                "DASHBOARD_WORK_SETTINGS_BUDGETS",
+                "DASHBOARD_AGENT_BUDGETS"
+            ],
+            "related": ["credits-and-billing", "missions", "approvals-and-escalations"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/credits-and-billing.md",
+            "section": "money-and-limits",
+            "order": 20,
+            "summary": "Credits, the ledger, the Billing and Usage & Credits pages, plans and seats.",
+            "keywords": ["credits", "billing", "invoice", "plan", "seats", "payment"],
+            "documents": ["DASHBOARD_SETTINGS_BILLING", "DASHBOARD_SETTINGS_PAYMENT_METHOD"],
+            "related": ["budgets-and-usage", "settings-map"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/sessions-and-steering.md",
+            "section": "when-something-goes-wrong",
+            "order": 10,
+            "summary": "Why a run sits queued, how to steer or interrupt a live run, and how to resume a parked one.",
+            "keywords": ["stuck", "queued", "session", "run", "interrupt", "resume"],
+            "documents": ["DASHBOARD_AGENT_SESSIONS", "DASHBOARD_AGENT_SESSION"],
+            "related": ["agents", "tasks", "job-runtimes"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/approvals-and-escalations.md",
+            "section": "when-something-goes-wrong",
+            "order": 20,
+            "summary": "What an Agent may do on its own, why a proposal waits for you, and what happens when a run gives up.",
+            "keywords": ["approval", "escalation", "guardrails", "auto-pause", "failure"],
+            "documents": [],
+            "related": ["inbox", "agents", "sessions-and-steering"],
+            "reviewedAt": "2026-09-14"
+        },
+        {
+            "source": "docs/features/job-runtimes.md",
+            "section": "when-something-goes-wrong",
+            "order": 30,
+            "summary": "The engine that runs background work, how to choose one and what to check when nothing runs.",
+            "keywords": ["background work", "job runtime", "worker", "queue", "not running"],
+            "documents": ["DASHBOARD_SETTINGS_JOB_RUNTIME"],
+            "related": ["sessions-and-steering", "plugins", "getting-started"],
+            "reviewedAt": "2026-09-14"
+        }
+    ]
+}

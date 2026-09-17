@@ -36,6 +36,10 @@ import { TaskCiAutoResumeAttempt } from '@ever-works/agent/entities';
 import { TaskReviewRejection } from '@ever-works/agent/entities';
 import { AgentRunRepository } from '@ever-works/agent/database';
 import {
+    TaskApprover,
+    TaskApproverRepository,
+    TaskAssignee,
+    TaskAssigneeRepository,
     TaskCiAutoResumeAttemptRepository,
     TaskCiAutoResumeService,
     TaskGitLinkService,
@@ -45,6 +49,8 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { WorkRepository } from '@ever-works/agent/database';
 import type { RunResumeRequest, RunResumeResult } from '@ever-works/agent/tasks-domain';
+import { agentReviewRunScope } from '@ever-works/agent/tasks-domain';
+import { RunSteeringService } from '@ever-works/agent/agents';
 import type { IngestResult } from '@ever-works/agent/ingest';
 import { GITHUB_CHECK_EVENT_KIND, GitHubCheckIntakeService } from './github-check-intake.service';
 import type { GitHubEventsBinding } from './github-pr-review-bridge.service';
@@ -109,22 +115,18 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
      * Give a run row a `createdAt` strictly after every run written before it.
      *
      * `agent_runs.createdAt` is a `CreateDateColumn`, which better-sqlite3
-     * fills with `datetime('now')` — SECOND resolution. The evaluator picks
-     * the run to resume with `AgentRunRepository.findLatestForTask`, which
-     * orders by `createdAt` alone, so two runs inserted inside the same
-     * wall-clock second TIE, and sqlite then hands back the one it scanned
-     * first: the OLDER row.
+     * fills with `datetime('now')` — SECOND resolution, so two runs inserted
+     * inside the same wall-clock second carry the same `createdAt`. The
+     * evaluator picks the run to resume with
+     * `AgentRunRepository.findLatestForTask`, which on sqlite breaks such a
+     * tie by insertion order (`rowid`), so the newer row wins either way —
+     * the unpinned tie cases further down this suite cover exactly that.
      *
-     * Left to the database clock that made this suite's answer depend on
-     * how fast it ran. A fast run put the seeded run and the resumed run in
-     * the same second, `findLatestForTask` returned the seeded COMPLETED run,
-     * and a second resume went out while the first resumed run was still
-     * queued. A loaded CI runner crossed a second boundary in between, the
-     * resumed QUEUED run was correctly the latest, the evaluator refused
-     * with `run-in-flight`, and "exactly two resumes" received one. On
-     * Postgres (`timestamptz`, microseconds) a resumed run is always
-     * strictly newer than the run it resumes; this pins the fixture to that
-     * same ordering instead of to the wall clock.
+     * The pin is kept because it models what Postgres (`timestamptz`,
+     * microseconds) does for real: a resumed run is always STRICTLY newer
+     * than the run it resumes. Pinning keeps the scenarios below about the
+     * evaluator's decisions rather than about the tie-break, and keeps the
+     * suite's answer independent of how fast the runner is.
      */
     async function pinRunCreatedAt(id: string): Promise<void> {
         runClock += 1000;
@@ -281,6 +283,8 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         runClock = Math.floor(Date.now() / 1000) * 1000 - 60 * 60 * 1000;
         await attemptRows.clear();
         await rejectionRows.clear();
+        await dataSource.getRepository(TaskApprover).clear();
+        await dataSource.getRepository(TaskAssignee).clear();
         await runRows.clear();
         await taskRows.clear();
         await workRows.clear();
@@ -295,6 +299,8 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
             awaitingInput?: boolean;
             ciHeadSha?: string | null;
             ciHeadSeenAt?: Date | null;
+            /** A fixed id for the seeded run; generated when omitted. */
+            runId?: string;
         } = {},
     ) {
         const work = await workRows.save(
@@ -339,6 +345,7 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         );
         const run = await runRows.save(
             runRows.create({
+                ...(overrides.runId === undefined ? {} : { id: overrides.runId }),
                 agentId: AGENT_ID,
                 userId: OWNER_USER,
                 triggerKind: 'task',
@@ -794,10 +801,432 @@ describe('GitHub check intake → auto-resume (better-sqlite3, real handler)', (
         expect(await attempts.countForTask(task.id)).toBe(2);
     });
 
+    // ── same-second runs, NOT pinned ────────────────────────────────
+
+    /**
+     * Two runs of one Task that share a `createdAt` — what better-sqlite3's
+     * whole-second `datetime('now')` produces for a burst (several agents
+     * dispatched for one Task, or a resume inside the same second). The
+     * evaluator must read the run inserted LAST.
+     *
+     * Both run ids are fixed, at opposite ends of the id space, and every
+     * scenario runs once with the newer run holding the SMALLER id (the
+     * default) and once with it holding the LARGER one. An id tie-break in
+     * either direction therefore fails at least one of each pair, as does no
+     * tie-break at all — only insertion order passes both.
+     */
+    const SMALLEST_RUN_ID = '00000000-0000-4000-8000-000000000001';
+    const LARGEST_RUN_ID = 'ffffffff-ffff-4fff-bfff-ffffffffffff';
+    const NEWER_ID_SMALLER = { older: LARGEST_RUN_ID, newer: SMALLEST_RUN_ID };
+    const NEWER_ID_LARGER = { older: SMALLEST_RUN_ID, newer: LARGEST_RUN_ID };
+
+    async function seedSameSecondSuccessor(overrides: {
+        olderStatus: string;
+        newerStatus: string;
+        newerAwaitingInput?: boolean;
+        ids?: { older: string; newer: string };
+    }) {
+        const ids = overrides.ids ?? NEWER_ID_SMALLER;
+        const { task, run: older } = await seedWorkTaskAndRun({
+            runStatus: overrides.olderStatus,
+            runId: ids.older,
+        });
+        expect(older.id).toBe(ids.older);
+        const newer = await runRows.save(
+            runRows.create({
+                id: ids.newer,
+                agentId: AGENT_ID,
+                userId: OWNER_USER,
+                triggerKind: 'task',
+                taskId: task.id,
+                status: overrides.newerStatus,
+                awaitingInput: overrides.newerAwaitingInput ?? false,
+            } as Partial<AgentRun>),
+        );
+        const sameSecond = new Date(Math.floor(runClock / 1000) * 1000);
+        await runRows.update({ id: In([older.id, newer.id]) }, {
+            createdAt: sameSecond,
+        } as never);
+        const tied = await runRows.find({ where: { id: In([older.id, newer.id]) } });
+        expect(new Set(tied.map((row) => row.createdAt.getTime())).size).toBe(1);
+        return { task, older, newer };
+    }
+
+    it('refuses with run-in-flight when a same-second newer run is still running', async () => {
+        const { task } = await seedSameSecondSuccessor({
+            olderStatus: 'completed',
+            newerStatus: 'running',
+        });
+        const service = buildService();
+
+        const result = await service.handle(BINDING, 'check_run', checkRun({ id: 90 }) as never);
+
+        expect(result.autoResume).toMatchObject({ reason: 'run-in-flight' });
+        expect(resumes).toHaveLength(0);
+        expect(await attempts.countForTask(task.id)).toBe(0);
+    });
+
+    it('refuses with awaiting-human when a same-second newer run is parked on a question', async () => {
+        const { task } = await seedSameSecondSuccessor({
+            olderStatus: 'completed',
+            newerStatus: 'completed',
+            newerAwaitingInput: true,
+        });
+        const service = buildService();
+
+        const result = await service.handle(BINDING, 'check_run', checkRun({ id: 91 }) as never);
+
+        expect(result.autoResume).toMatchObject({ reason: 'awaiting-human' });
+        expect(resumes).toHaveLength(0);
+        expect(await attempts.countForTask(task.id)).toBe(0);
+    });
+
+    it('resumes the same-second newer completed run, not the older failed one', async () => {
+        const { task, newer } = await seedSameSecondSuccessor({
+            olderStatus: 'failed',
+            newerStatus: 'completed',
+        });
+        const service = buildService();
+
+        const result = await service.handle(BINDING, 'check_run', checkRun({ id: 92 }) as never);
+
+        expect(result.autoResume).toMatchObject({ reason: 'resumed' });
+        expect(resumes).toHaveLength(1);
+        expect(resumes[0].runId).toBe(newer.id);
+        expect(await attempts.countForTask(task.id)).toBe(1);
+    });
+
+    describe('when the same-second newer run holds the lexically LARGER id', () => {
+        it('refuses with run-in-flight while that newer run is still running', async () => {
+            const { task, newer } = await seedSameSecondSuccessor({
+                olderStatus: 'completed',
+                newerStatus: 'running',
+                ids: NEWER_ID_LARGER,
+            });
+            expect(newer.id).toBe(LARGEST_RUN_ID);
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'check_run',
+                checkRun({ id: 93 }) as never,
+            );
+
+            expect(result.autoResume).toMatchObject({ reason: 'run-in-flight' });
+            expect(resumes).toHaveLength(0);
+            expect(await attempts.countForTask(task.id)).toBe(0);
+        });
+
+        it('refuses with awaiting-human while that newer run is parked on a question', async () => {
+            const { task } = await seedSameSecondSuccessor({
+                olderStatus: 'completed',
+                newerStatus: 'completed',
+                newerAwaitingInput: true,
+                ids: NEWER_ID_LARGER,
+            });
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'check_run',
+                checkRun({ id: 94 }) as never,
+            );
+
+            expect(result.autoResume).toMatchObject({ reason: 'awaiting-human' });
+            expect(resumes).toHaveLength(0);
+            expect(await attempts.countForTask(task.id)).toBe(0);
+        });
+
+        it('resumes that newer completed run, not the older failed one', async () => {
+            const { task, older, newer } = await seedSameSecondSuccessor({
+                olderStatus: 'failed',
+                newerStatus: 'completed',
+                ids: NEWER_ID_LARGER,
+            });
+            const service = buildService();
+
+            const result = await service.handle(
+                BINDING,
+                'check_run',
+                checkRun({ id: 95 }) as never,
+            );
+
+            expect(result.autoResume).toMatchObject({ reason: 'resumed' });
+            expect(resumes).toHaveLength(1);
+            expect(resumes[0].runId).toBe(newer.id);
+            expect(resumes[0].runId).not.toBe(older.id);
+            expect(await attempts.countForTask(task.id)).toBe(1);
+        });
+    });
+
     it('refuses a cancelled run', async () => {
         await seedWorkTaskAndRun({ runStatus: 'cancelled' });
         const service = buildService();
         await service.handle(BINDING, 'check_run', checkRun({ id: 15 }) as never);
+        expect(resumes).toHaveLength(0);
+    });
+
+    // ── reviewer agent stage (slice AD): CI feedback is the IMPLEMENTER's ──
+    //
+    // Slice AD verification, finding A2. The ordinary order of events is
+    // "PR opened → Task enters in_review → review run finishes → CI goes
+    // red", which leaves a REVIEW run as the Task's newest `agent_runs` row.
+    // The fix loop used to resume the newest row, so the CI failure went to
+    // the reviewer — and, through a resume that dropped the review scope,
+    // brought the reviewer back with full tools, a workspace and
+    // `transitionTask`.
+
+    const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
+
+    async function seedReviewRun(taskId: string, over: Partial<AgentRun> = {}) {
+        return runRows.save(
+            runRows.create({
+                agentId: REVIEWER_ID,
+                userId: OWNER_USER,
+                triggerKind: 'task',
+                taskId,
+                status: 'completed',
+                delegationScope: agentReviewRunScope(),
+                ...over,
+            } as Partial<AgentRun>),
+        );
+    }
+
+    /** sqlite's `createdAt` is second-precise; pin the order explicitly. */
+    async function stampCreatedAt(runId: string, iso: string) {
+        await runRows.update(runId, { createdAt: new Date(iso) } as never);
+    }
+
+    function redCheckInput() {
+        return {
+            userId: OWNER_USER,
+            owner: 'octo',
+            repo: 'site',
+            headSha: HEAD,
+            headBranch: 'task/t-42-9f3c1a2b',
+            prNumbers: [42],
+            prHeads: [{ number: 42, headSha: HEAD }],
+            observedAt: new Date('2026-09-06T10:05:00Z'),
+            verdict: 'failing' as const,
+            granularity: 'check_run' as const,
+            checkName: 'lint-and-test',
+            conclusion: 'failure',
+        };
+    }
+
+    it('sends CI feedback to the IMPLEMENTER when a finished review run is the Task’s newest run', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        const review = await seedReviewRun(task.id);
+        await stampCreatedAt(run.id, '2026-09-06T09:00:00Z');
+        await stampCreatedAt(review.id, '2026-09-06T09:30:00Z');
+        // The precondition the finding is about: the newest row IS the review.
+        expect((await runs.findLatestForTask(task.id))?.id).toBe(review.id);
+
+        const service = buildService();
+        await service.handle(BINDING, 'check_run', checkRun({ id: 31 }) as never);
+
+        expect(resumes).toHaveLength(1);
+        expect(resumes[0]).toMatchObject({ runId: run.id, allowCompleted: true });
+        expect(resumes[0].runId).not.toBe(review.id);
+        const ledger = await attempts.listForTask(task.id);
+        expect(ledger).toHaveLength(1);
+        expect(ledger[0].sourceRunId).toBe(run.id);
+        const feedback = await rejectionRows.find({ where: { taskId: task.id } });
+        expect(feedback).toHaveLength(1);
+        expect(feedback[0].runId).toBe(run.id);
+    });
+
+    it('looks past a review run that is still in flight — a review is not a fix in flight', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        const review = await seedReviewRun(task.id, { status: 'running' });
+        await stampCreatedAt(run.id, '2026-09-06T09:00:00Z');
+        await stampCreatedAt(review.id, '2026-09-06T09:30:00Z');
+
+        const service = buildService();
+        await service.handle(BINDING, 'check_run', checkRun({ id: 32 }) as never);
+
+        expect(resumes).toHaveLength(1);
+        expect(resumes[0].runId).toBe(run.id);
+    });
+
+    it('still honours the IMPLEMENTER’s own state behind a review run (in flight → no resume)', async () => {
+        const { task, run } = await seedWorkTaskAndRun({ runStatus: 'running' });
+        const review = await seedReviewRun(task.id);
+        await stampCreatedAt(run.id, '2026-09-06T09:00:00Z');
+        await stampCreatedAt(review.id, '2026-09-06T09:30:00Z');
+
+        const service = buildService();
+        await service.handle(BINDING, 'check_run', checkRun({ id: 33 }) as never);
+
+        expect(resumes).toHaveLength(0);
+    });
+
+    it('refuses with its own reason when EVERY run on the Task is a review run — no reviewer resumed, no attempt spent', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        await runRows.update(run.id, { delegationScope: agentReviewRunScope() } as never);
+
+        const autoResume = new TaskCiAutoResumeService(
+            tasks,
+            attempts,
+            new TaskGitLinkService(tasks, works),
+            runs,
+            rejections,
+            steering,
+            inbox,
+        );
+        const outcome = await autoResume.onCheckResult(redCheckInput());
+
+        expect(outcome).toEqual({ reason: 'no-authoring-run', taskId: task.id });
+        expect(resumes).toHaveLength(0);
+        expect(await attempts.listForTask(task.id)).toHaveLength(0);
+    });
+
+    it('end to end with the REAL RunSteeringService: the implementer is resumed unscoped, the reviewer never', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        const review = await seedReviewRun(task.id);
+        await stampCreatedAt(run.id, '2026-09-06T09:00:00Z');
+        await stampCreatedAt(review.id, '2026-09-06T09:30:00Z');
+
+        // No job runtime bound: `resume` creates the run row and reports
+        // it, which is everything this assertion needs to read.
+        const realSteering = new RunSteeringService(
+            runs,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            rejections,
+        );
+        const autoResume = new TaskCiAutoResumeService(
+            tasks,
+            attempts,
+            new TaskGitLinkService(tasks, works),
+            runs,
+            rejections,
+            realSteering,
+            inbox,
+        );
+        const outcome = await autoResume.onCheckResult(redCheckInput());
+        expect(outcome.reason).toBe('resumed');
+
+        const created = await runRows.findOneByOrFail({ id: outcome.runId! });
+        expect(created.agentId).toBe(AGENT_ID);
+        expect(created.taskId).toBe(task.id);
+        expect(created.delegationScope ?? null).toBeNull();
+        // The CI failure is the resumed IMPLEMENTER's first turn.
+        expect((created.pendingInput ?? []).join('\n')).toContain('Continuous integration is RED');
+
+        // …and a direct resume of the review run produces NOTHING — not an
+        // unscoped run, not a scoped one.
+        const before = await runRows.count();
+        await expect(
+            realSteering.resumeRun({ runId: review.id, userId: OWNER_USER, allowCompleted: true }),
+        ).rejects.toThrow(/review run/);
+        expect(await runRows.count()).toBe(before);
+    });
+
+    // Review of slice AD: only REVIEW-scoped runs were skipped. A human asking
+    // the reviewer "@code-reviewer why request-changes?" leaves a completed,
+    // unscoped CHAT run of the reviewer agent as the Task's newest row, and CI
+    // feedback was handed to THAT — the reviewer came back as a fully tooled
+    // task run with a workspace, the implementer was never told, and the
+    // reviewer, now an author, was refused `self-review` on every later round.
+
+    function autoResumeWithReviewers(
+        over: { approvers?: TaskApproverRepository; steeringPort?: typeof steering } = {},
+    ) {
+        return new TaskCiAutoResumeService(
+            tasks,
+            attempts,
+            new TaskGitLinkService(tasks, works),
+            runs,
+            rejections,
+            over.steeringPort ?? steering,
+            inbox,
+            undefined,
+            over.approvers ?? new TaskApproverRepository(dataSource.getRepository(TaskApprover)),
+            new TaskAssigneeRepository(dataSource.getRepository(TaskAssignee)),
+        );
+    }
+
+    async function seedReviewerChatRun(taskId: string) {
+        await dataSource
+            .getRepository(TaskApprover)
+            .save({ taskId, approverType: 'agent', approverId: REVIEWER_ID } as never);
+        return runRows.save(
+            runRows.create({
+                agentId: REVIEWER_ID,
+                userId: OWNER_USER,
+                triggerKind: 'chat',
+                taskId,
+                status: 'completed',
+            } as Partial<AgentRun>),
+        );
+    }
+
+    it('sends CI feedback to the IMPLEMENTER when the newest run is a REVIEWER agent’s chat reply', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        const review = await seedReviewRun(task.id);
+        const chat = await seedReviewerChatRun(task.id);
+        await stampCreatedAt(run.id, '2026-09-06T09:00:00Z');
+        await stampCreatedAt(review.id, '2026-09-06T09:30:00Z');
+        await stampCreatedAt(chat.id, '2026-09-06T09:45:00Z');
+        // The precondition the finding is about: the newest row is the
+        // reviewer's UNSCOPED chat run.
+        const newest = await runs.findLatestForTask(task.id);
+        expect(newest?.id).toBe(chat.id);
+        expect(newest?.delegationScope ?? null).toBeNull();
+
+        const outcome = await autoResumeWithReviewers().onCheckResult(redCheckInput());
+
+        expect(outcome.reason).toBe('resumed');
+        expect(resumes).toHaveLength(1);
+        expect(resumes[0].runId).toBe(run.id);
+        expect((await attempts.listForTask(task.id))[0].sourceRunId).toBe(run.id);
+    });
+
+    it('does NOT skip an approver agent that is also ASSIGNED — that agent is the implementer', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        // The Task's own agent is ALSO listed as an agent approver.
+        await taskRows.update(task.id, { agentId: AGENT_ID } as never);
+        await dataSource
+            .getRepository(TaskApprover)
+            .save({ taskId: task.id, approverType: 'agent', approverId: AGENT_ID } as never);
+
+        const outcome = await autoResumeWithReviewers().onCheckResult(redCheckInput());
+
+        expect(outcome.reason).toBe('resumed');
+        expect(resumes[0].runId).toBe(run.id);
+    });
+
+    it('refuses no-authoring-run when the only runs are a review run and the reviewer’s chat run', async () => {
+        const { task, run } = await seedWorkTaskAndRun();
+        // The seeded "implementer" run is re-labelled a review run, so the
+        // only unscoped run left belongs to the reviewer.
+        await runRows.update(run.id, { delegationScope: agentReviewRunScope() } as never);
+        await seedReviewerChatRun(task.id);
+
+        const outcome = await autoResumeWithReviewers().onCheckResult(redCheckInput());
+
+        expect(outcome).toEqual({ reason: 'no-authoring-run', taskId: task.id });
+        expect(resumes).toHaveLength(0);
+        expect(await attempts.listForTask(task.id)).toHaveLength(0);
+    });
+
+    it('resumes NOTHING when the reviewer list cannot be read — fails closed', async () => {
+        const { task } = await seedWorkTaskAndRun();
+        await seedReviewerChatRun(task.id);
+        const broken = {
+            findByTaskId: jest.fn(async () => {
+                throw new Error('approvers table unreadable');
+            }),
+        } as unknown as TaskApproverRepository;
+
+        const outcome = await autoResumeWithReviewers({ approvers: broken }).onCheckResult(
+            redCheckInput(),
+        );
+
+        expect(outcome.reason).toBe('error');
         expect(resumes).toHaveLength(0);
     });
 

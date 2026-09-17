@@ -330,3 +330,190 @@ describe('MemoryFilesController', () => {
         });
     });
 });
+
+/**
+ * Shared (organization-scope) folders on the same folder routes.
+ *
+ * The property that matters most is the one that is easy to break silently:
+ * a request with no `scope`, or a folder id that is not a shared folder of
+ * the active Organization, takes exactly the per-person path it always took.
+ */
+describe('MemoryFilesController — shared folders', () => {
+    const auth = { userId: 'u-1' } as AuthenticatedUser;
+    const SHARED_ID = '00000000-0000-0000-0000-0000000000f1';
+    const PERSONAL_ID = '00000000-0000-0000-0000-0000000000f2';
+
+    let folders: Record<string, jest.Mock>;
+    let library: Record<string, jest.Mock>;
+    let scopeContext: { getOrganizationId: jest.Mock };
+    let membership: { ensureMember: jest.Mock; ensureAdmin: jest.Mock };
+
+    const build = (withLibrary = true) =>
+        new MemoryFilesController(
+            folders as unknown as MemoryFoldersService,
+            {} as unknown as MemoryFilesService,
+            {} as unknown as MemoryFolderSyncService,
+            {} as unknown as KnowledgeBaseService,
+            {} as unknown as UploadsService,
+            {} as unknown as UserUploadRepository,
+            {} as unknown as WorkKnowledgeUploadRepository,
+            scopeContext as unknown as ScopeContextService,
+            membership as unknown as OrganizationMembershipService,
+            (withLibrary ? library : undefined) as never,
+        );
+
+    beforeEach(() => {
+        folders = {
+            getTree: jest.fn().mockResolvedValue([{ id: PERSONAL_ID }]),
+            createFolder: jest.fn().mockResolvedValue({ id: PERSONAL_ID }),
+            renameFolder: jest.fn().mockResolvedValue({ id: PERSONAL_ID }),
+            moveFolder: jest.fn().mockResolvedValue({ id: PERSONAL_ID }),
+            configureSync: jest.fn().mockResolvedValue({ id: PERSONAL_ID }),
+            requireOwned: jest.fn().mockResolvedValue({ id: PERSONAL_ID }),
+            deleteFolder: jest.fn().mockResolvedValue({ deletedFolders: 1, unlinkedFiles: 0 }),
+            listOrganizationFolders: jest.fn().mockResolvedValue([
+                {
+                    id: SHARED_ID,
+                    name: 'Playbooks',
+                    parentId: null,
+                    path: '/Playbooks',
+                    createdAt: new Date('2026-09-01T00:00:00Z'),
+                    updatedAt: new Date('2026-09-01T00:00:00Z'),
+                },
+            ]),
+            findOrganizationFolder: jest.fn(async (_org: string, id: string) =>
+                id === SHARED_ID ? { id: SHARED_ID, name: 'Playbooks', path: '/Playbooks' } : null,
+            ),
+        };
+        library = {
+            createFolder: jest.fn().mockResolvedValue({ id: SHARED_ID }),
+            renameFolder: jest.fn().mockResolvedValue({ id: SHARED_ID, name: 'Guides' }),
+            moveFolder: jest.fn().mockResolvedValue({ id: SHARED_ID }),
+            deleteFolder: jest.fn().mockResolvedValue({ deletedFolders: 1, unfiledDocuments: 12 }),
+        };
+        scopeContext = { getOrganizationId: jest.fn().mockReturnValue('o-1') };
+        membership = {
+            ensureMember: jest.fn().mockResolvedValue({ id: 'o-1' }),
+            ensureAdmin: jest.fn().mockResolvedValue({ id: 'o-1' }),
+        };
+    });
+
+    describe('omitting scope is byte-identical to before', () => {
+        it('tree', async () => {
+            await expect(build().getTree(auth)).resolves.toEqual({
+                folders: [{ id: PERSONAL_ID }],
+            });
+            expect(folders.listOrganizationFolders).not.toHaveBeenCalled();
+        });
+
+        it('create', async () => {
+            await build().createFolder(auth, { name: 'Docs' });
+            expect(folders.createFolder).toHaveBeenCalledWith('u-1', {
+                name: 'Docs',
+                parentId: null,
+                ownerAgentId: null,
+            });
+            expect(library.createFolder).not.toHaveBeenCalled();
+        });
+
+        it('rename / delete of a personal folder id', async () => {
+            const controller = build();
+            await controller.updateFolder(auth, PERSONAL_ID, { name: 'Notes' });
+            await controller.deleteFolder(auth, PERSONAL_ID, {});
+            expect(folders.renameFolder).toHaveBeenCalledWith('u-1', PERSONAL_ID, 'Notes');
+            expect(folders.deleteFolder).toHaveBeenCalledWith('u-1', PERSONAL_ID, {
+                recursive: false,
+            });
+            expect(library.renameFolder).not.toHaveBeenCalled();
+            expect(library.deleteFolder).not.toHaveBeenCalled();
+        });
+
+        it('a deployment without the library never looks for shared folders', async () => {
+            await build(false).deleteFolder(auth, SHARED_ID, {});
+            expect(folders.findOrganizationFolder).not.toHaveBeenCalled();
+            expect(folders.deleteFolder).toHaveBeenCalled();
+        });
+    });
+
+    describe('scope=organization', () => {
+        it('lists the active Organization’s shared folders after asserting membership', async () => {
+            const result = await build().getTree(auth, { scope: 'organization' });
+            expect(membership.ensureMember).toHaveBeenCalledWith('o-1', 'u-1');
+            expect(folders.listOrganizationFolders).toHaveBeenCalledWith('o-1');
+            expect(result.folders[0]).toMatchObject({
+                id: SHARED_ID,
+                path: '/Playbooks',
+                fileCount: 0,
+            });
+            expect(folders.getTree).not.toHaveBeenCalled();
+        });
+
+        it('returns no shared folders when there is no active Organization', async () => {
+            scopeContext.getOrganizationId.mockReturnValue(null);
+            await expect(build().getTree(auth, { scope: 'organization' })).resolves.toEqual({
+                folders: [],
+            });
+            expect(folders.listOrganizationFolders).not.toHaveBeenCalled();
+        });
+
+        it('creates a shared folder through the library with the resolved actor', async () => {
+            await build().createFolder(auth, { name: 'Playbooks', scope: 'organization' });
+            expect(library.createFolder).toHaveBeenCalledWith(
+                { userId: 'u-1', organizationId: 'o-1', canManageOrganization: true },
+                { name: 'Playbooks', parentId: null },
+            );
+            expect(folders.createFolder).not.toHaveBeenCalled();
+        });
+
+        it('refuses an agent-private shared folder', async () => {
+            await expect(
+                build().createFolder(auth, {
+                    name: 'Playbooks',
+                    scope: 'organization',
+                    ownerAgentId: '00000000-0000-0000-0000-00000000a9e1',
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('reports a refused admin seam to the library as canManageOrganization=false', async () => {
+            membership.ensureAdmin.mockRejectedValue(new NotFoundException());
+            await build().createFolder(auth, { name: 'X', scope: 'organization' });
+            expect(library.createFolder.mock.calls[0][0]).toMatchObject({
+                canManageOrganization: false,
+            });
+        });
+
+        it('404s a shared-folder write from a non-member', async () => {
+            membership.ensureMember.mockRejectedValue(new NotFoundException());
+            await expect(
+                build().createFolder(auth, { name: 'X', scope: 'organization' }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(library.createFolder).not.toHaveBeenCalled();
+        });
+
+        it('renames and moves a shared folder through the library', async () => {
+            await build().updateFolder(auth, SHARED_ID, { name: 'Guides', moveToRoot: true });
+            expect(library.renameFolder).toHaveBeenCalledWith(
+                expect.anything(),
+                SHARED_ID,
+                'Guides',
+            );
+            expect(library.moveFolder).toHaveBeenCalledWith(expect.anything(), SHARED_ID, null);
+            expect(folders.renameFolder).not.toHaveBeenCalled();
+        });
+
+        it('refuses a git-sync target on a shared folder', async () => {
+            await expect(
+                build().updateFolder(auth, SHARED_ID, { clearSyncRepo: true }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('deletes a shared folder through the library, which only unfiles its documents', async () => {
+            await expect(build().deleteFolder(auth, SHARED_ID, {})).resolves.toEqual({
+                deletedFolders: 1,
+                unfiledDocuments: 12,
+            });
+            expect(folders.deleteFolder).not.toHaveBeenCalled();
+        });
+    });
+});

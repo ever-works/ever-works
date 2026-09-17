@@ -584,6 +584,8 @@ describe('TriggerInternalApiClient', () => {
         it.each([
             ['TaskWorkspaceService', 'finalizeRun'],
             ['TaskChatService', 'post'],
+            // Named Conversations — a retried append would store the reply twice.
+            ['ConversationMessageService', 'appendAgentMessage'],
             ['RunDispatchGateService', 'drainForWork'],
             ['AgentRunRepository', 'createQueued'],
             ['AgentRepository', 'incrementErrorCount'],

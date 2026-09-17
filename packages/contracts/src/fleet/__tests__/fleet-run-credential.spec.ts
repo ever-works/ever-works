@@ -190,6 +190,38 @@ describe('isFleetRunTokenRouteAllowed — refused surface', () => {
 		expect(isFleetRunTokenRouteAllowed('POST', '/api/plugins/p1/enable')).toBe(true);
 	});
 
+	// ── Human-in-the-loop gate routes ─────────────────────────────────────
+	//
+	// Found in review of slice AD (EW-811). A run token acts AS THE OWNER, and
+	// the coarse `/api/inbox`, `/api/tasks` and `/api/me` families admitted the
+	// three routes the MCP whitelist withholds precisely because they ANSWER a
+	// gate. The inbox reply reaches `AgentApprovalsService.decide`, which stamps
+	// `decidedVia: 'user'` + the owner as decider — exactly what the merge
+	// approval verifier accepts as a HUMAN approval. A model on a fleet node
+	// could have approved its own merge.
+	it('refuses the inbox reply — the route that decides a merge approval as the owner', () => {
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/inbox/i1/reply')).toBe(false);
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/inbox/i1/reply/')).toBe(false);
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/inbox/i1/Reply?x=1')).toBe(false);
+		expect(isFleetRunTokenRouteAllowed('GET', '/api/inbox/i1/reply')).toBe(false);
+	});
+
+	it('refuses resolving an escalation and approving a definition of done', () => {
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/tasks/t1/escalations/e1/resolve')).toBe(false);
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/me/goals/g1/dod/approve')).toBe(false);
+	});
+
+	it('keeps the ASKING side of those families — only the gate answers are carved out', () => {
+		expect(isFleetRunTokenRouteAllowed('GET', '/api/inbox')).toBe(true);
+		expect(isFleetRunTokenRouteAllowed('GET', '/api/inbox/i1')).toBe(true);
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/inbox/i1/archive')).toBe(true);
+		expect(isFleetRunTokenRouteAllowed('GET', '/api/tasks/t1/escalations')).toBe(true);
+		expect(isFleetRunTokenRouteAllowed('POST', '/api/tasks/t1/transition')).toBe(true);
+		expect(isFleetRunTokenRouteAllowed('GET', '/api/me/goals/g1/dod')).toBe(true);
+		// Shape-exact: an extra or missing segment is a different route.
+		expect(isFleetRunTokenRouteAllowed('GET', '/api/inbox/reply')).toBe(true);
+	});
+
 	it('matches a denied segment exactly, never as a substring', () => {
 		// A future `/api/works/{id}/terminal-history` is a different route
 		// and must stay granted; only the exact segment is vetoed.

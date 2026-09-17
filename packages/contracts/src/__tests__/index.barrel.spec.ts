@@ -5,6 +5,7 @@ import * as root from '../index.js';
 import * as agents from '../agents/index.js';
 import * as computer from '../computer/index.js';
 import * as connections from '../connections/index.js';
+import * as conversations from '../conversations/index.js';
 import * as delegation from '../delegation/index.js';
 import * as digest from '../digest/index.js';
 import * as domain from '../domain/index.js';
@@ -17,6 +18,7 @@ import * as inbox from '../inbox/index.js';
 import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
+import * as modelRouting from '../model-routing/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as runs from '../runs/index.js';
@@ -47,6 +49,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
 	['computer', computer],
 	['connections', connections],
+	['conversations', conversations],
 	['delegation', delegation],
 	['digest', digest],
 	['domain', domain],
@@ -59,6 +62,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['ingest', ingest],
 	['item', item],
 	['kb', kb],
+	['model-routing', modelRouting],
 	['policy', policy],
 	['release', release],
 	['runs', runs],
@@ -73,8 +77,13 @@ describe('src/index.ts — the package root barrel', () => {
 	it('re-exports every area listed in the source file', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
+		// COUNTED off the AREAS array above, never added up from two branches'
+		// numbers: develop and the model-accounts branch each said 24 from
+		// their own base (develop lacked `model-routing`, this branch lacked
+		// `conversations`), so the literal survived the merge unchanged while
+		// the array itself grew to 25.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(23);
+		expect(exportLines).toBe(25);
 	});
 
 	it('has no name exported by two different areas', () => {
