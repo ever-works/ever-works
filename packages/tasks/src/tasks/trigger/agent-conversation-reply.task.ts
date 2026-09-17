@@ -8,6 +8,16 @@ import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 // Security: validate every payload id before any DB access.
 import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
 
+/** `assertUuid` as a predicate — the failure hook must never throw on a bad id. */
+function isUuid(value: unknown): value is string {
+    try {
+        assertUuid(value, 'id');
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export interface AgentConversationReplyPayload {
     agentId: string;
     userId: string;
@@ -40,7 +50,9 @@ export interface AgentConversationReplyPayload {
  *     back to recording it when the runner did not. When the Agent's budget
  *     refused the run (`budget_exceeded`), the model call failed, or the
  *     reply could not be stored (`provider_unavailable`), the triggering
- *     message is marked `failed` so the failure is visible and retryable.
+ *     message is marked `failed` so the failure is visible and retryable. A
+ *     worker that crashes outright does the same from `onFailure`, with
+ *     `provider_unavailable`.
  *
  * `maxDuration` matches the chat reply job.
  */
@@ -51,19 +63,48 @@ export const agentConversationReplyTask = task<
     id: 'agent-conversation-reply',
     maxDuration: 300,
     onFailure: async ({ payload, error }) => {
-        if (!payload?.runId) return;
-        assertUuid(payload.runId, 'payload.runId');
+        const runId = isUuid(payload?.runId) ? payload.runId : null;
+        // The person's message the crashed reply was answering. Without it
+        // being marked, a worker crash leaves the Conversation showing a
+        // message that was "sent" and an answer that never comes.
+        const refused =
+            isUuid(payload?.conversationId) && isUuid(payload?.triggeringMessageId)
+                ? {
+                      conversationId: payload.conversationId,
+                      messageId: payload.triggeringMessageId,
+                  }
+                : null;
+        if (!runId && !refused) return;
         try {
             const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
             appContext.useLogger(createTriggerLogger('AgentConversationReply:Failure'));
             try {
-                const runs = appContext.get(AgentRunRepository);
-                const run = await runs.findById(payload.runId);
-                if (run && (run.status === 'queued' || run.status === 'running')) {
-                    await runs.markFailed(
-                        run.id,
-                        error instanceof Error ? error.message : String(error),
-                    );
+                // Two independent repairs, each best-effort on its own: a run
+                // lookup or write that throws must never cost the person's
+                // message its failed state (and with it, Retry).
+                if (runId) {
+                    await (async () => {
+                        const runs = appContext.get(AgentRunRepository);
+                        const run = await runs.findById(runId);
+                        if (run && (run.status === 'queued' || run.status === 'running')) {
+                            await runs.markFailed(
+                                run.id,
+                                error instanceof Error ? error.message : String(error),
+                            );
+                        }
+                    })().catch(() => undefined);
+                }
+                if (refused) {
+                    // Guarded inside the service: only a person's message that
+                    // is still `sent` moves to `failed`, so a message already
+                    // failed (or answered and retried) is left as it is.
+                    await (async () => {
+                        const messages = appContext.get(ConversationMessageService);
+                        await messages.markReplyRefused({
+                            ...refused,
+                            failureCode: 'provider_unavailable',
+                        });
+                    })().catch(() => undefined);
                 }
             } finally {
                 await appContext.close();

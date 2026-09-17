@@ -4,6 +4,7 @@ export * from './conversations.module';
 export * from './conversation.types';
 export * from './conversation-dispatcher';
 export * from './conversation-context.resolver';
+export * from './conversation-attachment.resolver';
 export * from './conversation.service';
 export * from './conversation-mention.service';
 export * from './conversation-dispatch.service';
