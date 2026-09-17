@@ -345,6 +345,32 @@ export class AccountExportService {
         return this.fetchWorkRepoData(work);
     }
 
+    /**
+     * The same walk, given a Work ID rather than a Work.
+     *
+     * `fetchWorkRepoData` resolves the repository coordinates through
+     * `Work.getRepoOwner()` and `Work.getDataRepo()` — instance methods on
+     * the entity prototype, which consult `sourceRepository.relatedRepositories`
+     * and fall back to `owner` / `user.username` and the slug-derived default.
+     * A caller holding only `{ id, slug }` therefore cannot use
+     * {@link readWorkRepoContent}: the `TypeError` lands inside that method's
+     * own try/catch, which logs a warning and returns EMPTY content, so the
+     * caller sees a successful read of nothing. That is how the AW-22
+     * archive came to write `data/works/content/<slug>/*.jsonl` as zero-line
+     * files for every Work while reporting the domain complete.
+     *
+     * So the entity is loaded here, where the repository is, and `null`
+     * means "no such Work" rather than "this Work has no content" — a
+     * distinction the caller needs in order to report a gap.
+     */
+    async readWorkRepoContentById(workId: string): Promise<WorkRepoContent | null> {
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            return null;
+        }
+        return this.fetchWorkRepoData(work);
+    }
+
     private async fetchWorkRepoData(dir: any): Promise<{
         items: ExportedWorkItem[];
         categories: ExportedWorkCategory[];

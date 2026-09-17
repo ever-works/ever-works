@@ -1,4 +1,4 @@
-import type { DataSource, SelectQueryBuilder } from 'typeorm';
+import type { DataSource, EntityMetadata, SelectQueryBuilder } from 'typeorm';
 import type { BackupEntityQuery, BackupRowSource } from './collectors/collector.types';
 
 /**
@@ -34,11 +34,38 @@ export class TypeOrmBackupRowSource implements BackupRowSource {
             .columns.some((candidate) => candidate.propertyName === column);
     }
 
+    /**
+     * Read from the entity's metadata, so the answer follows the schema: a
+     * column that becomes nullable later turns an "honestly empty" file into
+     * a reported gap without anyone having to remember to update a table.
+     * An unknown entity or column answers `true` — "it might be NULL" is the
+     * safe answer, because it reports a gap rather than claiming an absence.
+     */
+    isNullable(entity: string, column: string): boolean {
+        if (!this.hasEntity(entity)) {
+            return true;
+        }
+        const metadata = this.dataSource.getMetadata(entity);
+        const found = metadata.columns.find((candidate) => candidate.propertyName === column);
+        if (!found) {
+            return true;
+        }
+        if (found.isPrimary === true) {
+            return false;
+        }
+        return found.isNullable !== false;
+    }
+
     async page(
         query: BackupEntityQuery,
         offset: number,
         limit: number,
     ): Promise<Record<string, unknown>[]> {
+        // The scope rule had nothing to narrow with, so there is no query to
+        // run — see BackupEntityQuery.matchesNothing.
+        if (query.matchesNothing) {
+            return [];
+        }
         if (query.within && query.within.ids.length === 0) {
             return [];
         }
@@ -57,6 +84,9 @@ export class TypeOrmBackupRowSource implements BackupRowSource {
 
     async countTrimmed(query: BackupEntityQuery): Promise<number> {
         if (!query.trim) {
+            return 0;
+        }
+        if (query.matchesNothing) {
             return 0;
         }
         if (query.within && query.within.ids.length === 0) {
@@ -131,15 +161,50 @@ export class TypeOrmBackupRowSource implements BackupRowSource {
         // A stable order is what makes two archives of unchanged data differ
         // only in their timestamps (spec FR-22): oldest first, ties broken by
         // the primary key so the order is total.
+        //
+        // The tiebreaker is read from the entity's metadata rather than
+        // assumed to be `id`. Three entities the spec table references have
+        // no `id` at all — UserNotificationPreference is keyed on `userId`,
+        // OrganizationOnboardingProfile and OrganizationNotificationDefault
+        // on `organizationId` — and none of the three has `createdAt`
+        // either. TypeORM leaves an unknown property path unsubstituted, so
+        // `ORDER BY entity.id` reached the driver verbatim and every page
+        // query on those three failed at statement preparation
+        // (better-sqlite3: `no such column: entity.id`; Postgres: 42703),
+        // emptying three files and settling every backup `ready_with_gaps`.
         const hasCreatedAt = metadata.columns.some((column) => column.propertyName === 'createdAt');
+        const tiebreakers = this.tiebreakerColumns(metadata);
         if (hasCreatedAt) {
             builder.orderBy('entity.createdAt', 'ASC');
-            builder.addOrderBy('entity.id', 'ASC');
-        } else {
-            builder.orderBy('entity.id', 'ASC');
+            for (const column of tiebreakers) {
+                builder.addOrderBy(`entity.${column}`, 'ASC');
+            }
+        } else if (tiebreakers.length > 0) {
+            builder.orderBy(`entity.${tiebreakers[0]}`, 'ASC');
+            for (const column of tiebreakers.slice(1)) {
+                builder.addOrderBy(`entity.${column}`, 'ASC');
+            }
         }
 
         return builder;
+    }
+
+    /**
+     * The entity's real primary key, as property names, for a total order.
+     *
+     * Composite keys contribute every column, in declaration order, because
+     * a partial tiebreaker is not a total order and offset paging over a
+     * non-total order can repeat or skip a row between pages.
+     */
+    private tiebreakerColumns(metadata: EntityMetadata): string[] {
+        const primary = metadata.primaryColumns.map((column) => column.propertyName);
+        if (primary.length > 0) {
+            return primary.map((column) => this.safeColumn(column));
+        }
+        // No declared primary key. Nothing correct is available, so order by
+        // nothing rather than by a column that may not exist: the rows still
+        // ship, and only archive-to-archive byte stability is lost.
+        return [];
     }
 
     /**
@@ -148,13 +213,27 @@ export class TypeOrmBackupRowSource implements BackupRowSource {
      * A query that narrows nothing is refused rather than executed: a bug
      * that dropped an `equals` clause would otherwise export the whole
      * table, and "it returned rows" is not a signal anyone would notice.
+     *
+     * "Narrows nothing" counts a `null` value as no narrowing, which is the
+     * part that was missing. `{ organizationId: null }` has one entry and so
+     * passed the old length check, but the clause it produces —
+     * `organizationId IS NULL` — selects every row in the table that no
+     * organization owns. On a nullable denormalized column that is every
+     * other account's not-yet-backfilled rows, in an archive the requester
+     * downloads. An empty string is treated the same way: a scope value
+     * nobody set is not a scope.
+     *
+     * The collector is expected to mark such a file
+     * {@link BackupEntityQuery.matchesNothing} and never get here; this is
+     * the backstop that makes "it cannot happen" true rather than intended.
      */
     private applyPredicate(
         builder: SelectQueryBuilder<Record<string, unknown>>,
         query: BackupEntityQuery,
     ): void {
         const equalsEntries = Object.entries(query.equals);
-        if (equalsEntries.length === 0 && !query.within) {
+        const narrowing = equalsEntries.filter(([, value]) => value !== null && value !== '');
+        if (narrowing.length === 0 && !query.within) {
             throw new Error(
                 `Refusing an unscoped backup query for ${query.entity}: every query must name a workspace`,
             );

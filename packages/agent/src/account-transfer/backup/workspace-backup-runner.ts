@@ -89,6 +89,15 @@ export interface WorkspaceBackupRunResult {
     readonly backupId: string;
 }
 
+/**
+ * What starting a backup produced. `started` means the row is claimed and
+ * its archive is being produced in the background; every other status is an
+ * outcome decided before any work began, exactly as {@link WorkspaceBackupRunResult}.
+ */
+export type WorkspaceBackupStartResult =
+    | WorkspaceBackupRunResult
+    | { readonly status: 'started'; readonly backupId: string; readonly reason?: undefined };
+
 /** Everything the runner needs that is not on the row. */
 export interface WorkspaceBackupRunOptions {
     /** Workspace identity written into the manifest (spec FR-11). */
@@ -112,6 +121,9 @@ const DEFAULT_FORMAT_REFERENCE = 'https://docs.ever.works/features/workspace-bac
 @Injectable()
 export class WorkspaceBackupRunner {
     private readonly logger = new Logger(WorkspaceBackupRunner.name);
+
+    /** Runs {@link startFromPayload} started in this process that have not settled yet. */
+    private readonly inFlight = new Map<string, Promise<WorkspaceBackupRunResult>>();
 
     constructor(
         private readonly backups: WorkspaceBackupRepository,
@@ -137,29 +149,146 @@ export class WorkspaceBackupRunner {
         backupId: string,
         options: WorkspaceBackupRunOptions,
     ): Promise<WorkspaceBackupRunResult> {
+        const claim = await this.claim(backupId);
+        if ('outcome' in claim) {
+            return claim.outcome;
+        }
+        return this.execute(claim.row, claim.startedAt, options, claim.storage);
+    }
+
+    /**
+     * Resolve who and what this archive is for, then run it.
+     *
+     * The identity is read HERE rather than carried in the job payload: a
+     * runtime replays the original payload on a retry, so a workspace
+     * renamed between enqueue and run would otherwise be archived under its
+     * old name and the manifest would quietly disagree with the product
+     * (spec FR-11).
+     *
+     * This waits for the whole archive. Called across the worker's internal
+     * RPC channel it outlives that channel's per-request deadline on any
+     * real workspace, which is why the archive task calls
+     * {@link startFromPayload} instead.
+     */
+    async runFromPayload(payload: {
+        backupId: string;
+        userId: string;
+        organizationId?: string | null;
+    }): Promise<WorkspaceBackupRunResult> {
+        return this.run(payload.backupId, await this.optionsFromPayload(payload));
+    }
+
+    /**
+     * Claim the row and START producing its archive, returning as soon as
+     * the claim is decided — never after the archive.
+     *
+     * Why this exists: the archive task reaches the runner over the
+     * worker's internal RPC channel, which gives up on a request after a
+     * short deadline (45 s by default, below the ingress timeouts in front
+     * of the API). {@link runFromPayload} holds that request open for the
+     * whole archive, so every backup longer than the deadline failed the
+     * task — and with it the one notification the owner is owed (spec
+     * FR-33) — while the archive carried on here regardless.
+     *
+     * The runner already owns the row: it claims it with a compare-and-set,
+     * heartbeats it, and settles it itself. So the RPC only has to start the
+     * work, and the task watches the ROW until it settles (see
+     * `WorkspaceBackupService.observeRun`). Every outcome decided before any
+     * work starts — a vanished row, one already claimed, no storage backend
+     * — is returned exactly as {@link run} returns it.
+     *
+     * The run it starts is tracked, not dropped: everything `run` settles on
+     * failure is settled here too, and a failure of that settling itself is
+     * caught, retried once and logged, so it can neither crash the process
+     * with an unhandled rejection nor leave the row `running` with nobody
+     * reporting on it. If the process itself dies, the heartbeats stop and
+     * the row is failed as `stalled` — by the task watching it, or by the
+     * sweeper.
+     */
+    async startFromPayload(payload: {
+        backupId: string;
+        userId: string;
+        organizationId?: string | null;
+    }): Promise<WorkspaceBackupStartResult> {
+        const options = await this.optionsFromPayload(payload);
+        const claim = await this.claim(payload.backupId);
+        if ('outcome' in claim) {
+            return claim.outcome;
+        }
+
+        const backupId = payload.backupId;
+        const execution = this.execute(claim.row, claim.startedAt, options, claim.storage)
+            .catch(async (error: unknown): Promise<WorkspaceBackupRunResult> => {
+                // `execute` settles every failure it can see, so reaching
+                // here means settling the row itself threw — most plausibly
+                // the database went away mid-run. One more attempt; if that
+                // fails too, the stopped heartbeats let the stall rule
+                // settle it.
+                const detail = error instanceof Error ? error.message : String(error);
+                this.logger.error(`Workspace backup ${backupId} could not be settled: ${detail}`);
+                await this.fail(backupId, 'internal', detail).catch((retryError: unknown) => {
+                    this.logger.error(
+                        `Workspace backup ${backupId} is left for the stall rule: ${
+                            retryError instanceof Error ? retryError.message : String(retryError)
+                        }`,
+                    );
+                });
+                return { status: 'failed', reason: 'internal', backupId };
+            })
+            .finally(() => {
+                this.inFlight.delete(backupId);
+            });
+        this.inFlight.set(backupId, execution);
+
+        return { status: 'started', backupId };
+    }
+
+    /**
+     * Everything {@link run} decides before any work starts: whether the row
+     * is there, whether it is still waiting, whether there is anywhere to
+     * put an archive, and whether THIS caller won the claim.
+     */
+    private async claim(backupId: string): Promise<
+        | { readonly outcome: WorkspaceBackupRunResult }
+        | {
+              readonly row: WorkspaceBackup;
+              readonly startedAt: Date;
+              readonly storage: BackupStorage;
+          }
+    > {
         const row = await this.dataSource
             .getRepository<WorkspaceBackup>('WorkspaceBackup')
             .findOne({
                 where: { id: backupId },
             });
         if (!row) {
-            return { status: 'skipped', reason: 'backup-not-found', backupId };
+            return { outcome: { status: 'skipped', reason: 'backup-not-found', backupId } };
         }
         if (row.status !== 'queued') {
-            return { status: 'skipped', reason: 'already-terminal', backupId };
+            return { outcome: { status: 'skipped', reason: 'already-terminal', backupId } };
         }
         if (!this.storage) {
             await this.fail(backupId, 'internal', 'No storage backend is configured for archives');
-            return { status: 'failed', reason: 'internal', backupId };
+            return { outcome: { status: 'failed', reason: 'internal', backupId } };
         }
 
         const startedAt = new Date();
         if (!(await this.backups.claimForRun(backupId, startedAt))) {
-            return { status: 'skipped', reason: 'already-claimed', backupId };
+            return { outcome: { status: 'skipped', reason: 'already-claimed', backupId } };
         }
+        return { row, startedAt, storage: this.storage };
+    }
 
+    /** Produce a claimed row's archive, settling the row on every failure it can name. */
+    private async execute(
+        row: WorkspaceBackup,
+        startedAt: Date,
+        options: WorkspaceBackupRunOptions,
+        storage: BackupStorage,
+    ): Promise<WorkspaceBackupRunResult> {
+        const backupId = row.id;
         try {
-            return await this.produce(row, startedAt, options, this.storage);
+            return await this.produce(row, startedAt, options, storage);
         } catch (error) {
             if (error instanceof BackupArchiveTooLargeError) {
                 await this.fail(backupId, 'too_large', error.message);
@@ -172,20 +301,12 @@ export class WorkspaceBackupRunner {
         }
     }
 
-    /**
-     * Resolve who and what this archive is for, then run it.
-     *
-     * The identity is read HERE rather than carried in the job payload: a
-     * runtime replays the original payload on a retry, so a workspace
-     * renamed between enqueue and run would otherwise be archived under its
-     * old name and the manifest would quietly disagree with the product
-     * (spec FR-11).
-     */
-    async runFromPayload(payload: {
+    /** The manifest identity for a payload, read fresh (spec FR-11). */
+    private async optionsFromPayload(payload: {
         backupId: string;
         userId: string;
         organizationId?: string | null;
-    }): Promise<WorkspaceBackupRunResult> {
+    }): Promise<WorkspaceBackupRunOptions> {
         const user = await this.dataSource
             .getRepository<{ id: string; name?: string | null; email: string }>('User')
             .findOne({ where: { id: payload.userId } });
@@ -214,7 +335,7 @@ export class WorkspaceBackupRunner {
                   kind: 'personal' as const,
               };
 
-        return this.run(payload.backupId, {
+        return {
             workspace,
             account: {
                 id: payload.userId,
@@ -222,7 +343,7 @@ export class WorkspaceBackupRunner {
                 email: user?.email ?? '',
             },
             build: process.env.EVER_WORKS_BUILD ?? 'development',
-        });
+        };
     }
 
     private async produce(
@@ -265,8 +386,28 @@ export class WorkspaceBackupRunner {
 
         const cancelled = { value: false };
         const queuedFiles: QueuedBackupFile[] = [];
-        const registeredIds = new Map<string, readonly string[]>();
+        const registeredIds = new Map<string, { ids: readonly string[]; complete: boolean }>();
         let lastHeartbeat = Date.now();
+
+        /**
+         * The throttled progress report, and the live cancellation signal.
+         *
+         * `heartbeat()` is bounded to `status = 'running'` and returns
+         * whether it matched a row, so a `false` is exactly "this backup is
+         * no longer running" — which after `requestCancel` means the owner
+         * cancelled. Reading that return is what makes `shouldStop()` true
+         * between pages; without it the only cancel probe was at a domain
+         * boundary, so a cancel issued while `activity` paged a
+         * multi-million-row table bought nothing until that whole domain
+         * finished, contradicting both doc comments that promise otherwise.
+         */
+        const heartbeat = async (): Promise<void> => {
+            if (Date.now() - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
+            lastHeartbeat = Date.now();
+            if (!(await this.backups.heartbeat(row.id, {}))) {
+                cancelled.value = true;
+            }
+        };
 
         const context: BackupCollectContext = {
             scope,
@@ -275,14 +416,12 @@ export class WorkspaceBackupRunner {
             source: new TypeOrmBackupRowSource(this.dataSource),
             pageSize: DEFAULT_PAGE_SIZE,
             enqueueFile: (file) => queuedFiles.push(file),
-            registerIds: (name, ids) => registeredIds.set(name, ids),
-            idsFor: (name) => registeredIds.get(name) ?? [],
+            registerIds: (name, ids, complete = true) => registeredIds.set(name, { ids, complete }),
+            idsFor: (name) => registeredIds.get(name)?.ids ?? [],
+            // An unregistered name is the "no rows" case, which is honest.
+            idsComplete: (name) => registeredIds.get(name)?.complete ?? true,
             shouldStop: () => cancelled.value,
-            heartbeat: async () => {
-                if (Date.now() - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
-                lastHeartbeat = Date.now();
-                await this.backups.heartbeat(row.id, {});
-            },
+            heartbeat,
         };
 
         const outcomes: BackupDomainOutcome[] = [];
@@ -313,7 +452,7 @@ export class WorkspaceBackupRunner {
             );
         }
 
-        const omissions = await this.copyFiles(queuedFiles, writer, storage);
+        const omissions = await this.copyFiles(queuedFiles, writer, storage, heartbeat);
 
         const manifest = buildManifest({
             producedAt: startedAt,
@@ -340,6 +479,11 @@ export class WorkspaceBackupRunner {
         );
         await writer.addChecksums();
 
+        // The last report before the two operations that can take longest —
+        // flushing the zip and finishing the upload — so a large archive
+        // does not look stalled to the sweeper at the very end.
+        await heartbeat();
+
         const archive = await writer.close();
         const stored = await upload;
         if ('error' in stored) {
@@ -355,7 +499,7 @@ export class WorkspaceBackupRunner {
         const retentionDays = options.retentionDays ?? limits.retentionDays;
         const gaps = hasGaps(manifest);
 
-        await this.backups.markTerminal(
+        const settled = await this.backups.markTerminal(
             row.id,
             {
                 status: gaps ? 'ready_with_gaps' : 'ready',
@@ -377,7 +521,42 @@ export class WorkspaceBackupRunner {
             ['running'],
         );
 
+        if (!settled) {
+            // The row left `running` while the archive was being written —
+            // an owner cancelled during the copy phase, or the stall sweep
+            // landed in it. The compare-and-set matched nothing, so
+            // `storageKey` was never recorded, and the object that WAS
+            // uploaded is now unreachable: expiry only visits ready rows,
+            // "delete now" needs a storage key, and the prune pass removes
+            // the record precisely BECAUSE the key is null. That is a
+            // permanent, billable orphan on an object store, so the object
+            // goes with the outcome that won.
+            await this.discardOrphan(stored.key, storage);
+            const current = await this.dataSource
+                .getRepository<WorkspaceBackup>('WorkspaceBackup')
+                .findOne({ where: { id: row.id }, select: { id: true, status: true } });
+            this.logger.warn(
+                `Workspace backup ${row.id} settled elsewhere as ${current?.status ?? 'unknown'}; discarded the archive it had already produced`,
+            );
+            return {
+                status: current?.status === 'cancelled' ? 'cancelled' : 'failed',
+                reason: current?.status ?? 'settled-elsewhere',
+                backupId: row.id,
+            };
+        }
+
         return { status: gaps ? 'ready_with_gaps' : 'ready', backupId: row.id };
+    }
+
+    /** Remove an archive no row will ever reference. Best effort by design. */
+    private async discardOrphan(key: string, storage: BackupStorage): Promise<void> {
+        await storage.deleteArchive(key).catch((error: unknown) => {
+            this.logger.warn(
+                `Could not delete the orphaned archive ${key}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        });
     }
 
     /**
@@ -414,14 +593,35 @@ export class WorkspaceBackupRunner {
         let planned: readonly BackupFilePlan[] = [];
 
         try {
-            const plans = await collector.plan(context);
-            planned = plans;
+            const initial = await collector.plan(context);
+            planned = initial;
+            // The plans as each file was actually walked. Every file is
+            // re-planned right before its walk rather than trusting the
+            // up-front plan: that plan was resolved before ANY file of this
+            // domain had been read, so a `parent` file whose parent sits
+            // earlier in the same domain carried an empty id list — agents'
+            // memberships, budgets and attachments, all nine task children,
+            // a Work's domains and deployments, webhook deliveries — and was
+            // written with zero records under a domain that said `complete`.
+            const plans: BackupFilePlan[] = [];
             const files: BackupDomainOutcome['files'] = [];
             let records = 0;
             let unavailable = 0;
             let failure: unknown;
+            // A plan that named its own shortfall before a single row was
+            // read — a `parent` file whose id list came from a registration
+            // that did not finish, or a file whose rows could not be scoped.
+            // Without this the file is written with zero records and no
+            // error, and the coverage table says the section is EMPTY for
+            // data that was never read.
+            let planCode: string | undefined;
 
-            for (const plan of plans) {
+            for (const [index, original] of initial.entries()) {
+                const plan = collector.replan
+                    ? await collector.replan(context, original)
+                    : original;
+                plans.push(plan);
+                planned = [...plans, ...initial.slice(index + 1)];
                 const entry = await writer.addJsonlEntry(
                     `data/${dataDir}/${plan.file}`,
                     collector.rows(context, plan),
@@ -429,9 +629,25 @@ export class WorkspaceBackupRunner {
                 files.push({ name: entry.name, records: entry.records, sha256: entry.sha256 });
                 records += entry.records;
                 if (plan.unavailable) unavailable += 1;
+                if (plan.errorCode !== undefined && planCode === undefined) {
+                    planCode = plan.errorCode;
+                }
                 if (entry.error !== undefined && failure === undefined) {
                     failure = entry.error;
                 }
+            }
+
+            if (failure === undefined && planCode !== undefined) {
+                return {
+                    outcome: {
+                        key,
+                        status: records > 0 ? 'partial' : 'failed',
+                        records,
+                        files,
+                        errorCode: planCode,
+                    },
+                    plans: planned,
+                };
             }
 
             if (failure !== undefined) {
@@ -643,10 +859,19 @@ export class WorkspaceBackupRunner {
         queued: readonly QueuedBackupFile[],
         writer: BackupArchiveWriter,
         storage: BackupStorage,
+        heartbeat: () => Promise<void>,
     ): Promise<BackupOmission[]> {
         const omissions: BackupOmission[] = [];
 
         for (const file of queued) {
+            // One report per file. With a 2 GiB attachment budget over a
+            // remote object store this phase can run far past the ten-minute
+            // stall window, and it used to be completely silent — so the
+            // sweeper failed backups that were working perfectly, and the
+            // archive they went on to produce became an orphan nothing could
+            // reach or delete. `heartbeat` throttles itself to 25 s.
+            await heartbeat();
+
             const verdict = writer.canAcceptFile(file.sizeBytes);
             if (!verdict.accepted) {
                 omissions.push({

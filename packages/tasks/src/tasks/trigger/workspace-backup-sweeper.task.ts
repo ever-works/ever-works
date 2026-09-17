@@ -1,6 +1,5 @@
 import { logger, schedules } from '@trigger.dev/sdk';
 import { WorkspaceBackupService } from '@ever-works/agent/account-transfer';
-import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 
@@ -31,6 +30,23 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
  * delete the same object. A pass that cannot take the lock does nothing and
  * the next hour picks it up — every pass is idempotent, so a missed hour
  * costs an hour of retention precision and nothing else.
+ *
+ * ## Why this calls one method instead of taking the locks here
+ *
+ * It used to resolve `WorkspaceBackupService` AND `DistributedTaskLockService`
+ * from `TriggerInternalModule`, which provided neither, so the cron threw
+ * `Nest could not find WorkspaceBackupService element` before any pass ran —
+ * every hour since it shipped. Retention was never enforced, and because
+ * `create()` adopts an active row, an owner whose worker died could never
+ * start another backup.
+ *
+ * The service is now an RPC proxy to the API (see
+ * `trigger-internal.module.ts`), and the three passes plus their locks are
+ * composed API-side as `runSweep()` — both because `runExclusive` takes a
+ * CALLBACK, which cannot cross an RPC boundary, and because the lock injects
+ * `@InjectRepository(CacheEntry)` and the worker process has no DataSource at
+ * all. Same shape as `CreditsSweepService.runDailySweep()`, for the same
+ * reason.
  */
 export const workspaceBackupSweeperTask = schedules.task({
     id: 'workspace-backup-sweeper',
@@ -39,26 +55,7 @@ export const workspaceBackupSweeperTask = schedules.task({
         return withWorkerContext(
             'WorkspaceBackupSweeper',
             async (appContext) => {
-                const backups = appContext.get(WorkspaceBackupService);
-                const locks = appContext.get(DistributedTaskLockService);
-                const now = new Date();
-
-                const summary = { expired: 0, stalled: 0, pruned: 0 };
-
-                const expired = await locks.runExclusive('workspace-backup:expire', () =>
-                    backups.expireDueArchives(now),
-                );
-                summary.expired = expired.result ?? 0;
-
-                const stalled = await locks.runExclusive('workspace-backup:stalls', () =>
-                    backups.failStalledBackups(now),
-                );
-                summary.stalled = stalled.result ?? 0;
-
-                const pruned = await locks.runExclusive('workspace-backup:prune', () =>
-                    backups.pruneOldRecords(now),
-                );
-                summary.pruned = pruned.result ?? 0;
+                const summary = await appContext.get(WorkspaceBackupService).runSweep(new Date());
 
                 if (summary.expired > 0 || summary.stalled > 0 || summary.pruned > 0) {
                     logger.info('workspace-backup-sweeper pass complete', { ...summary });
