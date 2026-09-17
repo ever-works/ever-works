@@ -115,10 +115,22 @@ Mirrors the plan's step tables. Tracked per epic in §3.
 | Item | Status | Evidence |
 | --- | --- | --- |
 | `ever-works/templates` (public), `app-fixture-hello`, `app-fixture-hello-template`, `cal-diy-template`, `umami-template`, `platforms` | `[x]` created + seeded 2026-09-17 | `gh api repos/ever-works/<r>` |
-| `auth.ever.co` — ZITADEL stand-up | `[ ]` | `ever.co` zone verified free |
+| **`auth.ever.co` DNS** | `[x]` **live** — proxied `CNAME` → `5a1c27a6-…cfargotunnel.com` in the `ever.co` zone, record id `506584f8c80e91b9f5f589109b46afbf`. Resolves through Cloudflare and answers **404 from nginx**, which is the correct pre-deploy state (the tunnel reaches the cluster; nothing claims the host yet). | `Invoke-RestMethod` create + `Resolve-DnsName` + `HEAD https://auth.ever.co/` |
+| **`auth.ever.co` — ZITADEL stand-up** | `[~]` **manifests done and in review**; **not deployed**. New `ever-id-prod` app in `ever-co/k8s-gitops` on branch `feat/ever-id-zitadel` → **PR [#56](https://github.com/ever-co/k8s-gitops/pull/56)**. Also a new `Database/zitadel` on the shared CNPG cluster. Verified: all JSON parses, `kubectl kustomize` builds, `--dry-run=client --validate=strict` creates all 7 objects. Secrets come from OpenBao at `ever/id/prod/zitadel` and are **not** provisioned yet, so the pod cannot start. | `gh pr view 56 --repo ever-co/k8s-gitops` |
 | Ever Works test tenant for the acceptance lanes | `[ ]` | owner decision J-08 |
 | PR to `ever-co/ever-teams` / `ever-co/ever-gauzy` for Ever ID | `[ ]` | owner authorised |
 | Existing `repo`-kind regression suites stay green | `[ ]` | every change is additive |
+
+### Track D blockers for the Ever ID stand-up (in order)
+
+1. **OpenBao path `ever/id/prod/zitadel`** with `ZITADEL_MASTERKEY` (exactly 32 chars), the Postgres DSN
+   (`postgresql://zitadel:<pw>@pg-rw.databases.svc.cluster.local:5432/zitadel?sslmode=disable`), and
+   `ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`.
+2. **A `zitadel` LOGIN role** on the CNPG primary, with a password matching the DSN — the out-of-band step
+   every other database on this cluster needed (`cloc`, `trigger`, `grafana`, `umami`).
+3. **Backups-first gate** satisfied before adding a database to the shared cluster.
+4. Merge PR #56 (or point ArgoCD at the branch) — until then `targetRevision: main` means ArgoCD cannot see it.
+5. Then the 10-step bootstrap in `apps/ever-id-prod/README.md`.
 
 ---
 
@@ -126,6 +138,21 @@ Mirrors the plan's step tables. Tracked per epic in §3.
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-17 · Wave 0 PR 0.1 in flight** — agent git tools (provider/owner/repo resolution, `branch` honoured,
+  protected branches refused, fail-closed). Tests-first, in a worktree, not committed yet.
+- **2026-09-17 · Wave 0 PR 0.2 in flight** — checkout keys unique/case-preserving/provider-scoped; no silent
+  `git init` when a repository is expected; non-blocking fork request that reuses an existing fork.
+- **2026-09-17 · five spec agents in flight** — blockers + confirmed high/medium gaps for
+  APW-01/02/03 · APW-04/05/13 · APW-06/07/10 · APW-08/09/11/12 (+ sole owner of README/CONTRACTS/ACCEPTANCE/TRACKER),
+  plus the golden-outputs artifact.
+- **2026-09-17 · Ever ID stood up as far as it can be without secrets.** `auth.ever.co` **DNS is live** (proxied
+  CNAME to the cloudflared tunnel; answers 404 from nginx, the correct pre-deploy state). Full ZITADEL manifest set
+  authored in `ever-co/k8s-gitops` → **PR #56** (`apps/ever-id-prod` + `apps/databases/database-zitadel.yaml` +
+  the ArgoCD Application), pinned `v4.17.3`, API and login UI v2 in one pod sharing the bootstrap PAT over an
+  `emptyDir`, `ExternalPort 443` with TLS disabled because Cloudflare terminates TLS and the tunnel speaks plain
+  HTTP to nginx. Validated: JSON parses, `kustomize` builds, client-side strict dry-run creates all seven objects.
+  **Not deployed** — it needs the OpenBao path `ever/id/prod/zitadel`, a `zitadel` LOGIN role on the CNPG primary,
+  and the PR merged. Claimed on the homelab `MAINTENANCE.md` board first (commit `3a0c983`).
 - **2026-09-17 · branch created.** `feat/app-works-implementation` cut from `plan/any-repo-as-work` @ `a183ecd70`.
-  Baseline verified clean. Gap register copied into the branch for reference. Four blockers already discharged by
-  the artifact work `EXT-01`, `GAP-01`, `EXT-02`, `EXT-03`.
+  Baseline verified clean. Gap register copied into the branch. Four blockers already discharged by the artifact
+  work: `EXT-01`, `GAP-01`, `EXT-02`, `EXT-03`.
