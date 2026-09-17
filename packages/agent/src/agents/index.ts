@@ -137,6 +137,10 @@ export * from './run-ledger.service';
 export * from './run-receipt.service';
 export * from './run-ledger.module';
 export { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
+export type {
+    AgentRunTimelineCursor,
+    AgentRunTimelinePage,
+} from '../database/repositories/agent-run-log.repository';
 export { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 export { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 // FU-14 — re-export WorkRepository for the AGENT_GIT_FACADE binding

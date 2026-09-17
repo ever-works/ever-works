@@ -13,6 +13,7 @@ import { Work } from '../../entities/work.entity';
 import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 import { addInsertionOrderTieBreak, isSqliteFamilyDriver } from '../insertion-order';
+import { timeSortKeyColumnSql, timeSortKeyParameterSql } from '../time-sort-key';
 import type { SubAgentScope } from '@ever-works/contracts';
 // Pure leaf (type-only imports of its own) — no runtime graph, no cycle.
 import { isAgentReviewRunScope } from '../../tasks-domain/task-agent-review';
@@ -1953,6 +1954,38 @@ export class AgentRunRepository {
     // scope inside the repository, exactly like `listSessionsForUser`.
 
     /**
+     * The ledger instant as a canonical millisecond text key, or `null` on
+     * a driver `time-sort-key.ts` does not canonicalise.
+     *
+     * Every ledger comparison — the window bounds, the cursor and the
+     * ORDER BY — goes through this ONE expression, so the three can never
+     * disagree. Comparing the raw `COALESCE(startedAt, createdAt)` against
+     * a bound `Date` instead (what these reads used to do) is wrong on both
+     * shipped drivers: on the sqlite family a run that never started
+     * carries whole-second `datetime('now')` text, which a
+     * `'… HH:MM:SS.000'` cursor sorts AFTER, so such a page restarts at the
+     * top of that second and serves its rows twice; on Postgres a
+     * millisecond cursor cannot name a microsecond row, so the cursor row
+     * satisfies the predicate again. It also fixes the window bound for a
+     * run whose ledger instant lands exactly on the boundary second, which
+     * the same string-shape mismatch used to exclude.
+     */
+    private ledgerInstantKeySql(): string | null {
+        return timeSortKeyColumnSql(
+            this.repository.manager?.connection?.options?.type,
+            LEDGER_INSTANT,
+        );
+    }
+
+    /** The same key for a bound `Date` parameter; `null` pairs with above. */
+    private ledgerInstantParameterKeySql(parameterName: string): string | null {
+        return timeSortKeyParameterSql(
+            this.repository.manager?.connection?.options?.type,
+            parameterName,
+        );
+    }
+
+    /**
      * Base query for one user's runs inside `[from, to)` narrowed by the
      * ledger filters. Private so no caller can obtain an unscoped builder.
      */
@@ -1962,11 +1995,21 @@ export class AgentRunRepository {
         filters: RunLedgerQueryFilters,
         ownershipScope?: OwnershipScope,
     ) {
+        const key = this.ledgerInstantKeySql();
+        const fromKey = this.ledgerInstantParameterKeySql('ledgerFrom');
+        const toKey = this.ledgerInstantParameterKeySql('ledgerTo');
         const qb = this.repository
             .createQueryBuilder('run')
             .where('run.userId = :userId', { userId })
-            .andWhere(`${LEDGER_INSTANT} >= :ledgerFrom`, { ledgerFrom: window.from })
-            .andWhere(`${LEDGER_INSTANT} < :ledgerTo`, { ledgerTo: window.to });
+            .andWhere(
+                key && fromKey ? `${key} >= ${fromKey}` : `${LEDGER_INSTANT} >= :ledgerFrom`,
+                {
+                    ledgerFrom: window.from,
+                },
+            )
+            .andWhere(key && toKey ? `${key} < ${toKey}` : `${LEDGER_INSTANT} < :ledgerTo`, {
+                ledgerTo: window.to,
+            });
         const ownership = ownershipSqlPredicate('run', ownershipScope, 'ledger');
         if (ownership) {
             qb.andWhere(ownership.clause, ownership.parameters);
@@ -2014,6 +2057,18 @@ export class AgentRunRepository {
      * rows; the caller asks for one extra to learn whether a next page
      * exists. The cursor is `(instant, id)`, so rows inserted above the
      * cursor while someone pages never shift the pages below it.
+     *
+     * The instant half is compared as the canonical millisecond key (see
+     * {@link ledgerInstantKeySql}) and not as a raw `Date`. Without that,
+     * a page whose last row never started — still queued, dispatch-failed,
+     * or cancelled before start, so its instant is the whole-second
+     * `createdAt` the sqlite family defaults — hands out a cursor the
+     * predicate places BEFORE that row, and the next page restarts at the
+     * top of its second. With 50+ runs enqueued in one second (a fan-out
+     * dispatch or a schedule sweep) that page is identical to the previous
+     * one and "load more" never advances. The cursor's own wire format is
+     * unchanged: it names a millisecond, which is exactly the resolution
+     * this key compares at.
      */
     async listLedgerPage(
         userId: string,
@@ -2024,16 +2079,20 @@ export class AgentRunRepository {
         ownershipScope?: OwnershipScope,
     ): Promise<AgentRun[]> {
         const qb = this.ledgerQuery(userId, window, filters, ownershipScope);
+        const key = this.ledgerInstantKeySql();
         if (cursor) {
+            const cursorKey = this.ledgerInstantParameterKeySql('ledgerCursorAt');
             qb.andWhere(
-                `(${LEDGER_INSTANT} < :ledgerCursorAt OR (${LEDGER_INSTANT} = :ledgerCursorAt AND run.id < :ledgerCursorId))`,
+                key && cursorKey
+                    ? `(${key} < ${cursorKey} OR (${key} = ${cursorKey} AND run.id < :ledgerCursorId))`
+                    : `(${LEDGER_INSTANT} < :ledgerCursorAt OR (${LEDGER_INSTANT} = :ledgerCursorAt AND run.id < :ledgerCursorId))`,
                 { ledgerCursorAt: cursor.at, ledgerCursorId: cursor.id },
             );
         }
         const take = Math.min(Math.max(Math.trunc(limit), 1), 201);
         return (
             qb
-                .orderBy(LEDGER_INSTANT, 'DESC')
+                .orderBy(key ?? LEDGER_INSTANT, 'DESC')
                 // No rowid tie-break: run.id is already unique here and is part of the cursor.
                 .addOrderBy('run.id', 'DESC')
                 .limit(take)

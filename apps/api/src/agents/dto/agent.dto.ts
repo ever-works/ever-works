@@ -648,15 +648,20 @@ export class ListRunSessionsQueryDto {
 /**
  * Session detail (Feature K) — query for
  * `GET /api/agents/runs/:runId/detail`. The cursor is the opaque
- * `<epochMillis>_<uuid>` token the previous page's `nextCursor` carried;
- * the format is validated at the edge so a garbage cursor is a 400, not
- * a silently ignored restart.
+ * `<epochMillis>_<tieBreak>` token the previous page's `nextCursor`
+ * carried; the format is validated at the edge so a garbage cursor is a
+ * 400, not a silently ignored restart.
+ *
+ * The tie-break half is whichever column the store orders equal
+ * timestamps by, so it is EITHER an integer insertion-order key or a uuid
+ * row id. Both are accepted: a uuid keeps every cursor a browser minted
+ * before the integer form existed working.
  */
 export class SessionDetailQueryDto {
     @ApiProperty({ required: false, description: 'Opaque timeline cursor from `nextCursor`.' })
     @IsOptional()
     @IsString()
-    @Matches(/^\d{1,15}_[0-9a-fA-F-]{36}$/)
+    @Matches(/^\d{1,15}_(?:[0-9a-fA-F-]{36}|\d{1,19})$/)
     cursor?: string;
 
     @ApiProperty({ required: false, minimum: 1, maximum: 200 })
