@@ -16,6 +16,7 @@ import * as fleet from '../fleet/index.js';
 import * as form from '../form/index.js';
 import * as github from '../github/index.js';
 import * as hitl from '../hitl/index.js';
+import * as home from '../home/index.js';
 import * as inbox from '../inbox/index.js';
 import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
@@ -65,6 +66,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['form', form],
 	['github', github],
 	['hitl', hitl],
+	['home', home],
 	['inbox', inbox],
 	['ingest', ingest],
 	['item', item],
@@ -93,16 +95,15 @@ describe('src/index.ts — the package root barrel', () => {
 		// lacked `connections`, `conversations`, `feed` and `model-routing`), so
 		// the literal below is re-counted off the merged array instead.
 		const exportLines = AREAS.length;
-		// 30 is COUNTED from the AREAS array above after merging develop, not
-		// added up from either side's number: this branch stood at 24 (with its
-		// own `playbook` area) and develop at 29 (its `model-routing`,
-		// `notifications`, `memory`, `connections`, `conversations`, `feed` and
-		// `billing` areas), and the merged barrel carries all of them — 29 + the
-		// one `playbook` area develop lacked = 30. Note `src/index.ts` has 31
-		// `export *` lines but only 30 AREAS: `./fleet/fleet-task-workspace.types.js`
-		// is a second sub-path of the existing `fleet` area, not a new area.
+		// 31 is COUNTED from the AREAS array above after merging develop into
+		// the AW-19 Home branch, not added up from either side’s number: develop
+		// stood at 30 areas and this branch at 23, and the merged barrel carries
+		// the union of both plus the `home` area AW-19 adds — counting the merged
+		// array gives 31. Note `src/index.ts` has 32 `export *` lines but only 31
+		// AREAS: `./fleet/fleet-task-workspace.types.js` is a second sub-path of
+		// the existing `fleet` area, not a new area.
 		// Recount the array after every merge instead of trusting either side.
-		expect(exportLines).toBe(30);
+		expect(exportLines).toBe(31);
 	});
 
 	it('has no name exported by two different areas', () => {

@@ -61,3 +61,6 @@ export * from './billing/index.js';
 // Attention controls (AW-13) — the notification matrix (one row per event,
 // one column per delivery target) and the attention budget meter shape.
 export * from './notifications/index.js';
+// Home (AW-19) — the composed morning read on the dashboard root: one status per
+// block, over the decision queue, the Runs ledger, schedules, costs and the feed.
+export * from './home/index.js';

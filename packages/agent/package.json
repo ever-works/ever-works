@@ -197,6 +197,10 @@
             "types": "./dist/schedules/index.d.ts",
             "default": "./dist/schedules/index.js"
         },
+        "./home": {
+            "types": "./dist/home/index.d.ts",
+            "default": "./dist/home/index.js"
+        },
         "./workspace-search": {
             "types": "./dist/workspace-search/index.d.ts",
             "default": "./dist/workspace-search/index.js"
