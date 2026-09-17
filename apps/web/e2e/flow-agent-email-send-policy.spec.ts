@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { createAgentViaAPI } from './helpers/agents-tasks';
+import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 
 /**
  * Agent email (AW-05, P1) — an owner decides whether an Agent's email waits
@@ -243,8 +244,13 @@ test.describe('Agent email — sending policy and addresses', () => {
         const inboxTab = tabStrip.getByRole('link', { name: 'Inbox', exact: true });
         await expect(inboxTab).toBeVisible({ timeout: 30_000 });
         await expect(inboxTab).toHaveAttribute('href', `/agents/${agent.id}/inbox`);
-        await inboxTab.click();
-        await expect(page).toHaveURL(new RegExp(`/agents/${agent.id}/inbox`), { timeout: 30_000 });
+        // A click that lands before React hydrates the tab strip is silently
+        // dropped: the link is visible, enabled and stable, Playwright reports
+        // the click as successful, and the URL never moves (stage run
+        // 34970057817 — 33 polls over 30s, every one of them ".../activity").
+        // `clickAndExpectUrl` re-clicks ONLY while the URL has not arrived, so
+        // "clicking Inbox reaches the page" is proven exactly as before.
+        await clickAndExpectUrl(page, inboxTab, new RegExp(`/agents/${agent.id}/inbox`));
 
         const panel = page.getByTestId('agent-email-send-policy');
         await expect(panel).toBeVisible({ timeout: 30_000 });
@@ -252,8 +258,17 @@ test.describe('Agent email — sending policy and addresses', () => {
         await expect(panel.getByTestId('email-cap-meter')).toBeVisible();
 
         await panel.getByTestId('email-cap-dailySendCap').fill('7');
-        await panel.getByRole('button', { name: 'Save', exact: true }).click();
-        await expect(panel.getByText('Sending policy saved')).toBeVisible({ timeout: 30_000 });
+        // If the tab click above landed pre-hydration as a plain anchor
+        // navigation, the inbox document arrives unhydrated too and the Save
+        // click is exposed to the same swallow. `clickUntil` re-clicks only
+        // while the success notice is still absent, so a Save that DID land is
+        // never undone, and the notice remains the proof. Safe by construction:
+        // `save()` PUTs a field diff (idempotent) and the notice has no
+        // auto-dismiss, so the post-condition cannot flip back to false.
+        const saveButton = panel.getByRole('button', { name: 'Save', exact: true });
+        const savedNotice = panel.getByText('Sending policy saved');
+        await clickUntil(saveButton, () => savedNotice.isVisible());
+        await expect(savedNotice).toBeVisible();
 
         const saved = await request.get(`${API_BASE}/api/email/agents/${agent.id}/send-policy`, {
             headers: authedHeaders(token),

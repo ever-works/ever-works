@@ -55,7 +55,17 @@ test.describe('Command palette', () => {
 
         await page.goto('/en/tasks', { waitUntil: 'domcontentloaded' });
         const palette = await openWithShortcut(page);
-        await expect(page.getByRole('dialog', { name: 'Search and commands' })).toBeVisible();
+        // headlessui puts role="dialog"/aria-modal/aria-label on the OUTER
+        // wrapper (`<div class="relative z-50">`), whose only children are
+        // `fixed inset-0` layers — so the wrapper's own box is 0px high and
+        // Playwright reports it hidden while the panel inside is painted (see
+        // flow-a11y-key-flows-axe.spec.ts, which measured it: dlgRect h=0,
+        // panelRect 437x256). Assert the a11y contract on the wrapper AND that
+        // the painted palette is the thing that wrapper names.
+        const dialog = page.getByRole('dialog', { name: 'Search and commands' });
+        await expect(dialog).toBeAttached();
+        await expect(dialog).toHaveAttribute('aria-modal', 'true');
+        await expect(dialog.getByTestId('command-palette')).toBeVisible();
 
         const input = page.getByTestId('command-palette-input');
         await expect(input).toBeFocused();
@@ -95,13 +105,24 @@ test.describe('Command palette', () => {
 
     test('"help" opens the Help drawer without navigating', async ({ page }) => {
         await page.goto('/en/tasks', { waitUntil: 'domcontentloaded' });
+        // Baseline sampled BEFORE the palette is opened, so the final
+        // `toBe(before)` covers the whole span — landing, opening and
+        // activating — exactly as it did before this change.
         const before = new URL(page.url()).pathname;
         await openWithShortcut(page);
         await page.getByTestId('command-palette-input').fill('open help');
         await page.keyboard.press('Enter');
 
         await expect(page.getByTestId('command-palette')).toBeHidden();
-        await expect(page.getByRole('dialog').first()).toBeVisible();
+        // Same zero-height headlessui wrapper as above. Name the drawer instead
+        // of taking `.first()` of every dialog on the page (WhatsNewPanel and
+        // the onboarding dialog are siblings in layout-client.tsx, so `.first()`
+        // could have passed on the wrong overlay), then assert its painted
+        // title — the wrapper's own box is never paintable.
+        const helpDrawer = page.getByRole('dialog', { name: 'Help & Resources' });
+        await expect(helpDrawer).toBeAttached();
+        await expect(helpDrawer).toHaveAttribute('aria-modal', 'true');
+        await expect(helpDrawer.getByRole('heading', { name: 'Help & Resources' })).toBeVisible();
         expect(new URL(page.url()).pathname).toBe(before);
     });
 
