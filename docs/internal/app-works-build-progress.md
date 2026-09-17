@@ -117,20 +117,44 @@ Mirrors the plan's step tables. Tracked per epic in §3.
 | `ever-works/templates` (public), `app-fixture-hello`, `app-fixture-hello-template`, `cal-diy-template`, `umami-template`, `platforms` | `[x]` created + seeded 2026-09-17 | `gh api repos/ever-works/<r>` |
 | **`auth.ever.co` DNS** | `[x]` **live** — proxied `CNAME` → `5a1c27a6-…cfargotunnel.com` in the `ever.co` zone, record id `506584f8c80e91b9f5f589109b46afbf`. Resolves through Cloudflare and answers **404 from nginx**, which is the correct pre-deploy state (the tunnel reaches the cluster; nothing claims the host yet). | `Invoke-RestMethod` create + `Resolve-DnsName` + `HEAD https://auth.ever.co/` |
 | **`auth.ever.co` — ZITADEL stand-up** | `[~]` **manifests done and in review**; **not deployed**. New `ever-id-prod` app in `ever-co/k8s-gitops` on branch `feat/ever-id-zitadel` → **PR [#56](https://github.com/ever-co/k8s-gitops/pull/56)**. Also a new `Database/zitadel` on the shared CNPG cluster. Verified: all JSON parses, `kubectl kustomize` builds, `--dry-run=client --validate=strict` creates all 7 objects. Secrets come from OpenBao at `ever/id/prod/zitadel` and are **not** provisioned yet, so the pod cannot start. | `gh pr view 56 --repo ever-co/k8s-gitops` |
-| Ever Works test tenant for the acceptance lanes | `[ ]` | owner decision J-08 |
+| Ever Works test tenant for the acceptance lanes | `[x]` **done** — see the box below. | `docs/internal/app-works-test-estate.md` |
 | PR to `ever-co/ever-teams` / `ever-co/ever-gauzy` for Ever ID | `[ ]` | owner authorised |
 | Existing `repo`-kind regression suites stay green | `[ ]` | every change is additive |
 
-### Track D blockers for the Ever ID stand-up (in order)
+### Track D — the test estate (done 2026-09-17)
 
-1. **OpenBao path `ever/id/prod/zitadel`** with `ZITADEL_MASTERKEY` (exactly 32 chars), the Postgres DSN
-   (`postgresql://zitadel:<pw>@pg-rw.databases.svc.cluster.local:5432/zitadel?sslmode=disable`), and
-   `ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD`.
-2. **A `zitadel` LOGIN role** on the CNPG primary, with a password matching the DSN — the out-of-band step
-   every other database on this cluster needed (`cloc`, `trigger`, `grafana`, `umami`).
-3. **Backups-first gate** satisfied before adding a database to the shared cluster.
-4. Merge PR #56 (or point ArgoCD at the branch) — until then `targetRevision: main` means ArgoCD cannot see it.
-5. Then the 10-step bootstrap in `apps/ever-id-prod/README.md`.
+**A "tenant" is not creatable here.** A `Tenant` is an internal 1:1-with-a-user container with **no create API**
+(`packages/agent/src/entities/tenant.entity.ts:33,22-25,52-53`; `apps/api/src/scope/tenant-bootstrap.service.ts:10-14`).
+The **creatable, user-facing scope is an Organization** (1 Tenant : 0..N Organizations —
+`organizations/organization.service.ts:506`, `POST /api/organizations`), selected per request with the
+`x-scope-slug` header. So the lanes get **organizations**, not a second tenant:
+
+| Object | Slug | id |
+| --- | --- | --- |
+| Organization | `app-works-dev` | `cf89c6bb-3cbd-46d9-b73e-db57466c804e` |
+| Organization | `app-works-stage` | `ef834760-935c-44f0-921f-103959f2644e` |
+
+Isolation is **proven with a negative control**: `GET /api/schedules` → `count=29` unscoped, `count=0` for each new
+scope, **HTTP 404** for a fake slug. The account's own active scope did not move.
+
+**Four estate gaps were found and are NOT worked around** (they are recorded, not papered over):
+`ever-works/templates` has **no `e2e` branch** although the dev/stage catalog pin requires one; `MAILHOG_URL` has no
+source in `.config` (APW-07's mail sink appears undeployed); `EVER_WORKS_GITHUB_PAT_CLASSIC` lacks `read:org`; and
+the **git connection is per-User, not per-Organization**, so both scopes share one GitHub identity.
+
+### Track D blocker — 🛑 **the backups-first gate is TRIPPED cluster-wide (not an App Works defect)**
+
+**On-site Ceph RGW is unreachable, so WAL archiving to `s3://pg-backups` has failed since 13:50Z on 2026-09-17.**
+All three gateways and the MetalLB VIP are dark, from the local machine *and* from inside the cluster. `rgw-lb/rgw-s3-lb`
+is `0/5` ready and its log is a continuous `rgw_nodes/<NOSRV> … SC` stream. `pg_stat_archiver` on primary `pg-2`:
+`last_archived_time 13:50:32Z`, `last_failed_time 21:30:58Z`, `failed_count 1084`; ~110 WAL segments queued. Also
+failing on the same endpoint: `pg-logical-dump`, `pve-config`, `offsite-sync`, `openbao-raft-snapshot`,
+`openbao-auto-unseal`.
+
+**No data is lost and nothing was changed** — this was diagnosed read-only and recorded on the fleet board
+(`ever-co/homelab` `MAINTENANCE.md`, commit `2f06199`). The consequence for *this* programme: **the Ever ID database
+cannot be added to the shared cluster until archiving is healthy**, which is exactly what the fleet's backups-first
+rule requires. The remaining restore point is the `pg-nightly-20260917020000` base backup plus WAL to 13:50Z.
 
 ---
 
@@ -138,8 +162,26 @@ Mirrors the plan's step tables. Tracked per epic in §3.
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-09-17 · 🔴 fleet incident found and escalated (read-only).** The on-site Ceph RGW is down; WAL archiving to
+  `s3://pg-backups` has failed since 13:50Z. Confirmed from both sides of the network, recorded on the fleet board
+  (`ever-co/homelab` commit `2f06199`). **Nothing was changed by me**; radosgw on the PVE hosts needs host access I
+  do not have. This trips the programme's own backups-first precondition for adding the Ever ID database.
+- **2026-09-17 · test estate done.** Two Ever Works **organizations** created (`app-works-dev`, `app-works-stage`)
+  because a `Tenant` has no create API — isolation proven with a 404 negative control. Full record, the env/secret
+  names the lanes need, and four estate gaps: `docs/internal/app-works-test-estate.md`.
+- **2026-09-17 · APW-05 complete (interim report received).** All 26 APW-05 rows addressed. **`XC-01` verified real
+  and fixed additively**: PR/verification builds no longer receive every `EW_` build secret, tracked-branch builds are
+  unchanged, and two new Work-scope settings (`allowBuildValuesOnPullRequests` default `false`,
+  `verificationPromptedValuesRequireApproval` default `true`) let an owner opt back in — no secret, path or capability
+  removed. `GAP-07` reconciled with `APW05-G01` and solved once, in APW-05. New FR-71/FR-72, S32, T46, ACC-05-31/32.
+- **2026-09-17 · three cross-agent defects routed to their owners** rather than fixed across folder boundaries: a
+  broken `./APW-05-builds/plan.md` link in APW-08, a stale validator fixture-registry row in the APW-03 schema
+  bundle (one missing accepted warning makes a valid spec fail), and a stale `catalog.md:265` that contradicts the
+  corrected `schema.md` §3 — with an explicit warning not to apply `GAP-01`'s removal half, which would break the
+  additive-only rule.
 - **2026-09-17 · Wave 0 PR 0.1 in flight** — agent git tools (provider/owner/repo resolution, `branch` honoured,
-  protected branches refused, fail-closed). Tests-first, in a worktree, not committed yet.
+  protected branches refused with `main`/`master`/`stage` as a non-configurable floor unioned with the Work's
+  effective merge policy, fail-closed). 393 lines of tests written first.
 - **2026-09-17 · Wave 0 PR 0.2 in flight** — checkout keys unique/case-preserving/provider-scoped; no silent
   `git init` when a repository is expected; non-blocking fork request that reuses an existing fork.
 - **2026-09-17 · five spec agents in flight** — blockers + confirmed high/medium gaps for
