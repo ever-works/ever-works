@@ -35,4 +35,13 @@ export interface FacadeOptions {
 	 * agentId/taskId attribution is unaffected).
 	 */
 	readonly runId?: string;
+
+	/**
+	 * Model accounts (AW-16) — the schedule this call runs for, keyed the way
+	 * the unified schedule list keys a row (`${source}:${ownerId}`, e.g.
+	 * `agent_heartbeat:<agentId>`), so the schedule's own model choice wins
+	 * over the Agent's. Optional: a heartbeat Run is recognised from the Run
+	 * itself, so only a caller outside a Run needs to set it.
+	 */
+	readonly scheduleId?: string;
 }

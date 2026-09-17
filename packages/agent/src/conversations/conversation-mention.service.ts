@@ -171,6 +171,10 @@ export class ConversationMentionService {
     }
 }
 
+// The `removeSpans` helper that used to live here moved with the parse rule
+// into `@ever-works/contracts` (`conversation-mentions.ts`), so the server and
+// the composer can never disagree. Its ReDoS-hardened space collapse moved
+// with it — see the ledger comment on `removeSpans` there.
 function describe(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }

@@ -21,7 +21,7 @@ import {
     ApiQuery,
 } from '@nestjs/swagger';
 import { NotificationService } from '@ever-works/agent/notifications';
-import { NotificationCategory } from '@ever-works/agent/entities';
+import { NotificationCategory, type NotificationQueryOptions } from '@ever-works/agent/entities';
 import { CurrentUser, AuthSessionGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 
@@ -66,6 +66,13 @@ export class NotificationsController {
         enum: ['ai_credits', 'subscription', 'generation', 'system', 'security'],
         description: 'Filter by notification category',
     })
+    @ApiQuery({
+        name: 'includeSilent',
+        required: false,
+        type: Boolean,
+        description:
+            'Include notifications written silently because in-app is off for their event (default false)',
+    })
     @ApiResponse({ status: 200, description: 'List of notifications' })
     async getNotifications(
         @CurrentUser() auth: AuthenticatedUser,
@@ -73,18 +80,26 @@ export class NotificationsController {
         @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
         @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
         @Query('category') category?: string,
+        @Query('includeSilent', new DefaultValuePipe(false), ParseBoolPipe)
+        includeSilent?: boolean,
     ) {
         const validCategory =
             category !== undefined &&
             (Object.values(NotificationCategory) as string[]).includes(category)
                 ? (category as NotificationCategory)
                 : undefined;
-        const notifications = await this.notificationService.getNotifications(auth.userId, {
+        const options: NotificationQueryOptions = {
             unreadOnly,
             limit: Math.min(limit, 100), // Cap at 100
             offset,
             category: validCategory,
-        });
+        };
+        // Attention controls (AW-13): silent rows are opt-in. The unread count
+        // below never includes them.
+        if (includeSilent === true) {
+            options.includeSilent = true;
+        }
+        const notifications = await this.notificationService.getNotifications(auth.userId, options);
 
         return { notifications };
     }

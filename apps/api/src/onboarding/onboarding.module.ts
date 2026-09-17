@@ -33,6 +33,7 @@ import { OnboardingCatalogController } from './onboarding-catalog.controller';
 import { OnboardingCatalogService } from './onboarding-catalog.service';
 import { OnboardingTelemetryController } from './onboarding-telemetry.controller';
 import { OnboardingSuggestionsController } from './onboarding-suggestions.controller';
+import { OnboardingRosterController } from './onboarding-roster.controller';
 import { ClaimController } from './claim.controller';
 import { AuthModule } from '../auth';
 import { UsersModule } from '../users/users.module';
@@ -58,6 +59,13 @@ import { UsersModule } from '../users/users.module';
         OnboardingCatalogController,
         OnboardingTelemetryController,
         OnboardingSuggestionsController,
+        // AW-20 P1 — the setup wizard's "Your agents" step: propose a
+        // roster, provision it in the background, acknowledge the
+        // introduction. `AgentDomainAgentsModule` (already imported above)
+        // supplies the AgentRepository it reads lane-holding agents
+        // through; `DatabaseModule` supplies the checklist repository the
+        // provisioning record lives on.
+        OnboardingRosterController,
         // Public preview + authenticated accept for organization invitations.
         // Lives here rather than on the api/organizations/:orgId family, whose
         // guard requires the membership the invitee does not have yet.

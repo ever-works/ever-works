@@ -118,6 +118,21 @@ export class WorkKnowledgeChunkRepository {
     }
 
     /**
+     * AW-07 — delete every chunk of one document in one Work. Completes the
+     * `PgVectorChunkRepositoryPort` method set so the API can hand this
+     * repository to the pgvector plugin as-is; the `work_id` filter keeps
+     * the partition invariant.
+     */
+    async deleteByDocument(workId: string, documentId: string): Promise<void> {
+        await this.repository.delete({ workId, documentId });
+    }
+
+    /** AW-07 — delete every chunk owned by one Work (the port's `deleteByWork`). */
+    async deleteByWork(workId: string): Promise<void> {
+        await this.repository.delete({ workId });
+    }
+
+    /**
      * EW-641 Phase 2/a row 30a — k-nearest-neighbor over the
      * `embedding` column using pgvector's cosine-distance operator
      * (`<=>`), matching the `vector_cosine_ops` ivfflat index from

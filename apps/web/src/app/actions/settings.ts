@@ -123,6 +123,13 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
 }
 
 // Notification Actions
+/**
+ * @deprecated Unreachable: nothing in the product calls this, it validates a
+ * preferences shape the API does not have, and it returns a simulated
+ * success without saving anything. Kept only so no export disappears. Real
+ * notification preferences are saved by the actions in
+ * `app/actions/notification-preferences.ts` (the notification matrix).
+ */
 export async function updateNotificationPreferences(preferences: {
     email: {
         updates: boolean;

@@ -15,6 +15,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
     SKILL_FILE_CONTENT_READER,
+    ROSTER_SKILL_BINDER,
     RUN_KILL_SWITCH,
     AgentEscalationService,
     RunSteeringService,
@@ -69,6 +70,7 @@ import {
     TaskAssigneeRepository,
     TaskReviewerRepository,
     TaskApproverRepository,
+    TaskAgentReviewService,
     RUN_STEERING_PORT,
     TERMINAL_SESSION_STARTER,
 } from '@ever-works/agent/tasks-domain';
@@ -140,6 +142,9 @@ import { AuthModule } from '../auth/auth.module';
 // this module is @Global(), so the agent-side AgentToolService's
 // @Optional() @Inject(SKILL_FILE_CONTENT_READER) resolves in production.
 import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
+// AW-20 P1 — backs the ROSTER_SKILL_BINDER binding below so a provisioned
+// roster agent arrives with its lane's suggested Skills already attached.
+import { RosterSkillBinderAdapter } from './roster-skill-binder.adapter';
 import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
 import { AgentCollaboratorsController } from './agent-collaborators.controller';
@@ -877,6 +882,13 @@ const HELD_FOR_APPROVAL_NOTE =
                 ToolGrantService,
                 WorkflowGraphExecutorService,
                 InboxService,
+                // Reviewer agent stage (slice AD, EW-811) — backs
+                // `submitTaskReview`. APPENDED LAST, and matched by the
+                // last parameter of `useFactory` below: this list is
+                // positional and the container passes it positionally, so
+                // inserting anywhere else silently rebinds every service
+                // after the insertion point.
+                TaskAgentReviewService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -897,11 +909,24 @@ const HELD_FOR_APPROVAL_NOTE =
                 toolGrants: ToolGrantService,
                 workflowExecutor: WorkflowGraphExecutorService,
                 inboxService: InboxService,
+                agentReviews: TaskAgentReviewService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
                 // when any of them is missing.
-                tasks: { tasksService, chatService, assignees, reviewers, approvers },
+                tasks: {
+                    tasksService,
+                    chatService,
+                    assignees,
+                    reviewers,
+                    approvers,
+                    // Reviewer agent stage (slice AD, EW-811). Unbound,
+                    // `submitTaskReview` is not offered at all and no
+                    // agent approval can be recorded — the same
+                    // fail-closed posture as the membership repositories
+                    // above.
+                    agentReviews,
+                },
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
@@ -999,9 +1024,17 @@ const HELD_FOR_APPROVAL_NOTE =
         // AgentToolService (@Optional() @Inject(SKILL_FILE_CONTENT_READER)).
         // Unbound, `getSkillFile` would list files but refuse every read.
         { provide: SKILL_FILE_CONTENT_READER, useExisting: SkillFileContentReaderService },
+        // AW-20 P1 — the seam roster provisioning attaches Skills through.
+        // `@Optional()` at the consumer, so WITHOUT this binding a roster
+        // is still provisioned and wired, just without its suggested
+        // Skills — the same dead-seam trap every other binding here
+        // documents.
+        RosterSkillBinderAdapter,
+        { provide: ROSTER_SKILL_BINDER, useExisting: RosterSkillBinderAdapter },
     ],
     exports: [
         SKILL_FILE_CONTENT_READER,
+        ROSTER_SKILL_BINDER,
         AGENT_HEARTBEAT_TRIGGER,
         // Goals autonomy layer — GoalOrchestratorService cancels the Goal's
         // in-flight iteration run and needs the SAME remote cancel this

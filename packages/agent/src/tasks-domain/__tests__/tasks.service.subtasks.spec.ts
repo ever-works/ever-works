@@ -188,6 +188,48 @@ describe('TasksService.listSubtasks', () => {
         expect(out.rows[0].approvalCleared).toBe(true);
     });
 
+    it('counts an AGENT approval only for the head the row records — as the → done gate does (review of P1-A)', async () => {
+        // An agent approval of an old head showed the checklist gate
+        // "cleared" while every `done` transition was refused.
+        const headA = 'a'.repeat(40);
+        const headB = 'b'.repeat(40);
+        const agentApproval = {
+            taskId: 'c1',
+            approverType: 'agent',
+            approvalState: 'approved',
+            decidedVia: 'agent-review',
+            decidedHeadSha: headA,
+        };
+        for (const [recorded, cleared] of [
+            [headB, false],
+            [null, false],
+            [headA, true],
+        ] as const) {
+            const { service, repos } = makeService();
+            repos.tasks.findByIdAndUser.mockResolvedValue(makeTask());
+            repos.tasks.findByUserIdFiltered.mockResolvedValue({
+                rows: [
+                    makeTask({
+                        id: 'c1',
+                        requireAllApprovers: true,
+                        prHeadSha: recorded,
+                        ciHeadSha: recorded,
+                    }),
+                ],
+                total: 1,
+            });
+            repos.approvers.findByTaskIds.mockResolvedValue([agentApproval]);
+
+            const out = await service.listSubtasks('user-1', 'task-1');
+
+            expect({ recorded, approvedCount: out.rows[0].approvedCount }).toEqual({
+                recorded,
+                approvedCount: cleared ? 1 : 0,
+            });
+            expect(out.rows[0].approvalCleared).toBe(cleared);
+        }
+    });
+
     it('an ungated row reports requiresApproval=false and a cleared gate', async () => {
         const { service, repos } = makeService();
         repos.tasks.findByIdAndUser.mockResolvedValue(makeTask());

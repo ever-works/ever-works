@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+    ArrayMaxSize,
     IsBoolean,
+    IsIn,
     IsEnum,
     IsInt,
     IsObject,
@@ -16,6 +18,17 @@ import {
     ValidateIf,
 } from 'class-validator';
 import type { SkillBindingTargetType, SkillOwnerType } from '@ever-works/agent/skills';
+import {
+    SKILL_PROVENANCES,
+    SKILL_READINESS_FILTERS,
+    SKILL_SHELF_SORTS,
+    SKILL_TAG_FACET_LIMIT,
+    SKILL_TAG_FILTER_MAX,
+    SKILL_TAG_PATTERN,
+    type SkillProvenance,
+    type SkillReadinessFilter,
+    type SkillShelfSort,
+} from '@ever-works/contracts';
 
 export const SKILL_OWNER_TYPES = ['tenant', 'mission', 'idea', 'work', 'agent'] as const;
 export const SKILL_BINDING_TARGET_TYPES = ['tenant', 'mission', 'idea', 'work', 'agent'] as const;
@@ -60,6 +73,64 @@ export class ListSkillsQueryDto {
     @IsInt()
     @Min(0)
     offset?: number;
+
+    // ── Skills shelf (all optional; omitted = exactly the pre-shelf list) ──
+
+    @ApiPropertyOptional({
+        description:
+            'Comma-separated tags; a Skill must carry ALL of them. At most 6, each a normalised tag.',
+        type: String,
+        example: 'billing,email',
+    })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === undefined || value === null || value === '') return undefined;
+        const values = Array.isArray(value) ? value : String(value).split(',');
+        return values.map((tag) => String(tag).trim()).filter(Boolean);
+    })
+    @ArrayMaxSize(SKILL_TAG_FILTER_MAX, { message: 'Six tags is the limit for one filter.' })
+    @IsString({ each: true })
+    @Matches(SKILL_TAG_PATTERN, {
+        each: true,
+        message: 'Each tag must be lower-case letters, digits and hyphens (at most 40 characters).',
+    })
+    tags?: string[];
+
+    @ApiPropertyOptional({ enum: SKILL_READINESS_FILTERS })
+    @IsOptional()
+    @IsIn(SKILL_READINESS_FILTERS)
+    readiness?: SkillReadinessFilter;
+
+    @ApiPropertyOptional({ enum: SKILL_PROVENANCES })
+    @IsOptional()
+    @IsIn(SKILL_PROVENANCES)
+    provenance?: SkillProvenance;
+
+    @ApiPropertyOptional({ description: '`true` = switched on, `false` = switched off.' })
+    @IsOptional()
+    @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+    @IsBoolean()
+    enabled?: boolean;
+
+    @ApiPropertyOptional({ enum: SKILL_SHELF_SORTS, default: 'updated' })
+    @IsOptional()
+    @IsIn(SKILL_SHELF_SORTS)
+    sort?: SkillShelfSort;
+}
+
+/** Skills shelf — `GET /api/skills/tags`. */
+export class ListSkillTagsQueryDto {
+    @ApiPropertyOptional({
+        minimum: 1,
+        maximum: SKILL_TAG_FACET_LIMIT,
+        default: SKILL_TAG_FACET_LIMIT,
+    })
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined || value === null ? value : Number(value)))
+    @IsInt()
+    @Min(1)
+    @Max(SKILL_TAG_FACET_LIMIT)
+    limit?: number;
 }
 
 export class ListSkillCatalogQueryDto {

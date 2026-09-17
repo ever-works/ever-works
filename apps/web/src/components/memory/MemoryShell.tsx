@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import {
     Brain,
@@ -11,6 +12,8 @@ import {
     X,
     Loader2,
     Sparkles,
+    LayoutList,
+    Library,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { browserApiFetch } from '@/lib/api/browser-api';
@@ -22,6 +25,10 @@ import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
 import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
 import { MemoryMeetingsPanel, type MemoryMeetingsData } from './MemoryMeetingsPanel';
+import { FactsPanel } from './FactsPanel';
+import type { MemoryFactListDto } from '@/lib/api/memory-facts-types';
+import { LibraryPanel } from '@/components/knowledge/LibraryPanel';
+import type { KnowledgeLibraryInitialData } from '@/lib/api/knowledge-library-types';
 import {
     buildMemoryQuery,
     type MemoryConsolidationReport,
@@ -38,7 +45,35 @@ interface MemoryShellProps {
      * without it — the block is simply absent.
      */
     meetings?: MemoryMeetingsData;
+    /**
+     * First page of memory facts (AW-07), server-fetched by the page. Optional
+     * for the same reason as `meetings`: the shell still renders standalone
+     * (and in specs) without it — the Facts block is simply absent.
+     */
+    facts?: MemoryFactListDto;
+    /**
+     * `true` when the page's server fetch of `facts` failed. The Facts block
+     * then shows its load error with Retry instead of an empty workspace.
+     */
+    factsLoadFailed?: boolean;
+    /**
+     * The view the page was requested with (`?view=library`). Omitted = the
+     * overview, which is the page exactly as it has always rendered.
+     */
+    initialView?: MemoryView;
+    /**
+     * Server-rendered first page + folder rail for a `?view=library` deep
+     * link, so the Library view paints without a loading flash. Optional —
+     * without it the Library view loads on first open.
+     */
+    library?: KnowledgeLibraryInitialData;
 }
+
+/** The two views of the Memory page. */
+export type MemoryView = 'overview' | 'library';
+
+/** Where the chosen view is remembered, per browser. */
+const VIEW_STORAGE_KEY = 'memory-tab';
 
 /** Facet kinds that map to a filter chip group. */
 type FacetKind = 'type' | 'work' | 'status' | 'source';
@@ -70,8 +105,49 @@ function formatDate(iso: string): string {
  * (they depend on cross-feature prerequisites — see the Memory spec
  * §2.4 / §4.3).
  */
-export function MemoryShell({ initial, meetings }: MemoryShellProps) {
+export function MemoryShell({
+    initial,
+    meetings,
+    facts,
+    factsLoadFailed,
+    initialView,
+    library,
+}: MemoryShellProps) {
     const t = useTranslations('dashboard.memoryPage');
+
+    // Overview | Library. The server passes the URL's `?view=` so the first
+    // render already shows the right view (no hydration mismatch, no flash).
+    // A remembered Library choice is restored after mount — but only on a
+    // bare `/memory`: a link that carries its own query or anchor (the
+    // Meetings pagination, `#meetings`) is about the overview and wins.
+    const [view, setView] = useState<MemoryView>(initialView ?? 'overview');
+
+    useEffect(() => {
+        if (initialView) return;
+        if (window.location.search || window.location.hash) return;
+        try {
+            if (window.localStorage.getItem(VIEW_STORAGE_KEY) === 'library') {
+                setView('library');
+            }
+        } catch {
+            // Storage blocked — the page stays on the overview.
+        }
+    }, [initialView]);
+
+    const changeView = useCallback((next: MemoryView) => {
+        setView(next);
+        try {
+            window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+        } catch {
+            // Storage blocked — the choice lasts this visit.
+        }
+        // Mirror the view to the URL so a Library link can be shared. Every
+        // other query key (the Meetings filters and page) is kept as-is.
+        const url = new URL(window.location.href);
+        if (next === 'library') url.searchParams.set('view', 'library');
+        else url.searchParams.delete('view');
+        window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    }, []);
 
     const [data, setData] = useState<MemoryResponse>(initial);
     const [query, setQuery] = useState('');
@@ -255,199 +331,257 @@ export function MemoryShell({ initial, meetings }: MemoryShellProps) {
                  * unrelated to creating a KB document — hidden for now rather
                  * than mis-navigating the user.
                  */}
-                <button
-                    type="button"
-                    data-testid="memory-consolidate-button"
-                    onClick={() => void runConsolidation(false)}
-                    disabled={isConsolidating}
-                    className={cn(
-                        'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors',
-                        'bg-card dark:bg-card-primary-dark border-card-border dark:border-white/9',
-                        'text-text dark:text-text-dark hover:border-border-secondary dark:hover:border-white/20',
-                        'disabled:opacity-60 disabled:cursor-not-allowed',
+                <div className="flex items-center gap-2 flex-wrap">
+                    <div
+                        data-testid="memory-view-toggle"
+                        role="group"
+                        aria-label={t('viewToggle.label')}
+                        className="flex items-center gap-0.5 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-0.5"
+                    >
+                        {(
+                            [
+                                ['overview', LayoutList, t('viewToggle.overview')],
+                                ['library', Library, t('viewToggle.library')],
+                            ] as const
+                        ).map(([key, Icon, label]) => (
+                            <button
+                                key={key}
+                                type="button"
+                                data-testid={`memory-view-${key}`}
+                                aria-pressed={view === key}
+                                onClick={() => changeView(key)}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150',
+                                    view === key
+                                        ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                        : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark',
+                                )}
+                            >
+                                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    {view === 'overview' && (
+                        <button
+                            type="button"
+                            data-testid="memory-consolidate-button"
+                            onClick={() => void runConsolidation(false)}
+                            disabled={isConsolidating}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors',
+                                'bg-card dark:bg-card-primary-dark border-card-border dark:border-white/9',
+                                'text-text dark:text-text-dark hover:border-border-secondary dark:hover:border-white/20',
+                                'disabled:opacity-60 disabled:cursor-not-allowed',
+                            )}
+                        >
+                            {isConsolidating && consolidatePreview === null ? (
+                                <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
+                            ) : (
+                                <Sparkles className="w-4 h-4" strokeWidth={1.5} />
+                            )}
+                            {t('consolidation.action')}
+                        </button>
                     )}
-                >
-                    {isConsolidating && consolidatePreview === null ? (
-                        <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
-                    ) : (
-                        <Sparkles className="w-4 h-4" strokeWidth={1.5} />
-                    )}
-                    {t('consolidation.action')}
-                </button>
+                </div>
             </div>
 
-            {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
-            <MemoryReviewPanel />
+            {view === 'library' ? (
+                <LibraryPanel
+                    initial={library}
+                    works={facets.works.map((work) => ({ value: work.value, label: work.label }))}
+                />
+            ) : (
+                <>
+                    {/* Facts (AW-07) — the atomic tier of Memory, with the section
+                        rail that jumps to every panel below. It belongs to the
+                        overview: the Library view is the shelf, and the rail's
+                        targets are the panels underneath this branch. Additive —
+                        nothing below moved. "Tidy up" reuses the existing
+                        consolidation pass. */}
+                    {facts && (
+                        <FactsPanel
+                            initial={facts}
+                            initialLoadFailed={factsLoadFailed}
+                            onTidyUp={() => void runConsolidation(false)}
+                        />
+                    )}
 
-            {/* Files — browse ALL files (chat uploads + KB originals) in folders */}
-            <MemoryFilesPanel />
+                    {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
+                    <MemoryReviewPanel />
 
-            {/* Originals — upload files into org-wide Memory */}
-            <MemoryUploadsPanel />
+                    {/* Files — browse ALL files (chat uploads + KB originals) in folders */}
+                    <MemoryFilesPanel />
 
-            {/* Agent memory — the half of Memory that is not a knowledge base */}
-            <AgentMemoryPanel />
+                    {/* Originals — upload files into org-wide Memory */}
+                    <MemoryUploadsPanel />
 
-            {/* Meetings — a memory SOURCE, so it sits with the other sources
+                    {/* Agent memory — the half of Memory that is not a knowledge base */}
+                    <AgentMemoryPanel />
+
+                    {/* Meetings — a memory SOURCE, so it sits with the other sources
                 rather than below the document list. Anchored `#meetings`;
                 `/meetings` redirects here. */}
-            {meetings && <MemoryMeetingsPanel data={meetings} />}
+                    {meetings && <MemoryMeetingsPanel data={meetings} />}
 
-            {/* Memory Consolidation — dry-run confirm surface / applied summary */}
-            {consolidateFailed && (
-                <div
-                    data-testid="memory-consolidate-error"
-                    className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400"
-                >
-                    {t('consolidation.failed')}
-                </div>
-            )}
-            {consolidatePreview && (
-                <ConsolidatePanel
-                    report={consolidatePreview}
-                    documents={documents}
-                    isSubmitting={isConsolidating}
-                    onApply={() => void runConsolidation(true)}
-                    onCancel={() => setConsolidatePreview(null)}
-                />
-            )}
-            {consolidateApplied && (
-                <div
-                    data-testid="memory-consolidate-applied"
-                    className="flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-text dark:text-text-dark"
-                >
-                    <span>
-                        {t('consolidation.applied', {
-                            promoted: consolidateApplied.promoted,
-                            synthesized: consolidateApplied.synthesized,
-                            superseded: consolidateApplied.superseded,
-                        })}
-                    </span>
-                    <button
-                        type="button"
-                        onClick={() => setConsolidateApplied(null)}
-                        aria-label={t('consolidation.cancel')}
-                        className="shrink-0 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
-                    >
-                        <X className="w-4 h-4" strokeWidth={1.5} />
-                    </button>
-                </div>
-            )}
-
-            {/* Search */}
-            <div className="relative">
-                <Search
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark pointer-events-none"
-                    strokeWidth={1.5}
-                />
-                <input
-                    data-testid="memory-search"
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder={t('searchPlaceholder')}
-                    className={cn(
-                        'w-full text-sm rounded-lg transition-colors outline-none pl-9 pr-9 py-2.5',
-                        'bg-card dark:bg-card-primary-dark',
-                        'border border-card-border dark:border-white/9',
-                        'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
-                        'focus:border-primary dark:focus:border-white/20 focus:ring-2 focus:ring-primary-800/20',
+                    {/* Memory Consolidation — dry-run confirm surface / applied summary */}
+                    {consolidateFailed && (
+                        <div
+                            data-testid="memory-consolidate-error"
+                            className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400"
+                        >
+                            {t('consolidation.failed')}
+                        </div>
                     )}
-                />
-                {isLoading && (
-                    <Loader2
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark animate-spin"
-                        strokeWidth={1.5}
-                    />
-                )}
-            </div>
+                    {consolidatePreview && (
+                        <ConsolidatePanel
+                            report={consolidatePreview}
+                            documents={documents}
+                            isSubmitting={isConsolidating}
+                            onApply={() => void runConsolidation(true)}
+                            onCancel={() => setConsolidatePreview(null)}
+                        />
+                    )}
+                    {consolidateApplied && (
+                        <div
+                            data-testid="memory-consolidate-applied"
+                            className="flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-text dark:text-text-dark"
+                        >
+                            <span>
+                                {t('consolidation.applied', {
+                                    promoted: consolidateApplied.promoted,
+                                    synthesized: consolidateApplied.synthesized,
+                                    superseded: consolidateApplied.superseded,
+                                })}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setConsolidateApplied(null)}
+                                aria-label={t('consolidation.cancel')}
+                                className="shrink-0 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
+                            >
+                                <X className="w-4 h-4" strokeWidth={1.5} />
+                            </button>
+                        </div>
+                    )}
 
-            {/* Header counts */}
-            <div className="flex items-center gap-2 text-sm text-text-muted dark:text-text-muted-dark">
-                <span className="font-medium text-text dark:text-text-dark">
-                    {t('documentsIndexed', { count: counts.indexed })}
-                </span>
-                {facets.works.length > 0 && (
-                    <>
-                        <span aria-hidden>·</span>
-                        <span>{t('worksCovered', { count: facets.works.length })}</span>
-                    </>
-                )}
-            </div>
+                    {/* Search */}
+                    <div className="relative">
+                        <Search
+                            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark pointer-events-none"
+                            strokeWidth={1.5}
+                        />
+                        <input
+                            data-testid="memory-search"
+                            type="search"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder={t('searchPlaceholder')}
+                            className={cn(
+                                'w-full text-sm rounded-lg transition-colors outline-none pl-9 pr-9 py-2.5',
+                                'bg-card dark:bg-card-primary-dark',
+                                'border border-card-border dark:border-white/9',
+                                'text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark',
+                                'focus:border-primary dark:focus:border-white/20 focus:ring-2 focus:ring-primary-800/20',
+                            )}
+                        />
+                        {isLoading && (
+                            <Loader2
+                                className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted dark:text-text-muted-dark animate-spin"
+                                strokeWidth={1.5}
+                            />
+                        )}
+                    </div>
 
-            {/* Filter chips */}
-            <div className="flex flex-col gap-3">
-                <FacetRow
-                    kind="type"
-                    label={t('filters.type')}
-                    facets={facets.types}
-                    selected={filters.type}
-                    onToggle={toggleFacet}
-                    renderLabel={titleCase}
-                />
-                <FacetRow
-                    kind="work"
-                    label={t('filters.work')}
-                    facets={facets.works}
-                    selected={filters.work}
-                    onToggle={toggleFacet}
-                />
-                <FacetRow
-                    kind="source"
-                    label={t('filters.source')}
-                    facets={facets.sources}
-                    selected={filters.source}
-                    onToggle={toggleFacet}
-                    renderLabel={titleCase}
-                />
-                <FacetRow
-                    kind="status"
-                    label={t('filters.status')}
-                    facets={facets.statuses}
-                    selected={filters.status}
-                    onToggle={toggleFacet}
-                    renderLabel={titleCase}
-                />
-                {hasActiveFilters && (
-                    <button
-                        type="button"
-                        onClick={clearAll}
-                        className="self-start inline-flex items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
-                    >
-                        <X className="w-3 h-3" strokeWidth={1.5} />
-                        {t('filters.clearAll')}
-                    </button>
-                )}
-            </div>
+                    {/* Header counts */}
+                    <div className="flex items-center gap-2 text-sm text-text-muted dark:text-text-muted-dark">
+                        <span className="font-medium text-text dark:text-text-dark">
+                            {t('documentsIndexed', { count: counts.indexed })}
+                        </span>
+                        {facets.works.length > 0 && (
+                            <>
+                                <span aria-hidden>·</span>
+                                <span>{t('worksCovered', { count: facets.works.length })}</span>
+                            </>
+                        )}
+                    </div>
 
-            {/* List body */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-                {documents.length === 0 ? (
-                    <EmptyState
-                        title={
-                            hasActiveFilters
-                                ? t('empty.noResults')
-                                : counts.documents === 0
-                                  ? t('empty.title')
-                                  : t('empty.noResults')
-                        }
-                        subtitle={hasActiveFilters ? undefined : t('empty.subtitle')}
-                    />
-                ) : (
-                    <ul className="flex flex-col gap-2">
-                        {documents.map((doc) => (
-                            <li key={doc.id}>
-                                <MemoryRow doc={doc} orgLabel={t('orgScoped')} />
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
+                    {/* Filter chips */}
+                    <div className="flex flex-col gap-3">
+                        <FacetRow
+                            kind="type"
+                            label={t('filters.type')}
+                            facets={facets.types}
+                            selected={filters.type}
+                            onToggle={toggleFacet}
+                            renderLabel={titleCase}
+                        />
+                        <FacetRow
+                            kind="work"
+                            label={t('filters.work')}
+                            facets={facets.works}
+                            selected={filters.work}
+                            onToggle={toggleFacet}
+                        />
+                        <FacetRow
+                            kind="source"
+                            label={t('filters.source')}
+                            facets={facets.sources}
+                            selected={filters.source}
+                            onToggle={toggleFacet}
+                            renderLabel={titleCase}
+                        />
+                        <FacetRow
+                            kind="status"
+                            label={t('filters.status')}
+                            facets={facets.statuses}
+                            selected={filters.status}
+                            onToggle={toggleFacet}
+                            renderLabel={titleCase}
+                        />
+                        {hasActiveFilters && (
+                            <button
+                                type="button"
+                                onClick={clearAll}
+                                className="self-start inline-flex items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
+                            >
+                                <X className="w-3 h-3" strokeWidth={1.5} />
+                                {t('filters.clearAll')}
+                            </button>
+                        )}
+                    </div>
 
-            {/* Scheduled consolidation — configuration, deliberately placed
+                    {/* List body */}
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                        {documents.length === 0 ? (
+                            <EmptyState
+                                title={
+                                    hasActiveFilters
+                                        ? t('empty.noResults')
+                                        : counts.documents === 0
+                                          ? t('empty.title')
+                                          : t('empty.noResults')
+                                }
+                                subtitle={hasActiveFilters ? undefined : t('empty.subtitle')}
+                                showHelpLink={!hasActiveFilters}
+                            />
+                        ) : (
+                            <ul className="flex flex-col gap-2">
+                                {documents.map((doc) => (
+                                    <li key={doc.id}>
+                                        <MemoryRow doc={doc} orgLabel={t('orgScoped')} />
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
+                    {/* Scheduled consolidation — configuration, deliberately placed
                 AFTER the document list. Someone opening /memory came to read
                 their documents, not to meet a settings form. */}
-            <MemoryConsolidationSettings />
+                    <MemoryConsolidationSettings />
+                </>
+            )}
         </div>
     );
 }
@@ -746,7 +880,16 @@ function MemoryRow({
     );
 }
 
-function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
+function EmptyState({
+    title,
+    subtitle,
+    showHelpLink = false,
+}: {
+    title: string;
+    subtitle?: string;
+    /** AW-25 — "How this works" into the Memory article (not on a filtered no-results list). */
+    showHelpLink?: boolean;
+}) {
     return (
         <div className="flex flex-col items-center justify-center text-center py-16 px-6">
             <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-surface-secondary dark:bg-card-primary-dark mb-4">
@@ -760,6 +903,9 @@ function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
                 <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark max-w-md">
                     {subtitle}
                 </p>
+            )}
+            {showHelpLink && (
+                <HelpLink target="memory#adding-to-memory" variant="emptyState" className="mt-3" />
             )}
         </div>
     );

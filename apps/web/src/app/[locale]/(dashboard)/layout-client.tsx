@@ -10,6 +10,8 @@ import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { Footer } from '@/components/footer';
 import { HelpDrawer, type HelpDrawerTab } from '@/components/dashboard/HelpDrawer';
+import { HelpCenterProvider } from '@/components/help/HelpCenterProvider';
+import { captureHelpEvent, helpRouteGroup, type HelpOpenSource } from '@/lib/help/help-telemetry';
 import { CommandPalette } from '@/components/command-palette/CommandPalette';
 import {
     CommandPaletteProvider,
@@ -107,6 +109,8 @@ export function DashboardLayoutClient({
     const [helpOpen, setHelpOpen] = useState(false);
     // Tab the Help drawer opens on when a palette command asks for one.
     const [helpTab, setHelpTab] = useState<HelpDrawerTab | undefined>(undefined);
+    // Help centre (AW-25): the manual article a help link asked for, if any.
+    const [helpTarget, setHelpTarget] = useState<string | null>(null);
     // What's new (AW-14): the panel's open state mirrors `helpOpen`; the count
     // is seeded once from the server layout and then only updated from the
     // panel's own responses — no polling (spec FR-31).
@@ -299,12 +303,63 @@ export function DashboardLayoutClient({
 
     const openHelp = useCallback(() => {
         setHelpTab(undefined);
+        setHelpTarget(null);
         setHelpOpen(true);
     }, []);
     const openHelpAt = useCallback((tab?: HelpDrawerTab) => {
         setHelpTab(tab);
+        setHelpTarget(null);
         setHelpOpen(true);
     }, []);
+    // Every way into Help reports where it came from (AW-25 telemetry); the
+    // drawer behaviour behind each entry point is unchanged.
+    const reportHelpOpened = useCallback((source: HelpOpenSource) => {
+        captureHelpEvent({
+            name: 'help_opened',
+            properties: {
+                source,
+                route_group: helpRouteGroup(
+                    typeof window === 'undefined' ? null : window.location.pathname,
+                ),
+            },
+        });
+    }, []);
+    const openHelpFromShortcut = useCallback(() => {
+        reportHelpOpened('shortcut');
+        openHelp();
+    }, [openHelp, reportHelpOpened]);
+    const openHelpFromHeader = useCallback(() => {
+        reportHelpOpened('header');
+        openHelp();
+    }, [openHelp, reportHelpOpened]);
+    const openHelpFromSidebar = useCallback(() => {
+        reportHelpOpened('sidebar');
+        openHelp();
+    }, [openHelp, reportHelpOpened]);
+    const openHelpTabFromSidebar = useCallback(
+        (tab: HelpDrawerTab) => {
+            reportHelpOpened('sidebar');
+            openHelpAt(tab);
+        },
+        [openHelpAt, reportHelpOpened],
+    );
+    const openHelpFromPalette = useCallback(
+        (tab?: HelpDrawerTab) => {
+            reportHelpOpened('palette');
+            openHelpAt(tab);
+        },
+        [openHelpAt, reportHelpOpened],
+    );
+    // A help link: open the drawer on its Manual tab at one article, in place.
+    const openHelpArticle = useCallback(
+        (target: string) => {
+            reportHelpOpened('deep_link');
+            setHelpTab(undefined);
+            setHelpTarget(target);
+            setHelpOpen(true);
+        },
+        [reportHelpOpened],
+    );
     const closeHelp = useCallback(() => setHelpOpen(false), []);
     const openWhatsNew = useCallback(() => setWhatsNewOpen(true), []);
     const closeWhatsNew = useCallback(() => setWhatsNewOpen(false), []);
@@ -420,7 +475,7 @@ export function DashboardLayoutClient({
         <BackgroundActivityProvider>
             <ChatProvider>
                 <CommandPaletteProvider>
-                    <DashboardKeyboardShortcuts onOpenHelp={openHelp} />
+                    <DashboardKeyboardShortcuts onOpenHelp={openHelpFromShortcut} />
                     <PostHogIdentify userId={user.id} email={user.email} name={user.username} />
                     <EverWorksOnboardingWizard
                         open={isOnboardingOpen}
@@ -453,7 +508,8 @@ export function DashboardLayoutClient({
                             onToggle={() => setSidebarOpen(!sidebarOpen)}
                             isCollapsed={sidebarCollapsed}
                             onCollapsedChange={handleSidebarCollapsedChange}
-                            onOpenHelp={openHelp}
+                            onOpenHelp={openHelpFromSidebar}
+                            onOpenHelpTab={openHelpTabFromSidebar}
                             chatOpen={chatOpen}
                             onOpenChat={toggleChat}
                             onInteraction={ensureResizableMode}
@@ -563,7 +619,7 @@ export function DashboardLayoutClient({
                                 user={user}
                                 onMenuClick={() => setSidebarOpen(!sidebarOpen)}
                                 isSidebarOpen={sidebarOpen}
-                                onHelpClick={openHelp}
+                                onHelpClick={openHelpFromHeader}
                                 onboardingBadge={
                                     showOnboardingBadge
                                         ? {
@@ -585,12 +641,16 @@ export function DashboardLayoutClient({
                                 className="flex-1 flex flex-col overflow-y-auto bg-white dark:bg-surface-dark min-h-0"
                                 id="main-content"
                             >
-                                <JobRuntimeDegradedBanner configured={jobRuntimeConfigured} />
-                                <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
-                                    <ChatPanelProvider open={chatOpen} setOpen={setChatOpen}>
-                                        {children}
-                                    </ChatPanelProvider>
-                                </div>
+                                {/* Help links (AW-25) anywhere in the page open the
+                                Help drawer in place through the same state as `?`. */}
+                                <HelpCenterProvider onOpenTarget={openHelpArticle}>
+                                    <JobRuntimeDegradedBanner configured={jobRuntimeConfigured} />
+                                    <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
+                                        <ChatPanelProvider open={chatOpen} setOpen={setChatOpen}>
+                                            {children}
+                                        </ChatPanelProvider>
+                                    </div>
+                                </HelpCenterProvider>
 
                                 <Footer apiVersion={apiVersion} />
 
@@ -606,6 +666,7 @@ export function DashboardLayoutClient({
                         open={helpOpen}
                         onClose={closeHelp}
                         initialTab={helpTab}
+                        initialTarget={helpTarget}
                         onboarding={{
                             currentStep: onboardingCurrentStep,
                             totalSteps: onboardingTotalSteps,
@@ -621,7 +682,7 @@ export function DashboardLayoutClient({
 
                     <CommandPalette
                         userId={user.id}
-                        onOpenHelp={openHelpAt}
+                        onOpenHelp={openHelpFromPalette}
                         sidebarCollapsed={sidebarCollapsed}
                         onSidebarCollapsedChange={handleSidebarCollapsedChange}
                         chatOpen={chatOpen}

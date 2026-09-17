@@ -44,6 +44,7 @@ const {
     resolveMaxGateAttemptsMock,
     shouldRunGateJudgeMock,
     shouldRunL0PreCheckMock,
+    isAgentReviewRunScopeMock,
     judgeSwitch,
 } = vi.hoisted(() => {
     class StubInternalModule {}
@@ -99,6 +100,11 @@ const {
         resolveAcceptanceCriteriaMock: vi.fn(),
         shouldRunGateJudgeMock: vi.fn(),
         resolveGateVerdictMock: vi.fn(),
+        // Reviewer agent stage (slice AD) — "is this run a REVIEW run?",
+        // read off the run row's admission scope. The predicate's own rules
+        // are pinned by the agent package's task-agent-review.spec; here it
+        // is a controllable input. Default: no run is a review run.
+        isAgentReviewRunScopeMock: vi.fn(),
         // Mutable operator switch behind `config.agents.isGateJudgeEnabled()`.
         judgeSwitch: { on: false },
     };
@@ -182,6 +188,7 @@ vi.mock('@ever-works/agent/tasks-domain', () => ({
     resolveMaxGateAttempts: resolveMaxGateAttemptsMock,
     shouldRunGateJudge: shouldRunGateJudgeMock,
     shouldRunL0PreCheck: shouldRunL0PreCheckMock,
+    isAgentReviewRunScope: isAgentReviewRunScopeMock,
 }));
 
 vi.mock('../trigger/worker/modules/trigger-internal.module', () => ({
@@ -326,6 +333,7 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         // byte-identical pre-G2 first turn.
         resolveL0ChecksMock.mockReturnValue([]);
         shouldRunL0PreCheckMock.mockReturnValue(false);
+        isAgentReviewRunScopeMock.mockReturnValue(false);
         // G2 acceptance-criteria judge OFF by default, at both switches:
         // the operator env flag and the applicability resolver.
         judgeSwitch.on = false;
@@ -1449,6 +1457,107 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
 
                 expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
                 expect(result).toMatchObject({ reason: 'gate-red', gateVerdict: 'fail' });
+            });
+        });
+
+        /**
+         * Reviewer agent stage (slice AD, EW-811) — a REVIEW run through the
+         * worker.
+         *
+         * The finding: this worker had no idea a run was a review. It
+         * provisioned the workspace, ran the quality-gate loop (which
+         * re-executes the model up to maxGateAttempts times on ONE review
+         * claim) and called finalizeRun, which commits and pushes whatever
+         * the run left in the worktree — so a reviewer could author commits
+         * on the very Task it was reviewing, and one claim was several model
+         * runs. The run row's admission scope is what marks a review run.
+         */
+        describe('a REVIEW run (review-only admission scope on the run row)', () => {
+            const REVIEW_SCOPE = { allowedTools: ['submitTaskReview'] };
+
+            const useReviewRun = () => {
+                useWorkTask();
+                runs.findById.mockResolvedValue({
+                    id: 'run-1',
+                    agentId: AGENT_ID,
+                    taskId: OWNED_TASK_ID,
+                    status: 'queued',
+                    workId: WORK_ID,
+                    delegationScope: REVIEW_SCOPE,
+                });
+                isAgentReviewRunScopeMock.mockImplementation(
+                    (scope: unknown) => scope === REVIEW_SCOPE,
+                );
+                // Everything that WOULD fire for an implementation run on this
+                // Work: isolation on, a required gate that is red, attempts left.
+                taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+                taskWorkspace.finalizeRun.mockResolvedValue({ outcome: 'pr-opened', prNumber: 7 });
+                resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+                resolveChecksPolicyMock.mockReturnValue('required');
+                resolveMaxGateAttemptsMock.mockReturnValue(3);
+                resolveL0ChecksMock.mockReturnValue([BUILD_CHECK]);
+                shouldRunL0PreCheckMock.mockReturnValue(true);
+                gateRunner.runChecks.mockResolvedValue({
+                    gateStatus: 'red',
+                    results: [{ id: 'build', status: 'red', exitCode: 1, durationMs: 5 }],
+                });
+                runner.execute.mockResolvedValue({
+                    status: 'dispatched',
+                    outcome: { summary: 'ok' },
+                });
+            };
+
+            const reviewPayload = () => ({ ...basePayload(OWNED_TASK_ID), runId: 'run-1' });
+
+            it('provisions NO workspace, so nothing it does can be committed or pushed', async () => {
+                useReviewRun();
+                await registeredConfig.run(reviewPayload());
+
+                expect(isAgentReviewRunScopeMock).toHaveBeenCalledWith(REVIEW_SCOPE);
+                expect(taskWorkspace.provisionForRun).not.toHaveBeenCalled();
+                expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+            });
+
+            it('runs the model exactly ONCE — no gate iterate loop on a review claim', async () => {
+                useReviewRun();
+                await registeredConfig.run(reviewPayload());
+
+                expect(runner.execute).toHaveBeenCalledTimes(1);
+                expect(gateRunner.runChecks).not.toHaveBeenCalled();
+            });
+
+            it('frames the run as a reviewer, and carries the review scope into the tool loop', async () => {
+                useReviewRun();
+                await registeredConfig.run(reviewPayload());
+
+                const arg = runner.execute.mock.calls[0][0];
+                expect(arg.workspaceCwd).toBeNull();
+                expect(arg.delegationScope).toBe(REVIEW_SCOPE);
+                expect(arg.immediateInput).toContain('CODE REVIEWER');
+                expect(arg.immediateInput).toContain('Owned Task');
+                // Not the implementation brief, and no pre-check block.
+                expect(arg.immediateInput).not.toContain('Status: in_progress');
+            });
+
+            it('leaves an implementation run on the same Work exactly as before (control)', async () => {
+                useReviewRun();
+                runs.findById.mockResolvedValue({
+                    id: 'run-1',
+                    agentId: AGENT_ID,
+                    taskId: OWNED_TASK_ID,
+                    status: 'queued',
+                    workId: WORK_ID,
+                    delegationScope: null,
+                });
+                gateRunner.runChecks.mockResolvedValue({
+                    gateStatus: 'green',
+                    results: [{ id: 'build', status: 'green', exitCode: 0, durationMs: 5 }],
+                });
+                await registeredConfig.run(reviewPayload());
+
+                expect(taskWorkspace.provisionForRun).toHaveBeenCalledTimes(1);
+                expect(gateRunner.runChecks).toHaveBeenCalled();
+                expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
             });
         });
     });

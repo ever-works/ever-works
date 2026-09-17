@@ -254,6 +254,35 @@ describe('dispatchersFromTenantClient', () => {
         expect(out).toBeNull();
     });
 
+    // AW-07 — a BYO tenant's memory-fact embeds go to its own Trigger.dev
+    // project under the same task id, and a failure is deferred work.
+    it('dispatchMemoryFactEmbed triggers memory-fact-embed on the tenant client and soft-fails', async () => {
+        const fakeTrigger = vi
+            .fn()
+            .mockResolvedValueOnce({ id: 'tenant-mfe' })
+            .mockRejectedValueOnce(new Error('SDK down'));
+        const fakeClient = {
+            tasks: { trigger: fakeTrigger },
+            runs: { cancel: vi.fn(), retrieve: vi.fn() },
+        };
+        const dispatchers = dispatchersFromTenantClient(fakeClient) as unknown as {
+            dispatchMemoryFactEmbed: (p: unknown) => Promise<string | null>;
+        };
+
+        await expect(
+            dispatchers.dispatchMemoryFactEmbed({ factId: 'f-1', userId: 'u-1' }),
+        ).resolves.toBe('tenant-mfe');
+        expect(fakeTrigger).toHaveBeenCalledWith(
+            'memory-fact-embed',
+            { factId: 'f-1', userId: 'u-1' },
+            { tags: ['memory-fact-embed', 'fact:f-1'] },
+        );
+        await expect(
+            dispatchers.dispatchMemoryFactEmbed({ factId: 'f-1', userId: 'u-1' }),
+        ).resolves.toBeNull();
+        expect(tasksTriggerMock).not.toHaveBeenCalled();
+    });
+
     it('dispatchKbReembedWork propagates SDK errors (no silent drop)', async () => {
         const fakeTrigger = vi.fn().mockRejectedValue(new Error('SDK down'));
         const fakeClient = {

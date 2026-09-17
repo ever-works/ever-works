@@ -210,4 +210,30 @@ describe('SentryInterceptor', () => {
         const ctx = sentryMock.captureException.mock.calls[0][1];
         expect(ctx.tags.statusCode).toBe(500);
     });
+
+    it('keeps a share token out of the request context, the transaction tag and the endpoint tag', async () => {
+        const token = 'Zb3kQ9x_T1-vYwP0aLmN8cR4sD6fG2hJ5kL7qW9eR1t';
+        const err = Object.assign(new Error('nope'), { status: 404 });
+        const req = {
+            method: 'GET',
+            originalUrl: `/share/${token}?viewSession=abc.def`,
+            headers: { authorization: 'Bearer abc.def' },
+            body: { token },
+        };
+        const next: CallHandler = { handle: () => throwError(() => err) };
+        await expect(lastValueFrom(interceptor.intercept(buildExecCtx(req), next))).rejects.toBe(
+            err,
+        );
+        const recorded = JSON.stringify([
+            sentryMock.setContext.mock.calls,
+            sentryMock.setTag.mock.calls,
+            sentryMock.captureException.mock.calls.map((call) => call[1]),
+        ]);
+        expect(recorded).not.toContain(token);
+        expect(recorded).not.toContain('abc.def');
+        expect(sentryMock.setTag).toHaveBeenCalledWith(
+            'transaction',
+            'GET /share/[redacted]?viewSession=[redacted]',
+        );
+    });
 });

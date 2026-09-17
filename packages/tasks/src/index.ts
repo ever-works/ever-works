@@ -19,3 +19,6 @@ export * from './dispatchers/idea-build-execute.dispatcher';
 // Judgment layer G5 — workflow graph run dispatch adapter. API-side
 // WorkflowsModule binds this to the WORKFLOW_RUN_DISPATCHER token.
 export * from './dispatchers/workflow-run.dispatcher';
+// AW-07 - memory fact embed dispatch adapter. API-side MemoryFactsApiModule
+// binds this to the MEMORY_FACT_EMBED_DISPATCHER token.
+export * from './dispatchers/memory-fact-embed.dispatcher';

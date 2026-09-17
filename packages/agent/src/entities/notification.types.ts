@@ -30,6 +30,14 @@ export interface CreateNotificationDto {
     isPersistent?: boolean;
     expiresAt?: Date;
     deduplicationKey?: string;
+    /**
+     * Attention controls (AW-13) — the registry key this notification is
+     * routed as. When set, the user's in-app choice for that event decides
+     * whether the row is written silently.
+     */
+    eventKey?: string;
+    /** Set by `NotificationService` from the user's in-app choice; callers leave it unset. */
+    isSilent?: boolean;
 }
 
 export interface NotificationQueryOptions {
@@ -38,4 +46,6 @@ export interface NotificationQueryOptions {
     limit?: number;
     offset?: number;
     category?: NotificationCategory;
+    /** Attention controls (AW-13) — include rows written silently. Default false. */
+    includeSilent?: boolean;
 }

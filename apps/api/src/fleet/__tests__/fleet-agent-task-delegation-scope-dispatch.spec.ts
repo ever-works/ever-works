@@ -1,12 +1,20 @@
 import type { SubAgentDelegationRequest, SubAgentScope } from '@ever-works/contracts';
+import { QUEUED_REASON_CONCURRENCY, RunDispatchGateService } from '@ever-works/agent/agents';
 import type {
     AgentTaskExecuteDispatcher,
     AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
-import { Task, TaskStatus, TaskTransitionService } from '@ever-works/agent/tasks-domain';
+import {
+    agentReviewRunScope,
+    Task,
+    TaskAgentReviewService,
+    TaskStatus,
+    TaskTransitionService,
+} from '@ever-works/agent/tasks-domain';
 import { NodeDispatcherFactory, NodeJobRuntimePlugin } from '@ever-works/job-runtime-node-plugin';
 import { SubAgentDelegationRunnerService } from '../../agents/sub-agent-delegation.runner';
 import {
+    FleetAgentTaskPlanError,
     FleetAgentTaskPlannerService,
     FleetDelegationScopeRefusedError,
 } from '../fleet-agent-task-planner.service';
@@ -14,6 +22,7 @@ import {
     createFleetAwareAgentTaskExecuteDispatcher,
     type FleetAgentTaskPlan,
     type FleetAgentTaskPlanner,
+    type FleetAwareDispatcherDeps,
 } from '../fleet-agent-task.dispatcher';
 import {
     FLEET_DELEGATION_SCOPE_UNENFORCEABLE,
@@ -110,6 +119,15 @@ interface RunRow {
     delegationScope: SubAgentScope | null;
     errorMessage: string | null;
     summary: string | null;
+    // What the dispatch-gate drain and the review-run variants read back.
+    agentId?: string;
+    taskId?: string | null;
+    workId?: string | null;
+    tenantId?: string | null;
+    organizationId?: string | null;
+    triggerKind?: string;
+    queuedReason?: string | null;
+    pendingInput?: string[] | null;
 }
 
 describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9)', () => {
@@ -445,15 +463,30 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
             findById: jest.Mock;
             markDispatchFailed: jest.Mock;
             setTriggerRunId: jest.Mock;
+            seedResumeContext: jest.Mock;
+            findOldestQueuedForConcurrency: jest.Mock;
+            claimQueuedForDispatch: jest.Mock;
         };
         let plannerTasks: { findById: jest.Mock };
+        /** The real planner the last {@link buildDispatcher} call wired in. */
+        let planner: FleetAgentTaskPlannerService;
 
         const buildRuns = () => {
             rows = new Map();
             let next = 0;
             runs = {
                 createQueued: jest.fn(
-                    async (input: { userId: string; delegationScope?: SubAgentScope | null }) => {
+                    async (input: {
+                        userId: string;
+                        delegationScope?: SubAgentScope | null;
+                        agentId?: string;
+                        taskId?: string | null;
+                        workId?: string | null;
+                        tenantId?: string | null;
+                        organizationId?: string | null;
+                        triggerKind?: string;
+                        queuedReason?: string | null;
+                    }) => {
                         next += 1;
                         const row: RunRow = {
                             id: `run-${next}`,
@@ -462,6 +495,14 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
                             delegationScope: input.delegationScope ?? null,
                             errorMessage: null,
                             summary: null,
+                            agentId: input.agentId,
+                            taskId: input.taskId ?? null,
+                            workId: input.workId ?? null,
+                            tenantId: input.tenantId ?? null,
+                            organizationId: input.organizationId ?? null,
+                            triggerKind: input.triggerKind,
+                            queuedReason: input.queuedReason ?? null,
+                            pendingInput: null,
                         };
                         rows.set(row.id, row);
                         return row;
@@ -477,12 +518,41 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
                     }
                 }),
                 setTriggerRunId: jest.fn().mockResolvedValue(undefined),
+                // The review brief lands here, BEFORE the enqueue.
+                seedResumeContext: jest.fn(
+                    async (id: string, context: { pendingInput?: string[] }) => {
+                        const row = rows.get(id);
+                        if (row) row.pendingInput = context.pendingInput ?? null;
+                    },
+                ),
+                // The dispatch-gate drain's two reads/writes, with the
+                // repository's semantics: FIFO over still-parked rows, and a
+                // claim that only a still-queued, still-parked row accepts.
+                findOldestQueuedForConcurrency: jest.fn(
+                    async (workId: string, queuedReason: string) =>
+                        [...rows.values()].find(
+                            (row) =>
+                                row.workId === workId &&
+                                row.status === 'queued' &&
+                                row.queuedReason === queuedReason,
+                        ) ?? null,
+                ),
+                claimQueuedForDispatch: jest.fn(async (id: string, queuedReason: string) => {
+                    const row = rows.get(id);
+                    if (!row || row.status !== 'queued' || row.queuedReason !== queuedReason) {
+                        return false;
+                    }
+                    row.queuedReason = null;
+                    return true;
+                }),
             };
         };
 
-        const buildDispatcher = (): AgentTaskExecuteDispatcher => {
+        const buildDispatcher = (
+            extra: Pick<FleetAwareDispatcherDeps, 'delegationScopeGuard'> = {},
+        ): AgentTaskExecuteDispatcher => {
             plannerTasks = { findById: jest.fn().mockResolvedValue(buildTask()) };
-            const planner = new FleetAgentTaskPlannerService(
+            planner = new FleetAgentTaskPlannerService(
                 plannerTasks as never,
                 { findByIdAndUser: jest.fn() } as never,
                 { findById: jest.fn() } as never,
@@ -496,10 +566,19 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
                 undefined,
                 runs as never,
             );
-            return createFleetAwareAgentTaskExecuteDispatcher(delegate, buildRouter(), { planner });
+            return createFleetAwareAgentTaskExecuteDispatcher(delegate, buildRouter(), {
+                planner,
+                ...extra,
+            });
         };
 
-        const buildTransition = (dispatcher: AgentTaskExecuteDispatcher): TaskTransitionService =>
+        const buildTransition = (
+            dispatcher: AgentTaskExecuteDispatcher,
+            extra: {
+                dispatchGate?: RunDispatchGateService;
+                agentReviews?: TaskAgentReviewService;
+            } = {},
+        ): TaskTransitionService =>
             new TaskTransitionService(
                 { findById: jest.fn() } as never,
                 { findByTaskId: jest.fn().mockResolvedValue([]) } as never,
@@ -509,7 +588,7 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
                 dispatcher,
                 undefined,
                 undefined,
-                undefined,
+                extra.dispatchGate,
                 undefined,
                 undefined,
                 {
@@ -519,6 +598,7 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
                             Promise.resolve({ id, userId, tenantId: null, organizationId: null }),
                         ),
                 } as never,
+                extra.agentReviews,
             );
 
         beforeEach(() => {
@@ -710,6 +790,416 @@ describe('fleet agent-task dispatch — delegated runs with a narrowed scope (G9
             expect(clock.sleep).not.toHaveBeenCalled();
             expect(store.enqueue).not.toHaveBeenCalled();
             expect(delegate.enqueue).not.toHaveBeenCalled();
+        });
+
+        /**
+         * Reviewer agent stage (slice AD, EW-811) meets this rule.
+         *
+         * A review run is admitted under the review-only scope
+         * (`agentReviewRunScope()`, i.e. `allowedTools ['submitTaskReview']`),
+         * and that scope NARROWS. So on a Work whose runs route to the fleet,
+         * the G9 guard refuses a review run FIRST, and slice AD's own
+         * `refuseAgentReviewRun` is never asked. Nothing else exercised the
+         * two together: AD's dispatcher specs use an admitting guard double,
+         * and the cases above never carry a review ledger. These pin, through
+         * the REAL dispatcher, planner, router, transition service and review
+         * service (only the rows, the ledger and the job store are in memory),
+         * that the combination still fails closed and adds up:
+         *
+         *   - the run row is failed with the G9 reason, and there is no job,
+         *     no cloud run and no plan;
+         *   - the review ledger row settles `failed` with the start of that
+         *     reason as its `refusalCode`, and no approver row is written, so
+         *     the approver stays pending and the done gate stays shut.
+         *
+         * Two variants pin the edges: an explicit guard that ADMITS the run,
+         * where `refuseAgentReviewRun` becomes the refusal (the rule that
+         * still matters if G9 is ever relaxed for nodes that can enforce a
+         * scope, because a verdict cannot be recorded on a node); and a run
+         * the dispatch gate parked, promoted later by the drain.
+         */
+        describe('an agent review run (slice AD) routed to the fleet', () => {
+            const REVIEWER = 'reviewer-1';
+            /**
+             * `recordDispatchResult` stores the first 64 characters of the
+             * dispatch error as the ledger's `refusalCode`. For a G9 refusal
+             * of run `run-1` that is exactly this, whatever the wording
+             * after it.
+             */
+            const G9_REFUSAL_CODE = `dispatch-failed: ${FLEET_DELEGATION_SCOPE_UNENFORCEABLE}: run run-1`;
+
+            interface ReviewRow {
+                id: string;
+                state: string;
+                runId: string | null;
+                refusalCode: string | null;
+            }
+
+            let reviewRows: Map<string, ReviewRow>;
+            let ledger: {
+                bindRun: jest.Mock;
+                stampRunId: jest.Mock;
+                casSettle: jest.Mock;
+                recordVerdict: jest.Mock;
+            };
+            /** Every read and write of `TaskApproverRepository`; none may be called. */
+            let reviewApprovers: Record<string, jest.Mock>;
+            let reviews: TaskAgentReviewService;
+
+            beforeEach(() => {
+                reviewRows = new Map([
+                    ['rev-1', { id: 'rev-1', state: 'dispatched', runId: null, refusalCode: null }],
+                ]);
+                // Same compare-and-set semantics as `TaskAgentReviewRepository`.
+                ledger = {
+                    bindRun: jest.fn(async (id: string, runId: string) => {
+                        const row = reviewRows.get(id);
+                        if (
+                            row &&
+                            row.state === 'dispatched' &&
+                            (row.runId === null || row.runId === runId)
+                        ) {
+                            row.runId = runId;
+                            return;
+                        }
+                        throw new Error(`agent-review-binding-refused: review ${id}`);
+                    }),
+                    stampRunId: jest.fn(async (id: string, runId: string) => {
+                        const row = reviewRows.get(id);
+                        if (row) row.runId = runId;
+                    }),
+                    casSettle: jest.fn(
+                        async (id: string, state: string, patch: { refusalCode?: string } = {}) => {
+                            const row = reviewRows.get(id);
+                            if (!row || row.state !== 'dispatched') return false;
+                            row.state = state;
+                            row.refusalCode = patch.refusalCode ?? null;
+                            return true;
+                        },
+                    ),
+                    // The ONLY ledger method that writes an approver row.
+                    recordVerdict: jest.fn(),
+                };
+                reviewApprovers = {
+                    findByTaskId: jest.fn().mockResolvedValue([]),
+                    findByTaskIds: jest.fn().mockResolvedValue([]),
+                    allApproved: jest.fn(),
+                    add: jest.fn(),
+                    setState: jest.fn(),
+                    remove: jest.fn(),
+                    removeForTask: jest.fn(),
+                    resetAgentDecisionToPending: jest.fn(),
+                    restoreAgentDecisionFromReview: jest.fn(),
+                };
+                // The REAL review service. It is also what the transition
+                // service binds the run through, so `bindRun` resolves by
+                // landing on the in-memory ledger row.
+                reviews = new TaskAgentReviewService(
+                    { findById: jest.fn() } as never,
+                    ledger as never,
+                    reviewApprovers as never,
+                );
+            });
+
+            /** What `fanOutAgentReviews` hands `dispatchAgentRun` for one review. */
+            const reviewDispatch = () => ({
+                delegationScope: agentReviewRunScope(),
+                reviewId: 'rev-1',
+                seedPendingInput: ['brief'],
+            });
+
+            const expectNoApproverWrite = () => {
+                expect(ledger.recordVerdict).not.toHaveBeenCalled();
+                const touched = Object.entries(reviewApprovers)
+                    .filter(([, fn]) => fn.mock.calls.length > 0)
+                    .map(([name]) => name);
+                expect(touched).toEqual([]);
+            };
+
+            it.each(['command', 'model-cli'])(
+                'is refused by the G9 guard first in %s mode: the run fails, the review settles failed, no approver is written',
+                async (mode) => {
+                    process.env.FLEET_NODE_AGENT_EXECUTION_MODE = mode;
+                    // Production wiring: no explicit guard, so the planner IS
+                    // the guard (TasksModule wires exactly this).
+                    const dispatcher = buildDispatcher();
+                    const refuseAgentReviewRun = jest.spyOn(planner, 'refuseAgentReviewRun');
+
+                    const result = await buildTransition(dispatcher, {
+                        agentReviews: reviews,
+                    }).dispatchAgentRun(buildTask(), REVIEWER, reviewDispatch());
+
+                    expect(result.runId).toBe('run-1');
+                    expect(result.dispatched).toBe(false);
+                    expect(result.parked).toBe(false);
+                    expect(
+                        result.error!.startsWith(
+                            `dispatch-failed: ${FLEET_DELEGATION_SCOPE_UNENFORCEABLE}:`,
+                        ),
+                    ).toBe(true);
+                    // Bound and briefed before the enqueue, like any review run.
+                    expect(ledger.bindRun).toHaveBeenCalledWith('rev-1', 'run-1');
+                    const row = rows.get('run-1')!;
+                    expect(row.pendingInput).toEqual(['brief']);
+                    // Failed with the reason, where a human reads it.
+                    expect(row.status).toBe('failed');
+                    expect(row.errorMessage).toBe(result.error);
+                    expect(row.errorMessage).toContain('allowedTools [submitTaskReview]');
+                    expect(row.errorMessage).toContain('is an agent review run');
+                    expect(row.errorMessage).toContain('review runs cannot run on the fleet');
+                    // No job row, no cloud run, no planning, and AD's own
+                    // refusal never asked: G9 got there first.
+                    expect(store.enqueue).not.toHaveBeenCalled();
+                    expect(delegate.enqueue).not.toHaveBeenCalled();
+                    expect(plannerTasks.findById).not.toHaveBeenCalled();
+                    expect(refuseAgentReviewRun).not.toHaveBeenCalled();
+
+                    // What `fanOutAgentReviews` does next with that result.
+                    await reviews.recordDispatchResult('rev-1', result);
+
+                    expect(G9_REFUSAL_CODE).toHaveLength(64);
+                    expect(result.error!.slice(0, 64)).toBe(G9_REFUSAL_CODE);
+                    expect(ledger.casSettle).toHaveBeenCalledTimes(1);
+                    expect(ledger.casSettle).toHaveBeenCalledWith('rev-1', 'failed', {
+                        refusalCode: G9_REFUSAL_CODE,
+                    });
+                    expect(reviewRows.get('rev-1')).toEqual({
+                        id: 'rev-1',
+                        state: 'failed',
+                        runId: 'run-1',
+                        refusalCode: G9_REFUSAL_CODE,
+                    });
+                    expectNoApproverWrite();
+                },
+            );
+
+            it.each(['command', 'model-cli'])(
+                'is refused by refuseAgentReviewRun behind an explicit guard that admits it (%s mode), and still settles failed',
+                async (mode) => {
+                    process.env.FLEET_NODE_AGENT_EXECUTION_MODE = mode;
+                    const delegationScopeGuard = {
+                        refuseUnenforceableDelegationScope: jest.fn().mockResolvedValue(undefined),
+                    };
+                    const dispatcher = buildDispatcher({ delegationScopeGuard });
+                    const refuseAgentReviewRun = jest.spyOn(planner, 'refuseAgentReviewRun');
+                    const plannerGuard = jest.spyOn(planner, 'refuseUnenforceableDelegationScope');
+                    const planSpy = jest.spyOn(planner, 'plan');
+
+                    const result = await buildTransition(dispatcher, {
+                        agentReviews: reviews,
+                    }).dispatchAgentRun(buildTask(), REVIEWER, reviewDispatch());
+
+                    // The explicit guard was asked and admitted; the planner
+                    // was not asked as the guard.
+                    expect(
+                        delegationScopeGuard.refuseUnenforceableDelegationScope,
+                    ).toHaveBeenCalledTimes(1);
+                    expect(plannerGuard).not.toHaveBeenCalled();
+                    // So AD's rule is the refusal, read off the run row.
+                    expect(refuseAgentReviewRun).toHaveBeenCalledTimes(1);
+                    expect(refuseAgentReviewRun).toHaveBeenCalledWith(
+                        expect.objectContaining({ runId: 'run-1', agentId: REVIEWER }),
+                    );
+                    const refusal = await refuseAgentReviewRun.mock.results[0].value.then(
+                        () => null,
+                        (err: unknown) => err,
+                    );
+                    expect(refusal).toBeInstanceOf(FleetAgentTaskPlanError);
+                    expect(refusal).not.toBeInstanceOf(FleetDelegationScopeRefusedError);
+                    expect((refusal as Error).message).toContain(
+                        'Run run-1 is an agent code-review run, and review runs cannot execute on the fleet',
+                    );
+
+                    expect(result).toMatchObject({
+                        runId: 'run-1',
+                        dispatched: false,
+                        parked: false,
+                    });
+                    expect(result.error).toBe(`dispatch-failed: ${(refusal as Error).message}`);
+                    expect(result.error).not.toContain('fleet-delegation-scope-');
+                    expect(rows.get('run-1')).toMatchObject({
+                        status: 'failed',
+                        errorMessage: result.error,
+                    });
+                    expect(planSpy).not.toHaveBeenCalled();
+                    expect(plannerTasks.findById).not.toHaveBeenCalled();
+                    expect(store.enqueue).not.toHaveBeenCalled();
+                    expect(delegate.enqueue).not.toHaveBeenCalled();
+
+                    await reviews.recordDispatchResult('rev-1', result);
+
+                    const refusalCode = result.error!.slice(0, 64);
+                    expect(
+                        refusalCode.startsWith(
+                            'dispatch-failed: Run run-1 is an agent code-review run',
+                        ),
+                    ).toBe(true);
+                    expect(ledger.casSettle).toHaveBeenCalledTimes(1);
+                    expect(ledger.casSettle).toHaveBeenCalledWith('rev-1', 'failed', {
+                        refusalCode,
+                    });
+                    expect(reviewRows.get('rev-1')).toMatchObject({
+                        state: 'failed',
+                        runId: 'run-1',
+                        refusalCode,
+                    });
+                    expectNoApproverWrite();
+                },
+            );
+
+            /**
+             * CodeRabbit CR-1 (CWE-863), through the REAL dispatcher and
+             * planner: behind an explicit guard that ADMITS the payload, a
+             * run id whose row does not exist used to pass
+             * `refuseAgentReviewRun` (only a found review row refused), so
+             * a run whose scope nothing could verify reached `plan()` and
+             * the job writer. It now stops at `refuseAgentReviewRun`, with
+             * that rule's reason rather than a G9 code.
+             */
+            it.each(['command', 'model-cli'])(
+                'refuses a run whose row is missing behind an explicit guard that admits it (%s mode): no plan, no job',
+                async (mode) => {
+                    process.env.FLEET_NODE_AGENT_EXECUTION_MODE = mode;
+                    const delegationScopeGuard = {
+                        refuseUnenforceableDelegationScope: jest.fn().mockResolvedValue(undefined),
+                    };
+                    const dispatcher = buildDispatcher({ delegationScopeGuard });
+                    const planSpy = jest.spyOn(planner, 'plan');
+
+                    const refusal = await dispatcher
+                        .enqueue(payload({ runId: 'run-gone', agentId: REVIEWER }))
+                        .then(
+                            () => null,
+                            (err: unknown) => err,
+                        );
+
+                    expect(
+                        delegationScopeGuard.refuseUnenforceableDelegationScope,
+                    ).toHaveBeenCalledTimes(1);
+                    expect(runs.findById).toHaveBeenCalledWith('run-gone');
+                    expect(refusal).toBeInstanceOf(FleetAgentTaskPlanError);
+                    expect(refusal).not.toBeInstanceOf(FleetDelegationScopeRefusedError);
+                    expect((refusal as Error).message).toContain('Run run-gone was not found');
+                    expect((refusal as Error).message).not.toContain('fleet-delegation-scope-');
+                    expect(planSpy).not.toHaveBeenCalled();
+                    expect(plannerTasks.findById).not.toHaveBeenCalled();
+                    expect(store.enqueue).not.toHaveBeenCalled();
+                    expect(delegate.enqueue).not.toHaveBeenCalled();
+                },
+            );
+
+            /**
+             * CURRENT, DOCUMENTED BEHAVIOUR — pinned so a change to it is a
+             * decision, not an accident.
+             *
+             * A review run the dispatch gate PARKS returns `parked: true`, so
+             * `recordDispatchResult` rightly leaves its ledger row open. When
+             * the drain promotes it later, G9 refuses it exactly as above, but
+             * `RunDispatchGateService.drainForWork` marks only the RUN failed:
+             * nothing on that path knows about the review ledger, so the review
+             * row stays `dispatched`, bound to a dead run.
+             *
+             * Harmless, and not a regression:
+             *   - no approver row is written, so the approver stays pending and
+             *     the done gate stays shut;
+             *   - the `(reviewer, head)` claim key stays taken, so that head is
+             *     not reviewed again by a re-plan;
+             *   - the budget slot was spent when the row was claimed ("a slot,
+             *     once taken, is spent forever", `TaskAgentReview` entity), so
+             *     settling the row would give nothing back;
+             *   - the dead run cannot record a verdict, and the ledger already
+             *     documents open rows whose run has died
+             *     (`TaskAgentReviewRepository.findOpenForReviewer`);
+             *   - the drain left the row open in exactly the same way before
+             *     G9 existed, when `refuseAgentReviewRun` refused the promoted
+             *     run; G9 only changed the reason on the run row.
+             */
+            it.each(['command', 'model-cli'])(
+                'parked, then drained (%s mode): the run fails on the G9 refusal and the review row stays dispatched',
+                async (mode) => {
+                    process.env.FLEET_NODE_AGENT_EXECUTION_MODE = mode;
+                    // The real gate and its default admission chain: a Work
+                    // valve of 1 with one run in flight parks the review run.
+                    process.env.AGENT_MAX_CONCURRENT_RUNS_PER_WORK = '1';
+                    delete process.env.PLAN_CONCURRENCY_ENFORCEMENT;
+                    let workInFlight = 1;
+                    const dispatcher = buildDispatcher();
+                    const refuseAgentReviewRun = jest.spyOn(planner, 'refuseAgentReviewRun');
+                    const g9 = jest.spyOn(planner, 'refuseUnenforceableDelegationScope');
+                    const gate = new RunDispatchGateService(
+                        {
+                            ...runs,
+                            countInFlightForWork: jest.fn(async () => workInFlight),
+                            countInFlightForOrganization: jest.fn().mockResolvedValue(0),
+                            countInFlightForUser: jest.fn().mockResolvedValue(0),
+                        } as never,
+                        dispatcher,
+                    );
+
+                    const result = await buildTransition(dispatcher, {
+                        agentReviews: reviews,
+                        dispatchGate: gate,
+                    }).dispatchAgentRun(
+                        buildTask({ workId: 'work-1' }),
+                        REVIEWER,
+                        reviewDispatch(),
+                    );
+
+                    expect(result).toEqual({
+                        runId: 'run-1',
+                        dispatched: false,
+                        parked: true,
+                        queuedReason: QUEUED_REASON_CONCURRENCY,
+                    });
+                    await reviews.recordDispatchResult('rev-1', result);
+                    // Parked is not a failure: the row stays open, bound and
+                    // briefed, and nothing has asked the fleet anything yet.
+                    expect(ledger.casSettle).not.toHaveBeenCalled();
+                    expect(reviewRows.get('rev-1')).toMatchObject({
+                        state: 'dispatched',
+                        runId: 'run-1',
+                    });
+                    expect(rows.get('run-1')).toMatchObject({
+                        status: 'queued',
+                        queuedReason: QUEUED_REASON_CONCURRENCY,
+                        pendingInput: ['brief'],
+                    });
+                    expect(g9).not.toHaveBeenCalled();
+
+                    // A slot frees and the terminal-transition drain promotes it.
+                    workInFlight = 0;
+                    const drained = await gate.drainForWork('work-1');
+
+                    expect(drained).toEqual({ dispatched: false, reason: 'dispatch-failed' });
+                    expect(g9).toHaveBeenCalledTimes(1);
+                    expect(g9).toHaveBeenCalledWith(
+                        expect.objectContaining({
+                            runId: 'run-1',
+                            agentId: REVIEWER,
+                            dedupKey: `task-1:${REVIEWER}:drain:run-1`,
+                        }),
+                    );
+                    expect(refuseAgentReviewRun).not.toHaveBeenCalled();
+                    const row = rows.get('run-1')!;
+                    expect(row.status).toBe('failed');
+                    expect(row.errorMessage!.slice(0, 64)).toBe(G9_REFUSAL_CODE);
+                    expect(row.errorMessage).toContain('allowedTools [submitTaskReview]');
+                    expect(row.errorMessage).toContain('is an agent review run');
+                    expect(store.enqueue).not.toHaveBeenCalled();
+                    expect(delegate.enqueue).not.toHaveBeenCalled();
+                    expect(plannerTasks.findById).not.toHaveBeenCalled();
+
+                    // The pinned part: the review row is NOT settled.
+                    expect(ledger.casSettle).not.toHaveBeenCalled();
+                    expect(reviewRows.get('rev-1')).toEqual({
+                        id: 'rev-1',
+                        state: 'dispatched',
+                        runId: 'run-1',
+                        refusalCode: null,
+                    });
+                    expectNoApproverWrite();
+                },
+            );
         });
     });
 });

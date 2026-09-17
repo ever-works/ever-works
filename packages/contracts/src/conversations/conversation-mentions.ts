@@ -167,8 +167,19 @@ function removeSpans(body: string, spans: Array<{ start: number; end: number }>)
 		cursor = span.end;
 	}
 	out += body.slice(cursor);
-	return out
-		.replace(/[ \t]{2,}/g, ' ')
-		.replace(/ +([,.;:!?])/g, '$1')
-		.trim();
+	return (
+		out
+			.replace(/[ \t]{2,}/g, ' ')
+			// A single space, not ` +`. The two are equivalent here because the
+			// collapse on the line above already leaves no run of two or more —
+			// and that equivalence is the whole point: ` +` IS quadratic when it
+			// meets a long run with no punctuation to anchor on (measured: 20k
+			// spaces 1.4s, 40k 5.8s, 80k 22s, 160k 85s), and the only thing
+			// standing between an attacker-supplied body and that cost is one
+			// earlier `.replace` that nothing forces to stay. Stated plainly:
+			// this was NOT exploitable before, and the change is so that a later
+			// edit to the collapse cannot make it so.
+			.replace(/ ([,.;:!?])/g, '$1')
+			.trim()
+	);
 }
