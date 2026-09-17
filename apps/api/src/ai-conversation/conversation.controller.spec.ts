@@ -2,7 +2,7 @@ jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
 jest.mock('@ever-works/agent/conversations', () => ({}));
 
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConversationController } from './conversation.controller';
 import { ConversationTitleService } from './conversation-title.service';
 import type { ConversationRepository } from '@ever-works/agent/database';
@@ -328,6 +328,55 @@ describe('ConversationController', () => {
             await expect(controller.mentionCandidates(auth, 'no')).resolves.toEqual({
                 candidates: [],
             });
+        });
+    });
+
+    describe('mention-candidates query handling', () => {
+        // `?q=a&q=b` reaches a controller as an ARRAY. Typing the parameter
+        // `string` does not make it one, and before the guard the character cap
+        // below measured the array's ELEMENT COUNT — two long values passed a
+        // cap of 80 — and handed a non-string to a service that does string work
+        // on it.
+        let mentions: { resolveCandidates: jest.Mock };
+
+        const bind = () =>
+            new ConversationController(
+                repo as unknown as ConversationRepository,
+                titleService as unknown as ConversationTitleService,
+                undefined,
+                undefined,
+                mentions as never,
+            );
+
+        beforeEach(() => {
+            mentions = { resolveCandidates: jest.fn().mockResolvedValue([]) };
+        });
+
+        it('refuses a repeated q instead of measuring an array of long values', async () => {
+            const repeated = ['a'.repeat(200), 'b'.repeat(200)];
+
+            await expect(bind().mentionCandidates(auth, repeated)).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(mentions.resolveCandidates).not.toHaveBeenCalled();
+        });
+
+        it('refuses a repeated q even when every value is short', async () => {
+            await expect(bind().mentionCandidates(auth, ['ab', 'cd'])).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(mentions.resolveCandidates).not.toHaveBeenCalled();
+        });
+
+        it('still serves a single string query, and still enforces the cap', async () => {
+            await expect(bind().mentionCandidates(auth, 'ada')).resolves.toEqual({
+                candidates: [],
+            });
+            expect(mentions.resolveCandidates).toHaveBeenCalledWith('ada', expect.anything());
+
+            await expect(bind().mentionCandidates(auth, 'x'.repeat(81))).rejects.toThrow(
+                BadRequestException,
+            );
         });
     });
 });

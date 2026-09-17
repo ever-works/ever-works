@@ -349,8 +349,21 @@ export class ConversationController {
      */
     @Get('mention-candidates')
     @ApiOperation({ summary: 'People and Agents the caller can mention' })
-    async mentionCandidates(@CurrentUser() auth: AuthenticatedUser, @Query('q') q?: string) {
+    async mentionCandidates(@CurrentUser() auth: AuthenticatedUser, @Query('q') rawQ?: unknown) {
         if (!this.mentions) return { candidates: [] };
+        // `?q=a&q=b` arrives as an ARRAY, not a string, and declaring the
+        // parameter `string` does not make it one. The cap below would then
+        // measure an array's element count — two repetitions are under any
+        // character cap — and hand a non-string to a service that does string
+        // work on it. Repeating `q` is not something a real client does, so
+        // refuse it rather than guessing which value was meant.
+        if (rawQ !== undefined && typeof rawQ !== 'string') {
+            throw new BadRequestException('q must be a single string value.');
+        }
+        // Re-derived rather than cast: the line above has already refused every
+        // other shape, so this is the same value, and the type follows from a
+        // check the compiler can see.
+        const q = typeof rawQ === 'string' ? rawQ : undefined;
         if (q !== undefined && q.length > MAX_MENTION_QUERY_CHARS) {
             throw new BadRequestException(
                 `q must be at most ${MAX_MENTION_QUERY_CHARS} characters.`,
