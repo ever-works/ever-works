@@ -638,6 +638,13 @@ export class WorkspaceBackupRunner {
             }
 
             if (failure === undefined && planCode !== undefined) {
+                // The trims were applied to every file that was read, the
+                // shortfall of one file notwithstanding. The format promises
+                // each applied trim is recorded with its cutoff and what it
+                // left out, and a `partial` domain can carry trims like any
+                // other — so a file planned off an unfinished parent must not
+                // erase the reports of its siblings.
+                const trims = await collector.trims(context, plans);
                 return {
                     outcome: {
                         key,
@@ -645,6 +652,7 @@ export class WorkspaceBackupRunner {
                         records,
                         files,
                         errorCode: planCode,
+                        ...(trims.length > 0 ? { trims } : {}),
                     },
                     plans: planned,
                 };

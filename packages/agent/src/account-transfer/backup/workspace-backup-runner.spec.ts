@@ -363,6 +363,44 @@ describe('WorkspaceBackupRunner', () => {
             );
         });
 
+        it('keeps the trim reports of a domain whose other file names a shortfall', async () => {
+            // A personal workspace: `email-conversations.jsonl` hangs off the
+            // owner's `agentIds`, so an agents page that spends its retries
+            // marks it `parent_ids_incomplete`. `notifications.jsonl`, in the
+            // same domain, is still read with its 180-day cutoff — but the
+            // early return for the shortfall skipped the trim pass, so the
+            // manifest recorded neither the cutoff nor how many notifications
+            // it left out.
+            const h = harness({
+                rows: {
+                    ...ROWS,
+                    Agent: [{ id: 'a1', userId: 'u1', organizationId: null }],
+                    Notification: [
+                        {
+                            id: 'n1',
+                            userId: 'u1',
+                            organizationId: null,
+                            createdAt: '2020-01-01T00:00:00.000Z',
+                        },
+                    ],
+                },
+                failPageFor: 'Agent',
+                row: { organizationId: null },
+            });
+            await h.runner.run('b1', {
+                ...OPTIONS,
+                workspace: { id: 'u1', slug: 'owner', displayName: 'Owner', kind: 'personal' },
+            });
+
+            const communication = domain(h.terminal(), 'communication') as ReturnType<
+                typeof domain
+            > & { trims?: { field: string; cutoff: string; omittedRecords: number }[] };
+            expect(communication.error).toEqual({ code: 'parent_ids_incomplete' });
+            expect(communication.trims).toEqual([
+                expect.objectContaining({ field: 'createdAt', omittedRecords: 1 }),
+            ]);
+        });
+
         it('still reports a dependent domain normally when the parent finished', async () => {
             const h = harness({ rows: ROWS });
             await h.runner.run('b1', OPTIONS);
