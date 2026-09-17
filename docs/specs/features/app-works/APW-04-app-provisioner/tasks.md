@@ -401,9 +401,20 @@ runner) — the R-10 hooks.
       `templates/app-provisioner/prompts/tasks/fix-verification.md`, `templates/app-provisioner/kb/playbooks/*.md`,
       `templates/app-provisioner/README.md`, `templates/app-provisioner/icon.svg`) and `eval/app-provisioner.yml`.
       **Modify** `manifest.json` in `ever-works/agents` — a `templates[]` row.
+      **⚠️ Read this before writing the row: the manifest is what the platform reads, and the files are new.**
+      Verified in source: the catalog service fetches **`manifest.json` only**
+      (`apps/api/src/agents/agent-template-catalog.service.ts:50-51,191-212`) and maps a row of exactly
+      `{ slug, name, title, summary, scope, avatarIcon, tags }` (`:8-16`), while the shipped templates live **in code**
+      (`packages/agent/src/agents/agent-templates.ts:62`, read by `agent-templates.service.ts`, written out as
+      `SOUL.md`). So the row is what makes `GET /api/agent-templates` list `app-provisioner`, and the `SOUL.md` /
+      `agent.yml` / `skills.yml` files are **additive catalog content** that no reader consumes yet — loading them is
+      its own work (`EXISTING-SUBSTRATE.md` says so, and APW-04 plan:607 calls it "(new, additive)"). **This task
+      must not assume the in-code catalog is replaced**: the two coexist, and the existing templates keep shipping
+      from code exactly as they do today.
       **Test**: that repository's schema CI on the pull request (validates `agent.yml` and `skills.yml`), then
       `GET /api/agent-templates` on dev.
-      **Done when**: the catalog's schema CI is green and `GET /api/agent-templates` lists `app-provisioner`.
+      **Done when**: the catalog's schema CI is green and `GET /api/agent-templates` lists `app-provisioner`
+      **while the pre-existing templates still list unchanged**.
 
 - [ ] **T31 (parallel). Skill (`ever-works/skills`).**
       **Create** in `ever-works/skills`: `skills/provision-app/SKILL.md` from [`skill-draft/SKILL.md`](./skill-draft/SKILL.md).
