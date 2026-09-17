@@ -578,6 +578,15 @@ describe('createNodeRuntime — agent-task publish fence', () => {
 
 		vi.resetModules();
 		vi.doMock('./executors/agent-task', () => ({
+			// Every export `runtime.ts` imports from this module has to be here.
+			// vitest's mock proxy THROWS on a read of an export the factory did not
+			// return, and the worker loop swallows that throw — so a missing one
+			// does not fail loudly, it just stops the stubbed executor from ever
+			// running, and the tests below then fail on their assertions with no
+			// error in sight. That is exactly how slice AK's `defaultSessionConfigFs`
+			// import turned three of them red on `main`. A reader that finds no
+			// file is the honest stub: the executor is replaced, so nothing reads it.
+			defaultSessionConfigFs: { readFile: async () => null },
 			runAgentTaskJob: async (_job: unknown, agentIo: Record<string, unknown>) => {
 				await run(agentIo, harness);
 				return {};
@@ -752,6 +761,15 @@ describe('createNodeRuntime — agent-task scoped push credential', () => {
 
 		vi.resetModules();
 		vi.doMock('./executors/agent-task', () => ({
+			// Every export `runtime.ts` imports from this module has to be here.
+			// vitest's mock proxy THROWS on a read of an export the factory did not
+			// return, and the worker loop swallows that throw — so a missing one
+			// does not fail loudly, it just stops the stubbed executor from ever
+			// running, and the tests below then fail on their assertions with no
+			// error in sight. That is exactly how slice AK's `defaultSessionConfigFs`
+			// import turned three of them red on `main`. A reader that finds no
+			// file is the honest stub: the executor is replaced, so nothing reads it.
+			defaultSessionConfigFs: { readFile: async () => null },
 			runAgentTaskJob: async (_job: unknown, agentIo: Record<string, unknown>) => {
 				await run(agentIo);
 				return {};
