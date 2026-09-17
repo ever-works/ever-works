@@ -44,3 +44,7 @@ export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';
+// Safety rails and the trust ladder (AW-24) — the shared vocabulary the
+// existing refusals (stop flag, pauses, grants, caps, merge policy) now speak:
+// thirteen kinds of work, four rungs, seven rails in a published order.
+export * from './safety/index.js';
