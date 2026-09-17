@@ -22,24 +22,47 @@ async function navigateInApp(page: Page, href: string): Promise<void> {
 }
 
 /**
- * The docked panel's width, read the two ways the layout expresses it, which
- * must agree: the number the resize handle states (`aria-valuenow`) and the
- * rendered box of the column the layout sizes with that same number (its inline
- * pixel `width`). The inner `conversation-panel` is not the measure: ChatPanel's
- * right border sits inside that column, so the view inside renders narrower
- * than the width the handle sets.
+ * The docked panel's width, read the three ways it is observable, which must
+ * agree:
+ *
+ *  - `stated` — the number the resize handle publishes as `aria-valuenow`;
+ *  - `rendered` — the box of the column the layout sizes with that same number
+ *    (the nearest ancestor carrying an inline pixel `width`);
+ *  - `borderGap` — how much narrower the conversation view itself renders,
+ *    which is exactly ONE pixel: ChatPanel's `border-r` sits on the
+ *    `overflow-hidden` box between the column and the view, so the view gets
+ *    the column's width minus that one-pixel border and nothing else.
+ *
+ * `borderGap` is here deliberately. `stated` and `rendered` both come from the
+ * same `chatWidth` state, so on their own they can only disagree if CSS
+ * overrides the inline width — a review of an earlier version of this helper
+ * pointed out that a view rendering 200px inside a 420px column would have
+ * passed every assertion, because `conversation-panel` was read only as the
+ * start of the walk and never measured. Asserting the gap rather than a second
+ * hard-coded width keeps that coverage without restating each expected size.
  */
-async function panelWidth(page: Page): Promise<{ stated: number; rendered: number | null }> {
+async function panelWidth(
+    page: Page,
+): Promise<{ stated: number; rendered: number | null; borderGap: number | null }> {
     const stated = Number(
         await page.getByTestId('chat-panel-resize-handle').getAttribute('aria-valuenow'),
     );
-    const rendered = await page.getByTestId('conversation-panel').evaluate((element) => {
+    const boxes = await page.getByTestId('conversation-panel').evaluate((element) => {
         // The nearest ancestor given a pixel width is the docked column itself.
         let column = element.parentElement;
         while (column && !column.style.width.endsWith('px')) column = column.parentElement;
-        return column ? Math.round(column.getBoundingClientRect().width) : null;
+        return {
+            rendered: column ? Math.round(column.getBoundingClientRect().width) : null,
+            inner: Math.round(element.getBoundingClientRect().width),
+        };
     });
-    return { stated, rendered };
+    return {
+        stated,
+        rendered: boxes.rendered,
+        // Null when the column was not found, so the assertion fails rather
+        // than comparing against a number nothing produced.
+        borderGap: boxes.rendered === null ? null : boxes.rendered - boxes.inner,
+    };
 }
 
 test.describe('Conversation panel navigation', () => {
@@ -102,21 +125,27 @@ test.describe('Conversation panel navigation', () => {
             await expect(handle).toBeVisible();
 
             await handle.dblclick();
-            await expect.poll(() => panelWidth(page)).toEqual({ stated: 420, rendered: 420 });
+            await expect
+                .poll(() => panelWidth(page))
+                .toEqual({ stated: 420, rendered: 420, borderGap: 1 });
 
             await handle.focus();
             await page.keyboard.press('ArrowRight');
             await page.keyboard.press('ArrowRight');
-            await expect.poll(() => panelWidth(page)).toEqual({ stated: 452, rendered: 452 });
+            await expect
+                .poll(() => panelWidth(page))
+                .toEqual({ stated: 452, rendered: 452, borderGap: 1 });
 
             await page.reload({ waitUntil: 'domcontentloaded' });
             await expect
                 .poll(() => panelWidth(page), { timeout: 30_000 })
-                .toEqual({ stated: 452, rendered: 452 });
+                .toEqual({ stated: 452, rendered: 452, borderGap: 1 });
 
             await page.getByTestId('chat-panel-resize-handle').focus();
             await page.keyboard.press('Home');
-            await expect.poll(() => panelWidth(page)).toEqual({ stated: 420, rendered: 420 });
+            await expect
+                .poll(() => panelWidth(page))
+                .toEqual({ stated: 420, rendered: 420, borderGap: 1 });
         } finally {
             await context.close();
         }

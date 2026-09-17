@@ -85,10 +85,18 @@ interface CatalogResponse {
  * apps/web/src/components/onboarding/useOnboardingFlow.ts, the function that
  * sizes both the wizard and the Help drawer's "Open onboarding (x/N)" label
  * (apps/web/src/app/[locale]/(dashboard)/layout-client.tsx). Its unit spec,
- * useOnboardingFlow.unit.spec.ts, pins the canonical order and counts. When a
- * product step is added, removed or reordered there, change this copy in the
- * same PR — otherwise the UI test's x/N cross-check below fails against the
- * real badge. This copy has already needed resyncing for Wave 11, A8 and AW-20.
+ * useOnboardingFlow.unit.spec.ts, pins the canonical order and counts.
+ *
+ * THREE e2e specs carry a copy of this function and must be changed TOGETHER,
+ * in the same PR as the product step, or the UI test's x/N cross-check fails
+ * against the real badge:
+ *
+ *   - flow-onboarding-wizard.spec.ts (this file)
+ *   - flow-onboarding-wizard-deep.spec.ts
+ *   - flow-onboarding-catalog-choices.spec.ts
+ *
+ * This copy has already needed resyncing for Wave 11, A8 and AW-20; the other
+ * two were not resynced at the time and had to be caught up on 2026-09-18.
  *
  * Base flow is always
  * welcome → ai-choice → storage-choice → db-choice → deploy-choice →
