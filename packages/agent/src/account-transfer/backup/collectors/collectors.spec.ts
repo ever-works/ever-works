@@ -430,6 +430,39 @@ describe('EntityBackupCollector', () => {
         expect(second.find((plan) => plan.file === 'memberships.jsonl')?.errorCode).toBeUndefined();
     });
 
+    it('re-plans a child from its own domain against the ids its parent has since registered', async () => {
+        // The runner plans a domain once, before any file is read, so the
+        // up-front plan of a same-domain child always holds an empty id list.
+        // `replan` is what it calls right before walking the child.
+        const source = new FixtureRowSource(
+            {
+                Agent: [{ id: 'a1', userId: 'u1', organizationId: 'org-1' }],
+                AgentMembership: [{ id: 'm1', agentId: 'a1' }],
+            },
+            { Agent: ['id', 'userId', 'organizationId'], AgentMembership: ['id', 'agentId'] },
+        );
+        const collector = new EntityBackupCollector(spec);
+        const context = contextFor(source);
+
+        const upFront = await collector.plan(context);
+        const memberships = upFront.find((plan) => plan.file === 'memberships.jsonl')!;
+        expect(memberships.query.within?.ids).toEqual([]);
+
+        for await (const _row of collector.rows(
+            context,
+            upFront.find((p) => p.file === 'agents.jsonl')!,
+        )) {
+            void _row;
+        }
+
+        const walked = await collector.replan(context, memberships);
+        expect(walked.file).toBe('memberships.jsonl');
+        expect(walked.query.within).toEqual({ column: 'agentId', ids: ['a1'] });
+        const rows: Record<string, unknown>[] = [];
+        for await (const row of collector.rows(context, walked)) rows.push(row);
+        expect(rows.map((row) => row.id)).toEqual(['m1']);
+    });
+
     it('yields nothing for a child whose parent registered no ids, rather than everything', async () => {
         // The failure this prevents: an empty `IN ()` silently dropped from a
         // predicate, turning "this workspace's memberships" into "all of them".

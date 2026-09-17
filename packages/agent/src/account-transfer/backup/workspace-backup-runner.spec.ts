@@ -373,6 +373,66 @@ describe('WorkspaceBackupRunner', () => {
         });
     });
 
+    describe('a child file whose parent is in the SAME domain', () => {
+        // `runDomain` planned a whole domain before reading any of its files,
+        // and a `parent` file resolves its id list at plan time — so a child
+        // whose parent sits earlier in the same domain always got `[]`, wrote
+        // zero records, and (the name being unregistered at that moment) was
+        // never flagged either. The cross-domain case (works → knowledge)
+        // worked; every same-domain one did not.
+        const ROWS: Record<string, Record<string, unknown>[]> = {
+            ...Object.fromEntries(
+                referencedEntities().map((entity) => [entity, [] as Record<string, unknown>[]]),
+            ),
+            Agent: [{ id: 'a1', userId: 'u1', organizationId: 'org-1' }],
+            AgentMembership: [{ id: 'm1', agentId: 'a1' }],
+            AgentBudget: [{ id: 'ab1', agentId: 'a1' }],
+            Task: [{ id: 't1', userId: 'u1', organizationId: 'org-1' }],
+            TaskAssignee: [{ id: 'ta1', taskId: 't1' }],
+            Work: [{ id: 'w1', slug: 'acme-tools', userId: 'u1', organizationId: 'org-1' }],
+            WorkDeployment: [{ id: 'wd1', workId: 'w1' }],
+            AgentRun: [{ id: 'r1', userId: 'u1', organizationId: 'org-1' }],
+            AgentRunLog: [{ id: 'rl1', runId: 'r1' }],
+        };
+
+        function domainOf(terminal: Record<string, unknown> | undefined, key: string) {
+            const summary = terminal?.manifestSummary as {
+                domains: {
+                    key: string;
+                    status: string;
+                    error?: unknown;
+                    files: { name: string; records: number }[];
+                }[];
+            };
+            return summary.domains.find((entry) => entry.key === key)!;
+        }
+
+        it.each([
+            ['agents', 'data/agents/memberships.jsonl'],
+            ['agents', 'data/agents/budgets.jsonl'],
+            ['tasks', 'data/tasks/assignees.jsonl'],
+            ['works', 'data/works/deployments.jsonl'],
+            ['runs', 'data/runs/run-logs.jsonl'],
+        ])('writes the %s child rows into %s', async (key, name) => {
+            const h = harness({ rows: ROWS });
+            await h.runner.run('b1', OPTIONS);
+
+            const file = domainOf(h.terminal(), key).files.find((entry) => entry.name === name);
+            expect(file?.records).toBe(1);
+        });
+
+        it('reports the domain complete once its children are actually read', async () => {
+            const h = harness({ rows: ROWS });
+            await h.runner.run('b1', OPTIONS);
+
+            const agents = domainOf(h.terminal(), 'agents');
+            expect(agents.status).toBe('complete');
+            expect(agents.error).toBeUndefined();
+            // Three rows across three files: the agent, its membership and its budget.
+            expect(agents.files.reduce((sum, entry) => sum + entry.records, 0)).toBe(3);
+        });
+    });
+
     describe('a personal workspace’s own organization-less rows', () => {
         // A person with no organization yet — the default state — owns
         // webhook subscriptions, code-host installations, onboarding
@@ -390,6 +450,7 @@ describe('WorkspaceBackupRunner', () => {
             ),
             Agent: [{ id: 'a1', userId: 'u1', organizationId: null }],
             WebhookSubscription: [{ id: 'wh1', accountId: 'u1', organizationId: null }],
+            WebhookDelivery: [{ id: 'wd1', subscriptionId: 'wh1' }],
             GitHubAppInstallation: [{ id: 'gh1', createdByUserId: 'u1', organizationId: null }],
             OnboardingRequest: [{ id: 'on1', accountId: 'u1', organizationId: null }],
             EmailConversation: [{ id: 'ec1', agentId: 'a1', organizationId: null }],
@@ -414,6 +475,19 @@ describe('WorkspaceBackupRunner', () => {
             await h.runner.run('b1', PERSONAL_OPTIONS);
 
             expect(file(h.terminal(), name)?.records).toBe(1);
+        });
+
+        it('writes the deliveries of the owner’s own subscriptions too', async () => {
+            // Deliveries hang off `webhookIds`, which the subscriptions file
+            // in the same domain registers. Both halves of the defect had to
+            // go for this to hold: the parent had to be read at all, and the
+            // child had to be planned after it.
+            const h = harness({ rows: ROWS, row: { organizationId: null } });
+            await h.runner.run('b1', PERSONAL_OPTIONS);
+
+            expect(file(h.terminal(), 'data/connections/webhook-deliveries.jsonl')?.records).toBe(
+                1,
+            );
         });
     });
 

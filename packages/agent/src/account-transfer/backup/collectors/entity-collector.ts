@@ -74,6 +74,15 @@ export class EntityBackupCollector implements BackupCollector {
         return plans;
     }
 
+    /**
+     * The same file, planned against the registrations as they stand NOW —
+     * what makes a same-domain `parent` file see its parent's ids. See
+     * {@link BackupCollector.replan}.
+     */
+    async replan(context: BackupCollectContext, plan: BackupFilePlan): Promise<BackupFilePlan> {
+        return this.planFile(context, plan.spec);
+    }
+
     async *rows(
         context: BackupCollectContext,
         plan: BackupFilePlan,

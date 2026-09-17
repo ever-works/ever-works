@@ -501,8 +501,12 @@ describe('TypeOrmBackupRowSource (better-sqlite3)', () => {
             ] as never);
         });
 
-        /** Every domain, walked in published order the way the runner walks it. */
-        async function walk(): Promise<{
+        /**
+         * Every domain, walked in published order. `replan` re-plans each
+         * file right before reading it, which is what the runner does — and
+         * the only way a child file sees a parent from its own domain.
+         */
+        async function walk(options: { replan?: boolean } = {}): Promise<{
             emitted: Emitted[];
             errorCodes: Map<string, string>;
             registrations: Map<string, { ids: readonly string[]; complete: boolean }>;
@@ -523,7 +527,11 @@ describe('TypeOrmBackupRowSource (better-sqlite3)', () => {
 
             for (const domain of BACKUP_DOMAINS) {
                 const collector = BACKUP_COLLECTORS.get(domain.key)!;
-                for (const plan of await collector.plan(context)) {
+                for (const original of await collector.plan(context)) {
+                    const plan =
+                        options.replan && collector.replan
+                            ? await collector.replan(context, original)
+                            : original;
                     const file = `${domain.dataDir}/${plan.file}`;
                     if (plan.errorCode) errorCodes.set(file, plan.errorCode);
                     try {
@@ -606,6 +614,41 @@ describe('TypeOrmBackupRowSource (better-sqlite3)', () => {
             expect(webhookIds?.complete).toBe(true);
             expect(webhookIds?.ids).toContain(OWN.subscription);
             expect(webhookIds?.ids).not.toContain(idOf('oth-wh'));
+        });
+
+        it('exports the deliveries of the owner’s subscriptions when walked file by file', async () => {
+            // `webhook-deliveries.jsonl` is scoped by `webhookIds`, which the
+            // subscriptions file in the SAME domain registers. Planned once
+            // per domain, the child resolved its ids before the parent was
+            // read and came out empty; re-planned before the walk, it sees
+            // them.
+            const { emitted, errorCodes } = await walk({ replan: true });
+            const deliveries = emitted
+                .filter((entry) => entry.entity === 'WebhookDelivery')
+                .map((entry) => entry.row.id);
+            expect(deliveries).toEqual([OWN.delivery]);
+            expect(errorCodes.get('connections/webhook-deliveries.jsonl')).toBeUndefined();
+        });
+
+        it('lets no stranger row into any file when walked file by file', async () => {
+            // The same cross-account property as the sweep above, over the
+            // walk the runner performs — where same-domain child files are
+            // actually queried rather than trivially empty.
+            const { emitted, unreadable } = await walk({ replan: true });
+            const leaked = emitted
+                .filter(({ row }) => {
+                    const text = JSON.stringify(row);
+                    return (
+                        OTHER_MARKERS.some((marker) => text.includes(marker)) ||
+                        STRANGER_MARKERS.some((marker) => text.includes(marker)) ||
+                        text.includes('other-stranger-delivery') ||
+                        text.includes(STRANGER) ||
+                        text.includes(STRANGER_TENANT)
+                    );
+                })
+                .map(({ file, row }) => `${file}: ${JSON.stringify(row)}`);
+            expect(leaked).toEqual([]);
+            expect(unreadable).toEqual([]);
         });
 
         it('still redacts the owner’s webhook signing secret on the way out', async () => {

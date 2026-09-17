@@ -248,6 +248,22 @@ export interface BackupCollector {
     readonly key: BackupDomainKey;
     /** Which files this domain writes for this run, in order. */
     plan(context: BackupCollectContext): Promise<BackupFilePlan[]>;
+    /**
+     * Resolve one planned file again, against the ids registered SO FAR.
+     *
+     * `plan()` answers for the whole domain before any of its files has been
+     * read, so a `parent` file whose parent sits earlier in the SAME domain
+     * — memberships under agents, deliveries under webhook subscriptions,
+     * the task children under tasks — would be planned off an id list
+     * nobody has registered yet: always empty, and never flagged, because an
+     * unregistered name reads as complete. The runner calls this right
+     * before it walks each file, so a child sees what its parent actually
+     * produced.
+     *
+     * Optional so an existing collector keeps compiling; the runner walks the
+     * original plan when it is absent.
+     */
+    replan?(context: BackupCollectContext, plan: BackupFilePlan): Promise<BackupFilePlan>;
     /** The rows of one planned file, paged. */
     rows(
         context: BackupCollectContext,

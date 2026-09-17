@@ -472,20 +472,35 @@ export class WorkspaceBackupRunner {
         let planned: readonly BackupFilePlan[] = [];
 
         try {
-            const plans = await collector.plan(context);
-            planned = plans;
+            const initial = await collector.plan(context);
+            planned = initial;
+            // The plans as each file was actually walked. Every file is
+            // re-planned right before its walk rather than trusting the
+            // up-front plan: that plan was resolved before ANY file of this
+            // domain had been read, so a `parent` file whose parent sits
+            // earlier in the same domain carried an empty id list — agents'
+            // memberships, budgets and attachments, all nine task children,
+            // a Work's domains and deployments, webhook deliveries — and was
+            // written with zero records under a domain that said `complete`.
+            const plans: BackupFilePlan[] = [];
             const files: BackupDomainOutcome['files'] = [];
             let records = 0;
             let unavailable = 0;
             let failure: unknown;
             // A plan that named its own shortfall before a single row was
-            // read — today, a `parent` file whose id list came from a
-            // registration that did not finish. Without this the file is
-            // written with zero records and no error, and the coverage table
-            // says the section is EMPTY for data that was never read.
+            // read — a `parent` file whose id list came from a registration
+            // that did not finish, or a file whose rows could not be scoped.
+            // Without this the file is written with zero records and no
+            // error, and the coverage table says the section is EMPTY for
+            // data that was never read.
             let planCode: string | undefined;
 
-            for (const plan of plans) {
+            for (const [index, original] of initial.entries()) {
+                const plan = collector.replan
+                    ? await collector.replan(context, original)
+                    : original;
+                plans.push(plan);
+                planned = [...plans, ...initial.slice(index + 1)];
                 const entry = await writer.addJsonlEntry(
                     `data/${dataDir}/${plan.file}`,
                     collector.rows(context, plan),
