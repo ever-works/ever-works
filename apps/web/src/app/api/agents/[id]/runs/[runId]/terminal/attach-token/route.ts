@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { bffProxy } from '@/lib/api/bff-proxy';
+import { toAttachSocketUrl } from '@/lib/api/attach-socket-origin';
 
 type RouteContext = { params: Promise<{ id: string; runId: string }> };
 
@@ -11,12 +12,19 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *
  * The browser cannot call the API attach endpoint directly (session
  * auth lives in the web cookie), and it cannot know the API origin for
- * the WebSocket leg (`API_URL` is a server env). This proxy does both:
+ * the WebSocket leg (the API address is a server env). This proxy does both:
  * forwards the mint with the session bearer, and rewrites the relative
- * `wsPath` into an ABSOLUTE `wsUrl` derived from `API_URL`
- * (http→ws / https→wss) — so cloud installs get
- * `wss://api.…/ws/terminal/:runId` and local dev gets
+ * `wsPath` into an ABSOLUTE `wsUrl` (http→ws / https→wss) — so cloud
+ * installs get `wss://api.…/ws/terminal/:runId` and local dev gets
  * `ws://localhost:3100/…` from the same code.
+ *
+ * That absolute URL is derived from the BROWSER-reachable API origin
+ * ({@link toAttachSocketUrl}), not from the server-only `API_URL` used for
+ * the upstream fetch just below. The two coincide in a single-origin
+ * install, but compose and the k8s manifests point `API_URL` at an
+ * in-cluster name the user's browser cannot resolve, and the page dials
+ * this URL verbatim. With `NEXT_PUBLIC_API_URL` unset the minted URL is
+ * unchanged — the same `API_URL` origin as before.
  *
  * The token itself is a 60s single-run credential; it rides the JSON
  * response (never a URL) and the browser presents it as the first WS
@@ -70,9 +78,8 @@ export const POST = bffProxy<RouteContext>(async ({ request, headers }, ctx) => 
         return NextResponse.json({ error: 'Malformed upstream response' }, { status: 502 });
     }
 
-    // API_URL ends in /api — the WS gateway hangs off the ORIGIN.
-    const origin = API_URL.replace(/\/api$/, '');
-    const wsUrl = origin.replace(/^http/, 'ws') + body.wsPath;
+    // The WS gateway hangs off the API ORIGIN, not its `/api` base.
+    const wsUrl = toAttachSocketUrl(body.wsPath);
 
     return NextResponse.json(
         { token: body.token, wsUrl, role: body.role, expiresInSec: body.expiresInSec },

@@ -485,6 +485,13 @@ spec:
               value: "https://app.ever.works"
             - name: API_URL
               value: "http://ever-works-api:3100"
+            # Browser-facing API origin. API_URL above is the in-cluster name the
+            # web server fetches with; a browser cannot resolve it. The agent live
+            # view and streaming terminal hand the browser a WebSocket URL built
+            # from this value instead. Read server-side at request time (it is not
+            # a web image build-arg), so setting it here takes effect.
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://api.ever.works"
             - name: NEXT_PUBLIC_WEB_URL
               value: "https://app.ever.works"
 

@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { API_URL } from '@/lib/constants';
 import { bffProxy } from '@/lib/api/bff-proxy';
+import { toAttachSocketUrl } from '@/lib/api/attach-socket-origin';
 import {
     computerApiUrl,
     forwardedAttachRole,
     invalidIdResponse,
     isUuid,
-    toComputerSocketUrl,
 } from '@/lib/api/computer-bff';
 
 type RouteContext = { params: Promise<{ id: string; sessionId: string }> };
@@ -20,6 +19,13 @@ type RouteContext = { params: Promise<{ id: string; sessionId: string }> };
  * session bearer and turns the relative `wsPath` into an absolute socket
  * URL. The token is short-lived, rides this JSON response only (never a
  * URL) and is presented as the socket's first message.
+ *
+ * The socket URL is minted from the BROWSER-reachable API origin
+ * ({@link toAttachSocketUrl}), not from the server-only `API_URL` this route
+ * fetches upstream with: those two are the same host in a single-origin
+ * install, but `API_URL` is an in-cluster name in compose and in the k8s
+ * manifests, and `use-computer-attach.ts` opens whatever URL it is given
+ * verbatim. With `NEXT_PUBLIC_API_URL` unset the minted URL is unchanged.
  *
  * The one role this ever forwards is `controller`, and only when the browser
  * asked for exactly that (`?role=controller`): the platform then mints a
@@ -64,7 +70,7 @@ export const POST = bffProxy<RouteContext>(async ({ request, headers }, ctx) => 
     return NextResponse.json(
         {
             token: body.token,
-            wsUrl: toComputerSocketUrl(API_URL, body.wsPath),
+            wsUrl: toAttachSocketUrl(body.wsPath),
             role: body.role,
             expiresInSec: body.expiresInSec,
         },
