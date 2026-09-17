@@ -22,7 +22,7 @@
 ## 1. Overview
 
 An App Work is only as good as its description of how to build and run the software. This epic makes that
-description — the **App spec** — a first-class, validated file in the user's own data repository, and
+description — the **App spec** — a first-class, validated file in the user's own Work Repository, and
 gives it three things around it. First, **validation that explains itself**: every problem names the
 exact field by its component or variable name, the line and column, and how to fix it — for a person in
 Settings and for the App Provisioner agent writing the file. An invalid file never takes a running app
@@ -40,7 +40,7 @@ Licenses that require offering source to network users produce a visible source 
 
 > **Program audit resolutions applied (2026-09-17).** [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5)
 > is binding: R-1 (shared types in the program's one contracts folder), R-2 (Activity naming), R-3 (red and amber
-> licenses), R-4 (first write into the data repository), R-5 (managed-tier availability comes from the tier's own
+> licenses), R-4 (first write into the Work Repository), R-5 (managed-tier availability comes from the tier's own
 > open state), R-11 (key pair formats), R-13 (`auto` zero-config builds) and R-22 (runnable test locations). Where
 > this spec's earlier text disagreed, it was changed to match.
 
@@ -129,7 +129,7 @@ Licenses that require offering source to network users produce a visible source 
 - **S11 — The ref is excluded.** **Given** a Blueprint whose upstream excludes tags `v6.*`, **when** a user
   pastes a URL pointing at tag `v6.2.0`, **then** the match reads **This Blueprint doesn't cover that
   version.** and nothing is applied automatically.
-- **S12 — No spec yet.** **Given** an App Work whose data repository has no `.works/works.yml`, **then** the
+- **S12 — No spec yet.** **Given** an App Work whose Work Repository has no `.works/works.yml`, **then** the
   page reads **No App spec yet.** with **Browse Blueprints** and **Run the App Provisioner**.
 - **S13 — Broken or oversized YAML.** An unclosed quote yields exactly one `yaml_syntax` error at its line; a
   300 KiB file yields one `file_too_large`. Either way the effective spec stays on the previous commit.
@@ -214,7 +214,7 @@ Licenses that require offering source to network users produce a visible source 
 
 ### 4.2 Reading the spec and the App spec state
 
-- **FR-15.** The system MUST read the App spec from the App Work's data repository at the head of its
+- **FR-15.** The system MUST read the App spec from the App Work's Work Repository at the head of its
   **tracked branch**, using the App Work's own Git connection; the database MUST hold derived state only.
 - **FR-16.** The tracked branch MUST start as the branch recorded at creation and MUST move only when a valid
   spec declares a different `source.branch` that exists and whose own spec declares the same branch.
@@ -304,7 +304,7 @@ Licenses that require offering source to network users produce a visible source 
 
 ### 4.5 Applying and upgrading a Blueprint
 
-- **FR-45.** When the data repository was created by this App Work's creation (Fork or Private copy) and its
+- **FR-45.** When the Work Repository was created by this App Work's creation (Fork or Private copy) and its
   `.works/works.yml` is absent or its App spec holds nothing beyond `source`, applying MUST write the source recorded
   at creation and the Blueprint's App spec **together**, with the overlay files, as one commit to the tracked branch
   through the Git provider's multi-file commit — never a clone — with the App Work owner's Git connection (R-4).
@@ -361,7 +361,7 @@ Licenses that require offering source to network users produce a visible source 
   record stay.
 - **FR-61.** When a license obligation requires offering source to network users and the deployed commit is
   not an upstream commit, the Deployment MUST expose a visible Source link to that commit of a public data
-  repository; a private data repository MUST declare `license.sourceOfferUrl` or the Deployment MUST be
+  repository; a private Work Repository MUST declare `license.sourceOfferUrl` or the Deployment MUST be
   refused with `sourceOfferMissing`.
 - **FR-62.** Before merging an Upstream sync, the system MUST be able to classify the upstream commit, so a
   worsened class can pause the merge and ask the owner.

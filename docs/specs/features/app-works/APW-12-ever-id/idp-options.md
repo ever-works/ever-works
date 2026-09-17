@@ -1,7 +1,10 @@
 # Decision record: the identity provider behind Ever ID
 
 **Epic**: [`APW-12-ever-id`](./spec.md) · **Answers**: program open question 6 ([`../README.md`](../README.md) §8)
-**Status**: `Proposed` — awaiting the owner decisions in §6 (APW-12 tasks T1–T2)
+**Status**: `Decided` — the provider is **ZITADEL**, self-hosted (**owner decision, 2026-09-17**). The
+provider-choice question (§6 D1) is closed; the *configuration* rows in §6 (domain, hosting tier, brokering,
+audience strategy, registration, consent, MFA policy, cross-product federation) are still open. The owner's
+binding constraints on how it integrates are §7.
 **Created**: 2026-09-17 · **Facts as of**: the 2026-09 review; every "verify" item is re-checked against the
 product's release notes on the day the decision is made.
 
@@ -63,6 +66,11 @@ product's release notes on the day the decision is made.
 - **License**: AGPL-3.0 for the server since its 2025 major release (earlier releases Apache-2.0; verify the
   current split for SDKs). Running it unmodified as a service carries no source obligation beyond AGPL's
   terms; Ever's own platforms are AGPL-3.0 already.
+  **Verified 2026-09-17 against the repository's own `LICENSING.md`:** the server is **AGPL-3.0-only**;
+  **`apps/login/` is MIT**, `packages/zitadel-client/` and `packages/zitadel-proto/` are MIT, and `proto/` plus
+  `apps/docs/` are Apache-2.0. So login-UI work is not an AGPL exercise, the parts one most wants to change are
+  permissive, and no permanent fork is planned (see §7). Pinning a version means recording *that version's*
+  licence: an older (pre-2025) release would be Apache-2.0 instead.
 - **HA**: stateless Go replicas over PostgreSQL; the newer login UI is a separate deployment.
 - **Protocol**: OpenID Certified; PKCE; device authorization grant; back-channel logout (added in recent
   releases — verify it is generally available); token exchange (verify maturity); project roles and audience
@@ -146,6 +154,11 @@ Scores 0–3 per criterion; weights sum to 100; total = Σ(weight × score) ÷ 3
 Under every weighting tried (operations 10–30, maturity 5–15, R11 5–10), Rauthy, authentik and Ory stay below
 both.
 
+**Note (2026-09-17).** The table is now the *documented comparison*, not the decider: the owner chose ZITADEL
+(§6) weighting footprint and built-in organisations more heavily than the criteria above do — in particular it
+scores ZITADEL 2 against Keycloak's 3 on license fit, and that gap is what §7 closes by hosting ZITADEL as-is.
+The scores are kept unchanged so a future re-evaluation starts from the same measured baseline.
+
 ## 5. Reversibility and migration cost
 
 - Every relying party stores links as (issuer, subject) and accepts **1–3 allowed issuers** at once, so two
@@ -155,17 +168,19 @@ both.
 - Otherwise each person re-links once through the normal, explicit connect flow; nothing is merged by e-mail.
 - Tokens are short-lived (access 900 s), so a cut-over needs no token migration.
 
-## 6. Recommendation and what the owner must decide
+## 6. Decision, and what the owner must still decide
 
-**Recommendation: Keycloak**, run as a separate Ever instance with at least 3 replicas, integrated only through
-standard OpenID Connect. It is the only option that meets every requirement today, including device sign-in,
-back-channel logout, audience-scoped access tokens, re-authenticated linking and a path to enterprise identity,
-with the deepest operator base. **ZITADEL** is the documented alternative if the owner weights a lighter
-footprint and built-in organisations above maturity.
+**Decided: ZITADEL** — self-hosted, run as a separate Ever instance with at least 3 replicas, integrated only
+through standard OpenID Connect (**owner decision, 2026-09-17**). The owner's grounds are a lighter footprint
+and built-in organisations, and the licence question is settled: hosted **as-is and unmodified** (§3.2, §7).
+**Keycloak stays the documented alternative** and still wins the weighted table in §4 — chiefly on operations
+burden and maturity — so if ZITADEL fails one of the verification items below, the fallback is a re-run of that
+scoring, not a rewrite of the relying parties: every platform integrates against the discovery document and
+accepts 1–3 issuers at once (§5).
 
 | #   | Decision                                                                               | Recommended default                                                                                                         |
 | --- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Product                                                                                | Keycloak                                                                                                                    |
+| D1  | Product                                                                                | **ZITADEL — decided by the owner 2026-09-17**                                                                               |
 | D2  | Public domain for Ever ID                                                              | a dedicated name, not under the Ever Works app domain, not under the user-apps domain, not shared with another product line |
 | D3  | Hosting tier                                                                           | a trusted tier separate from any tier running user-controlled code; database backups verified before go-live                |
 | D4  | Does Ever ID offer Google, GitHub and Microsoft sign-in (brokering)?                   | yes, with R7 linking                                                                                                        |
@@ -175,7 +190,7 @@ footprint and built-in organisations above maturity.
 | D8  | Multi-factor policy                                                                    | passkeys and TOTP offered; required for Ever ID administrators                                                              |
 | D9  | Whether another product line's identity provider ever federates with Ever ID           | no                                                                                                                          |
 
-### 6.1 Provider configuration the relying parties assume (once D1 is made)
+### 6.1 Provider configuration the relying parties assume (D1 is now decided)
 
 | Setting                          | Value                                                                                                                                                                    |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -195,3 +210,49 @@ footprint and built-in organisations above maturity.
 `Status` becomes `Decided` when D1–D9 are answered in this table (answer, date, decider), the provider passes
 Ever Works' **Test connection** on development with every check green (spec FR-3), and the tracker row for
 APW-12 P0 is ticked.
+
+**As of 2026-09-17:** D1 is answered (**ZITADEL**, owner) and the record's status is `Decided` for the provider
+alone. D2–D9 remain open, and APW-12 P0's `Test connection` gate is still outstanding — it must pass against a
+running ZITADEL before any relying party is wired.
+
+---
+
+## 7. Owner constraints on the integration (binding, 2026-09-17)
+
+These come from the owner and bind every platform's Ever ID work. They are additive-only in the same sense as
+program rule 1 (NN #20): nothing that authenticates users today is removed, replaced or routed away.
+
+1. **ZITADEL is an addition, never a replacement.** Each platform keeps its own authentication and its own user
+   database. Ever Works keeps Better Auth; Ever Gauzy keeps e-mail/password, magic code and its social
+   strategies; every other platform keeps whatever it has. Nothing is deleted, deprecated or bypassed.
+2. **Ever ID is the cross-platform SSO layer only.** It answers "who is this person, and do they have an
+   account here?" — not "where do profiles live". Account, profile and credential data stay in each platform's
+   own database.
+3. **Duplicated profiles are accepted.** A person may exist both in a platform's own database and in ZITADEL.
+   Links are stored per platform as (issuer, subject); no platform becomes a mirror of ZITADEL, and no
+   cross-platform profile merge is implied.
+4. **No platform's existing sign-in flow changes.** New flows go through Ever ID; existing ones are untouched
+   (spec FR-1…FR-5, [`cross-platform.md`](./cross-platform.md) §1.1).
+5. **Ever Gauzy's integration is a plugin, not core.** No ZITADEL code, dependency, strategy, entity or route
+   is added to Gauzy core (`packages/core`, `packages/auth/src/lib/internal.ts`, `packages/config`). It ships
+   as its own plugin package, registered the way Gauzy's other plugins are (§7.1). The dormant Keycloak
+   scaffolding stays exactly as it is (NN #20 — no removal).
+6. **Ever Works integrates through its own plugin architecture** (the `oidc-identity` capability), which is
+   already this epic's design.
+7. **Host it as-is.** No fork, no patch set. If a change is ever needed the order is configuration → ZITADEL
+   Actions → an upstream pull request (no CLA; contributions are accepted under Apache-2.0) → a **published**
+   fork as a last resort, which AGPL §13 permits provided the Corresponding Source of the deployed build is
+   offered to network users.
+
+### 7.1 What already exists in Ever Gauzy (verified 2026-09-17 against `ever-co/ever-gauzy` @ `origin/develop`)
+
+| Fact | Evidence |
+|---|---|
+| Gauzy has **no working cross-platform SSO** today. | No external issuer, no relying-party flow, no discovery document. |
+| It **does** carry dormant Keycloak OIDC scaffolding — with no route. | `packages/auth/src/lib/keycloak/{keycloak.strategy.ts,keycloak-auth-guard.ts}`; exported in `packages/auth/src/lib/internal.ts:6,18` and listed in `AuthGuards = [MicrosoftAuthGuard, KeycloakAuthGuard]` (`:35`); **no controller uses `KeycloakAuthGuard`** — the only `auth/keycloak` string is the strategy's own default callback URL. `cross-platform.md` §3.1 already records "Controllers (no Keycloak controller)". |
+| It self-disables when unconfigured. | `parseKeycloakConfig` warns `⚠️ Keycloak authentication configuration is incomplete. Defaulting to "disabled".` and returns `'disabled'` for client id/secret; `KEYCLOAK_*` keys exist in `.env.sample` and every local/compose template. |
+| **The existing Keycloak strategy cannot be pointed at ZITADEL.** | `passport-keycloak-oauth2-oidc@^1.0.5` **hard-codes Keycloak's URL shape** (`lib/strategy.js:86,87,94`): `{authServerURL}/realms/{realm}/protocol/openid-connect/{auth,token,userinfo}`. ZITADEL has no realms and serves `{issuer}/oauth/v2/authorize`, `{issuer}/oauth/v2/token`, `{issuer}/oidc/v1/userinfo`. A **new generic-OIDC strategy** is required — this is not reachable by configuration. |
+| A working custom-IdP precedent exists to copy. | Auth0: `packages/auth/src/lib/auth0/{auth0.strategy.ts,auth0.controller.ts}` — strategy **plus** controller, registered through `SocialAuthModule`. |
+| Strategies are wired in core today. | `packages/core/src/lib/auth/auth.module.ts:1,52` imports `SocialAuthModule` and calls `SocialAuthModule.registerAsync({…})`; `packages/auth/src/lib/internal.ts` is the registry. |
+| **Gauzy has a real plugin mechanism to carry it.** | `packages/plugin`: `PluginMetadata extends ModuleMetadata`, so a plugin is a NestJS module and may ship its own controllers, providers, entities, subscribers and configuration; `PluginModule.init()` imports `config.plugins`; `apps/api/src/plugins.ts` lists ~38 `@gauzy/plugin-*` packages, consumed by `apps/api/src/plugin.config.ts`. |
+| Cost of the plugin route. | A new `packages/plugins/<name>` package, a dependency, and **one import plus one array entry in `apps/api/src/plugins.ts`** — no ZITADEL code in core. Caveat: this is a **new plugin category** (the existing ones are integrations, AI providers and UI) and the plugin hooks are lifecycle/seed-oriented, so the integration lives in the plugin's own module rather than in a core auth extension point. |

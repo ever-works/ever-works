@@ -259,8 +259,10 @@ this, and the product says why.
 
 ### 4.6 Rate limits
 
-- **FR-26.** Per member: at most **1** upstream pull request opened per upstream repository per 24 hours; at most **2**
-  open (not merged or closed) per upstream repository at once; at most **3** opened across all upstream repositories
+- **FR-26.** Per member: at most **1** upstream pull request opened per upstream repository per 24 hours; at most the
+  App Work's own limit for open pull requests per upstream repository at once — the App spec's
+  `upstreamPullRequests.maxOpen` (default **3**, hard ceiling **10**) — and never more than **10** whatever the spec
+  says; at most **3** opened across all upstream repositories
   per 24 hours; at most **10** preparations started per 24 hours. Per App Work: at most **1** preparation running at
   a time. Per open upstream pull request: at most **5** approved pushes per 24 hours.
 - **FR-27.** A refusal by limit says which limit and when the next slot opens (S20).
@@ -448,7 +450,21 @@ Update variant title: `Push {count} commits to acme/bookings #812?`; primary `Ap
 | `tooManyExtraFiles` | `The prepared change touches more files than the original change.`                                                        |
 | `connectionScope`   | `Your GitHub connection needs permission to open pull requests. Reconnect GitHub.`                                        |
 | `notForkPusher`     | `Only someone whose GitHub account can push to {fork} can propose upstream.`                                              |
+| `notFork`           | `Only a fork can propose changes upstream. This App Work links to {upstream} instead of forking it.`                       |
+| `disabled`          | `Upstream pull requests are turned off for this workspace. An administrator can enable them.`                              |
+| `sourceNotMerged`   | `This change has to be merged into your fork before it can be proposed upstream.`                                          |
+| `excludedPath`      | `This change touches {path}, which {upstream} asks contributors not to change.`                                            |
+| `secretDetected`    | `Something in this change looks like a secret. Remove it before proposing it upstream.`                                    |
+| `notSingleCommit`   | `Proposing upstream needs a single commit; this change has {count}.`                                                       |
+| `fingerprintMismatch` | `The change is no longer the one that was approved. Review it and approve it again.`                                      |
+| `approvalExpired`   | `The approval expired before the pull request was opened. Approve it again.`                                               |
 | `timedOut`          | `Preparation took too long.`                                                                                              |
+| `providerUnsupported` | `{upstream}'s host does not support opening pull requests from Ever Works yet.`                                          |
+
+Placeholders available to this copy: `{upstream}`, `{fork}`, `{path}`, `{count}`, `{lines}`, `{limit}`, `{time}`,
+`{command}`. **Every value in `UPSTREAM_REFUSAL_CODES` has copy here** (23 of 23) — the plan requires one locale key
+per code in all 21 locales, and before 2026-09-17 nine codes had none, which made that requirement impossible to
+satisfy.
 
 ---
 

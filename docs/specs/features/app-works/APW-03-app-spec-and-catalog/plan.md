@@ -254,7 +254,7 @@ separate resolve endpoint, and resolving records no Activity (inspect has no sid
 **Apply** — `AppBlueprintApplyService` _(new)_, always inside job `app-blueprint-apply`:
 
 0. **Request** (`request(workId, blueprintId, { userId, matchSource, confirmForkMatch })`, synchronous, before
-   dispatch): resolve the Blueprint for the Work's data repository (`blueprintId` passed explicitly), refuse
+   dispatch): resolve the Blueprint for the Work's Work Repository (`blueprintId` passed explicitly), refuse
    `blueprintNotFound` / `forkMatchNeedsConfirmation` / `applyInProgress` (§4.2), persist `blueprintId`,
    `blueprintVersion`, `blueprintMatchSource` and `blueprintApplyStatus = 'applying'`, then record Activity
    **`app.blueprint.matched`** (`actionType: APP_BLUEPRINT`, details `{ blueprintId, version, matchSource }`) exactly
@@ -342,7 +342,7 @@ managed: allowed | <reason>, sourceOffer: { required, url | null, missing } }`. 
 - **Source offer (FR-61).** `sourceOffer.required = obligations includes 'network-source-offer' && (relation
 = link || WorkUpstreamState.ahead > 0)` — the deployed commit is not an upstream commit (APW-02's
   divergence; the same condition as APW-06 FR-44); `url` = `git.getFileWebUrl(owner, repo, deployedSha)` of
-  the data repository when it is public, else `license.sourceOfferUrl`; `missing` when neither.
+  the Work Repository when it is public, else `license.sourceOfferUrl`; `missing` when neither.
 - **Attestation location (C3, R-3 — resolved).** The single record is `WorkAppSpecState.attestation`, owned by this
   epic and exposed through `getHostingEligibility`; APW-06 stores no attestation of its own.
 

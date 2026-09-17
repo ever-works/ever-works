@@ -552,7 +552,8 @@ _Sandboxed in-zone builds (LG-24) and build limits (LG-25) — Resolution R-24._
       **Done when**: both specs pass.
 
 - [ ] **T35. Scope `any`.**
-      **Cross-epic PRs:** **Modify** `packages/agent/src/facades/build.facade.ts` (created by APW-05; its T35) so `apps-builder`
+      **Cross-epic PRs:** **Modify** `packages/agent/src/facades/build.facade.ts` (created by APW-05; **its T16** — this
+      file used to cite its own T35 here) so `apps-builder`
       resolves on `isOpen() && managedScope() === 'any'`; **modify** `packages/agent/src/apps-catalog/apps-catalog.mapper.ts`
       (APW-03) so the verified-only rule derives from `managedScope()`; APW-06 T51.
       Set `EVER_WORKS_APPS_MAX_SCOPE=any` on stage only (operator configuration, not a repository file).

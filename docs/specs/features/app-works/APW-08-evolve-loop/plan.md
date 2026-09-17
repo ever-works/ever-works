@@ -115,7 +115,7 @@ _Re-verified on `develop` @ `ee45946e5` (2026-09-17): items 1–6 are unchanged.
 ### 2.1 One rules resolver, one delivery reconciler, three small extensions
 
 ```
-                 .works/works.yml @ Task base commit (data repository)
+                 .works/works.yml @ Task base commit (Work Repository)
                                    │  AppSpecService.getEffectiveSpec(workId, baseSha) (APW-03)
                                    ▼
                  ┌──────────────────────────────────────────┐
@@ -792,7 +792,7 @@ Skill from [`skill-draft/SKILL.md`](./skill-draft/SKILL.md) published to `ever-w
       methods on the existing git capability.
 - [x] **II — No hard-coded plugin ids.** P0 removes the two `'github'` literals; the isolated-run predicate reads the
       pipeline plugin's `enforcesRuntimeNetworking` flag (APW-04).
-- [x] **III — Source-of-truth repositories.** App rules are read from `.works/works.yml` in the data repository at
+- [x] **III — Source-of-truth repositories.** App rules are read from `.works/works.yml` in the Work Repository at
       the base commit; the database stores derived delivery state only; the template proposes App spec changes by
       pull request.
 - [x] **IV — Job runtime.** Reconciler is a scheduled task; runs dispatch through the existing valve; `evolve`

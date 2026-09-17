@@ -261,12 +261,20 @@ kind, namespace, labelSelector)`, `deleteObject(…, propagationPolicy)`, `readP
       `claimDeployLock(workId, deploymentId, staleAfterS)`, `releaseDeployLock(workId, deploymentId)`, `setQueued(...)`,
       `selectForHealthPoll(limit)`, `recordHealth(...)`, `saveSnapshot(...)`, `claimDeletion(workId, opts)`,
       `recordDeletionAttempt(workId)`.
+      **FR-63 — derive the target on first read (this closes APW-01's recorded cross-epic requirement; without it a
+      Work created for Your cluster stays `none` and refuses to deploy).** `getOrCreate(workId)` must set `target`
+      from the Work's creation-time choice: `your-cluster` when the Work's persisted `deployProvider` names a
+      deployment plugin with `supportsApps === true`, the managed target when it is `ever-works-apps`, else `none`.
+      Never leave the column's default in place for a Work that was created with a target, and never overwrite a
+      target the owner has since changed.
       **Modify** `packages/agent/src/entities/index.ts`, `packages/agent/src/database/_entity-names.ts`,
       `packages/agent/src/database/_entities-inventory.ts` — register the entity next to `WorkDeployment`.
       **Test**: `packages/agent/src/database/repositories/__tests__/work-app-runtime-state.repository.spec.ts` _(new)_ —
       lock claim is atomic under two concurrent claims (one wins), stale lock reclaimed after 7 260 s, release only by the
       holder; `claimDeletion` refuses while a deploy lock is held and succeeds once; the entity metadata has no column
-      named `licenseAttestation` (ACC-06-39).
+      named `licenseAttestation` (ACC-06-39); **and** `getOrCreate` derives `your-cluster` for a Work whose
+      `deployProvider` is a `supportsApps` plugin, `ever-works-apps` for the managed provider, `none` otherwise, and
+      does not clobber a target that was already set.
       **Done when**: `pnpm --filter @ever-works/agent test -- work-app-runtime-state.repository` is green and the database
       drift specs pass without editing their counts by hand beyond the new entity.
 

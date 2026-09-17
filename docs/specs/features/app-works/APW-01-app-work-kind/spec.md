@@ -19,7 +19,7 @@
 
 > **Program audit resolutions applied (2026-09-17).** This spec follows
 > [CONTRACTS.md §0](../CONTRACTS.md#0-program-audit-resolutions-binding--2026-09-17-against-develop--ee45946e5):
-> R-3 (license classes at creation), R-4 (the first write into the data repository), R-6 (the kind switch refuses
+> R-3 (license classes at creation), R-4 (the first write into the Work Repository), R-6 (the kind switch refuses
 > every client), R-7 (Builds and App environment capabilities), R-12 (deploy target **None**) and R-15 (deleting an
 > App Work). Where older text in this epic disagreed, the resolution wins and the text below was aligned.
 
@@ -28,12 +28,12 @@
 ## 1. Overview
 
 A signed-in member pastes the URL of any GitHub repository into the create-Work surface and gets an
-**App Work**: a Work whose data repository is that code, which Ever Works can later build, run and keep
+**App Work**: a Work whose Work Repository is that code, which Ever Works can later build, run and keep
 changing with agents. Before anything is written anywhere, the member sees a **preview** of the
 repository — owner and name, stars, default branch, a license chip, whether a curated **App Blueprint**
 exists — and a clear choice of how the code becomes theirs:
 
-- **Link** — the repository itself becomes the data repository (offered when they can push to it);
+- **Link** — the repository itself becomes the Work Repository (offered when they can push to it);
 - **Fork** — a GitHub fork is made in their own account or one of their organizations, with their own
   GitHub connection, so they can follow upstream and later propose changes back;
 - **Private copy** — a private repository with the same code, for people who cannot have a public fork,
@@ -244,10 +244,13 @@ Every threshold below is a number on purpose.
   at creation, gated by the `works-app` feature flag in the web app and by an instance setting in the API.
 - **FR-2.** An App Work MUST have: Deploy, Builds, App environment, Tasks, Knowledge base and schedules
   **on**; Items, taxonomy, comparisons, community pull-request intake, item import/export, source validation
-  and the website generator **off**; exactly one repository role, the data repository. Builds and App
+  and the website generator **off**; exactly one repository role — the **Work Repository** (persisted
+  `website`), which holds the app code and is what Tasks, Builds and Deployments target; **never** the `data`
+  role, which holds a Work's data (`README.md` §1 repository-role note). The capability set is therefore
+  `repos: { data: false, work: false, website: true }`. Builds and App
   environment MUST be off for every other kind (Resolution R-7).
 - **FR-3.** The Repository Work kind MUST keep exactly its current capabilities and refusals.
-- **FR-4.** Every content pipeline that clones the data repository and writes generated content into it
+- **FR-4.** Every content pipeline that clones the Work Repository and writes generated content into it
   MUST refuse an App Work with a message naming the refused action (see §4.9).
 
 ### 4.2 Inspect — the preview (no side effects)
@@ -303,6 +306,15 @@ Every threshold below is a number on purpose.
   reports it, does not use Git LFS, and — for a private upstream — its owner allows forking. The copy is
   private, carries the default branch with its full history, and is named after the upstream, adding
   `-copy`, then `-copy-2` up to `-copy-5` when taken.
+- **FR-20a.** The App Work's **Work Repository** name MUST be chosen once, at creation, from the template it was
+  created from: **`<slug>-app`** when that template is an app template, and **`<slug>-website`** otherwise (the
+  unchanged default for Website/Work Templates and for every non-`app` kind). The chosen name and owner MUST be
+  persisted, never re-derived by a reader when the coordinates are recorded. A Work whose recorded name uses the
+  other suffix, or that the user renamed, MUST be respected and never renamed, and the platform MUST NOT rename a
+  repository it created. **The suffix is a naming convention only — the persisted role stays `website` and no new
+  repository-role value is added** (owner decision, 2026-09-17). A name conflict follows FR-24 (adopt, or the
+  existing conflict code) and is never resolved by adding a numeric suffix; `-copy` variants remain **Private
+  copy** only (FR-20).
 - **FR-21.** The create response MUST return within 10 seconds and MUST NOT wait for a fork or copy to
   finish.
 
@@ -310,9 +322,9 @@ Every threshold below is a number on purpose.
 
 - **FR-22.** Concurrent create requests for the same member, upstream, mode and target owner MUST be
   serialised for up to 120 seconds; a request that finds one in flight answers **already being created**.
-- **FR-23.** A create request identical in member, data repository and slug to an App Work created in the
+- **FR-23.** A create request identical in member, Work Repository and slug to an App Work created in the
   last 10 minutes MUST return that App Work, marked as already existing, and create nothing.
-- **FR-24.** Outside that window, a member MUST NOT get a second App Work on a data repository they
+- **FR-24.** Outside that window, a member MUST NOT get a second App Work on a Work Repository they
   already use; the answer names their existing App Work.
 - **FR-25.** Every create step that talks to GitHub MUST be safe to repeat: a retried fork adopts the
   existing fork; a retried copy adopts a repository of the chosen name that is empty or already a copy of
@@ -327,7 +339,7 @@ Every threshold below is a number on purpose.
   such on its page, in the Works list and to chat tools.
 - **FR-28.** Readiness MUST be handed to the fork lifecycle background job (APW-02); this epic MUST NOT
   poll GitHub inside the create request.
-- **FR-29.** Only after the data repository is ready MUST the system record `.works/works.yml` with version
+- **FR-29.** Only after the Work Repository is ready MUST the system record `.works/works.yml` with version
   2, kind `app` and the source block (relation, upstream owner/name/default branch when not linked, branch).
   Any other content already in that file MUST be preserved. How it lands is fixed by Resolution R-4: (a) a
   fork or private copy that this App Work's creation made MUST receive it as exactly one direct commit on the
@@ -386,7 +398,7 @@ Every threshold below is a number on purpose.
   bulk image capture, domain-type update, website repository update and template sync, comparison
   generation (automatic and manual), item source validation, community pull-request processing (the
   scheduled sweep skips silently; a direct call refuses), repository visibility changes, the generation
-  schedule upsert, and "sync from data repository".
+  schedule upsert, and "sync from Work Repository".
 - **FR-42.** Item listing for an App Work MUST answer an empty list without cloning.
 - **FR-43.** The `.works/works.yml` sync that follows a Work update MUST NOT write generator settings
   (prompt, model, providers, website repository) into an App Work's file.
@@ -419,7 +431,7 @@ Every threshold below is a number on purpose.
 
 | Entity                | Today                                               | This epic adds                                                                                               |
 | --------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Work**              | A kind, a data repository, providers, capabilities. | The kind **app**; a source relation (link/fork/private copy) and an upstream reference on its source record. |
+| **Work**              | A kind, a Work Repository, providers, capabilities. | The kind **app**; a source relation (link/fork/private copy) and an upstream reference on its source record. |
 | **Work kind catalog** | Six selectable kinds with capabilities and chips.   | A seventh, **App**, flag-gated; two capability flags, Builds and App environment, on only for App (R-7).     |
 | **Activity**          | Records Work lifecycle.                             | Source linked / forked / copied / failed.                                                                    |
 | **App spec**          | —                                                   | Its `source` block is written by this epic (the rest belongs to APW-03).                                     |

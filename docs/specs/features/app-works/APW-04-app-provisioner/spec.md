@@ -36,7 +36,7 @@ to build and run that software. The **App Provisioner** works it out. A Task **"
 up with the **`provision-app`** Skill, and the Agent studies the repository inside an isolated sandbox that
 holds **no secrets** and can reach **only** the repository host and public package and container registries. It writes an
 **App spec** and, only when the repository cannot be built without one, an overlay Dockerfile — never a change
-to the application's own source — and proposes both as a **pull request to the App Work's data repository**.
+to the application's own source — and proposes both as a **pull request to the App Work's Work Repository**.
 
 The pull request is not the finish line. A **verification loop** is the Task's quality gate: the platform
 validates the App spec, builds the pull request branch, boots the result on a short-lived verification target
@@ -103,7 +103,7 @@ Activity, and is narrated in the Work's chat; every token and runner minute spen
   **Provisioning** card on step **Studying the repository**, a Task titled **"Provision owner/repo"** exists on
   the App Work assigned to the user's App Provisioner Agent, and Activity records `app.provision.started`.
 - **S2 — The proposal.** **Given** the analysis run finishes, **when** its output passes the platform's checks,
-  **then** a pull request titled **"Provision: App spec for owner/repo"** is opened on the data repository with
+  **then** a pull request titled **"Provision: App spec for owner/repo"** is opened on the Work Repository with
   the report in its body, the card links it, and Activity records `app.provision.proposed`.
 - **S3 — Green on the first attempt.** **Given** an opened proposal, **when** validation, build, boot and smoke
   all pass, **then** the pull request gains an evidence comment (build log link, image digest, smoke table,
@@ -147,7 +147,7 @@ Activity, and is narrated in the Work's chat; every token and runner minute spen
 - **S15 — Not a server app.** **Given** a repository that is a library, a mobile app or a desktop app, **when**
   analysis concludes there is nothing to run as a web service, **then** the provisioning fails with reason
   **Not something that can run as a service**, the report explains why, and no pull request is opened.
-- **S16 — Verification infrastructure missing.** **Given** GitHub Actions is not usable on the data repository,
+- **S16 — Verification infrastructure missing.** **Given** GitHub Actions is not usable on the Work Repository,
   **when** the build step starts, **then** it is retried 3 times over 30 minutes without consuming an attempt,
   then fails with **"Builds are not available for this repository"** and a fix link.
 - **S17 — Pull request closed.** **Given** an open proposal, **when** the user closes it without merging, **then**
@@ -204,7 +204,7 @@ Every threshold below is a number on purpose.
   **`provision-app`** Skill bound. The Agent is created on first use (one per user, or one per Organization when
   the App Work belongs to one) and reused for every later provisioning.
 - **FR-8.** Each provisioning creates one Task titled **"Provision owner/repo"**, labelled `app-provision`,
-  isolated on its own branch of the data repository, assigned to that Agent.
+  isolated on its own branch of the Work Repository, assigned to that Agent.
 - **FR-9.** The Agent may not merge its own pull request, whatever the merge policy says.
 - **FR-10.** The Agent's tools are limited to reading and writing inside its sandbox, reporting progress, validating
   a draft App spec, and asking the user. Committing, opening pull requests, messaging, web search, sub-agents
@@ -387,7 +387,7 @@ Every threshold below is a number on purpose.
 
 | Entity                | Role in this epic                                                                                       |
 | --------------------- | ------------------------------------------------------------------------------------------------------- |
-| **App Work** (APW-01) | The Work being provisioned; its data repository is where the pull request goes.                         |
+| **App Work** (APW-01) | The Work being provisioned; its Work Repository is where the pull request goes.                         |
 | **App spec** (APW-03) | What the Provisioner writes; validated with APW-03's validator.                                         |
 | **Agent**             | Created from the App Provisioner template; one per user or Organization.                                |
 | **Skill**             | `provision-app`, installed from the Skills catalog and bound to that Agent.                             |

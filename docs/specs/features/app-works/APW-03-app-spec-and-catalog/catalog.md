@@ -263,7 +263,7 @@ are the union across every operand that decided the class.
 ```
 ever-works/cal-diy-template/
 ├── .works/works.yml        # App spec in `blueprint` mode: no `source`, no `blueprint` block (schema.md §3)
-├── overlay/                # files copied into the data repository at the same relative path
+├── overlay/                # files copied into the Work Repository at the same relative path
 │   └── Dockerfile
 ├── overlay.yml             # one row per overlay file (below)
 ├── tests/
@@ -280,7 +280,7 @@ ever-works/cal-diy-template/
 
 ```yaml
 files:
-    - path: Dockerfile # destination in the data repository, relative
+    - path: Dockerfile # destination in the Work Repository, relative
       mode: add-only # add-only (skip when the file exists) · replace (only through a pull request)
 ```
 

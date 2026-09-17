@@ -44,7 +44,7 @@ _Delivers FR-1…FR-8. No migration, no UI._
       result's `branch` is `feature-x` (today: no switch, no `ref`, `branch ?? 'main'`).
       Case 4 — `commitToRepo` with no branch on a Work whose base branch is `main` and whose resolved merge policy
       protects `main` writes no file, calls no `commit` / `push`, and rejects with the FR-3 copy.
-      Case 5 — `openPullRequest` calls `createPullRequest` with the data repository's owner and repo (today `''`/`''`)
+      Case 5 — `openPullRequest` calls `createPullRequest` with the Work Repository's owner and repo (today `''`/`''`)
       and `base` = `work.taskIsolationBaseBranch` when set, else the repository default branch.
       Case 6 — two concurrent `commitToRepo` calls on one Work do not interleave (the second `switchBranch` starts
       after the first `push` resolves).
@@ -185,8 +185,16 @@ integration point degrades to today's behaviour when their tables are absent (pl
 - [ ] **T11. Keep the Work in step with the App spec; force isolation.**
       **Create** `packages/agent/src/app-works/app-spec-applied.listener.ts` (new) — `@OnEvent` for APW-03's
       `AppSpecAppliedEvent` (`app.spec.applied`); read the spec at `event.commitSha`, then set
-      `taskIsolation = 'worktree'`, `taskIsolationBaseBranch = spec.source.branch`, `taskIsolationTargetRepo = 'data'`
+      `taskIsolation = 'worktree'`, `taskIsolationBaseBranch = spec.source.branch`, **`taskIsolationTargetRepo = 'website'`**
       with an ownership-scoped update; idempotent.
+      **Why `website` and not `data` (2026-09-17):** an App Work's app-code fork is the **Work Repository** — the
+      `website` role, whose UI label is literally "Work Repository" (`work-capabilities.ts:40-49`) — while `data`
+      holds the Work's *data* (README §1 repository-role note, APW-01 plan §3.1). Setting the target to `data`
+      would point every Task at the wrong repository, and it is not enough to set the field: **consume it.**
+      `getRepoOwner()` still defaults to `data` (`work.entity.ts:831`) and `TaskWorkspaceService.provisionForRun`
+      still hard-codes `getRepoOwner()` / `getDataRepo()` (`task-workspace.service.ts:219-220`), so the field is
+      currently *declared but unconsumed* — this task is what consumes it, and the same resolution must be honoured
+      by the build (APW-05), the deployment (APW-06) and `GitFacadeService.getRepoDir`.
       **Modify** `packages/agent/src/tasks-domain/task-isolation.ts` — `resolveTaskIsolation` returns `'on'` when
       `work.kind === 'app'` and the Task has a Work (the `agentCanCommit === false` branch is unchanged here).
       **Modify** `packages/agent/src/tasks-domain/task-transition.service.ts` `dispatchAgentRun` — refuse an App Work
@@ -198,7 +206,8 @@ integration point degrades to today's behaviour when their tables are absent (pl
       `taskIsolationBaseBranch = 'production'`; a second event writes nothing;
       `packages/agent/src/tasks-domain/__tests__/task-workspace.app-base-branch.spec.ts` (new) — on an App Work whose
       base is `production`, `provisionForRun` cuts the Task branch from `production` and `openPullRequestForBranch`
-      targets `production`, never the repository default branch (ACC-08-06); extend
+      targets `production`, never the repository default branch (ACC-08-06); **and a case proving the clone targets the
+      `website`-role repository, not `<slug>-data`**; extend
       `packages/agent/src/tasks-domain/__tests__/task-transition.service.spec.ts` — an App Work Task with an Agent
       whose `canCommitToRepo` is `false` is refused with the FR-9 copy and no run is dispatched (ACC-08-07, second
       half). Run: `pnpm --filter @ever-works/agent test task-isolation task-workspace task-transition app-spec-applied`.

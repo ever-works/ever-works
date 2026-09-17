@@ -24,7 +24,7 @@ installation), APW-07 (build-phase values) · **Depended on by**: APW-04 (verifi
 
 An App Work's code lives in the user's own repository. A **Build** turns one commit of that repository into
 one container image that a Deployment can run. The platform never builds on its own servers: in Wave 1 the
-build runs on **GitHub-hosted runners inside the user's data repository**, from a single workflow file the
+build runs on **GitHub-hosted runners inside the user's Work Repository**, from a single workflow file the
 platform writes there, `.github/workflows/ever-works-build.yml`, generated from the App spec's `build`
 block. The image is pushed to the container registry under the repository's owner and identified by an
 immutable digest. Build-time values the app needs travel as masked repository secrets whose names start with
@@ -74,7 +74,7 @@ verifies before it runs anything.
 ### 2.4 What this epic changes
 
 ```
-   App spec applied ──► 1 workflow file in the data repository
+   App spec applied ──► 1 workflow file in the Work Repository
         push · pull request · Rebuild ──► GitHub-hosted runner (user's repository, user's minutes)
              Build: queued ─► running ─► succeeded · failed (class + suggestion) · cancelled · blocked (reason)
                   │ image digest, deployable yes/no + reason, receipt
@@ -393,7 +393,7 @@ Every threshold below is a number on purpose.
 
 | Entity              | Today                                                        | This epic adds                                                                              |
 | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| **App Work**        | A Work of kind `app` with a data repository and an App spec. | Builds, a **Builds** tab, a **Latest build** card, build settings, a pull token.            |
+| **App Work**        | A Work of kind `app` with a Work Repository and an App spec. | Builds, a **Builds** tab, a **Latest build** card, build settings, a pull token.            |
 | **Deployment**      | One deploy of a Work.                                        | Nothing here; APW-06 links each App Work Deployment to the Build whose digest it runs.      |
 | **Activity**        | The account's event log.                                     | The `app.build.*` events.                                                                   |
 | **Usage receipt**   | Per-call usage rows recording who paid.                      | One row per Build for runner minutes.                                                       |

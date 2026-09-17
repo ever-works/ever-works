@@ -635,7 +635,7 @@ Activity (CONTRACTS §6, `app.provision.*`) via `ActivityLogService.log` with `a
   `repo.packagist.org`, `api.nuget.org`, `registry-1.docker.io`, `auth.docker.io`, `ghcr.io`, `quay.io`.
   Nothing else; the host validator in `environments.service.ts` already rejects IP literals, `localhost`, `.local`,
   `.internal`.
-- `attachedRepos`: exactly one entry (the data repository at the Task branch once pushed, else the base ref), `mountDir`
+- `attachedRepos`: exactly one entry (the Work Repository at the Task branch once pushed, else the base ref), `mountDir`
   `repo`. No env files.
 - Wall clock via pipeline `timeout`: 45 min (analysis) / 30 min (iterate).
 
@@ -890,7 +890,7 @@ limits; per-Organization cap override.
 - [x] **II — No hard-coded plugin ids.** `enforcesRuntimeNetworking` is read through the pipeline facade; the only
       template slug constant lives in the allow-list of the instantiation path, which is catalog data selection, not a
       plugin id.
-- [x] **III — Source of truth in repos.** The App spec lands by PR in the data repository; the table is derived state;
+- [x] **III — Source of truth in repos.** The App spec lands by PR in the Work Repository; the table is derived state;
       the automatic re-provision opt-in lives in the App spec.
 - [x] **IV — Job runtime.** `app-provision` and `app-provision-sweep` via `APP_PROVISION_DISPATCHER`; endpoints 202.
 - [x] **V — Forward-only migration.** One new table, six indexes, `down()` drops only those.

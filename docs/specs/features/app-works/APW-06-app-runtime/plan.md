@@ -89,7 +89,7 @@
   `verifyDomainResolution`, `normaliseIngressHost`-equivalent validation, `hashRuntimeEnv`'s canonical form.
 - `SubdomainAllocator.allocate(work, dnsOps)` with an apps-domain `IDnsOperations` (its `rootDomain()` wins).
 - `CloudflareDnsProvider` constructed with apps-zone configuration, mirroring `EverWorksDnsService`.
-- `validateClusterSourceForOwner` (keyed on the **data repository** owner) and `isReservedDeployNamespace`.
+- `validateClusterSourceForOwner` (keyed on the **Work Repository** owner) and `isReservedDeployNamespace`.
 - `WorkDeployment` rows, `GET /api/deploy/works/:id/deployments`, custom-domain rows and routes.
 - `NotificationService.create` + the core event catalogue; `ActivityLogService` via events.
 - The quota pattern of `EverWorksDeployQuotaService` (fail closed).
@@ -465,7 +465,11 @@ Job is rendered when `needsHairpin` is false or there is no primary host.
 Requested by APW-04 through `app-cluster-op` ops `verification-deploy`, `verification-status`,
 `verification-destroy` (§9.2), on the isolated worker, `your-cluster` only:
 
-- **Namespace** `<ns>-v<attempt>` (§4.1) with the purpose label and expiry annotation `now + ttlMinutes` (1–240); never
+- **Namespace** `<ns>-v<attempt>` — **this epic derives and owns the name**: `<ns>` is the live namespace name from
+  §4.1 (`ew-<slug ≤ 30>-<first 8 hex of workId>`), so `verification-deploy` **returns** it and
+  `verification-destroy` takes it back as a handle. APW-04 must **never** derive or hard-code a verification
+  namespace name of its own (an earlier draft used `ewv-<work short id>-<attempt>`, which would have had APW-04
+  destroying a namespace APW-06 never created). With the purpose label and expiry annotation `now + ttlMinutes` (1–240); never
   the live namespace, never recorded in `work_app_runtime_states.namespace`, never a `WorkDeployment` row.
 - **Rendered**: ServiceAccount, LimitRange, the five NetworkPolicies, pull Secret, env Secret from APW-07's ephemeral mode
   (values in memory only), Deployments and Services, `pre-deploy` / `first-deploy` Jobs. **Not rendered**: Ingress,
@@ -785,7 +789,8 @@ state so the resulting Build success auto-deploys even when `autoDeploy` is off.
   allocator's slug → `-<4 hex>` suffix rule gives `<slug>.<apps-domain>`); label length < 3 refused in the App branch of
   `ManagedSubdomainService`. Record: `ensureRecord({ host, type: ip ? 'A' : 'CNAME', target, proxied: false })` on
   `your-cluster` only after §6.1 validates the address; on `ever-works-apps` the tier edge owns wildcard DNS
-  (`AppsTierPolicy.edgeTlsMode`) and no per-app record is written. The health poll re-validates the address and
+  (`AppsTierPolicy.ingress().edgeTlsMode` — the value is a member of `ingress()`'s return, §5.1, not of the policy
+  itself) and no per-app record is written. The health poll re-validates the address and
   updates or removes the record.
 
 ### 8.4 Existing routes, App branch
@@ -840,8 +845,13 @@ Select `target ≠ 'none' AND paused = false AND removedAt IS NULL AND currentDe
 Each poll: `getAppStatus` + first `GET` smoke check over the public URL (runner not used; platform HTTP with the
 public-smoke classifier). Verdict: `down` if primary web ready = 0; `degraded` if any web component ready <
 desired or `check_failed`; `unreachable` on credential/connection errors; else `healthy`. Streak rules and
-notifications per spec FR-47, dedupe key `app-health:<workId>`, ≤ 1 per 6 h. Every 10th poll also re-resolves
-dependency egress hosts and the ingress address (drift → `ingress-reconcile` / `dns-reconcile`).
+notifications per spec FR-47, dedupe key `app-health:<workId>`, ≤ 1 per 6 h. **The public ingress address is
+re-validated on EVERY poll, not every tenth** — spec §4.6 requires it ("re-checked on every health poll (updated
+if it changes, withdrawn if it stops being public)"), and it is the guarantee that stops a DNS record pointing at
+an address that has since become private; an earlier draft deferred it to every 10th poll, which left up to ten
+minutes of exposure. Every **10th** poll additionally re-resolves the **dependency egress hosts** (a larger, more
+expensive list that carries no such public guarantee) — drift there dispatches `ingress-reconcile` /
+`dns-reconcile`.
 
 ### 9.4 Events, Activity, notifications
 
@@ -1141,7 +1151,7 @@ suffix, `app-preview-gc`), flag `works-app-previews` **C**.
       existing concrete-provider precedent and is flagged for EW-738.
 - [x] **II — No hard-coded plugin ids.** `AppRuntimeFacadeService` selects by `supportsApps` and the `apps-tier`
       capability; no `'k8s'` literal added outside the plugin (existing literals untouched).
-- [x] **III — Source of truth.** The App spec and image both come from the data repository commit; the database holds
+- [x] **III — Source of truth.** The App spec and image both come from the Work Repository commit; the database holds
       runtime state and history only; the license attestation stays APW-03's single record.
 - [x] **IV — Job runtime.** Every cluster action — including App Work deletion and verification targets — is a
       dispatched job; every action endpoint returns 202; overlap guarded by an atomic `UPDATE … WHERE "deployLockId" IS

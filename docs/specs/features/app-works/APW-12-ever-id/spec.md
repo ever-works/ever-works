@@ -585,8 +585,11 @@ A reviewer can run this list top to bottom against a running build with a test O
 
 ## 9. Open questions
 
-- **[NEEDS CLARIFICATION: identity provider product and domain.]** Decision record and recommendation in
-  [`idp-options.md`](./idp-options.md). This spec assumes only standard OpenID Connect.
+- **~~[NEEDS CLARIFICATION: identity provider product and domain.]~~ ANSWERED (owner, 2026-09-17): provider
+  **ZITADEL**, self-hosted **as-is and unmodified**, at **`auth.ever.co`** (verified free in the `ever.co` zone),
+  one instance serving every platform.** Decision record: [`idp-options.md`](./idp-options.md) §6–§7 (status
+  `Decided`); the binding "pure addition, never a replacement" constraints are §7 there. This spec assumes only
+  standard OpenID Connect, which is unchanged.
 - **[NEEDS CLARIFICATION: does Ever ID itself offer Google and GitHub sign-in?]** If yes, a person may reach
   Ever Works through Ever ID's Google button; Ever Works still sees only the Ever ID pair. Default: yes, with
   linking at Ever ID also explicit.

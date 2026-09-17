@@ -59,7 +59,9 @@ spec:
       role: worker
       command: ['node', 'src/worker.mjs']
       replicas: 1
-      resources: { cpu: 25m, memory: 48Mi, memoryLimit: 96Mi }
+      # 64Mi is APW-03's `MemQuantity` floor (schema.md:28, range 64Mi–256Gi): 48Mi here was `out_of_range`,
+      # and a spec with an error deploys nothing, so ACC-E2E-05 and the ACC-13-* lanes could not run at all.
+      resources: { cpu: 25m, memory: 64Mi, memoryLimit: 128Mi }
 
   dependencies:
     postgres: { version: '16', directUrl: false }

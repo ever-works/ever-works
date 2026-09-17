@@ -116,7 +116,10 @@ spec:
     - { name: DATABASE_HOST, template: '{{deps.postgres.host}}:{{deps.postgres.port}}' }
     - { name: NEXT_PUBLIC_WEBAPP_URL, from: domains.primary.url } # runtime value replaces the built placeholder
     - { name: NEXTAUTH_URL, template: '{{domains.primary.url}}/api/auth' } # verified: the framework's own default
-    - { name: EVER_WORKS_WEB_INTERNAL_URL, from: components.web.internalUrl } # used only by bootstrap-admin
+    # NOT named EVER_WORKS_*: that prefix is reserved for platform-injected values, and an `env` entry may not
+    # use it (CONTRACTS §1 / schema.md rule R23 → `reserved_env_name`). These three are the Blueprint's own
+    # bootstrap inputs, so they carry an APP_ prefix and the bootstrap-admin job below reads them by that name.
+    - { name: APP_WEB_INTERNAL_URL, from: components.web.internalUrl } # used only by bootstrap-admin
     # TODO(verify, APW-07): output names of the smtp dependency.
     - { name: EMAIL_SERVER_HOST, from: deps.smtp.host }
     - { name: EMAIL_SERVER_PORT, from: deps.smtp.port }
@@ -131,17 +134,21 @@ spec:
     - { name: GOOGLE_LOGIN_ENABLED, value: 'false' }
 
     # ── First administrator (prompted at creation; used once by bootstrap-admin) ──────────────────────────
-    - name: EVER_WORKS_BOOTSTRAP_ADMIN_EMAIL
+    - name: APP_BOOTSTRAP_ADMIN_EMAIL
       prompt: { description: 'Email address of the first administrator', required: true }
       validate: { pattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$" }
-    - name: EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD
+    - name: APP_BOOTSTRAP_ADMIN_PASSWORD
       secret: true
       prompt:
         {
           description: 'Password of the first administrator — at least 15 characters with upper-case, lower-case and a digit',
           required: true
         }
-      validate: { pattern: "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{15,}$" } # verified: the setup route's password rule
+      # NOT a `pattern`: schema.md §12 allows RE2 syntax only, which has no look-around, and the composition
+      # rule this is after ("upper-case, lower-case and a digit") cannot be expressed without it
+      # (`pattern_unsupported`). The platform checks the length; Cal.diy's own setup route enforces the full
+      # rule, and the prompt above states it to the person typing it.
+      validate: { minLength: 15 }
 
     # ── Optional integrations (prompted, may be left empty) ───────────────────────────────────────────────
     - name: GOOGLE_API_CREDENTIALS
@@ -176,14 +183,14 @@ spec:
         - --input-type=module
         - -e
         - |
-          const res = await fetch(`${process.env.EVER_WORKS_WEB_INTERNAL_URL}/api/auth/setup`, {
+          const res = await fetch(`${process.env.APP_WEB_INTERNAL_URL}/api/auth/setup`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               username: 'admin',
               full_name: 'Administrator',
-              email_address: process.env.EVER_WORKS_BOOTSTRAP_ADMIN_EMAIL,
-              password: process.env.EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD,
+              email_address: process.env.APP_BOOTSTRAP_ADMIN_EMAIL,
+              password: process.env.APP_BOOTSTRAP_ADMIN_PASSWORD,
             }),
           });
           const text = await res.text();

@@ -73,8 +73,10 @@ spec:
       validate: { length: 64, pattern: '^[0-9a-f]{64}$' }
     - { name: DISABLE_TELEMETRY, value: '1' } # verified: read by the telemetry script route and the config route
     - { name: DISABLE_UPDATES, value: '1' } # verified: read by the config route (no update checks)
-    - { name: EVER_WORKS_WEB_INTERNAL_URL, from: components.web.internalUrl } # used only by bootstrap-admin
-    - name: EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD
+    # NOT named EVER_WORKS_*: that prefix is reserved for platform-injected values (CONTRACTS §1 / schema.md
+    # rule R23 → `reserved_env_name`). These are the Blueprint's own bootstrap inputs, read by the job below.
+    - { name: APP_WEB_INTERNAL_URL, from: components.web.internalUrl } # used only by bootstrap-admin
+    - name: APP_BOOTSTRAP_ADMIN_PASSWORD
       secret: true
       prompt: { description: 'New password for the `admin` user (at least 12 characters)', required: true }
       validate: { pattern: '^.{12,}$' }
@@ -92,7 +94,7 @@ spec:
         - --input-type=module
         - -e
         - |
-          const base = process.env.EVER_WORKS_WEB_INTERNAL_URL;
+          const base = process.env.APP_WEB_INTERNAL_URL;
           const login = await fetch(`${base}/api/auth/login`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -104,7 +106,7 @@ spec:
           const change = await fetch(`${base}/api/me/password`, {
             method: 'POST',
             headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-            body: JSON.stringify({ currentPassword: 'umami', newPassword: process.env.EVER_WORKS_BOOTSTRAP_ADMIN_PASSWORD }),
+            body: JSON.stringify({ currentPassword: 'umami', newPassword: process.env.APP_BOOTSTRAP_ADMIN_PASSWORD }),
           });
           if (!change.ok) { console.error(`bootstrap-admin: password change HTTP ${change.status}`); process.exit(1); }
           console.log('bootstrap-admin: default password replaced');

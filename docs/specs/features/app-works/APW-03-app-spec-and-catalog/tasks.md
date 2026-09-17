@@ -556,7 +556,7 @@ _Delivers spec FR-53…FR-65._
       `packages/agent/src/tasks/job-runtime.providers.ts`, `packages/tasks/src/tasks/trigger/index.ts`.
       Eligibility per R-3 (plan §2.6): Your cluster after the owner's attestation for amber, red and unknown; Ever Works
       Apps for green, and for amber only with a recorded upstream agreement; red and unknown never. Source offer
-      required only when the obligation applies and the relation is `link` or the data repository is ahead of upstream
+      required only when the obligation applies and the relation is `link` or the Work Repository is ahead of upstream
       (plan §2.6, same condition as APW-06 FR-44). Activity `app.license.classified` / `changed` /
       `attestation_required` / `attested` with `actionType: APP_LICENSE` (R-2); `AppLicenseChangedEvent` on change.
       **Test**: `packages/agent/src/app-license/__tests__/app-license.service.spec.ts` — an amber Work refused for Ever

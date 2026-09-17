@@ -53,7 +53,7 @@ on `develop` today (§2.3).
 
 | The need                                 | What Ever Works offers today                                                                                                                                        | What the user does                                    |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Ask for a change to an app they run      | Tasks with isolation open a pull request on a Work's data repository, but nothing knows that repository is a fork whose deploy branch is not the default one.       | Edits the Task base branch by hand, hopes it matches. |
+| Ask for a change to an app they run      | Tasks with isolation open a pull request on a Work's Work Repository, but nothing knows that repository is a fork whose deploy branch is not the default one.       | Edits the Task base branch by hand, hopes it matches. |
 | Have the change checked                  | Quality gates run commands the Work owner lists; a repository can declare commands only on the Fleet path and only through an allow-list. No App spec checks exist. | Reads the pull request's CI, if any.                  |
 | Keep agents away from branding or schema | Nothing path-based.                                                                                                                                                 | Reviews every diff line by line.                      |
 | Know the change is live                  | A merged pull request **completes the Task** the moment the merge is seen. Nothing follows the merge to a build or a deployment.                                    | Watches the Deploy tab and refreshes the live site.   |
@@ -69,7 +69,7 @@ on `develop` today (§2.3).
    ignores the branch it is given and reports `main` regardless — so fixing only the provider name would make
    agents push straight onto the default branch. The pull-request tool opens against an empty owner and an
    empty repository name. Both name one provider in code. And the commit tool reads the Work's _import source_
-   coordinates, not the data repository Tasks use.
+   coordinates, not the Work Repository Tasks use.
 2. **A merge is treated as the finish line.** For an app it starts a build and a deployment that can each fail.
 3. **App-specific rules have nowhere to live.** Checks, off-limits paths, pull request size and the files agents
    should read are properties of the app and belong in the App spec in its repository (D3).
@@ -198,7 +198,7 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
 
 ### 4.0 Wave 0 — the Agent git tools
 
-- **FR-1.** The commit tool writes to the Work's **data repository** — the same repository Task isolation uses —
+- **FR-1.** The commit tool writes to the Work's **Work Repository** — the same repository Task isolation uses —
   on the Work's own git provider. It never resolves a repository from where a Work was imported from, and never
   names a provider in platform code.
 - **FR-2.** The commit lands on the branch the Agent names. If that branch does not exist it is created from the
@@ -206,10 +206,10 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
 - **FR-3.** With no branch named, the target is the Work's Task base branch. A commit to a branch the Work's
   resolved merge policy protects is refused: **"Agents can't commit straight to `main` on this Work. Commit to a
   branch and open a pull request."** Nothing is written, committed or pushed.
-- **FR-4.** The pull-request tool opens on the same data repository: head = the named branch; base = the named
+- **FR-4.** The pull-request tool opens on the same Work Repository: head = the named branch; base = the named
   base, else the Work's Task base branch, else the repository's default branch. The quality-gate check that
   already guards it keeps running first.
-- **FR-5.** Each tool refuses precisely — naming what is missing — when the Work has no data repository, the
+- **FR-5.** Each tool refuses precisely — naming what is missing — when the Work has no Work Repository, the
   provider is not connected, the branch name is invalid, or the head branch does not exist.
 - **FR-6.** Two commit calls on the same Work never interleave: the second waits for the first, for at most 120
   seconds, then fails with **"Another commit to this Work is in progress."**
@@ -225,7 +225,7 @@ Every threshold below is a number. "Recent", "large" and "soon" are not acceptan
   an Agent — the upstream sync conflict Task opened by the fork lifecycle (program Resolution R-21) — gets its
   Agent from the agent-resolution rule of FR-42. When that rule resolves no Agent that may commit, the Task is
   created unassigned and not started, and the App Work's owner is notified once.
-- **FR-10.** The branch is cut from the latest head of the App spec's source branch in the data repository — the
+- **FR-10.** The branch is cut from the latest head of the App spec's source branch in the Work Repository — the
   fork, the private copy or the linked repository. When the App spec changes that branch, Tasks started
   afterwards use the new branch; branches already cut are left alone.
 - **FR-11.** The Task's pull request targets the App spec's source branch in the same repository. Nothing in this
@@ -558,11 +558,11 @@ and returns focus to the button that opened it.
 
 **Wave 0 — Agent git tools**
 
-- [ ] **ACC-08-01** — On a non-GitHub data repository the commit tool commits and pushes; no provider id is hard-coded.
+- [ ] **ACC-08-01** — On a non-GitHub Work Repository the commit tool commits and pushes; no provider id is hard-coded.
 - [ ] **ACC-08-02** — Branch `feature-x` is committed, pushed and reported as `feature-x`; the default branch is unchanged.
 - [ ] **ACC-08-03** — No branch on a Work whose base branch is protected: nothing written, the FR-3 refusal returned.
-- [ ] **ACC-08-04** — The pull request opens on the data repository with the Work's base branch; FR-7 tests red before, green after.
-- [ ] **ACC-08-05** — An imported Work's commit targets its data repository, never its import source.
+- [ ] **ACC-08-04** — The pull request opens on the Work Repository with the Work's base branch; FR-7 tests red before, green after.
+- [ ] **ACC-08-05** — An imported Work's commit targets its Work Repository, never its import source.
 
 **Task target, runtime and checks**
 

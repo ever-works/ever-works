@@ -15,7 +15,9 @@ through the GitHub contents API. Paths drift; re-open each one before its task s
 ## 1. Principles (binding for P2 and P3)
 
 1. **Additive.** Ever ID is one more sign-in method. Email and password, magic code, Google, GitHub,
-   Facebook, Twitter, Microsoft, LinkedIn, Auth0 and Keycloak stay exactly as they are.
+   Facebook, Twitter, Microsoft, LinkedIn, Auth0 and Keycloak stay exactly as they are. **ZITADEL is an
+   addition, never a replacement** — each platform keeps its own authentication and its own user database, and
+   profile data stays local (owner constraint, 2026-09-17; [`idp-options.md`](./idp-options.md) §7).
 2. **Order.** Ever Works (P1) → Ever Teams (P2) → Ever Gauzy production (P3, last).
 3. **Generic OpenID Connect only.** Each platform integrates against the standard discovery document, not a
    vendor library, so the identity provider stays replaceable ([`idp-options.md`](./idp-options.md)).
@@ -73,7 +75,7 @@ platform's link table.
 | Strategy registry        | `packages/auth/src/lib/internal.ts`                                                                                                        | `Strategies` (Auth0, Facebook, Fiverr, GitHub, Google, Keycloak, LinkedIn, Microsoft, Twitter), `Controllers` (no Keycloak controller), `AuthGuards` (Microsoft, Keycloak).                                                                                                                                              |
 | Module                   | `packages/auth/src/lib/social-auth.module.ts`                                                                                              | Registers strategies, guards, controllers; `SocialAuthService` is replaced by core's `AuthService` via `registerAsync`.                                                                                                                                                                                                  |
 | Base service             | `packages/auth/src/lib/social-auth.service.ts`                                                                                             | `validateOAuthLoginEmail` contract; `routeRedirect` builds the web redirect after a social callback; OAuth-app registry types.                                                                                                                                                                                           |
-| Keycloak                 | `packages/auth/src/lib/keycloak/keycloak.strategy.ts`, `keycloak-auth-guard.ts`                                                            | `passport-keycloak-oauth2-oidc`, realm-specific config, `'disabled'` placeholders when unconfigured.                                                                                                                                                                                                                     |
+| Keycloak                 | `packages/auth/src/lib/keycloak/keycloak.strategy.ts`, `keycloak-auth-guard.ts`                                                            | `passport-keycloak-oauth2-oidc`, realm-specific config, `'disabled'` placeholders when unconfigured. **Dormant: no controller, so no route** — and it cannot be pointed at ZITADEL, because that library hard-codes `{authServerURL}/realms/{realm}/protocol/openid-connect/*` (`idp-options.md` §7.1). Leave as-is (NN #20).                                                                  |
 | Auth0                    | `packages/auth/src/lib/auth0/auth0.strategy.ts`, `auth0.controller.ts`                                                                     | `passport-auth0`; callback → `validateOAuthLoginEmail(user.emails)` → `routeRedirect`.                                                                                                                                                                                                                                   |
 | Social pattern           | `packages/auth/src/lib/google/google.controller.ts`                                                                                        | `@UseGuards(FeatureFlagEnabledGuard, AuthGuard('google'))` + `@FeatureFlag(FeatureEnum.FEATURE_GOOGLE_LOGIN)`.                                                                                                                                                                                                           |
 | Feature flags            | `packages/contracts/src/lib/feature.model.ts`, `packages/common/src/lib/guards/feature-flag-enabled.guard.ts`                              | `FEATURE_*_LOGIN` members; `featureEnabled()` returns **true unless** the variable is `'false'` (fail-open — Ever ID must not use it).                                                                                                                                                                                   |
@@ -185,12 +187,36 @@ clientSecret: EVER_ID_CLIENT_SECRET, checks: ['pkce', 'state', 'nonce'], authori
 
 ### 5.1 API sign-in for Gauzy's own web app
 
-- New `packages/auth/src/lib/ever-id/`: `ever-id.strategy.ts` (`PassportStrategy` over the generic
-  `openid-client` Passport strategy with `usePKCE: 'S256'`, `state` and `nonce`; configuration
-  `EVER_ID_ISSUER`, `EVER_ID_GAUZY_CLIENT_ID`, `EVER_ID_GAUZY_CLIENT_SECRET`, callback
-  `${API_BASE_URL}/api/auth/ever-id/callback`), `ever-id.controller.ts`, `index.ts`; registered in
-  `internal.ts` `Strategies` and `Controllers`. The Keycloak and Auth0 strategies are not modified and not
-  reused — they stay vendor-specific options for self-hosters.
+- **Gauzy side is a plugin, not core (owner constraint, 2026-09-17 — `idp-options.md` §7.5).** New
+  **`packages/plugins/<name>`** (the `@gauzy/plugin-*` convention) exporting a NestJS module — permitted
+  because `PluginMetadata extends ModuleMetadata` — that carries `ever-id.strategy.ts`
+  (`PassportStrategy` over the generic `openid-client` Passport strategy with `usePKCE: 'S256'`, `state` and
+  `nonce`; configuration `EVER_ID_ISSUER`, `EVER_ID_GAUZY_CLIENT_ID`, `EVER_ID_GAUZY_CLIENT_SECRET`, callback
+  `${API_BASE_URL}/api/auth/ever-id/callback`), its own guard, `ever-id.controller.ts` and `index.ts`. It is
+  registered by **one import plus one array entry in `apps/api/src/plugins.ts`** (the same registration point
+  ~38 existing plugins use) — and **not** by editing `packages/auth/src/lib/internal.ts`,
+  `packages/core/src/lib/auth/auth.module.ts` or `packages/config`. The Keycloak and Auth0 strategies are not
+  modified and not reused — they stay vendor-specific options for self-hosters, and the dormant Keycloak
+  scaffolding stays exactly as it is (NN #20).
+- **Two core touches to avoid, decided here** (either would be a ZITADEL edit in core code):
+  (a) do **not** add `FEATURE_EVER_ID_LOGIN` to `packages/contracts/src/lib/feature.model.ts` — the plugin
+  evaluates its own `EVER_ID_ENABLED === 'true'` inside its module and fails closed, which is stricter than the
+  core flag helper (fail-open, `cross-platform.md` §3.1); (b) do **not** append to the core `AuthGuards` /
+  `Strategies` arrays — the plugin's controller uses its own guard. Listing the plugin in `plugins.ts` is
+  registration, not vendor logic; if the owner wants even that out of the app file, the fallback is a
+  `GAUZY_PLUGINS`-style environment-addressed load, which is a change to the plugin loader and needs its own
+  decision.
+- **The provider-plugin family (owner decision, 2026-09-17).** Ever ID's own IdP is **ZITADEL**; the other
+  providers are **optional per-installation plugins for self-hosters**, not alternatives Ever ID switches to:
+  - `zitadel` — the Ever ID provider (this epic).
+  - `keycloak` — **moved from core to a plugin** (blast radius in [`idp-options.md`](./idp-options.md) §7.3).
+  - `supertokens` — **new, requested by the owner**, "not to replace anything": so a self-hoster can run Ever
+    Gauzy with SuperTokens exactly as they can with Keycloak today.
+  - `auth0` — already works today (`packages/auth/src/lib/auth0/`); it moves to the same shape when its plugin
+    is extracted, and is not required for Ever ID.
+  Each plugin is independent, enabled by its own configuration, and **fails closed when unconfigured** — the
+  existing Keycloak strategy's `'disabled'` placeholders are the precedent. None of them is a dependency of
+  Ever ID, and Ever ID is not a dependency of any of them.
 - Controller: `GET /auth/ever-id?handoff_challenge=<S256 of a browser verifier>` and
   `GET /auth/ever-id/callback`, both `@UseGuards(FeatureFlagEnabledGuard, AuthGuard('ever-id'))` +
   `@FeatureFlag(FeatureEnum.FEATURE_EVER_ID_LOGIN)` (new, evaluated `=== 'true'`).
@@ -330,4 +356,5 @@ Cypress in `apps/web/cypress/e2e/`; Ever Gauzy — Jest `*.spec.ts` beside the s
   identity provider ([`idp-options.md`](./idp-options.md) §6).
 - **Ever Rec and other Ever apps.** Not covered; the same model applies when they adopt.
 - **Gauzy self-hosters** who already use the Keycloak or Auth0 strategies: document that Ever ID's generic
-  strategy can point at their own provider, without changing theirs.
+  strategy can point at their own provider, without changing theirs. Ever ID's own provider is **ZITADEL**
+  (`idp-options.md` §6) — a self-hoster's Keycloak realm is neither required nor touched.

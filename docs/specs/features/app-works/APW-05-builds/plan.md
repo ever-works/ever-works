@@ -69,14 +69,14 @@ the builds routes, `app-build-*` jobs and `app.build.*` events)
 - **The existing `workflow_run` intake cannot drive Builds.** It ignores `queued`/`in_progress` and never maps a
   repository to a Work.
 - **Writing one file means cloning the repository.** Repository writes go through `GitOperations` (no depth, per
-  EXISTING-SUBSTRATE §3). Cloning a 1 GB data repository to add one workflow file is not acceptable; the workflow
+  EXISTING-SUBSTRATE §3). Cloning a 1 GB Work Repository to add one workflow file is not acceptable; the workflow
   is written through APW-03's clone-free `IGitProviderPlugin.commitFiles?` (CONTRACTS §3), handed to the plugin (§4.6).
 - **Tags cannot address a commit.** The k8s plugin truncates tags to 12 characters; Builds record digests instead.
 - **Existing pull credential resolution is not reused for App Works.** It was built for platform-generated sites,
   whose credentials are chosen for the platform's own repositories. App Works use a per-App-Work token that can only
   read packages (§4.12), so a cluster running user-controlled code never holds a credential that can do more.
 - **Nothing runs App checks in the repository's CI.** APW-08 needs the App spec's checks as ordinary provider check runs
-  on the pull request (Resolution R-9); only this epic writes a workflow into the data repository (§2.4, §4.14).
+  on the pull request (Resolution R-9); only this epic writes a workflow into the Work Repository (§2.4, §4.14).
 - **No webhook is guaranteed.** Repository webhooks are APW-02 (`createWebhook?`); App deliveries may not cover a fork.
 
 ### 1.3 What already exists and must be reused, not rebuilt

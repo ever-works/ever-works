@@ -442,8 +442,11 @@ range), APW-07 P1 (in-namespace ephemeral dependencies without PVCs).
 
 - [ ] **T34. Cluster verification target.**
       **Create** `packages/agent/src/app-provisioning/app-verification-target.service.ts` **(new)** — `checkAppCluster`
-      probe through `app-cluster-op` (10 s), namespace name `ewv-<work short id>-<attempt>` (≤ 63 chars),
-      `deployApp({ purpose: 'verification', ttlMinutes: 90 })` with APW-07's ephemeral env mode, pending-on-capacity > 10 min → infra verdict + runner fallback once, `destroy` on attempt end.
+      probe through `app-cluster-op` (10 s), `deployApp({ purpose: 'verification', ttlMinutes: 90 })` with APW-07's ephemeral env mode, pending-on-capacity > 10 min → infra verdict + runner fallback once, `destroy` on attempt end.
+      **The verification namespace name comes back from `verification-deploy`, never from here** — APW-06 §9.2 derives
+      `<ns>-v<attempt>` from the live namespace and owns it; this service keeps the returned handle and passes it to
+      `verification-destroy`. Do **not** compute, prefix or hard-code a name (`ewv-…` was an earlier draft: it would
+      have destroyed a namespace APW-06 never created, leaking one per attempt).
       **Modify** `packages/agent/src/app-provisioning/app-provisioning-step-runner.ts` — target selection of plan §2.4.
       **Test**: `packages/agent/src/app-provisioning/__tests__/app-verification-target.service.spec.ts` **(new)** with an
       APW-06 plugin double: no Ingress and no PVC in the render input, destroy called on green, red, cancel and TTL

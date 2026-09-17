@@ -265,7 +265,10 @@ Whole object ≤ 512 KiB (validated by the controller **and** a CRD `x-kubernete
 Refusal codes: `SPEC_LIMIT_EXCEEDED`, `NAMESPACE_FIELD_FORBIDDEN`, `QUOTA_PROFILE_UNKNOWN`,
 `PLATFORM_CREDENTIAL_IN_ENV`, `IMAGE_NOT_DIGEST_PINNED`, `IMAGE_SCAN_BLOCKED`, `IMAGE_UNSIGNED`,
 `IMAGE_OUTSIDE_TENANT_REGISTRY`, `HOST_NOT_VERIFIED`, `HOST_CLAIMED`, `SEALED_PAYLOAD_INVALID`,
-`CRON_TOO_FREQUENT`. Degraded reasons include `IMAGE_RUNS_AS_ROOT`, `QUOTA_EXCEEDED`.
+`CRON_TOO_FREQUENT`, **`ISOLATION_NOT_ENFORCED`** — refused when the zone cannot prove the isolation the Work
+requires (sandbox runtime class, default-deny network policy, quota profile applied); APW-06 renders it as the
+Deployment ending `failed (isolation_not_enforced)`, so the two epics must spell it the same way. Degraded
+reasons include `IMAGE_RUNS_AS_ROOT`, `QUOTA_EXCEEDED`.
 
 ### 3.2 `SelfCheck`, `UsageReport`, `AbuseSignal`, `AppBuild`
 
@@ -482,6 +485,10 @@ export interface IAppsTierProvider extends IPlugin {
 	acknowledgeUsageReports(names: string[]): Promise<void>;
 	listAbuseSignals(limit: number): Promise<AppsTierAbuseSignalReport[]>;
 	acknowledgeAbuseSignals(names: string[]): Promise<void>;
+	// APW-06 FR-7 routes "status, jobs, LOGS and removal … through the tier", and FR-48 exposes
+	// `POST /api/works/:id/app-logs` + `GET …/:requestId`. Without this member the managed target has no log
+	// path at all, so it is required in P2 alongside `getWork` — not optional, and not deferred.
+	getAppLogs(workId: string, opts: AppsTierLogRequest): Promise<AppsTierLogPage>; // FR-7 / FR-48
 	submitBuild?(input: AppsTierBuildRequest): Promise<void>; // P3, APW-05 apps-builder
 	getBuild?(buildId: string): Promise<AppsTierBuildStatus | null>;
 }
@@ -577,7 +584,7 @@ APW-06 declares the port and its disabled default; this epic owns what it means 
 | `isOpen()`                         | `evaluate().open` (sync over the 30 s cache; refreshed by an interval in the service). The method every consumer calls.                                                                        |
 | `isManagedEnabled()`               | **Alias only** — defined on this implementation (not on APW-06's port), returns `isOpen()`; no consumer calls it (NN #20).                                                                     |
 | `managedScope()`                   | `evaluate().scope`.                                                                                                                                                                            |
-| `eligibility(userId)`              | FR-35 reason codes in order (`emailUnverified`, `planRequired`, `ownerQuarantined`, `capReached`); APW-06's preconditions call it for target **Ever Works Apps**.                              |
+| `eligibility(userId)`              | FR-35 reason codes in order (`emailUnverified`, `planRequired`, `ownerQuarantined`, `capReached`); APW-06's preconditions call it for target **Ever Works Apps**. **`capReached` is a presentation of APW-06's cap, not a second cap**: the per-owner limit is `EverWorksAppsQuotaService.getMaxPerUser()` reading `EVER_WORKS_APPS_MAX_PER_USER` (default 3 — APW-06 plan §7, its precondition `quota_exceeded`), and this epic reads it through that service/port rather than defining its own constant, env var or table. Do not add a competing limit here.                              |
 | `resolveClusterCredential(workId)` | Returns the **control-namespace** credential from `EVER_WORKS_APPS_CONTROL_KUBECONFIG`; the only caller is the `ever-works-apps` plugin, and the credential cannot create a workload anywhere. |
 | `podPolicy()`                      | `{ runtimeClassName: zoneInfo.sandboxRuntimeClass, quota, limitRange }` from the Work's profile — informational for APW-06 renderer fixtures; the zone enforces.                               |
 | `ingress()`                        | `{ className: zone edge class, controllerNamespace: zone value, edgeTlsMode: 'edge' }`.                                                                                                        |
@@ -868,7 +875,7 @@ on stage, APW-03's verified-only constant derived from `managedScope()`. **Gate*
       custom hostnames use an edge-hostname capability plugin; the controller is a zone workload, not core.
 - [x] **II — No hard-coded plugin ids in core.** APW-06 selects by capability; the metering `pluginId` literal
       lives in the plugin's exported constant.
-- [x] **III — Source of truth.** App specs stay in the data repository; the tier stores operational state only.
+- [x] **III — Source of truth.** App specs stay in the Work Repository; the tier stores operational state only.
 - [x] **IV — Job runtime.** Self-check, watch, import, receipts are dispatched/scheduled; quarantine writes
       desired state synchronously by design (FR-45) and does no long-running work in the request.
 - [x] **V — Forward-only migrations.** Three additive migrations; seeds are inserts; `down()` removes only

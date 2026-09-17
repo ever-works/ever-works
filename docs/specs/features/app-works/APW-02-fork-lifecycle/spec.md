@@ -31,7 +31,7 @@ APW-09 (fork network)
 ## 1. Overview
 
 A fork is not finished when GitHub accepts the request, and it does not stay useful on its own. This epic
-makes an App Work's data repository behave like something a member can trust over months:
+makes an App Work's Work Repository behave like something a member can trust over months:
 
 - **Ready means ready.** An App Work leaves **Preparing** only when its repository can be read and its
   default branch has a commit — and, when its source is recorded through a setup pull request, only once that pull
@@ -262,7 +262,7 @@ Every threshold below is a number on purpose.
 
 ### 4.5 Readiness (P1)
 
-- **FR-17.** An App Work's data repository is **ready** when it can be read with the Work's credentials and
+- **FR-17.** An App Work's Work Repository is **ready** when it can be read with the Work's credentials and
   its default branch has at least one commit.
 - **FR-18.** Readiness MUST be checked in a background job at 2, 4, 8 and 15 seconds after the request, then
   every 15 seconds, for at most 15 minutes, then marked **timed out** with one Activity entry.
@@ -328,7 +328,7 @@ Every threshold below is a number on purpose.
   count, request license re-evaluation, and re-run hygiene when the tracked branch changed.
 - **FR-41.** Archived upstreams MUST pause scheduled sync; unreadable upstreams MUST pause it, emit "upstream
   unavailable" once, and be re-checked every 24 hours.
-- **FR-42.** A missing data repository MUST stop every background job for the App Work, emit "fork missing" once
+- **FR-42.** A missing Work Repository MUST stop every background job for the App Work, emit "fork missing" once
   and show a health warning.
 - **FR-43.** When upstream's default branch was renamed, the sync MUST follow the new name, record it, and show it.
 - **FR-44.** A linked App Work has no upstream: sync MUST NOT be offered and a sync request MUST be refused.
@@ -357,7 +357,7 @@ Every threshold below is a number on purpose.
 
 - **FR-54.** Every step MUST name the single permission it lacks: reading the repository, writing contents,
   opening pull requests, administering Actions, managing webhooks.
-- **FR-55.** The system MUST be able to install and remove a signed webhook on an App Work's data repository
+- **FR-55.** The system MUST be able to install and remove a signed webhook on an App Work's Work Repository
   (used by builds, APW-05), idempotently, and MUST NEVER install one on an upstream.
 - **FR-56.** Every read and write MUST be scoped to the caller; another account's App Work answers not found.
 - **FR-57.** Every user-visible string MUST be translatable; keys present in every locale file.
@@ -378,7 +378,7 @@ Every threshold below is a number on purpose.
 
 | Entity           | Today                                                              | This epic adds                                                                                            |
 | ---------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| **Work**         | Data repository coordinates; App Works carry an upstream (APW-01). | Nothing on the row; lifecycle lives in Upstream state.                                                    |
+| **Work**         | Work Repository coordinates; App Works carry an upstream (APW-01). | Nothing on the row; lifecycle lives in Upstream state.                                                    |
 | **Task**         | Delegated work with labels and an assignee.                        | A conflict is an ordinary Task, one open per App Work.                                                    |
 | **Activity**     | Records Work events.                                               | Fork ready, fork timeout, fork missing, Actions disabled, upstream synced, behind, conflict, unavailable. |
 | **Work tabs**    | Overview, Tasks, Deploy and the other per-Work tabs.               | The **Upstream** tab for App Works on a fork or private copy (shared with APW-09).                        |

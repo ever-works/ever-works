@@ -75,9 +75,9 @@ spec:
 | Where                                      | Mode              | Runs                                                                                                                     |
 | ------------------------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Editor (`yaml-language-server`)            | —                 | Structure only (JSON Schema, §25).                                                                                       |
-| Platform, on a Work's data repository      | `data-repository` | Structure, §21, §22 and server-only rules.                                                                               |
+| Platform, on a Work's Work Repository      | `data-repository` | Structure, §21, §22 and server-only rules.                                                                               |
 | Platform, draft text (`validate` API)      | `data-repository` | Structure, §21, §22; server-only rules when a Work id is given.                                                          |
-| Apps catalog CI, on a Blueprint repository | `blueprint`       | Structure, §21, §22. `source` and `blueprint` are **forbidden** (`blueprint_mode_forbidden_key`); `license` is optional. |
+| Apps catalog CI, on a Blueprint repository | `blueprint`       | Structure, §21, §22. **`source` and `blueprint` are allowed and expected** — a Blueprint's file becomes the App Work's spec, where both are present (all three APW-13 Blueprints declare both, and catalog CI check C4 requires zero errors). *Corrected 2026-09-17:* this row used to forbid them with `blueprint_mode_forbidden_key`, which **no APW-13 Blueprint could satisfy** — the code is kept in §23's list but is no longer emitted for these two keys. The rule that does apply in this mode: `blueprint.repo` must name the repository the file lives in. `license` is optional. |
 
 The **effective spec** of an App Work is the most recent evaluation of its tracked branch with zero
 errors. A later file with errors is reported but never replaces it; nothing is built or deployed from a
@@ -114,7 +114,7 @@ commit whose own spec has errors ([spec.md FR-20](./spec.md)).
 | `relation`               | enum   | **required**                   | `fork` · `private-copy` · `link`.                                                                    |
 | `upstream.repo`          | string | **required** unless `link`     | `^[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}$`. Forbidden when `link` (`upstream_forbidden_for_link`). |
 | `upstream.defaultBranch` | string | upstream's default at creation | Git ref name, 1–255 chars.                                                                           |
-| `branch`                 | string | data repository default branch | Git ref name, 1–255 chars, not ending `.lock`, no `..`, no `//`. The branch built and deployed.      |
+| `branch`                 | string | Work Repository default branch | Git ref name, 1–255 chars, not ending `.lock`, no `..`, no `//`. The branch built and deployed.      |
 
 Server-only rule: `relation` must equal the relation recorded when the App Work was created (error
 `source_relation_mismatch`) — a hand edit cannot turn a fork into a link.
@@ -142,7 +142,7 @@ Informational. The license gate classifies from **detection**, never from this b
 | `class`          | enum   | —       | `green` · `amber` · `red` · `unknown`.                                                                 |
 | `source`         | enum   | —       | `detected` · `blueprint` · `user`.                                                                     |
 | `notice`         | string | —       | ≤ 500 chars. Trademark / attribution notice shown with the app.                                        |
-| `sourceOfferUrl` | string | —       | `https://` URL ≤ 500 chars. Where network users obtain the source when the data repository is private. |
+| `sourceOfferUrl` | string | —       | `https://` URL ≤ 500 chars. Where network users obtain the source when the Work Repository is private. |
 
 Server-only: a declared `spdx` or `class` that differs from detection is warning
 `license_declared_mismatch`.
@@ -175,6 +175,8 @@ nothing; `auto` is a **zero-config build** — the build plugin detects the lang
 and builds an image without a Dockerfile. Which builder implements `auto` is the build plugin's choice and is never
 named in the App spec. When no enabled build plugin lists `auto` among its supported strategies, the server-only
 warning `build_strategy_unavailable` is reported (§22) and APW-05 refuses the Build.
+
+## 10. `components`
 
 At most 10. At least 1 when `build.strategy` ≠ `none` (error `strategy_requires_components`).
 
@@ -374,6 +376,7 @@ Quality gates for Tasks on this App Work; run sandboxed (README §7 rule 9). At 
 | `instructionFiles`           | RelPath[] | `[]`    | ≤ 10.    |
 | `maxPullRequestChangedLines` | integer   | `500`   | 50–5000. |
 | `maxPullRequestChangedFiles` | integer   | `50`    | 1–500.   |
+| `requireHumanMergePaths`     | Glob[]    | `[]`    | ≤ 50 entries. Paths whose changes **only a person may merge**, whatever the merge policy says (semantics: APW-08; declared in CONTRACTS §1 "Additions (APW-08)". Removals from this list are reported by `diffGuardedSpecBlocks` — see CONTRACTS §2A). |
 
 ## 19. `upstreamSync`
 
@@ -465,6 +468,7 @@ naming every entry in the cycle. Resolution depth ≤ 10 (`template_too_deep`).
 | R24 | `license.class: green` declared while `license.spdx` maps to another class in the registry.                                                                                                                                                                       | `license_declared_mismatch`                                                                     | warning                                                    |
 | R25 | `generate.keypair.format: base64url-raw` is used only with `type` `ed25519` or `ec-p256` (R-11).                                                                                                                                                                  | `keypair_format_unsupported`                                                                    | error                                                      |
 | R26 | `generate.keypair.passwordEnv` is present exactly when `format: pkcs12`, and names another `secret: true` entry generated with `kind` `base64`, `hex` or `chars` (R-11).                                                                                          | `keypair_password_invalid`                                                                      | error                                                      |
+| R27 | `license.sourceOfferUrl` is **required whenever the Work Repository is not public** (private fork or private copy), because the Source link is the licence's network-source-offer condition; a public repository satisfies it by being public. Added 2026-09-17: `ACC-03-36` already asserted `sourceOfferMissing`, but that code existed in no rule table and no code list, so the scenario could not pass. | `sourceOfferMissing`                                                                            | error                                                      |
 
 **Server-only rules** (need platform state, so editors cannot run them): `source_relation_mismatch`
 (§5), `blueprint_unknown` (§6), `license_declared_mismatch` against detection (§7),

@@ -287,7 +287,11 @@ export const UPSTREAM_REFUSAL_CODES = [
 
 export const UPSTREAM_LIMITS = {
 	openedPerUpstreamPer24h: 1,
-	openPerUpstream: 2,
+	// Ceiling only. The effective per-upstream open cap is the App Work's own setting,
+	// `spec.upstreamPullRequests.maxOpen` (schema.md §20, default 3, valid 1–10, read through
+	// AppSpecService.getEffectiveSpec). A hard-coded 2 here used to ignore the spec field entirely —
+	// FR-26 — so this constant must never be read as the limit itself.
+	openPerUpstreamCeiling: 10,
 	openedOverallPer24h: 3,
 	preparationsPer24h: 10,
 	runningPreparationsPerWork: 1,

@@ -124,6 +124,19 @@ AppUpstreamRef } from '../../apps/app-source.js'`; widen `SourceRepository.type`
       `'1'` ⇒ `false`.
       **Done when**: the spec is green and `apps/api/.env.example` contains `EVER_WORKS_APP_WORKS_ENABLED=false`.
 
+- [ ] **T7b. The web chip must fail CLOSED for `app` (R-6 says so; the shipped helper does the opposite).**
+      **Modify** `apps/web/src/lib/feature-flags/work-kinds.ts` — today it is documented as **fail-open**
+      ("DEFAULT IS ENABLED … a missing flag, or an `undefined` value → the chip is ENABLED"; only an explicit
+      `false` disables it, `:13-20,75-76`), which would leave the **App** chip visible whenever the PostHog flag
+      is missing — exactly the case R-6 must prevent. Add `app` to a fail-CLOSED set for this one kind: the chip
+      renders only when the flag resolves strictly `true` **and** the API-side gate agrees.
+      **Test**: extend the existing work-kinds spec — missing flag ⇒ App chip absent; `false` ⇒ absent;
+      `true` ⇒ present; every other `works-<kind>` flag keeps its fail-open behaviour (pin that too, so the
+      change is provably scoped to `app`).
+      **Done when**: the spec is green and no other kind's flag semantics changed.
+      (_Why this is a task in APW-01:_ CONTRACTS §7/R-6 require the fail-closed chip, but no epic owned the file
+      that implements it.)
+
 - [ ] **T8. Repository lookups.**
       **Modify** `packages/agent/src/database/repositories/work.repository.ts` — add
       `findAppWorksByDataRepository(userId, owner, repo)` (kind `app`, indexed `owner`, `data` role compared
@@ -248,7 +261,7 @@ relation }` for the conflict checks. Do not change `findRepositoryWorksWrapping`
       per-Work checkout removal (`checkoutKey: 'work:<id>:data'`, APW-02). (The workload removal of R-15 is T39.)
       **Test**: **create** `packages/agent/src/services/__tests__/work-lifecycle.app-kind.spec.ts` — the full
       delete matrix (link + flag ⇒ 400; fork + omitted ⇒ kept; fork + `true` + admin ⇒ deleted; fork + `true`
-      without admin ⇒ kept with message; data repository equal to upstream ⇒ never deleted; provider failure
+      without admin ⇒ kept with message; Work Repository equal to upstream ⇒ never deleted; provider failure
       ⇒ row deleted, message names the repository) and the update rules (ACC-01-10).
       **Done when**: the new spec is green and `packages/agent/src/services/__tests__/work-lifecycle.delete.spec.ts`
       passes unchanged.

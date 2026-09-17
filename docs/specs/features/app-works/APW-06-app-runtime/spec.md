@@ -259,6 +259,12 @@ Every threshold below is a number on purpose.
   sandboxed container runtime for tenant workloads; in Wave 3 any App Work the gate admits. On this target the platform
   never applies workloads itself: it renders the app's desired state and hands it to the tier, which renders and runs it
   inside the isolated zone; status, jobs, logs and removal go through the tier the same way.
+- **FR-63.** The target a person chose **at creation** is carried into the App Work's runtime state on its first
+  read, never left at the default: when the Work was created for **Your cluster**, the runtime state reports
+  **Your cluster**; when it was created for a managed target, that target; otherwise **None**. Until this
+  derivation happens the App Work would read as **None** and refuse to deploy, so it is a precondition of the
+  first Deployment, not a later correction. (APW-01 persists the creation-time choice; this epic derives and owns
+  the runtime value — see APW-01's recorded cross-epic requirement.)
 - **FR-8.** At most **3** App Works per owner may target Ever Works Apps (operator-configurable); paused App
   Works count. The limit is checked when the target is chosen and again atomically at deploy time.
 - **FR-9.** License gate per target, as APW-03's hosting eligibility reports it: **green** — every target; **amber** —
@@ -409,15 +415,15 @@ Every threshold below is a number on purpose.
 ### 4.7 Source offer
 
 - **FR-44.** When the license class requires offering source to network users (per APW-03's registry) **and**
-  either the App Work links its own repository or the data repository has commits the upstream does not (the same
+  either the App Work links its own repository or the Work Repository has commits the upstream does not (the same
   condition APW-03's hosting eligibility reports), the Deploy tab,
-  the Overview card and the App Launcher item show **Source**, linking to the data repository at the exact
-  deployed commit, or to the App spec's declared source-offer URL when the data repository is private. The
+  the Overview card and the App Launcher item show **Source**, linking to the Work Repository at the exact
+  deployed commit, or to the App spec's declared source-offer URL when the Work Repository is private. The
   app receives the same URL as `EVER_WORKS_SOURCE_URL`.
 - **FR-45.** Ever Works does not modify the running app to display the offer and does not verify that it does.
   The Deploy tab states: **"This license requires your app to offer its source to its users. Ever Works links
   to it here; showing that link inside your app is your responsibility. This is not legal advice."** A
-  private data repository with no source-offer URL shows a warning on every Deployment.
+  private Work Repository with no source-offer URL shows a warning on every Deployment.
 
 ### 4.8 Status and health
 
@@ -453,7 +459,7 @@ Every threshold below is a number on purpose.
 
 ### 4.10 Preview Deployments (Wave 3)
 
-- **FR-52.** When enabled for an App Work, a pull request from a branch **in the data repository** (never from a
+- **FR-52.** When enabled for an App Work, a pull request from a branch **in the Work Repository** (never from a
   fork of it) with a green Build gets a preview at `pr-<number>-<label>.<apps-domain>` in its own namespace,
   with 1 replica per component, no scheduled calls, temporary volumes, and its own dependencies — a preview
   never connects to the live app's data. Apps whose dependencies cannot be provisioned per preview get no
@@ -507,7 +513,7 @@ Every threshold below is a number on purpose.
 | --------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Deployment**              | One row per deploy: state, provider, branch, commit, website, error. | The Build it deployed, target, per-component outcome, job outcomes, smoke results, the App spec commit, rollback facts, and the states **Rolled back** and **Skipped**. |
 | **Custom domain**           | Stored, verified, merged into the website's ingress.                 | For App Works: published only when verified; can be marked primary.                                                                                                     |
-| **Managed subdomain**       | One label per Work under the platform domain.                        | For App Works: under the apps domain only.                                                                                                                              |
+| **Managed subdomain**       | One label per Work under the platform domain.                        | For App Works: under the apps domain, which defaults to the platform's own domain (`ever.works`) — never another Ever product's domain (owner decision 2026-09-17).      |
 | **Build** (APW-05)          | —                                                                    | The only source of images a Deployment may use.                                                                                                                         |
 | **Activity / Notification** | Existing.                                                            | App runtime events and four notification kinds (deploy failed, down, back, cluster unreachable).                                                                        |
 
@@ -634,7 +640,7 @@ dialog (S30, S31), next to APW-01's separate fork checkbox:
 
 | Element                  | Copy                                                                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| Deployment states        | `Queued` · `Deploying` · `Checking` · `Live` · `Live with warnings` · `Failed` · `Rolled back` · `Cancelled` · `Skipped`      |
+| Deployment states        | `Queued` · `Deploying` · `Checking` · `Live` · `Live with warnings` · `Failed` · `Rolled back` · `Cancelled` · `Cancelled — quarantined` · `Skipped` |
 | App states               | `Not deployed` · `Live` · `Degraded` · `Down` · `Can't reach your cluster` · `Paused`                                         |
 | Precondition list header | `Fix these before deploying:`                                                                                                 |
 | Kubeconfig refused       | `This kubeconfig {reason}. Use a service account token instead.`                                                              |
@@ -693,7 +699,7 @@ states are text plus icon, never colour alone.
 - [ ] **ACC-06-24** Failed rollback ends "rollback did not complete" and sends an urgent notification (S20).
 - [ ] **ACC-06-25** Verified custom domain is published ≤ 60 s after verify without restart; unverified is never published (S8).
 - [ ] **ACC-06-26** Primary change with restart vs rebuild policy behaves per FR-38 (S9).
-- [ ] **ACC-06-27** Managed subdomain is never under the platform domain; misconfigured apps domain disables the feature (Wave 1 for Your cluster).
+- [ ] **ACC-06-27** Managed subdomain is never under **another Ever product's** domain (a subdomain of the platform's own `ever.works` IS allowed — owner decision 2026-09-17); misconfigured apps domain disables the feature (Wave 1 for Your cluster).
 - [ ] **ACC-06-28** Managed DNS record on Your cluster targets only a public ingress address and is withdrawn when it is not (Wave 1).
 - [ ] **ACC-06-29** TLS modes produce `https`/`http` URLs and certificate requests as stated (FR-42).
 - [ ] **ACC-06-30** Source link appears only when the license requires it and the fork differs; it targets the deployed commit (S12).

@@ -301,7 +301,7 @@ all App Works (Resolution R-24).
   **Also delete stored data** and typed the App Work's slug when deleting it; they are then deleted only after the
   workloads are gone, and dependencies are released by their own providers first. Without that confirmation the
   stored data is retained for 30 days and removed only by a separate, explicit operator action outside this epic.
-  Backups are never deleted by a removal. The tier never touches the upstream or the data repository; those follow
+  Backups are never deleted by a removal. The tier never touches the upstream or the Work Repository; those follow
   the App Work deletion rules of APW-01.
 - **FR-29.** The controller publishes a heartbeat at least every 30 seconds.
 

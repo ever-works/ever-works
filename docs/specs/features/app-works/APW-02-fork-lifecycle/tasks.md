@@ -351,7 +351,10 @@ limit)`, `findUnavailableDueForRecheck(nowMs, limit)`, `claimSetupPullRequestChe
 - [ ] **T26. `AppUpstreamSyncService` and schedule helper.**
       **Create** `packages/agent/src/app-works/upstream-schedule.ts` — `computeNextUpstreamSync(schedule, from, workId)`
       reusing `computeNextHeartbeat` from `packages/agent/src/agents/heartbeat-cron.ts` (default, hourly clamp, stable
-      jitter).
+      jitter). **The helper reads all four `upstreamSync` fields (plan §6.4, schema.md §19): `schedule`, `enabled`
+      (`false` ⇒ `nextSyncAt` stays `null` and the dispatcher never fires, while manual **Sync now** still works),
+      `branch` (the branch compared and merged) and `mode` (`merge` only).** All four are read from APW-03's
+      effective spec, with the documented defaults when the block or the field is absent.
       **Create** `packages/agent/src/app-works/app-upstream-sync.service.ts` — `run(payload)` per [plan §6.3](./plan.md)
       with `DistributedTaskLockService`, a `ProviderCallBudget` wrapper, `AppLicenseService` (`@Optional()`, APW-03).
       **Create** `packages/agent/src/app-works/app-upstream-conflict.copy.ts` — the spec §6.3 templates.
