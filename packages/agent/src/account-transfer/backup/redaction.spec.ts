@@ -19,12 +19,26 @@ import {
  *  1. Fixture rows for every entity that carries a secret column, asserting
  *     no secret VALUE survives and — where it is useful — the field NAME
  *     does.
- *  2. A reflection pass over the entity sources that fails when a
- *     secret-shaped column has no rule and no reviewed exemption.
+ *  2. Reflection passes over the entity sources that fail when a column that
+ *     looks like it carries a secret has no rule and no reviewed exemption.
  *
  * Half 2 is the one that matters in a year: it is what makes a new
  * `fooSecretEncrypted` column on a new entity a failing test rather than a
  * quiet leak into everybody's downloaded backup.
+ *
+ * It used to reflect on ONE family — the name shape
+ * `/secret|password|token|hash|credential/i` — and four leaks walked
+ * straight through it, because a column name is not where "this is a
+ * credential" is written:
+ *
+ *  - `Work.deployDatabaseUrlEncrypted` — a Postgres connection string.
+ *  - `Work.deployRuntimeEnvEncrypted` — an allow-listed payment-key bag.
+ *  - `RepoConnection.envFiles` — seed `.env` file bodies.
+ *  - `NotificationChannel.targetConfig` — a live bot token / webhook URL.
+ *
+ * So there are now four families: the original name shape, a name ending in
+ * `Encrypted`, an `@EncryptedJsonColumn` decorator, and the payment-provider
+ * identifier columns of `BillingProfile`.
  */
 describe('workspace backup redaction', () => {
     describe('rows that never appear at all', () => {
@@ -79,6 +93,92 @@ describe('workspace backup redaction', () => {
                 platformSyncSecretEncrypted: { wasSet: false },
             });
             expect(JSON.stringify(row)).not.toContain(secretLiteral);
+        });
+
+        it('exports a deployed Work without its database URL or its runtime env bag', () => {
+            // The archive is the only surface in the product that emits this
+            // material at all: the API masks the runtime env, and the
+            // database URL is never echoed back. Both are AES envelopes, so
+            // what leaked was ciphertext — which the archive's own
+            // `stored_credentials` exclusion covers explicitly ("in
+            // plaintext or ciphertext").
+            const databaseUrl = 'enc::v1::postgres-url-envelope-do-not-export-me';
+            const runtimeEnv = 'enc::v1::runtime-env-envelope-do-not-export-me';
+            const row = redactRow('Work', {
+                id: 'w1',
+                slug: 'acme-tools',
+                deployDatabaseMode: 'shared',
+                deployDatabaseUrlEncrypted: databaseUrl,
+                deployRuntimeEnvEncrypted: runtimeEnv,
+            });
+
+            expect(row).toEqual({
+                id: 'w1',
+                slug: 'acme-tools',
+                // Which database backs the site is a record, not a capability.
+                deployDatabaseMode: 'shared',
+                deployDatabaseUrlEncrypted: { wasSet: true },
+                deployRuntimeEnvEncrypted: { wasSet: true },
+            });
+            expect(JSON.stringify(row)).not.toContain(databaseUrl);
+            expect(JSON.stringify(row)).not.toContain(runtimeEnv);
+        });
+
+        it('exports a repo connection’s env-file PATHS and none of their contents', () => {
+            // `page()` reads rows with `getRawMany()`, which bypasses the
+            // decrypt transformer — so on an install with no
+            // PLUGIN_SECRET_ENCRYPTION_KEY, and for any row written before
+            // the column was encrypted, the stored value IS the `.env` text.
+            // Both shapes are covered: the decrypted object and the raw string.
+            const envBody = 'STRIPE_SECRET_KEY=sk-live-do-not-export-me';
+            const decrypted = redactRow('RepoConnection', {
+                id: 'rc1',
+                provider: 'a-code-host',
+                credentialMode: 'app',
+                credentialRef: 'ref-123',
+                envFiles: { '.env': envBody, 'apps/web/.env.local': envBody },
+            });
+
+            expect(decrypted).toEqual({
+                id: 'rc1',
+                provider: 'a-code-host',
+                credentialMode: 'app',
+                credentialRef: { wasSet: true },
+                // The paths survive, which is what tells the owner which
+                // repositories need their `.env` re-seeded — the same answer
+                // the masked API response already gives.
+                envFiles: { '.env': { wasSet: true }, 'apps/web/.env.local': { wasSet: true } },
+            });
+            expect(JSON.stringify(decrypted)).not.toContain(envBody);
+
+            const raw = redactRow('RepoConnection', { id: 'rc2', envFiles: envBody });
+            expect(raw).toEqual({ id: 'rc2', envFiles: { wasSet: true } });
+            expect(JSON.stringify(raw)).not.toContain(envBody);
+        });
+
+        it('exports a notification channel’s endpoint field names and no credential', () => {
+            // `domain-specs.ts` already tells the reader of this file that
+            // "channel endpoints are redacted". This is the test that makes
+            // that sentence true.
+            const botToken = '123456:AAH-do-not-export-me';
+            const row = redactRow('NotificationChannel', {
+                id: 'nc1',
+                pluginId: 'a-chat-channel',
+                verified: true,
+                targetConfig: { botToken, chatId: '-100123', webhookUrl: null },
+            });
+
+            expect(row).toEqual({
+                id: 'nc1',
+                pluginId: 'a-chat-channel',
+                verified: true,
+                targetConfig: {
+                    botToken: { wasSet: true },
+                    chatId: { wasSet: true },
+                    webhookUrl: { wasSet: false },
+                },
+            });
+            expect(JSON.stringify(row)).not.toContain(botToken);
         });
 
         it('keeps the NAMES of a plugin’s secret settings and none of their values', () => {
@@ -192,9 +292,25 @@ describe('workspace backup redaction', () => {
                 providerSubscriptionId: 'sub_123',
                 defaultPaymentMethodRef: 'pm_123',
                 status: 'active',
+                // The metered pair. `paygEnabled` and `paygStatus` are
+                // record — whether the owner opted in, and how it is doing —
+                // while the two ids address live billing objects, which the
+                // published `payment_identifiers` exclusion covers.
+                paygEnabled: true,
+                paygStatus: 'active',
+                paygSubscriptionId: 'sub_metered_123',
+                paygSubscriptionItemId: 'si_metered_123',
             });
 
-            expect(row).toEqual({ id: 'b1', provider: 'a-payment-provider', status: 'active' });
+            expect(row).toEqual({
+                id: 'b1',
+                provider: 'a-payment-provider',
+                status: 'active',
+                paygEnabled: true,
+                paygStatus: 'active',
+            });
+            expect(row).not.toHaveProperty('paygSubscriptionId');
+            expect(row).not.toHaveProperty('paygSubscriptionItemId');
         });
 
         it('exports a tenant job-runtime config without the pointer to its credentials', () => {
@@ -304,13 +420,40 @@ describe('workspace backup redaction', () => {
             join(__dirname, '..', 'entities'),
         ];
         const SECRET_SHAPED = /secret|password|token|hash|credential/i;
+        /** Family 2 — envelope-encrypted at rest, said in the column name. */
+        const ENCRYPTED_NAMED = /encrypted$/i;
+        /** Family 3 — envelope-encrypted at rest, said only by the decorator. */
+        const ENCRYPTED_DECORATOR = 'EncryptedJsonColumn';
+        /**
+         * Family 4 — a payment-provider handle on the billing profile. The
+         * archive publishes a `payment_identifiers` exclusion, so an id that
+         * addresses a live billing object needs a rule.
+         */
+        const PAYMENT_IDENTIFIER = /^(?:provider|payg)[A-Za-z0-9_]*(?:Id|Ref)$/;
         // `    someColumn?: Type` / `    someColumn: Type` — the property
         // declarations TypeORM turns into columns. Relations and methods do
         // not match, and neither do commented-out lines.
         const PROPERTY = /^\s{4}(?:readonly\s+)?([A-Za-z_][A-Za-z0-9_]*)\??\s*:/;
+        /** `    @SomeDecorator` / `    @SomeDecorator({ … })` on its own line. */
+        const DECORATOR = /^\s{4}@([A-Za-z_][A-Za-z0-9_]*)/;
 
-        function collectColumns(): Array<{ entity: string; column: string; file: string }> {
-            const found: Array<{ entity: string; column: string; file: string }> = [];
+        interface EntityProperty {
+            readonly entity: string;
+            readonly column: string;
+            readonly file: string;
+            /** Decorators attached to this property, nearest-first. */
+            readonly decorators: readonly string[];
+        }
+
+        /**
+         * Every property declaration in every entity source, WITH the
+         * decorators that sit above it. Reading the decorators is what makes
+         * the `@EncryptedJsonColumn` family possible at all: those column
+         * names (`envFiles`, `targetConfig`, `authHeaders`, `credentials`)
+         * say nothing about what is inside them.
+         */
+        function collectProperties(): EntityProperty[] {
+            const found: EntityProperty[] = [];
             for (const dir of ENTITY_DIRS) {
                 let files: string[];
                 try {
@@ -323,16 +466,44 @@ describe('workspace backup redaction', () => {
                     const entityMatch = /export class ([A-Za-z0-9_]+)/.exec(source);
                     if (!entityMatch) continue;
                     const entity = entityMatch[1];
+                    let pending: string[] = [];
                     for (const line of source.split('\n')) {
+                        const decorator = DECORATOR.exec(line);
+                        if (decorator) {
+                            pending.unshift(decorator[1]);
+                            continue;
+                        }
                         const property = PROPERTY.exec(line);
                         if (!property) continue;
-                        const column = property[1];
-                        if (!SECRET_SHAPED.test(column)) continue;
-                        found.push({ entity, column, file });
+                        found.push({ entity, column: property[1], file, decorators: pending });
+                        pending = [];
                     }
                 }
             }
             return found;
+        }
+
+        function collectColumns(): Array<{ entity: string; column: string; file: string }> {
+            return collectProperties()
+                .filter(({ column }) => SECRET_SHAPED.test(column))
+                .map(({ entity, column, file }) => ({ entity, column, file }));
+        }
+
+        /** Columns with no rule, no drop and no reviewed exemption. */
+        function unhandled(properties: readonly EntityProperty[]): string[] {
+            return [
+                ...new Set(
+                    properties
+                        .filter(({ entity, column }) => {
+                            if (shouldDropEntirely(entity)) return false;
+                            if (isDroppedColumn(entity, column)) return false;
+                            if (isRedactedColumn(entity, column)) return false;
+                            if (isBenignColumn(column)) return false;
+                            return true;
+                        })
+                        .map(({ entity, column }) => `${entity}.${column}`),
+                ),
+            ];
         }
 
         it('finds the entity sources at all (a silent zero here would make this guard useless)', () => {
@@ -341,20 +512,58 @@ describe('workspace backup redaction', () => {
         });
 
         it('has a rule or a reviewed exemption for every secret-shaped column', () => {
-            const unhandled = collectColumns()
-                .filter(({ entity, column }) => {
-                    if (shouldDropEntirely(entity)) return false;
-                    if (isDroppedColumn(entity, column)) return false;
-                    if (isRedactedColumn(entity, column)) return false;
-                    if (isBenignColumn(column)) return false;
-                    return true;
-                })
-                .map(({ entity, column }) => `${entity}.${column}`);
-
             // If this fails, decide in `redaction.ts`: drop the row, redact
             // the value to { wasSet }, delete the column, or add it to
             // BACKUP_BENIGN_COLUMNS with the reason it carries no secret.
-            expect([...new Set(unhandled)]).toEqual([]);
+            expect(
+                unhandled(collectProperties().filter((p) => SECRET_SHAPED.test(p.column))),
+            ).toEqual([]);
+        });
+
+        it('has a rule for every column whose name says it is encrypted at rest', () => {
+            const encrypted = collectProperties().filter((p) => ENCRYPTED_NAMED.test(p.column));
+
+            // A silent zero would make the family useless.
+            expect(encrypted.length).toBeGreaterThan(5);
+            // `Work.deployDatabaseUrlEncrypted` and
+            // `Work.deployRuntimeEnvEncrypted` are the two this family was
+            // added for; both must be in the reflected set.
+            expect(encrypted.map((p) => `${p.entity}.${p.column}`)).toEqual(
+                expect.arrayContaining([
+                    'Work.deployDatabaseUrlEncrypted',
+                    'Work.deployRuntimeEnvEncrypted',
+                ]),
+            );
+            expect(unhandled(encrypted)).toEqual([]);
+        });
+
+        it('has a rule for every @EncryptedJsonColumn, whatever the column is called', () => {
+            const encrypted = collectProperties().filter((p) =>
+                p.decorators.includes(ENCRYPTED_DECORATOR),
+            );
+
+            // Six entities use the decorator today. A zero here would mean
+            // the decorator scan stopped matching, not that the risk went
+            // away, so the count is asserted rather than assumed.
+            expect(encrypted.length).toBeGreaterThanOrEqual(5);
+            expect(encrypted.map((p) => `${p.entity}.${p.column}`)).toEqual(
+                expect.arrayContaining([
+                    'RepoConnection.envFiles',
+                    'NotificationChannel.targetConfig',
+                ]),
+            );
+            expect(unhandled(encrypted)).toEqual([]);
+        });
+
+        it('has a rule for every payment-provider identifier on the billing profile', () => {
+            const identifiers = collectProperties().filter(
+                (p) => p.entity === 'BillingProfile' && PAYMENT_IDENTIFIER.test(p.column),
+            );
+
+            expect(identifiers.map((p) => p.column)).toEqual(
+                expect.arrayContaining(['paygSubscriptionId', 'paygSubscriptionItemId']),
+            );
+            expect(unhandled(identifiers)).toEqual([]);
         });
 
         it('fails on a newly introduced secret column that no rule covers', () => {
@@ -367,6 +576,22 @@ describe('workspace backup redaction', () => {
             expect(isDroppedColumn(entity, column)).toBe(false);
             expect(isRedactedColumn(entity, column)).toBe(false);
             expect(isBenignColumn(column)).toBe(false);
+        });
+
+        it('fails on a future @EncryptedJsonColumn whose name looks harmless', () => {
+            // The third family's own guard. `campaignPayload` matches no name
+            // shape at all — which is exactly the situation `envFiles` and
+            // `targetConfig` were in — so the decorator has to be what
+            // demands a decision.
+            const entity = 'SomeFutureEntity';
+            const column = 'campaignPayload';
+            expect(SECRET_SHAPED.test(column)).toBe(false);
+            expect(ENCRYPTED_NAMED.test(column)).toBe(false);
+            expect(
+                unhandled([
+                    { entity, column, file: 'x.entity.ts', decorators: ['EncryptedJsonColumn'] },
+                ]),
+            ).toEqual([`${entity}.${column}`]);
         });
 
         it('gives every benign exemption a stated reason', () => {

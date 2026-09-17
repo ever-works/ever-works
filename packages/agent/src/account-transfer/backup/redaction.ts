@@ -33,12 +33,31 @@ import {
  *
  * ## The guard that keeps this honest
  *
- * `redaction.spec.ts` reflects over `AGENT_ENTITY_NAMES` and every entity
- * source file, and fails when a column whose name matches
- * `/secret|password|token|hash|credential/i` is neither redacted, nor
- * dropped, nor listed in {@link BACKUP_BENIGN_COLUMNS} with a reason. A new
- * secret column therefore cannot silently start being exported: it either
- * gets a rule or it gets an explicit, reviewed "this is not a secret".
+ * `redaction.spec.ts` reflects over every entity source file and fails when a
+ * column that LOOKS like it carries a secret has no rule and no reviewed
+ * exemption. Three independent families are reflected, because the first one
+ * alone shipped four leaks:
+ *
+ *  1. **Name-shaped.** A column matching
+ *     `/secret|password|token|hash|credential/i`.
+ *  2. **Encrypted-at-rest by name.** A column whose name ends in
+ *     `Encrypted`. `Work.deployDatabaseUrlEncrypted` (the per-Work Postgres
+ *     connection string) and `Work.deployRuntimeEnvEncrypted` (the
+ *     allow-listed runtime env bag) match neither family 1 nor any pattern
+ *     below, and were exported verbatim until this family existed.
+ *  3. **Encrypted-at-rest by decorator.** A column declared with
+ *     `@EncryptedJsonColumn`. Those names say nothing about their contents —
+ *     `RepoConnection.envFiles` is seed `.env` file bodies and
+ *     `NotificationChannel.targetConfig` is a live bot token / webhook URL —
+ *     so only the decorator identifies them.
+ *
+ * A fourth, narrower pass covers `BillingProfile`: the archive publishes a
+ * `payment_identifiers` exclusion, so every `provider*`/`payg*` identifier
+ * column on that entity needs a rule or a reviewed exemption too.
+ *
+ * A new secret column therefore cannot silently start being exported: it
+ * either gets a rule or it gets an explicit, reviewed "this is not a secret"
+ * in {@link BACKUP_BENIGN_COLUMNS}.
  */
 
 /**
@@ -87,6 +106,17 @@ const DROPPED_ENTITY_SET = new Set(BACKUP_DROPPED_ENTITIES);
 const SECRET_COLUMN_PATTERNS: readonly RegExp[] = Object.freeze([
     /secretencrypted$/i,
     /credentialsencrypted$/i,
+    // Anything the platform bothered to envelope-encrypt at rest is material
+    // the archive may not carry, whatever the rest of the name says. The two
+    // narrower patterns above are subsumed by this one and kept so a reader
+    // can still see which shapes were named deliberately.
+    //
+    // This is the rule that would have stopped `deployDatabaseUrlEncrypted`
+    // (a Postgres connection string, user and password included) and
+    // `deployRuntimeEnvEncrypted` (an allow-listed payment-key bag) from
+    // shipping in `data/works/works.jsonl` while the four sibling
+    // `deploy*SecretEncrypted` columns on the same row were redacted.
+    /encrypted$/i,
     /^secretsettings$/i,
     /^authheaders$/i,
     /^credentialref$/i,
@@ -98,7 +128,27 @@ const SECRET_COLUMN_PATTERNS: readonly RegExp[] = Object.freeze([
 /** Extra per-entity columns redacted to `{ wasSet }` where the shape rule cannot see them. */
 const ENTITY_SECRET_COLUMNS: Readonly<Record<string, readonly string[]>> = Object.freeze({
     FleetNode: Object.freeze(['previousCredentialHash']),
-    RepoConnection: Object.freeze(['credentialRef']),
+    // `envFiles` is the seed `.env` bodies keyed by repository path, an
+    // `@EncryptedJsonColumn` the entity itself records as MASKED in API
+    // responses ("paths + sizes only; full content is returned only by the
+    // explicit owner-gated env-files endpoint"). `page()` reads rows with
+    // `getRawMany()`, which bypasses the decrypt transformer, so what the
+    // archive would have carried is the stored text: the `enc::v1::`
+    // envelope on a keyed install, and the literal `.env` contents wherever
+    // `PLUGIN_SECRET_ENCRYPTION_KEY` is unset or the row predates the
+    // column being encrypted. Redacted to a bag of `{ wasSet }` keyed by
+    // path, which is exactly the masked answer the API already gives — it
+    // still tells the owner which repositories need their `.env` re-seeded.
+    RepoConnection: Object.freeze(['credentialRef', 'envFiles']),
+    // `targetConfig` is the per-plugin channel endpoint bag, and the entity
+    // documents what is inside it: a Telegram `botToken`, a WhatsApp
+    // `accessToken`, a Novu `apiKey`, a Slack/Discord `webhookUrl`. Another
+    // `@EncryptedJsonColumn`, so the same `getRawMany()` caveat applies —
+    // and `domain-specs.ts` already claims of this very file that "channel
+    // endpoints are redacted", which until now they were not. The bag keeps
+    // its field NAMES and none of their values, so the archive answers
+    // "which channels do I have to re-credential?".
+    NotificationChannel: Object.freeze(['targetConfig']),
     // AW-16 Model accounts. `credentials` is the provider's own secret
     // settings bag, encrypted at rest. It is a named bag rather than one
     // opaque value, so `redactRow` keeps the NAMES of the fields that were
@@ -144,6 +194,16 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
         'providerCustomerId',
         'providerSubscriptionId',
         'defaultPaymentMethodRef',
+        // The metered (pay-as-you-go) pair, dropped for the same reason as
+        // their siblings above: `paygSubscriptionId` addresses a live
+        // subscription at the payment provider and `paygSubscriptionItemId`
+        // is the item that "threshold / price updates address", so both are
+        // capabilities rather than records. The archive's own
+        // `payment_identifiers` exclusion promises that provider
+        // subscription and METER identifiers are absent; these two were the
+        // only ones still present.
+        'paygSubscriptionId',
+        'paygSubscriptionItemId',
     ]),
     Invoice: Object.freeze(['providerInvoiceId', 'providerCustomerId']),
     LicencePurchase: Object.freeze(['providerPaymentId']),
