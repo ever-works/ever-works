@@ -36,6 +36,31 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * Everything else — a storage backend that will not take the stream, a
  * database that is down — is recorded on the row with a reason the card has
  * specific copy for, so the owner is never shown a generic error.
+ *
+ * ## Where the archive is actually built
+ *
+ * `WorkspaceBackupRunner`, `WorkspaceBackupRepository` and
+ * `WorkspaceBackupService` are RPC proxies to the API process (see
+ * `trigger-internal.module.ts`). This task used to resolve them from the
+ * default `TriggerWorkerModule`, which provides none of them, so every
+ * dispatched backup died at `appContext.get(WorkspaceBackupRunner)` with
+ * `Nest could not find WorkspaceBackupRunner element` and the row was left
+ * at `queued` forever — the exact regression this repository already records
+ * for `AnonymousUserCleanupService`.
+ *
+ * Proxying is not a preference: the runner injects `@InjectDataSource()`,
+ * streams to the active storage backend and clones each Work's data
+ * repository, and the worker process has no TypeORM DataSource at all. So
+ * the dispatch still flows through the job-runtime dispatcher and this task,
+ * and the hour of work happens where its dependencies are.
+ *
+ * One consequence is handled below rather than hidden: the internal RPC
+ * channel has a per-request deadline (45 s by default), and a large archive
+ * will exceed it. A client-side deadline does not stop the API pod, and the
+ * runner owns the row — it claims it with a compare-and-set and settles it
+ * itself — so the archive still completes and still lands. What would be
+ * lost is the one notification of spec FR-33, so a failed run call falls
+ * through to reading the row and notifying on it if it has in fact settled.
  */
 export const workspaceBackupTask = task<'workspace-backup', WorkspaceBackupPayload>({
     id: 'workspace-backup',
@@ -73,12 +98,53 @@ export const workspaceBackupTask = task<'workspace-backup', WorkspaceBackupPaylo
                 };
             }
 
-            const runner = appContext.get(WorkspaceBackupRunner);
-            const result = await runner.runFromPayload({
-                backupId: payload.backupId,
+            const scope = {
                 userId: payload.userId,
                 organizationId: payload.organizationId ?? null,
-            });
+                tenantId: payload.tenantId ?? null,
+            };
+
+            /**
+             * Exactly one notification per finished backup (spec FR-33),
+             * raised here rather than inside the runner so a cancelled run —
+             * which the owner already knows about — stays silent. Reads the
+             * row rather than trusting a status, because the row is the only
+             * thing that knows what actually happened.
+             */
+            const notifyFromRow = async (): Promise<string | undefined> => {
+                const settled = await appContext
+                    .get(WorkspaceBackupRepository)
+                    .findInScope(scope, payload.backupId);
+                if (!settled || settled.status === 'cancelled') {
+                    return settled?.status;
+                }
+                await appContext.get(WorkspaceBackupService).notifyFinished(settled);
+                return settled.status;
+            };
+
+            const runner = appContext.get(WorkspaceBackupRunner);
+            let result: Awaited<ReturnType<typeof runner.runFromPayload>>;
+            try {
+                result = await runner.runFromPayload({
+                    backupId: payload.backupId,
+                    userId: payload.userId,
+                    organizationId: payload.organizationId ?? null,
+                });
+            } catch (error) {
+                // The run call did not come back — most plausibly the
+                // internal RPC deadline elapsed on a large archive. The
+                // runner still owns the row and settles it itself, so the
+                // honest thing is to report what the row says rather than
+                // guess, and to still raise the notification the owner is
+                // owed if it has settled.
+                const status = await notifyFromRow().catch(() => undefined);
+                logger.warn('workspace-backup: run call did not return', {
+                    backupId: payload.backupId,
+                    rowStatus: status,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+                throw error;
+            }
 
             if (result.status === 'skipped') {
                 logger.info('workspace-backup: nothing to do', {
@@ -88,22 +154,8 @@ export const workspaceBackupTask = task<'workspace-backup', WorkspaceBackupPaylo
                 return result;
             }
 
-            // Exactly one notification per finished backup (spec FR-33),
-            // raised here rather than inside the runner so a cancelled run —
-            // which the owner already knows about — stays silent.
             if (result.status !== 'cancelled') {
-                const backups = appContext.get(WorkspaceBackupRepository);
-                const settled = await backups.findInScope(
-                    {
-                        userId: payload.userId,
-                        organizationId: payload.organizationId ?? null,
-                        tenantId: payload.tenantId ?? null,
-                    },
-                    payload.backupId,
-                );
-                if (settled) {
-                    await appContext.get(WorkspaceBackupService).notifyFinished(settled);
-                }
+                await notifyFromRow();
             }
 
             logger.info('workspace-backup finished', {

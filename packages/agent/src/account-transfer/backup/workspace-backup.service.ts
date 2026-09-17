@@ -14,6 +14,7 @@ import {
     type WorkspaceBackupScope,
 } from '../../database/repositories/workspace-backup.repository';
 import { TenantRepository } from '../../database/repositories/tenant.repository';
+import { DistributedTaskLockService } from '../../cache/distributed-task-lock.service';
 import {
     WORKSPACE_BACKUP_DISPATCHER,
     type WorkspaceBackupDispatcher,
@@ -115,6 +116,12 @@ export class WorkspaceBackupService {
         private readonly activity?: BackupActivityRecorder,
         @Optional() @Inject(BACKUP_NOTIFIER) private readonly notifier?: BackupNotifier,
         @Optional() private readonly tenants?: TenantRepository,
+        // The hourly sweep's mutex, used by {@link runSweep}. Appended last
+        // and @Optional() like everything above it, so every existing
+        // construction site keeps compiling; with nothing bound the passes
+        // run unlocked, which is safe because each one is an idempotent
+        // compare-and-set.
+        @Optional() private readonly locks?: DistributedTaskLockService,
     ) {}
 
     /**
@@ -508,6 +515,54 @@ export class WorkspaceBackupService {
         const before = new Date(now.getTime() - this.limits().recordRetentionDays * MS_PER_DAY);
         const prunable = await this.backups.findPrunable(before, limit);
         return this.backups.deleteByIds(prunable.map((backup) => backup.id));
+    }
+
+    /**
+     * All three sweeper passes, each under its own distributed lock.
+     *
+     * The hourly cron used to take the locks itself, from the Trigger worker
+     * — which cannot construct `DistributedTaskLockService` at all: the lock
+     * injects `@InjectRepository(CacheEntry)` and the worker process has no
+     * TypeORM DataSource (every service it resolves is an RPC proxy). So the
+     * cron died with `Nest could not find WorkspaceBackupService element`
+     * before any pass ran: retention was never enforced, stalled backups
+     * were never failed — and because `create()` ADOPTS an active row, an
+     * owner whose worker died could never start another backup — and no
+     * record was ever pruned.
+     *
+     * Composing the three passes here, where the lock and the repositories
+     * live, is the same shape `CreditsSweepService.runDailySweep()` uses for
+     * the same reason. The individual passes stay public and unchanged: they
+     * are what the tests drive and what an operator can call one at a time.
+     *
+     * With no lock service bound (isolated unit tests, older deployments)
+     * the passes still run: every one of them is an idempotent
+     * compare-and-set, so a second replica duplicates work rather than
+     * corrupting it, and doing nothing would be the worse failure.
+     */
+    async runSweep(
+        now: Date = new Date(),
+        limit = 200,
+    ): Promise<{ expired: number; stalled: number; pruned: number }> {
+        const exclusively = async (key: string, pass: () => Promise<number>): Promise<number> => {
+            if (!this.locks) {
+                return pass();
+            }
+            const outcome = await this.locks.runExclusive(key, pass);
+            return outcome.result ?? 0;
+        };
+
+        return {
+            expired: await exclusively('workspace-backup:expire', () =>
+                this.expireDueArchives(now, limit),
+            ),
+            stalled: await exclusively('workspace-backup:stalls', () =>
+                this.failStalledBackups(now, limit),
+            ),
+            pruned: await exclusively('workspace-backup:prune', () =>
+                this.pruneOldRecords(now, limit),
+            ),
+        };
     }
 
     /**

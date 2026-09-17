@@ -87,6 +87,8 @@ import {
     MemoryFactSweepService,
 } from '@ever-works/agent/services';
 import { SkillReadinessService } from '@ever-works/agent/skills';
+import { WorkspaceBackupRunner, WorkspaceBackupService } from '@ever-works/agent/account-transfer';
+import { WorkspaceBackupRepository } from '@ever-works/agent/database';
 import {
     CreditLedgerService,
     CreditsSweepService,
@@ -432,6 +434,19 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly memoryFactEmbedService?: MemoryFactEmbedService,
         @Optional()
         private readonly memoryFactSweepService?: MemoryFactSweepService,
+        // AW-22 Workspace backup — backs the `workspace-backup` task
+        // (`runFromPayload`, then `notifyFinished` on the settled row) and
+        // the `workspace-backup-sweeper` cron (`runSweep`). The archive is
+        // produced HERE and not in the worker because the runner needs the
+        // DataSource, the active storage backend and each Work's data-repo
+        // walk, none of which exist in worker scope. Appended LAST +
+        // @Optional() per the arity rule above.
+        @Optional()
+        private readonly workspaceBackupRunner?: WorkspaceBackupRunner,
+        @Optional()
+        private readonly workspaceBackupService?: WorkspaceBackupService,
+        @Optional()
+        private readonly workspaceBackupRepository?: WorkspaceBackupRepository,
     ) {}
 
     onModuleInit() {
@@ -561,6 +576,13 @@ export class TriggerInternalController implements OnModuleInit {
             // Skills shelf — `skill-readiness-sweep` calls `sweepStale()`
             // here (allow-list auto-derived).
             SkillReadinessService: this.skillReadinessService,
+            // AW-22 — `workspace-backup` calls `runFromPayload()` on the
+            // runner and `notifyFinished()` on the service; the
+            // `workspace-backup-sweeper` cron calls `runSweep()`
+            // (allow-list auto-derived).
+            WorkspaceBackupRunner: this.workspaceBackupRunner,
+            WorkspaceBackupService: this.workspaceBackupService,
+            WorkspaceBackupRepository: this.workspaceBackupRepository,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
