@@ -11,7 +11,6 @@ import type {
     RunLedgerWindow,
     RunWindowStats,
 } from '@ever-works/contracts';
-import { usePathname, useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { getRunStatsAction, getRunsAction } from '@/app/actions/runs';
 import { RunReceiptPanel } from './RunReceiptPanel';
@@ -29,6 +28,7 @@ import {
     hasOpenRuns,
     isTypingTarget,
     mergeRefreshedRows,
+    parseRunsViewState,
     stepAnchorDate,
     windowIncludesNow,
     type RunsViewState,
@@ -63,8 +63,6 @@ export function RunsClient({
 }) {
     const t = useTranslations('dashboard.runsPage');
     const locale = useLocale();
-    const router = useRouter();
-    const pathname = usePathname();
 
     const [view, setView] = useState<RunsViewState>(initialView);
     const [page, setPage] = useState<RunLedgerPage | null>(initialPage);
@@ -103,19 +101,49 @@ export function RunsClient({
         [view.granularity, view.date, view.filters, timeZone],
     );
 
-    // ── URL mirror ────────────────────────────────────────────────────
-    const firstUrlSync = useRef(true);
+    // ── The address bar outranks a replayed server render ─────────────
+    // The mirror below rewrites the history entry without re-rendering the
+    // server page, so that entry keeps the payload of the view the page was
+    // LOADED with, and Back/Forward onto it replays that payload (the App
+    // Router's back/forward cache ignores stale time). `initialView` can
+    // therefore be older than the URL; on mount the URL wins, and the load
+    // effect fetches its window. Mount only: afterwards the view drives the
+    // URL, never the reverse.
     useEffect(() => {
-        if (firstUrlSync.current) {
-            firstUrlSync.current = false;
-            return;
-        }
-        router.replace(`${pathname}?${buildRunsSearch(view)}`, { scroll: false });
-    }, [view, pathname, router]);
+        const fromUrl = parseRunsViewState(new URLSearchParams(window.location.search));
+        if (buildRunsSearch(fromUrl) !== buildRunsSearch(initialView)) setView(fromUrl);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── URL mirror ────────────────────────────────────────────────────
+    // A same-document history write, not `router.replace`: a router
+    // navigation only commits the URL when its RSC transition commits — a
+    // server render of this page that nothing uses (the actions below
+    // refetch the window) — so under load the address bar trailed the view
+    // by seconds. The App Router patches `history.replaceState`, so
+    // `useSearchParams` / `usePathname` still follow. `location.pathname` is
+    // the address bar's own path: a `/org/<slug>` prefix is kept, and there
+    // is no locale segment to keep (`localePrefix: 'never'`).
+    // Nothing to write while the view is still the object the page mounted
+    // with. Not a "first run" flag: StrictMode (`next dev`) re-runs this
+    // effect after the App Router's effect cleanup has put the browser's
+    // unpatched `replaceState` back, and a write then would wipe the router's
+    // history state for this entry.
+    const mountedView = useRef(view);
+    useEffect(() => {
+        if (view === mountedView.current) return;
+        window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}?${buildRunsSearch(view)}`,
+        );
+    }, [view]);
 
     // ── Remembered granularity (never the window) ─────────────────────
     useEffect(() => {
-        if (granularityFromUrl) return;
+        // A granularity the address bar names wins, including on a replayed
+        // render of a visit whose URL named none when the server saw it.
+        if (granularityFromUrl || new URLSearchParams(window.location.search).has('g')) return;
         try {
             const saved = localStorage.getItem(RUNS_GRANULARITY_STORAGE_KEY);
             if ((saved === 'week' || saved === 'month') && saved !== initialView.granularity) {
