@@ -107,3 +107,6 @@ export * from './repositories/product-changelog-read.repository';
 // Repository registry (Feature G) — repo connections + agent grants.
 export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';
+// AW-22 Workspace backup — the record of one archive attempt, and the
+// compare-and-set transitions the runner, the sweeper and the owner race on.
+export * from './repositories/workspace-backup.repository';

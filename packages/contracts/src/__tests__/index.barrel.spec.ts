@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as root from '../index.js';
 
 import * as agents from '../agents/index.js';
+import * as backup from '../backup/index.js';
 import * as computer from '../computer/index.js';
 import * as connections from '../connections/index.js';
 import * as conversations from '../conversations/index.js';
@@ -47,6 +48,7 @@ import * as workflow from '../workflow/index.js';
 /** [area name, namespace] for every barrel `src/index.ts` re-exports. */
 const AREAS: Array<[string, Record<string, unknown>]> = [
 	['agents', agents],
+	['backup', backup],
 	['computer', computer],
 	['connections', connections],
 	['conversations', conversations],
@@ -82,8 +84,13 @@ describe('src/index.ts — the package root barrel', () => {
 		// their own base (develop lacked `model-routing`, this branch lacked
 		// `conversations`), so the literal survived the merge unchanged while
 		// the array itself grew to 25.
+		//
+		// +1 `backup` (AW-22 Workspace backup — the published archive format)
+		// -> 26, again COUNTED off the array above. This branch said 24 from
+		// its own base and develop had reached 25; `backup` is the only area
+		// develop does not carry, so neither number is the answer.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(25);
+		expect(exportLines).toBe(26);
 	});
 
 	it('has no name exported by two different areas', () => {

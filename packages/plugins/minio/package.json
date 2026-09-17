@@ -53,7 +53,9 @@
 				"storage",
 				"put-object",
 				"get-object",
-				"presigned-put"
+				"presigned-put",
+				"put-object-stream",
+				"get-object-stream"
 			],
 			"description": "Self-hosted S3-compatible object storage (MinIO). Same protocol as AWS S3 but points at a custom endpoint.",
 			"author": {

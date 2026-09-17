@@ -292,6 +292,14 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.KB_DOCUMENT_FILED]: 'work',
     [ActivityActionType.KB_DOCUMENT_EXPORTED]: 'work',
     [ActivityActionType.MEMORY_FOLDER_RENAMED]: 'work',
+
+    // Workspace backup (AW-22). Starting one is work the owner set going;
+    // downloading one is the moment a copy of the whole workspace leaves the
+    // platform, which is exactly what `EXPORT` is classified as beside it;
+    // removing the bytes early is a settings-shaped act on the workspace.
+    [ActivityActionType.WORKSPACE_BACKUP_CREATED]: 'work',
+    [ActivityActionType.WORKSPACE_BACKUP_DOWNLOADED]: 'delivery',
+    [ActivityActionType.WORKSPACE_BACKUP_DELETED]: 'system',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */

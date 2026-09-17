@@ -172,6 +172,7 @@ import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
 import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 import { SharedView } from '../entities/shared-view.entity';
+import { WorkspaceBackup } from '../entities/workspace-backup.entity';
 
 import {
     PluginEntity,
@@ -442,4 +443,8 @@ export const ENTITIES = [
     // AW-18 Shared view — one row per Workspace holding what its share link
     // publishes and the hashed + encrypted token. Never a copy of content.
     SharedView,
+    // AW-22 Workspace backup — the record of one archive attempt. A partial
+    // unique index in the migration (never at decorator level) is what stops
+    // two tabs starting two backups of the same workspace at once.
+    WorkspaceBackup,
 ];

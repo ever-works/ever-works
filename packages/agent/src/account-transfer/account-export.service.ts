@@ -30,6 +30,21 @@ import { maskSecretSettings } from './types';
 import { getActiveCapabilities } from '../plugins/utils/active-capabilities.util';
 import { AgentsSkillsTasksExportService } from './agents-skills-tasks-export.service';
 
+/**
+ * What one Work's data repo holds, as {@link AccountExportService.readWorkRepoContent}
+ * returns it. Named so the AW-22 workspace backup can depend on the shape
+ * without restating it.
+ */
+export interface WorkRepoContent {
+    items: ExportedWorkItem[];
+    categories: ExportedWorkCategory[];
+    tags: ExportedWorkTag[];
+    collections: ExportedWorkCollection[];
+    siteConfig?: Record<string, any>;
+    comparisons: ExportedComparison[];
+    markdownTemplate?: ExportedMarkdownTemplate;
+}
+
 @Injectable()
 export class AccountExportService {
     private readonly logger = new Logger(AccountExportService.name);
@@ -308,6 +323,26 @@ export class AccountExportService {
             collections: repoData.collections,
             comparisons: repoData.comparisons,
         };
+    }
+
+    /**
+     * The per-Work content walk, as a public seam.
+     *
+     * Added by AW-22 so the workspace backup can write each Work's items,
+     * categories, tags, collections and comparisons into its archive without
+     * a second implementation of "read a Work's items out of its data repo".
+     * This is a one-line delegation to the private walk the account export
+     * has always used: there is exactly one clone-or-pull, one
+     * `DataRepository` read and one failure policy (a repo that will not
+     * clone yields empty content and logs, it does not throw), and both
+     * callers get the same answer.
+     *
+     * Deliberately additive — `exportAccountData` and `exportWork` are
+     * untouched, so `GET /api/account/export` returns exactly what it
+     * returned before.
+     */
+    async readWorkRepoContent(work: any): Promise<WorkRepoContent> {
+        return this.fetchWorkRepoData(work);
     }
 
     private async fetchWorkRepoData(dir: any): Promise<{

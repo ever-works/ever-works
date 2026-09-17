@@ -48,3 +48,8 @@ export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';
+// Workspace backup (AW-22) — the published archive format: the fifteen
+// domains, their restorability classes, the trim windows, the exclusions
+// list and the manifest shape. One source for the writer, the API, the web
+// report and the field reference.
+export * from './backup/index.js';

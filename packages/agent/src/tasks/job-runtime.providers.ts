@@ -11,6 +11,7 @@ import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from './template-customization-disp
 import { WEBHOOK_DELIVERY_DISPATCHER } from './webhook-delivery-dispatcher';
 import { WORK_GENERATION_DISPATCHER } from './work-generation-dispatcher';
 import { WORK_IMPORT_DISPATCHER } from './work-import-dispatcher';
+import { WORKSPACE_BACKUP_DISPATCHER } from './workspace-backup-dispatcher';
 
 /**
  * EW-685 P0 T4 — binding factory for the `*_DISPATCHER` symbols.
@@ -143,6 +144,7 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
     WEBHOOK_DELIVERY_DISPATCHER,
     WORK_GENERATION_DISPATCHER,
     WORK_IMPORT_DISPATCHER,
+    WORKSPACE_BACKUP_DISPATCHER,
 ] as const;
 
 /**
@@ -160,7 +162,7 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  *     letting the API's existing in-process dev fallback continue to
  *     kick in unchanged.
  *
- * Provider arity is pinned at 11 — one per entry in {@link DISPATCHER_SYMBOLS}
+ * Provider arity is pinned at 12 — one per entry in {@link DISPATCHER_SYMBOLS}
  * — and verified by `__tests__/job-runtime.providers.spec.ts`.
  *
  * @param opts Optional `symbols` filter — when supplied, only those

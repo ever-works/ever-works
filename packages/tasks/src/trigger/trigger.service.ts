@@ -25,6 +25,8 @@ import {
     KbTranscribeDispatcher,
     KbReembedWorkPayload,
     KbReembedWorkDispatcher,
+    WorkspaceBackupPayload,
+    WorkspaceBackupDispatcher,
 } from '@ever-works/agent/tasks';
 import type {
     JobRunStatus,
@@ -47,6 +49,7 @@ import { kbNormalizeAudioTask } from '../tasks/trigger/kb-normalize-audio.task';
 import { kbTranscribeTask } from '../tasks/trigger/kb-transcribe.task';
 import { kbReembedWorkTask } from '../tasks/trigger/kb-reembed-work.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
+import { workspaceBackupTask } from '../tasks/trigger/workspace-backup.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 /**
@@ -101,7 +104,8 @@ export class TriggerService
         KbOrgOverlayFanoutDispatcher,
         KbNormalizeMediaDispatcher,
         KbTranscribeDispatcher,
-        KbReembedWorkDispatcher
+        KbReembedWorkDispatcher,
+        WorkspaceBackupDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -646,6 +650,45 @@ export class TriggerService
      * (or `null` when Trigger.dev is disabled / disposed — KB retrieval
      * falls back to lexical via row 30 RRF until the dispatch lands).
      */
+    /**
+     * AW-22 — enqueue one complete workspace archive.
+     *
+     * Returns the run handle so a cancel can reach the run, or `null` when
+     * the runtime is not configured. Unlike every other dispatcher here,
+     * `null` is NOT a deferral for the caller: nothing would ever pick a
+     * queued backup up, so `WorkspaceBackupService` fails the row at once
+     * and the card explains that backups are unavailable in this deployment
+     * (spec FR-46) rather than showing a progress bar that never moves.
+     */
+    async dispatchWorkspaceBackup(payload: WorkspaceBackupPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await workspaceBackupTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'workspace-backup',
+                        `user:${payload.userId}`,
+                        `backup:${payload.backupId}`,
+                    ],
+                    machine: this.machine() as any,
+                    // Per-workspace serialisation on top of the partial
+                    // unique index, so a retry storm cannot produce two
+                    // archives of the same workspace at once (spec FR-3).
+                    concurrencyKey: `workspace-backup:${payload.organizationId ?? payload.userId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch workspace-backup task', error as Error);
+            return null;
+        }
+    }
+
     async dispatchKbEmbedDocument(payload: KbEmbedDocumentPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;

@@ -369,6 +369,16 @@ export enum ActivityActionType {
     SHARED_VIEW_REGENERATED = 'shared_view_regenerated',
     SHARED_VIEW_SECTIONS_CHANGED = 'shared_view_sections_changed',
     SHARED_VIEW_INDEXING_CHANGED = 'shared_view_indexing_changed',
+    // AW-22 Workspace backup — the whole-workspace archive leaves a trace of
+    // its own, so "when did I last back this up, and did anyone take a copy
+    // off the platform?" is answerable from the workspace's own record
+    // rather than from our logs (spec FR-32). Additive members —
+    // `activity_log.actionType` is a plain varchar, so no migration is
+    // needed. `details` carries `{ backupId, sizeBytes?, domainsCompleted? }`
+    // and never a storage key.
+    WORKSPACE_BACKUP_CREATED = 'workspace_backup_created',
+    WORKSPACE_BACKUP_DOWNLOADED = 'workspace_backup_downloaded',
+    WORKSPACE_BACKUP_DELETED = 'workspace_backup_deleted',
 }
 
 /**

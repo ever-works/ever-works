@@ -880,4 +880,85 @@ describe('AccountExportService', () => {
             expect(tailService.exportTail).not.toHaveBeenCalled();
         });
     });
+
+    /**
+     * AW-22 — `readWorkRepoContent` is a public seam onto the SAME per-Work
+     * data-repo walk this service has always used, added so the workspace
+     * backup can put a Work's items, categories, tags, collections and
+     * comparisons in its archive without a second implementation of the walk.
+     *
+     * The point of these tests is that it really is the same walk — same
+     * clone-or-pull, same `DataRepository` reads, same failure policy — and
+     * that adding it changed nothing about `exportAccountData`.
+     */
+    describe('readWorkRepoContent — the public seam onto the one data-repo walk', () => {
+        it('clones the Work’s data repo and returns everything the walk reads', async () => {
+            const data = makeData({
+                getItems: jest.fn().mockResolvedValue([{ slug: 'a' }, { slug: 'b' }]),
+                getCategories: jest.fn().mockResolvedValue([{ slug: 'cat' }]),
+                getTags: jest.fn().mockResolvedValue([{ slug: 'tag' }]),
+                getCollections: jest.fn().mockResolvedValue([{ slug: 'col' }]),
+                getConfig: jest.fn().mockResolvedValue({ title: 'Best Tools' }),
+                getComparisons: jest.fn().mockResolvedValue([{ slug: 'x-vs-y' }]),
+                getComparisonMarkdown: jest.fn().mockResolvedValue('# X vs Y'),
+                readMarkdownTemplate: jest.fn().mockResolvedValue({ header: 'H', footer: 'F' }),
+            });
+            const { service, mocks } = makeService({ data });
+
+            const content = await service.readWorkRepoContent(makeWork());
+
+            // The same clone the export performs, with the same arguments.
+            expect(mocks.gitFacade.cloneOrPull).toHaveBeenCalledWith(
+                { owner: 'octocat', repo: 'best-tools-data' },
+                { userId: 'user-1', providerId: 'github' },
+            );
+            expect(content.items).toEqual([{ slug: 'a' }, { slug: 'b' }]);
+            expect(content.categories).toEqual([{ slug: 'cat' }]);
+            expect(content.tags).toEqual([{ slug: 'tag' }]);
+            expect(content.collections).toEqual([{ slug: 'col' }]);
+            expect(content.siteConfig).toEqual({ title: 'Best Tools' });
+            expect(content.markdownTemplate).toEqual({ header: 'H', footer: 'F' });
+            // Comparisons keep their rendered markdown, as the export's do.
+            expect(content.comparisons).toEqual([{ slug: 'x-vs-y', markdown: '# X vs Y' }]);
+        });
+
+        it('returns empty content rather than throwing when the repo will not clone', async () => {
+            // The archive must not lose its other fourteen domains because one
+            // Work's repo is gone. This is the walk's existing failure policy,
+            // inherited rather than re-decided.
+            const { service, mocks } = makeService();
+            mocks.gitFacade.cloneOrPull.mockRejectedValueOnce(new Error('repo gone'));
+
+            const content = await service.readWorkRepoContent(makeWork());
+
+            expect(content).toEqual({
+                items: [],
+                categories: [],
+                tags: [],
+                collections: [],
+                siteConfig: undefined,
+                comparisons: [],
+                markdownTemplate: undefined,
+            });
+        });
+
+        it('leaves exportAccountData’s own use of the walk untouched', async () => {
+            // Program rule #1: the seam is an addition. The JSON export still
+            // reads the repo itself and still embeds the content it always did.
+            const data = makeData({
+                getItems: jest.fn().mockResolvedValue([{ slug: 'a' }]),
+            });
+            const { service, mocks } = makeService({ data });
+            mocks.userRepository.findById.mockResolvedValue({
+                id: 'user-1',
+                email: 'owner@example.invalid',
+            });
+            mocks.workRepository.findByUser.mockResolvedValue([makeWork()]);
+
+            const result = await service.exportAccountData('user-1');
+
+            expect(result.version).toBe(1);
+            expect((result.data as any).works[0].items).toEqual([{ slug: 'a' }]);
+        });
+    });
 });

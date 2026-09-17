@@ -118,6 +118,11 @@ describe('activity-log.types', () => {
             ['SHARED_VIEW_INDEXING_CHANGED', 'shared_view_indexing_changed'],
             // Agent computers — one row per stretch of control of an Agent's machine.
             ['AGENT_COMPUTER_CONTROLLED', 'agent_computer_controlled'],
+            // AW-22 Workspace backup — starting one, taking a copy off the
+            // platform, and removing the bytes early.
+            ['WORKSPACE_BACKUP_CREATED', 'workspace_backup_created'],
+            ['WORKSPACE_BACKUP_DOWNLOADED', 'workspace_backup_downloaded'],
+            ['WORKSPACE_BACKUP_DELETED', 'workspace_backup_deleted'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -287,7 +292,14 @@ describe('activity-log.types', () => {
             // shared_view_*, schedule_*) the only ones this branch lacked.
             // Neither 169 nor 175 is the answer, and 169 + 175 is nonsense —
             // the number below was COUNTED off the merged enum.
-            expect(literals).toHaveLength(183);
+            //
+            // +3 workspace_backup_created / _downloaded / _deleted (AW-22
+            //    Workspace backup) — this branch's own additions, disjoint
+            //    from everything develop grew while it was open -> 186
+            //    COUNTED from the merged enum. This branch budgeted 164 from
+            //    its own base (161 + 3) and develop had reached 183; neither
+            //    number is the answer and the two must never be added.
+            expect(literals).toHaveLength(186);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {
