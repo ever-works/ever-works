@@ -33,6 +33,7 @@ export * from './terms-acceptance.entity';
 export * from './github-app-installation.entity';
 export * from './github-app-installation-repository.entity';
 export * from './github-app-user-link.entity';
+export * from './onboarding-checklist.entity';
 export * from './onboarding-request.entity';
 export * from './template.entity';
 export * from './template-customization.entity';

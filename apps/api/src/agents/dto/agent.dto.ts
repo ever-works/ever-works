@@ -40,6 +40,14 @@ import { AGENT_INIT_SCRIPT_MAX_BYTES } from '@ever-works/contracts';
 import { MergePolicyDto } from '@ever-works/agent/validation';
 
 /**
+ * AW-20 — accepted shape of `agents.lane`: kebab-case, at most 32
+ * characters, starting with an alphanumeric. Declared once so the create
+ * and update DTOs cannot drift apart from each other or from the
+ * `varchar(32)` column behind them.
+ */
+const AGENT_LANE_PATTERN = /^[a-z0-9][a-z0-9-]{0,31}$/;
+
+/**
  * Permissions partial sent on create/update — every flag optional;
  * unset = inherit conservative default (all false).
  */
@@ -163,6 +171,18 @@ export class CreateAgentDto {
     @IsString()
     @MaxLength(5000)
     capabilities?: string;
+
+    /**
+     * AW-20 — the area of work this Agent owns (`research`, `content`,
+     * `coordination`, …). A label, never a permission: nothing in the
+     * authorization path reads it. Unique per user, enforced by the
+     * partial index `uq_agents_user_lane`.
+     */
+    @ApiProperty({ required: false, maxLength: 32, pattern: '^[a-z0-9][a-z0-9-]{0,31}$' })
+    @IsOptional()
+    @IsString()
+    @Matches(AGENT_LANE_PATTERN)
+    lane?: string;
 
     @ApiProperty({ required: false, maxLength: 100 })
     @IsOptional()
@@ -302,6 +322,13 @@ export class UpdateAgentDto {
     @IsString()
     @MaxLength(5000)
     capabilities?: string | null;
+
+    /** AW-20 — the area of work this Agent owns; `null` clears it. */
+    @ApiProperty({ required: false, maxLength: 32, pattern: '^[a-z0-9][a-z0-9-]{0,31}$' })
+    @IsOptional()
+    @IsString()
+    @Matches(AGENT_LANE_PATTERN)
+    lane?: string | null;
 
     @ApiProperty({ required: false, maxLength: 100 })
     @IsOptional()

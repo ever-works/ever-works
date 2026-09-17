@@ -40,7 +40,11 @@ export class NotificationEventType {
     @Column({ type: 'text' })
     description: string;
 
-    /** `true` → bypass quiet hours. */
+    /**
+     * `true` → only the owner can unblock it; bypasses quiet hours. Since
+     * AW-13, core rows flagged `quietHoursBypassNeedsOptIn` in
+     * `core-event-catalogue.ts` bypass only for a user who opted in.
+     */
     @Column({ type: 'boolean', default: false })
     urgent: boolean;
 

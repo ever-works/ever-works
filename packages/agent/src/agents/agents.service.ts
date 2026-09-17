@@ -77,6 +77,12 @@ export interface CreateAgentInput {
     name: string;
     title?: string | null;
     capabilities?: string | null;
+    /**
+     * AW-20 — the area of work this Agent owns. Optional and additive:
+     * every existing call site compiles unchanged and creates a laneless
+     * Agent, exactly as before.
+     */
+    lane?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
     maxSkillContextTokens?: number;
@@ -124,6 +130,8 @@ export interface UpdateAgentInput {
     name?: string;
     title?: string | null;
     capabilities?: string | null;
+    /** AW-20 — the area of work this Agent owns; `null` clears it. */
+    lane?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
     maxSkillContextTokens?: number;
@@ -370,6 +378,11 @@ export class AgentsService {
                 slug,
                 title: input.title ?? null,
                 capabilities: input.capabilities ?? null,
+                // AW-20 — a label, never a permission. Uniqueness per user
+                // is enforced by the partial index `uq_agents_user_lane`,
+                // and provisioning treats that rejection as "this lane is
+                // already filled" rather than as an error.
+                lane: input.lane ?? null,
                 aiProviderId: input.aiProviderId ?? null,
                 modelId: input.modelId ?? null,
                 maxSkillContextTokens: input.maxSkillContextTokens ?? 4000,
@@ -468,6 +481,10 @@ export class AgentsService {
 
         if (input.title !== undefined) patch.title = input.title;
         if (input.capabilities !== undefined) patch.capabilities = input.capabilities;
+        // AW-20 — editable wherever the title is (FR-29). Empty string
+        // normalises to null so clearing the field in a form does not
+        // persist a lane nobody can match on.
+        if (input.lane !== undefined) patch.lane = input.lane?.trim() ? input.lane.trim() : null;
         if (input.aiProviderId !== undefined) patch.aiProviderId = input.aiProviderId;
         if (input.modelId !== undefined) patch.modelId = input.modelId;
 

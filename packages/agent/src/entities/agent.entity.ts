@@ -260,6 +260,27 @@ export class Agent {
     capabilities?: string | null;
 
     /**
+     * AW-20 — the area of work this Agent owns (`research`, `content`,
+     * `coordination`, …). Optional: every Agent that existed before this
+     * column has none and behaves exactly as it did.
+     *
+     * 🛑 A lane is a LABEL, not a permission. It grants nothing, restricts
+     * nothing, and must never be read by an authorization decision — that
+     * is what `permissions` and the tool-grant matrix are for. It exists
+     * so a surface can ask "who owns research here?" and get a stable
+     * answer instead of pattern-matching `title`.
+     *
+     * Uniquely constrained per user by the PARTIAL index
+     * `uq_agents_user_lane` (`WHERE "lane" IS NOT NULL`) declared in
+     * migration `1791200000000-AddAgentLane` — in the schema rather than
+     * in a service check a second write path could bypass. A partial
+     * index has no TypeORM `@Index` spelling, which is why it is not
+     * declared beside the class-level indexes above.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    lane?: string | null;
+
+    /**
      * Direct manager for the Org Chart + `AGENTS.md reportsTo:` on company
      * import (teams-and-companies spec §1.2). Raw self-reference column —
      * FK ON DELETE SET NULL by migration; same-org + acyclicity are

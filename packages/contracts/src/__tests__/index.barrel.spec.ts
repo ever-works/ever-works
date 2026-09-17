@@ -20,6 +20,7 @@ import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
 import * as modelRouting from '../model-routing/index.js';
+import * as notifications from '../notifications/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as runs from '../runs/index.js';
@@ -65,6 +66,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['item', item],
 	['kb', kb],
 	['model-routing', modelRouting],
+	['notifications', notifications],
 	['policy', policy],
 	['release', release],
 	['runs', runs],
@@ -80,17 +82,17 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		// COUNTED off the AREAS array above, never added up from two branches'
-		// numbers: develop and the model-accounts branch each said 24 from
-		// their own base (develop lacked `model-routing`, this branch lacked
-		// `conversations`), so the literal survived the merge unchanged while
-		// the array itself grew to 25.
+		// numbers: develop and this branch each reported the total from their
+		// own base (develop lacked the AW-22 `backup` area, this branch lacked
+		// the AW-13 `notifications` area), so the literal below is re-counted
+		// off the merged array instead.
 		//
-		// +1 `backup` (AW-22 Workspace backup — the published archive format)
-		// -> 26, again COUNTED off the array above. This branch said 24 from
-		// its own base and develop had reached 25; `backup` is the only area
-		// develop does not carry, so neither number is the answer.
+		// The merged array carries BOTH `backup` and `notifications` -> 27,
+		// COUNTED off the array above. Develop said 26 and this branch said 26
+		// from their own bases; adding the two branches' own additions to
+		// either number is how this literal goes wrong.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(26);
+		expect(exportLines).toBe(27);
 	});
 
 	it('has no name exported by two different areas', () => {
