@@ -195,4 +195,44 @@ export const WAVE5_OPERATIONS: OperationSpec[] = [
         body: true,
         bodyHint: 'enabled (boolean) and/or channels (array of channel ids).',
     },
+
+    // Memory facts (AW-07) — "remember…" in chat lands as an ACTIVE fact
+    // because the author is the person in their own conversation. Not behind
+    // confirmation: it is exactly what they asked for, it is reversible (every
+    // fact can be forgotten and restored), and the reply reads the stored
+    // wording back so a wrong capture is caught on the spot.
+    {
+        toolName: 'remember_fact',
+        method: 'POST',
+        path: '/api/memory/facts',
+        summary:
+            'Remember one durable fact for every agent in this workspace, when the user says "remember…" or asks you to keep something in mind. Store one atomic statement per call, in the words the user used. The response carries the stored wording — read it back to the user in one line so they can check it.',
+        kind: 'create',
+        body: true,
+        bodyHint:
+            'body (string, required, 1-500 characters: the exact wording to store); pinned (optional boolean: send it with every run).',
+    },
+    {
+        toolName: 'list_memory_facts',
+        method: 'GET',
+        path: '/api/memory/facts',
+        summary:
+            'List or search the facts remembered in this workspace. With q, matches by meaning as well as by exact words.',
+        kind: 'read',
+        params: [
+            { name: 'q', in: 'query', type: 'string', description: 'What to look for' },
+            {
+                name: 'status',
+                in: 'query',
+                type: 'string',
+                description: 'active (default), proposed or forgotten',
+            },
+            {
+                name: 'limit',
+                in: 'query',
+                type: 'number',
+                description: 'Max facts to return (1-50)',
+            },
+        ],
+    },
 ];

@@ -108,6 +108,13 @@ jest.mock('../account/tenant-job-runtime/tenant-job-runtime.module', () => ({
 jest.mock('../organizations/organizations.module', () => ({
     OrganizationsModule: class OrganizationsModule {},
 }));
+// Model accounts (AW-16) — the module imports ModelRoutingModule (and the
+// controller it declares imports ModelAccountHealthService) from the
+// model-routing barrel; stub both so the entity chain is never loaded.
+jest.mock('@ever-works/agent/model-routing', () => ({
+    ModelRoutingModule: class ModelRoutingModule {},
+    ModelAccountHealthService: class ModelAccountHealthService {},
+}));
 // Named Conversations — the module imports ConversationsModule from the
 // conversations barrel; stub it so the entity chain is never loaded.
 jest.mock('@ever-works/agent/conversations', () => ({

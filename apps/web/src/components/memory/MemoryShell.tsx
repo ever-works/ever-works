@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import {
     Brain,
@@ -24,6 +25,8 @@ import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
 import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
 import { MemoryMeetingsPanel, type MemoryMeetingsData } from './MemoryMeetingsPanel';
+import { FactsPanel } from './FactsPanel';
+import type { MemoryFactListDto } from '@/lib/api/memory-facts-types';
 import { LibraryPanel } from '@/components/knowledge/LibraryPanel';
 import type { KnowledgeLibraryInitialData } from '@/lib/api/knowledge-library-types';
 import {
@@ -42,6 +45,17 @@ interface MemoryShellProps {
      * without it — the block is simply absent.
      */
     meetings?: MemoryMeetingsData;
+    /**
+     * First page of memory facts (AW-07), server-fetched by the page. Optional
+     * for the same reason as `meetings`: the shell still renders standalone
+     * (and in specs) without it — the Facts block is simply absent.
+     */
+    facts?: MemoryFactListDto;
+    /**
+     * `true` when the page's server fetch of `facts` failed. The Facts block
+     * then shows its load error with Retry instead of an empty workspace.
+     */
+    factsLoadFailed?: boolean;
     /**
      * The view the page was requested with (`?view=library`). Omitted = the
      * overview, which is the page exactly as it has always rendered.
@@ -91,7 +105,14 @@ function formatDate(iso: string): string {
  * (they depend on cross-feature prerequisites — see the Memory spec
  * §2.4 / §4.3).
  */
-export function MemoryShell({ initial, meetings, initialView, library }: MemoryShellProps) {
+export function MemoryShell({
+    initial,
+    meetings,
+    facts,
+    factsLoadFailed,
+    initialView,
+    library,
+}: MemoryShellProps) {
     const t = useTranslations('dashboard.memoryPage');
 
     // Overview | Library. The server passes the URL's `?view=` so the first
@@ -372,6 +393,20 @@ export function MemoryShell({ initial, meetings, initialView, library }: MemoryS
                 />
             ) : (
                 <>
+                    {/* Facts (AW-07) — the atomic tier of Memory, with the section
+                        rail that jumps to every panel below. It belongs to the
+                        overview: the Library view is the shelf, and the rail's
+                        targets are the panels underneath this branch. Additive —
+                        nothing below moved. "Tidy up" reuses the existing
+                        consolidation pass. */}
+                    {facts && (
+                        <FactsPanel
+                            initial={facts}
+                            initialLoadFailed={factsLoadFailed}
+                            onTidyUp={() => void runConsolidation(false)}
+                        />
+                    )}
+
                     {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
                     <MemoryReviewPanel />
 
@@ -528,6 +563,7 @@ export function MemoryShell({ initial, meetings, initialView, library }: MemoryS
                                           : t('empty.noResults')
                                 }
                                 subtitle={hasActiveFilters ? undefined : t('empty.subtitle')}
+                                showHelpLink={!hasActiveFilters}
                             />
                         ) : (
                             <ul className="flex flex-col gap-2">
@@ -844,7 +880,16 @@ function MemoryRow({
     );
 }
 
-function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
+function EmptyState({
+    title,
+    subtitle,
+    showHelpLink = false,
+}: {
+    title: string;
+    subtitle?: string;
+    /** AW-25 — "How this works" into the Memory article (not on a filtered no-results list). */
+    showHelpLink?: boolean;
+}) {
     return (
         <div className="flex flex-col items-center justify-center text-center py-16 px-6">
             <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-surface-secondary dark:bg-card-primary-dark mb-4">
@@ -858,6 +903,9 @@ function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
                 <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark max-w-md">
                     {subtitle}
                 </p>
+            )}
+            {showHelpLink && (
+                <HelpLink target="memory#adding-to-memory" variant="emptyState" className="mt-3" />
             )}
         </div>
     );

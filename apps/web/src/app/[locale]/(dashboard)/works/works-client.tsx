@@ -425,6 +425,7 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                             router.push(ROUTES.DASHBOARD_NEW);
                         },
                     }}
+                    helpTarget={searchQuery ? undefined : 'creating-a-work'}
                 />
             )}
         </div>

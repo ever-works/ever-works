@@ -263,6 +263,18 @@ export class AgentApprovalsService {
         return rows;
     }
 
+    /**
+     * AW-23 — how many proposals of ONE agent are still waiting on a
+     * person, for the identity card's "Waiting on you" reason.
+     *
+     * A count rather than a list on purpose: the card states a number and
+     * links to the queue; loading the rows to measure them would make a
+     * status read pay for data nothing renders.
+     */
+    async countPendingForAgent(userId: string, agentId: string): Promise<number> {
+        return this.proposals.count({ where: { userId, agentId, status: 'pending' } });
+    }
+
     /** Filterable list — used by the controller's `?status=` surface. */
     async list(
         userId: string,

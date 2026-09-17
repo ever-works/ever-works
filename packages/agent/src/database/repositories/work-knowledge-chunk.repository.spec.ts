@@ -270,4 +270,25 @@ describe('WorkKnowledgeChunkRepository', () => {
             expect(typeof out[0].distance).toBe('number');
         });
     });
+
+    // AW-07 — completes the PgVectorChunkRepositoryPort method set so the API
+    // can publish this repository to the pgvector store as-is.
+    describe('deleteByDocument / deleteByWork', () => {
+        let del: jest.Mock;
+
+        beforeEach(() => {
+            del = jest.fn().mockResolvedValue({ affected: 1 });
+            (repository as unknown as { delete: jest.Mock }).delete = del;
+        });
+
+        it('deletes one document scoped by workId (partition invariant)', async () => {
+            await chunkRepo.deleteByDocument('work-1', 'doc-1');
+            expect(del).toHaveBeenCalledWith({ workId: 'work-1', documentId: 'doc-1' });
+        });
+
+        it('deletes every chunk of one Work', async () => {
+            await chunkRepo.deleteByWork('work-1');
+            expect(del).toHaveBeenCalledWith({ workId: 'work-1' });
+        });
+    });
 });

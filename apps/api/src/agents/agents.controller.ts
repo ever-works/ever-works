@@ -24,15 +24,20 @@ import { Throttle } from '@nestjs/throttler';
 import {
     AgentFileService,
     AGENT_FILE_NAMES,
+    AgentHaltReason,
+    AgentHaltService,
     AgentRunLogRepository,
+    type AgentRunTimelineCursor,
     AgentRunRepository,
     AgentScheduleDispatcherService,
     AGENT_HEARTBEAT_TRIGGER,
     AgentsService,
     AgentExportService,
     AgentScope,
+    AgentStatus,
     AGENT_RUN_CANCELLER,
     type AgentRunCanceller,
+    QUEUED_REASON_AGENT_PAUSED,
     RunDispatchGateService,
     RunSteeringService,
     SkillBindingRepository,
@@ -58,25 +63,38 @@ import {
     ActivityActionType,
     ActivityStatus,
 } from '@ever-works/agent/activity-log';
-import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
+import {
+    AGENT_RESUME_PROMOTION_BUDGET,
+    AGENT_STATUS_BATCH_MAX,
+    containsSecret,
+    type AgentHeldWorkDto,
+    type AgentIdentityDto,
+    type AgentStatusDto,
+    type TaskAcceptanceCheck,
+    type TaskCheckResult,
+} from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { ScopeContextService } from '../scope';
 import {
     AddAgentAttachmentDto,
+    AgentStatusQueryDto,
     AgentTargetBodyDto,
     AssignTaskToAgentDto,
     CreateAgentDto,
     CreateAgentFromTemplateDto,
+    ListAgentHeldQueryDto,
     ListAgentRunsQueryDto,
     ListAgentsQueryDto,
     ListRunSessionsQueryDto,
+    PauseAgentDto,
     ResumeRunDto,
     SessionDetailQueryDto,
     SteerRunDto,
     UpdateAgentDto,
     UpdateAgentGuardrailsDto,
 } from './dto/agent.dto';
+import { AgentIdentityService } from './agent-identity.service';
 // Type-only (erased at compile time) so the spec-side jest.mock factories
 // for '@ever-works/agent/agents' never have to know about entity shapes.
 import type { AgentRun, AgentRunLog } from '@ever-works/agent/entities';
@@ -130,6 +148,12 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_RUN_TRIGGERED,
     ActivityActionType.AGENT_RUN_CANCELLED,
     ActivityActionType.AGENT_TASK_ASSIGNED,
+    // AW-23 — the brake's own trail: why the agent stopped, what was
+    // held while it was stopped, and what a resume let through. Held
+    // work that never surfaced would make "nothing is lost" unverifiable.
+    ActivityActionType.AGENT_BLOCKED_ON_CREDENTIAL,
+    ActivityActionType.AGENT_RUN_HELD,
+    ActivityActionType.AGENT_RUNS_RELEASED,
     // Agent Collaborators — allow-list edits are emitted by
     // `AgentCollaboratorsController` with `details.resourceId` = the
     // PARENT agent, so they belong in this agent's feed.
@@ -185,6 +209,14 @@ export interface SessionTimelineEntry {
     id: string;
     kind: 'assistant-message' | 'user-message' | 'tool-call' | 'marker';
     createdAt: string;
+    /**
+     * The cursor that resumes exactly after THIS row. The live-follow poll
+     * follows from the last row on screen, so it needs the server's own
+     * cursor: deriving one from `createdAt` + `id` cannot name a position
+     * inside a whole second on the sqlite family, where `createdAt`
+     * defaults to `datetime('now')`.
+     */
+    cursor: string;
     /** Message rows + marker rows: the (already redacted, capped) text. */
     text: string | null;
     toolName: string | null;
@@ -196,7 +228,7 @@ export interface SessionTimelineEntry {
     truncated: boolean;
 }
 
-function toSessionTimelineEntry(log: AgentRunLog): SessionTimelineEntry {
+function toSessionTimelineEntry(log: AgentRunLog, tieBreak?: string): SessionTimelineEntry {
     const md = (log.metadata ?? {}) as Record<string, unknown>;
     const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
     const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
@@ -209,6 +241,7 @@ function toSessionTimelineEntry(log: AgentRunLog): SessionTimelineEntry {
               ? log.step
               : 'marker',
         createdAt: log.createdAt.toISOString(),
+        cursor: timelineCursorOf(log, tieBreak),
         text: isTool ? null : log.message,
         toolName: isTool ? str(md.toolName) : null,
         callId: isTool ? str(md.callId) : null,
@@ -222,22 +255,33 @@ function toSessionTimelineEntry(log: AgentRunLog): SessionTimelineEntry {
 }
 
 /**
- * Parse the `<epochMillis>_<uuid>` cursor the previous page returned.
+ * Parse the `<epochMillis>_<tieBreak>` cursor the previous page returned.
  * The DTO already regex-validated the shape; a still-unparsable value
  * degrades to "first page" rather than erroring.
+ *
+ * The tie-break half is whichever column the store orders equal
+ * timestamps by — an integer insertion-order key on the sqlite family, a
+ * uuid row id elsewhere — so a digits-only tail is handed over as the
+ * exact position and a uuid tail as the older, id-shaped one. The
+ * repository knows which of the two ITS driver can honour, and honours an
+ * id-shaped cursor it cannot use as "the start of the millisecond it
+ * names": rows may repeat (the client de-duplicates on row id), none are
+ * skipped, and the cursor it hands back next is exact. So a cursor a
+ * browser is still holding mid-session keeps working.
  */
-function parseTimelineCursor(cursor?: string): { createdAt: Date; id: string } | undefined {
+function parseTimelineCursor(cursor?: string): AgentRunTimelineCursor | undefined {
     if (!cursor) return undefined;
     const separator = cursor.indexOf('_');
     if (separator <= 0) return undefined;
     const ms = Number(cursor.slice(0, separator));
-    const id = cursor.slice(separator + 1);
-    if (!Number.isFinite(ms) || id.length === 0) return undefined;
-    return { createdAt: new Date(ms), id };
+    const tail = cursor.slice(separator + 1);
+    if (!Number.isFinite(ms) || tail.length === 0) return undefined;
+    const createdAt = new Date(ms);
+    return /^\d+$/.test(tail) ? { createdAt, tieBreak: tail } : { createdAt, id: tail };
 }
 
-function timelineCursorOf(log: AgentRunLog): string {
-    return `${log.createdAt.getTime()}_${log.id}`;
+function timelineCursorOf(log: AgentRunLog, tieBreak?: string): string {
+    return `${log.createdAt.getTime()}_${tieBreak ?? log.id}`;
 }
 
 @ApiTags('agents')
@@ -292,6 +336,16 @@ export class AgentsController {
         private readonly steering?: RunSteeringService,
         @Optional()
         private readonly scopeContext?: ScopeContextService,
+        // AW-23 — the halt record behind "why is this agent not working?"
+        // and the composer behind the identity card. Trailing + Optional
+        // for the same positional-spec reason as every seam above: when
+        // unbound, pause/resume keep exactly today's behaviour and the
+        // identity endpoint reports that it is unavailable rather than
+        // inventing a card.
+        @Optional()
+        private readonly halt?: AgentHaltService,
+        @Optional()
+        private readonly identity?: AgentIdentityService,
     ) {}
 
     @Get()
@@ -340,6 +394,8 @@ export class AgentsController {
                 name: body.name,
                 title: body.title ?? null,
                 capabilities: body.capabilities ?? null,
+                // AW-20 — the area of work this Agent owns. Label only.
+                lane: body.lane ?? null,
                 aiProviderId: body.aiProviderId ?? null,
                 modelId: body.modelId ?? null,
                 // Environments — service validates same-user + published
@@ -571,11 +627,12 @@ export class AgentsController {
         }
         const limit = query.limit ?? 100;
         const after = parseTimelineCursor(query.cursor);
-        const [timelineRows, messages, toolCalls] = await Promise.all([
-            this.agentRunLogs.findTimelineByRun(runId, SESSION_TIMELINE_STEPS, limit, after),
+        const [timelinePage, messages, toolCalls] = await Promise.all([
+            this.agentRunLogs.findTimelinePage(runId, SESSION_TIMELINE_STEPS, limit, after),
             this.agentRunLogs.countByRunSteps(runId, SESSION_MESSAGE_STEPS),
             this.agentRunLogs.countByRunSteps(runId, ['tool-invocation']),
         ]);
+        const timelineRows = timelinePage.rows;
         const filesTouched = (run.workspaceMeta?.filesTouched ?? []).filter(
             (p): p is string => typeof p === 'string' && p.length > 0,
         );
@@ -597,10 +654,15 @@ export class AgentsController {
             },
             filesTouched,
             timeline: {
-                entries: timelineRows.map((row) => toSessionTimelineEntry(row)),
+                entries: timelineRows.map((row) =>
+                    toSessionTimelineEntry(row, timelinePage.tieBreaks.get(row.id)),
+                ),
                 // A full page means there MAY be more; the client stops on
                 // the first short page.
-                nextCursor: last && timelineRows.length === limit ? timelineCursorOf(last) : null,
+                nextCursor:
+                    last && timelineRows.length === limit
+                        ? timelineCursorOf(last, timelinePage.tieBreaks.get(last.id))
+                        : null,
                 limit,
             },
         };
@@ -656,6 +718,61 @@ export class AgentsController {
         );
     }
 
+    /**
+     * AW-23 — the batched roster status read.
+     *
+     * ONE request covers a whole visible page of agents, not one request
+     * per card: a workspace with sixty agents on screen polling every ten
+     * seconds would otherwise issue six requests a second for data that
+     * fits in one.
+     *
+     * ⚠️ `status` is a STATIC segment and this declaration MUST stay
+     * ABOVE `@Get(':id')`. Nest matches routes in declaration order, so
+     * moving it below turns every poll into a lookup for an agent whose
+     * id is the literal string "status" — a 404 with no obvious cause.
+     * `agents.controller.status-batch.spec.ts` pins the ordering.
+     */
+    @Get('status')
+    @ApiOperation({
+        summary:
+            'Batched live status for up to 100 of my Agents — one request per roster poll, ' +
+            'never one per card.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    async getStatuses(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: AgentStatusQueryDto,
+    ): Promise<{ statuses: AgentStatusDto[] }> {
+        const ids = [
+            ...new Set(
+                query.ids
+                    .split(',')
+                    .map((id) => id.trim())
+                    .filter((id) => id.length > 0),
+            ),
+        ];
+        if (ids.length === 0) return { statuses: [] };
+        if (ids.length > AGENT_STATUS_BATCH_MAX) {
+            throw new BadRequestException(
+                `At most ${AGENT_STATUS_BATCH_MAX} Agent ids may be polled in one request.`,
+            );
+        }
+        if (!this.identity) return { statuses: [] };
+        // Ids the caller does not own simply do not come back. A roster
+        // poll that happens to include a foreign id degrades to a shorter
+        // list rather than 404-ing the whole batch — and never becomes an
+        // existence oracle for someone else's agent.
+        const rows = await this.service.findStatusRows(
+            auth.userId,
+            ids,
+            this.scopeContext?.getScope(),
+        );
+        return {
+            statuses: rows.map((row) => this.identity!.buildStatus(row, { openDecisionCount: 0 })),
+        };
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get one Agent' })
     @HttpCode(HttpStatus.OK)
@@ -682,6 +799,8 @@ export class AgentsController {
                 name: body.name,
                 title: body.title,
                 capabilities: body.capabilities,
+                // AW-20 — `undefined` leaves the lane alone, `null` clears it.
+                lane: body.lane,
                 aiProviderId: body.aiProviderId,
                 modelId: body.modelId,
                 // Environments — `undefined` leaves the assignment alone,
@@ -796,43 +915,118 @@ export class AgentsController {
         return this.service.archive(auth.userId, id, this.scopeContext?.getScope());
     }
 
+    /**
+     * AW-23 — Pause, and MEAN it.
+     *
+     * Everything about this endpoint's contract is unchanged: same path,
+     * same verb, same `AgentDto` in the response. Posted with no body at
+     * all it behaves exactly as it did before — which is why the body is
+     * optional and the response only GAINS fields.
+     *
+     * What changed is behind it. The pause now writes a halt RECORD
+     * (reason, time, author, the owner's note), and the brake bound in
+     * the agent-side module refuses every dispatch path for a paused
+     * agent instead of only the heartbeat claim.
+     */
     @Post(':id/pause')
-    @ApiOperation({ summary: 'Pause an active Agent (ACTIVE → PAUSED)' })
+    @ApiOperation({
+        summary:
+            'Pause an active Agent (ACTIVE → PAUSED). Optional body records why. ' +
+            'A paused Agent picks up nothing new: scheduled runs, assigned tasks, ' +
+            'chat replies and delegated work are all held until it resumes.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async pause(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<AgentDto> {
+        @Body() body?: PauseAgentDto,
+    ): Promise<AgentDto & { heldCount?: number; inFlightCount?: number }> {
+        const note = typeof body?.note === 'string' ? body.note.trim() : '';
+        if (note && containsSecret(note)) {
+            // 🛑 The value is never echoed back — naming the field is
+            // enough for the person to find it, and the unsaved text
+            // stays in their editor because nothing was stored.
+            throw new BadRequestException(
+                'That looks like a secret. Remove it from the pause note and try again.',
+            );
+        }
+
         const dto = await this.service.pause(auth.userId, id, this.scopeContext?.getScope());
-        // agents/spec.md — status transitions MUST leave an activity
-        // trail; surfaced in the /agents/[id]/activity feed via
-        // GET :id/events.
-        void this.tryLog({
-            userId: auth.userId,
-            agentId: id,
-            actionType: ActivityActionType.AGENT_PAUSED,
-            details: { status: dto.status },
-        });
-        return dto;
+
+        // Record WHY. A second pause on an already-paused agent (a stale
+        // tab, a double click) is a no-op that preserves the first note,
+        // time and author — and writes no second activity row.
+        let wrote = true;
+        if (this.halt) {
+            const result = await this.halt.halt(id, AgentHaltReason.USER, {
+                note: note || null,
+                byUserId: auth.userId,
+            });
+            wrote = result.written;
+        }
+
+        const inFlightCount = await this.countInFlight(id);
+        const heldCount = await this.countHeld(id);
+
+        if (wrote) {
+            // agents/spec.md — status transitions MUST leave an activity
+            // trail; surfaced in the /agents/[id]/activity feed via
+            // GET :id/events. `hasNote` rather than the note body: the
+            // feed payload carries no free text a person typed.
+            void this.tryLog({
+                userId: auth.userId,
+                agentId: id,
+                actionType: ActivityActionType.AGENT_PAUSED,
+                details: {
+                    status: dto.status,
+                    hasNote: Boolean(note),
+                    stopInFlight: body?.stopInFlight === true,
+                    heldCount,
+                },
+            });
+        }
+
+        // A run already in flight is left to FINISH. Stopping it is a
+        // second, explicit decision the caller has to ask for.
+        if (body?.stopInFlight === true) {
+            await this.requestStopInFlight(auth.userId, id);
+        }
+
+        return { ...dto, heldCount, inFlightCount };
     }
 
+    /**
+     * AW-23 — Resume, and release what the pause held.
+     *
+     * Same path, same verb, same `AgentDto`. The response gains
+     * `releasedCount` so the UI can say "3 held runs released" instead of
+     * hoping; the drain itself is best-effort and never fails the resume.
+     */
     @Post(':id/resume')
-    @ApiOperation({ summary: 'Resume a paused/errored Agent (→ ACTIVE)' })
+    @ApiOperation({
+        summary:
+            'Resume a paused/errored Agent (→ ACTIVE). Clears the stored halt reason and ' +
+            'releases work held while it was paused, oldest first.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async resume(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<AgentDto> {
+    ): Promise<AgentDto & { releasedCount?: number }> {
         const dto = await this.service.resume(auth.userId, id, this.scopeContext?.getScope());
+        // FR-17 — the reason is cleared on resume, and at no other time
+        // except activation from draft and unarchive.
+        await this.halt?.clear(id);
+        const releasedCount = await this.releaseHeld(auth.userId, id);
         void this.tryLog({
             userId: auth.userId,
             agentId: id,
             actionType: ActivityActionType.AGENT_RESUMED,
-            details: { status: dto.status },
+            details: { status: dto.status, releasedCount },
         });
-        return dto;
+        return { ...dto, releasedCount };
     }
 
     @Post(':id/heartbeat/pause')
@@ -907,6 +1101,10 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
         const dto = await this.service.unarchive(auth.userId, id, this.scopeContext?.getScope());
+        // FR-17 — a restored agent starts with a clean slate: whatever
+        // stopped it before it was archived is no longer the answer to
+        // "why is this not working?".
+        await this.halt?.clear(id);
         void this.tryLog({
             userId: auth.userId,
             agentId: id,
@@ -914,6 +1112,138 @@ export class AgentsController {
             details: { status: dto.status },
         });
         return dto;
+    }
+
+    // ── AW-23 — the halt reason, the held work and the identity card ──
+
+    /**
+     * Everything the identity card paints, in ONE request.
+     *
+     * One request is a requirement, not an optimisation: a card that
+     * fanned out would paint its dot before its sentence, and a dot
+     * without a sentence is exactly the state this epic exists to
+     * abolish.
+     */
+    @Get(':id/identity')
+    @ApiOperation({
+        summary:
+            'Everything the Agent identity card renders — who it is, what it is doing, and why it is not — in one request.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    async getIdentity(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentIdentityDto> {
+        // Cross-user 404 through the service, exactly as `getOne` does.
+        const agent = await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
+        if (!this.identity) {
+            throw new InternalServerErrorException('Agent identity service is not available.');
+        }
+        return this.identity.build(agent);
+    }
+
+    /**
+     * The work being HELD because this Agent is paused, in the order a
+     * Resume will release it. "Nothing is lost" answered with a list.
+     */
+    @Get(':id/held')
+    @ApiOperation({ summary: 'Runs held while this Agent is paused, oldest first.' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    async listHeld(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query() query: ListAgentHeldQueryDto,
+    ): Promise<AgentHeldWorkDto> {
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
+        if (!this.identity) return { total: 0, items: [] };
+        return this.identity.listHeld(id, query.limit);
+    }
+
+    /** How many runs of this Agent are still finishing. */
+    private async countInFlight(agentId: string): Promise<number> {
+        try {
+            return await this.agentRuns.countInFlightForAgent(agentId);
+        } catch (err) {
+            this.logger.warn(`Agent ${agentId}: in-flight count failed: ${err}`);
+            return 0;
+        }
+    }
+
+    /** How many runs of this Agent are parked because it is paused. */
+    private async countHeld(agentId: string): Promise<number> {
+        try {
+            const held = await this.agentRuns.listQueuedForAgent(
+                agentId,
+                QUEUED_REASON_AGENT_PAUSED,
+                0,
+            );
+            return held.total;
+        } catch (err) {
+            this.logger.warn(`Agent ${agentId}: held count failed: ${err}`);
+            return 0;
+        }
+    }
+
+    /**
+     * Release the work a pause held. Best-effort by contract: a resume
+     * must succeed even when the drain hiccups, and what is left stays
+     * held for the next Resume rather than being lost.
+     */
+    private async releaseHeld(userId: string, agentId: string): Promise<number> {
+        if (!this.dispatchGate) return 0;
+        try {
+            const result = await this.dispatchGate.promoteParkedForAgent(
+                agentId,
+                AGENT_RESUME_PROMOTION_BUDGET,
+            );
+            if (result.promoted > 0) {
+                void this.tryLog({
+                    userId,
+                    agentId,
+                    actionType: ActivityActionType.AGENT_RUNS_RELEASED,
+                    details: {
+                        releasedCount: result.promoted,
+                        budgetExhausted: result.budgetExhausted,
+                    },
+                });
+            }
+            return result.promoted;
+        } catch (err) {
+            this.logger.warn(`Agent ${agentId}: releasing held work failed: ${err}`);
+            return 0;
+        }
+    }
+
+    /**
+     * Ask every run still in flight to stop, through the EXISTING
+     * cooperative interrupt — the same one `POST :id/runs/:runId/interrupt`
+     * uses. Nothing is killed: the run halts between tool-loop
+     * iterations and completes with a summary.
+     *
+     * Best-effort: a pause has already landed by the time this runs, and
+     * failing it because a stop request did not land would be worse than
+     * letting the run finish on its own.
+     */
+    private async requestStopInFlight(userId: string, agentId: string): Promise<void> {
+        if (!this.steering) return;
+        try {
+            const run = await this.agentRuns.findNewestInFlightForAgent(agentId);
+            if (!run) return;
+            const scope = this.scopeContext?.getScope();
+            await (scope
+                ? this.steering.interrupt(run.id, userId, scope)
+                : this.steering.interrupt(run.id, userId));
+            void this.tryLog({
+                userId,
+                agentId,
+                actionType: ActivityActionType.AGENT_RUN_CANCELLED,
+                details: { runId: run.id, control: 'interrupt', source: 'pause' },
+            });
+        } catch (err) {
+            this.logger.warn(`Agent ${agentId}: stop-in-flight request failed: ${err}`);
+        }
     }
 
     // ── Phase 4 — Agent file storage (5 canonical MD files + agent.yml) ─
@@ -1040,7 +1370,16 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<{ outcome: string; runId?: string; reason?: string }> {
         // Cross-user 404 via service-level access check.
-        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
+        const agent = await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
+        // AW-23 — a synchronous, user-initiated dispatch is REFUSED
+        // rather than parked, and refused by name. Work that arrives on
+        // its own (a task assignment, a chat reply, delegation) is held
+        // and released on Resume; work a person asked for right now would
+        // be a mystery if it silently went into a queue. No run row is
+        // created — this check is before every dispatch path.
+        if (agent.status === AgentStatus.PAUSED) {
+            throw new ConflictException('This agent is paused. Resume it first.');
+        }
         if (!this.heartbeatTrigger) {
             throw new InternalServerErrorException(
                 'AGENT_HEARTBEAT_TRIGGER not bound — run-now is unavailable until the Trigger.dev adapter wires up.',
@@ -1606,6 +1945,16 @@ export class AgentsController {
                         userId: auth.userId,
                         workId: task.workId ?? null,
                         organizationId: task.organizationId ?? null,
+                        // AW-23 — the whole of this epic's enforcement at
+                        // this call site. The brake middleware inside the
+                        // gate can only see the agent if the agent is
+                        // passed, and until now it was not: assigning a
+                        // task to a paused agent RAN it. With this the
+                        // run is created HELD (`agent-paused`) and
+                        // released on Resume — the same parked shape the
+                        // concurrency valve has always returned, carrying
+                        // a new value.
+                        agentId: id,
                     },
                     reserve,
                 );
@@ -1628,7 +1977,12 @@ export class AgentsController {
             void this.tryLog({
                 userId: auth.userId,
                 agentId: id,
-                actionType: ActivityActionType.AGENT_TASK_ASSIGNED,
+                actionType:
+                    admission.queuedReason === QUEUED_REASON_AGENT_PAUSED
+                        ? // AW-23 — held by a pause is its own story: the
+                          // assignment was ACCEPTED and nothing failed.
+                          ActivityActionType.AGENT_RUN_HELD
+                        : ActivityActionType.AGENT_TASK_ASSIGNED,
                 details: {
                     runId: run.id,
                     taskId: body.taskId,

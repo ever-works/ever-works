@@ -87,6 +87,23 @@ describe('NotificationsController', () => {
             });
         });
 
+        // AW-13: rows written silently (in-app turned off for their event)
+        // are opt-in; the default list is unchanged.
+        it('includes silent notifications only when asked', async () => {
+            service.getNotifications.mockResolvedValue([] as any);
+
+            await controller.getNotifications(auth, false, 25, 0, undefined, true);
+            expect(service.getNotifications).toHaveBeenLastCalledWith(
+                'user-1',
+                expect.objectContaining({ includeSilent: true }),
+            );
+
+            await controller.getNotifications(auth, false, 25, 0, undefined, false);
+            expect(service.getNotifications.mock.calls.at(-1)?.[1]).not.toHaveProperty(
+                'includeSilent',
+            );
+        });
+
         it('treats limit equal to cap (100) as 100', async () => {
             service.getNotifications.mockResolvedValue([] as any);
 

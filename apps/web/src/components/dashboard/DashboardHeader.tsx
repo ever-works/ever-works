@@ -45,6 +45,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
     const t = useTranslations('dashboard.header');
     const tTheme = useTranslations('common.theme');
+    const tHelpCenter = useTranslations('dashboard.helpCenter');
 
     return (
         <header
@@ -131,9 +132,11 @@ export function DashboardHeader({
                             </div>
                         </Tooltip>
 
-                        <Tooltip content={t('tooltips.help')} position="bottom">
+                        <Tooltip content={tHelpCenter('openTooltip')} position="bottom">
                             <button
                                 onClick={onHelpClick}
+                                aria-label={tHelpCenter('openTooltip')}
+                                data-testid="header-help-button"
                                 className={cn(
                                     'rounded-md cursor-pointer',
                                     'text-text-secondary dark:text-text-secondary-dark',

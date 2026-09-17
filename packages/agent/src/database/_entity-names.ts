@@ -131,9 +131,14 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'McpServerConnection',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
+    // AW-07 — Memory facts (atomic tier of Memory)
+    'MemoryFact',
     // Memory Files — user-defined folders organizing uploads on /memory
     'MemoryFolder',
     'Mission',
+    // Model accounts (AW-16) — provider accounts + the model ladder.
+    'ModelAccount',
+    'ModelPolicy',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
     'GoalMetricSample',
@@ -148,6 +153,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'NotificationChannel',
     'NotificationChannelDeliveryLog',
     'NotificationEventType',
+    'OnboardingChecklist',
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',
@@ -224,6 +230,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'UserTaskCounter',
     'UserTemplatePreference',
     'UserUpload',
+    // AW-07 — pgvector chunks for vector namespaces that are not a Work
+    'VectorNamespaceChunk',
     'WebhookDelivery',
     'WebhookSubscription',
     'Work',

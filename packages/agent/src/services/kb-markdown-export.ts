@@ -1,5 +1,7 @@
 import * as yaml from 'yaml';
 
+import { trimEdgeChars } from '../utils/text.utils';
+
 /** What a single-document Markdown export needs to know about the document. */
 export interface KbMarkdownExportInput {
     title: string;
@@ -56,6 +58,6 @@ export function renderKbMarkdownExport(doc: KbMarkdownExportInput): {
 
 /** A filename-safe slug: anything outside `[A-Za-z0-9._-]` becomes `-`. */
 function safeSlug(slug: string): string {
-    const cleaned = slug.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[.-]+|-+$/g, '');
+    const cleaned = trimEdgeChars(slug.replace(/[^A-Za-z0-9._-]+/g, '-'), '.-', '-');
     return cleaned.length > 0 ? cleaned.slice(0, 200) : 'document';
 }

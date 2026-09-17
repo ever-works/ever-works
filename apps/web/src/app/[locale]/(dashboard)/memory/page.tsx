@@ -2,6 +2,11 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { memoryAPI, EMPTY_MEMORY_RESPONSE, type MemoryResponse } from '@/lib/api/memory';
 import {
+    memoryFactsAPI,
+    settleInitialMemoryFacts,
+    type InitialMemoryFacts,
+} from '@/lib/api/memory-facts';
+import {
     knowledgeLibraryAPI,
     EMPTY_LIBRARY_LIST,
     EMPTY_LIBRARY_TREE,
@@ -44,6 +49,10 @@ const WORK_OPTIONS_LIMIT = 100;
  * meetings failure surfaces as a load-error box *inside the block* and a
  * works failure just costs the "routed to" filter its options. Neither
  * can take the Memory page down.
+ *
+ * The page also server-fetches the first page of **memory facts** (AW-07)
+ * for the Facts block at the top of the shell; its search, views and writes
+ * re-query the `/api/memory/facts` BFF from the client.
  *
  * All interactivity (search, filter chips, view toggle) lives in the
  * client `MemoryShell`, which re-queries the same-origin BFF proxy
@@ -88,6 +97,14 @@ export default async function MemoryPage({
             error: err instanceof Error ? err.message : 'Failed to load meetings.',
         }));
 
+    // Memory facts (AW-07) — first page of the "All" view. Defensive like the
+    // two fetches above: a failure never takes the page down. It is not passed
+    // off as an empty workspace either — the Facts block says the load failed
+    // and offers Retry, and every write still works.
+    const factsPromise: Promise<InitialMemoryFacts> = settleInitialMemoryFacts(
+        memoryFactsAPI.list({ view: 'all' }),
+    );
+
     const libraryPromise: Promise<KnowledgeLibraryInitialData | undefined> =
         initialView === 'library'
             ? Promise.all([
@@ -106,10 +123,11 @@ export default async function MemoryPage({
               }))
             : Promise.resolve(undefined);
 
-    const [initial, works, meetingsResult, library] = await Promise.all([
+    const [initial, works, meetingsResult, facts, library] = await Promise.all([
         initialPromise,
         worksPromise,
         meetingsPromise,
+        factsPromise,
         libraryPromise,
     ]);
 
@@ -144,6 +162,8 @@ export default async function MemoryPage({
         <MemoryShell
             initial={initial}
             meetings={meetings}
+            facts={facts.facts}
+            factsLoadFailed={facts.loadFailed}
             initialView={initialView}
             library={library}
         />

@@ -33,6 +33,7 @@ export * from './terms-acceptance.entity';
 export * from './github-app-installation.entity';
 export * from './github-app-installation-repository.entity';
 export * from './github-app-user-link.entity';
+export * from './onboarding-checklist.entity';
 export * from './onboarding-request.entity';
 export * from './template.entity';
 export * from './template-customization.entity';
@@ -54,6 +55,8 @@ export * from './work-knowledge-tag.entity';
 export * from './work-knowledge-citation.entity';
 export * from './work-knowledge-chunk.entity';
 export * from './work-knowledge-chunk-coordinate.entity';
+// AW-07 — pgvector chunks for vector namespaces that are not a Work.
+export * from './vector-namespace-chunk.entity';
 export * from './kb-retrieval-log.entity';
 export * from './kb-types';
 export * from './types';
@@ -176,6 +179,9 @@ export * from './fleet-execution-preference.entity';
 // profile (logins and files) on each Node.
 export * from './computer-session.entity';
 export * from './node-agent-profile.entity';
+// Model accounts (AW-16) — provider accounts + the model ladder
+export * from './model-account.entity';
+export * from './model-policy.entity';
 // Fleet cost accounting (EW-777) — the owner's fleet-wide daily
 // model-spend ceiling and its one-notice trip marker.
 export * from './fleet-cost-policy.entity';
@@ -200,6 +206,10 @@ export * from './workflow-run.entity';
 export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+// AW-07 — Memory facts (the atomic tier of Memory) + the shared
+// context-file / fact vocabulary re-exported from contracts.
+export * from './memory-fact.entity';
+export * from './context-file-types';
 export * from './knowledge-document-reader-state.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './agent-plugin-package.entity';

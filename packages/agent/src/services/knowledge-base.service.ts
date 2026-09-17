@@ -61,6 +61,7 @@ import { KbRetrievalLogRepository } from '../database/repositories/kb-retrieval-
 import { z } from 'zod';
 import { KB_DOCUMENT_CLASSES } from '@ever-works/contracts';
 import { sanitizeDescription } from '../utils/sanitize.util';
+import { trimEdgeChars } from '../utils/text.utils';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -3845,11 +3846,8 @@ export class KnowledgeBaseService {
 
     private slugFromFilename(filename: string): string {
         const base = filename.replace(/\.[^.]+$/, '');
-        return base
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '')
-            .slice(0, 96);
+        const hyphenated = base.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        return trimEdgeChars(hyphenated, '-', '-').slice(0, 96);
     }
 
     private humanizeFilename(filename: string): string {

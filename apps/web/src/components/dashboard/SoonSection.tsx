@@ -1,7 +1,9 @@
 'use client';
 
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, Check, CircleAlert, PauseCircle } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
+import type { HomeScheduleKind, HomeScheduleRow, HomeToday } from '@ever-works/contracts';
+import { HomeBlockShell } from '@/components/home/HomeBlockShell';
 import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import type { SoonRunItem } from './dashboard-signals.types';
@@ -27,7 +29,45 @@ const PREVIEW_LIMIT = 3;
 // The Schedules view lives under Activity; owned by the Schedules front.
 const SCHEDULES_ACTIVITY_HREF = '/activity?view=schedules';
 
-export function SoonSection({ items, total }: { items: SoonRunItem[]; total: number }) {
+interface SoonSectionProps {
+    /** Upcoming runs (the original Soon block). */
+    items?: SoonRunItem[];
+    total?: number;
+    /**
+     * Home (AW-19) — the Today panel. When given (or when `failed`), the block
+     * covers the user's local day instead: what already ran and what is still
+     * due before midnight, for every schedule kind.
+     */
+    today?: HomeToday | null;
+    /** The Today panel's schedule read failed; renders its error card. */
+    failed?: boolean;
+    /** The timezone the day was computed in; times render on that wall clock. */
+    timeZone?: string;
+    onRetry?: () => void;
+}
+
+export function SoonSection({
+    items = [],
+    total = 0,
+    today,
+    failed = false,
+    timeZone,
+    onRetry,
+}: SoonSectionProps) {
+    if (today !== undefined || failed) {
+        return (
+            <SoonToday
+                today={today ?? null}
+                failed={failed}
+                timeZone={timeZone}
+                onRetry={onRetry}
+            />
+        );
+    }
+    return <SoonUpcoming items={items} total={total} />;
+}
+
+function SoonUpcoming({ items, total }: { items: SoonRunItem[]; total: number }) {
     const t = useTranslations('dashboard.soon');
     const format = useFormatter();
 
@@ -112,5 +152,172 @@ export function SoonSection({ items, total }: { items: SoonRunItem[]; total: num
                 })}
             </ul>
         </section>
+    );
+}
+
+/** Label key under `dashboard.soon.source` for every schedule kind — none is left unlabelled. */
+const TODAY_KIND_KEY: Record<HomeScheduleKind, string> = {
+    recurring_task: 'recurringTask',
+    agent_heartbeat: 'agentHeartbeat',
+    work_schedule: 'workSchedule',
+    mission_tick: 'missionTick',
+    source_validation: 'sourceValidation',
+    data_sync: 'dataSync',
+    inbound_trigger: 'inboundTrigger',
+};
+
+/**
+ * Home (AW-19) — the Today panel: the rows that already fired today, dimmed
+ * with a tick, above a rule; then the rows still due before the end of the
+ * local day, soonest first, with a link to the full schedules view when more
+ * are due than the panel previews.
+ */
+function SoonToday({
+    today,
+    failed,
+    timeZone,
+    onRetry,
+}: {
+    today: HomeToday | null;
+    failed: boolean;
+    timeZone?: string;
+    onRetry?: () => void;
+}) {
+    const t = useTranslations('dashboard.soon');
+    const tBlock = useTranslations('dashboard.home.block');
+    const remaining = today ? Math.max(0, today.dueTotal - today.due.length) : 0;
+    const state =
+        failed || !today
+            ? 'failed'
+            : today.ran.length === 0 && today.dueTotal === 0
+              ? 'empty'
+              : 'ready';
+
+    return (
+        <HomeBlockShell
+            blockId="today"
+            title={t('todayTitle')}
+            icon={CalendarClock}
+            state={state}
+            failedLabel={tBlock('names.today')}
+            onRetry={onRetry}
+            headerAction={
+                remaining > 0 ? (
+                    <Link
+                        href={SCHEDULES_ACTIVITY_HREF}
+                        className="font-medium text-primary hover:underline"
+                        data-testid="dashboard-soon-today-more"
+                    >
+                        {t('more', { n: remaining })} →
+                    </Link>
+                ) : null
+            }
+            empty={
+                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                    {t('emptyTitle')}{' '}
+                    <Link
+                        href={SCHEDULES_ACTIVITY_HREF}
+                        className="font-medium text-primary hover:underline"
+                    >
+                        {t('emptyAction')} →
+                    </Link>
+                </p>
+            }
+        >
+            {today ? (
+                <div data-testid="dashboard-soon-today">
+                    {today.ran.length > 0 ? (
+                        <>
+                            <ul aria-label={t('ranLabel')} className="space-y-1 opacity-70">
+                                {today.ran.map((row) => (
+                                    <TodayRow key={`ran-${row.id}`} row={row} timeZone={timeZone} />
+                                ))}
+                            </ul>
+                            <hr className="my-2 border-border/40 dark:border-white/8" />
+                        </>
+                    ) : null}
+                    {today.due.length > 0 ? (
+                        <ul className="space-y-1">
+                            {today.due.map((row) => (
+                                <TodayRow key={`due-${row.id}`} row={row} timeZone={timeZone} />
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {t('nothingElse')}
+                        </p>
+                    )}
+                </div>
+            ) : null}
+        </HomeBlockShell>
+    );
+}
+
+function TodayRow({ row, timeZone }: { row: HomeScheduleRow; timeZone?: string }) {
+    const t = useTranslations('dashboard.soon');
+    // The kind key is chosen at runtime from a closed map, so relax the
+    // literal-key typing for that one lookup.
+    const tx = t as unknown as (key: string) => string;
+    const format = useFormatter();
+    const at = new Date(row.at);
+    let time = '—';
+    if (!Number.isNaN(at.getTime())) {
+        try {
+            time = format.dateTime(at, {
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+                timeZone,
+            });
+        } catch {
+            time = format.dateTime(at, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+        }
+    }
+    const ran = row.state === 'ran';
+
+    return (
+        <li data-testid="dashboard-soon-today-row" data-state={row.state} data-kind={row.kind}>
+            <Link
+                href={row.href}
+                className="flex items-center gap-2 rounded-md px-1 py-1 text-sm no-underline hover:bg-card-hover dark:hover:bg-white/3"
+            >
+                <span className="flex w-4 shrink-0 justify-center">
+                    {ran ? <Check aria-hidden="true" className="h-3.5 w-3.5 text-success" /> : null}
+                </span>
+                <span className="w-12 shrink-0 tabular-nums text-text-secondary dark:text-text-secondary-dark">
+                    {ran ? (
+                        <>
+                            <span className="sr-only">{t('ranAt', { time })}</span>
+                            <span aria-hidden="true">{time}</span>
+                        </>
+                    ) : (
+                        time
+                    )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-text dark:text-text-dark">
+                    {row.name}
+                </span>
+                {row.status !== 'active' ? (
+                    <span
+                        className={cn(
+                            'inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium',
+                            row.status === 'error'
+                                ? 'bg-danger/10 text-danger'
+                                : 'bg-warning/10 text-warning',
+                        )}
+                    >
+                        {row.status === 'error' ? (
+                            <CircleAlert aria-hidden="true" className="h-3 w-3" />
+                        ) : (
+                            <PauseCircle aria-hidden="true" className="h-3 w-3" />
+                        )}
+                        {row.status === 'error' ? t('statusError') : t('statusPaused')}
+                    </span>
+                ) : null}
+                <span className="shrink-0 rounded-md bg-surface-secondary px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark">
+                    {tx(`source.${TODAY_KIND_KEY[row.kind]}`)}
+                </span>
+            </Link>
+        </li>
     );
 }

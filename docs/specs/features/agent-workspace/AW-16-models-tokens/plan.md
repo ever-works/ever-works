@@ -236,11 +236,19 @@ Constraints enforced by the migration, not the entity:
 - `UNIQUE (tenantId, organizationId, providerPluginId, label)` — spec FR-3.
 - `UNIQUE (tenantId, organizationId, providerPluginId, position)`, applied **deferred** so a
   reorder can swap two rows in one transaction.
-- FK `userId → users(id)` `ON DELETE CASCADE`.
+- A row's lifetime follows its workspace, never the person who wrote it (same on
+  `model_policies`): FK `ownerUserId → users(id)` `ON DELETE CASCADE` (set only for a
+  personal workspace), FK `organizationId → organizations(id)` `ON DELETE CASCADE`, and
+  FK `userId → users(id)` `ON DELETE SET NULL` (`userId` is nullable: the creator or
+  last writer is a record, so deleting a member never deletes an organization's
+  credentials or policies).
 
 Counting limits (8 per provider, 32 per workspace) are service-enforced with a `SELECT
 COUNT` inside the same transaction as the insert; a DB constraint cannot express "8 per
-provider per scope" portably across Postgres and better-sqlite3.
+provider per scope" portably across Postgres and better-sqlite3. On Postgres every add
+takes a transaction-scoped advisory lock keyed by the workspace, then one keyed by
+workspace + provider (reorder, rename, reconnect and remove take only the latter), so
+concurrent adds cannot both pass either count.
 
 ### 3.2 New entity — `ModelPolicy`
 

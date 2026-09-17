@@ -304,6 +304,22 @@ describe('InboxItemRepository — decision view (integration)', () => {
         expect(clamped.rows).toHaveLength(1);
     });
 
+    it('counts only decisions raised at or before an instant (Home overdue count)', async () => {
+        const old = await seedItem({ title: 'old' });
+        const edge = await seedItem({ title: 'edge' });
+        await seedItem({ title: 'young' });
+        await seedItem({ kind: 'notice', title: 'old notice', createdAt: old.createdAt });
+
+        const page = await repository.listDecisionsForUser(userId, {
+            createdAtOrBefore: edge.createdAt,
+            limit: 1,
+        });
+
+        expect(page.total).toBe(2);
+        const unfiltered = await repository.listDecisionsForUser(userId, { limit: 1 });
+        expect(unfiltered.total).toBe(3);
+    });
+
     describe('keyset paging (`after`) over a queue that changes between reads', () => {
         /** The `after` position of a row exactly as a caller read it. */
         function positionOf(row: InboxDecisionRow, sortAt: Date = row.item.createdAt) {

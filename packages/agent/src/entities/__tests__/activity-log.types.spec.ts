@@ -86,6 +86,27 @@ describe('activity-log.types', () => {
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
             ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // Memory facts + context files (AW-07).
+            ['MEMORY_FACT_CREATED', 'memory_fact_created'],
+            ['MEMORY_FACT_UPDATED', 'memory_fact_updated'],
+            ['MEMORY_FACT_FORGOTTEN', 'memory_fact_forgotten'],
+            ['MEMORY_FACT_RESTORED', 'memory_fact_restored'],
+            ['MEMORY_FACT_ACCEPTED', 'memory_fact_accepted'],
+            ['MEMORY_FACT_DISCARDED', 'memory_fact_discarded'],
+            ['MEMORY_FACTS_CLEARED', 'memory_facts_cleared'],
+            ['CONTEXT_FILE_UPDATED', 'context_file_updated'],
+            ['CONTEXT_FILE_RESTORED', 'context_file_restored'],
+            ['CONTEXT_FILE_MODE_CHANGED', 'context_file_mode_changed'],
+            ['CONTEXT_BUDGET_EXCEEDED', 'context_budget_exceeded'],
+            // Model accounts (AW-16) — provider account + model default changes.
+            ['MODEL_ACCOUNT_ADDED', 'model_account_added'],
+            ['MODEL_ACCOUNT_UPDATED', 'model_account_updated'],
+            ['MODEL_ACCOUNT_REORDERED', 'model_account_reordered'],
+            ['MODEL_ACCOUNT_PAUSED', 'model_account_paused'],
+            ['MODEL_ACCOUNT_RESUMED', 'model_account_resumed'],
+            ['MODEL_ACCOUNT_RECONNECTED', 'model_account_reconnected'],
+            ['MODEL_ACCOUNT_REMOVED', 'model_account_removed'],
+            ['MODEL_POLICY_UPDATED', 'model_policy_updated'],
             // Skills shelf — the workspace-level on/off switch.
             ['SKILL_ENABLED', 'skill_enabled'],
             ['SKILL_DISABLED', 'skill_disabled'],
@@ -200,9 +221,66 @@ describe('activity-log.types', () => {
             // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
+            // +11 memory_fact_* x6, memory_facts_cleared, context_file_* x3,
+            //     context_budget_exceeded (AW-07 memory facts + context
+            //     files) -> 168, counted from the merged enum.
             //
+            // +8 model_account_added / _updated / _reordered / _paused /
+            //    _resumed / _reconnected / _removed and model_policy_updated
+            //    (model accounts, AW-16) -> 165 on this branch's base.
             // +3 agent_run_started / agent_run_completed / agent_run_failed
+            //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160.
+            //    On the Knowledge library shelf side the same three literals
+            //    land together with its +5 shelf literals: 162 (shelf side) and
+            //    160 (develop side) each counted from their own base, and that
+            //    merged enum COUNTED 165.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop, and -> 166 once the knowledge library branch had
+            //    merged develop's Agent computers take-over work.
+            //
+            // 172 after the AW-07 memory facts + context files branch merged
+            // develop again — COUNTED from the merged enum. The AW-07 branch
+            // stood at 171 (it had already absorbed develop's Live Feed
+            // run-lifecycle members) and develop stood at 161; the only member
+            // develop contributed that AW-07 did not already carry is
+            // agent_computer_controlled, so 171 + 1 = 172. Do NOT re-derive
+            // this by adding the deltas above — count the merged enum.
+            //
+            // 177 after this branch merged develop's knowledge library shelf
+            // (kb_document_archived / _unarchived / _filed / _exported and
+            // memory_folder_renamed — the 5 members develop carried that AW-07
+            // did not). COUNTED from the merged enum, not added up: this branch
+            // stood at 172 and develop at 166, and the overlap between the two
+            // is everything except those 5 shelf literals. Recount the enum
+            // after every merge instead of trusting either side's number.
+            //
+            // +5 shared_view_enabled / _disabled / _regenerated /
+            //    _sections_changed / _indexing_changed (Shared view, AW-18) —
+            //    develop grew these while this branch sat, and they are the only
+            //    members develop carried that AW-07 did not already have.
+            //
+            // 182 after this branch merged develop again. COUNTED from the
+            // merged enum, never added up: this branch stood at 177 and develop
+            // at 171, the five shared-view literals are everything develop had
+            // that this branch lacked, and the eleven memory-fact / context-file
+            // literals are everything this branch had that develop lacked.
+            // Recount the enum after every merge instead of trusting either
+            // side's number.
+            //
+            // develop's own ledger for the same stretch, kept so neither side's
+            // bookkeeping is lost. Its "+3 agent_run_*" line above continues:
             //    (Live Feed — run lifecycle for non-heartbeat triggers) -> 160
+            //    on develop's base.
+            // +1 agent_computer_controlled (Agent computers, take-over) -> 161
+            //    on develop's base.
+            // 169 after the model-accounts branch merged develop's Live Feed
+            //    and Agent-computers work — COUNTED from the merged enum
+            //    (160 shared base + 8 model_* from this branch + 3
+            //    agent_run_* + 1 agent_computer_controlled from develop), not
+            //    taken from either side's total.
+            //
+            // develop's own ledger for the same stretch, kept so neither side's
+            // bookkeeping is lost. Its "+3 agent_run_*" line above continues:
             //    on this branch's own base; the same +3 reached develop together
             //    with the +5 knowledge library literals, which develop counted
             //    as -> 165 there.
@@ -255,7 +333,63 @@ describe('activity-log.types', () => {
             // two literals develop does not carry, and skill_enabled /
             // skill_disabled the only two this branch did not. Neither side's
             // 173 is the answer and the two must never be added together.
-            expect(literals).toHaveLength(175);
+            //
+            // Merging that develop (175) into this model-accounts branch (169)
+            // COUNTS 183 from the merged enum: the eight model_account_* /
+            // model_policy_updated literals are the only ones develop does not
+            // carry, and the fourteen literals develop grew while this branch
+            // was open (skill_*, kb_document_*, memory_folder_renamed,
+            // shared_view_*, schedule_*) the only ones this branch lacked.
+            // Neither 169 nor 175 is the answer, and 169 + 175 is nonsense —
+            // the number below was COUNTED off the merged enum.
+            //
+            // Merging that develop (183, model accounts included) into this
+            // AW-07 memory-facts + context-files branch (182) COUNTS 194 from
+            // the merged enum: the eleven memory_fact_* / memory_facts_cleared /
+            // context_file_* / context_budget_exceeded literals are the only ones
+            // develop does not carry, and the twelve literals develop grew while
+            // this branch was open (model_account_* x7, model_policy_updated,
+            // skill_enabled, skill_disabled, schedule_paused, schedule_resumed)
+            // the only ones this branch lacked. Neither 182 nor 183 is the
+            // answer, and 182 + 183 is nonsense — 194 was COUNTED off the
+            // merged enum, and must be recounted after every merge.
+            //
+            // This AW-23 branch's own ledger for the same stretch, kept so
+            // neither side's bookkeeping is lost:
+            //   +5 shared_view_enabled / _disabled / _regenerated /
+            //   _sections_changed / _indexing_changed (Shared view, AW-18) —
+            //   develop landed those while this branch was open and counted
+            //   171 there; merging that develop into the Skills shelf branch's
+            //   168 COUNTED to 173 from the merged enum, the two skill_*
+            //   literals still being that branch's only additions develop did
+            //   not carry.
+            //   +3 agent_blocked_on_credential / agent_run_held /
+            //   agent_runs_released (the agent brake and the stated halt
+            //   reason, AW-23) — this branch's only additions, disjoint from
+            //   everything develop grew while it was open -> 176 COUNTED from
+            //   the merged enum, not added up from the ledger above.
+            //
+            // Merging that develop (194, AW-07 memory facts + context files
+            // included) into this AW-23 branch (176) COUNTS 197 from the merged
+            // enum: agent_blocked_on_credential / agent_run_held /
+            // agent_runs_released are the only three literals develop does not
+            // carry, and the twenty-one literals develop grew while this branch
+            // was open (memory_fact_* x6, memory_facts_cleared, context_file_*
+            // x3, context_budget_exceeded, model_account_* x7,
+            // model_policy_updated, schedule_paused, schedule_resumed) the only
+            // ones this branch lacked. Neither 176 nor 194 is the answer, and
+            // 176 + 194 is nonsense — 197 was COUNTED off the merged enum, and
+            // must be recounted after every merge.
+            expect(literals).toHaveLength(197);
+        });
+
+        it('every literal fits the varchar(50) action_type column', () => {
+            const literals = Object.values(ActivityActionType).filter(
+                (v) => typeof v === 'string',
+            ) as string[];
+            for (const v of literals) {
+                expect(v.length).toBeLessThanOrEqual(50);
+            }
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
