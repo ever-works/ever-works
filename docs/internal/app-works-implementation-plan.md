@@ -39,18 +39,18 @@ bindings) and checkout-directory key uniqueness.
 
 ---
 
-## 2. Decisions the owner must make before Wave 1 starts
+## 2. Decisions the owner must make before Wave 1 starts — **all answered 2026-09-17**
 
-| #   | Decision                                                                                                                           | Default the specs assume                                   | Blocks              |
+| #   | Decision                                                                                                                           | Answer (owner, 2026-09-17)                                 | Blocks              |
 | --- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------- |
-| 1   | File Jira epic + 13 stories (APW-01…13)                                                                                            | `EW-TBD` placeholders                                      | tracking only       |
-| 2   | Create the template repos — **answered (owner, 2026-09-17)**: the human listing repo is **`ever-works/templates`** (not `ever-works/apps`), and each template is its own `-template` repo: `ever-works/{cal-diy,umami,app-fixture-hello}-template` plus the fixture's **application source** repo `ever-works/app-fixture-hello` (a different repository from its `-template` — an earlier list conflated the two) | as specified in APW-03 `catalog.md`, APW-13                | APW-03, APW-13      |
-| 3   | GitHub test organization + test user for the acceptance lanes                                                                      | placeholders in ACCEPTANCE.md §0.3                         | APW-13 lanes        |
-| 4   | ~~User-apps apex domain (Public Suffix List submission takes weeks)~~ — **answered (owner, 2026-09-17): no new apex.** User apps run on `<slug>.ever.works` or as `<slug>.<tenant-custom-domain>`; the PSL/`<apps-domain>` work is dropped and D10's cookie-isolation premise must be re-stated, not silently kept | the existing subdomain mechanism                           | APW-06, APW-10      |
-| 5   | Where the managed Apps tier runs — **answered (owner, 2026-09-17): the same way Works run today** — our own shared k8s with namespace-level isolation, **plus connected customer nodes** and customer k8s clusters. This replaces "rented, isolated capacity" and re-scopes APW-10's launch gate away from "own hosts/network/egress identity" | shared k8s + isolation, customer nodes optional            | Wave 2              |
-| 6   | Ever ID identity provider + domain                                                                                                 | **provider answered: ZITADEL**, self-hosted as-is, additive only (owner, 2026-09-17 — `idp-options.md` §6–§7); domain still open | Wave 2 Ever ID      |
-| 7   | Publishing home of the App Launcher web component and platform catalog                                                             | public catalog repo; component package home TBD            | APW-11 P2           |
-| 8   | Legal review of `licenses.yml` classes                                                                                             | green / amber / red per CONTRACTS R-3                      | managed hosting     |
+| 1   | File Jira epic + 13 stories (APW-01…13)                                                                                            | **No — tracking docs are enough.** `TRACKER.md` is the system of record; the Jira export stays as a ready-to-import draft and is **not** filed | nothing |
+| 2   | Create the template repos — the human listing repo is **`ever-works/templates`** (**public 100%**); each template is its own `-template` repo: `ever-works/{cal-diy,umami,app-fixture-hello}-template` plus the fixture's **application source** repo `ever-works/app-fixture-hello` (a different repository from its `-template`); `ever-works/platforms` for the launcher catalog | **Yes — create them all, private preferred**, except `ever-works/templates` which is public | APW-03, APW-11, APW-13 |
+| 3   | GitHub test organization + test user for the acceptance lanes                                                                      | **Use an Ever Works tenant, not a test GitHub org** — the lanes provision their own tenant; `ACCEPTANCE.md` §0.3's org/machine-user names become one tenant plus the GitHub account it connects | APW-13 lanes |
+| 4   | User-apps apex domain — **answered and corrected the same day: no new apex is *registered*, and the dedicated PSL apex is KEPT.** Managed addresses default to the platform's own domain (`<slug>.ever.works`); the tenant's custom domain and its subdomains work through the shipped flow; a dedicated **PSL-listed** apex stays an operator-selectable configuration with LG-15 and its probes intact. Where the shared default is used, R-16's `__Host-` cookie controls are mandatory | three coexisting shapes (D10, R-16) | APW-06, APW-10 |
+| 5   | Where the managed Apps tier runs — **answered: the same way Works run today, and the scope EXPANDS.** Our own shared k8s with namespace-level isolation **plus connected customer nodes and customer k8s clusters** — and, additively, a host reached over SSH or any further `deployment` plugin. This does **not** replace "own hosts/network/egress identity": LG-01/LG-03/LG-16 are kept and now carry a **per-shape attestation** (R-27, `APW-06-app-runtime/deploy-shapes.md`) | shared k8s + connected nodes + customer clusters + plugins | Wave 2 |
+| 6   | Ever ID identity provider + domain                                                                                                 | **ZITADEL**, self-hosted as-is at **`auth.ever.co`** (`ever.co` zone verified free), additive only, one instance for all platforms (`idp-options.md` §6–§7) | Wave 2 Ever ID |
+| 7   | Publishing home of the App Launcher web component and platform catalog                                                             | catalog: `ever-works/platforms` (**create it**); component package home still open — `ever-co` at P2 per I-02 | APW-11 P2 |
+| 8   | Legal review of `licenses.yml` classes                                                                                             | **Yes, 100%** — reviewed before launch; Cal.diy uses the MIT community edition | managed hosting |
 
 ---
 
@@ -104,8 +104,14 @@ behind an off-by-default flag, existing sign-ins kept).
 ## 7. Rules for whoever implements this
 
 - **Claim live changes** on the shared board before any infra change (Wave 2 operations work), and never
-  touch Ever Gauzy production (`ever-gauzy-prod`); the managed Apps tier must not share hosts, network,
-  data servers or edge with it (APW-10 launch gate).
+  touch Ever Gauzy production (`ever-gauzy-prod`) — no tier workload, credential or egress identity may
+  touch its namespace, its nodes' data plane, its data servers or its edge. **Everything else is per-shape and
+  additive (R-27, `APW-06-app-runtime/deploy-shapes.md`)**: the tier may run on the **Ever Works shared customer
+  cluster** in its own namespace + node pool + egress identity + ingress, **and** on a machine the owner connects
+  to Ever Works, a customer-owned cluster, a host reached over SSH, or any provider published as a `deployment`
+  plugin. Adding a shape never narrows an existing one — the earlier "must not share hosts, network, data servers
+  or edge" wording is superseded by the per-shape attestations in APW-10's gate (LG-01/LG-03/LG-16), which locate
+  the requirement on whichever shape a tenant actually runs on instead of removing it.
 - **Specs win over memory**: re-read the epic's `plan.md` + CONTRACTS §0 before coding; if `develop` moved,
   re-verify cited paths (a "we already have this" claim does not decay; "we don't have this" does).
 - **Tests before code** for every epic task; a PR is done when its tasks' "Done when" lines are observable,
