@@ -29,7 +29,10 @@ import type { BackupDomainKey, BackupTrimPolicyKey, BackupTrimReport } from '@ev
  *   person AND the active organization, or `organizationId IS NULL` for the
  *   un-organized workspace. This is the common case and the strict one.
  * - `organization` — rows that carry only `organizationId`. A personal
- *   workspace has none, and the file comes out empty rather than unscoped.
+ *   workspace has none, and the file comes out empty rather than unscoped:
+ *   `organizationId IS NULL` is not a narrowing on a nullable column, it is
+ *   "every row nobody has backfilled yet", so the plan is marked
+ *   {@link BackupEntityQuery.matchesNothing} instead of queried.
  * - `parent` — child rows reached through ids their parent registered, so a
  *   table with no scope column of its own can still never cross a workspace.
  */
@@ -113,6 +116,25 @@ export interface BackupEntityQuery {
     readonly entity: string;
     /** `column = value`, or `column IS NULL` when the value is `null`. */
     readonly equals: Readonly<Record<string, string | null>>;
+    /**
+     * Set when the scope rule cannot be satisfied at all for this run, so the
+     * file is written EMPTY rather than queried.
+     *
+     * The case that matters is an `organization`-scoped file in a workspace
+     * with no organization. The obvious predicate — `organizationId IS NULL`
+     * — reads like "this workspace's rows" and is in fact "every row in the
+     * table that has not been assigned an organization yet", which on the
+     * four `organization`-scoped tables whose `organizationId` is nullable
+     * is every OTHER account's rows. There is no narrowing to be had, so the
+     * honest answer is no rows at all: `collector.types.ts` documents the
+     * rule as "a personal workspace has none, and the file comes out empty
+     * rather than unscoped", and this flag is what makes that true.
+     *
+     * A query carrying it never reaches SQL — the collector stops before
+     * paging and the row source returns an empty page — so it cannot
+     * degenerate into a predicate again downstream.
+     */
+    readonly matchesNothing?: boolean;
     /** `column IN (...)`. An empty id list means the query matches nothing. */
     readonly within?: { readonly column: string; readonly ids: readonly string[] };
     /** Rows older than the cutoff are left out and counted (spec FR-14). */

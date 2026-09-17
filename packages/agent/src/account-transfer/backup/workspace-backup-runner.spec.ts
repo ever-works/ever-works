@@ -99,6 +99,11 @@ function harness(
             columns: Object.keys(rows[entity]?.[0] ?? { id: '' }).map((propertyName) => ({
                 propertyName,
             })),
+            // The row source reads the real primary key for its ORDER BY
+            // tiebreaker rather than assuming `id`, so the fake has to carry
+            // one — a metadata double without `primaryColumns` is not a
+            // metadata double.
+            primaryColumns: [{ propertyName: 'id' }],
         }),
         getRepository: (entity: string) => ({
             findOne: async () =>

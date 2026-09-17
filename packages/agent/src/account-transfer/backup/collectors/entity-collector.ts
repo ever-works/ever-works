@@ -85,6 +85,9 @@ export class EntityBackupCollector implements BackupCollector {
         if (shouldDropEntirely(plan.spec.entity)) {
             return;
         }
+        if (plan.query.matchesNothing) {
+            return;
+        }
         if (plan.query.within && plan.query.within.ids.length === 0) {
             return;
         }
@@ -144,6 +147,9 @@ export class EntityBackupCollector implements BackupCollector {
             if (plan.unavailable || !plan.query.trim) {
                 continue;
             }
+            if (plan.query.matchesNothing) {
+                continue;
+            }
             if (plan.query.within && plan.query.within.ids.length === 0) {
                 continue;
             }
@@ -175,17 +181,27 @@ export class EntityBackupCollector implements BackupCollector {
 
         const equals: Record<string, string | null> = {};
         let within: BackupEntityQuery['within'];
+        // Set when the rule needs an organization this workspace does not
+        // have. The file is written empty; see BackupEntityQuery.matchesNothing.
+        let matchesNothing = false;
 
         switch (file.scope.by) {
             case 'owner':
                 // A single identity row matched on its primary key: the
                 // account for D1, the organization descriptor for D2. A
-                // personal workspace has no organization row, and `null`
-                // matches nothing, so the file comes out empty.
+                // personal workspace has no organization row at all, so the
+                // file comes out empty — asked as `id IS NULL` it would
+                // merely HAPPEN to match nothing, because a primary key is
+                // never null, and "it happens to be safe" is not the
+                // property this file wants to rest on.
+                if (file.scope.of === 'organization' && context.scope.organizationId === null) {
+                    matchesNothing = true;
+                    break;
+                }
                 equals.id =
                     file.scope.of === 'account'
                         ? context.scope.userId
-                        : context.scope.organizationId;
+                        : (context.scope.organizationId as string);
                 break;
             case 'user':
                 equals.userId = context.scope.userId;
@@ -197,6 +213,22 @@ export class EntityBackupCollector implements BackupCollector {
                 }
                 break;
             case 'organization':
+                // CROSS-ACCOUNT GUARD. `organizationId` is the ONLY column
+                // this rule narrows on, so a workspace with no organization
+                // has nothing to narrow with. Four of the tables this rule
+                // covers — OnboardingRequest, EmailConversation,
+                // GitHubAppInstallation, WebhookSubscription — declare
+                // `organizationId` nullable and document NULL as the default
+                // state until the owner creates their first organization, so
+                // `organizationId IS NULL` would select every other
+                // account's rows: contact emails, conversation participants,
+                // code-host installation payloads and webhook URLs, into a
+                // zip the requester downloads. There is no narrowing
+                // available here, so the file yields nothing.
+                if (context.scope.organizationId === null) {
+                    matchesNothing = true;
+                    break;
+                }
                 equals.organizationId = context.scope.organizationId;
                 break;
             case 'parent':
@@ -214,6 +246,7 @@ export class EntityBackupCollector implements BackupCollector {
                 equals,
                 ...(within ? { within } : {}),
                 ...(trim ? { trim } : {}),
+                ...(matchesNothing ? { matchesNothing: true } : {}),
             },
         };
     }
