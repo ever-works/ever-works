@@ -48,3 +48,6 @@ export * from './feed/index.js';
 // Runs ledger + run receipt (AW-09) — the calendar-navigated ledger of every
 // Agent run and the itemised receipt of one run, over the existing run rows.
 export * from './runs/index.js';
+// Attention controls (AW-13) — the notification matrix (one row per event,
+// one column per delivery target) and the attention budget meter shape.
+export * from './notifications/index.js';

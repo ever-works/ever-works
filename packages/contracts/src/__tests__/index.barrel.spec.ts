@@ -19,6 +19,7 @@ import * as ingest from '../ingest/index.js';
 import * as item from '../item/index.js';
 import * as kb from '../kb/index.js';
 import * as modelRouting from '../model-routing/index.js';
+import * as notifications from '../notifications/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as runs from '../runs/index.js';
@@ -63,6 +64,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['item', item],
 	['kb', kb],
 	['model-routing', modelRouting],
+	['notifications', notifications],
 	['policy', policy],
 	['release', release],
 	['runs', runs],
@@ -78,12 +80,12 @@ describe('src/index.ts — the package root barrel', () => {
 		// Guard against an area being added to src/index.ts without being added
 		// here, which would leave the collision check below blind to it.
 		// COUNTED off the AREAS array above, never added up from two branches'
-		// numbers: develop and the model-accounts branch each said 24 from
-		// their own base (develop lacked `model-routing`, this branch lacked
-		// `conversations`), so the literal survived the merge unchanged while
-		// the array itself grew to 25.
+		// numbers: develop and this branch each reported the total from their
+		// own base (develop lacked the AW-13 `notifications` area, this branch
+		// lacked `connections`, `conversations`, `feed` and `model-routing`), so
+		// the literal below is re-counted off the merged array instead.
 		const exportLines = AREAS.length;
-		expect(exportLines).toBe(25);
+		expect(exportLines).toBe(26);
 	});
 
 	it('has no name exported by two different areas', () => {

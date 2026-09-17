@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
@@ -229,6 +229,18 @@ describe('NotificationDropdown — EW-602 auto-toast', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    // AW-13 — the bell is the way into choosing what reaches you.
+    it('links from the open bell to the notification settings page', async () => {
+        getUnreadNotificationCount.mockResolvedValue({ success: true, count: 0 });
+        const { container, getByText, unmount } = render(<NotificationDropdown />);
+
+        fireEvent.click(container.querySelector('button') as HTMLButtonElement);
+
+        const link = getByText('notifications.settingsLink');
+        expect(link.closest('a')?.getAttribute('href')).toBe('/settings/notifications');
+        unmount();
     });
 
     it('cleans up the polling interval on unmount (no lingering setInterval calls)', async () => {

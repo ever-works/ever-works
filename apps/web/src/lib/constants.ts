@@ -286,6 +286,10 @@ export const ROUTES = {
     DASHBOARD_NOTIFICATIONS: '/notifications',
     // The page that actually exists — /notifications has no route and soft-404s.
     DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
+    // AW-13 — the two pages the notification matrix links to: chat channels
+    // (each connected one adds a column) and the digest cadence.
+    DASHBOARD_SETTINGS_CHANNELS: '/settings/integrations/channels',
+    DASHBOARD_SETTINGS_DIGEST: '/settings/digest',
     // Agent email (AW-05) — the tenant email address registry an Agent's
     // addresses are assigned from.
     DASHBOARD_SETTINGS_EMAILS: '/settings/integrations/emails',

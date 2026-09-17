@@ -3179,7 +3179,8 @@
                 "title": "Notifications",
                 "empty": "No new notifications",
                 "fetchFailed": "Failed to load notifications",
-                "dismissFailed": "Failed to dismiss notification"
+                "dismissFailed": "Failed to dismiss notification",
+                "settingsLink": "Notification settings →"
             },
             "help": {
                 "title": "Help & Resources",
@@ -10349,19 +10350,89 @@
             "empty": "No event types registered yet. Producers will populate the registry on first emission.",
             "columns": {
                 "event": "Event",
-                "inApp": "In-app"
+                "inApp": "In-app",
+                "email": "Email",
+                "overflow": "+{count} more",
+                "emailUnverified": "Not verified",
+                "verifyEmail": "Verify now →",
+                "emailNotConfigured": "Not configured on this workspace",
+                "channelDisabled": "Disabled — deliveries are skipped"
             },
             "quietHours": {
                 "title": "Quiet hours",
                 "start": "Start",
                 "end": "End",
-                "timezone": "Timezone"
+                "timezone": "Timezone",
+                "empty": "Quiet hours: not set",
+                "preset": "Set 22:00 – 07:00",
+                "set": "Quiet hours: {start} – {end} ({timezone})",
+                "change": "Change",
+                "clear": "Clear",
+                "save": "Save",
+                "cancel": "Cancel",
+                "urgentBypass": "Let every urgent event through during quiet hours",
+                "urgentBypassHint": "Off: only the alerts that always came through during quiet hours do. Every other email and chat message waits until quiet hours end."
             },
             "mute": {
                 "title": "Mute category",
                 "until": "Mute until",
                 "muted": "Muted",
                 "unmute": "Unmute"
+            },
+            "intro": "You are interrupted only for things that only you can unblock. Everything else stays visible in the Live Feed and your digest.",
+            "retry": "Retry",
+            "switchLabel": "{event} → {column}",
+            "groups": {
+                "needsYou": "Needs you",
+                "needsYouHint": "we interrupt you for these",
+                "signals": "Signals",
+                "signalsHint": "worth knowing, not worth an interruption by email",
+                "routine": "Routine",
+                "routineHint": "already visible elsewhere in the product",
+                "digest": "Digest"
+            },
+            "rowState": {
+                "saving": "Saving…",
+                "saved": "Saved",
+                "failed": "Couldn't save",
+                "retry": "Try again",
+                "locked": "Always shown in the app",
+                "emailProfile": "Budget alert emails follow your profile setting",
+                "muted": "Muted until {time}"
+            },
+            "alternativeSurface": {
+                "liveFeedRunsHome": "Visible in the Live Feed, on Runs and on Home.",
+                "liveFeedWorkActivity": "Visible in the Live Feed and on the Work's activity."
+            },
+            "reset": {
+                "button": "Reset to recommended",
+                "dialogTitle": "Reset to recommended?",
+                "dialogBody": "{count} of {total} rows will change back to the recommended setting. Your quiet hours and connected channels are not affected.",
+                "confirm": "Reset",
+                "cancel": "Cancel"
+            },
+            "overflow": {
+                "title": "Other channels for {event}",
+                "used": "{used} of {max} targets used",
+                "done": "Done"
+            },
+            "links": {
+                "connectChannel": "Want a chat channel too? Connect one →",
+                "changeCadence": "Change cadence →"
+            },
+            "errors": {
+                "load": "Couldn't load your notification settings. Nothing has changed.",
+                "tooManyTargets": "An event can be sent to at most {max} places. Turn one off first.",
+                "channelRemoved": "A channel no longer exists. Its column has been removed. Your other choices are unchanged."
+            },
+            "emptyState": {
+                "title": "Nothing to configure yet",
+                "body": "No events are registered on this workspace, so there is nothing to route. Everything your agents do is still in the Live Feed.",
+                "openFeed": "Open the Live Feed →"
+            },
+            "announce": {
+                "saved": "Saved",
+                "failed": "Couldn't save {event}"
             }
         },
         "inbox": {
