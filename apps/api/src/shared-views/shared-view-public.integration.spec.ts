@@ -16,17 +16,30 @@ const sentryMock = {
         fatal: jest.fn(),
     },
 };
-jest.mock('@sentry/nestjs', () => sentryMock);
-jest.mock('@sentry/profiling-node', () => ({ nodeProfilingIntegration: jest.fn(() => ({})) }));
+// `virtual: true` on all three: these packages are dependencies of
+// `packages/monitoring`, NOT of `apps/api`, and pnpm's strict layout means
+// they cannot be resolved from a spec that lives here. Without the flag jest
+// refuses the mock with "Cannot find module" and the whole suite fails to
+// RUN -- which is how this reached `stage` red while every other suite passed.
+// The real module still resolves where it is actually imported, from inside
+// `packages/monitoring`; this file only ever needs the stub.
+jest.mock('@sentry/nestjs', () => sentryMock, { virtual: true });
+jest.mock('@sentry/profiling-node', () => ({ nodeProfilingIntegration: jest.fn(() => ({})) }), {
+    virtual: true,
+});
 
 const posthogCapture = jest.fn();
-jest.mock('posthog-node', () => ({
-    PostHog: jest.fn().mockImplementation(() => ({
-        capture: posthogCapture,
-        identify: jest.fn(),
-        shutdown: jest.fn().mockResolvedValue(undefined),
-    })),
-}));
+jest.mock(
+    'posthog-node',
+    () => ({
+        PostHog: jest.fn().mockImplementation(() => ({
+            capture: posthogCapture,
+            identify: jest.fn(),
+            shutdown: jest.fn().mockResolvedValue(undefined),
+        })),
+    }),
+    { virtual: true },
+);
 
 jest.mock('@ever-works/agent/shared-views', () => ({
     SharedViewService: class SharedViewService {},
