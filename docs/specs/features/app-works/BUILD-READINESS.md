@@ -249,10 +249,30 @@ The decision sheet's 11 `OWNER` rows are now all closed. Each line below records
    controls explicitly. Reconciled across D10, R-16, ACC-06-27, ACC-13-20, APW-06 S33/FR-40/FR-41/ACC-06-47,
    APW-10 LG-15 + its board row + its open question, APW-13 FR-52/ACC-13-20 + plan §8.4 + T34/T60, README Q2, and the
    env table.
-4. **Create the repositories (D-04) — yes, private where possible, `ever-works/templates` public 100%.** The list is
-   unchanged (`ever-works/templates` **public**; `{cal-diy,umami,app-fixture-hello}-template`,
-   `ever-works/app-fixture-hello`, `ever-works/platforms` private preferred). Tracked as §8 step 0; all still 404 as
-   of this writing.
+4. **Create the repositories (D-04) — DONE 2026-09-17.** Created under `ever-works`, seeded from the artifact bundles
+   in `_build-artifacts/`, and verified by API read-back:
+
+   | Repository | Visibility | Seeded | What it is |
+   | --- | --- | --- | --- |
+   | `ever-works/templates` | **public** (confirmed anonymously readable) | 18 files | The curated App Blueprint listing + the design's `manifest.json`/`licenses.yml`/schema + a validator workflow that ran **green on GitHub** |
+   | `ever-works/app-fixture-hello` | private | 54 files | The fixture's **application source**; `evidence/` moved to `docs/evidence/` and every relative reference updated |
+   | `ever-works/app-fixture-hello-template` | private | 9 files | The fixture's App Blueprint (metadata-only) |
+   | `ever-works/cal-diy-template` | private | 4 files | Cal.diy Blueprint (community build, MIT) |
+   | `ever-works/umami-template` | private | 4 files | Umami Blueprint |
+   | `ever-works/platforms` | private | 13 files | APW-11's launcher catalog (`platforms.json` + schema + validator, also **green on GitHub**) |
+
+   The three blueprint repos carry the `ever-works-app-blueprint` topic, which is the disambiguator D4/K-04 depends
+   on: the existing template scan is a bare `template$` suffix match
+   (`packages/agent/src/template-catalog/template-catalog.service.ts:1047-1049`), so the topic — not the name — is
+   what separates an App Blueprint from a Website Template.
+   **Two follow-ups this created, both additive and both recorded rather than fixed unasked:**
+   (a) `ever-works/app-fixture-hello`'s own `ci` workflow is red in all three jobs — the documented fixture test
+   failures (56 pass / 7 fail / 1 cancelled of 64), a pre-existing 337-problem `format:check` that is byte-identical
+   to the source, and `profiles/_generate.mjs` reading `../../APW-13-golden-paths/…`, a path that only exists inside
+   this spec worktree; (b) the copied Blueprint READMEs still carry links that pointed into the spec tree, and each
+   repo's README now says so explicitly instead of silently carrying dead links.
+   One leak was caught in the process: the fixture's `.cache/` npm logs contain a machine user-profile path, so the
+   whole directory was excluded and `.cache/` gitignored — verified clean by `git grep` over HEAD.
 5. **The GitHub test estate (J-08) — answered: use an Ever Works tenant.** The acceptance lanes provision their own
    **tenant inside Ever Works** instead of a separate test GitHub organization, which removes the org-provisioning
    blocker entirely. `ACCEPTANCE.md` §0.3's "test organization + machine user" wording is re-read as *one Ever Works
@@ -275,23 +295,35 @@ The decision sheet's 11 `OWNER` rows are now all closed. Each line below records
 
 ---
 
-## 7. State of the branch
+## 7. State of the branch — **committed and pushed**
 
-**⚠️ Whoever commits must include the Blueprint fixes.** The two blocker fixes in the Blueprints (the `EVER_WORKS_*`
-rename, the RE2-illegal password pattern and the fixture's below-floor memory) are **uncommitted edits in this
-worktree**. If they are left out, catalog CI's reserved-name check fails again and the fixture stops validating —
-the "known issue" would reappear as a regression. Commit the tracked changes as a set (`git status` lists them),
-then decide separately about `_build-artifacts/`.
+Branch **`plan/any-repo-as-work`** on `ever-works/ever-works`, on top of `873274c9f` (which was three commits behind
+`origin/develop`; those commits do not touch any path this program cites — **re-verified 2026-09-17 against
+`origin/develop` @ `653449ad3`**: all four Wave 0 defects are still present at the same lines, so nothing here has
+been silently fixed upstream and nothing here is racing a fix).
 
-Everything in this report is **uncommitted** on `plan/any-repo-as-work` (the branch is not pushed; its base is
-`873274c9f`, and `origin/develop` has since moved three commits further). The 2026-09-17 work comprises
-**~26 modified plan files** and **~124 new artifact files** under `_build-artifacts/`.
+| Commit | Contents |
+| --- | --- |
+| `e47866dc7` | The App Works program itself — 13 epics, README, CONTRACTS, ACCEPTANCE, TRACKER, EXISTING-SUBSTRATE, internal implementation plan |
+| `cd9fb4c2d` | The owner's 2026-09-17 decisions applied, the blockers closed, `BUILD-READINESS.md` added (40 files, +781/−198) |
+| `b55f35e22` | `_build-artifacts/` — the schema + validator + 42 fixtures, the template-catalog design, the fixture application, the golden manifests, and the open-decision artifacts (145 files, +22,356) |
+| `498b50f4f` | **Additive-only pass**: D10 three address shapes, `deploy-shapes.md`, R-26/R-27, per-shape LG-01/03/15/16, all eleven owner answers closed |
+| `d9e228367` | `tools/verify-spec-tree.mjs` + the 24 broken `CONTRACTS.md §0` anchors repaired — tree now **CLEAN** |
+| `13efa24ee` | The implementation plan's eight decisions answered and the tier rule re-scoped per shape |
 
-Suggested first commit: the plan fixes and this report. For `_build-artifacts/`, decide where it belongs before
-proposing the branch — it is five streams of build scratch (schemas, golden manifests, a fixture application,
-decision sheets) and **probably should not reach the platform repository's PR**; the private Workspace mirror is
-the natural home, and nothing in it is secret (all hosts are RFC 2606 placeholders, all digests synthetic, every
-secret value the literal `<redacted>`). If it stays, add a `.gitignore` entry or keep it out of the PR explicitly.
+The earlier "whoever commits must include the Blueprint fixes" warning is **resolved**: the `EVER_WORKS_*` rename, the
+RE2-illegal password pattern and the fixture's below-floor memory went in with `cd9fb4c2d` and `b55f35e22`.
+`_build-artifacts/` **was** committed to the platform branch — deliberately, because the blueprints it contains are
+what the new `ever-works/*-template` repositories were seeded from, and every value in it is public-safe (RFC 2606
+hosts, synthetic digests, `<redacted>` for every secret). The private Workspace mirror carries the same tree under
+`knowledge/notes/2026-09-17-app-works/spec/`, kept in sync additively.
+
+**The PR is not open.** The program's own note stands — *"opening that PR is an owner call"* — and the branch is
+ready for one: `https://github.com/ever-works/ever-works/pull/new/plan/any-repo-as-work`.
+
+**Re-verify before branching Wave 0 off `develop`:** the cited line numbers in this report are against `873274c9f`.
+They were re-checked against `origin/develop @ 653449ad3` (identical defect lines) but a fresh `git fetch` before
+cutting the branch is the standing rule (workspace NN #25).
 
 ---
 
@@ -299,7 +331,11 @@ secret value the literal `<redacted>`). If it stays, add a `.gitignore` entry or
 
 1. **Wave 0 — start now.** `APW-08` P0 (agent git tools: provider/owner/repo resolution, `branch`, protected
    branches) and `APW-02` P0 (checkout keys, non-blocking fork request). Independent, small, tests-first, and
-   **not touched by a single open question**.
+   **not touched by a single open question**. **Its premises were re-verified on `origin/develop @ 653449ad3`:**
+   `const providerId = 'github'` at `apps/api/src/agents/agents.module.ts:685` (commit) and `:706` (pull request),
+   `branch: branch ?? 'main'` returned but unused at `:700`, `owner: ''` / `repo: ''` at `:732-733`, the
+   collision-prone `slugifyText(\`${owner}-${repo}\`)` checkout key at
+   `packages/plugin/src/git/git-operations.ts:306-308`, and the silent `git init` fallback at `:113-125`.
 2. **Wave 1 foundations (parallel):** `APW-03` P1 · `APW-02` P1 · `APW-07` P1 · `APW-11` P1 · `APW-09` P1.
 3. **Wave 1 creation and running:** `APW-01` P1 → `APW-05` P1 → `APW-06` P1 → `APW-04` P1.
 4. **Wave 1 loop:** `APW-08` P1 → `APW-13` P1 — the owner's Cal.diy example green on a user cluster.
