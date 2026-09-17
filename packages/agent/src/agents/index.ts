@@ -19,6 +19,7 @@ export * from './run-capture';
 // exactly ONE path out of this barrel: `run-dispatch-gate.service`, which
 // re-exports them for every pre-existing importer.
 export {
+    agentBrakeAdmission,
     composeRunAdmission,
     creditsAdmission,
     killSwitchAdmission,
@@ -54,6 +55,14 @@ export * from './run-steering.service';
 export * from './run-credits-precheck';
 // Panic controls (EW-778) — the global stop flag port the gate consults.
 export * from './run-kill-switch';
+// AW-23 — the per-Agent brake port, its implementation, the halt record
+// it reads, the pure status-reason resolver and the credential classifier.
+export * from './run-agent-brake';
+export * from './agent-brake.service';
+export * from './agent-halt.service';
+export * from './agent-halt-classifier';
+export * from './agent-status-reason';
+export * from './agent-notes-preview.port';
 export * from './seat-guard';
 export * from './run-plan-limits';
 export * from './terminal-session-dispatcher';
@@ -90,10 +99,12 @@ export * from './types';
 export {
     Agent,
     AgentAvatarMode,
+    AgentHaltReason,
     AgentIdleBehavior,
     AgentScope,
     AgentStatus,
     AGENT_PERMISSIONS_DEFAULT,
+    type AgentHaltDetail,
     type AgentPermissions,
     type AgentScorecardMetric,
     type AgentScorecardPeriod,

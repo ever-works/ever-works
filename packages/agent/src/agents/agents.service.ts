@@ -931,6 +931,27 @@ export class AgentsService {
         return toAgentDto(refreshed);
     }
 
+    /**
+     * AW-23 — the batched roster status read: the halt columns of many
+     * agents at once, owner- and scope-bounded, in ONE query.
+     *
+     * Returns the raw rows rather than `AgentDto`s because the caller
+     * derives a status reason from them and renders none of the rest —
+     * projecting the full DTO would make a ten-second poll pay for
+     * permissions, targets and guardrails nothing looks at.
+     *
+     * Ids the caller does not own are simply absent from the result: a
+     * roster poll degrades to a shorter list rather than 404-ing the
+     * whole batch, and never becomes an existence oracle.
+     */
+    async findStatusRows(
+        userId: string,
+        ids: readonly string[],
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent[]> {
+        return this.agents.findStatusRows(userId, ids, ownershipScope);
+    }
+
     async pause(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<AgentDto> {
         return this.transition(userId, id, AgentStatus.PAUSED, ownershipScope);
     }

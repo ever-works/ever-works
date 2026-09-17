@@ -1,3 +1,4 @@
+import type { RunAgentBrake } from './run-agent-brake';
 import type { RunCreditsPrecheck } from './run-credits-precheck';
 import type { RunKillSwitch } from './run-kill-switch';
 import type { RunPlanLimits } from './run-plan-limits';
@@ -40,10 +41,25 @@ export const QUEUED_REASON_INSUFFICIENT_CREDITS = 'insufficient-credits' as cons
  */
 export const QUEUED_REASON_KILL_SWITCH = 'kill-switch' as const;
 
+/**
+ * AW-23 — stamped when the AGENT BRAKE parks a run because the Agent is
+ * paused. Re-exported by the gate service. Released by
+ * `RunDispatchGateService.promoteParkedForAgent` on Resume, and exempt
+ * from the stuck-run sweeper for as long as the Agent stays paused: work
+ * held by a pause is waiting for a person, not stuck.
+ */
+export const QUEUED_REASON_AGENT_PAUSED = 'agent-paused' as const;
+
 export interface RunAdmissionInput {
     userId: string;
     workId?: string | null;
     organizationId?: string | null;
+    /**
+     * AW-23 — the Agent this run belongs to, so the brake middleware can
+     * see it. Optional: every pre-existing caller keeps compiling, and a
+     * run with no agent (there are none today) simply skips the brake.
+     */
+    agentId?: string | null;
 }
 
 export interface RunAdmissionVerdict {
@@ -82,6 +98,8 @@ export interface RunAdmissionContext {
     readonly planLimits?: RunPlanLimits;
     /** EW-778 — the global stop flag port. Absent = no fleet stack bound. */
     readonly killSwitch?: RunKillSwitch;
+    /** AW-23 — the per-Agent brake port. Absent = nothing bound; pass everything. */
+    readonly agentBrake?: RunAgentBrake;
 }
 
 export type RunAdmissionNext = () => Promise<RunAdmissionVerdict>;
@@ -150,6 +168,58 @@ export const killSwitchAdmission: RunAdmissionMiddleware = async (context, next)
     logger.log(`Dispatch gate: global stop flag is set — queueing run for user ${input.userId}.`);
     return { admitted: false, queuedReason: QUEUED_REASON_KILL_SWITCH };
 };
+
+/**
+ * AW-23 — the AGENT BRAKE, second in the chain.
+ *
+ * While an Agent is paused (or halted for any other reason) every new run
+ * for it is parked with `agent-paused` before any counter is consulted.
+ * Position matters twice over:
+ *
+ *  - AFTER the global stop flag, because a stopped platform is the
+ *    broader statement and its parked runs are what an operator looks
+ *    for; and
+ *  - BEFORE both concurrency valves, because a paused agent must not
+ *    consume a slot's worth of counting, and because a run parked for
+ *    capacity would be drained by the ordinary Work drain while its agent
+ *    is still stopped.
+ *
+ * A run with no `agentId` skips the brake — there is no agent to ask
+ * about. Every dispatch path that HAS one passes it.
+ *
+ * 🛑 FAIL CLOSED, and NEVER THROW, for exactly the reason the stop flag
+ * documents above: `RunDispatchGateService.admit()` swallows a throwing
+ * chain and admits the run, so an unreadable brake must be converted into
+ * a PARK verdict right here or a pause would let work through at the one
+ * moment it matters most.
+ */
+export const agentBrakeAdmission: RunAdmissionMiddleware = async (context, next) => {
+    const { input, logger, agentBrake } = context;
+    if (!agentBrake || !input.agentId) return next();
+    const agentId = input.agentId;
+    let verdict: AgentBrakeVerdictLike;
+    try {
+        verdict = await agentBrake.shouldHaltForAgent(agentId);
+    } catch (err) {
+        logger.warn(
+            `Dispatch gate: agent ${agentId} brake could not be read ` +
+                `— holding the run (fail-closed): ${err}`,
+        );
+        verdict = { halted: true };
+    }
+    if (!verdict.halted) return next();
+    logger.log(
+        `Dispatch gate: agent ${agentId} is stopped` +
+            `${verdict.reason ? ` (${verdict.reason})` : ''} — holding the run.`,
+    );
+    return { admitted: false, queuedReason: QUEUED_REASON_AGENT_PAUSED };
+};
+
+/** Structural echo of `AgentBrakeVerdict`, so this file stays import-light. */
+interface AgentBrakeVerdictLike {
+    halted: boolean;
+    reason?: string;
+}
 
 /**
  * Per-Work concurrency valve. A limit of `<= 0` disables it entirely —
@@ -312,12 +382,15 @@ export const creditsAdmission: RunAdmissionMiddleware = async (context, next) =>
 /**
  * The shipped order. The stop flag outranks everything (a stopped
  * platform parks with `kill-switch` and spends no count query at all);
- * below it, concurrency wins over credits by construction — a saturated
- * Work parks with `concurrency-limit` and never spends a billing query,
- * which is exactly what the pre-refactor ladder did.
+ * the per-Agent brake comes next, so a paused agent never consumes a
+ * concurrency count; below them, concurrency wins over credits by
+ * construction — a saturated Work parks with `concurrency-limit` and
+ * never spends a billing query, which is exactly what the pre-refactor
+ * ladder did.
  */
 export const DEFAULT_RUN_ADMISSION_CHAIN: readonly RunAdmissionMiddleware[] = [
     killSwitchAdmission,
+    agentBrakeAdmission,
     workConcurrencyAdmission,
     orgConcurrencyAdmission,
     creditsAdmission,

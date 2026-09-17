@@ -1,6 +1,8 @@
 import type {
     Agent,
     AgentAvatarMode,
+    AgentHaltDetail,
+    AgentHaltReason,
     AgentIdleBehavior,
     AgentPermissions,
     AgentScope,
@@ -54,6 +56,21 @@ export interface AgentDto {
     lastRunStatus: string | null;
     errorCount: number;
     pauseAfterFailures: number;
+    // ── Halt reason (AW-23) — why this agent is not working ──
+    // Additive fields on an existing DTO. Every one is `null` for an
+    // agent that has never halted, and for every agent that was already
+    // paused when this shipped: no backfill invented a timestamp.
+    //
+    // 🛑 `haltDetail` is a display name and a coarse kind. It never
+    // carries a credential, a token fragment or a raw provider error.
+    haltReason: AgentHaltReason | null;
+    haltNote: string | null;
+    haltedAt: Date | null;
+    haltedByUserId: string | null;
+    haltedRunId: string | null;
+    haltDetail: AgentHaltDetail | null;
+    /** Consecutive halts for the same reason; `2` is what the card reports. */
+    haltRepeatCount: number;
     avatarMode: AgentAvatarMode;
     avatarIcon: string | null;
     avatarImageUploadId: string | null;
@@ -114,6 +131,15 @@ export function toAgentDto(agent: Agent): AgentDto {
         lastRunStatus: agent.lastRunStatus ?? null,
         errorCount: agent.errorCount,
         pauseAfterFailures: agent.pauseAfterFailures,
+        haltReason: agent.haltReason ?? null,
+        haltNote: agent.haltNote ?? null,
+        haltedAt: agent.haltedAt ?? null,
+        haltedByUserId: agent.haltedByUserId ?? null,
+        haltedRunId: agent.haltedRunId ?? null,
+        haltDetail: agent.haltDetail ?? null,
+        // `?? 0` — rows written before the halt columns existed read as
+        // "never halted twice", which is the truth about them.
+        haltRepeatCount: agent.haltRepeatCount ?? 0,
         avatarMode: agent.avatarMode,
         avatarIcon: agent.avatarIcon ?? null,
         avatarImageUploadId: agent.avatarImageUploadId ?? null,

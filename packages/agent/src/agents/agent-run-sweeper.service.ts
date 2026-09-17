@@ -6,7 +6,11 @@ import {
     AgentRunRepository,
     STALE_PARK_SUMMARY_PREFIX,
 } from '../database/repositories/agent-run.repository';
-import { QUEUED_REASON_KILL_SWITCH, RunDispatchGateService } from './run-dispatch-gate.service';
+import {
+    QUEUED_REASON_AGENT_PAUSED,
+    QUEUED_REASON_KILL_SWITCH,
+    RunDispatchGateService,
+} from './run-dispatch-gate.service';
 import { AgentEscalationService } from './agent-escalation.service';
 import { NotificationService } from '../notifications/notification.service';
 import type { AgentRun } from '../entities/agent-run.entity';
@@ -138,8 +142,16 @@ export class AgentRunSweeperService {
         // Panic controls (EW-778) — a run the global stop flag parked is
         // waiting for an operator, not stuck. Excluded in the SQL AND
         // re-asserted below, exactly like `awaitingInput`.
+        //
+        // AW-23 — the same is true, and matters more, of a run held
+        // because its Agent is paused. Pause promises "nothing is lost";
+        // an agent paused over a weekend outlives any TTL, so reaping its
+        // held work would turn that promise into a lie. Both halves are
+        // required: the SQL predicate below AND the service-layer filter
+        // further down.
         const scanned = await this.runs.findStuckNonTerminal(cutoff, limit, [
             QUEUED_REASON_KILL_SWITCH,
+            QUEUED_REASON_AGENT_PAUSED,
         ]);
         // Run steering (Wave 4 M5) — THE hard rule of this plan: a run parked
         // on a human question must NEVER be reaped by a TTL sweep. It is not
@@ -157,12 +169,17 @@ export class AgentRunSweeperService {
             );
         }
         const stuck = notAwaiting.filter(
-            (row) => !(row.status === 'queued' && row.queuedReason === QUEUED_REASON_KILL_SWITCH),
+            (row) =>
+                !(
+                    row.status === 'queued' &&
+                    (row.queuedReason === QUEUED_REASON_KILL_SWITCH ||
+                        row.queuedReason === QUEUED_REASON_AGENT_PAUSED)
+                ),
         );
-        const skippedKillSwitch = notAwaiting.length - stuck.length;
-        if (skippedKillSwitch > 0) {
+        const skippedHeld = notAwaiting.length - stuck.length;
+        if (skippedHeld > 0) {
             this.logger.log(
-                `AgentRun sweep: skipped ${skippedKillSwitch} run(s) parked by the global stop flag (never reaped).`,
+                `AgentRun sweep: skipped ${skippedHeld} run(s) held by a stop — the global flag or a paused agent (never reaped).`,
             );
         }
         if (stuck.length === 0) {

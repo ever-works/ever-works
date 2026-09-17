@@ -212,10 +212,16 @@ describe('activity-log.types', () => {
             // +5 shared_view_enabled / _disabled / _regenerated /
             //    _sections_changed / _indexing_changed (Shared view, AW-18) —
             //    develop landed those while this branch was open and counted
-            //    171 there; merging that develop into this branch's 168 COUNTS
-            //    to 173 from the merged enum, the two skill_* literals still
-            //    being this branch's only additions develop does not carry.
-            expect(literals).toHaveLength(173);
+            //    171 there; merging that develop into the Skills shelf
+            //    branch's 168 COUNTED to 173 from the merged enum, the two
+            //    skill_* literals still being that branch's only additions
+            //    develop did not carry.
+            // +3 agent_blocked_on_credential / agent_run_held /
+            //    agent_runs_released (the agent brake and the stated halt
+            //    reason, AW-23) — this branch's only additions, disjoint from
+            //    everything develop grew while it was open -> 176 COUNTED from
+            //    the merged enum, not added up from the ledger above.
+            expect(literals).toHaveLength(176);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

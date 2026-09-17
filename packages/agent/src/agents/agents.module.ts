@@ -26,6 +26,9 @@ import { AgentAttachmentRepository } from '../database/repositories/attachment.r
 import { AgentEscalationRepository } from '../database/repositories/agent-escalation.repository';
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
 import { AgentsService } from './agents.service';
+import { AgentBrakeService } from './agent-brake.service';
+import { AgentHaltService } from './agent-halt.service';
+import { RUN_AGENT_BRAKE } from './run-agent-brake';
 import { AgentTemplatesService } from './agent-templates.service';
 import { OnboardingRoleSeedingService } from './role-seeding.service';
 import { AgentFileService } from './agent-file.service';
@@ -133,6 +136,16 @@ import { FacadesModule } from '../facades/facades.module';
         AgentEscalationRepository,
         TaskReviewRejectionRepository,
         AgentsService,
+        // AW-23 — the halt record ("why is this agent not working?") and
+        // the per-agent brake behind it.
+        AgentHaltService,
+        AgentBrakeService,
+        // Binding the brake to its token HERE is what turns Pause from a
+        // heartbeat-only suggestion into a platform-enforced stop: the
+        // run dispatch gate consumes RUN_AGENT_BRAKE with @Optional(), so
+        // without this line the middleware passes every run through and
+        // a paused agent keeps picking work up.
+        { provide: RUN_AGENT_BRAKE, useExisting: AgentBrakeService },
         // Wave 10 — prebuilt agent-template activation (catalog data +
         // ordinary Agent rows; no new persistence concepts).
         AgentTemplatesService,
@@ -193,6 +206,9 @@ import { FacadesModule } from '../facades/facades.module';
         AgentEscalationRepository,
         TaskReviewRejectionRepository,
         AgentsService,
+        AgentHaltService,
+        AgentBrakeService,
+        RUN_AGENT_BRAKE,
         AgentTemplatesService,
         OnboardingRoleSeedingService,
         AgentFileService,

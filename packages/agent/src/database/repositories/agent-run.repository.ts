@@ -1408,6 +1408,115 @@ export class AgentRunRepository {
     }
 
     /**
+     * AW-23 — oldest run parked for this AGENT with `queuedReason`, so a
+     * Resume can release held work oldest-first.
+     *
+     * Deliberately keyed on `agentId` rather than `workId`: work held by
+     * a pause belongs to the agent that was paused, and a heartbeat run
+     * carries no Work at all. The Work-keyed
+     * {@link findOldestQueuedForConcurrency} therefore cannot see it —
+     * which is exactly why a paused agent needs its own drain.
+     *
+     * Same predicate and same insertion-order tie-break as the Work-keyed
+     * query, so two runs created in the same millisecond still release in
+     * the order they arrived.
+     */
+    async findOldestQueuedForAgent(
+        agentId: string,
+        queuedReason: string,
+    ): Promise<AgentRun | null> {
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.agentId = :agentId', { agentId })
+                .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+                .andWhere('run.queuedReason = :queuedReason', { queuedReason })
+                .orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        ).getOne();
+    }
+
+    /**
+     * AW-23 — what is being HELD for this agent, for the panel that
+     * answers "nothing is lost" with a list instead of a promise.
+     *
+     * Returns the total (uncapped, so the panel can say "3 items" while
+     * showing two) alongside a bounded, oldest-first preview in the exact
+     * order a Resume will release them.
+     */
+    async listQueuedForAgent(
+        agentId: string,
+        queuedReason: string,
+        limit: number,
+    ): Promise<{ total: number; items: AgentRun[] }> {
+        const bounded = Math.max(0, Math.trunc(limit));
+        const where = () =>
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.agentId = :agentId', { agentId })
+                .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+                .andWhere('run.queuedReason = :queuedReason', { queuedReason });
+        const total = await where().getCount();
+        if (bounded === 0 || total === 0) return { total, items: [] };
+        const items = await addInsertionOrderTieBreak(
+            where().orderBy('run.createdAt', 'ASC'),
+            'ASC',
+        )
+            .take(bounded)
+            .getMany();
+        return { total, items };
+    }
+
+    /**
+     * AW-23 — runs of this agent that are still finishing.
+     *
+     * A pause lets an in-flight run finish rather than killing it, so the
+     * card has to be able to say how many are still going before it
+     * offers the second, explicit stop.
+     */
+    async countInFlightForAgent(agentId: string): Promise<number> {
+        return this.inFlightQb().andWhere('run.agentId = :agentId', { agentId }).getCount();
+    }
+
+    /**
+     * AW-23 — the run this agent is actually working on, for the card's
+     * "Working on" row.
+     *
+     * Deliberately NOT {@link findInFlightForAgent}, which counts parked
+     * rows as in-flight: a paused agent with three held runs is not
+     * working on anything, and saying it is would be the exact lie this
+     * epic exists to remove. `inFlightQb` excludes parked rows by
+     * construction.
+     */
+    async findNewestInFlightForAgent(agentId: string): Promise<AgentRun | null> {
+        return addInsertionOrderTieBreak(
+            this.inFlightQb()
+                .andWhere('run.agentId = :agentId', { agentId })
+                .orderBy('run.createdAt', 'DESC'),
+            'DESC',
+        ).getOne();
+    }
+
+    /**
+     * AW-23 — the newest FAILED run of this agent, so "Hit an error" can
+     * link to the run that caused it in one click.
+     *
+     * The fallback for an agent that hit the failure threshold before the
+     * halt columns existed: its halt record has no `haltedRunId`, and
+     * without this the reason would be a sentence with nowhere to go.
+     */
+    async findNewestFailedForAgent(agentId: string): Promise<AgentRun | null> {
+        return addInsertionOrderTieBreak(
+            this.repository
+                .createQueryBuilder('run')
+                .where('run.agentId = :agentId', { agentId })
+                .andWhere('run.status = :status', { status: 'failed' satisfies AgentRunStatus })
+                .orderBy('run.createdAt', 'DESC'),
+            'DESC',
+        ).getOne();
+    }
+
+    /**
      * CAS-claim a parked run for dispatch: clears `queuedReason` only
      * while the row is still `queued` AND still parked, so two drains
      * racing for the same run resolve to exactly one dispatcher. Returns
