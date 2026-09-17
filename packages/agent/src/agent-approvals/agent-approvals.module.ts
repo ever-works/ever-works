@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentActionProposal } from '../entities/agent-action-proposal.entity';
 import { Agent } from '../entities/agent.entity';
 import { AgentApprovalsService } from './agent-approvals.service';
+import { SafetyModule } from '../safety/safety.module';
 
 /**
  * Agent Action Approval Queue — the agent-side module that owns the
@@ -15,8 +16,12 @@ import { AgentApprovalsService } from './agent-approvals.service';
  * check in `createProposal`.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([AgentActionProposal, Agent])],
+    // Safety rails (AW-24) — `SafetyModule` supplies `AutonomyGrantService`,
+    // which `createProposal` folds into the guardrail decision (stricter
+    // wins). It is a leaf module over its own three tables, so importing it
+    // here adds no runtime coupling beyond those.
+    imports: [TypeOrmModule.forFeature([AgentActionProposal, Agent]), SafetyModule],
     providers: [AgentApprovalsService],
-    exports: [AgentApprovalsService],
+    exports: [AgentApprovalsService, SafetyModule],
 })
 export class AgentApprovalsModule {}

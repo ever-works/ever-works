@@ -28,6 +28,7 @@ import * as playbook from '../playbook/index.js';
 import * as policy from '../policy/index.js';
 import * as release from '../release/index.js';
 import * as runs from '../runs/index.js';
+import * as safety from '../safety/index.js';
 import * as secret from '../secret/index.js';
 import * as skills from '../skills/index.js';
 import * as tasks from '../tasks/index.js';
@@ -78,6 +79,7 @@ const AREAS: Array<[string, Record<string, unknown>]> = [
 	['policy', policy],
 	['release', release],
 	['runs', runs],
+	['safety', safety],
 	['secret', secret],
 	['skills', skills],
 	['tasks', tasks],
@@ -95,15 +97,19 @@ describe('src/index.ts — the package root barrel', () => {
 		// lacked `connections`, `conversations`, `feed` and `model-routing`), so
 		// the literal below is re-counted off the merged array instead.
 		const exportLines = AREAS.length;
-		// 31 is COUNTED from the AREAS array above after merging develop into
-		// the AW-19 Home branch, not added up from either side’s number: develop
-		// stood at 30 areas and this branch at 23, and the merged barrel carries
+		// 31 was COUNTED from the AREAS array after merging develop into the
+		// AW-19 Home branch, not added up from either side’s number: develop
+		// stood at 30 areas and that branch at 23, and the merged barrel carried
 		// the union of both plus the `home` area AW-19 adds — counting the merged
-		// array gives 31. Note `src/index.ts` has 32 `export *` lines but only 31
-		// AREAS: `./fleet/fleet-task-workspace.types.js` is a second sub-path of
-		// the existing `fleet` area, not a new area.
+		// array gave 31.
+		// 32 is COUNTED the same way after merging develop into the AW-24 safety
+		// branch: develop stood at 31 areas and this branch adds exactly one new
+		// area (`safety`), and re-counting the merged array gives 32. Note
+		// `src/index.ts` has 33 `export *` lines but only 32 AREAS:
+		// `./fleet/fleet-task-workspace.types.js` is a second sub-path of the
+		// existing `fleet` area, not a new area.
 		// Recount the array after every merge instead of trusting either side.
-		expect(exportLines).toBe(31);
+		expect(exportLines).toBe(32);
 	});
 
 	it('has no name exported by two different areas', () => {

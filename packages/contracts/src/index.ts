@@ -64,3 +64,7 @@ export * from './notifications/index.js';
 // Home (AW-19) — the composed morning read on the dashboard root: one status per
 // block, over the decision queue, the Runs ledger, schedules, costs and the feed.
 export * from './home/index.js';
+// Safety rails and the trust ladder (AW-24) — the shared vocabulary the
+// existing refusals (stop flag, pauses, grants, caps, merge policy) now speak:
+// thirteen kinds of work, four rungs, seven rails in a published order.
+export * from './safety/index.js';

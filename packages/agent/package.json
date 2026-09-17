@@ -253,6 +253,10 @@
             "types": "./dist/policy/index.d.ts",
             "default": "./dist/policy/index.js"
         },
+        "./safety": {
+            "types": "./dist/safety/index.d.ts",
+            "default": "./dist/safety/index.js"
+        },
         "./validation": {
             "types": "./dist/validation/index.d.ts",
             "default": "./dist/validation/index.js"

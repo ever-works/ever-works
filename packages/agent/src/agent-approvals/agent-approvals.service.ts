@@ -10,6 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, Repository, type FindOptionsWhere } from 'typeorm';
+import type { ResolvedLadder } from '@ever-works/contracts';
 import {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
     AgentActionProposal,
@@ -21,6 +22,11 @@ import { Agent } from '../entities/agent.entity';
 // Leaf token file — no runtime graph (see inbox-producer.port.ts).
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import { evaluateGuardrails } from '../agents/guardrails';
+// Safety rails (AW-24) — the STRICTER of the guardrails and the rung wins.
+// Pure helper + a service that is optional and appended last, so a runtime
+// with no ladder bound behaves exactly as it did before this epic landed.
+import { applyLadderToGuardrailDecision } from '../safety/guardrail-interop';
+import { AutonomyGrantService } from '../safety/autonomy-grant.service';
 import { RISK_SCORER } from './risk-scorer';
 import { toAgentActionProposalDto, type AgentActionProposalDto } from './types';
 import { AgentActionProposalDecidedEvent } from './agent-action-proposal-decided.event';
@@ -93,6 +99,12 @@ export class AgentApprovalsService {
         // inbox producer above: absent = decisions are records only, which
         // is the pre-event behaviour.
         @Optional() private readonly events?: EventEmitter2,
+        // Safety rails (AW-24). @Optional() and appended LAST like the two
+        // above: absent = the guardrail decision stands on its own, which is
+        // the pre-ladder behaviour. Present, the STRICTER of the guardrail
+        // decision and the resolved rung decides — the ladder can never make
+        // an Agent more autonomous than its guardrails already allow.
+        @Optional() private readonly ladder?: AutonomyGrantService,
     ) {}
 
     /**
@@ -102,6 +114,33 @@ export class AgentApprovalsService {
      * are auto-stamped from the active request scope by
      * `ScopeStampingSubscriber`.
      */
+    /**
+     * The rungs in force for this Agent, or `null` when the ladder is not
+     * bound or could not be read.
+     *
+     * Never throws: a ladder that cannot be resolved must not stop a proposal
+     * from being created, because the guardrail decision — which is the
+     * pre-ladder behaviour — is still a complete answer on its own. The
+     * fail-closed posture belongs at the ENFORCEMENT point (the safety gate),
+     * where refusing is the safe answer; here, refusing to record a proposal
+     * would lose the audit trail entirely.
+     */
+    private async resolveLadderFor(userId: string, agent: Agent): Promise<ResolvedLadder | null> {
+        if (!this.ladder) return null;
+        try {
+            return await this.ladder.resolve(userId, {
+                workspaceScopeId: agent.organizationId ?? agent.tenantId ?? userId,
+                agentId: agent.id,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Trust ladder could not be resolved for agent ${agent.id} — the guardrail ` +
+                    `decision stands: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return null;
+        }
+    }
+
     async createProposal(
         userId: string,
         input: CreateAgentActionProposalInput,
@@ -131,7 +170,21 @@ export class AgentApprovalsService {
         // A missing/null policy (or a missing agent row — impossible
         // here, the ownership gate above 404s first) queues, which is
         // exactly the pre-guardrails behavior.
-        const decision = evaluateGuardrails(agent.guardrails ?? null, input.actionType, riskFlags);
+        const guardrailDecision = evaluateGuardrails(
+            agent.guardrails ?? null,
+            input.actionType,
+            riskFlags,
+        );
+
+        // Safety rails (AW-24) — fold in the resolved rung for this KIND of
+        // work, taking the stricter of the two. `evaluateGuardrails` itself is
+        // unchanged and still decides on its own when no ladder is bound; the
+        // response shape does not change either.
+        const decision = applyLadderToGuardrailDecision(
+            guardrailDecision,
+            input.actionType,
+            await this.resolveLadderFor(userId, agent),
+        );
 
         const now = new Date();
         const row = this.proposals.create({

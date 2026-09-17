@@ -187,6 +187,12 @@ export * from './model-policy.entity';
 export * from './fleet-cost-policy.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
+// Safety rails and the trust ladder (AW-24) — the per-(scope, category)
+// rung, the durable record of what the rails stopped, and the owner's own
+// workspace stop.
+export * from './autonomy-grant.entity';
+export * from './rail-refusal.entity';
+export * from './workspace-pause.entity';
 // Agent Plugins MCP slice — external MCP server connections + per-agent
 // bindings (docs/specs/features/agent-plugins plan §2.4/§2.5).
 export * from './mcp-server-connection.entity';
