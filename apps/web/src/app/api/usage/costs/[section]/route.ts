@@ -20,7 +20,8 @@ const ALLOWED_SECTIONS = new Set<string>(COSTS_SECTIONS);
 // Security: allowlist of query parameters forwarded upstream, so
 // unknown/debug parameters (and anything that looks like a scope
 // override) are never passed through.
-const ALLOWED_PARAMS = new Set(['windowDays', 'limit']);
+// `full` (AW-17) unfolds the by-tool / by-mission breakdowns ("See all").
+const ALLOWED_PARAMS = new Set(['windowDays', 'limit', 'full']);
 
 export async function GET(
     request: NextRequest,

@@ -197,6 +197,10 @@
             "types": "./dist/schedules/index.d.ts",
             "default": "./dist/schedules/index.js"
         },
+        "./home": {
+            "types": "./dist/home/index.d.ts",
+            "default": "./dist/home/index.js"
+        },
         "./workspace-search": {
             "types": "./dist/workspace-search/index.d.ts",
             "default": "./dist/workspace-search/index.js"
@@ -249,6 +253,10 @@
             "types": "./dist/policy/index.d.ts",
             "default": "./dist/policy/index.js"
         },
+        "./safety": {
+            "types": "./dist/safety/index.d.ts",
+            "default": "./dist/safety/index.js"
+        },
         "./validation": {
             "types": "./dist/validation/index.d.ts",
             "default": "./dist/validation/index.js"
@@ -295,6 +303,7 @@
         "@nestjs/testing": "^11.1.18",
         "@swc/cli": "^0.8.1",
         "@swc/core": "^1.15.24",
+        "@types/archiver": "^5.3.4",
         "@types/jest": "^29.5.14",
         "@types/lodash": "^4.17.0",
         "@types/node": "^22.19.3",
@@ -329,6 +338,7 @@
         "ai": "^6.0.154",
         "ajv": "^8.18.0",
         "ajv-formats": "^3.0.1",
+        "archiver": "^5.3.2",
         "cache-manager": "^7.2.7",
         "check-links": "^3.0.1",
         "class-transformer": "^0.5.1",

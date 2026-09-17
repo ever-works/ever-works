@@ -3,6 +3,7 @@ import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from 'next/server';
 import { ALLOWED_REDIRECT_URLS, LOCALES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
+import { resolveApiCspHost, resolveApiCspSocketSources } from './lib/csp-api-sources';
 import { match } from 'path-to-regexp';
 import { getAuthFromRequest } from './lib/auth';
 import {
@@ -79,13 +80,21 @@ function buildCsp(): string {
         // Security: reject directive-injection payloads (whitespace/quotes/`;`/
         // bare `*`) — keep only valid scheme+host[:port] connect-src sources.
         .filter((s) => SAFE_CSP_HOST_SOURCE.test(s));
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.ever.works';
-    let apiHost: string;
-    try {
-        apiHost = new URL(apiUrl).origin;
-    } catch {
-        apiHost = 'https://api.ever.works';
-    }
+    const apiHost = resolveApiCspHost();
+    // The live-view and streaming-terminal sockets hang off the API origin over
+    // ws:/wss:. CSP3 scheme-part matching does NOT let an http(s) source
+    // authorise a ws(s) URL, so the socket origin must be listed too — without
+    // it every live view is refused with "violates … connect-src".
+    //
+    // The socket URL the browser is handed is minted from the SERVER-ONLY
+    // `API_URL` (`toComputerSocketUrl(API_URL, wsPath)` in the computer
+    // attach-token route, and the same origin→ws twist in the terminal one),
+    // which is a different host from `NEXT_PUBLIC_API_URL` in every shipped
+    // configuration. `resolveApiCspSocketSources()` therefore emits the socket
+    // twin of BOTH origins, de-duplicated: one source when they coincide, two
+    // exact origins when they differ. Space-joined here so the directive below
+    // stays the byte-twin of `next.config.ts`'s.
+    const apiWsHost = resolveApiCspSocketSources().join(' ');
     return [
         "default-src 'self'",
         "base-uri 'self'",
@@ -100,7 +109,7 @@ function buildCsp(): string {
         // EW-617 — Cloudflare Turnstile widget script + challenge iframe. Keep
         // in lock-step with next.config.ts's CSP array (its byte-twin).
         "frame-src 'self' https://challenges.cloudflare.com",
-        `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
+        `connect-src 'self' ${apiHost} ${apiWsHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
         "worker-src 'self' blob:",
     ].join('; ');
 }

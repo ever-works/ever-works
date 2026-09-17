@@ -20,7 +20,12 @@ import {
 import { WhatsNewPanel } from '@/components/whats-new/WhatsNewPanel';
 import { ChatProvider } from '@/components/ai/ChatProvider';
 import { ChatPanel } from '@/components/ai/ChatPanel';
-import { ChatPanelProvider } from '@/lib/hooks/use-chat-panel';
+import {
+    ChatPanelProvider,
+    CHAT_PANEL_MIN_WIDTH,
+    chatPanelWidthForKey,
+    resetChatPanelWidth,
+} from '@/lib/hooks/use-chat-panel';
 import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
@@ -448,6 +453,24 @@ export function DashboardLayoutClient({
         window.addEventListener('pointerup', handlePointerUp);
     }, []);
 
+    // Double-click on the handle puts the width back to the default (FR-17).
+    const resetChatWidth = useCallback(() => {
+        setChatWidth(resetChatPanelWidth(window.innerWidth));
+        setIsChatExpanded(false);
+    }, []);
+
+    // With the handle focused: ←/→ resize by 16 px, Home resets (spec §6.12).
+    const handleResizeKey = useCallback(
+        (e: React.KeyboardEvent<HTMLDivElement>) => {
+            const next = chatPanelWidthForKey(e.key, chatWidth, window.innerWidth);
+            if (next === null) return;
+            e.preventDefault();
+            setChatWidth(next);
+            setIsChatExpanded(false);
+        },
+        [chatWidth],
+    );
+
     return (
         <BackgroundActivityProvider>
             <ChatProvider>
@@ -557,10 +580,23 @@ export function DashboardLayoutClient({
                                     </button>
                                     <div
                                         onPointerDown={startDrag}
-                                        className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize bg-white dark:bg-surface-dark rounded"
+                                        onDoubleClick={resetChatWidth}
+                                        onKeyDown={handleResizeKey}
+                                        tabIndex={0}
+                                        role="separator"
+                                        aria-orientation="vertical"
+                                        aria-label={tChat('resizeChat')}
+                                        aria-describedby="chat-panel-resize-hint"
+                                        aria-valuenow={chatWidth}
+                                        aria-valuemin={CHAT_PANEL_MIN_WIDTH}
+                                        data-testid="chat-panel-resize-handle"
+                                        className="w-2.5 h-5 -ml-1 my-1.5 flex text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-white items-center justify-center cursor-col-resize bg-white dark:bg-surface-dark rounded focus-visible:outline-2 focus-visible:outline-primary"
                                         title={tChat('resizeChat')}
                                     >
                                         <GripVertical className="w-full h-4 text-text-muted/70" />
+                                        <span id="chat-panel-resize-hint" className="sr-only">
+                                            {tChat('panel.resizeHint')}
+                                        </span>
                                     </div>
                                     <button
                                         aria-label={tChat('expandChat')}

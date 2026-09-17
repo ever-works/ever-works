@@ -86,6 +86,7 @@ import type {
     KbNormalizeMediaPayload,
     KbTranscribePayload,
     KbReembedWorkPayload,
+    MemoryFactEmbedPayload,
 } from '@ever-works/agent/tasks';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
@@ -111,6 +112,8 @@ const TASK_IDS = {
     kbTranscribe: 'kb-transcribe',
     kbReembedWork: 'kb-reembed-work',
     notificationChannelDelivery: 'notification-channel-delivery',
+    // AW-07 — must match `MEMORY_FACT_EMBED_JOB_ID` / the task module id.
+    memoryFactEmbed: 'memory-fact-embed',
 } as const;
 
 /**
@@ -355,6 +358,21 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                 );
             }
             return handle.id;
+        },
+
+        /**
+         * AW-07 — soft dispatch like the other enqueue paths: a failed
+         * memory-fact embed is deferred work (the nightly sweep embeds the
+         * fact), never a failed save.
+         */
+        async dispatchMemoryFactEmbed(payload: MemoryFactEmbedPayload): Promise<string | null> {
+            return softDispatch(() =>
+                client.tasks.trigger(
+                    TASK_IDS.memoryFactEmbed,
+                    { factId: payload.factId, userId: payload.userId },
+                    { tags: ['memory-fact-embed', `fact:${payload.factId}`] },
+                ),
+            );
         },
 
         async dispatchNotificationChannelDelivery(

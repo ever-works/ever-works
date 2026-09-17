@@ -25,6 +25,8 @@ import { NotificationChannelFacadeService } from '../notification-channel.facade
 import { VectorStoreFacadeService } from '../vector-store.facade';
 // Goals feature PR-7 — metrics-provider capability facade.
 import { MetricsFacadeService } from '../metrics.facade';
+// AW-21 — playbook-provider capability facade.
+import { PlaybookCatalogFacadeService } from '../playbook-catalog.facade';
 // AW-15 — connection-scopes capability facade.
 import { ConnectionScopesFacadeService } from '../connection-scopes.facade';
 
@@ -66,6 +68,8 @@ describe('FacadesModule + barrel re-exports', () => {
         VectorStoreFacadeService,
         // Goals feature PR-7 — metrics-provider capability (custom-http, Stripe).
         MetricsFacadeService,
+        // AW-21 — playbook-provider capability (capability & playbook catalogue).
+        PlaybookCatalogFacadeService,
         // AW-15 — connection-scopes capability (provider access levels).
         ConnectionScopesFacadeService,
     ] as const;
@@ -143,6 +147,7 @@ describe('FacadesModule + barrel re-exports', () => {
                 NotificationChannelFacadeService,
             );
             expect(facadesBarrel.MetricsFacadeService).toBe(MetricsFacadeService);
+            expect(facadesBarrel.PlaybookCatalogFacadeService).toBe(PlaybookCatalogFacadeService);
             expect(facadesBarrel.ConnectionScopesFacadeService).toBe(ConnectionScopesFacadeService);
         });
 
@@ -263,6 +268,11 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Goals feature PR-7 — metrics-provider capability facade.
                     'MetricsFacadeError',
                     'MetricsFacadeService',
+                    // AW-21 — playbook-provider capability facade + its paging limits.
+                    'MAX_PLAYBOOK_CATALOG_ENTRIES',
+                    'PLAYBOOK_PROVIDER_PAGE_SIZE',
+                    'PlaybookCatalogFacadeError',
+                    'PlaybookCatalogFacadeService',
                     // AW-15 — connection-scopes capability facade.
                     'ConnectionScopesFacadeService',
                     // Merge-policy matrix (Wave 3, D4). `AgentMergeActor` is

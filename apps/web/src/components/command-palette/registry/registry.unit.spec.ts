@@ -196,6 +196,15 @@ describe('screens registry', () => {
         );
     });
 
+    it('reaches the capability catalogue and its saved workflows', () => {
+        const t = createEnTranslator();
+        const byId = new Map(screensFor('/tasks').map((screen) => [screen.id, screen]));
+        expect(byId.get('catalog')?.href).toBe(ROUTES.DASHBOARD_CATALOG);
+        expect(byId.get('catalog')?.title(t)).toBe('Catalog');
+        expect(byId.get('catalog.workflows')?.href).toBe(ROUTES.DASHBOARD_CATALOG_WORKFLOWS);
+        expect(byId.get('catalog.workflows')?.breadcrumb?.(t)).toEqual(['Catalog']);
+    });
+
     it('has unique ids', () => {
         const ids = screensFor('/works/w1').map((screen) => screen.id);
         expect(new Set(ids).size).toBe(ids.length);

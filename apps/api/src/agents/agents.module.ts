@@ -15,6 +15,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
     SKILL_FILE_CONTENT_READER,
+    ROSTER_SKILL_BINDER,
     RUN_KILL_SWITCH,
     AgentEscalationService,
     RunSteeringService,
@@ -95,6 +96,7 @@ import {
     PullRequestGateService,
     ToolGrantService,
 } from '@ever-works/agent/policy';
+import { SAFETY_GATE, SafetyGateService, SafetyModule } from '@ever-works/agent/safety';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     FacadesModule,
@@ -128,6 +130,11 @@ import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent
 // ConversationsModule imports only DatabaseModule and the agent-side
 // AgentsModule (never anything api-side), so no cycle is introduced.
 import { ConversationsModule, ConversationMessageService } from '@ever-works/agent/conversations';
+// AW-23 — AgentApprovalsService backs the identity card's "Waiting on
+// you" reason (pending proposals alongside open escalations). The
+// agent-side AgentApprovalsModule registers its own two entities and
+// imports nothing else, so no cycle is introduced.
+import { AgentApprovalsModule } from '@ever-works/agent/agent-approvals';
 // ActivityLogService is injected @Optional() into AgentsController for
 // the lifecycle trail (AGENT_PAUSED / AGENT_RESUMED / run-triggered /
 // run-cancelled / task-assigned) and the GET :id/events feed. Without
@@ -141,8 +148,12 @@ import { AuthModule } from '../auth/auth.module';
 // this module is @Global(), so the agent-side AgentToolService's
 // @Optional() @Inject(SKILL_FILE_CONTENT_READER) resolves in production.
 import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
+// AW-20 P1 — backs the ROSTER_SKILL_BINDER binding below so a provisioned
+// roster agent arrives with its lane's suggested Skills already attached.
+import { RosterSkillBinderAdapter } from './roster-skill-binder.adapter';
 import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
+import { AgentIdentityService } from './agent-identity.service';
 import { AgentCollaboratorsController } from './agent-collaborators.controller';
 import { AgentTemplatesController } from './agent-templates.controller';
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
@@ -212,6 +223,12 @@ const HELD_FOR_APPROVAL_NOTE =
         FleetModule,
         PrReviewModule,
         PolicyModule,
+        // Safety rails (AW-24) — supplies `SafetyGateService`, which THIS
+        // module re-binds to the `SAFETY_GATE` token below and exports, so
+        // the @Optional() @Inject in the agent-side `AgentRunService`
+        // actually resolves. SafetyModule imports only its own tables, so
+        // no cycle.
+        SafetyModule,
         // Agent Plugins MCP slice — provides McpToolSource for the
         // AGENT_MCP_TOOL_SOURCE binding below. Imports nothing api-side,
         // so no cycle is introduced.
@@ -225,10 +242,17 @@ const HELD_FOR_APPROVAL_NOTE =
         // Named Conversations — supplies ConversationMessageService for the
         // AGENT_RUN_CONVERSATION_REPLY_POSTER binding below.
         ConversationsModule,
+        // AW-23 — the identity card's "Waiting on you" reason counts
+        // PENDING approval proposals alongside open escalations.
+        // AgentApprovalsModule is a leaf (its own entities and nothing
+        // api-side), so no cycle is introduced.
+        AgentApprovalsModule,
     ],
     controllers: [AgentsController, AgentCollaboratorsController, AgentTemplatesController],
     providers: [
         AgentTemplateCatalogService,
+        // AW-23 — composes the one payload the identity card paints from.
+        AgentIdentityService,
         // Security: provided LOCALLY (not exported) so the merge-policy
         // chat tool's owner check runs the same `ensureAccess` gate the
         // HTTP surface does. Its deps (WorkRepository / WorkMemberRepository)
@@ -321,6 +345,15 @@ const HELD_FOR_APPROVAL_NOTE =
         // binding were not global AND exported. `FleetModule` (imported
         // above) exports FleetKillSwitchService.
         { provide: RUN_KILL_SWITCH, useExisting: FleetKillSwitchService },
+        // Safety rails (AW-24) — bind the ONE gate every side-effectful
+        // action passes through. Exactly the RUN_KILL_SWITCH posture above,
+        // and for exactly the same reason: `AgentRunService.invokeTool` is
+        // the one place every tool call converges, it reads this token
+        // through an @Optional() @Inject(), and that injection resolves to
+        // `undefined` — leaving every rail dark while the product still
+        // claims them — unless this binding is BOTH global AND exported.
+        // `SafetyModule` (imported above) exports SafetyGateService.
+        { provide: SAFETY_GATE, useExisting: SafetyGateService },
         // Streaming terminal — the two halves of the session dispatch.
         //
         // TERMINAL_SESSION_DISPATCHER is the job-runtime producer for the
@@ -377,6 +410,7 @@ const HELD_FOR_APPROVAL_NOTE =
                     agentId,
                     taskId,
                     runId,
+                    missionId,
                     query,
                     maxResults,
                     includeDomains,
@@ -385,8 +419,9 @@ const HELD_FOR_APPROVAL_NOTE =
                     const results = await search.search(
                         query,
                         { maxResults, includeDomains, excludeDomains },
-                        // Wave 9 M2 — runId feeds per-run cost attribution.
-                        { userId, workId, agentId, taskId, runId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution;
+                        // AW-17 — missionId rolls the usage up to the Task's Mission.
+                        { userId, workId, agentId, taskId, runId, missionId },
                     );
                     return {
                         results: results.map((r) => ({
@@ -404,6 +439,7 @@ const HELD_FOR_APPROVAL_NOTE =
                     agentId,
                     taskId,
                     runId,
+                    missionId,
                     url,
                     viewportWidth,
                     viewportHeight,
@@ -411,8 +447,9 @@ const HELD_FOR_APPROVAL_NOTE =
                 }) {
                     const result = await screenshot.capture(
                         { url, viewportWidth, viewportHeight, fullPage } as any,
-                        // Wave 9 M2 — runId feeds per-run cost attribution.
-                        { userId, workId, agentId, taskId, runId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution;
+                        // AW-17 — missionId rolls the usage up to the Task's Mission.
+                        { userId, workId, agentId, taskId, runId, missionId },
                     );
                     return {
                         success: result.success,
@@ -420,7 +457,16 @@ const HELD_FOR_APPROVAL_NOTE =
                         cacheUrl: result.cacheUrl ?? null,
                     };
                 },
-                async extractContent({ userId, workId, agentId, taskId, runId, url, maxChars }) {
+                async extractContent({
+                    userId,
+                    workId,
+                    agentId,
+                    taskId,
+                    runId,
+                    missionId,
+                    url,
+                    maxChars,
+                }) {
                     const result = await extractor.extractContent(url, undefined, {
                         userId,
                         workId,
@@ -428,6 +474,8 @@ const HELD_FOR_APPROVAL_NOTE =
                         taskId,
                         // Wave 9 M2 — runId feeds per-run cost attribution.
                         runId,
+                        // AW-17 — the Task's Mission.
+                        missionId,
                     });
                     const raw = result?.rawContent ?? '';
                     const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
@@ -499,6 +547,8 @@ const HELD_FOR_APPROVAL_NOTE =
                             taskId: input.facadeOptions.taskId,
                             // Wave 9 M2 — per-run cost attribution.
                             runId: input.facadeOptions.runId,
+                            // AW-17 — the Mission of the run's Task.
+                            missionId: input.facadeOptions.missionId,
                             providerOverride: input.facadeOptions.providerOverride,
                         },
                     );
@@ -1020,9 +1070,17 @@ const HELD_FOR_APPROVAL_NOTE =
         // AgentToolService (@Optional() @Inject(SKILL_FILE_CONTENT_READER)).
         // Unbound, `getSkillFile` would list files but refuse every read.
         { provide: SKILL_FILE_CONTENT_READER, useExisting: SkillFileContentReaderService },
+        // AW-20 P1 — the seam roster provisioning attaches Skills through.
+        // `@Optional()` at the consumer, so WITHOUT this binding a roster
+        // is still provisioned and wired, just without its suggested
+        // Skills — the same dead-seam trap every other binding here
+        // documents.
+        RosterSkillBinderAdapter,
+        { provide: ROSTER_SKILL_BINDER, useExisting: RosterSkillBinderAdapter },
     ],
     exports: [
         SKILL_FILE_CONTENT_READER,
+        ROSTER_SKILL_BINDER,
         AGENT_HEARTBEAT_TRIGGER,
         // Goals autonomy layer — GoalOrchestratorService cancels the Goal's
         // in-flight iteration run and needs the SAME remote cancel this
@@ -1047,6 +1105,7 @@ const HELD_FOR_APPROVAL_NOTE =
         TERMINAL_SESSION_DISPATCHER,
         TERMINAL_SESSION_STARTER,
         RUN_KILL_SWITCH,
+        SAFETY_GATE,
     ],
 })
 export class AgentsModule {}

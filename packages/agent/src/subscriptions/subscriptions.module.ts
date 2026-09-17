@@ -6,6 +6,7 @@ import { AgentRun } from '@src/entities/agent-run.entity';
 import { AgentRepository } from '@src/database/repositories/agent.repository';
 import { AgentRunRepository } from '@src/database/repositories/agent-run.repository';
 import { NotificationsModule } from '@src/notifications/notifications.module';
+import { UsageModule } from '@src/usage/usage.module';
 import { SubscriptionService } from './subscription.service';
 import { UsageLedgerService } from './usage-ledger.service';
 import { BillingProvider, ManualBillingProvider } from './billing/billing.provider';
@@ -38,6 +39,11 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         // runtime into this graph. The local AgentRunRepository never writes
         // a terminal transition, so it never exercises RUN_COST_SETTLER.
         TypeOrmModule.forFeature([Agent, AgentRun]),
+        // AW-17 — the credit price list port (`CREDIT_PRICE_LIST`) the pricing
+        // view reads, bound once in UsageModule beside the write path that
+        // prices with it. Re-exported so the api-side controllers see the
+        // same binding.
+        UsageModule,
     ],
     providers: [
         SubscriptionService,
@@ -120,6 +126,7 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         PaygService,
         SeatsService,
         BillingProvider,
+        UsageModule,
     ],
 })
 export class SubscriptionsModule {}

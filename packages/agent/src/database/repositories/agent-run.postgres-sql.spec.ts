@@ -6,7 +6,10 @@ import { AgentRunRepository } from './agent-run.repository';
 /**
  * The same-second tie-break (`insertion-order.ts`) is SQLite-only. This spec
  * pins that the Postgres SQL of every time-ordered `agent_runs` read is
- * byte-for-byte what it was before the tie-break existed.
+ * byte-for-byte what it was before the tie-break existed — and, for the two
+ * ledger reads, that the canonical millisecond sort key
+ * (`time-sort-key.ts`) is the ONLY thing that changed: no rowid, the same
+ * quoted identifiers, the same `(instant, id)` keyset shape.
  *
  * No database is needed: the repository runs over an unconnected Postgres
  * DataSource with metadata built, and the terminal `getOne` / `getMany` /
@@ -30,6 +33,20 @@ describe('AgentRunRepository — Postgres SQL for time-ordered reads', () => {
     };
 
     const sql = (...parts: string[]) => parts.join(' ');
+
+    /**
+     * The ledger's instant as `time-sort-key.ts` renders it on Postgres:
+     * the canonical millisecond text of `COALESCE(startedAt, createdAt)`,
+     * which every ledger window bound, cursor comparison and ORDER BY goes
+     * through so a millisecond cursor can name an exact position in a
+     * microsecond column.
+     */
+    const LEDGER_KEY =
+        `to_char(COALESCE("run"."startedAt", "run"."createdAt"), ` +
+        `'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
+    /** The same rendering of a bound `Date` parameter. */
+    const ledgerParameterKey = (parameter: string) =>
+        `to_char(CAST(:${parameter} AS timestamp), 'YYYY-MM-DD"T"HH24:MI:SS.MS')`;
 
     async function buildRepository(
         type: 'postgres' | 'better-sqlite3',
@@ -224,8 +241,8 @@ describe('AgentRunRepository — Postgres SQL for time-ordered reads', () => {
                 'SELECT "run"."id" AS "run_id", "run"."status" AS "run_status", "run"."startedAt" AS "run_startedAt", "run"."createdAt" AS "run_createdAt"',
                 'FROM "agent_runs" "run"',
                 'WHERE "run"."userId" = :userId',
-                'AND COALESCE("run"."startedAt", "run"."createdAt") >= :ledgerFrom',
-                'AND COALESCE("run"."startedAt", "run"."createdAt") < :ledgerTo',
+                `AND ${LEDGER_KEY} >= ${ledgerParameterKey('ledgerFrom')}`,
+                `AND ${LEDGER_KEY} < ${ledgerParameterKey('ledgerTo')}`,
                 'ORDER BY "run_createdAt" ASC LIMIT 20000',
             ),
         ],
@@ -239,10 +256,10 @@ describe('AgentRunRepository — Postgres SQL for time-ordered reads', () => {
             sql(
                 'SELECT <all columns> FROM "agent_runs" "run"',
                 'WHERE "run"."userId" = :userId',
-                'AND COALESCE("run"."startedAt", "run"."createdAt") >= :ledgerFrom',
-                'AND COALESCE("run"."startedAt", "run"."createdAt") < :ledgerTo',
-                'AND (COALESCE("run"."startedAt", "run"."createdAt") < :ledgerCursorAt OR (COALESCE("run"."startedAt", "run"."createdAt") = :ledgerCursorAt AND "run"."id" < :ledgerCursorId))',
-                'ORDER BY COALESCE("run"."startedAt", "run"."createdAt") DESC, "run"."id" DESC LIMIT 51',
+                `AND ${LEDGER_KEY} >= ${ledgerParameterKey('ledgerFrom')}`,
+                `AND ${LEDGER_KEY} < ${ledgerParameterKey('ledgerTo')}`,
+                `AND (${LEDGER_KEY} < ${ledgerParameterKey('ledgerCursorAt')} OR (${LEDGER_KEY} = ${ledgerParameterKey('ledgerCursorAt')} AND "run"."id" < :ledgerCursorId))`,
+                `ORDER BY ${LEDGER_KEY} DESC, "run"."id" DESC LIMIT 51`,
             ),
         ],
     ];

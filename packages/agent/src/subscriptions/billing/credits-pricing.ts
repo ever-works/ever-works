@@ -1,4 +1,6 @@
+import type { CreditPriceListView, CreditSettlementMode } from '@ever-works/contracts';
 import { config } from '@src/config';
+import { PublishedCreditPriceList, type CreditPriceList } from '../../usage/credit-price-list';
 import { CREDIT_PACKS, type CreditPack } from './credit-packs';
 import { catalog, getPaygCatalog, type CatalogPaygTier } from './stripe-catalog';
 
@@ -24,12 +26,39 @@ export interface CreditsPricingView {
         /** Effective ceiling for a self-service cap (catalog, or `PAYG_MAX_MONTHLY_CAP_CREDITS`). */
         maxMonthlyCapCredits: number;
     };
+    /**
+     * AW-17 — the credit price-list version new calls are priced at. The
+     * margin above stays: it still describes how a `provider-cost` entry
+     * converts a provider's own cost into credits.
+     */
+    pricebookVersion: number;
+    /** AW-17 — `YYYY-MM-DD` that version took effect. */
+    pricebookEffectiveFrom: string;
+    /** AW-17 — the published price list itself: what each kind of call costs. */
+    priceList: CreditPriceListView;
+    /**
+     * AW-17 — how runs on this deployment are actually debited
+     * (`CREDITS_SETTLEMENT_MODE`). `provider_cost` (default): from provider
+     * cost at `creditsPerDollar` and `marginPercent`, and the list's `per-unit`
+     * credits are reference prices only. `price_list`: those credits are what
+     * a call is charged. Mirrored on `priceList.settlementMode`.
+     */
+    settlementMode: CreditSettlementMode;
 }
 
-export function creditsPricingView(): CreditsPricingView {
+/**
+ * @param priceList the bound `CREDIT_PRICE_LIST` port. Callers with no DI
+ *   container (scripts, tests) get the published default.
+ */
+export function creditsPricingView(
+    priceList: CreditPriceList = new PublishedCreditPriceList(),
+): CreditsPricingView {
     const payg = getPaygCatalog();
+    const creditsPerDollar = config.billing.credits.getCreditsPerDollar();
+    const settlementMode = config.billing.credits.getSettlementMode();
+    const current = priceList.getVersion();
     return {
-        creditsPerDollar: config.billing.credits.getCreditsPerDollar(),
+        creditsPerDollar,
         marginPercent: config.billing.credits.getMarginPercent(),
         dailyFreeCredits: config.billing.credits.getDailyFreeCredits(),
         packs: CREDIT_PACKS,
@@ -39,6 +68,17 @@ export function creditsPricingView(): CreditsPricingView {
             defaultMonthlyCapCredits: payg.defaultMonthlyCapCredits,
             maxMonthlyCapCredits: config.billing.payg.getMaxMonthlyCapCredits(),
         },
+        pricebookVersion: priceList.currentVersion,
+        pricebookEffectiveFrom: current?.effectiveFrom ?? '',
+        priceList: {
+            version: priceList.currentVersion,
+            effectiveFrom: current?.effectiveFrom ?? '',
+            entries: current?.entries ?? [],
+            creditsPerDollar,
+            versions: priceList.versions(),
+            settlementMode,
+        },
+        settlementMode,
     };
 }
 

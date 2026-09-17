@@ -9,6 +9,7 @@ import { CreditLedgerEntry, CreditLedgerKind } from '@src/entities/credit-ledger
 import type { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
 import type { ClassToObject } from '@src/entities/types';
 import { config } from '@src/config';
+import { creditsForProviderCostCents } from '../billing/credit-pricebook';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './entitlements.service';
 
 /**
@@ -342,12 +343,11 @@ export class CreditLedgerService {
 
     /** costCents → whole credits at the configured conversion + margin. */
     creditsForCostCents(costCents: number): number {
-        if (!Number.isFinite(costCents) || costCents <= 0) {
-            return 0;
-        }
-        const creditsPerCent = config.billing.credits.getCreditsPerDollar() / 100;
-        const margin = 1 + config.billing.credits.getMarginPercent() / 100;
-        return Math.ceil(costCents * creditsPerCent * margin);
+        return creditsForProviderCostCents(
+            costCents,
+            config.billing.credits.getCreditsPerDollar(),
+            config.billing.credits.getMarginPercent(),
+        );
     }
 
     /**

@@ -33,6 +33,7 @@ export * from './terms-acceptance.entity';
 export * from './github-app-installation.entity';
 export * from './github-app-installation-repository.entity';
 export * from './github-app-user-link.entity';
+export * from './onboarding-checklist.entity';
 export * from './onboarding-request.entity';
 export * from './template.entity';
 export * from './template-customization.entity';
@@ -54,6 +55,8 @@ export * from './work-knowledge-tag.entity';
 export * from './work-knowledge-citation.entity';
 export * from './work-knowledge-chunk.entity';
 export * from './work-knowledge-chunk-coordinate.entity';
+// AW-07 — pgvector chunks for vector namespaces that are not a Work.
+export * from './vector-namespace-chunk.entity';
 export * from './kb-retrieval-log.entity';
 export * from './kb-types';
 export * from './types';
@@ -184,6 +187,12 @@ export * from './model-policy.entity';
 export * from './fleet-cost-policy.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
+// Safety rails and the trust ladder (AW-24) — the per-(scope, category)
+// rung, the durable record of what the rails stopped, and the owner's own
+// workspace stop.
+export * from './autonomy-grant.entity';
+export * from './rail-refusal.entity';
+export * from './workspace-pause.entity';
 // Agent Plugins MCP slice — external MCP server connections + per-agent
 // bindings (docs/specs/features/agent-plugins plan §2.4/§2.5).
 export * from './mcp-server-connection.entity';
@@ -197,6 +206,10 @@ export * from './workflow-run.entity';
 export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+// AW-07 — Memory facts (the atomic tier of Memory) + the shared
+// context-file / fact vocabulary re-exported from contracts.
+export * from './memory-fact.entity';
+export * from './context-file-types';
 export * from './knowledge-document-reader-state.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './agent-plugin-package.entity';
@@ -210,3 +223,7 @@ export * from './release-promotion.entity';
 export * from './product-changelog-read.entity';
 // AW-18 Shared view — a Workspace's read-only published projection.
 export * from './shared-view.entity';
+// AW-22 Workspace backup — one record of one attempt to produce a complete,
+// dated archive of one workspace, with the manifest summary that keeps the
+// history legible after the archive itself expires.
+export * from './workspace-backup.entity';

@@ -50,6 +50,7 @@ import { TermsAcceptance } from '../entities/terms-acceptance.entity';
 import { GitHubAppInstallation } from '../entities/github-app-installation.entity';
 import { GitHubAppInstallationRepository } from '../entities/github-app-installation-repository.entity';
 import { GitHubAppUserLink } from '../entities/github-app-user-link.entity';
+import { OnboardingChecklist } from '../entities/onboarding-checklist.entity';
 import { OnboardingRequest } from '../entities/onboarding-request.entity';
 import { Template } from '../entities/template.entity';
 import { TemplateCustomization } from '../entities/template-customization.entity';
@@ -67,6 +68,7 @@ import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import { WorkKnowledgeCitation } from '../entities/work-knowledge-citation.entity';
 import { KbRetrievalLog } from '../entities/kb-retrieval-log.entity';
 import { WorkKnowledgeChunk } from '../entities/work-knowledge-chunk.entity';
+import { VectorNamespaceChunk } from '../entities/vector-namespace-chunk.entity';
 import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
 import { Mission } from '../entities/mission.entity';
 import { Goal } from '../entities/goal.entity';
@@ -157,12 +159,16 @@ import { ModelPolicy } from '../entities/model-policy.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
+import { AutonomyGrant } from '../entities/autonomy-grant.entity';
+import { RailRefusal } from '../entities/rail-refusal.entity';
+import { WorkspacePause } from '../entities/workspace-pause.entity';
 import { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
 import { MemoryFolder } from '../entities/memory-folder.entity';
+import { MemoryFact } from '../entities/memory-fact.entity';
 import { KnowledgeDocumentReaderState } from '../entities/knowledge-document-reader-state.entity';
 // Repository registry (Feature G)
 import { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
@@ -172,6 +178,7 @@ import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { ReleasePromotion } from '../entities/release-promotion.entity';
 import { ProductChangelogRead } from '../entities/product-changelog-read.entity';
 import { SharedView } from '../entities/shared-view.entity';
+import { WorkspaceBackup } from '../entities/workspace-backup.entity';
 
 import {
     PluginEntity,
@@ -215,6 +222,7 @@ export const ENTITIES = [
     GitHubAppInstallation,
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
+    OnboardingChecklist,
     OnboardingRequest,
     Template,
     TemplateCustomization,
@@ -297,6 +305,9 @@ export const ENTITIES = [
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
+    // AW-07 — pgvector chunks for vector namespaces that are not a Work
+    // (a workspace's memory facts); `work_knowledge_chunks` FKs to works.
+    VectorNamespaceChunk,
     // Memory eval loop (memory upgrades M10) — append-only retrieval log
     // joined against citation rows to compute the recall-hit rate and
     // the zero-result gap topics that feed consolidation synthesis.
@@ -406,6 +417,11 @@ export const ENTITIES = [
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,
+    // Safety rails (AW-24) — the rung per (scope, category), the durable
+    // record of every refusal and hold, and the owner's workspace stop.
+    AutonomyGrant,
+    RailRefusal,
+    WorkspacePause,
     // Agent Plugins MCP slice — manual external MCP server registry +
     // per-agent/tenant bindings (plan §2.4/§2.5).
     McpServerConnection,
@@ -421,6 +437,9 @@ export const ENTITIES = [
     Environment,
     // Memory Files — user-defined folders organizing uploads on /memory.
     MemoryFolder,
+    // AW-07 — Memory facts: atomic, searchable, forgettable statements
+    // every agent in the workspace carries into its runs.
+    MemoryFact,
     // Knowledge library — one row per (person, KB document): last read
     // revision + pin. Written lazily on first open or pin.
     KnowledgeDocumentReaderState,
@@ -442,4 +461,8 @@ export const ENTITIES = [
     // AW-18 Shared view — one row per Workspace holding what its share link
     // publishes and the hashed + encrypted token. Never a copy of content.
     SharedView,
+    // AW-22 Workspace backup — the record of one archive attempt. A partial
+    // unique index in the migration (never at decorator level) is what stops
+    // two tabs starting two backups of the same workspace at once.
+    WorkspaceBackup,
 ];

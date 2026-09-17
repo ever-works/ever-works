@@ -1,12 +1,15 @@
-import { createHash } from 'node:crypto';
-import { promises as fs } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream, promises as fs } from 'node:fs';
 import { join, resolve, normalize, sep, extname } from 'node:path';
 import { tmpdir } from 'node:os';
+import { pipeline } from 'node:stream/promises';
 import type {
 	IStoragePlugin,
 	StoragePutInput,
 	StoragePutResult,
+	StoragePutStreamInput,
 	StorageGetResult,
+	StorageGetStreamResult,
 	IPlugin,
 	PluginContext,
 	PluginCategory,
@@ -37,7 +40,15 @@ export class LocalFsStoragePlugin implements IPlugin, IStoragePlugin {
 	readonly name = 'Local Filesystem';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'storage';
-	readonly capabilities: readonly string[] = ['storage', 'put-object', 'get-object'];
+	readonly capabilities: readonly string[] = [
+		'storage',
+		'put-object',
+		'get-object',
+		// AW-22 — the workspace-backup archive is written and served as a
+		// stream, so its size is bounded by the disk rather than by memory.
+		'put-object-stream',
+		'get-object-stream'
+	];
 
 	readonly providerName = 'local-fs';
 
@@ -89,6 +100,48 @@ export class LocalFsStoragePlugin implements IPlugin, IStoragePlugin {
 		return { key, url };
 	}
 
+	/**
+	 * AW-22 — write an object from a stream, never holding it in memory.
+	 *
+	 * The key stays `<ownerId>/<sha256><ext>`, identical to `putObject`, so
+	 * reads, deletes and owner GC keep working unchanged and two writes of
+	 * identical bytes still land on one file. The digest is only known once
+	 * the stream ends, so the bytes go to a temporary name inside the SAME
+	 * owner directory first and are renamed into place — a rename within one
+	 * directory is atomic, and a crash mid-write leaves a `.part` file
+	 * rather than a truncated object under a real key.
+	 */
+	async putObjectStream(input: StoragePutStreamInput): Promise<StoragePutResult> {
+		const ownerId = this.resolveOwnerId(input.ownerId);
+		this.assertValidOwnerId(ownerId);
+
+		const userDir = this.ownerDir(ownerId);
+		await fs.mkdir(userDir, { recursive: true });
+
+		const tempName = `${randomUUID().replace(/-/g, '')}.part`;
+		const tempPath = this.resolveSafe(userDir, tempName);
+		const hash = createHash('sha256');
+
+		try {
+			input.stream.on('data', (chunk: Buffer | string) => {
+				hash.update(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+			});
+			await pipeline(input.stream, createWriteStream(tempPath, { flags: 'w' }));
+		} catch (err) {
+			await fs.unlink(tempPath).catch(() => undefined);
+			throw err;
+		}
+
+		const ext = this.extractExt(input.filename);
+		const objectName = `${hash.digest('hex')}${ext}`;
+		const absPath = this.resolveSafe(userDir, objectName);
+		await fs.rename(tempPath, absPath);
+
+		const key = `${ownerId}/${objectName}`;
+		const url = `/api/uploads/${encodeURIComponent(ownerId)}/${objectName}`;
+		return { key, url };
+	}
+
 	async getObject(key: string): Promise<StorageGetResult> {
 		const { ownerId, filename } = this.parseKey(key);
 		const userDir = this.ownerDir(ownerId);
@@ -108,6 +161,30 @@ export class LocalFsStoragePlugin implements IPlugin, IStoragePlugin {
 		// Recover MIME from extension. The API layer treats this as a hint
 		// only — it re-sniffs magic bytes before serving the response.
 		return { buffer, mimeType: this.mimeFromExt(filename) };
+	}
+
+	/**
+	 * AW-22 — read an object back as a stream, so a multi-gigabyte archive
+	 * can be served without ever being buffered. `size` comes from `stat`,
+	 * which lets the caller set `Content-Length` before the first byte.
+	 */
+	async getObjectStream(key: string): Promise<StorageGetStreamResult> {
+		const { ownerId, filename } = this.parseKey(key);
+		const userDir = this.ownerDir(ownerId);
+		const absPath = this.resolveSafe(userDir, filename);
+
+		let size: number;
+		try {
+			size = (await fs.stat(absPath)).size;
+		} catch (err) {
+			const code = (err as NodeJS.ErrnoException).code;
+			if (code === 'ENOENT' || code === 'ENOTDIR') {
+				throw new Error(`Upload not found: ${key}`);
+			}
+			throw err;
+		}
+
+		return { stream: createReadStream(absPath), mimeType: this.mimeFromExt(filename), size };
 	}
 
 	async deleteObject(key: string): Promise<void> {
@@ -320,6 +397,9 @@ export class LocalFsStoragePlugin implements IPlugin, IStoragePlugin {
 				return 'text/plain';
 			case '.json':
 				return 'application/json';
+			// AW-22 — the workspace-backup archive.
+			case '.zip':
+				return 'application/zip';
 			default:
 				return 'application/octet-stream';
 		}

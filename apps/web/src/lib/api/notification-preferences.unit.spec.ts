@@ -29,6 +29,28 @@ beforeEach(() => {
 afterEach(() => vi.resetModules());
 
 describe('notificationPreferencesAPI — endpoint URL shape (no /api double-prefix)', () => {
+    it('getMatrix GETs /notifications/matrix', async () => {
+        const { notificationPreferencesAPI } = await importApi();
+        await notificationPreferencesAPI.getMatrix();
+        expect(serverFetchMock).toHaveBeenCalledWith('/notifications/matrix');
+    });
+
+    it('resetMatrix POSTs /notifications/matrix/reset with the named keys, or none', async () => {
+        const { notificationPreferencesAPI } = await importApi();
+        await notificationPreferencesAPI.resetMatrix(['generation_error']);
+        expect(serverMutationMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                method: 'POST',
+                endpoint: '/notifications/matrix/reset',
+                data: { eventKeys: ['generation_error'] },
+            }),
+        );
+        await notificationPreferencesAPI.resetMatrix();
+        expect(serverMutationMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({ endpoint: '/notifications/matrix/reset', data: {} }),
+        );
+    });
+
     it('listEventTypes GETs /notifications/event-types', async () => {
         const { notificationPreferencesAPI } = await importApi();
         await notificationPreferencesAPI.listEventTypes();
@@ -39,6 +61,26 @@ describe('notificationPreferencesAPI — endpoint URL shape (no /api double-pref
         const { notificationPreferencesAPI } = await importApi();
         await notificationPreferencesAPI.getPreferences();
         expect(serverFetchMock).toHaveBeenCalledWith('/notifications/preferences');
+    });
+
+    it('setMatrixEventTargets PUTs /notifications/matrix/event/:key with the list, an empty one included', async () => {
+        const { notificationPreferencesAPI } = await importApi();
+        await notificationPreferencesAPI.setMatrixEventTargets('generation_error', []);
+        expect(serverMutationMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                method: 'PUT',
+                endpoint: '/notifications/matrix/event/generation_error',
+                data: { channelIds: [] },
+                wrapInData: false,
+            }),
+        );
+        await notificationPreferencesAPI.setMatrixEventTargets('acme:deploy failed', ['email']);
+        expect(serverMutationMock).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                endpoint: '/notifications/matrix/event/acme%3Adeploy%20failed',
+                data: { channelIds: ['email'] },
+            }),
+        );
     });
 
     it('setEventSubscription PUTs /notifications/preferences/event/:key', async () => {

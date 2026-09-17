@@ -77,6 +77,12 @@ export interface CreateAgentInput {
     name: string;
     title?: string | null;
     capabilities?: string | null;
+    /**
+     * AW-20 — the area of work this Agent owns. Optional and additive:
+     * every existing call site compiles unchanged and creates a laneless
+     * Agent, exactly as before.
+     */
+    lane?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
     maxSkillContextTokens?: number;
@@ -124,6 +130,8 @@ export interface UpdateAgentInput {
     name?: string;
     title?: string | null;
     capabilities?: string | null;
+    /** AW-20 — the area of work this Agent owns; `null` clears it. */
+    lane?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
     maxSkillContextTokens?: number;
@@ -370,6 +378,11 @@ export class AgentsService {
                 slug,
                 title: input.title ?? null,
                 capabilities: input.capabilities ?? null,
+                // AW-20 — a label, never a permission. Uniqueness per user
+                // is enforced by the partial index `uq_agents_user_lane`,
+                // and provisioning treats that rejection as "this lane is
+                // already filled" rather than as an error.
+                lane: input.lane ?? null,
                 aiProviderId: input.aiProviderId ?? null,
                 modelId: input.modelId ?? null,
                 maxSkillContextTokens: input.maxSkillContextTokens ?? 4000,
@@ -468,6 +481,10 @@ export class AgentsService {
 
         if (input.title !== undefined) patch.title = input.title;
         if (input.capabilities !== undefined) patch.capabilities = input.capabilities;
+        // AW-20 — editable wherever the title is (FR-29). Empty string
+        // normalises to null so clearing the field in a form does not
+        // persist a lane nobody can match on.
+        if (input.lane !== undefined) patch.lane = input.lane?.trim() ? input.lane.trim() : null;
         if (input.aiProviderId !== undefined) patch.aiProviderId = input.aiProviderId;
         if (input.modelId !== undefined) patch.modelId = input.modelId;
 
@@ -929,6 +946,27 @@ export class AgentsService {
         const refreshed = await this.agents.findById(id);
         if (!refreshed) throw new NotFoundException('Agent vanished after transition');
         return toAgentDto(refreshed);
+    }
+
+    /**
+     * AW-23 — the batched roster status read: the halt columns of many
+     * agents at once, owner- and scope-bounded, in ONE query.
+     *
+     * Returns the raw rows rather than `AgentDto`s because the caller
+     * derives a status reason from them and renders none of the rest —
+     * projecting the full DTO would make a ten-second poll pay for
+     * permissions, targets and guardrails nothing looks at.
+     *
+     * Ids the caller does not own are simply absent from the result: a
+     * roster poll degrades to a shorter list rather than 404-ing the
+     * whole batch, and never becomes an existence oracle.
+     */
+    async findStatusRows(
+        userId: string,
+        ids: readonly string[],
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent[]> {
+        return this.agents.findStatusRows(userId, ids, ownershipScope);
     }
 
     async pause(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<AgentDto> {

@@ -1,11 +1,14 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isFleetModelPluginId, type CreditSettlementMode } from '@ever-works/contracts';
 import { AgentRun } from '@src/entities/agent-run.entity';
 import {
     PluginUsageRepository,
+    type RunMeterGroup,
     type RunPluginSpend,
 } from '@src/database/repositories/plugin-usage.repository';
+import { UsageMeter, UsagePayer } from '@src/entities/_types';
 import { ModelAccountRepository } from '@src/database/repositories/model-account.repository';
 import { modelWorkspaceKey } from '../../model-routing/model-workspace';
 import { isOwnerPaidUsage } from './owner-paid-usage';
@@ -52,6 +55,32 @@ import { PaygService } from '../billing/payg.service';
  * When that service is not wired (`@Optional()` — e.g. a deployment
  * without the plugins module), the exemption is skipped and the full
  * metered cost is billed; see `BYOK_EXEMPTION_UNRESOLVED_BILLS_FULL`.
+ *
+ * METERS (AW-17): usage rows now carry their meter, payer and — for a fixed
+ * `per-unit` price-list entry — the credits and price-list version that
+ * priced them, stamped when each row was written. Whether that stamp takes
+ * part in the debit is the configured SETTLEMENT MODE
+ * (`CREDITS_SETTLEMENT_MODE`):
+ *
+ * `provider_cost` (the default) never reads the classification: the run
+ * settles exactly as it did before meters existed — every row's provider cost
+ * through the provenance exemption above and the configured conversion. The
+ * stamped credits stay on the rows as the list-price figure for reports.
+ *
+ * `price_list` (opt-in) reads the classification beside the per-plugin totals:
+ *
+ *  - a fixed-priced credits row debits exactly its stamped credits (0 for a
+ *    cached or failed call);
+ *  - a row stamped as paid by the Workspace (`model` meter) or covered by an
+ *    add-on (`addon` meter) debits nothing, with no provenance lookup;
+ *  - EVERYTHING ELSE — rows with no fixed price (managed model access is
+ *    priced from the model's own cost), rows recorded before meters existed,
+ *    rows whose payer is unconfirmed — settles exactly as before: its
+ *    provider cost goes through the provenance exemption above and converts
+ *    at the configured rate. No price known ⇒ no change in what is debited.
+ *
+ * If the classified read fails, the whole run settles the pre-meter way. In
+ * both modes a Workspace-owned key is never debited.
  *
  * MODEL ACCOUNTS (AW-16): a Model Account is the workspace's own provider
  * credential, so a call it served is exempt the same way, row by row — the
@@ -132,17 +161,57 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 this.logger.warn(`Run ${runId}: costCents stamp failed (ignored): ${err}`);
             }
 
-            result.exemptPluginIds = await this.resolveExemptPlugins(
-                spend,
+            // AW-17 — the configured settlement mode decides whether the
+            // classification stamped at capture takes part in the debit at all.
+            // `provider_cost` (the default) never reads it: every row settles
+            // from its provider cost through the provenance exemption and the
+            // configured conversion, exactly as before meters existed.
+            const settlementMode = this.settlementMode();
+            result.settlementMode = settlementMode;
+            const metered =
+                settlementMode === 'price_list'
+                    ? splitMeteredSpend(spend, await this.readMeterGroups(runId))
+                    : settleEverythingFromProviderCost(spend);
+
+            const exempt = await this.resolveExemptPlugins(
+                metered.legacySpend,
                 run.userId,
                 run.workId ?? undefined,
             );
+            // Fixed-priced rows whose payer was not confirmed at capture get
+            // the same settlement-time provenance check the legacy rows get:
+            // a Workspace-owned key is never charged on doubt resolved.
+            const unconfirmedFixedPlugins = metered.fixedRows
+                .filter((row) => row.unconfirmed && !exempt.includes(row.pluginId))
+                .map((row) => ({ pluginId: row.pluginId, costCents: 1 }));
+            const exemptFixed =
+                unconfirmedFixedPlugins.length > 0
+                    ? await this.resolveExemptPlugins(
+                          dedupeByPlugin(unconfirmedFixedPlugins),
+                          run.userId,
+                          run.workId ?? undefined,
+                      )
+                    : [];
+            result.exemptPluginIds = unique([
+                ...exempt,
+                ...metered.workspacePluginIds,
+                ...exemptFixed,
+            ]);
+
+            // Model accounts (AW-16) — spend a Model Account of the run's own
+            // workspace served is not billable. It is provider-cost spend, so
+            // it comes off the LEGACY (provider-cost) leg below; the fixed
+            // price-list leg debits published credits, never provider cost,
+            // and is untouched by it. In `provider_cost` mode legacySpend IS
+            // the run's whole per-plugin spend, so this is byte-for-byte the
+            // pre-merge AW-16 subtraction.
             const accountPaid = await this.resolveModelAccountPaidSpend(
                 run,
                 result.exemptPluginIds,
             );
-            result.billableCostCents = spend
-                .filter((row) => !result.exemptPluginIds.includes(row.pluginId))
+
+            const legacyBillableCents = metered.legacySpend
+                .filter((row) => !exempt.includes(row.pluginId))
                 .reduce((sum, row) => {
                     const ownerPaid = accountPaid.byPlugin.get(row.pluginId);
                     return ownerPaid === undefined
@@ -151,9 +220,9 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 }, 0);
             if (accountPaid.accountIds.length > 0) {
                 result.exemptModelAccountIds = accountPaid.accountIds;
-                // A plugin whose whole spend a Model Account served ran
-                // entirely on the workspace's own credentials.
-                for (const row of spend) {
+                // A plugin whose whole provider-cost spend a Model Account
+                // served ran entirely on the workspace's own credentials.
+                for (const row of metered.legacySpend) {
                     const ownerPaid = accountPaid.byPlugin.get(row.pluginId);
                     if (
                         ownerPaid !== undefined &&
@@ -166,20 +235,40 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 }
             }
 
-            if (result.billableCostCents <= 0) {
+            const billedFixed = metered.fixedRows.filter(
+                (row) =>
+                    !(
+                        row.unconfirmed &&
+                        (exempt.includes(row.pluginId) || exemptFixed.includes(row.pluginId))
+                    ),
+            );
+            const fixedCredits = billedFixed.reduce((sum, row) => sum + row.creditsCharged, 0);
+            result.billableCostCents =
+                legacyBillableCents + billedFixed.reduce((sum, row) => sum + row.costCents, 0);
+
+            if (result.billableCostCents <= 0 && fixedCredits <= 0) {
                 result.status = 'settled';
                 return result;
             }
 
             try {
-                const entry = await this.creditLedgerService.consumeForRun({
+                const consume: Parameters<CreditLedgerService['consumeForRun']>[0] = {
                     userId: run.userId,
                     runId,
                     costCents: result.billableCostCents,
                     organizationId: run.organizationId ?? null,
                     tenantId: run.tenantId ?? null,
                     description: `Run ${runId} (${run.triggerKind})`,
-                });
+                };
+                if (metered.fixedRows.length > 0) {
+                    // Published fixed prices + the legacy conversion of the
+                    // rest. Without a fixed-priced row the ledger converts
+                    // the cost itself, byte-for-byte as before.
+                    consume.credits =
+                        fixedCredits +
+                        this.creditLedgerService.creditsForCostCents(legacyBillableCents);
+                }
+                const entry = await this.creditLedgerService.consumeForRun(consume);
                 result.debitedCredits = entry ? Math.abs(entry.amountCredits) : 0;
                 result.status = 'settled';
                 // Debit-time auto-recharge check (PRD §3.4). Best-effort:
@@ -363,6 +452,32 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
     }
 
     /**
+     * AW-17 — the settlement mode, read per settlement like every other
+     * credits knob: instance-level `CREDITS_SETTLEMENT_MODE`, default
+     * `provider_cost`. Billing has no tenant- or organization-level override
+     * today; one would resolve here, the single place the mode is read.
+     */
+    private settlementMode(): CreditSettlementMode {
+        return config.billing.credits.getSettlementMode();
+    }
+
+    /**
+     * AW-17 — the run's rows grouped by meter / payer / fixed price. A failed
+     * read is not an error: the run settles the pre-meter way.
+     */
+    private async readMeterGroups(runId: string): Promise<RunMeterGroup[]> {
+        try {
+            const groups = await this.pluginUsageRepository.getRunMeterGroups(runId);
+            return Array.isArray(groups) ? groups : [];
+        } catch (err) {
+            this.logger.debug(
+                `Run ${runId}: classified usage read failed, settling from provider cost: ${err}`,
+            );
+            return [];
+        }
+    }
+
+    /**
      * Model accounts (AW-16) — the spend, per plugin, that a Model Account
      * belonging to the run's workspace served. Plugins already exempt as a
      * whole are not looked at. Any failure (or no account repository wired)
@@ -471,4 +586,94 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
             return false;
         }
     }
+}
+
+/** A fixed-priced credits group, ready to debit. */
+interface FixedPricedRow {
+    pluginId: string;
+    costCents: number;
+    creditsCharged: number;
+    unconfirmed: boolean;
+}
+
+/**
+ * AW-17 — split a run's spend into (a) fixed-priced credits rows, (b) rows
+ * stamped as not debitable (Workspace-paid or add-on), and (c) the legacy
+ * remainder that settles from provider cost exactly as before. Pure.
+ *
+ * The legacy remainder is the per-plugin total MINUS the classified groups
+ * that are settled another way, so a plugin whose rows straddle both keeps
+ * its unclassified cost on the legacy path and nothing is counted twice.
+ */
+export function splitMeteredSpend(
+    spend: RunPluginSpend[],
+    groups: RunMeterGroup[],
+): {
+    fixedRows: FixedPricedRow[];
+    workspacePluginIds: string[];
+    legacySpend: RunPluginSpend[];
+} {
+    const settledElsewhere = new Map<string, number>();
+    const fixedRows: FixedPricedRow[] = [];
+    const workspacePluginIds: string[] = [];
+
+    for (const group of groups) {
+        const isFixed =
+            group.meter === UsageMeter.CREDITS &&
+            group.priceVersion !== null &&
+            group.payer !== UsagePayer.WORKSPACE;
+        const notDebited =
+            group.meter === UsageMeter.MODEL ||
+            group.meter === UsageMeter.ADDON ||
+            (group.meter === UsageMeter.CREDITS && group.payer === UsagePayer.WORKSPACE);
+        if (!isFixed && !notDebited) {
+            continue;
+        }
+        settledElsewhere.set(
+            group.pluginId,
+            (settledElsewhere.get(group.pluginId) ?? 0) + group.costCents,
+        );
+        if (isFixed) {
+            fixedRows.push({
+                pluginId: group.pluginId,
+                costCents: group.costCents,
+                creditsCharged: Math.max(0, Math.trunc(group.creditsCharged)),
+                unconfirmed: group.payer !== UsagePayer.PLATFORM,
+            });
+        } else if (group.meter !== UsageMeter.ADDON && group.costCents > 0) {
+            workspacePluginIds.push(group.pluginId);
+        }
+    }
+
+    const legacySpend = spend.map((row) => ({
+        pluginId: row.pluginId,
+        costCents: Math.max(0, row.costCents - (settledElsewhere.get(row.pluginId) ?? 0)),
+    }));
+
+    return { fixedRows, workspacePluginIds: unique(workspacePluginIds), legacySpend };
+}
+
+/**
+ * AW-17 — the `provider_cost` settlement: no fixed-priced rows, no rows
+ * treated as Workspace-paid from their capture-time stamp, and the run's
+ * per-plugin spend passed through untouched to the provenance exemption and
+ * the configured conversion. Pure.
+ */
+function settleEverythingFromProviderCost(
+    spend: RunPluginSpend[],
+): ReturnType<typeof splitMeteredSpend> {
+    return { fixedRows: [], workspacePluginIds: [], legacySpend: spend };
+}
+
+function unique(values: string[]): string[] {
+    return Array.from(new Set(values));
+}
+
+function dedupeByPlugin(rows: RunPluginSpend[]): RunPluginSpend[] {
+    const seen = new Set<string>();
+    return rows.filter((row) => {
+        if (seen.has(row.pluginId)) return false;
+        seen.add(row.pluginId);
+        return true;
+    });
 }

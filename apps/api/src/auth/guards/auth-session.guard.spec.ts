@@ -144,6 +144,10 @@ describe('AuthSessionGuard', () => {
                 iat: expect.any(Number),
                 iss: 'ever-works',
                 aud: 'ever-works',
+                // Safety rails (AW-24) — which credential path ran. The
+                // controls reserved for a person in an interactive session
+                // read this, and a machine credential must be legible as one.
+                authMethod: 'api-key',
             });
         });
 
@@ -317,7 +321,13 @@ describe('AuthSessionGuard', () => {
             const result = await guard.canActivate(createContext(req));
 
             expect(result).toBe(true);
-            expect(req.user).toBe(providerUser);
+            // Safety rails (AW-24) — the interactive path is stamped BY COPY,
+            // so a provider that returns a cached or frozen object is
+            // unaffected. That is a stronger property than the identity this
+            // previously asserted: the guard must not be able to mutate
+            // whatever the provider handed it.
+            expect(req.user).toEqual({ ...providerUser, authMethod: 'session' });
+            expect(providerUser).toEqual({ userId: 'u1', iss: 'auth-runtime' });
             expect(authProvider.authenticate).toHaveBeenCalled();
             // The Headers object passed to authenticate should carry the cookie value.
             const headers = (authProvider.authenticate as jest.Mock).mock.calls[0][0] as Headers;
@@ -413,6 +423,22 @@ describe('AuthSessionGuard — fleet-run credential (ew_run_)', () => {
         });
     });
 
+    it('stamps a run token as a machine credential, not as a person', async () => {
+        // Safety rails (AW-24) — a run token resolves to the OWNER, so every
+        // ownership check downstream keeps working. That is exactly why the
+        // credential path has to be recorded separately: without it, a model
+        // holding a run token would look like the owner to a control that may
+        // only ever be operated by a person.
+        const { guard, runCredentials, userRepository } = createGuard();
+        runCredentials.authenticate.mockResolvedValue(binding);
+        (userRepository.findById as jest.Mock).mockResolvedValue(activeUser);
+        const req = request();
+
+        await guard.canActivate(createContext(req));
+
+        expect(req.user.authMethod).toBe('api-key');
+    });
+
     it('passes the method and path so the route allowlist can be applied', async () => {
         const { guard, runCredentials, userRepository } = createGuard();
         runCredentials.authenticate.mockResolvedValue(binding);
@@ -494,7 +520,12 @@ describe('AuthSessionGuard — fleet-run credential (ew_run_)', () => {
         } as any;
         await expect(guard.canActivate(createContext(req))).resolves.toBe(true);
 
-        expect(req.user).toBe(providerUser);
+        // Safety rails (AW-24) — the interactive path is stamped BY COPY, so a
+        // provider that returns a cached or frozen object is unaffected. That
+        // is a stronger property than the identity this previously asserted:
+        // the guard must not be able to mutate what the provider handed it.
+        expect(req.user).toEqual({ userId: 'session-user', authMethod: 'session' });
+        expect(providerUser).toEqual({ userId: 'session-user' });
         expect(req.fleetRunCredential).toBeUndefined();
         expect(runCredentials.authenticate).not.toHaveBeenCalled();
         expect(apiKeyService.validateKey).not.toHaveBeenCalled();

@@ -10,8 +10,18 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t('plugins') };
 }
 
-export default async function PluginsPage() {
+/** Longest `?q=` accepted as an initial search; anything longer is ignored. */
+const MAX_INITIAL_QUERY = 64;
+
+export default async function PluginsPage({
+    searchParams,
+}: {
+    searchParams?: Promise<{ q?: string | string[] }>;
+}) {
     const t = await getTranslations('dashboard.plugins');
+    const query = (await searchParams)?.q;
+    const rawQuery = (Array.isArray(query) ? query[0] : query)?.trim() ?? '';
+    const initialQuery = rawQuery.length <= MAX_INITIAL_QUERY ? rawQuery : '';
     const pluginsData = await pluginsAPI.list().catch(() => ({
         plugins: [],
         categories: [],
@@ -26,6 +36,7 @@ export default async function PluginsPage() {
                 plugins={pluginsData.plugins}
                 categories={pluginsData.categories}
                 capabilities={pluginsData.capabilities}
+                initialQuery={initialQuery}
             />
         </div>
     );

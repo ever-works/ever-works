@@ -88,6 +88,15 @@ module.exports = {
         // NodeDispatcherFactory / NodeJobRuntimePlugin rather than a stub.
         '^@ever-works/job-runtime-node-plugin$':
             '<rootDir>/../../../packages/plugins/job-runtime-node/src/index.ts',
+        // AW-07 — two pull-model job-runtime plugins, source-mapped so
+        // `memory-facts/memory-fact-embed.job-runtime.spec.ts` proves the
+        // memory-fact embed dispatcher and handler run on the real
+        // BullMQ / pg-boss provider + worker-host factories, not only on
+        // Trigger.dev. Test-only: the API does not import either at runtime.
+        '^@ever-works/job-runtime-bullmq-plugin$':
+            '<rootDir>/../../../packages/plugins/job-runtime-bullmq/src/index.ts',
+        '^@ever-works/job-runtime-pgboss-plugin$':
+            '<rootDir>/../../../packages/plugins/job-runtime-pgboss/src/index.ts',
         // EW-637 — storage plugins source-mapped for tests.
         '^@ever-works/local-fs-plugin$':
             '<rootDir>/../../../packages/plugins/local-fs/src/index.ts',

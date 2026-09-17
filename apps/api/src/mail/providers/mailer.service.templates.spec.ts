@@ -54,6 +54,7 @@ const TEMPLATES_USED_BY_MAIL_SERVICE = [
     'magic-link',
     'member-invitation',
     'new-device-login',
+    'notification',
     'organization-invitation',
     'password-changed',
     'signup-confirmation',

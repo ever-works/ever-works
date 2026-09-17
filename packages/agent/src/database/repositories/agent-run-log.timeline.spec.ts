@@ -10,6 +10,12 @@ import { AgentRunLogRepository } from './agent-run-log.repository';
  * cursor predicate is a real (createdAt, id) keyset — not `createdAt >`
  * alone, which drops rows appended inside the same millisecond — and an
  * empty step list short-circuits instead of emitting `IN ()`.
+ *
+ * The query builder here carries no connection, which is how a driver
+ * `time-sort-key.ts` does not canonicalise reads, so what these cases pin
+ * is the raw-column fallback. The per-driver behaviour that replaces it is
+ * pinned against a real database in `agent-run-log.timeline.integration.spec.ts`
+ * (better-sqlite3) and as emitted SQL in `agent-run-log.postgres-sql.spec.ts`.
  */
 describe('AgentRunLogRepository — session-detail timeline reads', () => {
     let qb: Record<string, jest.Mock>;
@@ -30,9 +36,12 @@ describe('AgentRunLogRepository — session-detail timeline reads', () => {
             andWhere: jest.fn(record),
             orderBy: jest.fn(() => qb),
             addOrderBy: jest.fn(() => qb),
+            addSelect: jest.fn(() => qb),
             take: jest.fn(() => qb),
+            limit: jest.fn(() => qb),
             getCount: jest.fn().mockResolvedValue(7),
             getMany: jest.fn().mockResolvedValue([]),
+            getRawAndEntities: jest.fn().mockResolvedValue({ entities: [], raw: [] }),
         };
         repository = { createQueryBuilder: jest.fn(() => qb) };
         logs = new AgentRunLogRepository(repository as never);
@@ -67,7 +76,7 @@ describe('AgentRunLogRepository — session-detail timeline reads', () => {
             await logs.findTimelineByRun('r1', ['tool-invocation'], 100);
             expect(qb.orderBy).toHaveBeenCalledWith('log.createdAt', 'ASC');
             expect(qb.addOrderBy).toHaveBeenCalledWith('log.id', 'ASC');
-            expect(qb.take).toHaveBeenCalledWith(100);
+            expect(qb.limit).toHaveBeenCalledWith(100);
             // No cursor ⇒ exactly the run + step predicates.
             expect(predicates).toHaveLength(2);
         });
@@ -85,8 +94,61 @@ describe('AgentRunLogRepository — session-detail timeline reads', () => {
             expect(cursorPredicate[1]).toEqual({ afterCreatedAt: createdAt, afterId: 'log-42' });
         });
 
+        it('⭐ never binds an insertion-order tie-break against the id column', async () => {
+            // This mock stands in for a driver whose tie-break column is
+            // the row id. An integer insertion-order key is a position in
+            // the OTHER store's ordering, not an id here, so the cursor is
+            // honoured as the start of its instant instead of being
+            // compared against ids — a comparison that is a failed query,
+            // not merely a wrong page, against a `uuid` column.
+            const createdAt = new Date('2026-08-14T10:00:00.000Z');
+            await logs.findTimelineByRun('r1', ['tool-invocation'], 100, {
+                createdAt,
+                tieBreak: '42',
+            });
+            const cursorPredicate = predicates[2];
+            expect(cursorPredicate[0]).toBe('log.createdAt >= :afterCreatedAt');
+            expect(cursorPredicate[1]).toEqual({ afterCreatedAt: createdAt });
+        });
+
+        it('⭐ never binds an empty row id when the cursor carries neither half', async () => {
+            const createdAt = new Date('2026-08-14T10:00:00.000Z');
+            await logs.findTimelineByRun('r1', ['tool-invocation'], 100, { createdAt });
+            const cursorPredicate = predicates[2];
+            expect(cursorPredicate[0]).not.toContain(':afterId');
+            expect(Object.values(cursorPredicate[1] ?? {})).not.toContain('');
+        });
+
         it('short-circuits an empty step list', async () => {
             await expect(logs.findTimelineByRun('r1', [], 100)).resolves.toEqual([]);
+            expect(repository.createQueryBuilder).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('findTimelinePage', () => {
+        it('hands back the row order AND a cursor tie-break for every row', async () => {
+            const rows = [{ id: 'log-1' }, { id: 'log-2' }];
+            qb.getRawAndEntities.mockResolvedValue({
+                entities: rows,
+                raw: [{ log_id: 'log-1' }, { log_id: 'log-2' }],
+            });
+
+            const page = await logs.findTimelinePage('r1', ['tool-invocation'], 100);
+
+            expect(page.rows).toBe(rows);
+            // Off the sqlite family the tie-break IS the row id, so an
+            // id-shaped cursor stays exact.
+            expect([...page.tieBreaks]).toEqual([
+                ['log-1', 'log-1'],
+                ['log-2', 'log-2'],
+            ]);
+        });
+
+        it('short-circuits an empty step list with an empty page', async () => {
+            await expect(logs.findTimelinePage('r1', [], 100)).resolves.toEqual({
+                rows: [],
+                tieBreaks: new Map(),
+            });
             expect(repository.createQueryBuilder).not.toHaveBeenCalled();
         });
     });

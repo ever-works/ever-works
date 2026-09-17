@@ -1,0 +1,61 @@
+{
+	"name": "@ever-works/everworks-playbooks-plugin",
+	"version": "1.0.0",
+	"description": "Ever Works Playbooks — first-party playbook-provider plugin supplying the built-in Playbook catalogue: packaged outcomes with their trigger, steps, required capabilities, artefacts and escalation points.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "MIT",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"tsup": "^8.3.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "everworks-playbooks",
+			"name": "Ever Works Playbooks",
+			"category": "utility",
+			"description": "Ever Works Playbooks — first-party playbook-provider plugin supplying the built-in Playbook catalogue.",
+			"capabilities": [
+				"playbook-provider"
+			],
+			"autoEnable": true,
+			"defaultForCapabilities": [
+				"playbook-provider"
+			],
+			"distribution": "registry"
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

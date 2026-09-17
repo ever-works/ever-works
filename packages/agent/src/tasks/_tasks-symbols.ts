@@ -51,17 +51,35 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'KB_ORG_OVERLAY_FANOUT_DISPATCHER',
     'KB_REEMBED_WORK_DISPATCHER',
     'KB_TRANSCRIBE_DISPATCHER',
+    // AW-07 — embeds one memory fact (create / body edit / accept). `null`
+    // leaves the fact unembedded for the nightly sweep.
+    'MEMORY_FACT_EMBED_DISPATCHER',
+    // AW-07 — runtime-neutral ids for the two memory-fact jobs (see
+    // `memory-fact-jobs.ts`): every provider registers under these.
+    'MEMORY_FACT_EMBED_JOB_ID',
+    'MEMORY_FACT_GC_CRON',
+    'MEMORY_FACT_GC_JOB_ID',
     // EW-685 P0 T4 — binding factory that wires every `*_DISPATCHER` symbol
     // onto the active job-runtime provider's `dispatchers` view via the
     // `JOB_RUNTIME_PROVIDER_REGISTRY`. Wired into TriggerModule per the
     // EW-685 T4 full cutover.
     'buildJobRuntimeProviders',
+    // AW-07 — runtime-neutral memory-fact job handlers. A provider's
+    // registration (Trigger.dev task, BullMQ / pg-boss worker host, …) is a
+    // one-line adapter over these, so behaviour is identical on every runtime.
+    'parseMemoryFactEmbedPayload',
+    'runMemoryFactEmbedJob',
+    'runMemoryFactGcJob',
     // EW-742 P3.1 / T22 — enqueue-site `credentialVersion` capture helper.
     // Dispatchers `await stamper.stamp(tenantId)` and write the result into
     // the run record so the worker host can later resolve THAT snapshot
     // via CredentialVersionService.resolveSnapshot. See
     // `runtime-binding-stamper.service.ts` header for the per-dispatcher
     // wiring deferral.
+    // AW-20 P1 — enqueues one roster provisioning run (a coordinator plus
+    // lane-owning specialists, wired together). Sequential, retryable,
+    // and reports per-lane progress, so it belongs off the request thread.
+    'ROSTER_PROVISION_DISPATCHER',
     'RuntimeBindingStamperService',
     // EW-742 P3.2 — DI token for SecretStoreResolver implementations.
     // Symbol, not string — the value's reference is the unique identity.
@@ -83,5 +101,9 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'WORK_GENERATION_DISPATCHER',
     'WORK_GENERATION_MODE',
     'WORK_IMPORT_DISPATCHER',
+    // AW-22 Workspace backup — enqueues one complete archive of one
+    // workspace. A `null` return is treated as a hard failure by the
+    // caller, not a deferral: nothing else would ever pick the row up.
+    'WORKSPACE_BACKUP_DISPATCHER',
     'WorkImportErrorCode',
 ] as const;

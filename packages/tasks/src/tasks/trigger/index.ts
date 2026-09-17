@@ -37,6 +37,9 @@ export * from './agent-chat-reply.task';
 // Named Conversations — an Agent answers a message in a Conversation.
 export * from './agent-conversation-reply.task';
 export * from './task-recurrence-dispatcher.task';
+// AW-20 P1 — provisions a wired roster (coordinator + lane owners) for
+// the setup wizard's "Your agents" step.
+export * from './roster-provision.task';
 export * from './template-customization.task';
 export * from './work-generation.task';
 export * from './work-import.task';
@@ -54,7 +57,16 @@ export * from './credits-meter-flush.task';
 // Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
 // dry-run by default, never auto-applied).
 export * from './memory-consolidation-tick.task';
+// AW-07 - embed one memory fact, and the nightly sweep that purges expired
+// forgotten facts and backfills / re-embeds their vectors.
+export * from './memory-fact-embed.task';
+export * from './memory-fact-gc.task';
 // Model accounts (AW-16) — six-hourly credential health check per account.
 export * from './model-account-health.task';
 // Skills shelf — hourly readiness sweep.
 export * from './skill-readiness-sweep.task';
+// AW-22 Workspace backup — build one complete archive of one workspace,
+// and the hourly sweep that expires artefacts, fails stalls and prunes
+// records so the history list stays honest.
+export * from './workspace-backup.task';
+export * from './workspace-backup-sweeper.task';

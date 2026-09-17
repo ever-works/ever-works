@@ -46,6 +46,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentPluginPackage',
     'AgentPluginPackageAllowlist',
     'ActivityLog',
+    // Safety rails (AW-24) — one stored rung per (scope, kind of work).
+    'AutonomyGrant',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',
     'AgentActionProposal',
@@ -129,6 +131,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'McpServerConnection',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
+    // AW-07 — Memory facts (atomic tier of Memory)
+    'MemoryFact',
     // Memory Files — user-defined folders organizing uploads on /memory
     'MemoryFolder',
     'Mission',
@@ -149,6 +153,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'NotificationChannel',
     'NotificationChannelDeliveryLog',
     'NotificationEventType',
+    'OnboardingChecklist',
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',
@@ -158,6 +163,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'PluginUsageEvent',
     // AW-14 What's new — per-person read state for product changelog entries.
     'ProductChangelogRead',
+    // Safety rails (AW-24) — the durable record of what the rails stopped.
+    'RailRefusal',
     'RefreshToken',
     // Release promotion lane (self-build slice AI, EW-808).
     'ReleasePromotion',
@@ -223,6 +230,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'UserTaskCounter',
     'UserTemplatePreference',
     'UserUpload',
+    // AW-07 — pgvector chunks for vector namespaces that are not a Work
+    'VectorNamespaceChunk',
     'WebhookDelivery',
     'WebhookSubscription',
     'Work',
@@ -251,4 +260,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkSchedule',
     'Workflow',
     'WorkflowRun',
+    'WorkspaceBackup',
+    // Safety rails (AW-24) — present only while a workspace is paused.
+    'WorkspacePause',
 ] as const;

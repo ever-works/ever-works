@@ -129,6 +129,12 @@ export interface AgentRunTimelineEntry {
     id: string;
     kind: AgentRunTimelineEntryKind;
     createdAt: string;
+    /**
+     * The server's own cursor for resuming right after this row. Optional
+     * only for a response minted before the field existed; prefer it over
+     * deriving one — see {@link timelineEntryCursor}.
+     */
+    cursor?: string | null;
     text: string | null;
     toolName: string | null;
     callId: string | null;
@@ -162,12 +168,19 @@ export interface SessionDetailQuery {
 }
 
 /**
- * Client-side twin of the server's cursor builder: the token for one
- * timeline entry, used by the live-follow poll to ask "everything after
- * the last row I already have".
+ * The token for one timeline entry, used by the live-follow poll to ask
+ * "everything after the last row I already have".
+ *
+ * The server stamps each entry with its own exact cursor, because the
+ * tie-break inside one timestamp is a store-side ordering column the
+ * client cannot see. The `(createdAt, id)` form below is the fallback for
+ * a response that predates that field; it names the right instant but not
+ * the right position within it, which the server honours by re-serving
+ * that instant rather than skipping past it (callers de-duplicate on
+ * entry id).
  */
 export function timelineEntryCursor(entry: AgentRunTimelineEntry): string {
-    return `${new Date(entry.createdAt).getTime()}_${entry.id}`;
+    return entry.cursor ?? `${new Date(entry.createdAt).getTime()}_${entry.id}`;
 }
 
 /**

@@ -119,6 +119,14 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			await fs.rm(dir, { recursive: true, force: true });
 		}
 
+		// Refused BEFORE the first `git` call, and before anything is written to
+		// disk. The platform validates mount URLs, but the PRIMARY `repoUrl`
+		// reaches this plugin unvalidated, and this package is standalone — it
+		// cannot import the platform's contracts, and it can be loaded by a host
+		// that never ran them. So it decides for itself rather than trusting a
+		// caller it cannot see.
+		assertRemoteCloneUrl(spec.repoUrl);
+
 		await fs.mkdir(dir, { recursive: true });
 		if (!(await exists(join(dir, '.git')))) {
 			await this.git(['init', '--initial-branch', 'ew-provision'], dir, spec.auth);
@@ -360,6 +368,11 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	/** Inject per-operation auth into the URL of ONE command invocation. */
 	private authedUrl(repoUrl: string, auth: WorkspaceProvisionSpec['auth']): string {
+		// Every remote operation funnels through here, including the ones that
+		// read a URL back off a persisted handle rather than the provision spec.
+		// Re-checking is cheap and means one missed call site cannot reintroduce
+		// the hole.
+		assertRemoteCloneUrl(repoUrl);
 		if (!auth?.token) return repoUrl;
 		try {
 			const url = new URL(repoUrl);
@@ -434,6 +447,70 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	private async writeStamp(dir: string, stamp: { bindingKey: string; branch: string }): Promise<void> {
 		await fs.writeFile(join(dir, '.git', STAMP_FILE), JSON.stringify(stamp), 'utf8');
 	}
+}
+
+/**
+ * Refuse a clone URL that `git` would read as anything other than a remote.
+ *
+ * Two shapes reach `git` as an ARGUMENT and execute a command on the machine
+ * running this plugin — which, for a Fleet node, is somebody's actual PC:
+ *
+ *   - a value starting with `-`, parsed as an OPTION rather than a repository
+ *     (`--upload-pack=<cmd>` runs `<cmd>`);
+ *   - `<helper>::<address>`, git's transport-helper syntax, whose `ext::` form
+ *     runs its address verbatim.
+ *
+ * Neither is a local path, so a local-path deny-list does not see them. This is
+ * therefore an allow-list, and it is enforced HERE as well as in the platform's
+ * contracts: this package is standalone, its primary `repoUrl` is not validated
+ * upstream, and a host that loads it need not have run the platform's checks at
+ * all. Fail closed.
+ */
+export function assertRemoteCloneUrl(repoUrl: string): void {
+	if (!isSafeCloneArgument(repoUrl)) {
+		// The URL is not echoed: it can carry credentials, and a caller that
+		// sent one already knows what it sent.
+		throw new WorkspaceNotProvisionedError(
+			'repoUrl would reach git as an option or a transport helper, not as a repository — the sandbox-workspace provider refuses it.'
+		);
+	}
+}
+
+/**
+ * WHAT THIS DOES NOT DECIDE: which remotes a host is willing to clone. That is
+ * policy, and it belongs to the host — the platform's own mount rules refuse
+ * `file:` and local paths so that a Fleet node cannot clone its own disk, while
+ * this package's hermetic tests legitimately use a `file://` origin to run real
+ * git without a network. Duplicating the platform's policy here would break
+ * that harness and would still not be the platform's policy.
+ *
+ * What it does decide is narrower and is nobody's policy: a value that git will
+ * not treat as a repository AT ALL, because it executes instead.
+ */
+function isSafeCloneArgument(url: string): boolean {
+	// Parsed as an OPTION rather than a repository: `--upload-pack=<cmd>` runs
+	// `<cmd>`.
+	if (url.startsWith('-')) return false;
+	// `<helper>::<address>` is git's transport-helper syntax, and `ext::` runs
+	// its address verbatim. Anchored, so an IPv6 host such as
+	// `https://[::1]/x.git` is unaffected.
+	if (/^[A-Za-z0-9+.-]*::/.test(url)) return false;
+	// scp-like SSH (`git@host:owner/repo.git`) is not a parseable URL, so it is
+	// judged on its own shape: the host must begin alphanumerically, or
+	// `git@-oProxyCommand=…:x` would hand ssh an option in the host position.
+	if (/^[A-Za-z0-9._-]+@/.test(url)) {
+		return /^[A-Za-z0-9._-]+@[A-Za-z0-9][A-Za-z0-9._-]*:(?![\\/])/.test(url);
+	}
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		// Not a URL and not scp-like. git would read it as a path, which is the
+		// host's policy to allow or refuse, not an execution vector.
+		return true;
+	}
+	// Same option-in-the-host-position problem, reached through a real URL.
+	return !parsed.hostname.startsWith('-');
 }
 
 function sanitizeSegment(value: string): string {

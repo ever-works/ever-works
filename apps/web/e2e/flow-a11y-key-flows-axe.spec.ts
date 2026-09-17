@@ -130,7 +130,17 @@ test.describe('a11y — axe + keyboard + focus on authenticated key flows', () =
         // landmark contract (single main + a nav) holds on every page, and (b)
         // axe reports a bounded number of serious/critical violations — catching
         // a large a11y regression without chasing minor warnings.
-        const routes = ['/works', '/tasks', '/agents', '/settings', '/profile'];
+        // AW-21 — the capability catalogue index and one playbook detail page
+        // ride the same sweep, so they meet the same landmark + axe bar.
+        const routes = [
+            '/works',
+            '/tasks',
+            '/agents',
+            '/settings',
+            '/profile',
+            '/catalog',
+            '/catalog/playbooks/weekly-operations-report',
+        ];
         let axeRanAtLeastOnce = false;
 
         for (const route of routes) {

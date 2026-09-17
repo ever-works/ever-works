@@ -43,6 +43,11 @@ import {
 	isNodeBusy,
 	isQueueExpiredError,
 	nodeSatisfiesCapabilities,
+	FLEET_AGENT_TASK_CONTAINMENT_MAX_CONTROL_CHARS,
+	FLEET_AGENT_TASK_CONTAINMENT_MAX_REASON_CHARS,
+	FLEET_AGENT_TASK_EXECUTION_PATHS,
+	FLEET_AGENT_TASK_MAX_CONTAINMENT_DOWNGRADES,
+	normalizeFleetAgentTaskContainment,
 	normalizeFleetAgentTaskQuestion,
 	parseFleetAgentTaskQuestionMarkdown,
 	type FleetJobKind,
@@ -985,5 +990,152 @@ describe('FLEET_JOB_QUEUE_EXPIRED_REASON / isQueueExpiredError', () => {
 		expect(isQueueExpiredError('')).toBe(false);
 		expect(isQueueExpiredError(null)).toBe(false);
 		expect(isQueueExpiredError(undefined)).toBe(false);
+	});
+});
+
+/**
+ * The containment record (self-build slice AK).
+ *
+ * This is read from a node's own result, so it is untrusted input the
+ * same way the owner question is. Two properties matter:
+ *
+ *   1. it never throws — the model, check and git verdicts sitting next
+ *      to it in the same result are still true;
+ *   2. every coercion resolves toward LESS containment. The only way a
+ *      containment record can do harm is by over-reporting, so a value
+ *      that cannot be read must never become "hardened" or "isolated",
+ *      and a downgrade that cannot be read must never disappear.
+ */
+describe('normalizeFleetAgentTaskContainment (self-build slice AK)', () => {
+	it.each([
+		['null', null],
+		['undefined', undefined],
+		['a string', 'ordinary'],
+		['an array', [{ executionPath: 'hardened' }]],
+		['a number', 7]
+	] as Array<[string, unknown]>)('returns null for %s', (_label, value) => {
+		expect(normalizeFleetAgentTaskContainment(value)).toBeNull();
+	});
+
+	it('reads a well-formed record verbatim', () => {
+		expect(
+			normalizeFleetAgentTaskContainment({
+				executionPath: 'ordinary',
+				isolatedHome: true,
+				localSessionHome: '/home/owner/.claude',
+				downgrades: [{ control: 'network-egress', reason: 'no egress subsystem exists' }]
+			})
+		).toEqual({
+			executionPath: 'ordinary',
+			isolatedHome: true,
+			localSessionHome: '/home/owner/.claude',
+			downgrades: [{ control: 'network-egress', reason: 'no egress subsystem exists' }]
+		});
+	});
+
+	it('never reads an unrecognised execution path as `hardened`', () => {
+		for (const value of [undefined, null, 'HARDENED', 'sandboxed', 42, {}]) {
+			expect(normalizeFleetAgentTaskContainment({ executionPath: value })?.executionPath).toBe('ordinary');
+		}
+		expect(normalizeFleetAgentTaskContainment({ executionPath: 'hardened' })?.executionPath).toBe('hardened');
+	});
+
+	it('treats anything but a literal `true` as "the home was not isolated"', () => {
+		for (const value of ['true', 1, {}, undefined, null]) {
+			expect(normalizeFleetAgentTaskContainment({ isolatedHome: value })?.isolatedHome).toBe(false);
+		}
+		expect(normalizeFleetAgentTaskContainment({ isolatedHome: true })?.isolatedHome).toBe(true);
+	});
+
+	it('KEEPS an unreadable downgrade entry rather than dropping it', () => {
+		// Dropping would shrink the count of things that went wrong on the
+		// way through, which is over-reporting containment by omission.
+		const result = normalizeFleetAgentTaskContainment({
+			downgrades: [null, { control: 42 }, { control: 'isolated-home' }, 'not-an-object']
+		});
+		expect(result?.downgrades).toHaveLength(4);
+		expect(result?.downgrades.map((entry) => entry.control)).toEqual([
+			'unknown',
+			'unknown',
+			'isolated-home',
+			'unknown'
+		]);
+		expect(result?.downgrades.every((entry) => entry.reason.length > 0)).toBe(true);
+	});
+
+	it('summarises overflow instead of silently losing it', () => {
+		const many = Array.from({ length: FLEET_AGENT_TASK_MAX_CONTAINMENT_DOWNGRADES + 5 }, (_value, index) => ({
+			control: `control-${index}`,
+			reason: 'because'
+		}));
+		// `isolatedHome: true` isolates the property under test: a false one
+		// would also synthesise the `isolated-home` entry below, and this
+		// assertion is about the overflow marker, not about that.
+		const result = normalizeFleetAgentTaskContainment({ isolatedHome: true, downgrades: many });
+		expect(result?.downgrades).toHaveLength(FLEET_AGENT_TASK_MAX_CONTAINMENT_DOWNGRADES + 1);
+		const last = result?.downgrades.at(-1);
+		expect(last?.control).toBe('truncated');
+		expect(last?.reason).toContain('5 further downgrade');
+	});
+
+	/**
+	 * The invariant `FleetAgentTaskContainment.isolatedHome` documents —
+	 * "false always carries a matching downgrade" — enforced here rather
+	 * than trusted to every node author who ever writes to this shape.
+	 *
+	 * Under-reporting is the failure mode: a row that says `isolatedHome:
+	 * false` with two downgrades reads as "two known holes" when there are
+	 * three, and a reader has no way to tell that from a node that
+	 * genuinely had two.
+	 */
+	it('synthesises the isolated-home downgrade a node forgot to send', () => {
+		const result = normalizeFleetAgentTaskContainment({
+			isolatedHome: false,
+			downgrades: [{ control: 'network-egress', reason: 'no egress subsystem exists' }]
+		});
+		expect(result?.downgrades.map((entry) => entry.control)).toEqual(['network-egress', 'isolated-home']);
+		expect(result?.downgrades.at(-1)?.reason).toContain('gave no reason');
+	});
+
+	it('does not duplicate one the node DID send', () => {
+		const sent = { control: 'isolated-home', reason: 'ENOSPC on the scratch volume' };
+		const result = normalizeFleetAgentTaskContainment({ isolatedHome: false, downgrades: [sent] });
+		expect(result?.downgrades).toEqual([sent]);
+	});
+
+	it('adds nothing when the home WAS isolated', () => {
+		const result = normalizeFleetAgentTaskContainment({ isolatedHome: true, downgrades: [] });
+		expect(result?.downgrades).toEqual([]);
+	});
+
+	it('still names the missing reason when overflow swallowed the node’s own entry', () => {
+		// Both markers, and both for the same reason: a count that shrinks
+		// on the way through is the one thing this normalizer may not do.
+		const many = Array.from({ length: FLEET_AGENT_TASK_MAX_CONTAINMENT_DOWNGRADES + 2 }, (_value, index) => ({
+			control: `control-${index}`,
+			reason: 'because'
+		}));
+		const result = normalizeFleetAgentTaskContainment({ isolatedHome: false, downgrades: many });
+		expect(result?.downgrades.map((entry) => entry.control).slice(-2)).toEqual(['truncated', 'isolated-home']);
+	});
+
+	it('strips control characters and caps the two strings', () => {
+		const result = normalizeFleetAgentTaskContainment({
+			localSessionHome: '  /home/\x00owner/.claude  ',
+			downgrades: [{ control: 'x'.repeat(200), reason: 'y'.repeat(1000) }]
+		});
+		expect(result?.localSessionHome).toBe('/home/owner/.claude');
+		expect(result?.downgrades[0].control).toHaveLength(FLEET_AGENT_TASK_CONTAINMENT_MAX_CONTROL_CHARS);
+		expect(result?.downgrades[0].reason).toHaveLength(FLEET_AGENT_TASK_CONTAINMENT_MAX_REASON_CHARS);
+	});
+
+	it('reads a missing or blank session home as "nothing was mirrored in"', () => {
+		expect(normalizeFleetAgentTaskContainment({})?.localSessionHome).toBeNull();
+		expect(normalizeFleetAgentTaskContainment({ localSessionHome: '   ' })?.localSessionHome).toBeNull();
+		expect(normalizeFleetAgentTaskContainment({ localSessionHome: 42 })?.localSessionHome).toBeNull();
+	});
+
+	it('vocabulary is exactly the two execution paths', () => {
+		expect([...FLEET_AGENT_TASK_EXECUTION_PATHS]).toEqual(['hardened', 'ordinary']);
 	});
 });
