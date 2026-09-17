@@ -340,6 +340,8 @@ export class AgentsController {
                 name: body.name,
                 title: body.title ?? null,
                 capabilities: body.capabilities ?? null,
+                // AW-20 — the area of work this Agent owns. Label only.
+                lane: body.lane ?? null,
                 aiProviderId: body.aiProviderId ?? null,
                 modelId: body.modelId ?? null,
                 // Environments — service validates same-user + published
@@ -682,6 +684,8 @@ export class AgentsController {
                 name: body.name,
                 title: body.title,
                 capabilities: body.capabilities,
+                // AW-20 — `undefined` leaves the lane alone, `null` clears it.
+                lane: body.lane,
                 aiProviderId: body.aiProviderId,
                 modelId: body.modelId,
                 // Environments — `undefined` leaves the assignment alone,
@@ -831,6 +835,66 @@ export class AgentsController {
             agentId: id,
             actionType: ActivityActionType.AGENT_RESUMED,
             details: { status: dto.status },
+        });
+        return dto;
+    }
+
+    @Post(':id/heartbeat/pause')
+    @ApiOperation({
+        summary:
+            "Pause this Agent's heartbeat without pausing the Agent. The cadence and next slot are kept; assigned Task work, chat and manual run-now are unaffected.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async pauseHeartbeat(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentDto> {
+        const dto = await this.service.pauseHeartbeat(
+            auth.userId,
+            id,
+            this.scopeContext?.getScope(),
+        );
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.SCHEDULE_PAUSED,
+            details: {
+                scheduleId: `agent_heartbeat:${id}`,
+                sourceType: 'agent_heartbeat',
+                control: 'pause',
+                heartbeatPausedAt: dto.heartbeatPausedAt,
+            },
+        });
+        return dto;
+    }
+
+    @Post(':id/heartbeat/resume')
+    @ApiOperation({
+        summary:
+            "Resume this Agent's paused heartbeat with the cadence it had. A slot missed while paused is not replayed.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async resumeHeartbeat(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentDto> {
+        const dto = await this.service.resumeHeartbeat(
+            auth.userId,
+            id,
+            this.scopeContext?.getScope(),
+        );
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.SCHEDULE_RESUMED,
+            details: {
+                scheduleId: `agent_heartbeat:${id}`,
+                sourceType: 'agent_heartbeat',
+                control: 'resume',
+                nextHeartbeatAt: dto.nextHeartbeatAt,
+            },
         });
         return dto;
     }

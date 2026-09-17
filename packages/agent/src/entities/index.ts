@@ -33,6 +33,7 @@ export * from './terms-acceptance.entity';
 export * from './github-app-installation.entity';
 export * from './github-app-installation-repository.entity';
 export * from './github-app-user-link.entity';
+export * from './onboarding-checklist.entity';
 export * from './onboarding-request.entity';
 export * from './template.entity';
 export * from './template-customization.entity';
@@ -72,6 +73,7 @@ export * from './agent-membership.entity';
 export * from './skill.entity';
 export * from './skill-binding.entity';
 export * from './skill-file.entity';
+export * from './skill-tag.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
@@ -177,6 +179,9 @@ export * from './fleet-execution-preference.entity';
 // profile (logins and files) on each Node.
 export * from './computer-session.entity';
 export * from './node-agent-profile.entity';
+// Model accounts (AW-16) — provider accounts + the model ladder
+export * from './model-account.entity';
+export * from './model-policy.entity';
 // Fleet cost accounting (EW-777) — the owner's fleet-wide daily
 // model-spend ceiling and its one-notice trip marker.
 export * from './fleet-cost-policy.entity';

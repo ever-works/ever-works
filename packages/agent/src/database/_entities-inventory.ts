@@ -50,6 +50,7 @@ import { TermsAcceptance } from '../entities/terms-acceptance.entity';
 import { GitHubAppInstallation } from '../entities/github-app-installation.entity';
 import { GitHubAppInstallationRepository } from '../entities/github-app-installation-repository.entity';
 import { GitHubAppUserLink } from '../entities/github-app-user-link.entity';
+import { OnboardingChecklist } from '../entities/onboarding-checklist.entity';
 import { OnboardingRequest } from '../entities/onboarding-request.entity';
 import { Template } from '../entities/template.entity';
 import { TemplateCustomization } from '../entities/template-customization.entity';
@@ -90,6 +91,7 @@ import { TeamResource } from '../entities/team-resource.entity';
 import { Skill } from '../entities/skill.entity';
 import { SkillBinding } from '../entities/skill-binding.entity';
 import { SkillFile } from '../entities/skill-file.entity';
+import { SkillTag } from '../entities/skill-tag.entity';
 import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
@@ -152,6 +154,8 @@ import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 import { FleetAudit } from '../entities/fleet-audit.entity';
 import { ComputerSession } from '../entities/computer-session.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
+import { ModelAccount } from '../entities/model-account.entity';
+import { ModelPolicy } from '../entities/model-policy.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
@@ -214,6 +218,7 @@ export const ENTITIES = [
     GitHubAppInstallation,
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
+    OnboardingChecklist,
     OnboardingRequest,
     Template,
     TemplateCustomization,
@@ -260,6 +265,7 @@ export const ENTITIES = [
     Skill,
     SkillBinding,
     SkillFile,
+    SkillTag,
     // Phase 11 — Tasks family
     Task,
     TaskAssignee,
@@ -391,6 +397,10 @@ export const ENTITIES = [
     FleetAudit,
     ComputerSession,
     NodeAgentProfile,
+    // Model accounts (AW-16) — several credentials per AI provider, in
+    // order, and the workspace / Agent / schedule model ladder.
+    ModelAccount,
+    ModelPolicy,
     // Inbox (operator message center) — messages addressed to the human:
     // blocking questions, approval requests, escalation mirrors, notices.
     InboxItem,

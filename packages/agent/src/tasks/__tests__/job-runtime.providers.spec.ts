@@ -7,6 +7,7 @@ import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from '../kb-org-overlay-fanout-dispa
 import { KB_REEMBED_WORK_DISPATCHER } from '../kb-reembed-work-dispatcher';
 import { KB_TRANSCRIBE_DISPATCHER } from '../kb-transcribe-dispatcher';
 import { MEMORY_FACT_EMBED_DISPATCHER } from '../memory-fact-embed-dispatcher';
+import { ROSTER_PROVISION_DISPATCHER } from '../roster-provision-dispatcher';
 import { TEMPLATE_CUSTOMIZATION_DISPATCHER } from '../template-customization-dispatcher';
 import { WEBHOOK_DELIVERY_DISPATCHER } from '../webhook-delivery-dispatcher';
 import { WORK_GENERATION_DISPATCHER } from '../work-generation-dispatcher';
@@ -129,10 +130,12 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
     });
 
     describe('buildJobRuntimeProviders()', () => {
-        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 12)', () => {
+        it('returns exactly one NestJS provider per *_DISPATCHER symbol (arity = 13)', () => {
             const providers = buildJobRuntimeProviders();
-            // 11 original dispatchers + AW-07's MEMORY_FACT_EMBED_DISPATCHER.
-            expect(providers).toHaveLength(12);
+            // 11 original dispatchers + AW-07's MEMORY_FACT_EMBED_DISPATCHER +
+            // develop's ROSTER_PROVISION_DISPATCHER. COUNTED off the merged
+            // DISPATCHER_SYMBOLS list, not added up from either branch.
+            expect(providers).toHaveLength(13);
         });
 
         it('binds every *_DISPATCHER symbol exported from @ever-works/agent/tasks', () => {
@@ -144,7 +147,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             // Compare as a Set — Symbol values cannot be sorted (the default
             // sort comparator coerces to string and symbols throw on
             // String() coercion). Identity match against the canonical
-            // 11-symbol list is the actual invariant we care about.
+            // 13-symbol list is the actual invariant we care about.
             const expected = new Set<symbol>([
                 KB_BACKFILL_SKELETON_DISPATCHER,
                 KB_EMBED_DOCUMENT_DISPATCHER,
@@ -154,6 +157,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
                 KB_REEMBED_WORK_DISPATCHER,
                 KB_TRANSCRIBE_DISPATCHER,
                 MEMORY_FACT_EMBED_DISPATCHER,
+                ROSTER_PROVISION_DISPATCHER,
                 TEMPLATE_CUSTOMIZATION_DISPATCHER,
                 WEBHOOK_DELIVERY_DISPATCHER,
                 WORK_GENERATION_DISPATCHER,
@@ -194,6 +198,26 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             }
         });
 
+        it('binds ROSTER_PROVISION_DISPATCHER to the active provider (AW-20 P1)', () => {
+            // Named explicitly rather than left to the loop above: the
+            // roster run is the twelfth symbol, and the failure mode of
+            // forgetting it is silent — the endpoint would accept the
+            // request, enqueue nothing, and report a failed run.
+            const registry = new InMemoryJobRuntimeProviderRegistry();
+            const dispatchers: JobRuntimeDispatchers = {
+                dispatchRosterProvision: jest.fn(),
+                tag: 'roster-provider-dispatchers',
+            };
+            registry.register(mockProvider(dispatchers));
+
+            const provider = buildJobRuntimeProviders().find(
+                (p) => (p as { provide: symbol }).provide === ROSTER_PROVISION_DISPATCHER,
+            ) as { useFactory: (r: JobRuntimeProviderRegistry) => unknown } | undefined;
+
+            expect(provider).toBeDefined();
+            expect(provider?.useFactory(registry)).toBe(dispatchers);
+        });
+
         it('each factory returns null when no provider is registered (preserves dev fallback)', () => {
             // Per IJobRuntimeProvider contract JSDoc §3: a disabled or
             // unreachable runtime returns null and the API's in-process
@@ -213,7 +237,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
 
         it('symbols filter binds only the requested subset (pull-model provider partial bind)', () => {
             // EW-685 T4 full cutover landed in trigger.module.ts with no
-            // `symbols:` filter (all 11 bind through the registry). The
+            // `symbols:` filter (all 12 bind through the registry). The
             // `symbols:` option remains for tests and for future modules
             // that want to bind a strict subset (e.g. a pull-model worker
             // host that only owns a subset of the dispatcher surface).
@@ -244,7 +268,7 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             const registry = new InMemoryJobRuntimeProviderRegistry();
             const providers = buildJobRuntimeProviders();
             // Take the first provider as representative; the assertions
-            // above already cover identical behaviour across all 11.
+            // above already cover identical behaviour across all 12.
             const factory = (
                 providers[0] as { useFactory: (r: JobRuntimeProviderRegistry) => unknown }
             ).useFactory;

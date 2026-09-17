@@ -10,8 +10,12 @@
     "license": "AGPL-3.0",
     "private": true,
     "scripts": {
+        "predev": "node scripts/build-help-catalog.mjs --bodies",
         "dev": "next dev --turbopack",
+        "prebuild": "node scripts/build-help-catalog.mjs --bodies",
         "build": "next build --webpack",
+        "help:build": "node scripts/build-help-catalog.mjs",
+        "help:check": "node scripts/build-help-catalog.mjs --check",
         "type-check": "tsc --noEmit",
         "start": "next start",
         "lint": "eslint .",

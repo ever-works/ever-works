@@ -76,6 +76,10 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // via CredentialVersionService.resolveSnapshot. See
     // `runtime-binding-stamper.service.ts` header for the per-dispatcher
     // wiring deferral.
+    // AW-20 P1 — enqueues one roster provisioning run (a coordinator plus
+    // lane-owning specialists, wired together). Sequential, retryable,
+    // and reports per-lane progress, so it belongs off the request thread.
+    'ROSTER_PROVISION_DISPATCHER',
     'RuntimeBindingStamperService',
     // EW-742 P3.2 — DI token for SecretStoreResolver implementations.
     // Symbol, not string — the value's reference is the unique identity.

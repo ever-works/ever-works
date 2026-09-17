@@ -128,6 +128,38 @@ describe('SkillsPageClient', () => {
         expect(routerReplace).toHaveBeenCalledWith('/skills?section=custom');
     });
 
+    it('a shelf filtered only through the URL (provenance) says "no results", not "no Skills"', () => {
+        renderPage({
+            filters: {
+                section: 'installed',
+                search: '',
+                installedOffset: 0,
+                catalogOffset: 0,
+                provenance: 'package',
+            },
+        });
+        expect(screen.queryByTestId('skill-shelf-empty')).toBeNull();
+        expect(screen.getByTestId('skill-shelf-no-results')).toBeTruthy();
+        expect(screen.getAllByTestId('skill-shelf-active-filter')).toHaveLength(1);
+    });
+
+    it('Clear filters drops the URL-only provenance and enabled filters too', () => {
+        routerReplace.mockClear();
+        renderPage({
+            filters: {
+                section: 'installed',
+                search: '',
+                installedOffset: 0,
+                catalogOffset: 0,
+                readiness: 'ready',
+                provenance: 'package',
+                enabled: false,
+            },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'clearFilters' }));
+        expect(routerReplace).toHaveBeenLastCalledWith('/skills');
+    });
+
     it('guards pagination copy when the current page is empty', () => {
         renderPage({
             installedMeta: { total: 75, limit: 50, offset: 50 },

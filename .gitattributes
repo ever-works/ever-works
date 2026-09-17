@@ -51,6 +51,11 @@ Dockerfile  text eol=lf
 *.md        text eol=lf
 *.css       text eol=lf
 
+# Node scripts with a `#!/usr/bin/env node` shebang. The help-catalog
+# generator is also imported by Vitest specs, and a CRLF shebang line is a
+# syntax error for the module transformer on a Windows working tree.
+apps/web/scripts/*.mjs text eol=lf
+
 # PowerShell scripts stay CRLF — that's the Windows native
 # convention and Windows PowerShell tolerates either, but PS 5.1
 # occasionally gets confused by LF-only here-strings.

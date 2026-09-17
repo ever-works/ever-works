@@ -42,6 +42,16 @@ export type RunPluginSpend = {
     costCents: number;
 };
 
+/**
+ * Model accounts (AW-16) — one run's metered spend served by one Model
+ * Account (`metadata.modelAccountId`), per plugin.
+ */
+export type RunModelAccountSpend = {
+    pluginId: string;
+    modelAccountId: string;
+    costCents: number;
+};
+
 /** Run receipt (AW-09) — one run's usage for one (capability, model) pair. */
 export type RunSpendLine = {
     capability: string;
@@ -261,6 +271,40 @@ export class PluginUsageRepository {
             pluginId: r.pluginId,
             costCents: Number(r.costCents ?? 0),
         }));
+    }
+
+    /**
+     * Model accounts (AW-16) — the part of one run's spend that a Model
+     * Account served, summed per (plugin, account). Rows without a
+     * `metadata.modelAccountId` are not returned; zero-cost rows are skipped.
+     *
+     * `metadata` is a plain JSON column, and reading a key inside it differs
+     * between Postgres and better-sqlite3, so the run's costed rows are read
+     * (three columns, narrowed by the `(runId, occurredAt)` index) and summed
+     * here. The volume is one run's usage.
+     */
+    async getRunCostByModelAccount(runId: string): Promise<RunModelAccountSpend[]> {
+        const events = await this.repository
+            .createQueryBuilder('e')
+            .select(['e.id', 'e.pluginId', 'e.costCents', 'e.metadata'])
+            .where('e.runId = :runId', { runId })
+            .andWhere('e.costCents > 0')
+            .getMany();
+
+        const byAccount = new Map<string, RunModelAccountSpend>();
+        for (const event of events) {
+            const modelAccountId = event.metadata?.modelAccountId;
+            if (typeof modelAccountId !== 'string' || modelAccountId.length === 0) continue;
+            const key = `${event.pluginId}\0${modelAccountId}`;
+            const current = byAccount.get(key) ?? {
+                pluginId: event.pluginId,
+                modelAccountId,
+                costCents: 0,
+            };
+            current.costCents += Number(event.costCents ?? 0);
+            byAccount.set(key, current);
+        }
+        return Array.from(byAccount.values());
     }
 
     async getSpendByPlugin(

@@ -32,12 +32,20 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
 import {
+    cloneRecurringTaskAsInstance,
     computeNextTemplateOccurrence,
     validateRecurrenceCron,
     validateRecurrenceRule,
 } from './recurrence';
+import {
+    SCHEDULE_ALREADY_RUNNING,
+    SCHEDULE_NO_AGENT,
+    SCHEDULE_NOT_RECURRING,
+    SCHEDULE_OWNER_ARCHIVED,
+} from '../schedules/schedule-control.codes';
+import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { AgentRepository } from '../database/repositories/agent.repository';
-import type { Agent } from '../entities/agent.entity';
+import { AgentStatus, type Agent } from '../entities/agent.entity';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { UserRepository } from '../database/repositories/user.repository';
 import { OrganizationMemberRepository } from '../database/repositories/organization-member.repository';
@@ -227,6 +235,15 @@ export const RUN_AGENT_NOT_FOUND = 'RUN_AGENT_NOT_FOUND' as const;
 /** Hard cap on `runTasksBatch` — a board action, not a bulk job runner. */
 export const RUN_BATCH_MAX_TASKS = 20;
 
+/**
+ * Schedules run-now claim lease. Refreshed while the claim is held, so it
+ * only bounds how long a claim left behind by a crashed process blocks the
+ * next run-now of that template.
+ */
+const RUN_NOW_CLAIM_TTL_MS = 60_000;
+/** Hard ceiling on one run-now holding its claim (spawn + dispatch). */
+const RUN_NOW_CLAIM_MAX_LIFETIME_MS = 10 * 60_000;
+
 /** One row of the board's agent picker. */
 export interface RunCandidateAgent {
     id: string;
@@ -245,6 +262,26 @@ export interface RunTaskResult {
     parked: boolean;
     queuedReason?: string;
     error?: string;
+}
+
+/**
+ * Schedules — the outcome of firing a recurring template out of band.
+ * `nextOccurrenceAt` is the template's UNCHANGED next scheduled fire, echoed
+ * so the caller can state that run-now did not move the cadence.
+ */
+export interface RecurringRunNowResult {
+    templateId: string;
+    instanceId: string;
+    instanceSlug: string;
+    nextOccurrenceAt: Date | null;
+    runs: Array<{
+        agentId: string;
+        runId: string | null;
+        dispatched: boolean;
+        parked: boolean;
+        queuedReason?: string;
+        error?: string;
+    }>;
 }
 
 export type RunBatchItemResult =
@@ -312,7 +349,14 @@ export class TasksService {
         // positional-spec arity rule; absent means extra repositories are
         // refused (never silently accepted unchecked).
         @Optional() private readonly repoConnections?: RepoConnectionRepository,
+        // Schedules — the per-template run-now claim (see
+        // `withRunNowClaim`). Appended LAST + @Optional per the
+        // positional-spec arity rule.
+        @Optional() private readonly runNowLock?: DistributedTaskLockService,
     ) {}
+
+    /** Per-process run-now claims, used only when `runNowLock` is unbound. */
+    private readonly runNowInFlight = new Set<string>();
 
     /**
      * Review-fix I4: shared validator for assignee / reviewer / approver
@@ -1000,16 +1044,289 @@ export class TasksService {
         id: string,
         ownershipScope?: OwnershipScope,
     ): Promise<Task> {
-        await this.getOne(userId, id, ownershipScope);
-        await this.tasks.updateById(id, {
+        const current = await this.getOne(userId, id, ownershipScope);
+        const patch: Partial<Task> = {
             isRecurring: false,
             recurrenceRule: null,
             recurrenceCron: null,
             nextOccurrenceAt: null,
             recurrenceEndsAt: null,
             recurrenceMaxOccurrences: null,
-        });
+        };
+        // Schedules — stopping the recurrence also ends its pause, so a
+        // cadence set on this Task later starts un-paused instead of
+        // inheriting a pause nobody can see on the Task page. Only written
+        // when there is a pause to clear, so every other clear is unchanged.
+        if (current?.recurrencePausedAt) {
+            patch.recurrencePausedAt = null;
+        }
+        await this.tasks.updateById(id, patch);
         return this.getOne(userId, id, ownershipScope);
+    }
+
+    // ── Schedules — reversible pause + out-of-band run ───────────
+
+    /** Resolve an owner-scoped recurring TEMPLATE (never a spawned instance). */
+    private async getRecurringTemplate(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.getOne(userId, id, ownershipScope);
+        if (!task.isRecurring || task.parentRecurringTaskId) {
+            throw new BadRequestException({
+                code: SCHEDULE_NOT_RECURRING,
+                message: 'This Task is not a recurring template.',
+            });
+        }
+        return task;
+    }
+
+    /**
+     * Pause a recurring template. Writes ONLY `recurrencePausedAt`: the
+     * cadence, `nextOccurrenceAt`, the end date, the occurrence cap and the
+     * occurred count are all preserved, and the dispatcher's due-scan skips
+     * the row while it is set. Idempotent — a second pause keeps the first
+     * instant.
+     */
+    async pauseRecurrence(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.getRecurringTemplate(userId, id, ownershipScope);
+        if (!task.recurrencePausedAt) {
+            await this.tasks.updateById(id, { recurrencePausedAt: new Date() });
+        }
+        return this.getOne(userId, id, ownershipScope);
+    }
+
+    /**
+     * Resume a paused recurring template. A slot that fell due while paused
+     * is NOT replayed: when `nextOccurrenceAt` is already in the past it
+     * moves to the first slot after now (same bounds, same occurred count),
+     * so resuming never fires a backlog of missed occurrences. Idempotent on
+     * a template that is not paused.
+     */
+    async resumeRecurrence(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.getRecurringTemplate(userId, id, ownershipScope);
+        if (task.recurrencePausedAt) {
+            const now = new Date();
+            const patch: Partial<Task> = { recurrencePausedAt: null };
+            if (task.nextOccurrenceAt && task.nextOccurrenceAt.getTime() <= now.getTime()) {
+                patch.nextOccurrenceAt = computeNextTemplateOccurrence({
+                    rule: task.recurrenceRule ?? null,
+                    cron: task.recurrenceCron ?? null,
+                    from: now,
+                    recurrenceEndsAt: task.recurrenceEndsAt ?? null,
+                    recurrenceMaxOccurrences: task.recurrenceMaxOccurrences ?? null,
+                    recurrenceOccurredCount: task.recurrenceOccurredCount ?? 0,
+                });
+            }
+            await this.tasks.updateById(id, patch);
+        }
+        return this.getOne(userId, id, ownershipScope);
+    }
+
+    /**
+     * Fire a recurring template NOW, out of band.
+     *
+     * Spawns one instance exactly the way the recurrence dispatcher does
+     * (`cloneRecurringTaskAsInstance`, a fresh per-user slug, the template's
+     * assignee rows copied) and dispatches it through
+     * `TaskTransitionService.dispatchAgentRun` — the single gated path, so
+     * the concurrency valve, the credits precheck and the configured job
+     * runtime apply unchanged.
+     *
+     * Additive by construction: `nextOccurrenceAt` and
+     * `recurrenceOccurredCount` are never written, so the next scheduled
+     * fire is byte-identical before and after. Permitted on a paused
+     * template, and does not resume it.
+     *
+     * Refusals (409, body `{ code, message }`):
+     *  - `SCHEDULE_ALREADY_RUNNING` — the latest instance still has a
+     *    queued / running run (`runId` + `startedAt` in the body), or another
+     *    run-now of the same template holds the claim right now (`runId`
+     *    null — its run row does not exist yet);
+     *  - `SCHEDULE_OWNER_ARCHIVED` — the only resolvable Agent is archived;
+     *  - `SCHEDULE_NO_AGENT` — no Agent assignee and no `agentId`.
+     *
+     * The in-flight check, the instance insert and the dispatch (which
+     * writes the queued run row the check reads) run under ONE per-template
+     * claim, so two simultaneous requests can never both pass the check —
+     * the second is refused instead of spawning a second instance.
+     */
+    async runRecurringNow(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<RecurringRunNowResult> {
+        const template = await this.getRecurringTemplate(userId, id, ownershipScope);
+        return this.withRunNowClaim(template.id, () =>
+            this.fireRecurringTemplate(userId, template, ownershipScope),
+        );
+    }
+
+    /**
+     * Hold the per-template run-now claim for the duration of `fire`, or
+     * refuse with `SCHEDULE_ALREADY_RUNNING` when another request holds it.
+     *
+     * The claim is the shared DB-backed `DistributedTaskLockService` (an
+     * INSERT on a primary-keyed row, so it serialises across API replicas).
+     * A graph without it — positional unit fixtures — falls back to a
+     * per-process claim with the same refuse-don't-wait semantics.
+     */
+    private async withRunNowClaim<T>(templateId: string, fire: () => Promise<T>): Promise<T> {
+        const refuse = () =>
+            new ConflictException({
+                code: SCHEDULE_ALREADY_RUNNING,
+                message: 'This schedule is already running.',
+                runId: null,
+                taskId: null,
+                startedAt: null,
+            });
+
+        if (this.runNowLock) {
+            const outcome = await this.runNowLock.runExclusive(
+                `schedule-run-now:${templateId}`,
+                fire,
+                {
+                    ttlMs: RUN_NOW_CLAIM_TTL_MS,
+                    maxLifetimeMs: RUN_NOW_CLAIM_MAX_LIFETIME_MS,
+                },
+            );
+            if (!outcome.acquired) throw refuse();
+            return outcome.result as T;
+        }
+
+        if (this.runNowInFlight.has(templateId)) throw refuse();
+        this.runNowInFlight.add(templateId);
+        try {
+            return await fire();
+        } finally {
+            this.runNowInFlight.delete(templateId);
+        }
+    }
+
+    private async fireRecurringTemplate(
+        userId: string,
+        template: Task,
+        ownershipScope?: OwnershipScope,
+    ): Promise<RecurringRunNowResult> {
+        if (this.agentRuns) {
+            const latest = await this.tasks
+                .findLatestRecurrenceInstance(template.id)
+                .catch(() => null);
+            const latestRun = latest
+                ? await this.agentRuns.findLatestForTask(latest.id).catch(() => null)
+                : null;
+            if (latestRun && (latestRun.status === 'queued' || latestRun.status === 'running')) {
+                throw new ConflictException({
+                    code: SCHEDULE_ALREADY_RUNNING,
+                    message: 'This schedule is already running.',
+                    runId: latestRun.id,
+                    taskId: latest?.id ?? null,
+                    startedAt: latestRun.startedAt ?? latestRun.createdAt ?? null,
+                });
+            }
+        }
+
+        const candidateIds = new Set<string>();
+        try {
+            for (const row of await this.assignees.findAgentAssignees(template.id)) {
+                candidateIds.add(row.assigneeId);
+            }
+        } catch (err) {
+            this.logger.warn(`Run-now: agent-assignee lookup failed for ${template.id}: ${err}`);
+        }
+        if (candidateIds.size === 0 && template.agentId) {
+            candidateIds.add(template.agentId);
+        }
+        if (candidateIds.size === 0) {
+            throw new ConflictException({
+                code: SCHEDULE_NO_AGENT,
+                message: 'No agent is assigned to this schedule.',
+            });
+        }
+
+        const agentIds: string[] = [];
+        let archivedCount = 0;
+        for (const agentId of candidateIds) {
+            if (!this.agents) {
+                agentIds.push(agentId);
+                continue;
+            }
+            const agent = await this.agents
+                .findByIdAndUser(agentId, userId, ownershipScope)
+                .catch(() => null);
+            if (!agent) continue;
+            if (agent.status === AgentStatus.ARCHIVED) {
+                archivedCount += 1;
+                continue;
+            }
+            agentIds.push(agentId);
+        }
+        if (agentIds.length === 0) {
+            throw new ConflictException(
+                archivedCount > 0
+                    ? { code: SCHEDULE_OWNER_ARCHIVED, message: 'The owning agent is archived.' }
+                    : {
+                          code: SCHEDULE_NO_AGENT,
+                          message: 'No agent is assigned to this schedule.',
+                      },
+            );
+        }
+
+        const nextNumber = await this.counter.nextSlug(template.userId);
+        const instance = await this.tasks.create({
+            ...cloneRecurringTaskAsInstance(template),
+            slug: `T-${nextNumber}`,
+        });
+        try {
+            for (const row of await this.assignees.findByTaskId(template.id)) {
+                await this.assignees
+                    .add(instance.id, row.assigneeType, row.assigneeId)
+                    .catch((err) =>
+                        this.logger.warn(
+                            `Run-now: assignee copy failed for ${instance.id}: ${err}`,
+                        ),
+                    );
+            }
+        } catch (err) {
+            this.logger.warn(`Run-now: assignee lookup failed for ${template.id}: ${err}`);
+        }
+
+        const runs: RecurringRunNowResult['runs'] = [];
+        for (const agentId of agentIds) {
+            const dispatch = await this.transitions.dispatchAgentRun(instance, agentId, {
+                dedupKey: `${instance.id}:${agentId}:schedule-run-now`,
+            });
+            runs.push({ agentId, ...dispatch });
+        }
+
+        await this.logActivity({
+            userId,
+            taskId: template.id,
+            actionType: ActivityActionType.SCHEDULE_EXECUTED,
+            details: {
+                source: 'run-now',
+                scheduleId: `recurring_task:${template.id}`,
+                instanceId: instance.id,
+                runIds: runs.map((run) => run.runId).filter(Boolean),
+            },
+        });
+
+        return {
+            templateId: template.id,
+            instanceId: instance.id,
+            instanceSlug: instance.slug,
+            nextOccurrenceAt: template.nextOccurrenceAt ?? null,
+            runs,
+        };
     }
 
     // ── Schedule mode "Scheduled" (one-shot) ──────────────────────

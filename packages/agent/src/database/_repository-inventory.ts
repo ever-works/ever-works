@@ -42,6 +42,8 @@ import { CreditLedgerRepository } from './repositories/credit-ledger.repository'
 import { EmailConversationRepository } from './repositories/email-conversation.repository';
 import { EmailMessageRepository } from './repositories/email-message.repository';
 import { AgentInboxRepository } from './repositories/agent-inbox.repository';
+import { ModelAccountRepository } from './repositories/model-account.repository';
+import { ModelPolicyRepository } from './repositories/model-policy.repository';
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
@@ -53,6 +55,7 @@ import { NotificationChannelDeliveryLogRepository } from './repositories/notific
 import { NotificationChannelRepository } from './repositories/notification-channel.repository';
 import { NotificationEventTypeRepository } from './repositories/notification-event-type.repository';
 import { NotificationRepository } from './repositories/notification.repository';
+import { OnboardingChecklistRepository } from './repositories/onboarding-checklist.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
 import { OrganizationNotificationDefaultRepository } from './repositories/organization-notification-default.repository';
 import { OrganizationOnboardingProfileRepository } from './repositories/organization-onboarding-profile.repository';
@@ -110,10 +113,13 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     LicencePurchaseRepository,
     CreditMeterEventRepository,
     MemoryFolderRepository,
+    ModelAccountRepository,
+    ModelPolicyRepository,
     NotificationChannelDeliveryLogRepository,
     NotificationChannelRepository,
     NotificationEventTypeRepository,
     NotificationRepository,
+    OnboardingChecklistRepository,
     OnboardingRequestRepository,
     OrganizationNotificationDefaultRepository,
     OrganizationOnboardingProfileRepository,

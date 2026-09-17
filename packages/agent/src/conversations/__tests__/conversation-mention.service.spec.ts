@@ -78,6 +78,20 @@ describe('ConversationMentionService', () => {
             expect(body).toBe('@ghost please ask @Nova to review');
         });
 
+        it('tidies spacing around punctuation the same way after a strip', () => {
+            // Pins the behaviour of the tidy-up pass, which was rewritten from
+            // `/ +([,.;:!?])/` to `/ ([,.;:!?])/` to take a quadratic scan off a
+            // path fed by attacker-supplied bodies. The two spellings agree only
+            // because the whitespace collapse runs first; this is what says so.
+            expect(service.parse('@ghost , then @Nova !', candidates).agentVisibleBody).toBe(
+                ', then @Nova!',
+            );
+            expect(service.parse('@ghost ask @Nova  ,  now', candidates).agentVisibleBody).toBe(
+                'ask @Nova, now',
+            );
+            expect(service.parse('@ghost\t\t  ?', candidates).agentVisibleBody).toBe('?');
+        });
+
         it('an Agent the sender cannot see behaves exactly like one that does not exist', () => {
             // Orion exists for someone else, but is not in THIS sender's candidates.
             const visible = service.parse('hey @Orion', [NOVA]);

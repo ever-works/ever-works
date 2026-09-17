@@ -44,6 +44,22 @@ export class UserNotificationSubscription {
     @Column({ type: 'simple-json' })
     channelIds: string[];
 
+    /**
+     * Attention controls (AW-13) — where the latest write of this choice came
+     * from. `'matrix'` when it was saved from Settings -> Notifications, which
+     * always writes the complete list for the row: an empty list there means
+     * "nothing" and a list without `'in-app'` keeps the notification out of
+     * the bell.
+     *
+     * NULL for every row stored before AW-13 and for every write through
+     * `PUT /api/notifications/preferences/event/:eventKey` (API callers, the
+     * chat assistant). Those rows keep their original meaning: an empty list
+     * falls back to the organisation / event defaults, and the notification
+     * always reaches the bell. See `notification-choice.ts`.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    origin?: string | null;
+
     @UpdateDateColumn()
     updatedAt: Date;
 }

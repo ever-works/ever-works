@@ -15,6 +15,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
     SKILL_FILE_CONTENT_READER,
+    ROSTER_SKILL_BINDER,
     RUN_KILL_SWITCH,
     AgentEscalationService,
     RunSteeringService,
@@ -141,6 +142,9 @@ import { AuthModule } from '../auth/auth.module';
 // this module is @Global(), so the agent-side AgentToolService's
 // @Optional() @Inject(SKILL_FILE_CONTENT_READER) resolves in production.
 import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
+// AW-20 P1 — backs the ROSTER_SKILL_BINDER binding below so a provisioned
+// roster agent arrives with its lane's suggested Skills already attached.
+import { RosterSkillBinderAdapter } from './roster-skill-binder.adapter';
 import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
 import { AgentCollaboratorsController } from './agent-collaborators.controller';
@@ -1020,9 +1024,17 @@ const HELD_FOR_APPROVAL_NOTE =
         // AgentToolService (@Optional() @Inject(SKILL_FILE_CONTENT_READER)).
         // Unbound, `getSkillFile` would list files but refuse every read.
         { provide: SKILL_FILE_CONTENT_READER, useExisting: SkillFileContentReaderService },
+        // AW-20 P1 — the seam roster provisioning attaches Skills through.
+        // `@Optional()` at the consumer, so WITHOUT this binding a roster
+        // is still provisioned and wired, just without its suggested
+        // Skills — the same dead-seam trap every other binding here
+        // documents.
+        RosterSkillBinderAdapter,
+        { provide: ROSTER_SKILL_BINDER, useExisting: RosterSkillBinderAdapter },
     ],
     exports: [
         SKILL_FILE_CONTENT_READER,
+        ROSTER_SKILL_BINDER,
         AGENT_HEARTBEAT_TRIGGER,
         // Goals autonomy layer — GoalOrchestratorService cancels the Goal's
         // in-flight iteration run and needs the SAME remote cancel this

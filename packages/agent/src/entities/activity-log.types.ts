@@ -244,6 +244,10 @@ export enum ActivityActionType {
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
     SKILL_FILE_EDITED = 'skill_file_edited',
+    // Skills shelf — the workspace-level on/off switch. Appended only; the
+    // column is a varchar, so no migration.
+    SKILL_ENABLED = 'skill_enabled',
+    SKILL_DISABLED = 'skill_disabled',
     // Repository registry (Feature G) — Settings → Repositories rows +
     // the Agent ↔ repo grant edge. Additive entries only (NN #20).
     REPO_CONNECTION_CREATED = 'repo_connection_created',
@@ -344,6 +348,26 @@ export enum ActivityActionType {
     CONTEXT_FILE_RESTORED = 'context_file_restored',
     CONTEXT_FILE_MODE_CHANGED = 'context_file_mode_changed',
     CONTEXT_BUDGET_EXCEEDED = 'context_budget_exceeded',
+    // Model accounts (AW-16) — one row per change to a workspace's provider
+    // accounts or model defaults. `details` names the account and the field
+    // that changed ({ accountId, label, providerPluginId, field } or
+    // { fromPosition, toPosition }); a credential VALUE is never included.
+    // Additive members — storage is a plain varchar, so no migration is needed.
+    MODEL_ACCOUNT_ADDED = 'model_account_added',
+    MODEL_ACCOUNT_UPDATED = 'model_account_updated',
+    MODEL_ACCOUNT_REORDERED = 'model_account_reordered',
+    MODEL_ACCOUNT_PAUSED = 'model_account_paused',
+    MODEL_ACCOUNT_RESUMED = 'model_account_resumed',
+    MODEL_ACCOUNT_RECONNECTED = 'model_account_reconnected',
+    MODEL_ACCOUNT_REMOVED = 'model_account_removed',
+    MODEL_POLICY_UPDATED = 'model_policy_updated',
+    // Schedules workspace — one row each time an owner pauses or resumes a
+    // cadence from any source (recurring Task, heartbeat, Mission tick,
+    // inbound Trigger). `details` carries `{ scheduleId, sourceType,
+    // control, before, after }`. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    SCHEDULE_PAUSED = 'schedule_paused',
+    SCHEDULE_RESUMED = 'schedule_resumed',
     // Live Feed — a run starting and a run reaching a terminal state, for
     // every trigger kind other than `heartbeat` (heartbeat runs keep the
     // three `agent_heartbeat_*` members above, unchanged). Declared here so

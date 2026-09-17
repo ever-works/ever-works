@@ -15,6 +15,7 @@ import { GoalEvaluationService, GoalOrchestratorService } from '@ever-works/agen
 import {
     AgentEscalationService,
     AgentRunService,
+    RosterProvisioningService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
     RunDispatchGateService,
@@ -42,6 +43,8 @@ import {
     PaygService,
 } from '@ever-works/agent/subscriptions';
 import { FleetJobService } from '@ever-works/agent/fleet';
+import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
+import { SkillReadinessService } from '@ever-works/agent/skills';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -144,6 +147,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: AgentRunService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'AgentRunService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // AW-20 P1 - `roster-provision` drives the whole provisioning
+        // state machine here. Proxied rather than provided directly: the
+        // service writes Agents, collaborator rows and the checklist row,
+        // all of which live behind the API process's DataSource.
+        {
+            provide: RosterProvisioningService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'RosterProvisioningService'),
             inject: [TriggerInternalApiClient],
         },
         // Judgment layer G3 - `agent-task-execute` files an escalation
@@ -426,6 +439,27 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'MemoryFactSweepService'),
             inject: [TriggerInternalApiClient],
         },
+        // Model accounts (AW-16) — the model-account-health cron resolves
+        // ModelAccountHealthService via this proxy. The real service lives in
+        // the API, where the AI provider plugins and their settings are
+        // loaded; the worker only calls probeDueAccounts() over the internal
+        // HTTP channel.
+        {
+            provide: ModelAccountHealthService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'ModelAccountHealthService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Skills shelf — the skill-readiness-sweep cron calls `sweepStale()`
+        // on this proxy, which RPCs to the live API where the Skill, binding
+        // and connection repositories, the tool-grant matrix and the
+        // credential port are wired. Same shape as TerminalTranscriptService.
+        {
+            provide: SkillReadinessService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'SkillReadinessService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -440,6 +474,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
         AgentRunService,
+        RosterProvisioningService,
         AgentEscalationService,
         TaskReviewRejectionService,
         AgentRepository,
@@ -468,6 +503,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TerminalTranscriptService,
         MemoryFactEmbedService,
         MemoryFactSweepService,
+        ModelAccountHealthService,
+        SkillReadinessService,
     ],
 })
 export class TriggerInternalModule {}

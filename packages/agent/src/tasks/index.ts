@@ -15,6 +15,11 @@ export * from './work-generation.types';
 export * from './work-generation-dispatcher';
 export * from './work-import.types';
 export * from './work-import-dispatcher';
+// AW-20 P1 — roster provisioning. Creating four agents is ~30 writes
+// that run sequentially, retry independently and must report per-lane
+// progress; it cannot happen on a request thread.
+export * from './roster-provision.types';
+export * from './roster-provision-dispatcher';
 export * from './template-customization.types';
 export * from './template-customization-dispatcher';
 export * from './webhook-delivery.types';

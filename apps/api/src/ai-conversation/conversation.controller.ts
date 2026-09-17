@@ -14,7 +14,7 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiProperty, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiProperty, ApiQuery, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     ArrayMaxSize,
@@ -349,8 +349,28 @@ export class ConversationController {
      */
     @Get('mention-candidates')
     @ApiOperation({ summary: 'People and Agents the caller can mention' })
-    async mentionCandidates(@CurrentUser() auth: AuthenticatedUser, @Query('q') q?: string) {
+    // Stated explicitly because the parameter below is typed `unknown` — which
+    // is what it genuinely is on the wire, but which emits `Object` into the
+    // decorator metadata Swagger reads without the CLI plugin. The published
+    // contract would then describe an object, and this document generates the
+    // MCP tool schemas, so a generated client would send the documented shape
+    // and be refused. The runtime type stays honest; the document does too.
+    @ApiQuery({ name: 'q', required: false, type: String, description: 'Name or slug prefix' })
+    async mentionCandidates(@CurrentUser() auth: AuthenticatedUser, @Query('q') rawQ?: unknown) {
         if (!this.mentions) return { candidates: [] };
+        // `?q=a&q=b` arrives as an ARRAY, not a string, and declaring the
+        // parameter `string` does not make it one. The cap below would then
+        // measure an array's element count — two repetitions are under any
+        // character cap — and hand a non-string to a service that does string
+        // work on it. Repeating `q` is not something a real client does, so
+        // refuse it rather than guessing which value was meant.
+        if (rawQ !== undefined && typeof rawQ !== 'string') {
+            throw new BadRequestException('q must be a single string value.');
+        }
+        // Re-derived rather than cast: the line above has already refused every
+        // other shape, so this is the same value, and the type follows from a
+        // check the compiler can see.
+        const q = typeof rawQ === 'string' ? rawQ : undefined;
         if (q !== undefined && q.length > MAX_MENTION_QUERY_CHARS) {
             throw new BadRequestException(
                 `q must be at most ${MAX_MENTION_QUERY_CHARS} characters.`,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { HelpLink } from '@/components/help/HelpLink';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -63,7 +64,13 @@ export function JobRuntimeDegradedBanner({ configured }: { configured: boolean |
                     className="underline underline-offset-2 hover:no-underline"
                 >
                     {t('docsLink')}
-                </a>
+                </a>{' '}
+                <HelpLink
+                    target="job-runtimes#settings--job-runtime"
+                    variant="error"
+                    surface="error_banner"
+                    className="ml-2 text-amber-800 hover:text-amber-950 dark:text-amber-200 dark:hover:text-amber-100"
+                />
             </div>
             <button
                 type="button"

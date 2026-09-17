@@ -620,14 +620,22 @@ export class TaskRepository {
      * method rather than adding optional params here.
      */
     async findDueRecurringTemplates(limit: number, now: Date = new Date()): Promise<Task[]> {
-        return this.repository
-            .createQueryBuilder('task')
-            .where('task.isRecurring = :rec', { rec: true })
-            .andWhere('task.nextOccurrenceAt IS NOT NULL')
-            .andWhere('task.nextOccurrenceAt <= :now', { now })
-            .orderBy('task.nextOccurrenceAt', 'ASC')
-            .take(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('task')
+                .where('task.isRecurring = :rec', { rec: true })
+                // Schedules — a paused template keeps its cadence and its
+                // `nextOccurrenceAt`; it is simply not due while paused. Every
+                // job runtime reaches this scan through
+                // `TaskRecurrenceDispatcherService.dispatchDue`, so the pause is
+                // honoured wherever the cron is hosted.
+                .andWhere('task.recurrencePausedAt IS NULL')
+                .andWhere('task.nextOccurrenceAt IS NOT NULL')
+                .andWhere('task.nextOccurrenceAt <= :now', { now })
+                .orderBy('task.nextOccurrenceAt', 'ASC')
+                .take(limit)
+                .getMany()
+        );
     }
 
     /**
@@ -653,8 +661,27 @@ export class TaskRepository {
             .where('id = :id', { id: taskId })
             .andWhere('isRecurring = :rec', { rec: true })
             .andWhere('nextOccurrenceAt = :expected', { expected })
+            // Schedules — closes the window between the due-scan read and
+            // this claim: a template paused in between is not spawned.
+            .andWhere('recurrencePausedAt IS NULL')
             .execute();
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Schedules — the most recently spawned instance of a recurring
+     * template, or null when it has never fired. Run-now reads it to refuse
+     * a second out-of-band fire while the previous one is still in flight.
+     *
+     * @internal Unscoped — callers must have resolved the template through
+     * an owner-scoped read first (`TasksService.getOne`).
+     */
+    async findLatestRecurrenceInstance(templateId: string): Promise<Task | null> {
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.parentRecurringTaskId = :templateId', { templateId })
+            .orderBy('task.createdAt', 'DESC')
+            .getOne();
     }
 
     /**

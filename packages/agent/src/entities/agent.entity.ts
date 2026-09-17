@@ -203,6 +203,8 @@ export enum AgentIdleBehavior {
 })
 @Index('idx_agents_user_status', ['userId', 'status'])
 @Index('idx_agents_next_heartbeat', ['status', 'nextHeartbeatAt'])
+// Schedules — the heartbeat due-scan also filters `heartbeatPausedAt IS NULL`.
+@Index('idx_agents_heartbeat_due', ['status', 'heartbeatPausedAt', 'nextHeartbeatAt'])
 @Index('idx_agents_mission', ['missionId'])
 @Index('idx_agents_work', ['workId'])
 @Index('idx_agents_idea', ['ideaId'])
@@ -256,6 +258,27 @@ export class Agent {
 
     @Column({ type: 'text', nullable: true })
     capabilities?: string | null;
+
+    /**
+     * AW-20 — the area of work this Agent owns (`research`, `content`,
+     * `coordination`, …). Optional: every Agent that existed before this
+     * column has none and behaves exactly as it did.
+     *
+     * 🛑 A lane is a LABEL, not a permission. It grants nothing, restricts
+     * nothing, and must never be read by an authorization decision — that
+     * is what `permissions` and the tool-grant matrix are for. It exists
+     * so a surface can ask "who owns research here?" and get a stable
+     * answer instead of pattern-matching `title`.
+     *
+     * Uniquely constrained per user by the PARTIAL index
+     * `uq_agents_user_lane` (`WHERE "lane" IS NOT NULL`) declared in
+     * migration `1791200000000-AddAgentLane` — in the schema rather than
+     * in a service check a second write path could bypass. A partial
+     * index has no TypeORM `@Index` spelling, which is why it is not
+     * declared beside the class-level indexes above.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    lane?: string | null;
 
     /**
      * Direct manager for the Org Chart + `AGENTS.md reportsTo:` on company
@@ -344,6 +367,16 @@ export class Agent {
     // TypeORM pick the right column type per dialect.
     @PortableDateColumn({ nullable: true })
     nextHeartbeatAt?: Date | null;
+
+    /**
+     * Schedules — pause the heartbeat WITHOUT pausing the Agent. Non-null
+     * means the heartbeat dispatcher skips this Agent; `heartbeatCadence`
+     * and `nextHeartbeatAt` are preserved. Orthogonal to `AgentStatus`: an
+     * ACTIVE Agent with a paused heartbeat keeps answering its assigned
+     * Tasks, chat and manual run-now. `null` reads as "not paused".
+     */
+    @PortableDateColumn({ nullable: true })
+    heartbeatPausedAt?: Date | null;
 
     @PortableDateColumn({ nullable: true })
     lastRunAt?: Date | null;
