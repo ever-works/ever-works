@@ -136,6 +136,25 @@ export interface WireCheck {
 	envGrants?: string[];
 }
 
+/**
+ * Environment names one command is FORCED to see, whatever the scrub
+ * decided (self-build slice AK).
+ *
+ * The scrub answers "which of this machine's names may a command see".
+ * This answers a different question — "where does THIS command's home,
+ * temp and provider config live" — and the answer has to survive the
+ * scrub rather than be filtered by it, because several of the names
+ * involved (`HOME`, `APPDATA`, `TEMP`) are on the allowlist and would
+ * otherwise be overwritten by the machine's real values, while others
+ * (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`) are not on it at all and would be
+ * dropped — severing the CLI login the redirect exists to preserve.
+ *
+ * Node-owned values only. Nothing on the wire reaches this: the model
+ * step builds it from a directory it just created under its own scratch
+ * root, and no payload field feeds it.
+ */
+export type NodeCommandEnvOverlay = Readonly<Record<string, string>>;
+
 /** Injected so the whole executor is testable without spawning processes. */
 export interface AcceptanceChecksIo {
 	spawnFn?: typeof spawn;
@@ -288,7 +307,8 @@ async function executeCheck(
 	rootCwd: string,
 	io: AcceptanceChecksIo,
 	signal?: AbortSignal,
-	limits: NodeCommandLimits = DEFAULT_NODE_COMMAND_LIMITS
+	limits: NodeCommandLimits = DEFAULT_NODE_COMMAND_LIMITS,
+	envOverlay?: NodeCommandEnvOverlay
 ): Promise<NodeCheckResult> {
 	const spawnFn = io.spawnFn ?? spawn;
 	const now = io.now ?? (() => Date.now());
@@ -343,7 +363,7 @@ async function executeCheck(
 				shell: true,
 				detached: process.platform !== 'win32',
 				windowsHide: true,
-				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv, check.envGrants)
+				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv, check.envGrants, envOverlay)
 			});
 		} catch (error) {
 			tail = error instanceof Error ? error.message : String(error);
@@ -607,9 +627,22 @@ export function runNodeCommandStep(
 	 * command ran under before the setup phase existed, so no caller that
 	 * does not pass one changes behaviour.
 	 */
-	limits: NodeCommandLimits = DEFAULT_NODE_COMMAND_LIMITS
+	limits: NodeCommandLimits = DEFAULT_NODE_COMMAND_LIMITS,
+	/**
+	 * Per-CALL containment for this one command (self-build slice AK).
+	 *
+	 * Deliberately an ARGUMENT rather than a field on `io`: `io` is built
+	 * once per job and handed to the setup phase, the model step and the
+	 * acceptance checks alike, so anything living there would silently
+	 * apply to all three. The isolated home is correct for exactly one of
+	 * them — the model step, which is where the untrusted prompt is — and
+	 * wrong for the others, whose whole job is to drive the machine's real
+	 * toolchain caches. Per-call is what makes that difference visible at
+	 * the call site instead of inferable from a constructor.
+	 */
+	envOverlay?: NodeCommandEnvOverlay
 ): Promise<NodeCheckResult> {
-	return executeCheck(step, rootCwd, io, signal, limits);
+	return executeCheck(step, rootCwd, io, signal, limits, envOverlay);
 }
 
 /** Terminate the shell and every descendant without constructing a shell command. */
@@ -912,7 +945,15 @@ export function buildNodeCheckEnv(
 	 * platform-owned refusal below. Absent / empty = today's behaviour
 	 * exactly: every platform-owned name is refused.
 	 */
-	platformOwnedGrants?: readonly string[] | null
+	platformOwnedGrants?: readonly string[] | null,
+	/**
+	 * Containment for ONE command (self-build slice AK) — see
+	 * {@link NodeCommandEnvOverlay}. Applied LAST, after the allowlist, the
+	 * prefix sweep, the grants and the program-resolution block, for the
+	 * same reason those already run in that order: a control that can be
+	 * re-opened by a name further down the list is not a control.
+	 */
+	envOverlay?: NodeCommandEnvOverlay
 ): Record<string, string> {
 	// Windows env names are case-insensitive (`Path` vs `PATH`), so index
 	// the parent once by upper-cased name and look everything up through it.
@@ -1014,6 +1055,23 @@ export function buildNodeCheckEnv(
 	}
 	if (!hasName(env, 'TMPDIR') && !hasName(env, 'TEMP') && !hasName(env, 'TMP')) {
 		env.TMPDIR = tmpdir();
+	}
+
+	// CONTAINMENT, LAST (self-build slice AK). Everything above this line
+	// is "what a command on this machine is allowed to see"; the overlay is
+	// "where this particular command's home is". It runs after the HOME /
+	// TEMP back-fills immediately above precisely because those back-fills
+	// would otherwise reinstate the machine's real home over the top of the
+	// redirect on a node whose parent env happens not to export one.
+	//
+	// Every name is deleted in all its case-spellings before it is set:
+	// Windows env names are case-insensitive, the allowlist forwards names
+	// using the PARENT's own spelling (`Temp`, `Path`), and a map holding
+	// both `Temp=<real>` and `TEMP=<isolated>` is a redirect that fails
+	// open on exactly the platform the fleet runs on.
+	for (const [name, value] of Object.entries(envOverlay ?? {})) {
+		deleteEnvName(env, name);
+		env[name] = value;
 	}
 
 	return env;

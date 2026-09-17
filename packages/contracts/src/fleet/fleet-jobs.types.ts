@@ -1192,6 +1192,173 @@ function truncateToUtf8Bytes(value: string, maxBytes: number): { value: string; 
 }
 
 /**
+ * WHICH executor actually ran the model step (self-build slice AK).
+ *
+ *   - `hardened` — `model-execution/`: the credential boundary, the
+ *     version probe, the executable-identity recheck and the native
+ *     Windows Job Object. It fails closed without a signed helper, so
+ *     nothing reports this yet; the value exists so the day one does, a
+ *     reader can tell the two apart without inferring it from absences.
+ *   - `ordinary` — `runNodeCommandStep`: the shared command runner every
+ *     acceptance check goes through. This is what a fleet node runs today.
+ */
+export type FleetAgentTaskExecutionPath = 'hardened' | 'ordinary';
+
+export const FLEET_AGENT_TASK_EXECUTION_PATHS: readonly FleetAgentTaskExecutionPath[] = ['hardened', 'ordinary'];
+
+/** How many downgrade entries one run may report before the rest are summarised. */
+export const FLEET_AGENT_TASK_MAX_CONTAINMENT_DOWNGRADES = 16;
+
+/** Caps on one downgrade entry's two strings. */
+export const FLEET_AGENT_TASK_CONTAINMENT_MAX_CONTROL_CHARS = 64;
+export const FLEET_AGENT_TASK_CONTAINMENT_MAX_REASON_CHARS = 300;
+
+/**
+ * ONE control this run did not get, and why (self-build slice AK).
+ *
+ * `control` is a stable slug a dashboard can group by; `reason` is the
+ * sentence an operator reads. A downgrade is never a failure on its own —
+ * the run still produced a verdict — it is the record that the verdict was
+ * produced with less containment than the design intends.
+ */
+export interface FleetAgentTaskContainmentDowngrade extends Record<string, unknown> {
+	/** Stable slug, e.g. `isolated-home`, `process-containment`, `network-egress`. */
+	control: string;
+	/** One sentence, for a human reading the run report. */
+	reason: string;
+}
+
+/**
+ * What containment the run ACTUALLY got (self-build slice AK).
+ *
+ * The failure this exists to make impossible is a run that silently gets
+ * less containment than intended. Every control is therefore reported
+ * positively (it applied) or as a downgrade (it did not, and why) — never
+ * by omission, because an absent key is indistinguishable from an older
+ * node, a refactor that dropped the call, or a control that was never
+ * wired at all.
+ *
+ * Stored inside `FleetJob.result`, which is a nullable `simple-json`
+ * column holding `Record<string, unknown>`, so adding this needs no
+ * migration.
+ */
+export interface FleetAgentTaskContainment extends Record<string, unknown> {
+	/** Which executor ran the model step. */
+	executionPath: FleetAgentTaskExecutionPath;
+	/**
+	 * Whether the per-run isolated HOME was actually applied to the model
+	 * step's environment.
+	 *
+	 * False must carry a matching `isolated-home` downgrade, and since a
+	 * node is only a convention away from forgetting one,
+	 * {@link normalizeFleetAgentTaskContainment} SYNTHESISES the entry
+	 * rather than trusting the node to have sent it. A reader can therefore
+	 * rely on the pairing; an author of a node cannot rely on the reader
+	 * noticing that they did not.
+	 */
+	isolatedHome: boolean;
+	/**
+	 * The provider config directory deliberately mirrored back in over the
+	 * isolated home, so the machine's own CLI login still resolves —
+	 * `~/.claude` for Claude Code, `~/.codex` for Codex. Null when no
+	 * isolation was applied, because then nothing had to be mirrored: the
+	 * run already had the whole real home.
+	 *
+	 * An absolute path on the node, so it names the machine account —
+	 * `C:\Users\<owner>\.claude`. That is deliberate (an operator debugging
+	 * a login failure needs the exact directory that was mirrored) and it
+	 * is the reason this field is a path and never the directory's
+	 * contents.
+	 */
+	localSessionHome: string | null;
+	/** Every control that did not apply. Empty means nothing was downgraded. */
+	downgrades: FleetAgentTaskContainmentDowngrade[];
+}
+
+/**
+ * Read a node's containment record without trusting it.
+ *
+ * COERCING, never throwing, exactly like
+ * {@link normalizeFleetAgentTaskQuestion}: this is consumed from a node's
+ * result, and a malformed containment block must not cost the run the
+ * verdict sitting next to it.
+ *
+ * Every coercion resolves toward LESS containment, because the only way
+ * this record can do harm is by over-reporting:
+ *
+ *   - an unrecognised `executionPath` reads as `ordinary`, never `hardened`;
+ *   - `isolatedHome` is true only for a literal `true`;
+ *   - an unreadable downgrade entry is KEPT as an `unknown` control rather
+ *     than dropped, so the count of things that went wrong can never shrink
+ *     on the way through;
+ *   - entries past the cap collapse into one `truncated` entry that says
+ *     how many were lost, for the same reason;
+ *   - `isolatedHome: false` with no `isolated-home` downgrade gets one
+ *     SYNTHESISED here. The pairing is documented as an invariant, and a
+ *     documented invariant that only a node's own discipline enforces is
+ *     the under-report this function exists to make impossible.
+ */
+export function normalizeFleetAgentTaskContainment(raw: unknown): FleetAgentTaskContainment | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const input = raw as Record<string, unknown>;
+
+	const executionPath: FleetAgentTaskExecutionPath =
+		input.executionPath === 'hardened' || input.executionPath === 'ordinary' ? input.executionPath : 'ordinary';
+
+	const rawDowngrades = Array.isArray(input.downgrades) ? input.downgrades : [];
+	const downgrades: FleetAgentTaskContainmentDowngrade[] = [];
+	for (const entry of rawDowngrades.slice(0, FLEET_AGENT_TASK_MAX_CONTAINMENT_DOWNGRADES)) {
+		const record =
+			entry && typeof entry === 'object' && !Array.isArray(entry) ? (entry as Record<string, unknown>) : null;
+		const control =
+			record && typeof record.control === 'string'
+				? containmentText(record.control, FLEET_AGENT_TASK_CONTAINMENT_MAX_CONTROL_CHARS)
+				: '';
+		const reason =
+			record && typeof record.reason === 'string'
+				? containmentText(record.reason, FLEET_AGENT_TASK_CONTAINMENT_MAX_REASON_CHARS)
+				: '';
+		downgrades.push({
+			control: control || 'unknown',
+			reason: reason || 'this node reported a downgrade whose reason could not be read'
+		});
+	}
+	const dropped = rawDowngrades.length - downgrades.length;
+	if (dropped > 0) {
+		downgrades.push({
+			control: 'truncated',
+			reason: `${dropped} further downgrade(s) were reported by the node and not recorded`
+		});
+	}
+
+	const localSessionHome =
+		typeof input.localSessionHome === 'string'
+			? containmentText(input.localSessionHome, FLEET_AGENT_TASK_CONTAINMENT_MAX_REASON_CHARS) || null
+			: null;
+
+	const isolatedHome = input.isolatedHome === true;
+	// The invariant, enforced rather than trusted. A node that reports
+	// `isolatedHome: false` and forgets the downgrade would otherwise land
+	// on a job row that reads "two known holes" when there are three, and
+	// the reader has no other way to tell that apart from a node that
+	// genuinely had only two.
+	if (!isolatedHome && !downgrades.some((entry) => entry.control === 'isolated-home')) {
+		downgrades.push({
+			control: 'isolated-home',
+			reason: 'this node reported that the per-run isolated home did not apply, but gave no reason'
+		});
+	}
+
+	return { executionPath, isolatedHome, localSessionHome, downgrades };
+}
+
+function containmentText(value: string, maxChars: number): string {
+	const clean = stripControlCharacters(value).trim();
+	const points = Array.from(clean);
+	return points.length > maxChars ? points.slice(0, maxChars).join('').trimEnd() : clean;
+}
+
+/**
  * The `result` an `agent-task` job carries back to the platform.
  *
  * Shared between the node (which produces it) and the API-side
@@ -1259,6 +1426,23 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	 * result, which is stored on the job row and rendered in run reports.
 	 */
 	mcp?: FleetAgentTaskMcpResult | null;
+	/**
+	 * Self-build slice AK: what containment the model step ACTUALLY got —
+	 * which executor ran it, whether the per-run isolated home applied, and
+	 * every control that did not, with its reason.
+	 *
+	 * Present on every RESULT whose run had a model step, successful or
+	 * failed. Absent on a run that had no `execution` block (nothing to
+	 * contain) and on nodes older than the slice.
+	 *
+	 * It is not a promise about every run, only about every result: a run
+	 * that throws — an abort, a cancelled lease, a bridge that would not
+	 * start — returns no result at all, so there is no object for this
+	 * field to be missing from. Never a verdict either: a downgraded run
+	 * still reports its real status. Read it through
+	 * {@link normalizeFleetAgentTaskContainment}.
+	 */
+	containment?: FleetAgentTaskContainment | null;
 	/** Why `status` is `failed`, in one sentence, for the run report. */
 	failureReason?: string | null;
 }
